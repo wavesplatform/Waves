@@ -19,7 +19,7 @@ case class MicroBlock(
     reference: BlockId,
     totalResBlockSig: BlockId,
     signature: ByteStr,
-    stateHash: ByteStr
+    stateHash: Option[ByteStr]
 ) extends Signed {
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
 
@@ -40,7 +40,7 @@ object MicroBlock {
       transactionData: Seq[Transaction],
       reference: BlockId,
       totalResBlockSig: BlockId,
-      stateHash: ByteStr
+      stateHash: Option[ByteStr]
   ): Either[ValidationError, MicroBlock] =
     MicroBlock(version, generator.publicKey, transactionData, reference, totalResBlockSig, ByteStr.empty, stateHash).validate
       .map(_.sign(generator.privateKey))

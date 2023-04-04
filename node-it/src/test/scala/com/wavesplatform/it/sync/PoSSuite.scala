@@ -379,7 +379,7 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
         signer = signerPK,
         featureVotes = Seq.empty,
         rewardVote = -1L,
-        stateHash = ByteStr.empty
+        stateHash = None
       )
       .explicitGet()
   }

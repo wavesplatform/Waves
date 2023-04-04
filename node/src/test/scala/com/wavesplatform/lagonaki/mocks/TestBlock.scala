@@ -59,7 +59,7 @@ object TestBlock {
       version: Byte = 2,
       features: Seq[Short] = Seq.empty[Short],
       rewardVote: Long = -1L,
-      stateHash: ByteStr = ByteStr.empty
+      stateHash: Option[ByteStr] = None
   ): Block =
     sign(
       signer,
@@ -93,7 +93,7 @@ object TestBlock {
           Seq.empty,
           -1L,
           ByteStr.empty,
-          ByteStr.empty
+          None
         ),
         ByteStr.empty,
         Seq.empty
@@ -113,7 +113,7 @@ object TestBlock {
         features,
         -1L,
         Seq.empty,
-        ByteStr.empty
+        None
       )
     )
 }

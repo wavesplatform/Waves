@@ -2,9 +2,9 @@ package com.wavesplatform
 
 import java.nio.ByteBuffer
 import com.google.common.primitives.Shorts
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.{Asset, Proofs}
@@ -60,11 +60,11 @@ package object serialization {
       result
     }
 
-    def getByteArrayOrEmpty(size: Int): Array[Byte] = {
+    def getByteArrayOpt(size: Int): Option[Array[Byte]] = {
       if (buf.limit() - buf.position() >= size) {
-        getByteArray(size)
+        Some(getByteArray(size))
       } else {
-        Array.emptyByteArray
+        None
       }
     }
 

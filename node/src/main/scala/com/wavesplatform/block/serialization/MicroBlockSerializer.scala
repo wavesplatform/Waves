@@ -20,7 +20,7 @@ object MicroBlockSerializer {
       transactionDataBytes,
       microBlock.sender.arr,
       microBlock.signature.arr,
-      microBlock.stateHash.arr
+      microBlock.stateHash.map(_.arr).getOrElse(Array.emptyByteArray)
     )
   }
 
@@ -37,7 +37,7 @@ object MicroBlockSerializer {
       val transactionData = readTransactionData(version, buf)
       val generator       = buf.getPublicKey
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
-      val stateHash       = ByteStr(buf.getByteArrayOrEmpty(DigestLength))
+      val stateHash       = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
 
       MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature, stateHash)
     }

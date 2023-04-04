@@ -535,7 +535,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
       val maxNumber                = Math.max(utx.all.size / 2, 3)
       val rest                     = limitByNumber(maxNumber)
-      val (packed, restUpdated, _) = utx.packUnconfirmed(rest, PackStrategy.Unlimited)
+      val (packed, restUpdated, _) = utx.packUnconfirmed(rest, None, PackStrategy.Unlimited)
 
       packed.get.lengthCompare(maxNumber) should be <= 0
       if (maxNumber <= utx.all.size) restUpdated.isFull shouldBe true
@@ -581,7 +581,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           Random.shuffle(whitelistedTxs ++ txs).foreach(tx => utx.putIfNew(tx))
 
-          val (packed, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
+          val (packed, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)
           packed.get.take(5) should contain theSameElementsAs whitelistedTxs
         }
     }
@@ -592,7 +592,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
       time.advance(maxAge + 1000.millis)
 
-      val (packed, _, _) = utx.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
+      val (packed, _, _) = utx.packUnconfirmed(limitByNumber(100), None, PackStrategy.Unlimited)
       packed shouldBe empty
       utx.all shouldBe empty
     }
@@ -604,7 +604,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         time.advance(offset)
 
-        val (packed, _, _) = utx.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
+        val (packed, _, _) = utx.packUnconfirmed(limitByNumber(100), None, PackStrategy.Unlimited)
         packed.get.size shouldBe 2
         utx.all.size shouldBe 2
     }
@@ -670,7 +670,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one, "KeyBlock")
           )
         )
-        val (packed, _, _) = utx.packUnconfirmed(constraint, PackStrategy.Unlimited)
+        val (packed, _, _) = utx.packUnconfirmed(constraint, None, PackStrategy.Unlimited)
         packed.get.size shouldBe (unscripted.size + 1)
         packed.get.count(scripted.contains) shouldBe 1
       }
@@ -691,7 +691,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.utxPool.addTransaction(transfer1, verify = true)
         d.utxPool.addTransaction(transfer2, verify = true)
 
-        d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldEqual Seq(transfer1, transfer2)
+        d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1.get shouldEqual Seq(transfer1, transfer2)
       }
     }
 
@@ -789,7 +789,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true, nanoTimeSource = () => nanoTimeSource())
 
           utxPool.putIfNew(transfer).resultE should beRight
-          val (tx, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Limit(100 nanos))
+          val (tx, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Limit(100 nanos))
           tx.get should contain(transfer)
         }
 
@@ -809,7 +809,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             )
           val utxPool        = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings, Int.MaxValue, isMiningEnabled = true)
           val startTime      = System.nanoTime()
-          val (result, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+          val (result, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Estimate(3 seconds))
           result shouldBe None
           (System.nanoTime() - startTime).nanos.toMillis shouldBe 3000L +- 1000
         }
@@ -1000,7 +1000,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
           utx.all shouldBe Seq(invoke)
 
-          val (result, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
+          val (result, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Estimate(3 seconds))
           result shouldBe Some(Seq(invoke))
         }
       }
@@ -1063,7 +1063,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           utx.putIfNew(tx1).resultE should beRight
           rest.foreach(utx.putIfNew(_).resultE should beRight)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited) should matchPattern {
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited) should matchPattern {
             case (Some(Seq(`tx1`)), _, _) => // Success
           }
           utx.all shouldBe Seq(tx1)
@@ -1135,7 +1135,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             assertEvents { case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass
             }
 
-            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
+            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)
             assertEvents { case UtxEvent.TxRemoved(`invalidTransfer`, Some(_)) +: Nil => // Pass
             }
 
@@ -1146,7 +1146,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             addUnverified(validTransfer)
             events.clear()
             time.advance(maxAge + 1000.millis)
-            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)
+            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)
             assertEvents { case UtxEvent.TxRemoved(`validTransfer`, Some(GenericError("Expired"))) +: Nil => // Pass
             }
           }

@@ -194,7 +194,7 @@ case class NgState(
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
           val (accumulatedTxs, maybeFound) =
-            microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, ByteStr, DiscardedMicroBlocks)])) {
+            microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)])) {
               case ((accumulated, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>
                 val discDiff = microDiffs(mbId).diff
                 (accumulated, Some((sig, stateHash, discarded :+ (micro -> discDiff))))

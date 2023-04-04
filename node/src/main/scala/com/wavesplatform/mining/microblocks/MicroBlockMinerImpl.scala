@@ -67,7 +67,7 @@ class MicroBlockMinerImpl(
       restTotalConstraint: MiningConstraint,
       lastMicroBlock: Long
   ): Task[MicroBlockMiningResult] = {
-    val packTask = Task.cancelable[(Option[Seq[Transaction]], MiningConstraint, ByteStr)] { cb =>
+    val packTask = Task.cancelable[(Option[Seq[Transaction]], MiningConstraint, Option[ByteStr])] { cb =>
       @volatile var cancelled = false
       minerScheduler.execute { () =>
         val mdConstraint = MultiDimensionalMiningConstraint(
@@ -87,9 +87,9 @@ class MicroBlockMinerImpl(
             Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock")(
               utx.packUnconfirmed(
                 mdConstraint,
+                accumulatedBlock.header.stateHash,
                 packStrategy,
-                () => cancelled,
-                Some(accumulatedBlock.header.stateHash)
+                () => cancelled
               )
             )
           )
@@ -156,7 +156,7 @@ class MicroBlockMinerImpl(
       account: KeyPair,
       accumulatedBlock: Block,
       unconfirmed: Seq[Transaction],
-      stateHash: ByteStr
+      stateHash: Option[ByteStr]
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
       for {

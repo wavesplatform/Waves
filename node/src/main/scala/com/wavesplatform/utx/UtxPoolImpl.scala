@@ -252,11 +252,11 @@ case class UtxPoolImpl(
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
+      prevStateHash: Option[ByteStr],
       strategy: PackStrategy,
-      cancelled: () => Boolean,
-      initStateHash: Option[ByteStr]
-  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, ByteStr) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled, initStateHash)
+      cancelled: () => Boolean
+  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, Option[ByteStr]) = {
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, prevStateHash, cancelled)
   }
 
   def cleanUnconfirmed(): Unit = {
@@ -303,9 +303,9 @@ case class UtxPoolImpl(
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
       strategy: PackStrategy,
-      cancelled: () => Boolean,
-      initStateHash: Option[ByteStr]
-  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, ByteStr) = {
+      prevStateHash: Option[ByteStr],
+      cancelled: () => Boolean
+  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, Option[ByteStr]) = {
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime = nanoTimeSource()
 
@@ -384,7 +384,9 @@ case class UtxPoolImpl(
                             newCheckedAddresses,
                             r.validatedTransactions + tx.id(),
                             r.removedTransactions,
-                            (new TxStateSnapshotHashBuilder).createHashFromTxDiff(updatedBlockchain, newDiff).createHash(r.stateHash)
+                            r.stateHash.map(prevStateHash =>
+                              TxStateSnapshotHashBuilder.createHashFromTxDiff(updatedBlockchain, newDiff).createHash(prevStateHash)
+                            )
                           )
                         )
                     }
@@ -441,7 +443,7 @@ case class UtxPoolImpl(
           Set.empty,
           Set.empty,
           Set.empty,
-          initStateHash.getOrElse(TxStateSnapshotHashBuilder.EmptyHash)
+          prevStateHash
         )
       )
     }
@@ -594,6 +596,6 @@ private object UtxPoolImpl {
       checkedAddresses: Set[Address],
       validatedTransactions: Set[ByteStr],
       removedTransactions: Set[ByteStr],
-      stateHash: ByteStr
+      stateHash: Option[ByteStr]
   )
 }

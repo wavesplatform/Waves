@@ -28,7 +28,7 @@ case class BlockHeader(
     featureVotes: Seq[Short],
     rewardVote: Long,
     transactionsRoot: ByteStr,
-    stateHash: ByteStr
+    stateHash: Option[ByteStr]
 ) {
   val score: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / baseTarget).ensuring(_ > 0))
 }
@@ -95,7 +95,7 @@ object Block {
       featureVotes: Seq[Short],
       rewardVote: Long,
       transactionData: Seq[Transaction],
-      stateHash: ByteStr
+      stateHash: Option[ByteStr]
   ): Block = {
     val transactionsRoot = mkTransactionsRoot(version, transactionData)
     Block(
@@ -105,7 +105,7 @@ object Block {
     )
   }
 
-  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr, stateHash: ByteStr): Block =
+  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr, stateHash: Option[ByteStr]): Block =
     base.copy(
       signature = signature,
       transactionData = transactionData,
@@ -122,7 +122,7 @@ object Block {
       signer: KeyPair,
       featureVotes: Seq[Short],
       rewardVote: Long,
-      stateHash: ByteStr
+      stateHash: Option[ByteStr]
   ): Either[GenericError, Block] =
     create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs, stateHash).validate
       .map(_.sign(signer.privateKey))
@@ -156,7 +156,7 @@ object Block {
         Seq(),
         -1L,
         txs,
-        ByteStr.empty
+        None
       )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)

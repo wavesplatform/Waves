@@ -333,7 +333,7 @@ object Importer extends ScorexLogging {
               Nil,
               0,
               ByteStr.empty,
-              ByteStr.empty
+              None
             ),
             ByteStr.empty,
             Nil

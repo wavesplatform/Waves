@@ -71,7 +71,7 @@ package object history {
         signer = signer,
         Seq.empty,
         -1L,
-        ByteStr.empty
+        None
       )
       .explicitGet()
 

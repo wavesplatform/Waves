@@ -179,7 +179,7 @@ object GenesisBlockGenerator {
           signer = genesisSigner,
           featureVotes = Seq.empty,
           rewardVote = -1L,
-          ByteStr.empty
+          None
         )
         .explicitGet()
 

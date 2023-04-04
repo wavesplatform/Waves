@@ -1113,7 +1113,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .returning(
         Some(
           SignedBlockHeader(
-            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, ByteStr.empty),
+            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None),
             ByteStr.empty
           )
         )
@@ -1124,7 +1124,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .returning(
         Some(
           SignedBlockHeader(
-            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, ByteStr.empty),
+            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None),
             ByteStr.empty
           )
         )

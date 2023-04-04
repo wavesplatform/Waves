@@ -6,10 +6,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.crypto
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 
@@ -50,7 +50,7 @@ class BlockSpecification extends PropSpec {
         recipient,
         Seq.empty,
         -1L,
-        ByteStr.empty
+        None
       )
       .explicitGet()
 
@@ -68,7 +68,7 @@ class BlockSpecification extends PropSpec {
             recipient,
             Seq.empty,
             -1L,
-            ByteStr.empty
+            None
           )
           .explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes()).get
@@ -94,7 +94,7 @@ class BlockSpecification extends PropSpec {
           recipient,
           Seq(1),
           -1L,
-          ByteStr.empty
+          None
         ) should produce("could not contain feature votes")
       }
     }
@@ -115,7 +115,7 @@ class BlockSpecification extends PropSpec {
         recipient,
         supportedFeatures,
         -1L,
-        ByteStr.empty
+        None
       ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
     }
   }
@@ -136,7 +136,7 @@ class BlockSpecification extends PropSpec {
           recipient,
           featureVotes,
           -1L,
-          ByteStr.empty
+          None
         )
         .explicitGet()
       val parsedBlock = Block.parseBytes(block.bytes()).get
@@ -151,7 +151,7 @@ class BlockSpecification extends PropSpec {
 
   property("block signed by a weak public key is invalid") {
     val weakAccount = PublicKey(Array.fill(32)(0: Byte))
-    forAll(blockGen) { case (baseTarget, reference, generationSignature, recipient, transactionData) =>
+    forAll(blockGen) { case (baseTarget, reference, generationSignature, _, transactionData) =>
       val block = Block
         .create(
           3.toByte,
@@ -163,7 +163,7 @@ class BlockSpecification extends PropSpec {
           Seq.empty,
           -1L,
           transactionData,
-          ByteStr.empty
+          None
         )
         .copy(signature = ByteStr(Array.fill(64)(0: Byte)))
       block.signatureValid() shouldBe false
@@ -172,19 +172,19 @@ class BlockSpecification extends PropSpec {
 
   ignore("sign time for 60k txs") {
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GenerationSignatureLength)) {
-      case ((txs, acc, ref, gs)) =>
-        val (block, t0) =
+      case (txs, acc, ref, gs) =>
+        val (block, _) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L, ByteStr.empty).explicitGet()
+            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L, None).explicitGet()
           )
-        val (bytes, t1) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
-        val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
-        val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc.privateKey, hash))
+        val (bytes, _) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
+        val (hash, _)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
+        Instrumented.withTimeMillis(crypto.sign(acc.privateKey, hash))
     }
   }
 
   ignore("serialize and deserialize big block") {
-    forAll(bigBlockGen(100 * 1000)) { case block =>
+    forAll(bigBlockGen(100 * 1000)) { block =>
       val parsedBlock = Block.parseBytes(block.bytes()).get
       block.signatureValid() shouldBe true
       parsedBlock.signatureValid() shouldBe true

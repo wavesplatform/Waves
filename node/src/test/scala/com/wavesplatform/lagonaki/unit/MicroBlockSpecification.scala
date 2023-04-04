@@ -33,7 +33,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val transactions = Seq(tr, tr2)
 
-    val microBlock  = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, ByteStr.empty).explicitGet()
+    val microBlock  = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, None).explicitGet()
     val parsedBlock = MicroBlock.parseBytes(MicroBlockSerializer.toBytes(microBlock)).get
 
     assert(microBlock.signaturesValid().isRight)
@@ -50,7 +50,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
   test("MicroBlock cannot be created with zero transactions") {
 
     val transactions       = Seq.empty[TransferTransaction]
-    val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, ByteStr.empty)
+    val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, None)
 
     eitherBlockOrError should produce("cannot create empty MicroBlock")
   }
@@ -61,7 +61,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
       TransferTransaction.selfSigned(1.toByte, sender, gen.toAddress, Waves, 5, Waves, 1000, ByteStr.empty, System.currentTimeMillis()).explicitGet()
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
-    val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, ByteStr.empty)
+    val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, None)
     eitherBlockOrError should produce("too many txs in MicroBlock")
   }
 }

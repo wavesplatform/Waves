@@ -336,7 +336,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         featureVotes = Nil,
         rewardVote = -1L,
         signer = generator,
-        stateHash = ByteStr.empty
+        stateHash = None
       )
       .explicitGet()
   }

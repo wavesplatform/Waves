@@ -165,7 +165,7 @@ object BlockSerializer {
     val generator        = buf.getPublicKey
     val transactionsRoot = ByteStr.empty
     val signature        = ByteStr(buf.getByteArray(SignatureLength))
-    val stateHash        = ByteStr(buf.getByteArrayOrEmpty(DigestLength))
+    val stateHash        = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
     Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature, stateHash)
   }
 
@@ -183,7 +183,7 @@ object BlockSerializer {
       rewardVote: Long,
       transactionsRoot: ByteStr,
       signature: ByteStr,
-      stateHash: ByteStr
+      stateHash: Option[ByteStr]
   )
 
   def transactionField(transactions: Seq[Transaction]): JsObject = Json.obj(

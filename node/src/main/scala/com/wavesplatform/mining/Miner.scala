@@ -138,13 +138,13 @@ class MinerImpl(
       )
       .leftMap(_.toString)
 
-  private def packTransactionsForKeyBlock(): (Seq[Transaction], MiningConstraint, ByteStr) = {
+  private def packTransactionsForKeyBlock(prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
     val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, TxStateSnapshotHashBuilder.EmptyHash)
+    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, prevStateHash)
     else {
       val mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
       val (maybeUnconfirmed, updatedMdConstraint, stateHash) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
+        utx.packUnconfirmed(mdConstraint, prevStateHash, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
       )
       val unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
@@ -178,7 +178,7 @@ class MinerImpl(
         s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = ${appender.MaxTimeDrift}"
       )
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
-      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock()
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(lastBlockHeader.stateHash)
       block <- Block
         .buildAndSign(
           version,

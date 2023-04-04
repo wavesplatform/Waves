@@ -17,7 +17,14 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 
 object BlockDiffer {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
-  final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff, stateHash: ByteStr)
+  final case class Result(
+      diff: Diff,
+      carry: Long,
+      totalFee: Long,
+      constraint: MiningConstraint,
+      detailedDiff: DetailedDiff,
+      stateHash: Option[ByteStr]
+  )
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
@@ -92,7 +99,7 @@ object BlockDiffer {
         blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
-        None,
+        maybePrevBlock.flatMap(_.header.stateHash),
         resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
@@ -104,7 +111,7 @@ object BlockDiffer {
   def fromMicroBlock(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
-      prevStateHash: ByteStr,
+      prevStateHash: Option[ByteStr],
       micro: MicroBlock,
       constraint: MiningConstraint,
       verify: Boolean = true
@@ -114,7 +121,7 @@ object BlockDiffer {
   def fromMicroBlockTraced(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
-      prevStateHash: ByteStr,
+      prevStateHash: Option[ByteStr],
       micro: MicroBlock,
       constraint: MiningConstraint,
       verify: Boolean = true
@@ -133,7 +140,7 @@ object BlockDiffer {
         blockchain,
         constraint,
         prevBlockTimestamp,
-        Some(prevStateHash),
+        prevStateHash,
         Diff.empty,
         hasNg = true,
         micro.transactionData,
@@ -172,17 +179,20 @@ object BlockDiffer {
     txs
       .foldLeft(
         TracedResult(
-          Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), prevStateHash.getOrElse(TxStateSnapshotHashBuilder.EmptyHash))
+          Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), prevStateHash)
             .asRight[ValidationError]
         )
       ) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (
-              TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHash)), _, _),
+              TracedResult(
+                Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHashOpt)),
+                _,
+                _
+              ),
               tx
             ) =>
-          val txStateSnapshotHashBuilder = new TxStateSnapshotHashBuilder
-          val currBlockchain             = CompositeBlockchain(blockchain, currDiff)
+          val currBlockchain = CompositeBlockchain(blockchain, currDiff)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
             val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
             if (updatedConstraint.isOverfilled)
@@ -212,7 +222,8 @@ object BlockDiffer {
                 totalWavesFee,
                 updatedConstraint,
                 DetailedDiff(newParentDiff, thisTxDiff :: txDiffs),
-                txStateSnapshotHashBuilder.createHashFromTxDiff(currBlockchain, thisTxDiff).createHash(prevStateHash)
+                prevStateHashOpt
+                  .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxDiff(currBlockchain, thisTxDiff).createHash(prevStateHash))
               )
               TracedResult(result.leftMap(GenericError(_)))
             }
