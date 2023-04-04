@@ -14,31 +14,25 @@ object Dependencies {
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.12"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.14.1"
-
-  private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
-
   private def web3jModule(module: String) = "org.web3j" % module % "4.9.5"
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
-  val akkaHttp           = akkaHttpModule("akka-http")
-  val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  val googleGuava        = "com.google.guava"    % "guava"             % "31.1-jre"
-  val kamonCore          = kamonModule("core")
-  val machinist          = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.5" // 1.4.x and later is built for Java 11
-  val janino             = "org.codehaus.janino" % "janino"            % "3.1.9"
-  val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
-  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
-  val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.85.Final"
+  val akkaHttp        = akkaHttpModule("akka-http")
+  val googleGuava     = "com.google.guava"    % "guava"             % "31.1-jre"
+  val kamonCore       = kamonModule("core")
+  val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.3.5" // 1.4.x and later is built for Java 11
+  val janino          = "org.codehaus.janino" % "janino"            % "3.1.9"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
+  val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.85.Final"
 
-  val catsCore  = catsModule("core", "2.9.0")
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.14" % Test
+  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.15" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
@@ -59,8 +53,8 @@ object Dependencies {
       // defined here because %%% can only be used within a task or setting macro
       // explicit dependency can likely be removed when monix 3 is released
       monixModule("eval").value,
-      catsCore.value,
-      "com.lihaoyi" %%% "fastparse" % "2.3.3",
+      "org.typelevel" %%% "cats-core" % "2.9.0",
+      "com.lihaoyi"   %%% "fastparse" % "2.3.3",
       shapeless.value,
       "org.typelevel" %%% "cats-mtl" % "1.3.0",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
@@ -74,8 +68,8 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.spotify" % "docker-client" % "8.16.0",
-    jacksonModule("dataformat", "dataformat-properties"),
+    "com.spotify"                      % "docker-client"                 % "8.16.0",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.14.2",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -95,7 +89,7 @@ object Dependencies {
 
   private[this] val dbDeps =
     Seq(
-      "org.rocksdb" % "rocksdbjni" % "7.10.2"
+      "org.rocksdb" % "rocksdbjni" % "8.0.0"
     )
 
   lazy val node = Def.setting(
@@ -104,7 +98,7 @@ object Dependencies {
       "commons-net"          % "commons-net"              % "3.8.0",
       "org.apache.commons"   % "commons-lang3"            % "3.12.0",
       "com.iheart"          %% "ficus"                    % "1.5.2",
-      "net.logstash.logback" % "logstash-logback-encoder" % "7.2" % Runtime,
+      "net.logstash.logback" % "logstash-logback-encoder" % "7.3" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
@@ -113,7 +107,7 @@ object Dependencies {
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"       %% "play-json" % "2.9.3",
+      "com.typesafe.play"       %% "play-json" % "2.9.4",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
@@ -121,12 +115,10 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging"            %% "scala-logging"         % "3.9.5",
-      "eu.timepit"                            %% "refined"               % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit"                            %% "refined-cats"          % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.13.5.2",
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.5.2" % "provided",
-      "com.esaulpaugh"                         % "headlong"              % "9.0.0",
+      "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
+      "eu.timepit"                 %% "refined"       % "0.10.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                 %% "refined-cats"  % "0.10.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.esaulpaugh"              % "headlong"      % "9.2.0",
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test
@@ -161,5 +153,5 @@ object Dependencies {
   }
 
   lazy val kanela =
-    Seq("io.kamon" % "kanela-agent" % "1.0.14")
+    Seq("io.kamon" % "kanela-agent" % "1.0.17")
 }

@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
-import com.github.plokhotnyuk.jsoniter_scala.core.*
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.databind.{JsonSerializer, SerializerProvider}
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.StreamSerializerUtils.*
@@ -47,331 +48,349 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.EthEncoding
-import play.api.libs.json.{JsObject, Json, JsonConfiguration, OWrites, OptionHandlers}
+import play.api.libs.json.{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsValue, Json, JsonConfiguration, OWrites, OptionHandlers}
 
 final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
 
-  implicit val assetCodec: JsonValueCodec[Asset] = new OnlyEncodeJsonValueCodec[Asset] {
-    override def encodeValue(x: Asset, out: JsonWriter): Unit =
-      x match {
-        case Waves           => out.writeNull()
-        case IssuedAsset(id) => out.writeVal(id.toString)
+  val assetSerializer: JsonSerializer[Asset] =
+    (value: Asset, gen: JsonGenerator, serializers: SerializerProvider) => {
+      value match {
+        case Waves           => gen.writeNull()
+        case IssuedAsset(id) => gen.writeString(id.toString)
       }
-  }
+    }
 
-  def evaluatedCodec(numbersAsString: Boolean): JsonValueCodec[EVALUATED] = new OnlyEncodeJsonValueCodec[EVALUATED] {
-    override def encodeValue(x: EVALUATED, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      x match {
+  def evaluatedSerializer(numbersAsString: Boolean): JsonSerializer[EVALUATED] =
+    (value: EVALUATED, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      value match {
         case CONST_LONG(num) =>
-          out.writeKeyValue("type", "Int")
-          out.writeKeyValue("value", num, numbersAsString)
+          gen.writeStringField("type", "Int")
+          gen.writeNumberField("value", num, numbersAsString)
         case CONST_BYTESTR(bs) =>
-          out.writeKeyValue("type", "ByteVector")
-          out.writeKeyValue("value", bs.toString)
+          gen.writeStringField("type", "ByteVector")
+          gen.writeStringField("value", bs.toString)
         case CONST_STRING(str) =>
-          out.writeKeyValue("type", "String")
-          out.writeKeyValue("value", str)
+          gen.writeStringField("type", "String")
+          gen.writeStringField("value", str)
         case CONST_BOOLEAN(b) =>
-          out.writeKeyValue("type", "Boolean")
-          out.writeKeyValue("value", b)
+          gen.writeStringField("type", "Boolean")
+          gen.writeBooleanField("value", b)
         case CaseObj(caseType, fields) =>
-          out.writeKeyValue("type", caseType.name)
-          out.writeKeyValue(
-            "value",
-            out => {
-              out.writeObjectStart()
-              fields.foreach { case (key, value) =>
-                out.writeKeyValue(key, encodeValue(value, _))
-              }
-              out.writeObjectEnd()
+          gen.writeStringField("type", caseType.name)
+          gen.writeValueField("value") { gen =>
+            gen.writeStartObject()
+            fields.foreach { case (key, value) =>
+              gen.writeValueField(key, value)(evaluatedSerializer(numbersAsString), serializers)
             }
-          )
+            gen.writeEndObject()
+          }
         case ARR(xs) =>
-          out.writeKeyValue("type", "Array")
-          out.writeKeyValue(
-            "value",
-            out => {
-              out.writeArrayStart()
-              xs.foreach(elem => encodeValue(elem, _))
-              out.writeArrayEnd()
-            }
-          )
+          gen.writeStringField("type", "Array")
+          gen.writeArrayField("value", xs)(evaluatedSerializer(numbersAsString), serializers)
         case FAIL(reason) =>
-          out.writeKeyValue("error", reason)
+          gen.writeStringField("error", reason)
         case _ =>
       }
-      out.writeObjectEnd()
+      gen.writeEndObject()
     }
-  }
 
-  def funcCallCodec(numbersAsString: Boolean): JsonValueCodec[FUNCTION_CALL] = new OnlyEncodeJsonValueCodec[FUNCTION_CALL] {
-    def writeSingleArg(arg: EXPR, out: JsonWriter): Unit = {
-      out.writeObjectStart()
+  def funcCallSerializer(numbersAsString: Boolean): JsonSerializer[FUNCTION_CALL] = new JsonSerializer[FUNCTION_CALL] {
+    override def serialize(funcCall: FUNCTION_CALL, gen: JsonGenerator, serializers: SerializerProvider): Unit = {
+      gen.writeStartObject()
+      gen.writeStringField("function", funcCall.function.funcName)
+      gen.writeArrayField("args") { out =>
+        funcCall.args.foreach {
+          case Terms.ARR(elements) =>
+            gen.writeStartObject()
+            gen.writeStringField("type", "list")
+            out.writeArrayField("value")(out => elements.foreach(e => writeSingleArg(e, out)))
+            gen.writeEndObject()
+          case other => writeSingleArg(other, out)
+        }
+      }
+      gen.writeEndObject()
+    }
+
+    def writeSingleArg(arg: EXPR, gen: JsonGenerator): Unit = {
+      gen.writeStartObject()
       arg match {
         case CONST_LONG(num) =>
-          out.writeKeyValue("type", "integer")
-          out.writeKeyValue("value", num, numbersAsString)
+          gen.writeStringField("type", "integer")
+          gen.writeNumberField("value", num, numbersAsString)
         case CONST_BOOLEAN(bool) =>
-          out.writeKeyValue("type", "boolean")
-          out.writeKeyValue("value", bool)
+          gen.writeStringField("type", "boolean")
+          gen.writeBooleanField("value", bool)
         case CONST_BYTESTR(bytes) =>
-          out.writeKeyValue("type", "binary")
-          out.writeKeyValue("value", bytes.base64)
+          gen.writeStringField("type", "binary")
+          gen.writeStringField("value", bytes.base64)
         case CONST_STRING(str) =>
-          out.writeKeyValue("type", "string")
-          out.writeKeyValue("value", str)
+          gen.writeStringField("type", "string")
+          gen.writeStringField("value", str)
         case ARR(_) =>
-          out.writeKeyValue("type", "list")
-          out.writeKeyValue("value", "unsupported")
+          gen.writeStringField("type", "list")
+          gen.writeStringField("value", "unsupported")
         case arg => throw new NotImplementedError(s"Not supported: $arg")
       }
-      out.writeObjectEnd()
-    }
-
-    override def encodeValue(x: FUNCTION_CALL, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("function", x.function.funcName)
-      out.writeKeyValueArray(
-        "args",
-        out => {
-          x.args.foreach {
-            case Terms.ARR(elements) =>
-              out.writeObjectStart()
-              out.writeKeyValue("type", "list")
-              out.writeKeyValueArray("value", out => elements.foreach(e => writeSingleArg(e, out)))
-              out.writeObjectEnd()
-            case other => writeSingleArg(other, out)
-          }
-        }
-      )
-      out.writeObjectEnd()
+      gen.writeEndObject()
     }
   }
 
-  implicit val leaseStatusCodec: JsonValueCodec[LeaseStatus] = new OnlyEncodeJsonValueCodec[LeaseStatus] {
-    override def encodeValue(x: LeaseStatus, out: JsonWriter): Unit =
-      if (x == LeaseStatus.active) out.writeVal("active") else out.writeVal("canceled")
-  }
-  def leaseRefCodec(numbersAsString: Boolean): JsonValueCodec[LeaseRef] = new OnlyEncodeJsonValueCodec[LeaseRef] {
-    override def encodeValue(l: LeaseRef, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("id", l.id.toString)
-      l.originTransactionId.fold(out.writeKeyNull("originTransactionId"))(txId => out.writeKeyValue("originTransactionId", txId.toString))
-      l.sender.fold(out.writeKeyNull("sender"))(sender => out.writeKeyValue("sender", sender.toString))
-      l.recipient.fold(out.writeKeyNull("recipient"))(recipient => out.writeKeyValue("recipient", recipient.toString))
-      l.amount.fold(out.writeKeyNull("amount"))(amount => out.writeKeyValue("amount", amount, numbersAsString))
-      l.height.fold(out.writeKeyNull("height"))(height => out.writeKeyValue("height", height, numbersAsString))
-      out.writeKeyValue("status", if (l.status == LeaseStatus.active) "active" else "canceled")
-      l.cancelHeight.fold(out.writeKeyNull("cancelHeight"))(ch => out.writeKeyValue("cancelHeight", ch, numbersAsString))
-      l.cancelTransactionId.fold(out.writeKeyNull("cancelTransactionId"))(cti => out.writeKeyValue("cancelTransactionId", cti.toString))
-      out.writeObjectEnd()
+  val leaseStatusSerializer: JsonSerializer[LeaseStatus] =
+    (status: LeaseStatus, gen: JsonGenerator, serializers: SerializerProvider) => {
+      if (status == LeaseStatus.active) gen.writeString("active") else gen.writeString("canceled")
     }
-  }
 
-  def leaseCodec(numbersAsString: Boolean): JsonValueCodec[Lease] = new OnlyEncodeJsonValueCodec[Lease] {
-    override def encodeValue(x: Lease, out: JsonWriter): Unit =
-      leaseRefCodec(numbersAsString).encodeValue(leaseIdToLeaseRef(x.id, Some(x.recipient), Some(x.amount)), out)
-  }
-
-  def leaseCancelCodec(numbersAsString: Boolean): JsonValueCodec[LeaseCancel] = new OnlyEncodeJsonValueCodec[LeaseCancel] {
-    override def encodeValue(x: LeaseCancel, out: JsonWriter): Unit =
-      leaseRefCodec(numbersAsString).encodeValue(leaseIdToLeaseRef(x.id), out)
-  }
-
-  def paymentCodec(numbersAsString: Boolean): JsonValueCodec[Payment] = new OnlyEncodeJsonValueCodec[Payment] {
-    override def encodeValue(p: Payment, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("amount", p.amount, numbersAsString)
-      out.writeKeyValue("assetId", assetCodec.encodeValue(p.assetId, _))
-      out.writeObjectEnd()
+  def leaseRefSerializer(numbersAsString: Boolean): JsonSerializer[LeaseRef] =
+    (l: LeaseRef, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("id", l.id.toString)
+      l.originTransactionId.fold(gen.writeNullField("originTransactionId"))(txId => gen.writeStringField("originTransactionId", txId.toString))
+      l.sender.fold(gen.writeNullField("sender"))(sender => gen.writeStringField("sender", sender.toString))
+      l.recipient.fold(gen.writeNullField("recipient"))(recipient => gen.writeStringField("recipient", recipient.toString))
+      l.amount.fold(gen.writeNullField("amount"))(amount => gen.writeNumberField("amount", amount, numbersAsString))
+      l.height.fold(gen.writeNullField("height"))(height => gen.writeNumberField("height", height, numbersAsString))
+      gen.writeStringField("status", if (l.status == LeaseStatus.active) "active" else "canceled")
+      l.cancelHeight.fold(gen.writeNullField("cancelHeight"))(ch => gen.writeNumberField("cancelHeight", ch, numbersAsString))
+      l.cancelTransactionId.fold(gen.writeNullField("cancelTransactionId"))(cti => gen.writeStringField("cancelTransactionId", cti.toString))
+      gen.writeEndObject()
     }
-  }
 
-  def attachedPaymentCodec(numbersAsString: Boolean): JsonValueCodec[AttachedPayment] = new OnlyEncodeJsonValueCodec[AttachedPayment] {
-    override def encodeValue(p: AttachedPayment, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("assetId", assetCodec.encodeValue(p.assetId, _))
-      out.writeKeyValue("amount", p.amount, numbersAsString)
-      out.writeObjectEnd()
+  def leaseSerializer(numbersAsString: Boolean): JsonSerializer[Lease] =
+    (l: Lease, gen: JsonGenerator, serializers: SerializerProvider) => {
+      leaseRefSerializer(numbersAsString).serialize(leaseIdToLeaseRef(l.id, Some(l.recipient), Some(l.amount)), gen, serializers)
     }
-  }
 
-  def isrPaymentCodec(numbersAsString: Boolean): JsonValueCodec[InvokeScriptResult.Payment] =
-    new OnlyEncodeJsonValueCodec[InvokeScriptResult.Payment] {
-      override def encodeValue(p: InvokeScriptResult.Payment, out: JsonWriter): Unit = {
-        out.writeObjectStart()
-        out.writeKeyValue("address", p.address.toString)
-        out.writeKeyValue("asset", out => assetCodec.encodeValue(p.asset, out))
-        out.writeKeyValue("amount", p.amount, numbersAsString)
-        out.writeObjectEnd()
+  def leaseCancelSerializer(numbersAsString: Boolean): JsonSerializer[LeaseCancel] =
+    (lc: LeaseCancel, gen: JsonGenerator, serializers: SerializerProvider) => {
+      leaseRefSerializer(numbersAsString).serialize(leaseIdToLeaseRef(lc.id), gen, serializers)
+    }
+
+  def paymentSerializer(numbersAsString: Boolean): JsonSerializer[Payment] =
+    (p: Payment, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeNumberField("amount", p.amount, numbersAsString)
+      gen.writeValueField("assetId")(assetSerializer.serialize(p.assetId, _, serializers))
+      gen.writeEndObject()
+    }
+
+  def attachedPaymentSerializer(numbersAsString: Boolean): JsonSerializer[AttachedPayment] =
+    (p: AttachedPayment, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeValueField("assetId")(assetSerializer.serialize(p.assetId, _, serializers))
+      gen.writeNumberField("amount", p.amount, numbersAsString)
+      gen.writeEndObject()
+    }
+
+  def isrPaymentSerializer(numbersAsString: Boolean): JsonSerializer[InvokeScriptResult.Payment] =
+    (p: InvokeScriptResult.Payment, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("address", p.address.toString)
+      gen.writeValueField("asset")(assetSerializer.serialize(p.asset, _, serializers))
+      gen.writeNumberField("amount", p.amount, numbersAsString)
+      gen.writeEndObject()
+    }
+
+  def issueSerializer(numbersAsString: Boolean): JsonSerializer[Issue] =
+    (issue: Issue, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("id", issue.id.toString)
+      issue.compiledScript.foreach(sc => gen.writeStringField("compiledScript", sc.toString))
+      gen.writeNumberField("decimals", issue.decimals, numbersAsString)
+      gen.writeStringField("description", issue.description)
+      gen.writeBooleanField("isReissuable", issue.isReissuable)
+      gen.writeStringField("name", issue.name)
+      gen.writeNumberField("quantity", issue.quantity, numbersAsString)
+      gen.writeNumberField("nonce", issue.nonce, numbersAsString)
+      gen.writeEndObject()
+    }
+
+  def reissueSerializer(numbersAsString: Boolean): JsonSerializer[Reissue] =
+    (r: Reissue, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("assetId", r.assetId.toString)
+      gen.writeBooleanField("isReissuable", r.isReissuable)
+      gen.writeNumberField("quantity", r.quantity, numbersAsString)
+      gen.writeEndObject()
+    }
+
+  def burnSerializer(numbersAsString: Boolean): JsonSerializer[Burn] =
+    (b: Burn, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("assetId", b.assetId.toString)
+      gen.writeNumberField("quantity", b.quantity, numbersAsString)
+      gen.writeEndObject()
+    }
+
+  def sponsorFeeSerializer(numbersAsString: Boolean): JsonSerializer[SponsorFee] =
+    (s: SponsorFee, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("assetId", s.assetId.toString)
+      s.minSponsoredAssetFee.foreach(fee => gen.writeNumberField("minSponsoredAssetFee", fee, numbersAsString))
+      gen.writeEndObject()
+    }
+
+  def callSerializer(numbersAsString: Boolean): JsonSerializer[Call] =
+    (c: Call, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("function", c.function)
+      gen.writeArrayField("args", c.args)(evaluatedSerializer(numbersAsString), serializers)
+      gen.writeEndObject()
+    }
+
+  def invocationSerializer(numbersAsString: Boolean): JsonSerializer[Invocation] =
+    (inv: Invocation, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("dApp", inv.dApp.toString)
+      gen.writeValueField("call")(callSerializer(numbersAsString).serialize(inv.call, _, serializers))
+      gen.writeArrayField("payments", inv.payments)(attachedPaymentSerializer(numbersAsString), serializers)
+      gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(inv.stateChanges, _, serializers))
+      gen.writeEndObject()
+    }
+
+  val errorMessageSerializer: JsonSerializer[ErrorMessage] =
+    (err: ErrorMessage, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeNumberField("code", err.code, false)
+      gen.writeStringField("text", err.text)
+      gen.writeEndObject()
+    }
+
+  def invokeScriptResultSerializer(numbersAsString: Boolean): JsonSerializer[InvokeScriptResult] =
+    (isr: InvokeScriptResult, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeArrayField("data", isr.data)(DataEntry.dataEntrySerializer(numbersAsString), serializers)
+      gen.writeArrayField("transfers", isr.transfers)(isrPaymentSerializer(numbersAsString), serializers)
+      gen.writeArrayField("issues", isr.issues)(issueSerializer(numbersAsString), serializers)
+      gen.writeArrayField("reissues", isr.reissues)(reissueSerializer(numbersAsString), serializers)
+      gen.writeArrayField("burns", isr.burns)(burnSerializer(numbersAsString), serializers)
+      gen.writeArrayField("sponsorFees", isr.sponsorFees)(sponsorFeeSerializer(numbersAsString), serializers)
+      gen.writeArrayField("leases", isr.leases)(leaseSerializer(numbersAsString), serializers)
+      gen.writeArrayField("leaseCancels", isr.leaseCancels)(leaseCancelSerializer(numbersAsString), serializers)
+      gen.writeArrayField("invokes", isr.invokes)(invocationSerializer(numbersAsString), serializers)
+      isr.error.foreach(err => gen.writeValueField("error")(errorMessageSerializer.serialize(err, _, serializers)))
+      gen.writeEndObject()
+    }
+
+  def txMetaJsonSerializer(address: Address, isBlockV5: Int => Boolean, numbersAsString: Boolean): JsonSerializer[TxMetaEnriched] =
+    (txMeta: TxMetaEnriched, gen: JsonGenerator, serializers: SerializerProvider) => {
+      txMeta.meta match {
+        case TransactionMeta.Invoke(height, tx: InvokeScriptTransaction, succeeded, spentComplexity, invokeScriptResult) =>
+          gen.writeStartObject()
+          gen.writeNumberField("type", tx.tpe.id, numbersAsString)
+          gen.writeStringField("id", tx.id().toString)
+          gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
+          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
+          gen.writeNumberField("version", tx.version, numbersAsString)
+          if (tx.asInstanceOf[PBSince].isProtobufVersion) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
+          gen.writeStringField("sender", tx.sender.toAddress(tx.chainId).toString)
+          gen.writeStringField("senderPublicKey", tx.sender.toString)
+          gen.writeArrayField("proofs")(gen => tx.proofs.proofs.foreach(p => gen.writeString(p.toString)))
+          gen.writeStringField("dApp", tx.dApp.toString)
+          gen.writeArrayField("payment", tx.payments)(paymentSerializer(numbersAsString), serializers)
+          gen.writeValueField("call")(funcCallSerializer(numbersAsString).serialize(tx.funcCall, _, serializers))
+          gen.writeNumberField("height", height.toInt, numbersAsString)
+          val appStatus =
+            if (isBlockV5(height))
+              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
+            else
+              None
+          appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
+          gen.writeNumberField("spentComplexity", spentComplexity, numbersAsString)
+          invokeScriptResult.fold(gen.writeNullField("stateChanges"))(isr =>
+            gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(isr, _, serializers))
+          )
+          gen.writeEndObject()
+        case TransactionMeta.Ethereum(height, tx, succeeded, spentComplexity, Some(EthereumTransactionMeta(Payload.Invocation(i), _)), isr) =>
+          val functionCallEi = SerdeV1.deserializeFunctionCall(i.functionCall.toByteArray).toOption
+          val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
+
+          gen.writeStartObject()
+          gen.writeStringField("id", tx.id().toString)
+          gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
+          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
+          gen.writeNumberField("version", tx.version, numbersAsString)
+          if (tx.isProtobufVersion) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
+          gen.writeStringField("bytes", EthEncoding.toHexString(tx.bytes()))
+          gen.writeStringField("sender", tx.senderAddress().toString)
+          gen.writeStringField("senderPublicKey", tx.signerPublicKey().toString)
+          gen.writeNumberField("height", height.toInt, numbersAsString)
+          val appStatus =
+            if (isBlockV5(height))
+              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
+            else
+              None
+          appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
+          gen.writeNumberField("spentComplexity", spentComplexity, numbersAsString)
+          gen.writeStringField("type", "invocation")
+          gen.writeStringField("dApp", Address(EthEncoding.toBytes(tx.underlying.getTo)).toString)
+          functionCallEi.fold(gen.writeNullField("call"))(fc =>
+            gen.writeValueField("call")(funcCallSerializer(numbersAsString).serialize(fc, _, serializers))
+          )
+          gen.writeArrayField("payment", payments)(paymentSerializer(numbersAsString), serializers)
+          isr.fold(gen.writeNullField("stateChanges"))(isr =>
+            gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(isr, _, serializers))
+          )
+          gen.writeEndObject()
+        case meta @ TransactionMeta.Default(height, mtt: MassTransferTransaction, succeeded, spentComplexity) if mtt.sender.toAddress != address =>
+          /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction
+            * only.
+            */
+          jsObjectSerializer(numbersAsString).serialize(
+            mtt.compactJson(address, txMeta.aliases.getOrElse(Set.empty)) ++ transactionMetaJson(meta),
+            gen,
+            serializers
+          )
+        case other =>
+          jsObjectSerializer(numbersAsString).serialize(other.transaction.json() ++ transactionMetaJson(other), gen, serializers)
       }
     }
 
-  def issueCodec(numbersAsString: Boolean): JsonValueCodec[Issue] = new OnlyEncodeJsonValueCodec[Issue] {
-    override def encodeValue(issue: Issue, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("id", issue.id.toString)
-      issue.compiledScript.foreach(sc => out.writeKeyValue("compiledScript", sc.toString))
-      out.writeKeyValue("decimals", issue.decimals, numbersAsString)
-      out.writeKeyValue("description", issue.description)
-      out.writeKeyValue("isReissuable", issue.isReissuable)
-      out.writeKeyValue("name", issue.name)
-      out.writeKeyValue("quantity", issue.quantity, numbersAsString)
-      out.writeKeyValue("nonce", issue.nonce, numbersAsString)
-      out.writeObjectEnd()
+  def jsObjectSerializer(numbersAsString: Boolean): JsonSerializer[JsObject] = new JsonSerializer[JsObject] {
+    override def serialize(jsObj: JsObject, gen: JsonGenerator, serializers: SerializerProvider): Unit = {
+      gen.writeStartObject()
+      jsObj.fields.foreach { case (key, value) => encodeField(key, value, gen, serializers) }
+      gen.writeEndObject()
     }
-  }
 
-  def reissueCodec(numbersAsString: Boolean): JsonValueCodec[Reissue] = new OnlyEncodeJsonValueCodec[Reissue] {
-    override def encodeValue(r: Reissue, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("assetId", r.assetId.toString)
-      out.writeKeyValue("isReissuable", r.isReissuable)
-      out.writeKeyValue("quantity", r.quantity, numbersAsString)
-      out.writeObjectEnd()
-    }
-  }
-
-  def burnCodec(numbersAsString: Boolean): JsonValueCodec[Burn] = new OnlyEncodeJsonValueCodec[Burn] {
-    override def encodeValue(b: Burn, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("assetId", b.assetId.toString)
-      out.writeKeyValue("quantity", b.quantity, numbersAsString)
-      out.writeObjectEnd()
-    }
-  }
-
-  def sponsorFeeCodec(numbersAsString: Boolean): JsonValueCodec[SponsorFee] = new OnlyEncodeJsonValueCodec[SponsorFee] {
-    override def encodeValue(s: SponsorFee, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("assetId", s.assetId.toString)
-      s.minSponsoredAssetFee.foreach(fee => out.writeKeyValue("minSponsoredAssetFee", fee, numbersAsString))
-      out.writeObjectEnd()
-    }
-  }
-
-  def callCodec(numbersAsString: Boolean): JsonValueCodec[Call] = new OnlyEncodeJsonValueCodec[Call] {
-    override def encodeValue(c: Call, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("function", c.function)
-      out.writeKeyValueArray("args", c.args)(evaluatedCodec(numbersAsString))
-      out.writeObjectEnd()
-    }
-  }
-
-  def invocationCodec(numbersAsString: Boolean): JsonValueCodec[Invocation] = new OnlyEncodeJsonValueCodec[Invocation] {
-    override def encodeValue(inv: Invocation, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("dApp", inv.dApp.toString)
-      out.writeKeyValue("call", out => callCodec(numbersAsString).encodeValue(inv.call, out))
-      out.writeKeyValueArray("payments", inv.payments)(attachedPaymentCodec(numbersAsString))
-      out.writeKeyValue("stateChanges", out => invokeScriptResultCodec(numbersAsString).encodeValue(inv.stateChanges, out))
-      out.writeObjectEnd()
-    }
-  }
-
-  val errorMessageCodec: JsonValueCodec[ErrorMessage] = new OnlyEncodeJsonValueCodec[ErrorMessage] {
-    override def encodeValue(err: ErrorMessage, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("code", err.code, numberAsString = false)
-      out.writeKeyValue("text", err.text)
-      out.writeObjectEnd()
-    }
-  }
-
-  def invokeScriptResultCodec(numbersAsString: Boolean): JsonValueCodec[InvokeScriptResult] =
-    new OnlyEncodeJsonValueCodec[InvokeScriptResult] {
-      override def encodeValue(isr: InvokeScriptResult, out: JsonWriter): Unit = {
-        out.writeObjectStart()
-        out.writeKeyValueArray("data", isr.data)(DataEntry.dataEntryCodec(numbersAsString))
-        out.writeKeyValueArray("transfers", isr.transfers)(isrPaymentCodec(numbersAsString))
-        out.writeKeyValueArray("issues", isr.issues)(issueCodec(numbersAsString))
-        out.writeKeyValueArray("reissues", isr.reissues)(reissueCodec(numbersAsString))
-        out.writeKeyValueArray("burns", isr.burns)(burnCodec(numbersAsString))
-        out.writeKeyValueArray("sponsorFees", isr.sponsorFees)(sponsorFeeCodec(numbersAsString))
-        out.writeKeyValueArray("leases", isr.leases)(leaseCodec(numbersAsString))
-        out.writeKeyValueArray("leaseCancels", isr.leaseCancels)(leaseCancelCodec(numbersAsString))
-        out.writeKeyValueArray("invokes", isr.invokes)(invocationCodec(numbersAsString))
-        isr.error.foreach(err => out.writeKeyValue("error", errorMessageCodec.encodeValue(err, _)))
-        out.writeObjectEnd()
+    private def encodeField(key: String, jsValue: JsValue, gen: JsonGenerator, serializers: SerializerProvider): Unit = {
+      jsValue match {
+        case n: JsNumber =>
+          gen.writeNumberField(key, n.value, numbersAsString)
+        case b: JsBoolean =>
+          gen.writeBooleanField(key, b.value)
+        case s: JsString =>
+          gen.writeStringField(key, s.value)
+        case a: JsArray =>
+          gen.writeArrayField(key)(out => a.value.foreach(encodeArrayElem(_, out, serializers)))
+        case o: JsObject =>
+          gen.writeValueField(key)(serialize(o, _, serializers))
+        case _ =>
+          gen.writeNullField(key)
       }
     }
 
-  def txMetaJsonCodec(address: Address, isBlockV5: Int => Boolean, numbersAsString: Boolean): JsonValueCodec[TxMetaEnriched] =
-    new OnlyEncodeJsonValueCodec[TxMetaEnriched] {
-      override def encodeValue(txMeta: TxMetaEnriched, out: JsonWriter): Unit = {
-        txMeta.meta match {
-          case TransactionMeta.Invoke(height, tx: InvokeScriptTransaction, succeeded, spentComplexity, invokeScriptResult) =>
-            out.writeObjectStart()
-            out.writeKeyValue("type", tx.tpe.id, numbersAsString)
-            out.writeKeyValue("id", tx.id().toString)
-            out.writeKeyValue("fee", tx.assetFee._2, numbersAsString)
-            tx.assetFee._1.maybeBase58Repr.foreach(out.writeKeyValue("feeAssetId", _))
-            out.writeKeyValue("timestamp", tx.timestamp, numbersAsString)
-            out.writeKeyValue("version", tx.version, numbersAsString)
-            if (tx.asInstanceOf[PBSince].isProtobufVersion) out.writeKeyValue("chainId", tx.chainId, numbersAsString)
-            out.writeKeyValue("sender", tx.sender.toAddress(tx.chainId).toString)
-            out.writeKeyValue("senderPublicKey", tx.sender.toString)
-            out.writeKeyValueArray("proofs", out => tx.proofs.proofs.foreach(p => out.writeVal(p.toString)))
-            out.writeKeyValue("dApp", tx.dApp.toString)
-            out.writeKeyValueArray("payment", tx.payments)(paymentCodec(numbersAsString))
-            out.writeKeyValue("call", funcCallCodec(numbersAsString).encodeValue(tx.funcCall, _))
-            out.writeKeyValue("height", height.toInt, numbersAsString)
-            val appStatus =
-              if (isBlockV5(height))
-                if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
-              else
-                None
-            appStatus.foreach(s => out.writeKeyValue("applicationStatus", s))
-            out.writeKeyValue("spentComplexity", spentComplexity, numbersAsString)
-            invokeScriptResult.fold(out.writeKeyNull("stateChanges"))(isr =>
-              out.writeKeyValue("stateChanges", out => invokeScriptResultCodec(numbersAsString).encodeValue(isr, out))
-            )
-            out.writeObjectEnd()
-          case TransactionMeta.Ethereum(height, tx, succeeded, spentComplexity, Some(EthereumTransactionMeta(Payload.Invocation(i), _)), isr) =>
-            val functionCallEi = SerdeV1.deserializeFunctionCall(i.functionCall.toByteArray).toOption
-            val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
-
-            out.writeObjectStart()
-            out.writeKeyValue("id", tx.id().toString)
-            out.writeKeyValue("fee", tx.assetFee._2, numbersAsString)
-            tx.assetFee._1.maybeBase58Repr.foreach(out.writeKeyValue("feeAssetId", _))
-            out.writeKeyValue("timestamp", tx.timestamp, numbersAsString)
-            out.writeKeyValue("version", tx.version, numbersAsString)
-            if (tx.isProtobufVersion) out.writeKeyValue("chainId", tx.chainId, numbersAsString)
-            out.writeKeyValue("bytes", EthEncoding.toHexString(tx.bytes()))
-            out.writeKeyValue("sender", tx.senderAddress().toString)
-            out.writeKeyValue("senderPublicKey", tx.signerPublicKey().toString)
-            out.writeKeyValue("height", height.toInt, numbersAsString)
-            val appStatus =
-              if (isBlockV5(height))
-                if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
-              else
-                None
-            appStatus.foreach(s => out.writeKeyValue("applicationStatus", s))
-            out.writeKeyValue("spentComplexity", spentComplexity, numbersAsString)
-            out.writeKeyValue("type", "invocation")
-            out.writeKeyValue("dApp", Address(EthEncoding.toBytes(tx.underlying.getTo)).toString)
-            functionCallEi.fold(out.writeKeyNull("call"))(fc => out.writeKeyValue("call", out => funcCallCodec(numbersAsString).encodeValue(fc, out)))
-            out.writeKeyValueArray("payment", payments)(paymentCodec(numbersAsString))
-            isr.fold(out.writeKeyNull("stateChanges"))(isr =>
-              out.writeKeyValue("stateChanges", out => invokeScriptResultCodec(numbersAsString).encodeValue(isr, out))
-            )
-            out.writeObjectEnd()
-          case meta @ TransactionMeta.Default(height, mtt: MassTransferTransaction, succeeded, spentComplexity) if mtt.sender.toAddress != address =>
-            /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer
-              * transaction only.
-              */
-            jsValueCodec(numbersAsString).encodeValue(
-              mtt.compactJson(address, txMeta.aliases.getOrElse(Set.empty)) ++ transactionMetaJson(meta),
-              out
-            )
-          case other =>
-            jsValueCodec(numbersAsString).encodeValue(other.transaction.json() ++ transactionMetaJson(other), out)
-        }
+    private def encodeArrayElem(jsValue: JsValue, gen: JsonGenerator, serializers: SerializerProvider): Unit = {
+      jsValue match {
+        case n: JsNumber =>
+          gen.writeNumber(n.value.bigDecimal)
+        case b: JsBoolean =>
+          gen.writeBoolean(b.value)
+        case s: JsString =>
+          gen.writeString(s.value)
+        case a: JsArray =>
+          gen.writeStartArray()
+          a.value.foreach(encodeArrayElem(_, gen, serializers))
+          gen.writeEndArray()
+        case o: JsObject =>
+          serialize(o, gen, serializers)
+        case _ =>
+          gen.writeNull()
       }
     }
+  }
 
   def transactionMetaJson(meta: TransactionMeta): JsObject = {
     val specificInfo = meta.transaction match {

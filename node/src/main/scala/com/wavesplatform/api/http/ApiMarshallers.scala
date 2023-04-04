@@ -8,12 +8,17 @@ import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromE
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
-import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, writeToArray}
+import com.fasterxml.jackson.core.util.ByteArrayBuilder
+import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.databind.JsonSerializer
+import com.fasterxml.jackson.databind.ser.DefaultSerializerProvider
+import com.wavesplatform.api.http.ApiMarshallers.writeToBytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import play.api.libs.json.*
 
+import scala.util.Using
 import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
 
@@ -89,12 +94,12 @@ trait ApiMarshallers extends JsonFormats {
         .compose(writes.writes)
     )
 
-  implicit def jsonBytesMarshaller[A](implicit codec: Boolean => JsonValueCodec[A]): ToEntityMarshaller[A] =
+  implicit def jacksonMarshaller[A](implicit ser: Boolean => JsonSerializer[A]): ToEntityMarshaller[A] =
     Marshaller.oneOf(
       jsonByteStringMarshaller
-        .compose(v => ByteString.fromArrayUnsafe(writeToArray[A](v)(codec(false)))),
+        .compose(v => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(false)))),
       customJsonByteStringMarshaller
-        .compose(v => ByteString.fromArrayUnsafe(writeToArray[A](v)(codec(true))))
+        .compose(v => ByteString.fromArrayUnsafe(writeToBytes[A](v)(ser(true))))
     )
 
   // preserve support for using plain strings as request entities
@@ -112,19 +117,19 @@ trait ApiMarshallers extends JsonFormats {
     }
   }
 
-  def jsonBytesStreamMarshaller[A](
-      prefix: String = "[",
-      delimiter: String = ",",
-      suffix: String = "]"
-  )(implicit codec: Boolean => JsonValueCodec[A]): ToResponseMarshaller[Source[A, NotUsed]] =
-    jsonStreamMarshaller(jsonBytesMarshaller[A])(prefix, delimiter, suffix)
-
   def playJsonStreamMarshaller(
       prefix: String = "[",
       delimiter: String = ",",
       suffix: String = "]"
   ): ToResponseMarshaller[Source[JsValue, NotUsed]] =
     jsonStreamMarshaller(playJsonMarshaller[JsValue])(prefix, delimiter, suffix)
+
+  def jacksonStreamMarshaller[A](
+      prefix: String = "[",
+      delimiter: String = ",",
+      suffix: String = "]"
+  )(implicit ser: Boolean => JsonSerializer[A]): ToResponseMarshaller[Source[A, NotUsed]] =
+    jsonStreamMarshaller(jacksonMarshaller[A])(prefix, delimiter, suffix)
 
   private def jsonStreamMarshaller[A](
       marshaller: ToEntityMarshaller[A]
@@ -160,4 +165,16 @@ trait ApiMarshallers extends JsonFormats {
   }
 }
 
-object ApiMarshallers extends ApiMarshallers
+object ApiMarshallers extends ApiMarshallers {
+  private lazy val jsonFactory = new JsonFactory()
+
+  def writeToBytes[A](value: A)(implicit ser: JsonSerializer[A]): Array[Byte] = {
+    Using.resource(new ByteArrayBuilder(jsonFactory._getBufferRecycler())) { bb =>
+      Using.resource(jsonFactory.createGenerator(bb)) { gen =>
+        ser.serialize(value, gen, new DefaultSerializerProvider.Impl)
+        gen.flush()
+        bb.toByteArray
+      }
+    }((bb: ByteArrayBuilder) => bb.release())
+  }
+}

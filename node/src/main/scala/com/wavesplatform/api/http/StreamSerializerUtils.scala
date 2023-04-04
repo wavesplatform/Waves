@@ -1,123 +1,64 @@
 package com.wavesplatform.api.http
 
-import com.github.plokhotnyuk.jsoniter_scala.core.{JsonReader, JsonValueCodec, JsonWriter}
-import play.api.libs.json.{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsValue}
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.databind.{JsonSerializer, SerializerProvider}
 
 object StreamSerializerUtils {
-  implicit class JsonWriterOps(val writer: JsonWriter) extends AnyVal {
-    def writeKeyValue(key: String, writeVal: JsonWriter => Unit): Unit = {
-      writer.writeKey(key)
-      writeVal(writer)
+  implicit class JsonGeneratorOps(val gen: JsonGenerator) extends AnyVal {
+    def writeValueField[A](key: String, value: A)(ser: JsonSerializer[A], provider: SerializerProvider): Unit = {
+      gen.writeFieldName(key)
+      ser.serialize(value, gen, provider)
     }
 
-    def writeKeyValue(key: String, value: String): Unit = {
-      writer.writeKey(key)
-      writer.writeVal(value)
+    def writeValueField[A](key: String)(writeF: JsonGenerator => Unit): Unit = {
+      gen.writeFieldName(key)
+      writeF(gen)
     }
 
-    def writeKeyValue(key: String, value: Boolean): Unit = {
-      writer.writeKey(key)
-      writer.writeVal(value)
-    }
-
-    def writeKeyNull(key: String): Unit = {
-      writer.writeKey(key)
-      writer.writeNull()
-    }
-
-    def writeKeyValue(key: String, value: Long, numberAsString: Boolean): Unit = {
+    def writeNumberField(key: String, value: Long, numberAsString: Boolean): Unit = {
       if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
-        writeKeyValue(key, _.writeValAsString(value))
+        gen.writeStringField(key, value.toString)
       } else {
-        writeKeyValue(key, _.writeVal(value))
+        gen.writeNumberField(key, value)
       }
     }
 
-    def writeKeyValue(key: String, value: BigDecimal, numberAsString: Boolean): Unit = {
+    def writeNumberField(key: String, value: BigDecimal, numberAsString: Boolean): Unit = {
       if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
-        writeKeyValue(key, _.writeValAsString(value))
+        gen.writeStringField(key, value.bigDecimal.toPlainString)
       } else {
-        writeKeyValue(key, _.writeVal(value))
+        gen.writeNumberField(key, value.bigDecimal)
       }
     }
 
-    def writeKeyValue(key: String, value: Int, numberAsString: Boolean): Unit = {
+    def writeNumberField(key: String, value: Int, numberAsString: Boolean): Unit = {
       if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
-        writeKeyValue(key, _.writeValAsString(value))
+        gen.writeStringField(key, value.toString)
       } else {
-        writeKeyValue(key, _.writeVal(value))
+        gen.writeNumberField(key, value)
       }
     }
 
-    def writeKeyValue(key: String, value: Byte, numberAsString: Boolean): Unit = {
+    def writeNumberField(key: String, value: Byte, numberAsString: Boolean): Unit = {
       if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
-        writeKeyValue(key, _.writeValAsString(value))
+        gen.writeStringField(key, value.toString)
       } else {
-        writeKeyValue(key, _.writeVal(value))
+        gen.writeNumberField(key, value)
       }
     }
 
-    def writeKeyValueArray(key: String, writeArrayElems: JsonWriter => Unit): Unit = {
-      writer.writeKey(key)
-      writer.writeArrayStart()
-      writeArrayElems(writer)
-      writer.writeArrayEnd()
+    def writeArrayField(key: String)(writeArrayElems: JsonGenerator => Unit): Unit = {
+      gen.writeFieldName(key)
+      gen.writeStartArray()
+      writeArrayElems(gen)
+      gen.writeEndArray()
     }
 
-    def writeKeyValueArray[A](key: String, value: Seq[A])(elemCodec: JsonValueCodec[A]): Unit = {
-      writer.writeKey(key)
-      writer.writeArrayStart()
-      value.foreach(v => elemCodec.encodeValue(v, writer))
-      writer.writeArrayEnd()
+    def writeArrayField[A](key: String, value: Seq[A])(ser: JsonSerializer[A], provider: SerializerProvider): Unit = {
+      gen.writeFieldName(key)
+      gen.writeStartArray()
+      value.foreach(v => ser.serialize(v, gen, provider))
+      gen.writeEndArray()
     }
-  }
-
-  def jsValueCodec(numbersAsString: Boolean): JsonValueCodec[JsObject] = new OnlyEncodeJsonValueCodec[JsObject] {
-    def encodeValue(jsObj: JsObject, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      jsObj.fields.foreach { case (key, value) => encodeField(key, value, out) }
-      out.writeObjectEnd()
-    }
-
-    private def encodeField(key: String, jsValue: JsValue, out: JsonWriter): Unit = {
-      jsValue match {
-        case n: JsNumber =>
-          out.writeKeyValue(key, n.value, numbersAsString)
-        case b: JsBoolean =>
-          out.writeKeyValue(key, b.value)
-        case s: JsString =>
-          out.writeKeyValue(key, s.value)
-        case a: JsArray =>
-          out.writeKeyValueArray(key, out => a.value.foreach(encodeArrayElem(_, out)))
-        case o: JsObject =>
-          out.writeKeyValue(key, encodeValue(o, _))
-        case _ =>
-          out.writeKeyNull(key)
-      }
-    }
-
-    private def encodeArrayElem(jsValue: JsValue, out: JsonWriter): Unit = {
-      jsValue match {
-        case n: JsNumber =>
-          out.writeVal(n.value)
-        case b: JsBoolean =>
-          out.writeVal(b.value)
-        case s: JsString =>
-          out.writeVal(s.value)
-        case a: JsArray =>
-          out.writeArrayStart()
-          a.value.foreach(encodeArrayElem(_, out))
-          out.writeArrayEnd()
-        case o: JsObject =>
-          encodeValue(o, out)
-        case _ =>
-          out.writeNull()
-      }
-    }
-  }
-
-  trait OnlyEncodeJsonValueCodec[A] extends JsonValueCodec[A] {
-    override def decodeValue(in: JsonReader, default: A): A = ???
-    override def nullValue: A                               = ???
   }
 }

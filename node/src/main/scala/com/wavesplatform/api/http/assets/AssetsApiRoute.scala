@@ -11,13 +11,13 @@ import cats.instances.list.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, JsonWriter}
-import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.databind.{JsonSerializer, SerializerProvider}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsCodec}
+import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsSerializer}
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.common.state.ByteStr
@@ -180,7 +180,7 @@ case class AssetsApiRoute(
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetInfo, NotUsed]] =
-      jsonBytesStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(AssetsApiRoute.assetInfoCodec)
+      jacksonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(AssetsApiRoute.assetInfoSerializer)
 
     routeTimeout.executeFromObservable(
       (assets match {
@@ -247,7 +247,7 @@ case class AssetsApiRoute(
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
     else {
       import cats.syntax.either.*
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jsonBytesStreamMarshaller()(assetDetailsCodec)
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jacksonStreamMarshaller()(assetDetailsSerializer)
 
       val compBlockchain = compositeBlockchain()
       routeTimeout.executeStreamed {
@@ -471,81 +471,80 @@ object AssetsApiRoute {
     case class AssetId(assetId: String) extends AssetInfo
   }
 
-  implicit val assetIdCodec: JsonValueCodec[AssetInfo.AssetId] = JsonCodecMaker.make
-
-  def assetScriptDetailsCodec(numbersAsString: Boolean): JsonValueCodec[AssetScriptDetails] = new OnlyEncodeJsonValueCodec[AssetScriptDetails] {
-    override def encodeValue(details: AssetScriptDetails, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("scriptComplexity", details.scriptComplexity, numbersAsString)
-      out.writeKeyValue("script", details.script)
-      out.writeKeyValue("scriptText", details.scriptText)
-      out.writeObjectEnd()
+  def assetScriptDetailsSerializer(numbersAsString: Boolean): JsonSerializer[AssetScriptDetails] =
+    (details: AssetScriptDetails, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeNumberField("scriptComplexity", details.scriptComplexity, numbersAsString)
+      gen.writeStringField("script", details.script)
+      gen.writeStringField("scriptText", details.scriptText)
+      gen.writeEndObject()
     }
-  }
 
-  def assetDetailsCodec(numbersAsString: Boolean): JsonValueCodec[AssetDetails] = new OnlyEncodeJsonValueCodec[AssetDetails] {
-    override def encodeValue(details: AssetDetails, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("assetId", details.assetId)
-      out.writeKeyValue("issueHeight", details.issueHeight, numbersAsString)
-      out.writeKeyValue("issueTimestamp", details.issueTimestamp, numbersAsString)
-      out.writeKeyValue("issuer", details.issuer)
-      out.writeKeyValue("issuerPublicKey", details.issuerPublicKey)
-      out.writeKeyValue("name", details.name)
-      out.writeKeyValue("description", details.description)
-      out.writeKeyValue("decimals", details.decimals, numbersAsString)
-      out.writeKeyValue("reissuable", details.reissuable)
-      out.writeKeyValue("quantity", details.quantity, numbersAsString)
-      out.writeKeyValue("scripted", details.scripted)
-      details.minSponsoredAssetFee.foreach(fee => out.writeKeyValue("minSponsoredAssetFee", fee, numbersAsString))
-      out.writeKeyValue("originTransactionId", details.originTransactionId)
-      out.writeKeyValue("sequenceInBlock", details.sequenceInBlock, numbersAsString)
-      details.scriptDetails.foreach(sd => out.writeKeyValue("scriptDetails", assetScriptDetailsCodec(numbersAsString).encodeValue(sd, _)))
-      out.writeObjectEnd()
+  def assetDetailsSerializer(numbersAsString: Boolean): JsonSerializer[AssetDetails] =
+    (details: AssetDetails, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeStringField("assetId", details.assetId)
+      gen.writeNumberField("issueHeight", details.issueHeight, numbersAsString)
+      gen.writeNumberField("issueTimestamp", details.issueTimestamp, numbersAsString)
+      gen.writeStringField("issuer", details.issuer)
+      gen.writeStringField("issuerPublicKey", details.issuerPublicKey)
+      gen.writeStringField("name", details.name)
+      gen.writeStringField("description", details.description)
+      gen.writeNumberField("decimals", details.decimals, numbersAsString)
+      gen.writeBooleanField("reissuable", details.reissuable)
+      gen.writeNumberField("quantity", details.quantity, numbersAsString)
+      gen.writeBooleanField("scripted", details.scripted)
+      details.minSponsoredAssetFee.foreach(fee => gen.writeNumberField("minSponsoredAssetFee", fee, numbersAsString))
+      gen.writeStringField("originTransactionId", details.originTransactionId)
+      gen.writeNumberField("sequenceInBlock", details.sequenceInBlock, numbersAsString)
+      details.scriptDetails.foreach(sd => gen.writeValueField("scriptDetails", sd)(assetScriptDetailsSerializer(numbersAsString), serializers))
+      gen.writeEndObject()
     }
-  }
 
-  def issueTxCodec(numbersAsString: Boolean): JsonValueCodec[IssueTransaction] = new OnlyEncodeJsonValueCodec[IssueTransaction] {
-    override def encodeValue(tx: IssueTransaction, out: JsonWriter): Unit = {
-      out.writeObjectStart()
-      out.writeKeyValue("type", tx.tpe.id, numbersAsString)
-      out.writeKeyValue("id", tx.id().toString)
-      out.writeKeyValue("fee", tx.assetFee._2, numbersAsString)
-      tx.assetFee._1.maybeBase58Repr.fold(out.writeKeyNull("feeAssetId"))(out.writeKeyValue("feeAssetId", _))
-      out.writeKeyValue("timestamp", tx.timestamp, numbersAsString)
-      out.writeKeyValue("version", tx.version, numbersAsString)
-      if (tx.version >= TxVersion.V2) out.writeKeyValue("chainId", tx.chainId, numbersAsString) else out.writeKeyNull("chainId")
-      out.writeKeyValue("sender", tx.sender.toAddress(tx.chainId).toString)
-      out.writeKeyValue("senderPublicKey", tx.sender.toString)
-      out.writeKeyValueArray("proofs", out => tx.proofs.proofs.foreach(p => out.writeVal(p.toString)))
-      out.writeKeyValue("assetId", tx.assetId.toString)
-      out.writeKeyValue("name", tx.name.toStringUtf8)
-      out.writeKeyValue("quantity", tx.quantity.value, numbersAsString)
-      out.writeKeyValue("reissuable", tx.reissuable)
-      out.writeKeyValue("decimals", tx.decimals.value, numbersAsString)
-      out.writeKeyValue("description", tx.description.toStringUtf8)
+  def issueTxSerializer(numbersAsString: Boolean): JsonSerializer[IssueTransaction] =
+    (tx: IssueTransaction, gen: JsonGenerator, serializers: SerializerProvider) => {
+      gen.writeStartObject()
+      gen.writeNumberField("type", tx.tpe.id, numbersAsString)
+      gen.writeStringField("id", tx.id().toString)
+      gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
+      tx.assetFee._1.maybeBase58Repr.fold(gen.writeNullField("feeAssetId"))(gen.writeStringField("feeAssetId", _))
+      gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
+      gen.writeNumberField("version", tx.version, numbersAsString)
+      if (tx.version >= TxVersion.V2) gen.writeNumberField("chainId", tx.chainId, numbersAsString) else gen.writeNullField("chainId")
+      gen.writeStringField("sender", tx.sender.toAddress(tx.chainId).toString)
+      gen.writeStringField("senderPublicKey", tx.sender.toString)
+      gen.writeArrayField("proofs")(gen => tx.proofs.proofs.foreach(p => gen.writeString(p.toString)))
+      gen.writeStringField("assetId", tx.assetId.toString)
+      gen.writeStringField("name", tx.name.toStringUtf8)
+      gen.writeNumberField("quantity", tx.quantity.value, numbersAsString)
+      gen.writeBooleanField("reissuable", tx.reissuable)
+      gen.writeNumberField("decimals", tx.decimals.value, numbersAsString)
+      gen.writeStringField("description", tx.description.toStringUtf8)
       if (tx.version >= TxVersion.V2) {
-        tx.script.map(_.bytes().base64).fold(out.writeKeyNull("script"))(out.writeKeyValue("script", _))
+        tx.script.map(_.bytes().base64).fold(gen.writeNullField("script"))(gen.writeStringField("script", _))
       }
-      if (tx.usesLegacySignature) out.writeKeyValue("signature", tx.signature.toString)
-      out.writeObjectEnd()
+      if (tx.usesLegacySignature) gen.writeStringField("signature", tx.signature.toString)
+      gen.writeEndObject()
     }
-  }
 
-  def assetInfoCodec(numbersAsString: Boolean): JsonValueCodec[AssetInfo] = new OnlyEncodeJsonValueCodec[AssetInfo] {
-    override def encodeValue(x: AssetInfo, out: JsonWriter): Unit = x match {
-      case info: AssetInfo.FullAssetInfo =>
-        out.writeObjectStart()
-        out.writeKeyValue("assetId", info.assetId)
-        out.writeKeyValue("reissuable", info.reissuable)
-        info.minSponsoredAssetFee.foreach(out.writeKeyValue("minSponsoredAssetFee", _, numbersAsString))
-        info.sponsorBalance.foreach(out.writeKeyValue("sponsorBalance", _, numbersAsString))
-        out.writeKeyValue("quantity", info.quantity, numbersAsString)
-        info.issueTransaction.foreach(tx => out.writeKeyValue("issueTransaction", issueTxCodec(numbersAsString).encodeValue(tx, _)))
-        out.writeKeyValue("balance", info.balance, numbersAsString)
-        out.writeKeyValue("sequenceInBlock", info.sequenceInBlock, numbersAsString)
-        out.writeObjectEnd()
-      case assetId: AssetInfo.AssetId => assetIdCodec.encodeValue(assetId, out)
+  def assetInfoSerializer(numbersAsString: Boolean): JsonSerializer[AssetInfo] =
+    (value: AssetInfo, gen: JsonGenerator, serializers: SerializerProvider) => {
+      value match {
+        case info: AssetInfo.FullAssetInfo =>
+          gen.writeStartObject()
+          gen.writeStringField("assetId", info.assetId)
+          gen.writeBooleanField("reissuable", info.reissuable)
+          info.minSponsoredAssetFee.foreach(gen.writeNumberField("minSponsoredAssetFee", _, numbersAsString))
+          info.sponsorBalance.foreach(gen.writeNumberField("sponsorBalance", _, numbersAsString))
+          gen.writeNumberField("quantity", info.quantity, numbersAsString)
+          info.issueTransaction.foreach(tx => gen.writeValueField("issueTransaction", tx)(issueTxSerializer(numbersAsString), serializers))
+          gen.writeNumberField("balance", info.balance, numbersAsString)
+          gen.writeNumberField("sequenceInBlock", info.sequenceInBlock, numbersAsString)
+          gen.writeEndObject()
+        case assetId: AssetInfo.AssetId =>
+          gen.writeStartObject()
+          gen.writeStringField("assetId", assetId.assetId)
+          gen.writeEndObject()
+      }
     }
-  }
 }
