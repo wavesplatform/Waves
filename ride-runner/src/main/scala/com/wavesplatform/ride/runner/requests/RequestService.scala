@@ -15,12 +15,11 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelablePromise, Scheduler}
-import monix.reactive.Observable
 import play.api.libs.json.JsObject
 
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 
 trait RequestService extends AutoCloseable {
   def start(): Unit
@@ -65,16 +64,8 @@ class DefaultRequestService(
     val task =
       if (!isWorking.get()) Task.unit
       else
-        Observable
-          .repeatEval(requestScheduler.getJob())
+        requestScheduler.jobs
           .takeWhile(_ => isWorking.get())
-          .concatMap {
-            case Some(x) => Observable.now(x)
-            case None =>
-              Observable
-                .fromTask(Task.sleep(100.millis))
-                .flatMap(_ => Observable.empty)
-          }
           .mapParallelUnordered(3) { toRun =>
             val orig = currJobs.computeIfAbsent(toRun, _ => RequestJob.mk())
             if (orig.inProgress) Task.unit
@@ -112,6 +103,7 @@ class DefaultRequestService(
 
   override def close(): Unit = {
     isWorking.set(false)
+    requestScheduler.close()
 //    Await.result(currTask)
   }
 

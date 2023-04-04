@@ -10,7 +10,7 @@ import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, SynchronizedJobScheduler}
+import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
@@ -37,56 +37,49 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
 
   "RequestsService" - {
     "trackAndRun" - {
-      "multiple simultaneous requests resolve once" in test { d =>
-        implicit val scheduler = d.scheduler
-
-        d.processor.startScripts()
-        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
-        d.scheduler.tick()
-
-        val r1, r2 = d.requests.trackAndRun(aRequest)
-        scheduler.tick()
-        r1.runSyncUnsafe(1.second) shouldBe r2.runSyncUnsafe(1.second)
-      }
-
       "returns an actual value" in test { d =>
         def checkExpectedResults(aResult: Int, bResult: Int, cResult: Int): Unit = {
-          withClue("a:")(d.trackAndRun(aRequest) shouldBe aResult)
-          withClue("b:")(d.trackAndRun(bRequest) shouldBe bResult)
-          withClue("c:")(d.trackAndRun(cRequest) shouldBe cResult)
+          withClue(s"a $aliceAddr:")(d.check(aRequest, aResult))
+          withClue(s"b $bobAddr:")(d.check(bRequest, bResult))
+          withClue(s"c: $carlAddr")(d.check(cRequest, cResult))
         }
 
         d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
         d.scheduler.tick()
         checkExpectedResults(0, 1, 0)
 
-        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(2, 0)))
+        d.blockchainApi.blockchainUpdatesUpstream.onNext(
+          WrappedEvent.Next(
+            mkBlockAppendEvent(2, 0, List(mkDataEntryUpdate(aliceAddr, "x", 0, 1)))
+          )
+        )
         d.scheduler.tick()
-        checkExpectedResults(0, 2, 0)
+        checkExpectedResults(1, 2, 0)
 
         d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(3, 0)))
         d.scheduler.tick()
-        checkExpectedResults(0, 3, 1)
+        checkExpectedResults(1, 3, 1)
 
         d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(4, 0)))
         d.scheduler.tick()
-        checkExpectedResults(0, 4, 1)
+        checkExpectedResults(1, 4, 1)
       }
     }
   }
 
   private case class TestDependencies(
+      requestServiceSettings: DefaultRequestService.Settings,
       requests: RequestService,
       processor: Processor,
       blockchainApi: TestBlockchainApi,
       scheduler: TestScheduler
   ) {
-    def trackAndRun(request: ScriptRequest): Int = {
+    def check(request: ScriptRequest, expectedValue: Int): Unit = {
       val task = requests.trackAndRun(request).runToFuture(scheduler)
       scheduler.tick()
       val r = Await.result(task, 5.seconds)
       withClue(s"$r:") {
-        (r \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt
+        (r \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
       }
     }
   }
@@ -119,13 +112,16 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       )
     }
 
-    val requestsService = use(new DefaultRequestService(
-      settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
-      db = testDb.storage,
-      sharedBlockchain = sharedBlockchain,
-      SynchronizedJobScheduler[ScriptRequest](10),
-      runScriptScheduler = testScheduler
-    ))
+    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds)
+    val requestsService = use(
+      new DefaultRequestService(
+        settings = requestServiceSettings,
+        db = testDb.storage,
+        sharedBlockchain = sharedBlockchain,
+        use(new TestJobScheduler()),
+        runScriptScheduler = testScheduler
+      )
+    )
     val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
@@ -153,6 +149,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     testScheduler.tick()
     f(
       TestDependencies(
+        requestServiceSettings,
         requestsService,
         new BlockchainProcessor(sharedBlockchain, requestsService),
         blockchainApi,

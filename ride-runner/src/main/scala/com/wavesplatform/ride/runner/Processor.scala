@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.requests.RequestService
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.{AffectedTags, ScriptRequest, SharedBlockchainStorage}
@@ -47,8 +46,6 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
 
   override def process(event: BlockchainUpdated): Unit = {
     val height = Height(event.height)
-    log.info(s"Processing ${getSimpleName(event.update)} at $height")
-
     event.update match {
       case Update.Append(append) =>
         append.body match {
@@ -70,8 +67,6 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
       ProcessResult(height, affected),
       { (orig, update) => orig.combine(update) }
     )
-
-    log.info(s"Processed $height")
   }
 
   override def runAffectedScripts(updateType: UpdateType): Task[Unit] = {

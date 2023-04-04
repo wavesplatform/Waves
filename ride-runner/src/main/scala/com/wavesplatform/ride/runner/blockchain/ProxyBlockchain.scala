@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
+// TODO It seems we can remove this
 class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest])(implicit ctx: ReadWrite) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = sharedBlockchain.blockchainSettings
 

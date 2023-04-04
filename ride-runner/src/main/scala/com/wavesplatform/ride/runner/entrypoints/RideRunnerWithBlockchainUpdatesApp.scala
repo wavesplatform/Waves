@@ -121,17 +121,18 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: shared (local or network)=${sharedBlockchain.heightUntagged}, network=$lastHeightAtStart")
 
-    val requestsService = new DefaultRequestService(
+    val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       db.access,
       sharedBlockchain,
       null, // TODO
       rideScheduler
     )
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
 
     // TODO #100 Fix App with BlockchainUpdates
     // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
+    // Await.result(requestService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     // TODO #100 Settings?
     val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
@@ -144,7 +145,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       blockchainUpdates.close()
     }
 
-    val processor = new BlockchainProcessor(sharedBlockchain, requestsService)
+    val processor = new BlockchainProcessor(sharedBlockchain, requestService)
     val events = blockchainUpdates.downstream
       .doOnError(e =>
         Task {
@@ -168,7 +169,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     blockchainUpdates.start(lastSafeKnownHeight + 1, endHeight)
 
     // TODO
-    val task = Task.parTraverseUnordered(scripts)(requestsService.trackAndRun).runToFuture(rideScheduler)
+    val task = Task.parTraverseUnordered(scripts)(requestService.trackAndRun).runToFuture(rideScheduler)
     Await.result(task, Duration.Inf)
 
     log.info("Initialization completed")

@@ -5,15 +5,14 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
-import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.requests.DefaultRequestService
+import com.wavesplatform.ride.runner.requests.{DefaultRequestService, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -67,23 +66,25 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
     }
 
-    val request = ScriptRequest(aliceAddr, Json.obj("expr" -> "foo()"))
-    val requestService = new DefaultRequestService(
-      settings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds),
-      db = testDb.storage,
-      sharedBlockchain = sharedBlockchain,
-//      requestsStorage = new RequestsStorage {
-//        override def size: Int                      = 1
-//        override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
-//        override def all(): List[ScriptRequest]     = List(request)
-//      },
-      null, // TODO
-      runScriptScheduler = testScheduler
+    val request                = ScriptRequest(aliceAddr, Json.obj("expr" -> "foo()"))
+    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds)
+    val requestService = use(
+      new DefaultRequestService(
+        settings = requestServiceSettings,
+        db = testDb.storage,
+        sharedBlockchain = sharedBlockchain,
+        requestScheduler = use(new TestJobScheduler()),
+        runScriptScheduler = testScheduler
+      ) {
+        override def start(): Unit = {
+          super.start()
+          testScheduler.tick()
+          trackAndRun(request).runToFuture
+          testScheduler.tick()
+        }
+      }
     )
     val processor = new BlockchainProcessor(sharedBlockchain, requestService)
-
-    requestService.runAll().runToFuture
-    testScheduler.tick(1.milli) // 1 millisecond to detect that script will be ran in the end
 
     def getScriptResult: JsObject = {
       val r = requestService.trackAndRun(request).runToFuture
@@ -115,10 +116,12 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       .runToFuture
 
     // We don't have a correct mock for getFromBlockchain, so we need to track changes from BlockchainUpdates
-    val _ = getScriptResult // So, track this script
 
     blockchainUpdatesStream.start(1)
-    events.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
+    events.foreach { evt =>
+      blockchainApi.blockchainUpdatesUpstream.onNext(evt)
+      testScheduler.tick()
+    }
 
     testScheduler.tick()
     testScheduler.tick(blockchainStateSettings.delayBeforeForceRestart)

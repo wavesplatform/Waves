@@ -154,9 +154,10 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       settings.rideRunner.requestsService,
       rideDb.access,
       sharedBlockchain,
-      SynchronizedJobScheduler(50),
+      new SynchronizedJobScheduler()(rideScheduler),
       rideScheduler
     )
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
 
     val lastSafeKnownHeight = Height(math.max(0, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(math.max(sharedBlockchain.heightUntagged, lastHeightAtStart))
