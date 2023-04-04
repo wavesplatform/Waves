@@ -79,7 +79,7 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
     if (last.isEmpty) Task(log.info(s"[${last.newHeight}] No changes"))
     else {
       RideRunnerStats.rideRequestAffectedNumber(updateType).update(last.affected.size.toDouble)
-      requestsService.runAffected(last.newHeight, last.affected)
+      requestsService.runAffected(last.affected)
     }
   }
 

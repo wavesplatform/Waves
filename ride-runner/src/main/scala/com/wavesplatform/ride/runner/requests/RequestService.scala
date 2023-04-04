@@ -26,7 +26,7 @@ trait RequestService extends AutoCloseable {
   def start(): Unit
   def runAll(): Task[Unit]
   // TODO prioritizeAffected
-  def runAffected(atHeight: Int, affected: Set[ScriptRequest]): Task[Unit]
+  def runAffected(affected: Set[ScriptRequest]): Task[Unit]
   def trackAndRun(request: ScriptRequest): Task[JsObject]
 }
 
@@ -102,6 +102,7 @@ class DefaultRequestService(
                 case _ => Task.unit
               }
           }
+          .logErr
           .lastL
           .as(())
 
@@ -121,36 +122,37 @@ class DefaultRequestService(
     Task.unit
   }
 
-  override def runAffected(reason: Int, affected: Set[ScriptRequest]): Task[Unit] = Task {
+  override def runAffected(affected: Set[ScriptRequest]): Task[Unit] = Task {
+    // println(s"3 ==> affected: $affected")
     requestScheduler.addMultiple(affected)
     RideRunnerStats.rideRequestTotalNumber.update(requests.estimatedSize().toDouble)
   }
 
-  override def trackAndRun(request: ScriptRequest): Task[JsObject] = {
-    val currentHeight = Height(sharedBlockchain.heightUntagged)
-    val cache         = Option(requests.getIfPresent(request))
-    cache match {
-      case Some(cache) =>
-        rideRequestCacheHits.increment()
-        Task.now(cache.lastResult)
+  override def trackAndRun(request: ScriptRequest): Task[JsObject] = Option(requests.getIfPresent(request)) match {
+    case Some(cache) =>
+      rideRequestCacheHits.increment()
+      Task.now(cache.lastResult)
 
-      case _ =>
-        rideRequestCacheMisses.increment()
-        Task {
-          db.readWrite { implicit ctx =>
-            sharedBlockchain.accountScripts.getUntagged(currentHeight, request.address)
+    case _ =>
+      rideRequestCacheMisses.increment()
+      Option(currJobs.get(request)) match {
+        case Some(job) => Task.fromCancelablePromise(job.result)
+        case None =>
+          Task {
+            db.readWrite { implicit ctx =>
+              sharedBlockchain.accountScripts.getUntagged(Height(sharedBlockchain.heightUntagged), request.address)
+            }
+          }.flatMap {
+            // TODO #19 Change/move an error to an appropriate layer
+            case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
+            case _ =>
+              log.info(s"Adding ${request.logPrefix} as $request")
+              val job = RequestJob.mk()
+              currJobs.putIfAbsent(request, job)
+              requestScheduler.add(request)
+              Task.fromCancelablePromise(job.result)
           }
-        }.flatMap {
-          // TODO #19 Change/move an error to an appropriate layer
-          case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
-          case _ =>
-            log.info(s"Adding ${request.logPrefix} as $request")
-            val job = RequestJob.mk()
-            currJobs.putIfAbsent(request, job)
-            requestScheduler.add(request)
-            Task.fromCancelablePromise(job.result)
-        }
-    }
+      }
   }
 
   private def runManyAll(height: Int, scripts: Iterable[RideScriptRunEnvironment])(implicit ctx: ReadWrite): Task[Unit] = {

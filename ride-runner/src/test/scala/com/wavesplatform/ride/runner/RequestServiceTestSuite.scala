@@ -5,15 +5,15 @@ import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
 import com.wavesplatform.api.HasGrpc
-import com.wavesplatform.api.grpc.BalanceResponse
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService}
+import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
 import monix.eval.Task
@@ -29,12 +29,6 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
   private val bRequest = ScriptRequest(bobAddr, Json.obj("expr" -> "default()"))
   private val cRequest = ScriptRequest(carlAddr, Json.obj("expr" -> "default()"))
 
-  private val requestsStorage = new RequestsStorage {
-    override val all: List[ScriptRequest]       = List(aRequest, bRequest, cRequest)
-    override val size: Int                      = all.size
-    override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
-  }
-
   private val accountScripts = Map(
     aliceAddr -> mkScript(aliceScriptSrc),
     bobAddr   -> mkScript(bobScriptSrc),
@@ -44,11 +38,15 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
   "RequestsService" - {
     "trackAndRun" - {
       "multiple simultaneous requests resolve once" in test { d =>
+        implicit val scheduler = d.scheduler
+
+        d.processor.startScripts()
         d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
         d.scheduler.tick()
 
         val r1, r2 = d.requests.trackAndRun(aRequest)
-        r1 shouldBe r2
+        scheduler.tick()
+        r1.runSyncUnsafe(1.second) shouldBe r2.runSyncUnsafe(1.second)
       }
 
       "returns an actual value" in test { d =>
@@ -97,10 +95,11 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     implicit val testScheduler = TestScheduler()
 
     val blockchainApi = new TestBlockchainApi() {
-      override def getCurrentBlockchainHeight(): Int                      = 2
-      override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
-      override def getActivatedFeatures(height: Int): Map[Short, Int]     = blockchainSettings.functionalitySettings.preActivatedFeatures
-      override def getAccountScript(address: Address): Option[Script]     = accountScripts.get(address)
+      override def getCurrentBlockchainHeight(): Int = 2
+      override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf] =
+        toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
+      override def getActivatedFeatures(height: Int): Map[Short, Int] = blockchainSettings.functionalitySettings.preActivatedFeatures
+      override def getAccountScript(address: Address): Option[Script] = accountScripts.get(address)
       override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
         if (address == aliceAddr && key == "x") IntegerDataEntry("x", 0).some
         else super.getAccountDataEntry(address, key)
@@ -120,20 +119,18 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       )
     }
 
-    val requestsService = new DefaultRequestService(
+    val requestsService = use(new DefaultRequestService(
       settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
       db = testDb.storage,
       sharedBlockchain = sharedBlockchain,
-//      requestsStorage = requestsStorage,
-      null, // TODO
+      SynchronizedJobScheduler[ScriptRequest](10),
       runScriptScheduler = testScheduler
-    )
+    ))
     val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
     val workingHeight = Height(1)
     val eventsStream = blockchainUpdatesStream.downstream
-      .doOnComplete(Task(log.info("test")))
       .doOnError(e =>
         Task {
           log.error("Error!", e)

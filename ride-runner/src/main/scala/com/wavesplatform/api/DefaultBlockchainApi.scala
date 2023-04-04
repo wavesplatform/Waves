@@ -17,6 +17,7 @@ import com.wavesplatform.api.grpc.{
   BalancesRequest,
   BlockRangeRequest,
   BlockRequest,
+  BlockWithHeight,
   BlockchainApiGrpc,
   BlocksApiGrpc,
   DataRequest,
@@ -25,6 +26,7 @@ import com.wavesplatform.api.grpc.{
 }
 import com.wavesplatform.api.observers.{ManualGrpcObserver, MonixWrappedDownstream}
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.concurrent.MayBeSemaphore
@@ -32,7 +34,6 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
@@ -46,8 +47,6 @@ import monix.execution.exceptions.UpstreamTimeoutException
 import monix.reactive.operators.extraSyntax.*
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
-import play.api.libs.json.{Json, Reads}
-import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -59,8 +58,7 @@ import scala.util.control.NoStackTrace
 class DefaultBlockchainApi(
     settings: Settings,
     grpcApiChannel: Channel,
-    blockchainUpdatesApiChannel: Channel,
-    httpBackend: SttpBackend[Identity, Any]
+    blockchainUpdatesApiChannel: Channel
 ) extends ScorexLogging
     with BlockchainApi {
 
@@ -185,7 +183,7 @@ class DefaultBlockchainApi(
     toVanillaScript(as.scriptBytes).tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.hashCode())}"))
   }
 
-  override def getBlockHeader(height: Int): Option[SignedBlockHeader] = {
+  override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf] = {
     val x = grpcCall("getBlockHeader") {
       ClientCalls.blockingUnaryCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
@@ -193,10 +191,10 @@ class DefaultBlockchainApi(
       )
     }
 
-    x.block.map(toVanilla).tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}"))
+    toVanilla(x).tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.header.id())}"))
   }
 
-  override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader] = {
+  override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeaderWithVrf] = {
     val xs = grpcCall("getBlockHeaderRange") {
       ClientCalls.blockingServerStreamingCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),
@@ -205,25 +203,9 @@ class DefaultBlockchainApi(
     }
 
     xs.asScala
-      .map(x => toVanilla(x.getBlock))
+      .flatMap(toVanilla)
       .toList
       .tap(_ => log.trace(s"getBlockHeaderRange($fromHeight, $toHeight)"))
-  }
-
-  // TODO #5: It seems VRF can be obtained only from REST API, take from gRPC/BlockchainUpdates API when it will be possible
-  override def getVrf(height: Int): Option[ByteStr] = {
-    basicRequest
-      .get(uri"${settings.nodeApiBaseUri}/blocks/headers/at/$height")
-      .response(asString)
-      .send(httpBackend)
-      .body match {
-      case Left(e) =>
-        log.warn(s"Can't get VRF for $height: ${e.take(100)}")
-        None
-
-      case Right(rawJson) =>
-        Json.parse(rawJson).as[HttpBlockHeader].VRF
-    }
   }
 
   override def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = {
@@ -350,16 +332,10 @@ class DefaultBlockchainApi(
 }
 
 object DefaultBlockchainApi {
+  // TODO remove nodeApiBaseUri?
   case class Settings(nodeApiBaseUri: String, grpcApi: GrpcApiSettings, blockchainUpdatesApi: BlockchainUpdatesApiSettings)
   case class GrpcApiSettings(maxConcurrentRequests: Option[Int])
   case class BlockchainUpdatesApiSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
-
-  private case class HttpBlockHeader(VRF: Option[ByteStr] = None)
-
-  private object HttpBlockHeader {
-    import com.wavesplatform.utils.byteStrFormat
-    implicit val httpBlockHeaderReads: Reads[HttpBlockHeader] = Json.using[Json.WithDefaultValues].reads
-  }
 
   private case object StopException           extends RuntimeException("By a request") with NoStackTrace
   private case object ReplaceWithNewException extends RuntimeException("Replace with a new observer") with NoStackTrace
@@ -367,8 +343,11 @@ object DefaultBlockchainApi {
   def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
   def toPb(asset: Asset): ByteString     = asset.fold(ByteString.EMPTY)(x => UnsafeByteOperations.unsafeWrap(x.id.arr))
 
-  def toVanilla(block: Block): SignedBlockHeader = {
-    val header = block.getHeader
+  def toVanilla(blockWithHeight: BlockWithHeight): Option[SignedBlockHeaderWithVrf] = for {
+    b      <- blockWithHeight.block
+    header <- b.header
+    signature = b.signature
+  } yield SignedBlockHeaderWithVrf(
     SignedBlockHeader(
       header = BlockHeader(
         version = header.version.toByte,
@@ -381,7 +360,8 @@ object DefaultBlockchainApi {
         rewardVote = header.rewardVote,
         transactionsRoot = header.transactionsRoot.toByteStr
       ),
-      signature = block.signature.toByteStr
-    )
-  }
+      signature = signature.toByteStr
+    ),
+    blockWithHeight.vrf.toByteStr
+  )
 }

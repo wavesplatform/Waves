@@ -21,7 +21,6 @@ import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import play.api.libs.json.Json
-import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -96,14 +95,10 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val blockchainUpdatesApiChannel = mkGrpcChannel("blockchainUpdatesApi", settings.rideRunner.blockchainUpdatesApiChannel)
 
     log.info("Creating general API gateway...")
-    val httpBackend = HttpURLConnectionBackend()
-    cs.cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") { httpBackend.close() }
-
     val blockchainApi = new DefaultBlockchainApi(
       settings = settings.rideRunner.blockchainApi,
       grpcApiChannel = grpcApiChannel,
-      blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
-      httpBackend = httpBackend
+      blockchainUpdatesApiChannel = blockchainUpdatesApiChannel
     )
 
     // TODO HACK: Remove when the storage format cemented
@@ -120,7 +115,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
         }
       }
 
-      val cleanTo = 1 // Increase if you want to clean the database
+      val cleanTo = 2 // Increase if you want to clean the database
       if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
         log.info(
           s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
@@ -163,7 +158,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       rideScheduler
     )
 
-    val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
+    val lastSafeKnownHeight = Height(math.max(0, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(math.max(sharedBlockchain.heightUntagged, lastHeightAtStart))
 
     log.info(s"Watching blockchain updates...")

@@ -1,12 +1,12 @@
 package com.wavesplatform.api
 
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.BlockchainApi.*
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.api.BlockchainApi.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.{AssetDescription, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
@@ -20,9 +20,8 @@ trait BlockchainApi {
   def getAccountDataEntries(address: Address): Seq[DataEntry[?]]
   def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]]
   def getAccountScript(address: Address): Option[Script]
-  def getBlockHeader(height: Int): Option[SignedBlockHeader]
-  def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader]
-  def getVrf(height: Int): Option[ByteStr]
+  def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf]
+  def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeaderWithVrf]
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription]
   def resolveAlias(alias: Alias): Option[Address]
   def getBalance(address: Address, asset: Asset): Long

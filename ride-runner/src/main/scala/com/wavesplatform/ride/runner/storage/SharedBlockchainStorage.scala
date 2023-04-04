@@ -34,8 +34,6 @@ class SharedBlockchainStorage[TagT] private (
 ) extends ScorexLogging {
   val blockchainSettings: BlockchainSettings = settings.blockchain
 
-  val maxRollbackSize = 100
-
   val chainId = blockchainSettings.addressSchemeCharacter.toByte
 
   val data = new AccountDataStorage[TagT](settings.caches.accountData, chainId, blockchainApi, persistentCaches.accountDataEntries)
@@ -48,8 +46,6 @@ class SharedBlockchainStorage[TagT] private (
     persistentCaches.accountScripts
   )
 
-  val vrf = new VrfStorage(settings.caches.vrf, blockchainApi, persistentCaches.vrf, heightUntagged)
-
   val height = new HeightTagsStorage[TagT](heightUntagged)
 
   // Ride: wavesBalance, height, lastBlock
@@ -57,7 +53,7 @@ class SharedBlockchainStorage[TagT] private (
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
     db.readWrite { implicit ctx =>
-      blockHeaders.getLocal(height).map(_.id() == id)
+      blockHeaders.getLocal(height).map(_.header.id() == id)
     }
 
   // No way to get this from blockchain updates
@@ -178,7 +174,7 @@ class SharedBlockchainStorage[TagT] private (
 
   private def rollback(fromHeight: Height, toHeight: Height, rollback: BlockchainUpdated.Rollback)(implicit ctx: ReadWrite): AffectedTags[TagT] =
     rollbackProcessingTime.measure {
-      vrf.remove((toHeight + 1) to fromHeight)
+      blockHeaders.removeFrom(fromHeight)
 
       val stateUpdate = rollback.getRollbackStateUpdate
       stateUpdate.assets.foldLeft(empty) { case (r, x) =>

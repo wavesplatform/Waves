@@ -12,7 +12,6 @@ import monix.eval.Task
 import monix.execution.ExecutionModel
 import monix.execution.exceptions.UpstreamTimeoutException
 import monix.execution.schedulers.TestScheduler
-import sttp.client3.testing.SttpBackendStub
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
@@ -63,8 +62,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               DefaultBlockchainApi.BlockchainUpdatesApiSettings(upstreamTimeout, 2)
             ),
             EmptyChannel,
-            channel,
-            SttpBackendStub.synchronous
+            channel
           )
 
           val stream        = blockchainApi.mkBlockchainUpdatesStream(testScheduler)
@@ -164,8 +162,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               DefaultBlockchainApi.BlockchainUpdatesApiSettings(1.second, 2)
             ),
             EmptyChannel,
-            channel,
-            SttpBackendStub.synchronous
+            channel
           )
 
           val stream        = blockchainApi.mkBlockchainUpdatesStream(testScheduler)
@@ -259,8 +256,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               DefaultBlockchainApi.BlockchainUpdatesApiSettings(upstreamTimeout, 2)
             ),
             EmptyChannel,
-            channel,
-            SttpBackendStub.synchronous
+            channel
           )
 
           val stream        = blockchainApi.mkBlockchainUpdatesStream(testScheduler)

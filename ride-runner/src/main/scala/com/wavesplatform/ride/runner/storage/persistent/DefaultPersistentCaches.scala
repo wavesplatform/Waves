@@ -2,9 +2,8 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.collections.syntax.*
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.rocksdb.AddressId
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
@@ -284,21 +283,21 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
   override val blockHeaders = new BlockPersistentCache {
     protected lazy val log = LoggerFacade(LoggerFactory.getLogger("DefaultPersistentCaches.blockHeaders"))
 
-    private val Key = CacheKeys.SignedBlockHeaders
+    private val Key = CacheKeys.SignedBlockHeadersWithVrf
 
     @volatile private var lastHeight = initialBlockHeadersLastHeight
 
     override def getLastHeight(implicit ctx: ReadOnly): Option[Int] = lastHeight
 
-    override def get(height: Int)(implicit ctx: ReadOnly): Option[SignedBlockHeader] =
+    override def get(height: Int)(implicit ctx: ReadOnly): Option[SignedBlockHeaderWithVrf] =
       ctx
         .getOpt(Key.mkKey(height))
-        .tap { r => log.trace(s"get($height): ${r.toFoundStr("id", _.id())}") }
+        .tap { r => log.trace(s"get($height): ${r.toFoundStr("id", _.header.id())}") }
 
-    override def getFrom(height: Int, n: Int)(implicit ctx: ReadOnly): List[SignedBlockHeader] = {
+    override def getFrom(height: Int, n: Int)(implicit ctx: ReadOnly): List[SignedBlockHeaderWithVrf] = {
       val lastHeight = height + n - 1
       val startKey   = Key.mkKey(height)
-      val result     = List.newBuilder[SignedBlockHeader]
+      val result     = List.newBuilder[SignedBlockHeaderWithVrf]
       ctx.iterateFrom(Key.prefixBytes, startKey.keyBytes) { entry =>
         val currentHeight = Key.parseKey(entry.getKey)
         val goNext        = currentHeight <= lastHeight
@@ -308,7 +307,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
       result.result()
     }
 
-    override def set(height: Int, data: SignedBlockHeader)(implicit ctx: ReadWrite): Unit = {
+    override def set(height: Int, data: SignedBlockHeaderWithVrf)(implicit ctx: ReadWrite): Unit = {
       ctx.put(Key.mkKey(height), data)
       if (lastHeight.forall(_ < height)) {
         lastHeight = Some(height)
@@ -331,31 +330,6 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
       } else {
         ctx.delete(CacheKeys.Height.Key)
         None
-      }
-    }
-  }
-
-  override def vrf: VrfPersistentCache = new VrfPersistentCache {
-    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("DefaultPersistentCaches.vrf"))
-
-    val Key = CacheKeys.VRF
-
-    override def get(height: Int)(implicit ctx: ReadOnly): RemoteData[ByteStr] =
-      ctx
-        .getOpt(Key.mkKey(height))
-        .fold[RemoteData[ByteStr]](RemoteData.Unknown)(RemoteData.loaded)
-        .tap { r => log.trace(s"get($height): $r") }
-
-    override def set(height: Int, vrf: Option[ByteStr])(implicit ctx: ReadWrite): Unit = {
-      ctx.put(Key.mkKey(height), vrf)
-      log.trace(s"set($height)")
-    }
-
-    override def removeFrom(height: Int)(implicit ctx: ReadWrite): Unit = {
-      val first = Key.mkKey(height)
-      ctx.iterateFrom(Key.prefixBytes, first.keyBytes) { x =>
-        ctx.delete(x.getKey)
-        true
       }
     }
   }

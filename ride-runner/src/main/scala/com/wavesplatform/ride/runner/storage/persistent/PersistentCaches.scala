@@ -14,7 +14,6 @@ trait PersistentCaches {
   def accountLeaseBalances: PersistentCache[Address, LeaseBalance]
   def transactions: TransactionPersistentCache
   def blockHeaders: BlockPersistentCache
-  def vrf: VrfPersistentCache
 
   def getActivatedFeatures(): RemoteData[Map[Short, Int]]
   def setActivatedFeatures(data: Map[Short, Int]): Unit

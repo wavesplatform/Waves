@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.db.RideDbAccess
 
@@ -25,7 +26,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
           }
 
           db.readOnly { implicit ctx =>
-            cache.get(1).value.header.timestamp shouldBe 20
+            cache.get(1).value.header.header.timestamp shouldBe 20
           }
         }
 
@@ -52,7 +53,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
             }
 
             db.readOnly { implicit ctx =>
-              cache.get(1).value.header.timestamp shouldBe 2
+              cache.get(1).value.header.header.timestamp shouldBe 2
             }
           }
 
@@ -78,7 +79,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
             }
 
             db.readOnly { implicit ctx =>
-              cache.get(2).value.header.timestamp shouldBe 4
+              cache.get(2).value.header.header.timestamp shouldBe 4
             }
           }
 
@@ -116,7 +117,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
 
           db.readOnly { implicit ctx =>
             cache.get(2) shouldBe empty
-            cache.get(1).value.header.timestamp shouldBe 2
+            cache.get(1).value.header.header.timestamp shouldBe 2
           }
         }
 
@@ -150,7 +151,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
           }
 
           db.readOnly { implicit ctx =>
-            cache.get(1).value.header.timestamp shouldBe 2
+            cache.get(1).value.header.header.timestamp shouldBe 2
           }
         }
 
@@ -220,11 +221,13 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def defaultHeader(ts: Long) =
+  private def defaultHeader(ts: Long) = SignedBlockHeaderWithVrf(
     SignedBlockHeader(
       BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Vector.empty, 0, ByteStr.empty),
       ByteStr.empty
-    )
+    ),
+    vrf = ByteStr.empty
+  )
 
   private def test(f: (RideDbAccess, BlockPersistentCache) => Unit): Unit = withDb { db =>
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))

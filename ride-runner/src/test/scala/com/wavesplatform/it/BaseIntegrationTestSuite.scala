@@ -4,8 +4,9 @@ import cats.syntax.option.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.HasGrpc
-import com.wavesplatform.api.grpc.BalanceResponse
+import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
@@ -37,7 +38,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val blockchainApi = new TestBlockchainApi() {
       override def getCurrentBlockchainHeight(): Int = 1
 
-      override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
+      override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf] =
+        toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
 
       override def getActivatedFeatures(height: Int): Map[Short, Int] = blockchainSettings.functionalitySettings.preActivatedFeatures
 

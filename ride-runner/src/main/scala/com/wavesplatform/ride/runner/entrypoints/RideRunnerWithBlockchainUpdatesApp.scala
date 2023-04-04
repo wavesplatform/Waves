@@ -17,7 +17,6 @@ import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import play.api.libs.json.Json
-import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
@@ -104,16 +103,10 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val blockchainUpdatesApiChannel = mkGrpcChannel("blockchainUpdatesApi", settings.rideRunner.blockchainUpdatesApiChannel)
 
     log.info("Creating general API gateway...")
-    val httpBackend = HttpURLConnectionBackend()
-    cs.cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") {
-      httpBackend.close()
-    }
-
     val blockchainApi = new DefaultBlockchainApi(
       settings = settings.rideRunner.blockchainApi,
       grpcApiChannel = grpcApiChannel,
-      blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
-      httpBackend = httpBackend
+      blockchainUpdatesApiChannel = blockchainUpdatesApiChannel
     )
 
     log.info("Opening a caches DB...")
@@ -143,7 +136,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     // TODO #100 Settings?
     val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(math.max(sharedBlockchain.heightUntagged, lastHeightAtStart))
-    val endHeight           = Height(workingHeight + 1)                              // 101 // lastHeightAtStart
+    val endHeight           = Height(workingHeight + 1)                                      // 101 // lastHeightAtStart
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)

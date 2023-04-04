@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.api.grpc.BalanceResponse
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
@@ -39,12 +39,11 @@ class TestBlockchainApi(implicit val scheduler: Scheduler) extends BlockchainApi
   override def getAccountDataEntries(address: Address): Seq[DataEntry[?]]               = kill(s"getAccountDataEntries(address=$address)")
   override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] = kill(s"getAccountDataEntry(address=$address, $key)")
   override def getAccountScript(address: Address): Option[Script]                       = kill(s"getAccountScript(address=$address)")
-  override def getBlockHeader(height: Int): Option[SignedBlockHeader]                   = kill(s"getBlockHeader(height=$height)")
+  override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf]            = kill(s"getBlockHeader(height=$height)")
 
-  override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader] =
+  override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeaderWithVrf] =
     kill(s"getBlockHeaderRange(fromHeight=$fromHeight, toHeight=$toHeight)")
 
-  override def getVrf(height: Int): Option[ByteStr]                                    = kill(s"getVrf(height=$height)")
   override def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = kill(s"getAssetDescription(asset=$asset)")
   override def resolveAlias(alias: Alias): Option[Address]                             = kill(s"resolveAlias(alias=$alias)")
   override def getBalance(address: Address, asset: Asset): Long                        = kill(s"getBalance(address=$address, asset=$asset)")

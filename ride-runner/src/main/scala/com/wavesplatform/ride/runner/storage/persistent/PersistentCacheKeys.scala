@@ -4,10 +4,22 @@ import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.google.protobuf.{CodedInputStream, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
-import com.wavesplatform.database.rocksdb.{AddressId, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
+import com.wavesplatform.database.rocksdb.{
+  AddressId,
+  Key,
+  readAccountScriptInfo,
+  readAssetDetails,
+  readAssetScript,
+  readBlockMeta,
+  writeAccountScriptInfo,
+  writeAssetDetails,
+  writeAssetScript,
+  writeBlockMeta
+}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -261,7 +273,7 @@ object CacheKeys {
   object AccountScriptsHistory extends CacheHistoryKey[AddressId](21)
   object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](22)
 
-  object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](30)
+  object SignedBlockHeadersWithVrf extends CacheKey[Int, SignedBlockHeaderWithVrf](30)
 
   object Height extends CacheKey[Unit, Int](40) {
     val Key = mkKey(())
@@ -336,27 +348,31 @@ object CacheKeys {
 
   implicit val accountScriptInfoAsBytes: AsBytes[AccountScriptInfo] = AsBytes[Array[Byte]].transform(readAccountScriptInfo, writeAccountScriptInfo)
 
-  implicit val blockHeaderAsBytes: AsBytes[SignedBlockHeader] = new AsBytes[SignedBlockHeader] {
-    override def toByteArray(x: SignedBlockHeader): Array[Byte] =
+  implicit val blockHeaderAsBytes: AsBytes[SignedBlockHeaderWithVrf] = new AsBytes[SignedBlockHeaderWithVrf] {
+    override def toByteArray(x: SignedBlockHeaderWithVrf): Array[Byte] =
       new ByteArrayOutputStream()
         .writeWithLen(
           writeBlockMeta(
             PBBlockMeta(
-              header = Some(PBBlocks.protobuf(x.header)),
-              signature = UnsafeByteOperations.unsafeWrap(x.signature.arr)
-              // TODO #15 Optimize working with VRF
+              header = Some(PBBlocks.protobuf(x.header.header)),
+              signature = UnsafeByteOperations.unsafeWrap(x.header.signature.arr),
+              vrf = UnsafeByteOperations.unsafeWrap(x.vrf.arr)
             )
           )
         )
         .toByteArray
 
-    override def fromByteArray(xs: Array[Byte]): (SignedBlockHeader, Int) = {
+    override def fromByteArray(xs: Array[Byte]): (SignedBlockHeaderWithVrf, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
       (toSignedHeader(readBlockMeta(bb.getByteArray(len))), Ints.BYTES + len)
     }
 
-    private def toSignedHeader(m: PBBlockMeta): SignedBlockHeader = SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr)
+    private def toSignedHeader(m: PBBlockMeta): SignedBlockHeaderWithVrf =
+      SignedBlockHeaderWithVrf(
+        SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr),
+        m.vrf.toByteStr
+      )
   }
 
   implicit val assetDescriptionAsBytes: AsBytes[AssetDescription] = new AsBytes[AssetDescription] {

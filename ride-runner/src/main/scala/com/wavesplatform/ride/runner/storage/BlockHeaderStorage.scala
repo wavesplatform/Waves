@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.storage
 
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -29,17 +30,17 @@ class BlockHeaderStorage private (
     */
   def latestHeight: Option[Int] = readLockCond(liquidBlocks.headOption)(_ => false).map(_.height)
 
-  def getLocal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
+  def getLocal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
     getFromLiquidBlockOr(atHeight, persistentCache.get(atHeight))
 
-  def get(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
+  def get(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
     getFromLiquidBlockOr(atHeight, getInternal(atHeight))
 
-  private def getFromLiquidBlockOr(atHeight: Int, or: => Option[SignedBlockHeader]): Option[SignedBlockHeader] =
+  private def getFromLiquidBlockOr(atHeight: Int, or: => Option[SignedBlockHeaderWithVrf]): Option[SignedBlockHeaderWithVrf] =
     readLockCond(liquidBlocks.headOption.collect { case x if x.height == atHeight => x.header })(_ => false)
       .orElse(or)
 
-  private def getInternal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
+  private def getInternal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
     persistentCache.get(atHeight).orElse {
       blockchainApi.getBlockHeader(atHeight).tap {
         case Some(r) => persistentCache.set(atHeight, r)
@@ -59,7 +60,10 @@ class BlockHeaderStorage private (
             val newFullBlock = BlockInfo(
               event.height,
               event.id.toByteStr,
-              SignedBlockHeader(PBBlocks.vanilla(block.getBlock.getHeader), block.getBlock.signature.toByteStr)
+              SignedBlockHeaderWithVrf(
+                SignedBlockHeader(PBBlocks.vanilla(block.getBlock.getHeader), block.getBlock.signature.toByteStr),
+                block.vrf.toByteStr
+              )
             )
             log.debug(s"Update at ${newFullBlock.height} with ${newFullBlock.id.toString.take(5)}")
             persistentCache.set(newFullBlock.height, newFullBlock.header)
@@ -72,9 +76,12 @@ class BlockHeaderStorage private (
               event.height,
               // Same as newLiquidBlock.header.id() and event.id.toByteStr
               microBlock.getMicroBlock.totalBlockId.toByteStr,
-              SignedBlockHeader(
-                last.header.header.copy(transactionsRoot = microBlock.updatedTransactionsRoot.toByteStr),
-                signature = microBlock.getMicroBlock.signature.toByteStr
+              SignedBlockHeaderWithVrf(
+                SignedBlockHeader(
+                  last.header.header.header.copy(transactionsRoot = microBlock.updatedTransactionsRoot.toByteStr),
+                  signature = microBlock.getMicroBlock.signature.toByteStr
+                ),
+                last.header.vrf
               )
             )
             persistentCache.set(newLiquidBlock.height, newLiquidBlock.header)
@@ -90,7 +97,7 @@ class BlockHeaderStorage private (
             log.debug(s"Remove from ${toHeight + 1}")
             persistentCache.removeFrom(toHeight + 1)
             val header = getInternal(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
-            liquidBlocks = BlockInfo(toHeight, header.id(), header) :: Nil
+            liquidBlocks = BlockInfo(toHeight, header.header.id(), header) :: Nil
 
           case last :: rest =>
             log.debug(s"Replace at ${last.height} with ${last.id.toString.take(5)}")
@@ -113,8 +120,8 @@ object BlockHeaderStorage {
     liquidBlocks = for {
       h <- persistentCache.getLastHeight.toList
       b <- persistentCache.get(h)
-    } yield BlockInfo(h, b.id(), b)
+    } yield BlockInfo(h, b.header.id(), b)
   )
 
-  case class BlockInfo(height: Int, id: ByteStr, header: SignedBlockHeader)
+  case class BlockInfo(height: Int, id: ByteStr, header: SignedBlockHeaderWithVrf)
 }

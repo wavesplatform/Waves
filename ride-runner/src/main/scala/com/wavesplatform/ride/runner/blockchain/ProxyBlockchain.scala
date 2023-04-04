@@ -3,13 +3,26 @@ package com.wavesplatform.ride.runner.blockchain
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TransactionId, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  Height,
+  LeaseBalance,
+  TransactionId,
+  TxMeta,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
@@ -32,10 +45,13 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest])(
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
   // Ride: blockInfoByHeight, lastBlock
-  override def blockHeader(height: Int): Option[SignedBlockHeader] = sharedBlockchain.blockHeaders.get(height) // TODO #?, tag)
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(height).map(_.header)
 
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = sharedBlockchain.vrf.get(height) // TODO #?, tag)
+  override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(height).map(_.vrf)
+
+  // TODO #?, tag)
+  private def blockHeaderWithVrf(height: Int): Option[SignedBlockHeaderWithVrf] = sharedBlockchain.blockHeaders.get(height)
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = sharedBlockchain.heightUntagged

@@ -1,5 +1,6 @@
 package com.wavesplatform.blockchain
 
+import com.wavesplatform.api.UpdateType
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
@@ -20,11 +21,13 @@ class TestProcessor extends Processor {
     actions = actions.appended(RemoveFrom(height))
   }
 
+  override def startScripts(): Unit = {}
+
   override def process(event: BlockchainUpdated): Unit = {
     actions = actions.appended(Process(event))
   }
 
-  override def runAffectedScripts(): Task[Unit] = {
+  override def runAffectedScripts(updateType: UpdateType): Task[Unit] = {
     actions = actions.appended(RunAffectedScripts)
     Task.now(())
   }
