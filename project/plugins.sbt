@@ -6,7 +6,7 @@ resolvers ++= Seq(
 // Should go before Scala.js
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
 
-libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.12"
+libraryDependencies += "com.thesamet.scalapb" %% "compilerplugin" % "0.11.13"
 
 Seq(
   "com.eed3si9n"       % "sbt-assembly"             % "1.2.0",
@@ -21,10 +21,10 @@ Seq(
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
-  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.3",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.14.2",
   "org.hjson"                     % "hjson"                % "3.0.0",
   "org.vafer"                     % "jdeb"                 % "1.10" artifacts Artifact("jdeb", "jar", "jar"),
-  "org.slf4j"                     % "jcl-over-slf4j"       % "2.0.0",
+  "org.slf4j"                     % "jcl-over-slf4j"       % "2.0.5",
   ("com.spotify"                  % "docker-client"        % "8.16.0")
     .exclude("commons-logging", "commons-logging")
 )

@@ -37,5 +37,4 @@ class ObservedLoadingCache[K, V](override val delegate: LoadingCache[K, V], chan
     case k: K => changed.onNext(k)
     case _    =>
   }
-
 }

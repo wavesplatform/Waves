@@ -1,15 +1,19 @@
 package com.wavesplatform.utx
 
+import scala.concurrent.duration.FiniteDuration
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{MiningConstraint, MultiDimensionalMiningConstraint}
+import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool.PackStrategy
 
-import scala.concurrent.duration.FiniteDuration
+trait UtxForAppender {
+  def setPriorityDiffs(diffs: Seq[Diff]): Unit
+}
 
-trait UtxPool extends AutoCloseable {
+trait UtxPool extends UtxForAppender with AutoCloseable {
   def putIfNew(tx: Transaction, forceValidate: Boolean = false): TracedResult[ValidationError, Boolean]
   def removeAll(txs: Iterable[Transaction]): Unit
   def all: Seq[Transaction]

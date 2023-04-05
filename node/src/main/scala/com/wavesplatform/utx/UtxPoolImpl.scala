@@ -199,9 +199,18 @@ case class UtxPoolImpl(
     val diffEi = {
       def calculateDiff(): TracedResult[ValidationError, Diff] = {
         if (forceValidate)
-          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, tx)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+            priorityPool.compositeBlockchain,
+            tx
+          )
         else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), utxSettings.alwaysUnlimitedExecution, verify)(
+          TransactionDiffer.limitedExecution(
+            blockchain.lastBlockTimestamp,
+            time.correctedTime(),
+            utxSettings.alwaysUnlimitedExecution,
+            verify,
+            enableExecutionLog = true
+          )(
             priorityPool.compositeBlockchain,
             tx
           )
@@ -256,7 +265,7 @@ case class UtxPoolImpl(
       strategy: PackStrategy,
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, Option[ByteStr]) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, prevStateHash, cancelled)
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true))(initialConstraint, strategy, prevStateHash, cancelled)
   }
 
   def cleanUnconfirmed(): Unit = {
@@ -270,9 +279,17 @@ case class UtxPoolImpl(
           TxStateActions.removeExpired(tx)
         } else {
           val differ = if (!isMiningEnabled && utxSettings.forceValidateInCleanup) {
-            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+              priorityPool.compositeBlockchain,
+              _
+            )
           } else {
-            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), utxSettings.alwaysUnlimitedExecution)(
+            TransactionDiffer.limitedExecution(
+              blockchain.lastBlockTimestamp,
+              time.correctedTime(),
+              utxSettings.alwaysUnlimitedExecution,
+              enableExecutionLog = true
+            )(
               priorityPool.compositeBlockchain,
               _
             )

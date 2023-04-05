@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 
 import scala.util.{Left, Right}
@@ -17,9 +16,12 @@ object BalanceDiffValidation {
   }
 
   def apply(b: Blockchain)(d: Diff): Either[AccountBalanceError, Diff] = {
-    def check(acc: Address, portfolio: Portfolio): Either[(Address, String), Unit] = {
+    def check(
+        acc: Address,
+        portfolio: Portfolio
+    ): Either[(Address, String), Unit] = {
       val balance  = portfolio.balance
-      val oldWaves = b.balance(acc, Waves)
+      val oldWaves = b.balance(acc)
       val oldLease = b.leaseBalance(acc)
 
       def negativeBalanceCheck(newLease: LeaseBalance, newWaves: Long): Either[(Address, String), Unit] =
@@ -68,7 +70,11 @@ object BalanceDiffValidation {
     }
   }
 
-  private def negativeAssetsInfo(b: Blockchain, acc: Address, diff: Portfolio): Map[ByteStr, Long] =
+  private def negativeAssetsInfo(
+      b: Blockchain,
+      acc: Address,
+      diff: Portfolio
+  ): Map[ByteStr, Long] =
     diff.assets
       .map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
       .filter(_._2 < 0)

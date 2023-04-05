@@ -77,7 +77,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
   }
 
   private def checkFee(preconditions: Seq[Block], txs: TransactionsForCheck)(f: ValidationResults => Any): Unit =
-    withLevelDBWriter(fs) { blockchain =>
+    withRocksDBWriter(fs) { blockchain =>
       preconditions.foreach { block =>
         val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) =
           BlockDiffer.fromBlock(blockchain, blockchain.lastBlock, block, MiningConstraint.Unlimited, block.header.generationSignature).explicitGet()

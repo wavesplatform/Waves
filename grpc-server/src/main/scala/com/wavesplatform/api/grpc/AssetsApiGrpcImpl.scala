@@ -30,16 +30,12 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
 
     val responseStream = addressOption match {
       case Some(address) =>
-        Observable.fromIterator(
-          accountsApi
-            .nftList(address, afterAssetId)
-            .map { case (a, d) =>
-              NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
-            }
-            .take(request.limit)
-            .toListL // FIXME: Strict loading because of segfault in leveldb
-            .map(_.iterator)
-        )
+        accountsApi
+          .nftList(address, afterAssetId)
+          .concatMapIterable(_.map { case (a, d) =>
+            NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
+          })
+          .take(request.limit)
       case _ => Observable.empty
     }
 

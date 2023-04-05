@@ -1,11 +1,12 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
-import com.wavesplatform.api.http.ApiError.{InvalidIds, *}
-import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
+import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
@@ -20,10 +21,13 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -63,12 +67,19 @@ class TransactionsRouteSpec
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime
+  private val getCompositeBlockchain =
+    () => {
+      (() => blockchain.carryFee).expects().returns(0)
+      (() => blockchain.settings).expects().returns(WavesSettings.default().blockchainSettings)
+      CompositeBlockchain(blockchain, None)
+    }
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
     addressTransactions,
     testWallet,
     blockchain,
+    getCompositeBlockchain,
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
@@ -126,6 +137,7 @@ class TransactionsRouteSpec
         d.commonApi.transactions,
         testWallet,
         d.blockchain,
+        () => d.blockchain.getCompositeBlockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
@@ -239,6 +251,7 @@ class TransactionsRouteSpec
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) { case (address, limit) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
+          (() => blockchain.activatedFeatures).expects().returns(Map.empty)
           Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
           }
@@ -249,6 +262,7 @@ class TransactionsRouteSpec
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) { case (address, limit, txId) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
+          (() => blockchain.activatedFeatures).expects().returns(Map.empty)
           Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
           }
@@ -325,7 +339,7 @@ class TransactionsRouteSpec
         .once()
       (blockchain.resolveAlias _).expects(recipientAlias).returning(Right(recipientAddress))
 
-      Get(routePath(s"/address/${invokeAddress}/limit/1")) ~> route ~> check {
+      Get(routePath(s"/address/$invokeAddress/limit/1")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject]
         json should matchJson(s"""{
@@ -376,12 +390,36 @@ class TransactionsRouteSpec
                                  |}""".stripMargin)
       }
     }
+
+    "large-significand-format" in {
+      withDomain(RideV6) { d =>
+        val tx = TxHelpers.transfer()
+        d.appendBlock(tx)
+        val route = seal(
+          transactionsApiRoute
+            .copy(blockchain = d.blockchain, compositeBlockchain = () => d.blockchain.getCompositeBlockchain, commonApi = d.transactionsApi)
+            .route
+        )
+        Get(routePath(s"/address/$defaultAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          val result = responseAs[JsArray] \ 0 \ 0
+          (result \ "amount").as[String] shouldBe tx.amount.value.toString
+          (result \ "fee").as[String] shouldBe tx.fee.value.toString
+
+          (result \ "height").as[Int] shouldBe 1
+          (result \ "spentComplexity").as[Int] shouldBe 0
+          (result \ "version").as[Int] shouldBe tx.version
+          (result \ "type").as[Int] shouldBe tx.tpe.id
+          (result \ "timestamp").as[Long] shouldBe tx.timestamp
+        }
+      }
+    }
   }
 
   routePath("/info/{id}") - {
     "returns meta for eth transfer" in {
       val blockchain = createBlockchainStub { blockchain =>
         blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultEthAddress -> Long.MaxValue / 3, TxHelpers.secondAddress -> 0L))
         blockchain.stub.activateAllFeatures()
       }
 
@@ -433,6 +471,7 @@ class TransactionsRouteSpec
     "returns meta and state changes for eth invoke" in {
       val blockchain = createBlockchainStub { blockchain =>
         blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultEthAddress -> Long.MaxValue / 3))
         blockchain.stub.setScript(
           TxHelpers.secondAddress,
           TxHelpers.scriptV5("""@Callable(i)

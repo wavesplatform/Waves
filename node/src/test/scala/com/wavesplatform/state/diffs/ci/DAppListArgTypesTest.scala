@@ -11,6 +11,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, *}
 import com.wavesplatform.lang.v1.compiler.{TestCompiler, Types}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -43,7 +44,7 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
 
   property("can't pass list as callable argument before V4 activation") {
     // precompiled to avoid compilation error
-    val callable = CallableFunction(CallableAnnotation("i"), FUNC("f", List("args"), REF("nil")))
+    val callable = CallableFunction(CallableAnnotation("i"), FUNC("f", List("args"), REF(GlobalValNames.Nil)))
     val v3DApp   = DApp(DAppMeta(), Nil, List(callable), None)
 
     val (preparingTxs, invoke, _) = preconditions(ContractScript(V3, v3DApp).explicitGet(), rideList())

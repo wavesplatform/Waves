@@ -12,7 +12,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxForAppender
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -24,15 +24,16 @@ object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxForAppender,
       pos: PoSSelector,
       scheduler: Scheduler,
-      verify: Boolean = true
+      verify: Boolean = true,
+      txSignParCheck: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-      else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
+      if (blockchainUpdater.isLastBlockId(newBlock.header.reference)) {
+        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
+      } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
         Left(BlockAppendError("Block is not a child of the last block", newBlock))
@@ -41,7 +42,7 @@ object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxForAppender,
       pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,

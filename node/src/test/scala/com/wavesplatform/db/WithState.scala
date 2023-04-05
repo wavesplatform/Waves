@@ -1,9 +1,12 @@
 package com.wavesplatform.db
 
+import com.google.common.primitives.Shorts
+
+import java.nio.file.Files
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -16,68 +19,75 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
-import monix.reactive.Observer
-import monix.reactive.subjects.{PublishSubject, Subject}
-import org.iq80.leveldb.{DB, Options}
-import org.scalatest.Suite
+import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-import java.nio.file.Files
+trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
+  protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
-  protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
-  protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers                   = BlockchainUpdateTriggers.noop
+  private val path  = Files.createTempDirectory("rocks-temp").toAbsolutePath
+  protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
 
-  private[this] val currentDbInstance = new ThreadLocal[DB]
-  protected def db: DB                = currentDbInstance.get()
+  private val MaxKey = Shorts.toByteArray(KeyTags.maxId.toShort)
+  private val MinKey = new Array[Byte](2)
 
-  protected def tempDb[A](f: DB => A): A = {
-    val path = Files.createTempDirectory("lvl-temp").toAbsolutePath
-    val db   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
-    currentDbInstance.set(db)
+  protected def tempDb[A](f: RDB => A): A = {
+    val path = Files.createTempDirectory("rocks-temp").toAbsolutePath
+    val rdb  = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     try {
-      f(db)
+      f(rdb)
     } finally {
-      db.close()
-      currentDbInstance.remove()
+      rdb.close()
       TestHelpers.deleteRecursively(path)
     }
   }
 
-  protected def withLevelDBWriter[A](ws: WavesSettings)(test: LevelDBWriter => A): A = tempDb { db =>
-    val (_, ldb) = TestStorageFactory(
-      ws,
-      db,
-      ntpTime,
-      ignoreSpendableBalanceChanged,
-      ignoreBlockchainUpdateTriggers
-    )
-    test(ldb)
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    rdb.close()
+    TestHelpers.deleteRecursively(path)
   }
 
-  protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: LevelDBWriter => A): A =
-    withLevelDBWriter(TestSettings.Default.copy(blockchainSettings = bs))(test)
+  protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = {
+    try {
+      val (_, rdw) = TestStorageFactory(
+        ws,
+        rdb,
+        ntpTime,
+        ignoreBlockchainUpdateTriggers
+      )
+      test(rdw)
+    } finally {
+      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle).foreach { cfh =>
+        rdb.db.deleteRange(cfh, MinKey, MaxKey)
+      }
+    }
+  }
 
-  def withLevelDBWriter[A](fs: FunctionalitySettings)(test: LevelDBWriter => A): A =
-    withLevelDBWriter(TestLevelDB.createTestBlockchainSettings(fs))(test)
+  protected def withRocksDBWriter[A](bs: BlockchainSettings)(test: RocksDBWriter => A): A =
+    withRocksDBWriter(TestSettings.Default.copy(blockchainSettings = bs))(test)
 
-  def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
+  def withRocksDBWriter[A](fs: FunctionalitySettings)(test: RocksDBWriter => A): A =
+    withRocksDBWriter(TestRocksDB.createTestBlockchainSettings(fs))(test)
+
+  def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled, enableExecutionLog: Boolean = false)(
       assertion: Either[ValidationError, Diff] => Unit
-  ): Unit = withLevelDBWriter(fs) { state =>
-    assertDiffEi(preconditions, block, state)(assertion)
+  ): Unit = withRocksDBWriter(fs) { state =>
+    assertDiffEi(preconditions, block, state, enableExecutionLog)(assertion)
   }
 
-  def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
+  def assertDiffEi(preconditions: Seq[Block], block: Block, state: RocksDBWriter, enableExecutionLog: Boolean)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
     def differ(blockchain: Blockchain, b: Block) =
-      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, enableExecutionLog = enableExecutionLog)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, precondition).explicitGet()
@@ -87,11 +97,21 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     assertion(totalDiff1.map(_.diff))
   }
 
-  def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
+  def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled, enableExecutionLog: Boolean = false)(
       assertion: TracedResult[ValidationError, Diff] => Unit
-  ): Unit = withLevelDBWriter(fs) { state =>
+  ): Unit = withRocksDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, b: Block) =
-      BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
+      BlockDiffer.fromBlockTraced(
+        blockchain,
+        None,
+        b,
+        MiningConstraint.Unlimited,
+        b.header.generationSignature,
+        (_, _) => (),
+        verify = true,
+        enableExecutionLog = enableExecutionLog,
+        txSignParCheck = true
+      )
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, precondition).resultE.explicitGet()
@@ -103,7 +123,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
       assertion: (Diff, Blockchain) => Unit
-  ): Unit = withLevelDBWriter(fs) { state =>
+  ): Unit = withRocksDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
@@ -133,7 +153,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     assertDiffAndState(preconditions, block, fs, withNg = false)(assertion)
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
-    withLevelDBWriter(fs) { state =>
+    withRocksDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, b: Block) =
         BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
@@ -169,27 +189,30 @@ trait WithDomain extends WithState { _: Suite =>
       settings: WavesSettings =
         DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty,
-      wrapDB: DB => DB = identity
+      wrapDB: RocksDB => RocksDB = identity
   )(test: Domain => A): A =
-    withLevelDBWriter(settings) { blockchain =>
+    withRocksDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(
         blockchain,
-        Observer.stopped,
         settings,
         ntpTime,
         BlockchainUpdateTriggers.combined(domain.triggers),
-        loadActiveLeases(db, _, _)
+        loadActiveLeases(rdb, _, _)
       )
-      domain = Domain(wrapDB(db), bcu, blockchain, settings)
-      val genesis = balances.map { case AddrWithBalance(address, amount) =>
-        TxHelpers.genesis(address, amount)
-      }
-      if (genesis.nonEmpty) {
-        domain.appendBlock(genesis*)
-      }
-      try test(domain)
-      finally bcu.shutdown()
+
+      try {
+        val wrappedDb = wrapDB(rdb.db)
+        assert(wrappedDb.getNativeHandle == rdb.db.getNativeHandle, "wrap function should not create new database instance")
+        domain = Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, Seq.empty), bcu, blockchain, settings)
+        val genesis = balances.map { case AddrWithBalance(address, amount) =>
+          TxHelpers.genesis(address, amount)
+        }
+        if (genesis.nonEmpty) {
+          domain.appendBlock(genesis*)
+        }
+        test(domain)
+      } finally bcu.shutdown()
     }
 
   private val allVersions = DirectiveDictionary[StdLibVersion].all

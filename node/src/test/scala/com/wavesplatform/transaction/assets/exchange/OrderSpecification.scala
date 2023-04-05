@@ -155,40 +155,45 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
 
       Random.nextBytes(rndAsset)
 
-      Verifier.verifyAsEllipticCurveSignature(order, checkWeakPk = true) should beRight
+      Verifier.verifyAsEllipticCurveSignature(order, isRideV6Activated = true) should beRight
 
-      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey), checkWeakPk = true) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(matcherPublicKey = pka.publicKey), isRideV6Activated = true) should produce(err)
       val assetPair = order.assetPair
       Verifier.verifyAsEllipticCurveSignature(
         order.copy(assetPair = assetPair.copy(amountAsset = IssuedAsset(ByteStr(rndAsset)))),
-        checkWeakPk = true
+        isRideV6Activated = true
       ) should produce(err)
       Verifier.verifyAsEllipticCurveSignature(
         order.copy(assetPair = assetPair.copy(priceAsset = IssuedAsset(ByteStr(rndAsset)))),
-        checkWeakPk = true
+        isRideV6Activated = true
       ) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType)), checkWeakPk = true) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(price = TxOrderPrice.unsafeFrom(order.price.value + 1)), checkWeakPk = true) should produce(
+      Verifier.verifyAsEllipticCurveSignature(order.copy(orderType = OrderType.reverse(order.orderType)), isRideV6Activated = true) should produce(
+        err
+      )
+      Verifier.verifyAsEllipticCurveSignature(
+        order.copy(price = TxOrderPrice.unsafeFrom(order.price.value + 1)),
+        isRideV6Activated = true
+      ) should produce(
         err
       )
       Verifier.verifyAsEllipticCurveSignature(
         order.copy(amount = TxExchangeAmount.unsafeFrom(order.amount.value + 1)),
-        checkWeakPk = true
+        isRideV6Activated = true
       ) should produce(err)
-      Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1), checkWeakPk = true) should produce(err)
+      Verifier.verifyAsEllipticCurveSignature(order.copy(expiration = order.expiration + 1), isRideV6Activated = true) should produce(err)
       Verifier.verifyAsEllipticCurveSignature(
         order.copy(matcherFee = TxMatcherFee.unsafeFrom(order.matcherFee.value + 1)),
-        checkWeakPk = true
+        isRideV6Activated = true
       ) should produce(err)
 
       val orderAuth = order.orderAuthentication.asInstanceOf[OrderProofs]
       Verifier.verifyAsEllipticCurveSignature(
         order.copy(orderAuthentication = orderAuth.copy(key = pka.publicKey)),
-        checkWeakPk = true
+        isRideV6Activated = true
       ) should produce(err)
       Verifier.verifyAsEllipticCurveSignature(
         order.copy(orderAuthentication = orderAuth.copy(proofs = Proofs(Seq(ByteStr(pka.publicKey.arr ++ pka.publicKey.arr))))),
-        checkWeakPk = true
+        isRideV6Activated = true
       ) should produce(err)
     }
   }

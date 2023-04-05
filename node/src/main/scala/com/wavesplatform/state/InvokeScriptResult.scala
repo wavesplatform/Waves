@@ -42,7 +42,7 @@ object InvokeScriptResult {
   type Issue       = com.wavesplatform.lang.v1.traits.domain.Issue
   type Reissue     = com.wavesplatform.lang.v1.traits.domain.Reissue
   type Burn        = com.wavesplatform.lang.v1.traits.domain.Burn
-  type DataEntry   = com.wavesplatform.state.DataEntry[_]
+  type DataEntry   = com.wavesplatform.state.DataEntry[?]
 
   val empty = InvokeScriptResult()
 

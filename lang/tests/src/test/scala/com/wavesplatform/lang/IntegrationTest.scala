@@ -92,7 +92,7 @@ class IntegrationTest extends PropSpec with Inside {
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
       EvaluatorV2
-        .applyCompleted(evalCtx, v._1, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true)
+        .applyCompleted(evalCtx, v._1, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true, enableExecutionLog = false)
         ._3
         .bimap(_.message, _.asInstanceOf[T])
     )
@@ -1603,7 +1603,7 @@ class IntegrationTest extends PropSpec with Inside {
         ("true", "Boolean"),
         ("123", "Int"),
         ("base58'aaaa'", "ByteVector"),
-        ("unit", "Unit")
+        (GlobalValNames.Unit, "Unit")
       ) #::: getElement
 
     /*  Example for size = 2

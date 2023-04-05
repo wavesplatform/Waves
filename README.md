@@ -184,7 +184,7 @@ If you'd like to contribute, please fork the repository and use a feature branch
 
 For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate.
 
-Please follow the [code of conduct](./CODE_OF_CONDUCT.md) during communication with the each other. 
+Please follow the [code of conduct](./CODE_OF_CONDUCT.md) during communication with each other. 
 
 ## ℹ️ Support (get help)
 

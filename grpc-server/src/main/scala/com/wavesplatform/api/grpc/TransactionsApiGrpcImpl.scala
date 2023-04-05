@@ -32,31 +32,21 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
           val maybeSender = Option(request.sender)
             .collect { case s if !s.isEmpty => s.toAddress }
 
-          Observable.fromIterator(
-            commonApi
-              .transactionsByAddress(
-                recipientAddrOrAlias,
-                maybeSender,
-                Set.empty,
-                None
-              )
-              .toListL // FIXME: Strict loading because of segfault in leveldb
-              .map(_.iterator)
+          commonApi.transactionsByAddress(
+            recipientAddrOrAlias,
+            maybeSender,
+            Set.empty,
+            None
           )
 
         // By sender
         case None if !request.sender.isEmpty =>
           val senderAddress = request.sender.toAddress
-          Observable.fromIterator(
-            commonApi
-              .transactionsByAddress(
-                senderAddress,
-                Some(senderAddress),
-                Set.empty,
-                None
-              )
-              .toListL // FIXME: Strict loading because of segfault in leveldb
-              .map(_.iterator)
+          commonApi.transactionsByAddress(
+            senderAddress,
+            Some(senderAddress),
+            Set.empty,
+            None
           )
 
         // By ids

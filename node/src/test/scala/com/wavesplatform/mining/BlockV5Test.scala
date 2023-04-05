@@ -30,7 +30,7 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalatest.*
 import org.scalatest.enablers.Length
@@ -447,9 +447,9 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]], time: Time = ntpTime, settings: WavesSettings = testSettings)(
       f: Blockchain & BlockchainUpdater & NG => Unit
   ): Unit = {
-    withLevelDBWriter(settings.blockchainSettings) { blockchain =>
+    withRocksDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl =
-        new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty) {
+        new BlockchainUpdaterImpl(blockchain, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty) {
           override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
         }
       try f(bcu)

@@ -18,7 +18,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
   private def assertDetailedDiff(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: (Diff, DetailedDiff) => Unit
   ): Unit =
-    withLevelDBWriter(fs) { state =>
+    withRocksDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block) =
         BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited, b.header.generationSignature)
 

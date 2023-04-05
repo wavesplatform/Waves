@@ -252,7 +252,7 @@ class DecompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("b").explicitGet(), CONST_LONG(1))),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -267,7 +267,7 @@ class DecompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("x"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -415,7 +415,7 @@ class DecompilerTest extends PropSpec {
         |    then 1
         |    else 2
         |    ).foo""".stripMargin
-    val expr4 = FUNCTION_CALL(Native(401), List(IF(TRUE, REF("nil"), REF("nil")), CONST_LONG(0)))
+    val expr4 = FUNCTION_CALL(Native(401), List(IF(TRUE, REF(GlobalValNames.Nil), REF(GlobalValNames.Nil)), CONST_LONG(0)))
     Decompiler(expr4, decompilerContextV3) shouldEq
       """(if (true)
         |    then nil

@@ -320,6 +320,7 @@ class DAppEnvironment(
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,
+    enableExecutionLog: Boolean,
     totalComplexityLimit: Int,
     var remainingCalls: Int,
     var availableActions: Int,
@@ -378,6 +379,7 @@ class DAppEnvironment(
           mutableBlockchain,
           blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
           limitedExecution,
+          enableExecutionLog,
           totalComplexityLimit,
           availableComplexity,
           remainingCalls,
@@ -404,7 +406,11 @@ class DAppEnvironment(
       availablePayments = remainingPayments
       availableData = remainingData
       availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
+      (
+        evaluated,
+        diff.scriptsComplexity.toInt,
+        if (enableExecutionLog) DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity) else List.empty
+      )
     }
 
     r.v.map {

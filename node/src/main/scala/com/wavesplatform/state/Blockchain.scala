@@ -44,6 +44,7 @@ trait Blockchain {
 
   def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)]
   def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
+  def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]]
   def transactionMeta(id: ByteStr): Option[TxMeta]
 
   def containsTransaction(tx: Transaction): Boolean
@@ -71,7 +72,13 @@ trait Blockchain {
 
   def leaseBalance(address: Address): LeaseBalance
 
+  def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]
+
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
+
+  def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long]
+
+  def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 }
@@ -81,7 +88,7 @@ object Blockchain {
     def isEmpty: Boolean = blockchain.height == 0
 
     def isSponsorshipActive: Boolean = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-    def isNGActive: Boolean = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
+    def isNGActive: Boolean          = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
       blockchain

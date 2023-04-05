@@ -9,6 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.state.diffs.*
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -131,7 +132,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TestBlock.create(Seq(invoke)),
       features
     ) { case (diff, _) =>
-      diff.accountData(master.toAddress).data shouldBe
+      diff.accountData(master.toAddress) shouldBe
         Map(
           "key1" -> EmptyDataEntry("key1"),
           "key2" -> EmptyDataEntry("key2")
@@ -314,7 +315,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
          | let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
          | [
          |   i0,
-         |   SponsorFee(calculateAssetId(i0), ${minSponsoredAssetFee.getOrElse("unit")})
+         |   SponsorFee(calculateAssetId(i0), ${minSponsoredAssetFee.getOrElse(GlobalValNames.Unit)})
          | ]
        """.stripMargin
     )

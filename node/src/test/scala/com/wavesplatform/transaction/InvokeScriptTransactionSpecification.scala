@@ -40,8 +40,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     deser.timestamp shouldEqual transaction.timestamp
     deser.proofs shouldEqual transaction.proofs
     bytes shouldEqual deser.bytes()
-    Verifier.verifyAsEllipticCurveSignature(transaction, checkWeakPk = false) should beRight
-    Verifier.verifyAsEllipticCurveSignature(deser, checkWeakPk = false) should beRight // !!!!!!!!!!!!!!!
+    Verifier.verifyAsEllipticCurveSignature(transaction, isRideV6Activated = false) should beRight
+    Verifier.verifyAsEllipticCurveSignature(deser, isRideV6Activated = false) should beRight // !!!!!!!!!!!!!!!
   }
 
   property("protobuf roundtrip") {

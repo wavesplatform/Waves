@@ -11,6 +11,7 @@ import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
 import scala.util.Try
+import scala.util.chaining.scalaUtilChainingOps
 
 case class ExchangeTransaction(
     version: TxVersion,
@@ -33,6 +34,17 @@ case class ExchangeTransaction(
     with PBSince.V3 {
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
+
+  override protected def verifyFirstProof(isRideV6Activated: Boolean): Either[GenericError, Unit] =
+    super.verifyFirstProof(isRideV6Activated).tap { _ =>
+      if (isRideV6Activated) {
+        order1.firstProofIsValidSignatureAfterV6
+        order2.firstProofIsValidSignatureAfterV6
+      } else {
+        order1.firstProofIsValidSignatureBeforeV6
+        order2.firstProofIsValidSignatureBeforeV6
+      }
+    }
 
   override val sender: PublicKey = buyOrder.matcherPublicKey
 

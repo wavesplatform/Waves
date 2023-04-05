@@ -100,6 +100,7 @@ class EthereumTransactionSpec
       b.stub.issueAsset(TestAsset.id)
       b.stub.creditBalance(senderAddress, Waves, Long.MaxValue)
       b.stub.creditBalance(senderAddress, TestAsset, Long.MaxValue)
+      (b.wavesBalances _).when(*).returns(Map(senderAddress -> Long.MaxValue))
       (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
     }
     val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis())).andThen(_.resultE.explicitGet())
@@ -301,6 +302,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -360,6 +364,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -397,6 +404,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -450,6 +460,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -497,6 +510,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -534,6 +550,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -587,6 +606,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(TestAsset.id)
 
       val script = TxHelpers.script(
@@ -646,6 +668,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(TestAsset.id)
 
       val script = TxHelpers.script(

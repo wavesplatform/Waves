@@ -1,19 +1,18 @@
 package com.wavesplatform.network
 
 import java.util.concurrent.TimeUnit
-
-import cats._
-import cats.instances.bigInt._
-import cats.instances.tuple._
+import cats.*
+import cats.instances.bigInt.*
+import cats.instances.tuple.*
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel._
+import io.netty.channel.*
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 case class BestChannel(channel: Channel, score: BigInt) {
   override def toString: String = s"BestChannel(${id(channel)},$score)"
@@ -42,7 +41,8 @@ object RxScoreObserver extends ScorexLogging {
         val head = bestScoreChannels.head
         log.trace(s"${id(head)} Publishing new best channel with score=$bestScore > localScore $localScore")
         Some(BestChannel(head, bestScore))
-    } else None
+    }
+    else None
   }
 
   def apply(

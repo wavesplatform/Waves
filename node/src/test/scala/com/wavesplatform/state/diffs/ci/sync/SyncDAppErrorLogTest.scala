@@ -879,7 +879,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
         TestBlock.create(Seq(setScript))
       ),
       TestBlock.create(Seq(invoke)),
-      settings.blockchainSettings.functionalitySettings
+      settings.blockchainSettings.functionalitySettings,
+      enableExecutionLog = true
     ) { result =>
       result.trace
         .collectFirst { case invokeTrace: InvokeScriptTrace =>
@@ -946,7 +947,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
         TxHelpers.setScript(dApp2, dAppContract2(dApp3.toAddress)),
         TxHelpers.setScript(dApp3, dAppContract3)
       )
-      d.transactionDiffer(invoke)
+      d.transactionDifferWithLog(invoke)
         .trace
         .collectFirst { case invokeTrace: InvokeScriptTrace =>
           invokeTrace.resultE match {

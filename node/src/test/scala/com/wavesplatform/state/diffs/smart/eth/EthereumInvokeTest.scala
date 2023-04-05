@@ -11,6 +11,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -55,7 +56,8 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
        | let feeAssetId = t.feeAssetId == unit
        | let checkFunc  = t.function == "default"
        | let checkArgs  = t.args == [$passingArg]
-       | let payments   = ${if (version > V3) s"t.payments == [$payments]" else s"t.payment == ${if (payments.nonEmpty) payments else "unit"}"}
+       | let payments   = ${if (version > V3) s"t.payments == [$payments]"
+    else s"t.payment == ${if (payments.nonEmpty) payments else GlobalValNames.Unit}"}
        | ${assertProvenPart("t", proofs = false)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments && checkId
      """.stripMargin
   }
@@ -69,7 +71,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
          |   ${if (syncCall) s""" strict r = invoke(Address(base58'$dAppAddress'), "default", [], []) """ else ""}
          |   let check =
          |     value == $passingArg &&
-         |     ${if (version > V3) s"i.payments == [$payments]" else s"i.payment == ${if (payments.nonEmpty) payments else "unit"}"}
+         |     ${if (version > V3) s"i.payments == [$payments]" else s"i.payment == ${if (payments.nonEmpty) payments else GlobalValNames.Unit}"}
          |
          |   ${if (version > V3) """[ BooleanEntry("check", check) ]""" else """ WriteSet([DataEntry("check", check)]) """}
          | }
@@ -145,8 +147,8 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
       d.appendBlock(ethInvoke)
 
       d.liquidDiff.errorMessage(ethInvoke.id()) shouldBe None
-      d.liquidDiff.accountData(dApp).data("check").value shouldBe true
-      if (syncCall) d.liquidDiff.accountData(dApp2).data("check").value shouldBe true
+      d.liquidDiff.accountData(dApp)("check").value shouldBe true
+      if (syncCall) d.liquidDiff.accountData(dApp2)("check").value shouldBe true
 
       val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
       d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio

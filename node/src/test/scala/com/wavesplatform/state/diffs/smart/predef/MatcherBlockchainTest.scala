@@ -40,6 +40,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def wavesAmount(height: Int): BigInt                                                         = ???
       override def transferById(id: ByteStr): Option[(Int, TransferTransaction)]                            = ???
       override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]                              = ???
+      override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]]                  = ???
       override def transactionMeta(id: ByteStr): Option[TxMeta]                                             = ???
       override def containsTransaction(tx: Transaction): Boolean                                            = ???
       override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]                        = ???
@@ -54,7 +55,10 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def accountData(acc: Address, key: String): Option[DataEntry[?]]                             = ???
       override def hasData(address: Address): Boolean                                                       = ???
       override def leaseBalance(address: Address): LeaseBalance                                             = ???
+      override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]                       = ???
       override def balance(address: Address, mayBeAssetId: Asset): Long                                     = ???
+      override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long]                        = ???
+      override def wavesBalances(addresses: Seq[Address]): Map[Address, Long]                               = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
     }
 
@@ -95,6 +99,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
           checkEstimatorSumOverflow = true,
           newEvaluatorMode = true,
           checkWeakPk = true,
+          enableExecutionLog = false,
           fixBigScriptField = true
         )
         ._3 shouldBe Right(CONST_BOOLEAN(true))

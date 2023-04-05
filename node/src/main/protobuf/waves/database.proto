@@ -26,6 +26,8 @@ message BlockMeta {
   int64 total_fee_in_waves = 7;
   int64 reward = 8;
   bytes vrf = 9;
+  bytes total_score = 10;
+  int64 total_waves_amount = 11;
 }
 
 message TransactionMeta {
@@ -34,6 +36,7 @@ message TransactionMeta {
   int32 type = 3;
   bool failed = 4;
   int64 spent_complexity = 5;
+  int32 size = 6;
 }
 
 message EthereumTransactionMeta {
@@ -80,6 +83,7 @@ message StaticAssetInfo {
   bool is_nft = 4;
   int32 sequence_in_block = 5;
   int32 height = 6;
+  bytes id = 7;
 }
 
 message DataEntry {

@@ -1,8 +1,8 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.TimeUnit
-
 import com.google.common.cache.CacheBuilder
+
+import java.util.concurrent.TimeUnit
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}

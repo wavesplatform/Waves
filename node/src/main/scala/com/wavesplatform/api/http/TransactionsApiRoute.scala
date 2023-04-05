@@ -7,35 +7,32 @@ import cats.instances.list.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.*
-import com.wavesplatform.transaction.lease.*
-import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.utils.{EthEncoding, Time}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import play.api.libs.json.*
+import monix.reactive.Observable
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
+    compositeBlockchain: () => CompositeBlockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
     time: Time,
@@ -55,13 +52,16 @@ case class TransactionsApiRoute(
 
   def addressWithLimit: Route = {
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
-      routeTimeout.executeToFuture {
-        val after =
-          maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
-        if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
+      val after =
+        maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
+      if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
 
-        transactionsByAddress(address, limit, after).map(txs => List(txs)) // Double list - [ [tx1, tx2, ...] ]
-      }
+      val blockV5Activation  = blockchain.activatedFeatures.get(BlockchainFeatures.BlockV5.id)
+      val improvedSerializer = serializer.copy(blockchain = compositeBlockchain())
+
+      routeTimeout.executeFromObservable {
+        transactionsByAddress(address, limit, after) // Double list - [ [tx1, tx2, ...] ]
+      }(jacksonStreamMarshaller("[[", ",", "]]")(improvedSerializer.txMetaJsonSerializer(address, h => blockV5Activation.exists(v5h => v5h <= h), _)))
     }
   }
 
@@ -196,7 +196,7 @@ case class TransactionsApiRoute(
       case (errors, _) => InvalidIds(errors)
     }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Task[List[JsObject]] = {
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Observable[TxMetaEnriched] = {
     val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
@@ -205,31 +205,28 @@ case class TransactionsApiRoute(
         .map(aliases => aliases.toSet)
         .memoize
 
-    /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
-      */
-    def compactJson(address: Address, meta: TransactionMeta): Task[JsObject] = {
-      import com.wavesplatform.transaction.transfer.*
+    def txMetaEnriched(address: Address, meta: TransactionMeta): Task[TxMetaEnriched] =
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          (if (
-             mtt.transfers.exists(pt =>
-               pt.address match {
-                 case address: Address => false
-                 case a: Alias         => true
-               }
-             )
-           ) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
-           else Task.now(mtt.compactJson(address, Set.empty))).map(_ ++ serializer.transactionMetaJson(meta))
+          val aliasExists = mtt.transfers.exists(pt =>
+            pt.address match {
+              case _: Address => false
+              case _: Alias   => true
+            }
+          )
 
-        case _ => Task.now(serializer.transactionWithMetaJson(meta))
+          if (aliasExists) {
+            aliasesOfAddress.map(aliases => TxMetaEnriched(meta, Some(aliases)))
+          } else {
+            Task.now(TxMetaEnriched(meta))
+          }
+        case _ => Task.now(TxMetaEnriched(meta))
       }
-    }
 
     commonApi
       .transactionsByAddress(address, None, Set.empty, maybeAfter)
       .take(limitParam)
-      .mapEval(compactJson(address, _))
-      .toListL
+      .mapEval(txMetaEnriched(address, _))
   }
 }
 
@@ -272,155 +269,5 @@ object TransactionsApiRoute {
     } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 
-  private[http] object TransactionJsonSerializer {
-    def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
-      if (isBlockV5)
-        Json.obj("applicationStatus" -> (if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed))
-      else
-        JsObject.empty
-
-    def height(height: Int): JsObject =
-      Json.obj("height" -> height)
-  }
-
-  private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
-    def transactionMetaJson(meta: TransactionMeta): JsObject = {
-      val specificInfo = meta.transaction match {
-        case lease: LeaseTransaction =>
-          import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus.*
-          Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) active else canceled))
-
-        case leaseCancel: LeaseCancelTransaction =>
-          Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
-
-        case _ => JsObject.empty
-      }
-
-      val stateChanges = meta match {
-        case i: TransactionMeta.Invoke =>
-          Json.obj("stateChanges" -> i.invokeScriptResult)
-
-        case e: TransactionMeta.Ethereum =>
-          val payloadJson: JsObject = e.meta
-            .map(_.payload)
-            .collect {
-              case Payload.Invocation(i) =>
-                val functionCallEi = SerdeV1.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
-                val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
-                Json.obj(
-                  "type"         -> "invocation",
-                  "dApp"         -> Address(EthEncoding.toBytes(e.transaction.underlying.getTo)),
-                  "call"         -> functionCallEi.toOption,
-                  "payment"      -> payments,
-                  "stateChanges" -> e.invokeScriptResult
-                )
-
-              case Payload.Transfer(t) =>
-                val (asset, amount) = PBAmounts.toAssetAndAmount(t.getAmount)
-                Json.obj(
-                  "type"      -> "transfer",
-                  "recipient" -> Address(t.publicKeyHash.toByteArray),
-                  "asset"     -> asset,
-                  "amount"    -> amount
-                )
-            }
-            .getOrElse(JsObject.empty)
-          Json.obj("payload" -> payloadJson)
-
-        case _ => JsObject.empty
-      }
-
-      Seq(
-        TransactionJsonSerializer.height(meta.height),
-        metaJson(TxMeta(meta.height, meta.succeeded, meta.spentComplexity)),
-        stateChanges,
-        specificInfo
-      ).reduce(_ ++ _)
-    }
-
-    def transactionWithMetaJson(meta: TransactionMeta): JsObject = {
-      meta.transaction.json() ++ transactionMetaJson(meta)
-    }
-
-    def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
-      case leaseCancel: LeaseCancelTransaction =>
-        leaseCancel.json() ++ Json.obj("lease" -> leaseIdToLeaseRef(leaseCancel.leaseId))
-
-      case t => t.json()
-    }
-
-    def metaJson(m: TxMeta): JsObject =
-      TransactionJsonSerializer.applicationStatus(isBlockV5(m.height), m.succeeded) ++ Json.obj("spentComplexity" -> m.spentComplexity)
-
-    private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
-
-    // Extended lease format. Overrides default
-    private[this] def leaseIdToLeaseRef(
-        leaseId: ByteStr,
-        recipientParamOpt: Option[AddressOrAlias] = None,
-        amountOpt: Option[Long] = None
-    ): LeaseRef = {
-      val detailsOpt           = blockchain.leaseDetails(leaseId)
-      val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
-      val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipient))
-      val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
-
-      val statusOpt = detailsOpt.map(_.status)
-      val status    = LeaseStatus(statusOpt.contains(LeaseDetails.Status.Active))
-      val statusDataOpt = statusOpt.map {
-        case LeaseDetails.Status.Active                  => (None, None)
-        case LeaseDetails.Status.Cancelled(height, txId) => (Some(height), txId)
-        case LeaseDetails.Status.Expired(height)         => (Some(height), None)
-      }
-
-      LeaseRef(
-        leaseId,
-        detailsOpt.map(_.sourceId),
-        detailsOpt.map(_.sender.toAddress),
-        resolvedRecipientOpt,
-        amountOpt orElse detailsOpt.map(_.amount),
-        txMetaOpt.map(_.height),
-        status,
-        statusDataOpt.flatMap(_._1),
-        statusDataOpt.flatMap(_._2)
-      )
-    }
-
-    private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =
-      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.id, Some(l.recipient), Some(l.amount)))
-
-    private[http] implicit val leaseCancelWrites: OWrites[InvokeScriptResult.LeaseCancel] =
-      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.id))
-
-    // To override nested InvokeScriptResult writes
-    private[http] implicit lazy val invocationWrites: OWrites[InvokeScriptResult.Invocation] = (i: InvokeScriptResult.Invocation) =>
-      Json.obj(
-        "dApp"         -> i.dApp,
-        "call"         -> i.call,
-        "payment"      -> i.payments,
-        "stateChanges" -> invokeScriptResultWrites.writes(i.stateChanges)
-      )
-
-    private[http] implicit lazy val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
-      import InvokeScriptResult.{issueFormat, reissueFormat, burnFormat, sponsorFeeFormat}
-      Json.writes[InvokeScriptResult]
-    }
-  }
-
-  private[this] final case class LeaseRef(
-      id: ByteStr,
-      originTransactionId: Option[ByteStr],
-      sender: Option[Address],
-      recipient: Option[Address],
-      amount: Option[Long],
-      height: Option[Int],
-      status: LeaseStatus = LeaseStatus.active,
-      cancelHeight: Option[Int] = None,
-      cancelTransactionId: Option[ByteStr] = None
-  )
-  private[this] object LeaseRef {
-    import com.wavesplatform.utils.byteStrFormat
-    implicit val config                        = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
-    implicit val jsonWrites: OWrites[LeaseRef] = Json.writes[LeaseRef]
-  }
+  case class TxMetaEnriched(meta: TransactionMeta, aliases: Option[Set[Alias]] = None)
 }
