@@ -115,7 +115,6 @@ class DefaultRequestService(
   }
 
   override def runAffected(affected: Set[ScriptRequest]): Task[Unit] = Task {
-    // println(s"3 ==> affected: $affected")
     requestScheduler.addMultiple(affected)
     RideRunnerStats.rideRequestTotalNumber.update(requests.estimatedSize().toDouble)
   }

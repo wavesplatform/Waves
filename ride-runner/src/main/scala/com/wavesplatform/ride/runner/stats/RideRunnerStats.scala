@@ -55,14 +55,9 @@ object RideRunnerStats {
   private val grpcCallTimer                              = Kamon.timer("grpc.call", "gRPC calls time")
   def grpcCallTimerFor(methodName: String, raw: Boolean) = grpcCallTimer.withTag("method", methodName).withTag("raw", raw)
 
-  private val workSchedulerSize = Kamon.gauge("job-scheduler.size", "A size of queues in a work scheduler")
-  val prioritizedWorkSize       = workSchedulerSize.withTag("tpe", "prioritized")
-  val regularWorkSize           = workSchedulerSize.withTag("tpe", "regular")
-
-  private val jobSchedulerTime       = Kamon.timer("job-scheduler.time")
-  val jobSchedulerPrioritizeTime     = jobSchedulerTime.withTag("op", "prioritize")
-  val jobSchedulerPrioritizeManyTime = jobSchedulerTime.withTag("op", "prioritizeMany")
-  val jobSchedulerGetJobTime         = jobSchedulerTime.withTag("op", "getJob")
+  private val jobSchedulerSize = Kamon.gauge("job-scheduler.size", "A size of queues in a work scheduler")
+  val prioritizedJobSize       = jobSchedulerSize.withTag("tpe", "prioritized")
+  val regularJobSize           = jobSchedulerSize.withTag("tpe", "regular")
 
   val columnFamilyProperties = Kamon.gauge("rocksdb.props", "RocksDB column family properties")
   val dbStats                = Kamon.gauge("rocksdb.stats", "RocksDB statistics")

@@ -1,11 +1,12 @@
 package com.wavesplatform.ride.runner.requests
 
+import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 
-import scala.collection.mutable
+import java.util.concurrent.ConcurrentHashMap
 
 trait JobScheduler[T] extends AutoCloseable {
   def add(item: T, prioritized: Boolean = false): Unit
@@ -15,10 +16,10 @@ trait JobScheduler[T] extends AutoCloseable {
 
 class SynchronizedJobScheduler[T]()(implicit val scheduler: Scheduler) extends JobScheduler[T] {
   private val prioritizedQueue = ConcurrentSubject.publish[T]
-  private val prioritizedItems = mutable.Set.empty[T]
+  private val prioritizedItems = ConcurrentHashMap.newKeySet[T]()
 
   private val regularQueue = ConcurrentSubject.publish[T]
-  private val regularItems = mutable.Set.empty[T]
+  private val regularItems = ConcurrentHashMap.newKeySet[T]()
 
   override val jobs: Observable[T] = Observable
     .mergePrioritizedList(
@@ -27,15 +28,17 @@ class SynchronizedJobScheduler[T]()(implicit val scheduler: Scheduler) extends J
       0 -> regularQueue.doOnNextAck((x, _) => Task(regularItems.remove(x)))
     )
 
-  override def add(item: T, prioritized: Boolean): Unit = synchronized {
-    unsafeAdd(item, prioritized)
+  override def add(item: T, prioritized: Boolean): Unit = {
+    addOne(item, prioritized)
+    updateStats(prioritized)
   }
 
-  override def addMultiple(items: Iterable[T], prioritized: Boolean): Unit = synchronized {
-    items.foreach(unsafeAdd(_, prioritized))
+  override def addMultiple(items: Iterable[T], prioritized: Boolean): Unit = {
+    items.foreach(addOne(_, prioritized))
+    updateStats(prioritized)
   }
 
-  private def unsafeAdd(item: T, prioritized: Boolean): Unit = if (!prioritizedItems.contains(item)) {
+  private def addOne(item: T, prioritized: Boolean): Unit = if (!prioritizedItems.contains(item)) {
     if (prioritized) {
       prioritizedItems.add(item)
       prioritizedQueue.onNext(item)
@@ -44,6 +47,10 @@ class SynchronizedJobScheduler[T]()(implicit val scheduler: Scheduler) extends J
       regularQueue.onNext(item)
     }
   }
+
+  private def updateStats(prioritized: Boolean): Unit =
+    if (prioritized) RideRunnerStats.prioritizedJobSize.update(prioritizedItems.size.toDouble)
+    else RideRunnerStats.regularJobSize.update(regularItems.size.toDouble)
 
   override def close(): Unit = {
     prioritizedQueue.onComplete()
