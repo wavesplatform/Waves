@@ -64,7 +64,7 @@ object RollbackBenchmark extends ScorexLogging {
         issuer,
         Seq.empty,
         -1,
-        ByteStr.empty
+        None
       )
       .explicitGet()
 
@@ -95,7 +95,7 @@ object RollbackBenchmark extends ScorexLogging {
           issuer,
           Seq.empty,
           -1,
-          ByteStr.empty
+          None
         )
         .explicitGet()
     val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L))).toMap)

@@ -5,6 +5,7 @@ import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -18,6 +19,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
   private val prevResBlockSig  = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
   private val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
+  private val stateHash        = ByteStr.fill(DigestLength)(Random.nextInt(100).toByte)
   private val reference        = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
   private val sender           = KeyPair(reference.dropRight(2))
   private val gen              = KeyPair(reference)
@@ -33,7 +35,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
 
     val transactions = Seq(tr, tr2)
 
-    val microBlock  = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, None).explicitGet()
+    val microBlock  = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig, Some(stateHash)).explicitGet()
     val parsedBlock = MicroBlock.parseBytes(MicroBlockSerializer.toBytes(microBlock)).get
 
     assert(microBlock.signaturesValid().isRight)
@@ -44,6 +46,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     assert(microBlock.totalResBlockSig == parsedBlock.totalResBlockSig)
     assert(microBlock.reference == parsedBlock.reference)
     assert(microBlock.transactionData == parsedBlock.transactionData)
+    assert(microBlock.stateHash == parsedBlock.stateHash)
     assert(microBlock == parsedBlock)
   }
 
