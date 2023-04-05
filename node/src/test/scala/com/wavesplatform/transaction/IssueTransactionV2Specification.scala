@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.test.PropSpec
@@ -46,28 +45,28 @@ class IssueTransactionV2Specification extends PropSpec with WithNewDBForEachTest
       "AAMCVNUoqr7DXKEA2Hx7ehKGMvrxnNRFMYGUV0RRE6MqIe8iAAhHaWdhY29pbgAIR2lnYWNvaW4AAAACVAvkAAgBAAAAAAX14QAAAAFjXdP0HQABAAEAQJgqUCQFUctLLrdJY8pUMZ3zO8sGtTL6xZhiVLDGaM8xG9r7ll2rPepblKWwbgP/QqZ0C8aAg2IMxY5E7hbUsos="
     )
     val json = Json.parse("""
-        |{
-        |  "type": 3,
-        |  "id": "2ykNAo5JrvNCcL8PtCmc9pTcNtKUy2PjJkrFdRvTfUf4",
-        |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-        |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
-        |  "fee": 100000000,
-        |  "feeAssetId": null,
-        |  "timestamp": 1526287561757,
-        |  "proofs": [
-        |  "43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g"
-        |  ],
-        |  "version": 2,
-        |  "assetId": "2ykNAo5JrvNCcL8PtCmc9pTcNtKUy2PjJkrFdRvTfUf4",
-        |  "chainId": 84,
-        |  "name": "Gigacoin",
-        |  "quantity": 10000000000,
-        |  "reissuable": true,
-        |  "decimals": 8,
-        |  "description": "Gigacoin",
-        |  "script":null
-        |}
-        |""".stripMargin)
+                            |{
+                            |  "type": 3,
+                            |  "id": "2ykNAo5JrvNCcL8PtCmc9pTcNtKUy2PjJkrFdRvTfUf4",
+                            |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                            |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                            |  "fee": 100000000,
+                            |  "feeAssetId": null,
+                            |  "timestamp": 1526287561757,
+                            |  "proofs": [
+                            |  "43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g"
+                            |  ],
+                            |  "version": 2,
+                            |  "assetId": "2ykNAo5JrvNCcL8PtCmc9pTcNtKUy2PjJkrFdRvTfUf4",
+                            |  "chainId": 84,
+                            |  "name": "Gigacoin",
+                            |  "quantity": 10000000000,
+                            |  "reissuable": true,
+                            |  "decimals": 8,
+                            |  "description": "Gigacoin",
+                            |  "script":null
+                            |}
+                            |""".stripMargin)
 
     val tx = IssueTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
@@ -136,8 +135,8 @@ class IssueTransactionV2Specification extends PropSpec with WithNewDBForEachTest
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-            CryptoContext.build(Global, V3).withEnvironment[Environment],
+            PureContext.build(V3, useNewPowPrecision = true),
+            CryptoContext.build(Global, V3),
             WavesContext.build(
               Global,
               DirectiveSet(V3, Account, Expression).explicitGet(),

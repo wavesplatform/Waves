@@ -31,10 +31,10 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Asset, DataTransaction, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
-import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
@@ -868,18 +868,16 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val expr       = Parser.parseExpr(script).get.value
     val directives = DirectiveSet(V2, AssetType, Expression).explicitGet()
     val ctx =
-      PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+      PureContext.build(V2, useNewPowPrecision = true) |+|
+        CryptoContext.build(Global, V2) |+|
         WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet(), fixBigScriptField = true)
 
     val environment = WavesEnvironment(
-      chainId,
-      Coeval(???),
       null,
-      EmptyBlockchain,
       Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+      ByteStr.empty,
       directives,
-      ByteStr.empty
+      EmptyBlockchain
     )
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, V3, expr)
@@ -899,18 +897,16 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
     val ctx =
-      PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+      PureContext.build(V2, useNewPowPrecision = true) |+|
+        CryptoContext.build(Global, V2) |+|
         WavesContext.build(Global, directives, fixBigScriptField = true)
 
     val env = WavesEnvironment(
-      chainId,
-      Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
       null,
-      EmptyBlockchain,
       Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+      ByteStr.empty,
       directives,
-      ByteStr.empty
+      EmptyBlockchain
     )
 
     for {

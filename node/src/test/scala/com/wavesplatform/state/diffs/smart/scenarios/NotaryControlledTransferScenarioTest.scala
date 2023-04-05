@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import cats.syntax.either.*
 import cats.Id
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -14,17 +14,14 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, Testing}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.*
-import com.wavesplatform.state.diffs.smart.predef.chainId
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.EmptyBlockchain
-import monix.eval.Coeval
 
 class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
 
@@ -37,25 +34,25 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
 
     val genesis = Seq(company, king, notary, accountA, accountB).map(acc => TxHelpers.genesis(acc.toAddress))
 
-    val assetScript   = s"""
-                     |
-                     | match tx {
-                     |   case ttx: TransferTransaction =>
-                     |      let king = Address(base58'${king.toAddress}')
-                     |      let company = Address(base58'${company.toAddress}')
-                     |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
-                     |      let txIdBase58String = toBase58String(ttx.id)
-                     |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {
-                     |        case b : Boolean => b
-                     |        case _ : Unit => false
-                     |      }
-                     |      let recipientAddress = addressFromRecipient(ttx.recipient)
-                     |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
-                     |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
-                     |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
-                     |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
-                     |   case _ => throw()
-                     | }
+    val assetScript = s"""
+                         |
+                         | match tx {
+                         |   case ttx: TransferTransaction =>
+                         |      let king = Address(base58'${king.toAddress}')
+                         |      let company = Address(base58'${company.toAddress}')
+                         |      let notary1 = addressFromPublicKey(extract(getBinary(king, "notary1PK")))
+                         |      let txIdBase58String = toBase58String(ttx.id)
+                         |      let isNotary1Agreed = match getBoolean(notary1,txIdBase58String) {
+                         |        case b : Boolean => b
+                         |        case _ : Unit => false
+                         |      }
+                         |      let recipientAddress = addressFromRecipient(ttx.recipient)
+                         |      let recipientAgreement = getBoolean(recipientAddress,txIdBase58String)
+                         |      let isRecipientAgreed = if(isDefined(recipientAgreement)) then extract(recipientAgreement) else false
+                         |      let senderAddress = addressFromPublicKey(ttx.senderPublicKey)
+                         |      senderAddress.bytes == company.bytes || (isNotary1Agreed && isRecipientAgreed)
+                         |   case _ => throw()
+                         | }
         """.stripMargin
     val untypedScript = Parser.parseExpr(assetScript).get.value
     val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1)
@@ -80,9 +77,9 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
     )
   }
 
-  private val dummyEvalContext: EvaluationContext[Environment, Id] = {
+  private val dummyEvalContext: EvaluationContext[Id] = {
     val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
-    val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, ds, ByteStr.empty)
+    val environment = WavesEnvironment(null, null, ByteStr.empty, ds, EmptyBlockchain)
     lazyContexts((ds, true, true))().evaluationContext(environment)
   }
 
@@ -115,7 +112,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
       append(Seq(issue, kingDataTransaction, transferFromCompanyToA)).explicitGet()
       append(Seq(transferFromAToB)) should produce("NotAllowedByScript")
       append(Seq(notaryDataTransaction)).explicitGet()
-      append(Seq(transferFromAToB)) should produce("NotAllowedByScript") //recipient should accept tx
+      append(Seq(transferFromAToB)) should produce("NotAllowedByScript") // recipient should accept tx
       append(Seq(accountBDataTransaction)).explicitGet()
       append(Seq(transferFromAToB)).explicitGet()
     }

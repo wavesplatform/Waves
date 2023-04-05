@@ -19,7 +19,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, Wa
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
@@ -31,8 +30,8 @@ class ContractCompilerTest extends PropSpec {
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, version).withEnvironment[Environment],
+          PureContext.build(version, useNewPowPrecision = true),
+          CryptoContext.build(com.wavesplatform.lang.Global, version),
           WavesContext.build(
             Global,
             DirectiveSet(version, Account, DAppType).explicitGet(),
@@ -367,8 +366,8 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3, useNewPowPrecision = true),
+          CryptoContext.build(com.wavesplatform.lang.Global, V3),
           WavesContext.build(
             Global,
             DirectiveSet(V3, Account, DAppType).explicitGet(),
@@ -495,8 +494,8 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3, useNewPowPrecision = true),
+          CryptoContext.build(com.wavesplatform.lang.Global, V3),
           WavesContext.build(
             Global,
             DirectiveSet(V3, Account, DAppType).explicitGet(),
@@ -814,7 +813,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true) |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
@@ -824,8 +823,8 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
+          PureContext.build(V3, useNewPowPrecision = true),
+          CryptoContext.build(com.wavesplatform.lang.Global, V3),
           WavesContext.build(
             Global,
             DirectiveSet(V3, Account, DAppType).explicitGet(),
@@ -921,7 +920,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, useNewPowPrecision = true) |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
@@ -959,7 +958,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true) |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
@@ -982,7 +981,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, useNewPowPrecision = true) |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     val result = compiler.ContractCompiler(ctx.compilerContext, expr, V4)

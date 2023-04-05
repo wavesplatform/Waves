@@ -50,9 +50,9 @@ object ContractScript {
 
     override val containsArray: Boolean = {
       val declExprs = expr.decs.map {
-        case l: LET        => l.value
-        case f: FUNC       => f.body
-        case _: FAILED_DEC => FAILED_EXPR()
+        case l: LET     => l.value
+        case f: FUNC    => f.body
+        case FAILED_DEC => FAILED_EXPR
       }
       val callableExprs = expr.callableFuncs.map(_.u.body)
       val verifierExpr  = expr.verifierFuncOpt.map(_.u.body).toList
@@ -138,8 +138,8 @@ object ContractScript {
           )
         case FUNC(name, args, _) =>
           FUNCTION_CALL(FunctionHeader.User(name), List.fill(args.size)(TRUE))
-        case Terms.FAILED_DEC() =>
-          FAILED_EXPR()
+        case Terms.FAILED_DEC =>
+          FAILED_EXPR
       }
     val funcWithContext = annotationArgNameOpt.fold(declExpr)(argName => BLOCK(LET(argName, TRUE), declExpr))
     dec.foldRight(funcWithContext)((declaration, expr) => BLOCK(declaration, expr))

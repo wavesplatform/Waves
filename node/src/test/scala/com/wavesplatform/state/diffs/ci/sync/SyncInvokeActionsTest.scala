@@ -52,7 +52,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
            | func default() = {
            |   strict assetId = Address(base58'$dApp2Address').invoke("default", [], [])
            |   [
-           |     ScriptTransfer(i.caller, 1000, assetId.exactAs[ByteVector])
+           |     ScriptTransfer(i.caller, 700, assetId.exactAs[ByteVector])
            |   ]
            | }
          """.stripMargin
@@ -63,7 +63,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
            | func default() = {
            |   let issue   = Issue("name", "", 1000, 4, true, unit, 0)
            |   let assetId = issue.calculateAssetId()
-           |   ([issue, ScriptTransfer(i.caller, 1000, assetId)], assetId)
+           |   ([issue, ScriptTransfer(i.caller, 900, assetId)], assetId)
            | }
          """.stripMargin
       )

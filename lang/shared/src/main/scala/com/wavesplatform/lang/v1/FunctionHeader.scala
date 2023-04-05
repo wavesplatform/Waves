@@ -1,8 +1,16 @@
 package com.wavesplatform.lang.v1
 
+import scala.collection.mutable
+
 sealed abstract class FunctionHeader(val funcName: String)
 object FunctionHeader {
-  case class Native(name: Short) extends FunctionHeader(name.toString)
+  case class Native private(name: Short) extends FunctionHeader(name.toString)
+  object Native {
+    private[this] val cache = mutable.Map.empty[Short, Native]
+    def apply(name: Short): Native = cache.getOrElse(name, cache.synchronized {
+      cache.getOrElseUpdate(name, new Native(name))
+    })
+  }
 
   case class User(internalName: String, name: String) extends FunctionHeader(internalName) {
     override def hashCode(): Int = internalName.##

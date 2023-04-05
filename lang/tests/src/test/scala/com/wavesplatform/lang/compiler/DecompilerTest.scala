@@ -17,7 +17,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
@@ -806,7 +805,7 @@ class DecompilerTest extends PropSpec {
 
     val ctx =
       Monoid.combine(
-        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
+        PureContext.build(V4, useNewPowPrecision = true),
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
       )
 
@@ -867,8 +866,8 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V4).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true),
+          CryptoContext.build(Global, V4),
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
@@ -908,8 +907,8 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V4).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true),
+          CryptoContext.build(Global, V4),
           WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
@@ -920,12 +919,6 @@ class DecompilerTest extends PropSpec {
   }
 
   property("V5 - new functions") {
-    val directives =
-      """
-        | {-# STDLIB_VERSION 5    #-}
-        | {-#CONTENT_TYPE    DAPP #-}
-        |""".stripMargin
-
     val script =
       s"""
          | @Callable(i)
@@ -934,20 +927,13 @@ class DecompilerTest extends PropSpec {
          |   nil
          | }
         """.stripMargin
+    val dApp = TestCompiler(V5).compileContract(
+      """
+        | {-# STDLIB_VERSION 5    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin ++ script)
 
-    val parsedExpr = Parser.parseContract(directives ++ script).get.value
-
-    val ctx =
-      Monoid.combineAll(
-        Seq(
-          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V5).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
-        )
-      )
-
-    val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V5).explicitGet()
-    val res  = Decompiler(dApp, ctx.decompilerContext, V5)
+    val res  = Decompiler(dApp.expr, TestCompiler(V5).dappContext.decompilerContext, V5)
     res shouldEq script
   }
 
@@ -974,8 +960,8 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V5).withEnvironment[Environment],
+          PureContext.build(V5, useNewPowPrecision = true),
+          CryptoContext.build(Global, V5),
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
@@ -1019,8 +1005,8 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combineAll(
         Seq(
-          PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V5).withEnvironment[Environment],
+          PureContext.build(V5, useNewPowPrecision = true),
+          CryptoContext.build(Global, V5),
           WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )

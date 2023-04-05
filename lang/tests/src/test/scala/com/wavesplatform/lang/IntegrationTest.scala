@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
 import cats.kernel.Monoid
 import cats.syntax.either.*
@@ -14,13 +16,12 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
@@ -30,7 +31,6 @@ import com.wavesplatform.test.*
 import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
-import java.nio.charset.StandardCharsets
 import scala.util.Random
 
 class IntegrationTest extends PropSpec with Inside {
@@ -38,20 +38,20 @@ class IntegrationTest extends PropSpec with Inside {
       code: String,
       pointInstance: Option[CaseObj] = None,
       pointType: FINAL = AorBorC,
-      ctxt: CTX[NoContext] = CTX.empty,
+      ctxt: CTX = CTX.empty,
       version: StdLibVersion = V3
   ): Either[String, T] =
-    genericEval[NoContext, T](code, pointInstance, pointType, ctxt, version, Contextful.empty[Id])
+    genericEval[T](code, pointInstance, pointType, ctxt, version, Common.emptyBlockchainEnvironment())
 
-  private def genericEval[C[_[_]], T <: EVALUATED](
+  private def genericEval[T <: EVALUATED](
       code: String,
       pointInstance: Option[CaseObj] = None,
       pointType: FINAL = AorBorC,
-      ctxt: CTX[C],
+      ctxt: CTX,
       version: StdLibVersion,
-      env: C[Id]
+      env: Environment[Id]
   ): Either[String, T] = {
-    val f: BaseFunction[C] =
+    val f: BaseFunction =
       NativeFunction(
         "fn1",
         1,
@@ -63,7 +63,7 @@ class IntegrationTest extends PropSpec with Inside {
         case xs       => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
 
-    val f2: BaseFunction[C] =
+    val f2: BaseFunction =
       NativeFunction(
         "fn2",
         1,
@@ -75,22 +75,22 @@ class IntegrationTest extends PropSpec with Inside {
         case xs       => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
 
-    val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
+    val lazyVal       = ContextfulVal.pure(pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
 
-    val ctx: CTX[C] =
+    val ctx: CTX =
       Monoid.combineAll(
         Seq(
-          PureContext.build(version, useNewPowPrecision = true).withEnvironment[C],
-          CryptoContext.build(Global, version).withEnvironment[C],
-          addCtx.withEnvironment[C],
-          CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
+          PureContext.build(version, useNewPowPrecision = true),
+          CryptoContext.build(Global, version),
+          addCtx,
+          CTX(sampleTypes, stringToTuple, Array(f, f2)),
           ctxt
         )
       )
 
     val compiled = ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext, StdLibVersion.VersionDic.all.last)
-    val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
+    val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Id]]
     compiled.flatMap(v =>
       EvaluatorV2
         .applyCompleted(
@@ -429,18 +429,14 @@ class IntegrationTest extends PropSpec with Inside {
   }
 
   property("context won't change after execution of a user function") {
-    val doubleFst = UserFunction[NoContext]("ID", 0, LONG, ("x", LONG)) {
+    val doubleFst = UserFunction("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(PureContext.sumLong.header, List(REF("x"), REF("x")))
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1, useNewPowPrecision = true).evaluationContext[Id],
-      EvaluationContext.build(
-        typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
-        functions = Seq(doubleFst)
-      )
-    )
+      PureContext.build(V1, useNewPowPrecision = true),
+      CTX(Seq.empty, Map("x" -> (LONG, ContextfulVal.pure(CONST_LONG(3L)))), Array(doubleFst))
+    ).evaluationContext(Common.emptyBlockchainEnvironment())
 
     val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000L))), REF("x")))
     ev[CONST_LONG](context, expr) shouldBe evaluated(2003L)
@@ -448,13 +444,9 @@ class IntegrationTest extends PropSpec with Inside {
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1, useNewPowPrecision = true).evaluationContext[Id],
-      EvaluationContext.build(
-        typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
-        functions = Seq()
-      )
-    )
+      PureContext.build(V1, useNewPowPrecision = true),
+      CTX(Seq.empty, Map("x" -> (LONG, ContextfulVal.pure(CONST_LONG(3L)))), Array.empty)
+    ).evaluationContext(Common.emptyBlockchainEnvironment())
 
     val expr = FUNCTION_CALL(
       function = PureContext.sumLong.header,
@@ -624,10 +616,10 @@ class IntegrationTest extends PropSpec with Inside {
     for (i <- 65528 to 65535) array(i) = 1
     val src =
       s""" arr.toInt(65528) """
-    val arrVal = ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(array), limit = CONST_BYTESTR.DataTxSize).explicitGet())
+    val arrVal = ContextfulVal.pure(CONST_BYTESTR(ByteStr(array), limit = CONST_BYTESTR.DataTxSize).explicitGet())
     eval[EVALUATED](
       src,
-      ctxt = CTX[NoContext](
+      ctxt = CTX(
         Seq(),
         Map("arr" -> (BYTESTR -> arrVal)),
         Array()
@@ -1100,21 +1092,21 @@ class IntegrationTest extends PropSpec with Inside {
 
     val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
 
-    genericEval[Environment, EVALUATED](
+    genericEval[EVALUATED](
       writeSetScript,
       ctxt = ctx,
       version = V4,
       env = utils.environment
     ) should produce("Can't find a function 'WriteSet'")
 
-    genericEval[Environment, EVALUATED](
+    genericEval[EVALUATED](
       transferSetScript,
       ctxt = ctx,
       version = V4,
       env = utils.environment
     ) should produce("Can't find a function 'TransferSet'")
 
-    genericEval[Environment, EVALUATED](
+    genericEval[EVALUATED](
       scriptResultScript,
       ctxt = ctx,
       version = V4,
@@ -1398,7 +1390,7 @@ class IntegrationTest extends PropSpec with Inside {
 
     val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
 
-    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+    genericEval[EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
   }
 
@@ -1411,7 +1403,7 @@ class IntegrationTest extends PropSpec with Inside {
 
     val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
 
-    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+    genericEval[EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       Right(CONST_BOOLEAN(true))
   }
 
@@ -2030,7 +2022,7 @@ class IntegrationTest extends PropSpec with Inside {
 
   property("different Lease action constructors") {
     val script = " Lease(Address(base58''), 1234567) == Lease(Address(base58''), 1234567, 0) "
-    genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
+    genericEval[EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.environment) shouldBe
       Right(CONST_BOOLEAN(true))
   }
 
@@ -2044,7 +2036,7 @@ class IntegrationTest extends PropSpec with Inside {
          | calculateLeaseId(Lease(Alias("alias"), 9876, 100))           == base58'$id2' &&
          | base58'$id1' != base58'$id2'
        """.stripMargin
-    genericEval[Environment, EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.buildEnvironment(txId)) shouldBe
+    genericEval[EVALUATED](script, ctxt = v5Ctx, version = V5, env = utils.buildEnvironment(txId)) shouldBe
       Right(CONST_BOOLEAN(true))
   }
 
@@ -2052,9 +2044,9 @@ class IntegrationTest extends PropSpec with Inside {
     val script1 = s" calculateLeaseId(Lease(Address(base58'${"a" * 36}'), 1234567, 123)) "
     val script2 = s""" calculateLeaseId(Lease(Alias("${"a" * 31}"), 1234567, 123)) """
 
-    genericEval[Environment, EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) should
+    genericEval[EVALUATED](script1, ctxt = v5Ctx, version = V5, env = utils.environment) should
       produce("Address bytes length=27 exceeds limit=26")
-    genericEval[Environment, EVALUATED](script2, ctxt = v5Ctx, version = V5, env = utils.environment) should
+    genericEval[EVALUATED](script2, ctxt = v5Ctx, version = V5, env = utils.environment) should
       produce("Alias name length=31 exceeds limit=30")
   }
 

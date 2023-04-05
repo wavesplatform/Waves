@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.syntax.applicative._
-import cats.syntax.either._
+import cats.syntax.applicative.*
+import cats.syntax.either.*
 import cats.{Eval, Monad}
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.Types.TYPE
-import com.wavesplatform.lang.{CoevalF, ExecutionError}
-import monix.eval.Coeval
+import com.wavesplatform.lang.v1.traits.Environment
 
-sealed trait ContextfulNativeFunction[C[_[_]]] {
+sealed trait ContextfulNativeFunction {
   val name: String
   val resultType: TYPE
   val args: Seq[(String, TYPE)]
@@ -18,70 +18,53 @@ sealed trait ContextfulNativeFunction[C[_[_]]] {
 }
 
 object ContextfulNativeFunction {
-  abstract class Simple[C[_[_]]](
+  abstract class Simple(
       val name: String,
       val resultType: TYPE,
       val args: Seq[(String, TYPE)]
-  ) extends ContextfulNativeFunction[C] {
+  ) extends ContextfulNativeFunction {
     def evaluate[F[_]: Monad](
-        env: C[F],
+        env: Environment[F],
         evaluatedArgs: List[EVALUATED]
     ): F[Either[ExecutionError, EVALUATED]]
   }
-
-  abstract class Extended[C[_[_]]](
-      val name: String,
-      val resultType: TYPE,
-      val args: Seq[(String, TYPE)]
-  ) extends ContextfulNativeFunction[C] {
-    def evaluate[F[_]: Monad](
-        env: C[F],
-        evaluatedArgs: List[EVALUATED],
-        availableComplexity: Int
-    )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]]
-  }
 }
 
-trait ContextfulUserFunction[C[_[_]]] {
-  def apply[F[_]: Monad](context: C[F], startArgs: List[EXPR]): EXPR
+trait ContextfulUserFunction {
+  def apply[F[_]: Monad](context: Environment[F], startArgs: List[EXPR]): EXPR
 }
 
 object ContextfulUserFunction {
-  def pure[C[_[_]]](expr: EXPR): ContextfulUserFunction[C] =
-    new ContextfulUserFunction[C] {
-      override def apply[F[_]: Monad](context: C[F], startArgs: List[EXPR]): EXPR = expr
+  def pure(expr: EXPR): ContextfulUserFunction =
+    new ContextfulUserFunction {
+      override def apply[F[_]: Monad](context: Environment[F], startArgs: List[EXPR]): EXPR = expr
     }
 }
 
-trait ContextfulVal[C[_[_]]] {
+trait ContextfulVal {
   val isPure: Boolean = false
-  def apply[F[_]: Monad](context: C[F]): Eval[F[Either[ExecutionError, EVALUATED]]]
+  def apply[F[_]: Monad](context: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]]
 }
 
 object ContextfulVal {
-  def fromEval[C[_[_]]](v: Eval[Either[ExecutionError, EVALUATED]]): ContextfulVal[C] =
-    new ContextfulVal[C] {
-      override def apply[F[_]: Monad](context: C[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
+  def fromEval(v: Eval[Either[ExecutionError, EVALUATED]]): ContextfulVal =
+    new ContextfulVal {
+      override def apply[F[_]: Monad](context: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         v.map(_.pure[F])
     }
 
-  def pure[C[_[_]]](v: EVALUATED): ContextfulVal[C] =
-    new ContextfulVal[C] {
+  def pure(v: EVALUATED): ContextfulVal =
+    new ContextfulVal {
       override val isPure: Boolean = true
 
-      override def apply[F[_]: Monad](context: C[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
+      override def apply[F[_]: Monad](context: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         v.asRight[ExecutionError].pure[F].pure[Eval]
     }
 
-  trait Lifted[C[_[_]]] extends ContextfulVal[C] {
-    override def apply[F[_]: Monad](context: C[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
+  trait Lifted extends ContextfulVal {
+    override def apply[F[_]: Monad](context: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
       liftF(context).map(_.pure[F])
 
-    def liftF[F[_]: Monad](context: C[F]): Eval[Either[ExecutionError, EVALUATED]]
+    def liftF[F[_]: Monad](context: Environment[F]): Eval[Either[ExecutionError, EVALUATED]]
   }
-}
-
-object Contextful {
-  type NoContext[_[_]] = Any
-  def empty[F[_]]: NoContext[F] = ()
 }

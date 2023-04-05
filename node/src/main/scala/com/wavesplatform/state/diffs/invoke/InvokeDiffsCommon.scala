@@ -254,7 +254,7 @@ object InvokeDiffsCommon {
     } yield ()
   }
 
-  private def actionsToScriptResult(
+  def actionsToScriptResult(
       actions: StructuredCallableActions,
       storingComplexity: Int,
       tx: InvokeScriptLike,
@@ -608,7 +608,10 @@ object InvokeDiffsCommon {
 
       def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, StateSnapshot] = {
         val reissueDiff =
-          DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap(FailedTransactionError.asFailedScriptError)
+          DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue).leftMap[ValidationError] {
+            case fore: FailOrRejectError => fore
+            case other => FailOrRejectError(other.toString, false)
+          }
         val pseudoTx = ReissuePseudoTx(reissue, actionSender, pk, tx.txId, tx.timestamp)
         callAssetVerifierWithPseudoTx(reissueDiff, reissue.assetId, pseudoTx, AssetContext.Reissue)
       }
@@ -653,7 +656,7 @@ object InvokeDiffsCommon {
         } yield diff
 
       def callAssetVerifierWithPseudoTx(
-          actionDiff: Either[FailedTransactionError, StateSnapshot],
+          actionDiff: Either[ValidationError, StateSnapshot],
           assetId: ByteStr,
           pseudoTx: PseudoTx,
           assetType: AssetContext
@@ -714,7 +717,7 @@ object InvokeDiffsCommon {
     }
   }
 
-  private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptLike)(
+  def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptLike)(
       pseudoTx: PseudoTx,
       assetId: ByteStr,
       nextSnapshot: StateSnapshot,
@@ -751,6 +754,13 @@ object InvokeDiffsCommon {
         )
       case Success(s) => s
     }
+
+  case class ActionCount(
+      asset: Int,
+      balance: Int,
+      data: Int,
+      dataSize: Int
+  )
 
   def checkCallResultLimits(
       currentVersion: StdLibVersion,

@@ -9,14 +9,13 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.test.*
 
 class VarsDocTest extends PropSpec {
-  def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
+  def buildFullContext(ds: DirectiveSet): CTX = {
     val wavesCtx  = WavesContext.build(Global, ds, fixBigScriptField = true)
-    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
-    val pureCtx   = PureContext.build(ds.stdLibVersion, useNewPowPrecision = true).withEnvironment[Environment]
+    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion)
+    val pureCtx   = PureContext.build(ds.stdLibVersion, useNewPowPrecision = true)
     pureCtx |+| cryptoCtx |+| wavesCtx
   }
 
@@ -37,7 +36,7 @@ class VarsDocTest extends PropSpec {
         .map(DirectiveSet(_, Account, Expression).explicitGet())
         .toSeq
 
-  def varsDoc(ctx: CTX[Environment], ver: StdLibVersion): Iterable[(Option[String], String)] =
+  def varsDoc(ctx: CTX, ver: StdLibVersion): Iterable[(Option[String], String)] =
     ctx.vars.keys
       .map(k => (DocSource.varData.get((k, ver.value.asInstanceOf[Int])), k))
 }

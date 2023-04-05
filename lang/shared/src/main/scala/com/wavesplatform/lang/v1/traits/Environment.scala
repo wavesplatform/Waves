@@ -17,6 +17,8 @@ object Environment {
 
   case class AssetId(id: Array[Byte])
   type Tthis = Recipient.Address :+: AssetId :+: CNil
+
+
 }
 
 trait Environment[F[_]] {

@@ -7,6 +7,7 @@
     </appender>
 
     <logger name="scorex.crypto.signatures.Curve25519$" level="INFO"/>
+    <logger name="com.wavesplatform.transaction.smart.Verifier$" level="DEBUG"/>
 
     <root level="${logback.test.level:-OFF}">
         <appender-ref ref="STDOUT" />

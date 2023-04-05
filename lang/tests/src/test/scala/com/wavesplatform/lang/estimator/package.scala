@@ -11,12 +11,11 @@ import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 
 package object estimator {
   private val ctx =
-    PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment] |+|
+    PureContext.build(V3, useNewPowPrecision = true) |+|
       WavesContext.build(Global, DirectiveSet.contractDirectiveSet, fixBigScriptField = true)
 
   private val environment = Common.emptyBlockchainEnvironment()

@@ -34,14 +34,14 @@ class ExpressionCompiler(val version: StdLibVersion) {
         CONST_BYTESTR(b)
           .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, BYTESTR, expr))
-          .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
+          .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR, NOTHING, expr, List(err)) }
 
       def adjustStr(expr: Expressions.CONST_STRING, str: String): Either[CompilationError, CompilationStepResultExpr] =
         CONST_STRING(str)
           .filterOrElse(_ => allowIllFormedStrings || str.isWellFormed, CommonError(s"String '$str' contains ill-formed characters"))
           .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
-          .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
+          .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR, NOTHING, expr, List(err)) }
 
       expr match {
         case x: Expressions.CONST_LONG    => CompilationStepResultExpr(ctx, CONST_LONG(x.value), LONG, x).pure[CompileM]
@@ -53,7 +53,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         case x: Expressions.INVALID =>
           CompilationStepResultExpr(
             ctx,
-            FAILED_EXPR(),
+            FAILED_EXPR,
             NOTHING,
             x: Expressions.EXPR,
             List(Generic(x.position.start, x.position.end, x.message))
@@ -122,7 +122,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
             errorList
           )
         } else {
-          CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, parseNodeExpr, errorList ++ condWithErr._2.map(List(_)).get)
+          CompilationStepResultExpr(ctx, FAILED_EXPR, NOTHING, parseNodeExpr, errorList ++ condWithErr._2.map(List(_)).get)
         }
     } yield result
 
@@ -255,7 +255,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         } else {
           CompilationStepResultExpr(
             ctx,
-            FAILED_EXPR(),
+            FAILED_EXPR,
             NOTHING,
             Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = saveExprContext.toOption(ctx)),
             errorList ++ typedExpr.errors
@@ -313,7 +313,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         if (errorList.isEmpty) {
           CompilationStepResultDec(ctx, LET(letNameWithErr._1.get, compiledLet.expr), letType, parseNodeDecl, compiledLet.errors)
         } else {
-          CompilationStepResultDec(ctx, FAILED_DEC(), letType, parseNodeDecl, errorList ++ compiledLet.errors)
+          CompilationStepResultDec(ctx, FAILED_DEC, letType, parseNodeDecl, errorList ++ compiledLet.errors)
         }
     } yield result
 
@@ -362,7 +362,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
             compiledFuncBody.errors
           )
         } else {
-          CompilationStepResultDec(ctx, FAILED_DEC(), compiledFuncBody.t, parseNodeDecl, errorList ++ compiledFuncBody.errors)
+          CompilationStepResultDec(ctx, FAILED_DEC, compiledFuncBody.t, parseNodeDecl, errorList ++ compiledFuncBody.errors)
         }
     } yield (result, argTypesWithErr._1.map(_.map(nameAnfInfo => (nameAnfInfo._1, nameAnfInfo._2.vType))).getOrElse(List.empty))
   }
@@ -399,7 +399,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         if (!compLetResult.dec.isItFailed) {
           LET_BLOCK(compLetResult.dec.asInstanceOf[LET], compiledBody.expr)
         } else {
-          FAILED_EXPR()
+          FAILED_EXPR
         }
     } yield CompilationStepResultExpr(compiledBody.ctx, result, compiledBody.t, parseNodeExpr, compLetResult.errors ++ compiledBody.errors)
 
@@ -454,7 +454,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
           val (ctx, expr, t) = getterWithErr._1.get
           CompilationStepResultExpr(ctx, expr, t, parseNodeExpr.copy(resultType = Some(t)), compiledRef.errors)
         } else {
-          CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, parseNodeExpr, errorList ++ compiledRef.errors)
+          CompilationStepResultExpr(ctx, FAILED_EXPR, NOTHING, parseNodeExpr, errorList ++ compiledRef.errors)
         }
     } yield result
 
@@ -501,7 +501,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
           val (expr, t) = funcCallWithErr._1.get
           CompilationStepResultExpr(ctx, expr, t, parseNodeExpr, argErrorList)
         } else {
-          CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, parseNodeExpr, errorList ++ argErrorList)
+          CompilationStepResultExpr(ctx, FAILED_EXPR, NOTHING, parseNodeExpr, errorList ++ argErrorList)
         }
     } yield result
 
@@ -543,7 +543,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
         } else {
           CompilationStepResultExpr(
             ctx,
-            FAILED_EXPR(),
+            FAILED_EXPR,
             NOTHING,
             Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx)),
             errorList

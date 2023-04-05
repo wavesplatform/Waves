@@ -405,7 +405,7 @@ object Caches {
       .newBuilder()
       .maximumSize(maximumSize)
       .recordStats()
-      .build(new CacheLoader[K, V] {
+      .build[K, V](new CacheLoader[K, V] {
         override def load(key: K): V                                      = loader(key)
         override def loadAll(keys: lang.Iterable[? <: K]): util.Map[K, V] = batchLoader(keys)
       })

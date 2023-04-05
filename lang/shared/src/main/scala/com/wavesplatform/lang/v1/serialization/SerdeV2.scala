@@ -32,7 +32,7 @@ object SerdeV2 extends Serde[CodedInputStream, CodedOutputStream] {
           out.writeRawByte(args.size.toByte)
           args.foreach(out.writeStringNoTag)
         } *> aux(body)
-      case _: FAILED_DEC =>
+      case FAILED_DEC =>
         Coeval.raiseError(new Exception("Attempt to serialize failed declaration."))
     }
   }

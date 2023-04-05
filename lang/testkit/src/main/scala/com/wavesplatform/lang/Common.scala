@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
@@ -27,16 +27,15 @@ object Common {
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
-  val addCtx: CTX[NoContext]     = CTX[NoContext](Seq(dataEntryType), Map.empty, Array.empty)
+  val addCtx: CTX                = CTX(Seq(dataEntryType), Map.empty, Array.empty)
 
   def ev[T <: EVALUATED](
-      context: EvaluationContext[NoContext, Id] =
-        Monoid.combine(PureContext.build(V1, useNewPowPrecision = true).evaluationContext, addCtx.evaluationContext),
+      context: EvaluationContext[Id] = Monoid.combine(PureContext.build(V1, useNewPowPrecision = true), addCtx).evaluationContext(???),
       expr: EXPR
   ): Either[ExecutionError, T] =
-    new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
+    new EvaluatorV1[Id]().apply[T](context, expr)
 
-  val multiplierFunction: NativeFunction[NoContext] =
+  val multiplierFunction: NativeFunction =
     NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {
       case CONST_LONG(x1: Long) :: CONST_LONG(x2: Long) :: Nil => Try(x1 * x2).map(CONST_LONG).toEither.left.map(_.toString)
       case _                                                   => ??? // suppress pattern match warning
@@ -65,39 +64,33 @@ object Common {
     UNION.create(CorD.typeList, Some("PointCD"))
   )
 
-  def sampleUnionContext(instance: CaseObj) =
-    EvaluationContext.build(
-      Map.empty,
-      Map("p" -> LazyVal.fromEvaluated[Id](instance)),
-      Seq.empty[BaseFunction[NoContext]]
-    )
-
-  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] =
+  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval.evalOnce(???), nByte: Byte = 'T'): Environment[Id] =
     new Environment[Id] {
       def height: Long  = h
       def chainId: Byte = nByte
       def inputEntity   = in()
 
-      def transactionById(id: Array[Byte]): Option[Tx]                                    = ???
-      def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                   = ???
-      def transactionHeightById(id: Array[Byte]): Option[Long]                            = ???
-      def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                         = ???
-      def lastBlockOpt(): Option[BlockInfo]                                               = ???
-      def blockInfoByHeight(height: Int): Option[BlockInfo]                               = ???
-      def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]        = None
-      def hasData(recipient: Recipient): Boolean                                          = false
-      def resolveAlias(name: String): Either[String, Recipient.Address]                   = ???
-      def accountBalanceOf(a: Recipient, b: Option[Array[Byte]]): Either[String, Long]    = ???
-      def accountWavesBalanceOf(a: Recipient): Either[String, Environment.BalanceDetails] = ???
-      def tthis: Environment.Tthis                                                        = Coproduct(Address(ByteStr.empty))
-      def multiPaymentAllowed: Boolean                                                    = true
-      def txId: ByteStr                                                                   = ???
-      def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]               = ???
-      def addressFromString(address: String): Either[String, Recipient.Address]           = ???
-      def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]               = ???
-      def accountScript(addressOrAlias: Recipient): Option[Script]                        = ???
-      def calculateDelay(gt: ByteStr, b: Long): Long                                      = ???
-      def callScript(
+      def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+      def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
+      def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+      def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
+      def lastBlockOpt(): Option[BlockInfo]                                                               = ???
+      def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
+      def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = None
+      def hasData(recipient: Recipient): Boolean                                                          = false
+      def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+      def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
+      def tthis: Environment.Tthis                                                                        = Coproduct(Address(ByteStr.empty))
+      def multiPaymentAllowed: Boolean                                                                    = true
+      def txId: ByteStr                                                                                   = ???
+      def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+      def addressFromString(address: String): Either[String, Recipient.Address] =
+        Common.this.addressFromString(chainId, address).map(v => Recipient.Address(ByteStr(v.get)))
+      override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] = ???
+      def accountScript(addressOrAlias: Recipient): Option[Script]                   = ???
+      def calculateDelay( gt: ByteStr, b: Long): Long          = ???
+      override def callScript(
           dApp: Address,
           func: String,
           args: List[EVALUATED],
