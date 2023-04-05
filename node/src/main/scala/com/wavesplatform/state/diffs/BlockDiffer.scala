@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -12,8 +13,13 @@ import com.wavesplatform.state.patch.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, Transaction}
 
 object BlockDiffer {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
@@ -31,9 +37,12 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
-      verify: Boolean = true
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
+      verify: Boolean = true,
+      enableExecutionLog: Boolean = false,
+      txSignParCheck: Boolean = true
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify).resultE
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
@@ -41,7 +50,10 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
-      verify: Boolean
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
+      verify: Boolean,
+      enableExecutionLog: Boolean,
+      txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
     val stateHeight = blockchain.height
 
@@ -95,7 +107,10 @@ object BlockDiffer {
         resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
-        verify
+        loadCacheData,
+        verify = verify,
+        enableExecutionLog = enableExecutionLog,
+        txSignParCheck = txSignParCheck
       )
     } yield r
   }
@@ -105,16 +120,21 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      verify: Boolean = true
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
+      verify: Boolean = true,
+      enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
-    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, verify).resultE
+    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, loadCacheData, verify, enableExecutionLog).resultE
 
   def fromMicroBlockTraced(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      verify: Boolean = true
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
+      verify: Boolean = true,
+      enableExecutionLog: Boolean = false,
+      txSignParCheck: Boolean = true
   ): TracedResult[ValidationError, Result] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
@@ -133,7 +153,10 @@ object BlockDiffer {
         Diff.empty,
         hasNg = true,
         micro.transactionData,
-        verify = verify
+        loadCacheData,
+        verify = verify,
+        enableExecutionLog = enableExecutionLog,
+        txSignParCheck = txSignParCheck
       )
     } yield r
   }
@@ -152,7 +175,10 @@ object BlockDiffer {
       initDiff: Diff,
       hasNg: Boolean,
       txs: Seq[Transaction],
-      verify: Boolean
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
+      verify: Boolean,
+      enableExecutionLog: Boolean,
+      txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
     def updateConstraint(constraint: MiningConstraint, blockchain: Blockchain, tx: Transaction, diff: Diff): MiningConstraint =
       constraint.put(blockchain, tx, diff)
@@ -160,9 +186,15 @@ object BlockDiffer {
     val currentBlockHeight = blockchain.height
     val timestamp          = blockchain.lastBlockTimestamp.get
     val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
+    val rideV6Activated    = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+
+    if (verify && txSignParCheck)
+      ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
+
+    prepareCaches(blockGenerator, txs, loadCacheData)
 
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
@@ -212,5 +244,39 @@ object BlockDiffer {
           .lift(CompositeBlockchain(blockchain, prevDiff))
           .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
+  }
+
+  private def prepareCaches(blockGenerator: Address, txs: Seq[Transaction], loadCacheData: (Set[Address], Set[ByteStr]) => Unit): Unit = {
+    val addresses = Set.newBuilder[Address].addOne(blockGenerator)
+    val orders    = Set.newBuilder[ByteStr]
+
+    txs.foreach {
+      case tx: ExchangeTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress, tx.buyOrder.senderAddress, tx.sellOrder.senderAddress))
+        orders.addOne(tx.buyOrder.id()).addOne(tx.sellOrder.id())
+      case tx: GenesisTransaction => addresses.addOne(tx.recipient)
+      case tx: InvokeScriptTransaction =>
+        addresses.addAll(Seq(tx.senderAddress) ++ (tx.dApp match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: LeaseTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: MassTransferTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ tx.transfers.collect { case ParsedTransfer(addr: Address, _) => addr })
+      case tx: PaymentTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.recipient))
+      case tx: TransferTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: Authorized => addresses.addOne(tx.sender.toAddress)
+      case _              => ()
+    }
+
+    loadCacheData(addresses.result(), orders.result())
   }
 }

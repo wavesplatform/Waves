@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
@@ -11,8 +11,6 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.*
 import kamon.Kamon
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
 import scopt.OParser
 
 import scala.concurrent.Await
@@ -36,15 +34,13 @@ object Exporter extends ScorexLogging {
   // noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach { case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
-      implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
-
       val settings = Application.loadApplicationConfig(configFile)
 
       Using.resources(
         new NTP(settings.ntpServer),
-        openDB(settings.dbSettings.directory)
-      ) { (time, db) =>
-        val (blockchain, _)  = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
+        RDB.open(settings.dbSettings)
+      ) { (time, rdb) =>
+        val (blockchain, _)  = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
@@ -64,7 +60,7 @@ object Exporter extends ScorexLogging {
             val start         = System.currentTimeMillis()
             exportedBytes += IO.writeHeader(bos, format)
             (2 to height).foreach { h =>
-              val block = db.readOnly(ro => database.loadBlock(Height(h), ro))
+              val block = database.loadBlock(Height(h), rdb)
               exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, block, h)
                                 else IO.exportBlockToBinary(bos, block, format == Formats.Binary))
               if (h % (height / 10) == 0)

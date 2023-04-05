@@ -47,7 +47,7 @@ object InvokeScriptTransactionDiff {
     r.issues ++ r.invokes.flatMap(s => allIssues(s.stateChanges))
   }
 
-  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean)(
+  def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, enableExecutionLog: Boolean)(
       tx: InvokeScriptTransactionLike
   ): TracedResult[ValidationError, Diff] = {
 
@@ -112,7 +112,8 @@ object InvokeScriptTransactionDiff {
               failFreeLimit,
               invocationComplexity,
               paymentsComplexity,
-              blockchain
+              blockchain,
+              enableExecutionLog
             )
           } yield MainScriptResult(
             environment.currentDiff,
@@ -175,6 +176,7 @@ object InvokeScriptTransactionDiff {
           limitedExecution,
           ContractLimits.MaxTotalInvokeComplexity(version),
           otherIssues,
+          enableExecutionLog,
           log
         )
 
@@ -287,6 +289,7 @@ object InvokeScriptTransactionDiff {
             pk,
             Set(tx.sender.toAddress),
             limitedExecution,
+            enableExecutionLog,
             ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),
             ContractLimits.MaxCallableActionsAmountBeforeV6(version),
@@ -361,7 +364,8 @@ object InvokeScriptTransactionDiff {
       failFreeLimit: Int,
       estimatedComplexity: Int,
       paymentsComplexity: Int,
-      blockchain: Blockchain
+      blockchain: Blockchain,
+      enableExecutionLog: Boolean
   ): Either[ValidationError, (ScriptResult, Log[Id])] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
@@ -374,7 +378,8 @@ object InvokeScriptTransactionDiff {
         version,
         startLimit,
         blockchain.correctFunctionCallScope,
-        blockchain.newEvaluatorMode
+        blockchain.newEvaluatorMode,
+        enableExecutionLog
       )
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))

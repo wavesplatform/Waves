@@ -1,10 +1,10 @@
 package com.wavesplatform.utils
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
-
 import com.google.common.base.Ticker
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.utils.ObservedLoadingCacheSpecification.FakeTicker
 import monix.execution.Ack
@@ -13,7 +13,7 @@ import org.scalamock.scalatest.MockFactory
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
   private val ExpiringTime = 10.minutes
@@ -68,7 +68,7 @@ class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
       .newBuilder()
       .expireAfterWrite(ExpiringTime.toMillis, TimeUnit.MILLISECONDS)
       .ticker(ticker)
-      .build(new CacheLoader[String, Integer] {
+      .build[String, Integer](new CacheLoader[String, Integer] {
         override def load(key: String): Integer = key.length
       })
 

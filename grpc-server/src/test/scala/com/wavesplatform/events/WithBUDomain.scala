@@ -11,15 +11,15 @@ import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.transaction.TxHelpers
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
+import org.rocksdb.RocksDB
 import monix.reactive.subjects.PublishToOneSubject
-import org.iq80.leveldb.DB
 import org.scalatest.Suite
 
 trait WithBUDomain extends WithDomain { _: Suite =>
-  def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
+  def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
     withDomain(settings) { d =>
-      tempDb { db =>
-        val repo = new Repo(wrapDB(db), d.blocksApi)
+      tempDb { rdb =>
+        val repo = new Repo(wrapDB(rdb.db), d.blocksApi)
         d.triggers = Seq(repo)
         try f(d, repo)
         finally repo.shutdownHandlers()
@@ -29,8 +29,8 @@ trait WithBUDomain extends WithDomain { _: Suite =>
 
   def withManualHandle(settings: WavesSettings, setSendUpdate: (() => Unit) => Unit)(f: (Domain, Repo) => Unit): Unit =
     withDomain(settings) { d =>
-      tempDb { db =>
-        val repo = new Repo(db, d.blocksApi) {
+      tempDb { rdb =>
+        val repo = new Repo(rdb.db, d.blocksApi) {
           override def newHandler(
               id: String,
               maybeLiquidState: Option[LiquidState],

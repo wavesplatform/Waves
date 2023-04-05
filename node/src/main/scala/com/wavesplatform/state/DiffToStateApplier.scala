@@ -7,10 +7,7 @@ import com.wavesplatform.transaction.Asset.Waves
 
 import scala.collection.immutable.VectorMap
 
-/**
-  * A set of functions that apply diff
-  * to the blockchain and return new
-  * state values (only changed ones)
+/** A set of functions that apply diff to the blockchain and return new state values (only changed ones)
   */
 object DiffToStateApplier {
   case class PortfolioUpdates(
@@ -19,7 +16,7 @@ object DiffToStateApplier {
   )
 
   def portfolios(blockchain: Blockchain, diff: Diff): PortfolioUpdates = {
-    val balances = Map.newBuilder[Address, Map[Asset, Long]]
+    val balances = VectorMap.newBuilder[Address, Map[Asset, Long]]
     val leases   = Map.newBuilder[Address, LeaseBalance]
 
     for ((address, portfolioDiff) <- diff.portfolios) {

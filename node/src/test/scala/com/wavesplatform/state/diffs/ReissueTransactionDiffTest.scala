@@ -34,14 +34,12 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
   }
 
   property("Reissue transaction's fee before feature activation is 1 WAVES") {
-    beforeActivationScenario.foreach {
-      case (bs, txs) =>
-        checkFee(bs, txs) {
-          case (result, lessResult, moreResult) =>
-            result.explicitGet()
-            lessResult.left.value
-            moreResult.explicitGet()
-        }
+    beforeActivationScenario.foreach { case (bs, txs) =>
+      checkFee(bs, txs) { case (result, lessResult, moreResult) =>
+        result.explicitGet()
+        lessResult.left.value
+        moreResult.explicitGet()
+      }
     }
   }
 
@@ -69,19 +67,17 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
   }
 
   property("Reissue transaction's fee after feature activation is 0.001 WAVES") {
-    afterActivationScenario.foreach {
-      case (bs, txs) =>
-        checkFee(bs, txs) {
-          case (result, lessResult, moreResult) =>
-            result.explicitGet()
-            lessResult.left.value
-            moreResult.explicitGet()
-        }
+    afterActivationScenario.foreach { case (bs, txs) =>
+      checkFee(bs, txs) { case (result, lessResult, moreResult) =>
+        result.explicitGet()
+        lessResult.left.value
+        moreResult.explicitGet()
+      }
     }
   }
 
   private def checkFee(preconditions: Seq[Block], txs: TransactionsForCheck)(f: ValidationResults => Any): Unit =
-    withLevelDBWriter(fs) { blockchain =>
+    withRocksDBWriter(fs) { blockchain =>
       preconditions.foreach { block =>
         val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
           BlockDiffer.fromBlock(blockchain, blockchain.lastBlock, block, MiningConstraint.Unlimited, block.header.generationSignature).explicitGet()
@@ -123,10 +119,14 @@ object ReissueTransactionDiffTest {
   type ValidationResults    = (Either[ValidationError, Unit], Either[ValidationError, Unit], Either[ValidationError, Unit])
 
   val fs: FunctionalitySettings =
-    TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
+    TestFunctionalitySettings.Enabled.copy(
+      featureCheckBlocksPeriod = 1,
+      blocksForFeatureActivation = 1,
+      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
         BlockchainFeatures.FeeSponsorship.id -> 0,
         BlockchainFeatures.BlockV5.id        -> 3
-      ))
+      )
+    )
 
   val BeforeActivationFee: Long = 1 * Constants.UnitsInWave
   val AfterActivationFee: Long  = 100000

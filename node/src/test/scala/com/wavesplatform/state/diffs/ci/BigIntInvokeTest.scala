@@ -149,7 +149,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
 
       d.liquidDiff.errorMessage(invoke.id()) shouldBe None
       d.liquidDiff.scriptsRun shouldBe 2
-      d.liquidDiff.accountData.head._2.data("key").value shouldBe 1
+      d.liquidDiff.accountData.head._2("key").value shouldBe 1
     }
   }
 }

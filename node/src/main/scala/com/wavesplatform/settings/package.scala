@@ -10,6 +10,7 @@ import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
+import supertagged.TaggedType
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
@@ -52,6 +53,13 @@ package object settings {
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")
     case x :: xs => NonEmptyList(x, xs)
+  }
+
+  object SizeInBytes extends TaggedType[Long]
+  type SizeInBytes = SizeInBytes.Type
+
+  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = {(cfg: Config, path: String) =>
+    SizeInBytes(cfg.getBytes(path).toLong)
   }
 
   def loadConfig(userConfig: Config): Config = {

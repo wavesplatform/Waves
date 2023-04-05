@@ -80,7 +80,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
       addressApiRoute
-        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+        .copy(
+          blockchain = d.blockchainUpdater,
+          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+        )
         .route
     val address = TxHelpers.signer(1).toAddress
 
@@ -92,6 +95,44 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
     Get(routePath(s"/balance?address=$address&height=1")) ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 5")
+    }
+  }
+
+  routePath("/balance") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
+    val route =
+      addressApiRoute
+        .copy(
+          blockchain = d.blockchainUpdater,
+          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+        )
+        .route
+    val address       = TxHelpers.signer(1).toAddress
+    val transferCount = 5
+
+    val issue = TxHelpers.issue(TxHelpers.defaultSigner)
+    d.appendBlock(issue)
+
+    for (_ <- 1 until transferCount)
+      d.appendBlock(
+        TxHelpers.transfer(TxHelpers.defaultSigner, address, amount = 1),
+        TxHelpers.transfer(TxHelpers.defaultSigner, address, asset = issue.asset, amount = 2)
+      )
+
+    Get(routePath(s"/balance?address=$address&height=$transferCount")) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> (transferCount - 2)))
+    }
+    Post(routePath(s"/balance"), Json.obj("height" -> transferCount, "addresses" -> Seq(address.toString))) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> (transferCount - 2)))
+    }
+
+    Get(routePath(s"/balance?address=$address&height=$transferCount&asset=${issue.assetId}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> 2 * (transferCount - 2)))
+    }
+    Post(
+      routePath(s"/balance"),
+      Json.obj("height" -> transferCount, "addresses" -> Seq(address.toString), "asset" -> issue.assetId)
+    ) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> 2 * (transferCount - 2)))
     }
   }
 
@@ -403,7 +444,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
       val route =
         addressApiRoute
-          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .copy(
+            blockchain = d.blockchainUpdater,
+            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+          )
           .route
 
       val requestBody = Json.obj("keys" -> Seq("test"))
@@ -451,7 +495,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
       val route =
         addressApiRoute
-          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .copy(
+            blockchain = d.blockchainUpdater,
+            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+          )
           .route
 
       val maxLimitKeys      = Seq.fill(addressApiRoute.settings.dataKeysRequestLimit)(key)

@@ -23,7 +23,7 @@ import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
 
 object Common {
-  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
+  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))

@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -40,6 +41,7 @@ class TransactionBroadcastSpec
     stub[CommonTransactionsApi],
     stub[Wallet],
     blockchain,
+    stub[() => CompositeBlockchain],
     mockFunction[Int],
     transactionPublisher,
     testTime,
@@ -57,6 +59,15 @@ class TransactionBroadcastSpec
         sh.creditBalance(TxHelpers.matcher.toAddress, *)
         sh.creditBalance(ethBuyOrder.senderAddress, *)
         sh.creditBalance(ethSellOrder.senderAddress, *)
+        (blockchain.wavesBalances _)
+          .when(*)
+          .returns(
+            Map(
+              TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+              ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+              ethSellOrder.senderAddress  -> Long.MaxValue / 3
+            )
+          )
         sh.issueAsset(ByteStr(EthStubBytes32))
       }
 
@@ -272,7 +283,7 @@ class TransactionBroadcastSpec
 
         (blockchain.hasAccountScript _).when(*).returns(true)
       }
-      val publisher = createTxPublisherStub(blockchain)
+      val publisher = createTxPublisherStub(blockchain, enableExecutionLog = true)
       val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {

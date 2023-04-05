@@ -29,7 +29,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
@@ -56,6 +56,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             testWallet,
             DummyTransactionPublisher.accepting,
             d.blockchain,
+            () => d.blockchain.getCompositeBlockchain,
             TestTime(),
             d.accountsApi,
             d.assetsApi,
@@ -592,7 +593,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
               val tx2 = issue(secondSigner, 1, name = s"NFT$i", reissuable = false)
               (i, Seq(tx1, tx2))
             }
-            d.appendBlock(txs.flatMap(_._2): _*)
+            d.appendBlock(txs.flatMap(_._2)*)
             txs.map(_._1)
           }
         Seq(defaultAddress, secondAddress).foreach { address =>

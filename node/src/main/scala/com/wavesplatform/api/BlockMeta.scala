@@ -4,6 +4,8 @@ import com.wavesplatform.block.Block.protoHeaderHash
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.block.PBBlocks
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -25,7 +27,7 @@ case class BlockMeta(
     BlockHeaderSerializer.toJson(header, size, transactionCount, signature) ++
       Json.obj("height" -> height, "totalFee" -> totalFeeInWaves) ++
       reward.fold(Json.obj())(r => Json.obj("reward" -> r)) ++
-      vrf.fold(Json.obj())(v => Json.obj("VRF"       -> v.toString)) ++
+      vrf.fold(Json.obj())(v => Json.obj("VRF" -> v.toString)) ++
       headerHash.fold(Json.obj())(h => Json.obj("id" -> h.toString))
   }
 }
@@ -42,4 +44,21 @@ object BlockMeta {
     reward,
     vrf
   )
+
+  def fromPb(pbMeta: com.wavesplatform.database.protobuf.BlockMeta): Option[BlockMeta] = {
+    pbMeta.header.map { pbHeader =>
+      BlockMeta(
+        PBBlocks.vanilla(pbHeader),
+        pbMeta.signature.toByteStr,
+        if (pbMeta.headerHash.isEmpty) None else Some(pbMeta.headerHash.toByteStr),
+        pbMeta.height,
+        pbMeta.size,
+        pbMeta.transactionCount,
+        pbMeta.totalFeeInWaves,
+        Some(pbMeta.reward),
+        if (pbMeta.vrf.isEmpty) None
+        else Some(pbMeta.vrf.toByteStr)
+      )
+    }
+  }
 }

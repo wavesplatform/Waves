@@ -262,15 +262,15 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     "when NG state is empty" in forAll(ngEmptyScenario) { case (miner1, miner2, b2s, b3, m3s) =>
       withDomain(rewardSettings) { d =>
         b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-          val BlockDiffer.Result(diff, carryFee, totalFee, _, _) = differ(d.levelDBWriter, prevBlock, curBlock)
-          d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, curBlock)
+          val BlockDiffer.Result(diff, carryFee, totalFee, _, _) = differ(d.rocksDBWriter, prevBlock, curBlock)
+          d.rocksDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, curBlock)
           Some(curBlock)
         }
 
-        d.levelDBWriter.height shouldBe BlockRewardActivationHeight - 1
-        d.levelDBWriter.balance(miner1.toAddress) shouldBe InitialMinerBalance + OneFee
-        d.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.levelDBWriter.carryFee shouldBe OneCarryFee
+        d.rocksDBWriter.height shouldBe BlockRewardActivationHeight - 1
+        d.rocksDBWriter.balance(miner1.toAddress) shouldBe InitialMinerBalance + OneFee
+        d.rdb.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
+        d.rocksDBWriter.carryFee shouldBe OneCarryFee
 
         d.blockchainUpdater.processBlock(b3) should beRight
         d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneCarryFee

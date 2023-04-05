@@ -3,11 +3,8 @@ package com.wavesplatform.mining
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.WithDB
+import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,11 +13,11 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.BlockWithMaxBaseTargetTest.Env
-import com.wavesplatform.settings.{WavesSettings, _}
-import com.wavesplatform.state._
+import com.wavesplatform.settings.*
+import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
@@ -34,7 +31,10 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettings {
+import scala.concurrent.Await
+import scala.concurrent.duration.*
+
+class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with DBCacheSettings {
 
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {
@@ -98,8 +98,9 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
           }
         })
 
-        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith[Any] { case _: SecurityException =>
-          Task.unit
+        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith[Any] {
+          case _: SecurityException =>
+            Task.unit
         }
         Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
 
@@ -113,7 +114,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
+    val defaultWriter = TestRocksDB.withFunctionalitySettings(db, TestFunctionalitySettings.Stub)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)
@@ -129,7 +130,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
     )
 
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
     val utxPoolStub = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings, settings.maxTxErrorLogSize, settings0.minerSettings.enable)

@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator
 
+import cats.syntax.either.*
 import cats.{Monad, StackSafeMonad}
-import cats.syntax.either._
-import com.wavesplatform.lang.{ExecutionError, CommonError}
+import com.wavesplatform.lang.{CommonError, ExecutionError}
 import monix.eval.Coeval
 
 case class EvaluationResult[+A](value: Coeval[Either[(ExecutionError, Int), A]]) {
@@ -14,8 +14,8 @@ case class EvaluationResult[+A](value: Coeval[Either[(ExecutionError, Int), A]])
 }
 
 object EvaluationResult {
-  def apply[A](value: A): EvaluationResult[A]                  = EvaluationResult(Coeval(Right(value)))
-  def apply[A](error: String, limit: Int): EvaluationResult[A] = EvaluationResult(Coeval(Left((CommonError(error), limit))))
+  def apply[A](value: A): EvaluationResult[A]                  = EvaluationResult(Coeval.now(Right(value)))
+  def apply[A](error: String, limit: Int): EvaluationResult[A] = EvaluationResult(Coeval.now(Left((CommonError(error), limit))))
 
   implicit val monad: Monad[EvaluationResult] = new StackSafeMonad[EvaluationResult] {
     override def pure[A](a: A): EvaluationResult[A] =
@@ -23,7 +23,7 @@ object EvaluationResult {
 
     override def flatMap[A, B](fa: EvaluationResult[A])(f: A => EvaluationResult[B]): EvaluationResult[B] =
       EvaluationResult(fa.value.flatMap {
-        case l @ Left(_) => Coeval(l.rightCast[B])
+        case l @ Left(_) => Coeval.now(l.rightCast[B])
         case Right(r)    => f(r).value
       })
   }

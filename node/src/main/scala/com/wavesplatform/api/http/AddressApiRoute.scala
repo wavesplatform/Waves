@@ -197,7 +197,8 @@ case class AddressApiRoute(
 
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[DataEntry[?], NotUsed]] =
+        jacksonStreamMarshaller()(DataEntry.dataEntrySerializer)
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
@@ -209,7 +210,7 @@ case class AddressApiRoute(
                 log.trace(s"Error compiling regex $matches: ${e.getMessage}")
                 complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
               },
-              _ => accountData(address, Some(matches))
+              _ => accountData(address, matches)
             )
         } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
           extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
@@ -286,20 +287,30 @@ case class AddressApiRoute(
       pass
   }
 
-  private def accountData(address: Address, regex: Option[String] = None)(implicit m: ToResponseMarshaller[Source[JsValue, NotUsed]]) = {
-    routeTimeout.execute(
+  private def accountData(address: Address)(implicit m: ToResponseMarshaller[Source[DataEntry[?], NotUsed]]) = {
+    routeTimeout.executeFromObservable(
       commonAccountsApi
-        .dataStream(address, regex)
-        .toListL
-        .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
-    )(_.runAsyncLogErr(_))
+        .dataStream(address, None)
+    )
   }
 
+  private def accountData(addr: Address, regex: String)(implicit m: ToResponseMarshaller[Source[DataEntry[?], NotUsed]]) =
+    routeTimeout.executeFromObservable(
+      commonAccountsApi
+        .dataStream(addr, Some(regex))
+    )
+
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
-    commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
+    commonAccountsApi
+      .data(address, key)
+      .toRight(DataKeyDoesNotExist)
 
   private def accountDataList(address: Address, keys: String*) =
-    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[?]]))
+    Source.fromIterator(() =>
+      keys
+        .flatMap(commonAccountsApi.data(address, _))
+        .iterator
+    )
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {

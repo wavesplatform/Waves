@@ -232,7 +232,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
 
         case JsSuccess(o: Order, _) =>
           o.json() should matchJson(json)
-          Verifier.verifyAsEllipticCurveSignature(o, checkWeakPk = false).explicitGet()
+          Verifier.verifyAsEllipticCurveSignature(o, isRideV6Activated = false).explicitGet()
       }
     }
   }
