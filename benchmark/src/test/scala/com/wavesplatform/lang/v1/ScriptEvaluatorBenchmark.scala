@@ -10,10 +10,12 @@ import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, rand
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.{Common, Global}
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole

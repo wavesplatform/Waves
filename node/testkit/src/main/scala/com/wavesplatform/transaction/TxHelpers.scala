@@ -29,11 +29,14 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
+import monix.execution.atomic.AtomicInt
 import monix.execution.atomic.AtomicLong
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
+  private[this] val accountCounter = AtomicInt(0)
   def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
+  def signer(): SeedKeyPair = KeyPair(Ints.toByteArray(accountCounter.getAndIncrement()))
   def address(i: Int): Address    = signer(i).toAddress
 
   val defaultSigner: SeedKeyPair = signer(0)

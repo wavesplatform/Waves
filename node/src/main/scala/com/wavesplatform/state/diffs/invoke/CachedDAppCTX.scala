@@ -6,11 +6,12 @@ import com.wavesplatform.features.BlockchainFeatures.{ConsensusImprovements, Ecr
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{Account, DApp, StdLibVersion, V3}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.InvariableContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Functions, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.smart.InvokeFunction
 
 object CachedDAppCTX {
   private val cache: Map[(StdLibVersion, Boolean, Boolean, Boolean), InvariableContext] =
@@ -20,9 +21,10 @@ object CachedDAppCTX {
       fixBigScriptField  <- Seq(true, false)
       fixEcrecover       <- Seq(true, false)
     } yield {
-      val ctx = PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, version, fixEcrecover).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField)
+      val ctx = PureContext.build(version, useNewPowPrecision) |+|
+        CryptoContext.build(Global, version, fixEcrecover) |+|
+        WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField) |+|
+        CTX(Seq.empty, Map.empty, Array(true, false).map(reentrant => new InvokeFunction(reentrant, Functions.callDAppF(reentrant))))
       ((version, useNewPowPrecision, fixBigScriptField, fixEcrecover), InvariableContext(ctx))
     }).toMap
 

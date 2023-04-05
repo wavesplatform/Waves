@@ -22,7 +22,6 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
@@ -659,10 +658,10 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
                   if (thisAddr == addr) then share else unit
                 case _ => prev
               }
-    
+
               FOLD<3>(rewards, unit, check)
             }
-    
+
             @Callable(i)
             func storeBlockInfo(height: Int) = {
               let prefix = i.transactionId.toBase58String() + "_"
@@ -915,8 +914,8 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
           val expr = Parser.parseContract(script).get.value
 
           val ctx =
-            PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
-              CryptoContext.build(Global, version, fixEcrecover = true).withEnvironment[Environment] |+|
+            PureContext.build(version, useNewPowPrecision = true) |+|
+              CryptoContext.build(Global, version, fixEcrecover = true) |+|
               WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField = true)
 
           val compiledScript = ContractScript(version, ContractCompiler(ctx.compilerContext, expr, version).explicitGet()).explicitGet()

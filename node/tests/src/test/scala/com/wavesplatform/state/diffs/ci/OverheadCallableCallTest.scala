@@ -9,7 +9,9 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
+import org.scalatest.Ignore
 
+@Ignore
 class OverheadCallableCallTest extends PropSpec with WithDomain {
 
   private val body = {

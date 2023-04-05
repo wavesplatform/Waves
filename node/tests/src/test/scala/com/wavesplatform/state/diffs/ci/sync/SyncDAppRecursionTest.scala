@@ -49,7 +49,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
           | @Callable(i)
           | func default(end: Boolean, useSecondAddress: Boolean, forceInvoke: Boolean, forceReentrant: Boolean) =
       """.stripMargin
-    compile(
+    val scriptText =
       s"""
          | $prefix
          | if (end)
@@ -57,7 +57,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
          |     []
          |   else {
          |     let endWithNextDApp = useSecondAddress && $sendEndToNext
-         |     let sendEnd = $sendEnd || endWithNextDApp
+         |     let sendEnd = $sendEnd|| endWithNextDApp
          |     let address = ${secondNextDApp.fold("")(a => s"if (useSecondAddress) then Address(base58'$a') else")} Address(base58'$nextDApp')
          |     strict r =
          |       if (forceInvoke || endWithNextDApp) # param 'endWithNextDApp' is used for self-recursion check without reentrancy
@@ -73,7 +73,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
          |     []
          |   }
      """.stripMargin
-    )
+    compile(scriptText)
   }
 
   // A -> A -> B -> B

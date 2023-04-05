@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
+import java.util
+
 import cats.*
 import cats.syntax.functor.*
 import com.wavesplatform.lang.ExecutionError
@@ -9,30 +11,28 @@ import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, LetExecResult, LetLogCallback}
 
-import java.util
-
-case class EvaluationContext[C[_[_]], F[_]](
-    environment: C[F],
+case class EvaluationContext[F[_]](
+    environment: Environment[F],
     typeDefs: Map[String, FINAL],
     letDefs: Map[String, LazyVal[F]],
-    functions: Map[FunctionHeader, BaseFunction[C]]
+    functions: Map[FunctionHeader, BaseFunction]
 ) {
-  def mapK[G[_]: Monad](f: F ~> G): EvaluationContext[C, G] =
+  def mapK[G[_]: Monad](f: F ~> G): EvaluationContext[G] =
     EvaluationContext(
-      environment.asInstanceOf[C[G]],
+      environment.asInstanceOf[Environment[G]],
       typeDefs,
       letDefs.view.mapValues(_.mapK(f)).toMap,
       functions
     )
 }
 
-trait LoggedEvaluationContext[C[_[_]], F[_]] {
-  def ec: EvaluationContext[C, F]
+trait LoggedEvaluationContext[F[_]] {
+  def ec: EvaluationContext[F]
   def log(let: LET, result: LetExecResult[F]): Unit
 }
 
-case class EnabledLogEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F], ec: EvaluationContext[C, F])
-    extends LoggedEvaluationContext[C, F] {
+case class EnabledLogEvaluationContext[F[_]: Monad](l: LetLogCallback[F], ec: EvaluationContext[F])
+    extends LoggedEvaluationContext[F] {
   val loggedLets: util.IdentityHashMap[LET, Unit]          = new util.IdentityHashMap()
   val loggedErrors: collection.mutable.Set[ExecutionError] = collection.mutable.Set()
 
@@ -46,52 +46,11 @@ case class EnabledLogEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F
     }
   }
 
-  private def add(let: LET, result: LetExecResult[F]): Unit =
-    loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
+  private def add(let: LET, result: LetExecResult[F]): Unit = {
+//    loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
+  }
 }
 
 case class DisabledLogEvaluationContext[C[_[_]], F[_]](ec: EvaluationContext[C, F]) extends LoggedEvaluationContext[C, F] {
   override def log(let: LET, result: LetExecResult[F]): Unit = ()
-}
-
-object EvaluationContext {
-
-  val empty = EvaluationContext(Contextful.empty[Id], Map.empty, Map.empty, Map.empty)
-
-  implicit def monoid[F[_], C[_[_]]]: Monoid[EvaluationContext[C, F]] = new Monoid[EvaluationContext[C, F]] {
-    override val empty: EvaluationContext[C, F] = EvaluationContext.empty.asInstanceOf[EvaluationContext[C, F]]
-
-    override def combine(x: EvaluationContext[C, F], y: EvaluationContext[C, F]): EvaluationContext[C, F] =
-      EvaluationContext(
-        environment = y.environment,
-        typeDefs = x.typeDefs ++ y.typeDefs,
-        letDefs = x.letDefs ++ y.letDefs,
-        functions = x.functions ++ y.functions
-      )
-  }
-
-  def build[F[_], C[_[_]]](
-      environment: C[F],
-      typeDefs: Map[String, FINAL],
-      letDefs: Map[String, LazyVal[F]],
-      functions: Seq[BaseFunction[C]]
-  ): EvaluationContext[C, F] = {
-    if (functions.distinct.size != functions.size) {
-      val dups = functions.groupBy(_.header).filter(_._2.size != 1)
-      throw new Exception(s"Duplicate runtime functions names: $dups")
-    }
-    EvaluationContext(environment, typeDefs, letDefs, functions.map(f => f.header -> f).toMap)
-  }
-
-  def build(
-      typeDefs: Map[String, FINAL],
-      letDefs: Map[String, LazyVal[Id]],
-      functions: Seq[BaseFunction[NoContext]] = Seq()
-  ): EvaluationContext[NoContext, Id] = {
-    if (functions.distinct.size != functions.size) {
-      val dups = functions.groupBy(_.header).filter(_._2.size != 1)
-      throw new Exception(s"Duplicate runtime functions names: $dups")
-    }
-    EvaluationContext[NoContext, Id](Contextful.empty[Id], typeDefs, letDefs, functions.map(f => f.header -> f).toMap)
-  }
 }

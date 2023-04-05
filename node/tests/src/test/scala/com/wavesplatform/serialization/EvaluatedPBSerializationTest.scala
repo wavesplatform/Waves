@@ -106,9 +106,9 @@ class EvaluatedPBSerializationTest
 
   private def checkTxInfoResult(invoke: InvokeScriptTransaction, argType: Seq[String])(route: Route): Unit =
     Get(s"/transactions/info/${invoke.id()}") ~> route ~> check {
-      val callJsObj = (responseAs[JsObject] \\ "call")(1)
+      val callJsObj = (responseAs[JsObject] \ "call").as[JsObject]
       (callJsObj \ "function").as[String] shouldBe "test"
-      (callJsObj \\ "type").map(_.as[String]) shouldBe argType
+      (callJsObj \ "args" \\ "type").map(_.as[String]) shouldBe argType
     }
 
   private def transactionsApiRoute(d: Domain) = new TransactionsApiRoute(

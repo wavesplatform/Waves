@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
+import org.scalactic.source.Position
 
 class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -165,7 +166,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       reject: Boolean = false,
       sequentialCalls: Boolean = false,
       invokeExpression: Boolean = false
-  ): Unit = {
+  )(implicit pos: Position): Unit = {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
       scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression)
     withTestState(features(invokeExpression)) { (bu, db) =>

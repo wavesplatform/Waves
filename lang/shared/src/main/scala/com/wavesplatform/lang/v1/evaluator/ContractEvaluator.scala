@@ -6,15 +6,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.miniev.{Ev, State}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Recipient}
-import com.wavesplatform.lang.{CommonError, ExecutionError}
-import monix.eval.Coeval
+import com.wavesplatform.lang.{CommonError, ExecutionError, SoftLimitReached}
 
 object ContractEvaluator {
 
@@ -104,14 +102,13 @@ object ContractEvaluator {
     val verifierBlock =
       BLOCK(
         invocationArgLet,
-        BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity)))
+        BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List()))
       )
 
     evaluate(foldDeclarations(decls, verifierBlock), LogExtraInfo(invokedFuncName = Some(v.u.name), invArg = Some(invocationArgLet)))
   }
 
   def applyV2Coeval(
-      ctx: EvaluationContext[Environment, Id],
       dApp: DApp,
       dAppAddress: ByteStr,
       i: Invocation,
@@ -119,30 +116,24 @@ object ContractEvaluator {
       limit: Int,
       correctFunctionCallScope: Boolean,
       newMode: Boolean,
-      enableExecutionLog: Boolean,
-      fixedThrownError: Boolean
-  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
-    Coeval
-      .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
-      .flatMap {
-        case Right(value) =>
-          applyV2Coeval(
-            ctx,
-            value.expr,
-            LogExtraInfo(invokedFuncName = Some(i.funcCall.function.funcName), invArg = value.invArg, dAppAddress = Some(Address(dAppAddress))),
-            version,
-            i.transactionId,
-            limit,
-            correctFunctionCallScope,
-            newMode,
-            enableExecutionLog,
-            fixedThrownError
-          )
-        case Left(error) => Coeval.now(Left(error))
+      state: State
+  ): Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])] =
+    buildExprFromInvocation(dApp, i, version)
+      .leftMap((_, limit, Nil))
+      .flatMap { value =>
+        applyV2Coeval(
+          value.expr,
+          LogExtraInfo(invokedFuncName = Some(i.funcCall.function.funcName), invArg = value.invArg, dAppAddress = Some(Address(dAppAddress))),
+          version,
+          i.transactionId,
+          limit,
+          correctFunctionCallScope,
+          newMode,
+          state
+        )
       }
 
   private def applyV2Coeval(
-      ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       logExtraInfo: LogExtraInfo,
       version: StdLibVersion,
@@ -150,27 +141,18 @@ object ContractEvaluator {
       limit: Int,
       correctFunctionCallScope: Boolean,
       newMode: Boolean,
-      enableExecutionLog: Boolean,
-      fixedThrownError: Boolean
-  ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
-    EvaluatorV2
-      .applyLimitedCoeval(
-        expr,
-        logExtraInfo,
-        limit,
-        ctx,
-        version,
-        correctFunctionCallScope,
-        newMode,
-        enableExecutionLog = enableExecutionLog,
-        fixedThrownError = fixedThrownError
-      )
-      .map(_.flatMap { case (expr, unusedComplexity, log) =>
-        val result =
-          expr match {
-            case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
-            case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
-          }
-        result.bimap((_, unusedComplexity, log), (_, log))
-      })
+      state: State
+  ): Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])] = {
+    val (log, complexity, resultE) = Ev.run(expr, state)
+
+    resultE match {
+      case Right(ev) =>
+        ScriptResult
+          .fromObj(state.evaluationContext, transactionId, ev, version, complexity)
+          .leftMap(ee => (ee, complexity, log))
+          .map(_ -> log)
+      case Left(SoftLimitReached) => Right((IncompleteResult(FAIL("FAIL: Soft limit reached"), complexity), log))
+      case Left(ee)               => Left((ee, complexity, log))
+    }
+  }
 }

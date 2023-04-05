@@ -136,8 +136,8 @@ object WavesEnvironmentBenchmark {
       RDB.open(wavesSettings.dbSettings)
     }
 
-    val state = RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
-    val environment: Environment[Id] = {
+    val environment: Environment[Id] = ???/*{
+      val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
       WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
@@ -147,7 +147,7 @@ object WavesEnvironmentBenchmark {
         DirectiveSet.contractDirectiveSet,
         ByteStr.empty
       )
-    }
+    }*/
 
     @TearDown
     def close(): Unit = {

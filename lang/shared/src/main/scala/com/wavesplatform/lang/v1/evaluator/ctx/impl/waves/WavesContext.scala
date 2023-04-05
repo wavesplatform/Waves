@@ -9,11 +9,10 @@ import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals.*
-import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object WavesContext {
-  def build(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean): CTX[Environment] =
+  def build(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean): CTX =
     invariableCtx |+| variableCtx(global, ds, fixBigScriptField)
 
   private val commonFunctions =
@@ -41,7 +40,7 @@ object WavesContext {
   private val invariableCtx =
     CTX(Seq(), Map(height), commonFunctions)
 
-  private def variableCtx(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean): CTX[Environment] = {
+  private def variableCtx(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean): CTX = {
     val isTokenContext = ds.scriptType == Asset
     val proofsEnabled  = !isTokenContext
     val version        = ds.stdLibVersion
@@ -82,13 +81,13 @@ object WavesContext {
       if (ds.contentType == DApp || ds.scriptType == Call)
         Array(callDAppF(reentrant = false), callDAppF(reentrant = true))
       else
-        Array[BaseFunction[Environment]]()
+        Array[BaseFunction]()
 
     val accountFuncs =
       if (ds.scriptType == Account)
         selfCallFunctions(V5)
       else
-        Array[BaseFunction[Environment]]()
+        Array[BaseFunction]()
 
     fromV4Funcs(proofsEnabled, ds.stdLibVersion, typeDefs) ++ v5Funcs ++ dAppFuncs ++ accountFuncs
   }
@@ -137,7 +136,7 @@ object WavesContext {
       contentType: ContentType,
       proofsEnabled: Boolean,
       fixBigScriptField: Boolean
-  ): Map[String, (FINAL, ContextfulVal[Environment])] = {
+  ): Map[String, (FINAL, ContextfulVal)] = {
     val txVal = tx(isTokenContext, version, proofsEnabled, fixBigScriptField)
     version match {
       case V1 => Map(txVal)
