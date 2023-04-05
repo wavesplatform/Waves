@@ -49,7 +49,7 @@ object TxStateSnapshotHashBuilder {
 
     for {
       (address, data) <- txDiff.accountData
-      entry           <- data.data.values
+      entry           <- data.values
     } addEntry(KeyType.DataEntry, address.bytes, entry.key.getBytes(StandardCharsets.UTF_8))(entry.valueBytes)
 
     txDiff.aliases.foreach { case (alias, address) =>
@@ -90,7 +90,7 @@ object TxStateSnapshotHashBuilder {
 
     val assetReissuabilities = txDiff.issuedAssets.map { case (asset, assetInfo) =>
       asset -> assetInfo.volume.isReissuable
-    }.toSeq ++ txDiff.updatedAssets.collect {
+    } ++ txDiff.updatedAssets.collect {
       case (asset, Ior.Right(volume))   => asset -> volume.isReissuable
       case (asset, Ior.Both(_, volume)) => asset -> volume.isReissuable
     }
@@ -100,12 +100,15 @@ object TxStateSnapshotHashBuilder {
     }
 
     val assetNameDescs = txDiff.issuedAssets.map { case (asset, assetInfo) =>
-      (asset, assetInfo.dynamic.name.toByteArray, assetInfo.dynamic.description.toByteArray, assetInfo.dynamic.lastUpdatedAt.toInt)
-    }.toSeq ++ txDiff.updatedAssets.collect { case (asset, Ior.Left(assetInfo)) =>
-      (asset, assetInfo.name.toByteArray, assetInfo.description.toByteArray, assetInfo.lastUpdatedAt.toInt)
+      (asset, (assetInfo.dynamic.name.toByteArray, assetInfo.dynamic.description.toByteArray, assetInfo.dynamic.lastUpdatedAt.toInt))
+    } ++ txDiff.updatedAssets.collect {
+      case (asset, Ior.Left(assetInfo)) =>
+        (asset, (assetInfo.name.toByteArray, assetInfo.description.toByteArray, assetInfo.lastUpdatedAt.toInt))
+      case (asset, Ior.Both(assetInfo, _)) =>
+        (asset, (assetInfo.name.toByteArray, assetInfo.description.toByteArray, assetInfo.lastUpdatedAt.toInt))
     }
 
-    assetNameDescs.foreach { case (asset, name, description, changeHeight) =>
+    assetNameDescs.foreach { case (asset, (name, description, changeHeight)) =>
       addEntry(KeyType.AssetNameDescription, asset.id.arr)(name, description, Ints.toByteArray(changeHeight))
     }
 
