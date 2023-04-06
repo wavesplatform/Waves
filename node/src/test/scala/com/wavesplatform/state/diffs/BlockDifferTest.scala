@@ -2,15 +2,21 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.db.WithState
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.DigestLength
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
+import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.test.FreeSpec
 
-class BlockDifferTest extends FreeSpec with WithState {
+class BlockDifferTest extends FreeSpec with WithDomain {
   private val TransactionFee = 10
 
   private val signerA, signerB = randomKeyPair()
@@ -37,14 +43,12 @@ class BlockDifferTest extends FreeSpec with WithState {
       |10 |10   |B       |0          |40         |+10        |40+10=50   | <- 2nd check
        */
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
-        assertDiff(testChain.init, 1000) {
-          case (_, s) =>
-            s.balance(signerA.toAddress) shouldBe 40
+        assertDiff(testChain.init, 1000) { case (_, s) =>
+          s.balance(signerA.toAddress) shouldBe 40
         }
 
-        assertDiff(testChain, 1000) {
-          case (_, s) =>
-            s.balance(signerB.toAddress) shouldBe 50
+        assertDiff(testChain, 1000) { case (_, s) =>
+          s.balance(signerB.toAddress) shouldBe 50
         }
       }
 
@@ -64,9 +68,8 @@ class BlockDifferTest extends FreeSpec with WithState {
       |10 |10   |B       |0          |40         |+4         |40+4=44    | <- check
        */
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
-        assertDiff(testChain, 9) {
-          case (_, s) =>
-            s.balance(signerB.toAddress) shouldBe 44
+        assertDiff(testChain, 9) { case (_, s) =>
+          s.balance(signerB.toAddress) shouldBe 44
         }
       }
 
@@ -86,21 +89,49 @@ class BlockDifferTest extends FreeSpec with WithState {
       |10 |10   |B       |0          |34         |+4+6=10    |40+10=50   | <- 2nd check
        */
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
-        assertDiff(testChain.init, 4) {
-          case (_, s) =>
-            s.balance(signerA.toAddress) shouldBe 34
+        assertDiff(testChain.init, 4) { case (_, s) =>
+          s.balance(signerA.toAddress) shouldBe 34
         }
 
-        assertDiff(testChain, 4) {
-          case (_, s) =>
-            s.balance(signerB.toAddress) shouldBe 50
+        assertDiff(testChain, 4) { case (_, s) =>
+          s.balance(signerB.toAddress) shouldBe 50
         }
       }
     }
+
+    "correctly computes state hash" in
+      withDomain(DomainPresets.RideV6, balances = AddrWithBalance.enoughBalances(TxHelpers.signer(1))) { d =>
+        val txs           = (1 to 10).map(idx => TxHelpers.transfer(TxHelpers.signer(idx), TxHelpers.address(idx + 1), (100 - idx).waves))
+        val prevStateHash = ByteStr.fill(DigestLength)(1)
+        val prevBlock = TestBlock.create(
+          d.lastBlock.header.timestamp + 1,
+          d.lastBlockId,
+          Seq.empty,
+          version = Block.ProtoBlockVersion,
+          stateHash = Some(prevStateHash)
+        )
+        val block = TestBlock.create(txs, Block.ProtoBlockVersion)
+
+        val differResult =
+          BlockDiffer.fromBlock(d.blockchain, Some(prevBlock), block, MiningConstraint.Unlimited, block.header.generationSignature).explicitGet()
+
+        differResult.stateHash.get shouldBe differResult.detailedDiff.transactionDiffs.reverse
+          .foldLeft((prevStateHash, Diff.empty)) { case ((prevStateHash, accDiff), txDiff) =>
+            val blockchain = CompositeBlockchain(d.blockchain, accDiff)
+            val stateHash  = TxStateSnapshotHashBuilder.createHashFromTxDiff(blockchain, txDiff).createHash(prevStateHash)
+            (stateHash, accDiff.combineF(txDiff).explicitGet())
+          }
+          ._1
+      }
   }
 
   private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
-    val fs = FunctionalitySettings(featureCheckBlocksPeriod = ngAtHeight / 2, blocksForFeatureActivation = 1, preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)), doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
+    val fs = FunctionalitySettings(
+      featureCheckBlocksPeriod = ngAtHeight / 2,
+      blocksForFeatureActivation = 1,
+      preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
+      doubleFeaturesPeriodsAfterHeight = Int.MaxValue
+    )
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
 
@@ -112,10 +143,9 @@ class BlockDifferTest extends FreeSpec with WithState {
       TxHelpers.transfer(from, to.toAddress, 10000, fee = TransactionFee, version = TxVersion.V1)
     }
 
-    (genesisTx +: paymentTxs).zipWithIndex.map {
-      case (x, i) =>
-        val signer = if (i % 2 == 0) signerA else signerB
-        TestBlock.create(signer, Seq(x), features)
+    (genesisTx +: paymentTxs).zipWithIndex.map { case (x, i) =>
+      val signer = if (i % 2 == 0) signerA else signerB
+      TestBlock.create(signer, Seq(x), features)
     }
   }
 }
