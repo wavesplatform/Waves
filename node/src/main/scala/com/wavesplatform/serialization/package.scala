@@ -62,7 +62,7 @@ package object serialization {
     }
 
     def getByteArrayOpt(size: Int): Option[Array[Byte]] = {
-      if (buf.limit() - buf.position() >= size) {
+      if (buf.remaining() >= size) {
         Some(getByteArray(size))
       } else {
         None
