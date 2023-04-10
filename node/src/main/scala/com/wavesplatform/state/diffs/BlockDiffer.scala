@@ -36,6 +36,8 @@ object BlockDiffer {
     def apply(l: Long): Long = l / divider * dividend
   }
 
+  case object InvalidStateHash extends ValidationError
+
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   def fromBlock(
@@ -111,7 +113,8 @@ object BlockDiffer {
         blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
-        maybePrevBlock.flatMap(_.header.stateHash),
+        // TODO: correctly obtain previous state hash on feature activation height
+        if (blockchain.height == 0) Some(TxStateSnapshotHashBuilder.InitStateHash) else maybePrevBlock.flatMap(_.header.stateHash),
         resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
@@ -120,6 +123,7 @@ object BlockDiffer {
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
+      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.stateHash)
     } yield r
   }
 
@@ -169,6 +173,7 @@ object BlockDiffer {
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
+      _ <- checkStateHash(blockchain, micro.stateHash, r.stateHash)
     } yield r
   }
 
@@ -305,4 +310,17 @@ object BlockDiffer {
 
     loadCacheData(addresses.result(), orders.result())
   }
+
+  private def checkStateHash(
+      blockchain: Blockchain,
+      blockStateHash: Option[ByteStr],
+      computedStateHash: Option[ByteStr]
+  ): TracedResult[ValidationError, Unit] =
+    TracedResult(
+      Either.cond(
+        !blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) || computedStateHash.exists(blockStateHash.contains),
+        (),
+        InvalidStateHash
+      )
+    )
 }

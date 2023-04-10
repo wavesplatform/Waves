@@ -246,7 +246,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
     Try(appendMicroBlock(txs*)).toEither
 
-  def createMicroBlock(txs: Transaction*): MicroBlock = {
+  def createMicroBlock(stateHash: Option[ByteStr], txs: Transaction*): MicroBlock = {
     val lastBlock = this.lastBlock
     val block = Block
       .buildAndSign(
@@ -259,16 +259,16 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         defaultSigner,
         lastBlock.header.featureVotes,
         lastBlock.header.rewardVote,
-        lastBlock.header.stateHash
+        stateHash.orElse(lastBlock.header.stateHash)
       )
       .explicitGet()
     MicroBlock
-      .buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature, lastBlock.header.stateHash)
+      .buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature, block.header.stateHash)
       .explicitGet()
   }
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
-    val mb = createMicroBlock(txs*)
+    val mb = createMicroBlock(None, txs*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 

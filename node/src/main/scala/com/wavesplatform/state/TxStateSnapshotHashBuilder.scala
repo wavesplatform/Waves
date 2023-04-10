@@ -19,6 +19,8 @@ object TxStateSnapshotHashBuilder {
         StaticAssetInfo, AssetReissuability, AssetNameDescription = Value
   }
 
+  val InitStateHash: ByteStr = ByteStr(crypto.fastHash(""))
+
   final case class Result(txStateSnapshotHash: ByteStr) {
     def createHash(prevHash: ByteStr): ByteStr =
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
@@ -85,7 +87,11 @@ object TxStateSnapshotHashBuilder {
     }
 
     txDiff.issuedAssets.foreach { case (asset, assetInfo) =>
-      addEntry(KeyType.StaticAssetInfo, asset.id.arr)(assetInfo.static.issuer.toAddress.bytes, booleanToBytes(assetInfo.static.nft))
+      addEntry(KeyType.StaticAssetInfo, asset.id.arr)(
+        assetInfo.static.issuer.toAddress.bytes,
+        Array(assetInfo.static.decimals.toByte),
+        booleanToBytes(assetInfo.static.nft)
+      )
     }
 
     val assetReissuabilities = txDiff.issuedAssets.map { case (asset, assetInfo) =>

@@ -124,13 +124,13 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
           Array(KeyType.Alias.id.toByte) ++ address2.bytes ++ addr2Alias.name.getBytes(StandardCharsets.UTF_8),
           Array(KeyType.VolumeAndFee.id.toByte) ++ orderId.arr ++ Longs.toByteArray(volumeAndFee.volume) ++ Longs.toByteArray(volumeAndFee.fee),
           Array(KeyType.StaticAssetInfo.id.toByte) ++ assetId1.id.arr ++ assetInfo1.static.issuer.toAddress.bytes ++
-            (if (assetInfo1.static.nft) Array(1: Byte) else Array(0: Byte)),
+            Array(assetInfo1.static.decimals.toByte) ++ (if (assetInfo1.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.StaticAssetInfo.id.toByte) ++ assetId2.id.arr ++ assetInfo2.static.issuer.toAddress.bytes ++
-            (if (assetInfo2.static.nft) Array(1: Byte) else Array(0: Byte)),
+            Array(assetInfo2.static.decimals.toByte) ++ (if (assetInfo2.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.StaticAssetInfo.id.toByte) ++ assetId3.id.arr ++ assetInfo3.static.issuer.toAddress.bytes ++
-            (if (assetInfo3.static.nft) Array(1: Byte) else Array(0: Byte)),
+            Array(assetInfo3.static.decimals.toByte) ++ (if (assetInfo3.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.StaticAssetInfo.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.toAddress.bytes ++
-            (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
+            Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetReissuability.id.toByte) ++ assetId1.id.arr ++
             (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetReissuability.id.toByte) ++ assetId2.id.arr ++

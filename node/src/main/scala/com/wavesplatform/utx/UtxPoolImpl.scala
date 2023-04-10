@@ -265,7 +265,12 @@ case class UtxPoolImpl(
       strategy: PackStrategy,
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint, Option[ByteStr]) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true))(initialConstraint, strategy, prevStateHash, cancelled)
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true))(
+      initialConstraint,
+      strategy,
+      prevStateHash,
+      cancelled
+    )
   }
 
   def cleanUnconfirmed(): Unit = {

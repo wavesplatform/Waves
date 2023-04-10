@@ -417,7 +417,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           block3.id() should have length crypto.DigestLength
 
           val keyBlock = d.appendKeyBlock()
-          val mb1      = d.createMicroBlock(TxHelpers.transfer())
+          val mb1      = d.createMicroBlock(None, TxHelpers.transfer())
           d.blockchain.processMicroBlock(mb1)
           d.appendMicroBlock(TxHelpers.transfer())
 

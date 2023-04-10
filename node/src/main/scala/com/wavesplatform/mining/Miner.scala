@@ -178,7 +178,11 @@ class MinerImpl(
         s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = ${appender.MaxTimeDrift}"
       )
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
-      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(lastBlockHeader.stateHash)
+      // TODO: correctly obtain previous state hash on feature activation height
+      prevStateHash = lastBlockHeader.stateHash.filter(_ =>
+        blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchainUpdater.height + 1)
+      )
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(prevStateHash)
       block <- Block
         .buildAndSign(
           version,

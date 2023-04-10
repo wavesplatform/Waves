@@ -156,7 +156,7 @@ object Block {
         Seq(),
         -1L,
         txs,
-        None
+        genesisSettings.stateHash
       )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)
