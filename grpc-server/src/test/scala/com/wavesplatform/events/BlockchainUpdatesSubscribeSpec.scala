@@ -18,27 +18,26 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     val testAlias     = "test"
     val balanceBefore = d.balance(defaultAddress)
     val alias         = TxHelpers.createAlias(testAlias)
+    val subscription  = repo.createFakeObserver(SubscribeRequest(1))
 
-    d.appendBlock(alias)
+    d.appendMicroBlock(alias)
 
-    val balanceAfter = d.balance(defaultAddress)
-
-    val subscription                             = repo.createFakeObserver(SubscribeRequest.of(1, 2))
-    val subscribeAppend                          = subscription.values.head.update.get.getAppend
-    val subscribeTx                              = subscribeAppend.getBlock.getBlock.transactions
-    val subscribeTxId                            = subscribeAppend.transactionIds.head.toByteArray
-    val subscribeTransactionsMetadata            = subscribeAppend.transactionsMetadata
-    val subscribeTransactionStateUpdates         = subscribeAppend.transactionStateUpdates
-    val subscribeTransactionStateUpdatesBalances = subscribeTransactionStateUpdates.head.balances.head
+    val balanceAfter                    = d.balance(defaultAddress)
+    val append                          = subscription.values.head.update.get.getAppend
+    val tx                              = append.getBlock.getBlock.transactions
+    val txId                            = append.transactionIds.head.toByteArray
+    val transactionsMetadata            = append.transactionsMetadata
+    val transactionStateUpdates         = append.transactionStateUpdates
+    val transactionStateUpdatesBalances = transactionStateUpdates.head.balances.head
 
     if (subscription.completed) {
-      subscribeTx.head.transaction.wavesTransaction.get.getFee.amount shouldEqual alias.fee.value
-      subscribeTx.head.transaction.wavesTransaction.get.getCreateAlias.alias shouldBe testAlias
-      subscribeTxId shouldBe alias.id.apply().arr
-      subscribeTransactionsMetadata.head.senderAddress.toByteArray shouldBe alias.sender.toAddress.bytes
-      subscribeTransactionStateUpdatesBalances.address.toByteArray shouldBe alias.sender.toAddress.toString
-      subscribeTransactionStateUpdatesBalances.amountBefore shouldEqual balanceBefore
-      subscribeTransactionStateUpdatesBalances.amountAfter shouldEqual balanceAfter
+      tx.head.transaction.wavesTransaction.get.getFee.amount shouldEqual alias.fee.value
+      tx.head.transaction.wavesTransaction.get.getCreateAlias.alias shouldBe testAlias
+      txId shouldBe alias.id.apply().arr
+      transactionsMetadata.head.senderAddress.toByteArray shouldBe alias.sender.toAddress.bytes
+      transactionStateUpdatesBalances.address.toByteArray shouldBe alias.sender.toAddress.toString
+      transactionStateUpdatesBalances.amountBefore shouldEqual balanceBefore
+      transactionStateUpdatesBalances.amountAfter shouldEqual balanceAfter
     }
   }
 }
