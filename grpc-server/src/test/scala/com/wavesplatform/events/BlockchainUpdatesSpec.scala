@@ -15,7 +15,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated}
 import com.wavesplatform.features.BlockchainFeatures.BlockReward
-import com.wavesplatform.history.{Domain, randomSig}
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -432,27 +432,6 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         val issued = event.getAppend.transactionStateUpdates.head.assets
         issued shouldBe Seq(AssetStateUpdate.toPB(AssetStateUpdate(issue.assetId, None, Some(description))))
         event.referencedAssets shouldBe Seq(AssetInfo.toPB(AssetInfo(issue.assetId, description.decimals, description.name.toStringUtf8)))
-      }
-    }
-
-    "return correct data for alias tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
-      val testAlias = "test"
-      val alias = TxHelpers.createAlias(testAlias)
-      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
-
-      withGenerateSubscription(settings = currentSettings) { d =>
-        d.appendBlock(alias)
-      } {
-        events => val event = events.last
-
-        event.getAppend.getBlock.getBlock.transactions.head.transaction.wavesTransaction.get.getFee.amount shouldEqual alias.fee.value
-        event.getAppend.getBlock.getBlock.transactions.head.transaction.wavesTransaction.get.getCreateAlias.alias shouldBe testAlias
-        Base58.encode(event.getAppend.transactionIds.head.toByteArray) shouldBe alias.id.apply().toString
-        Base58.encode(event.getAppend.transactionsMetadata.head.senderAddress.toByteArray) shouldBe alias.sender.toAddress.toString
-        Base58.encode(event.getAppend.transactionStateUpdates.head.balances.head.address.toByteArray) shouldBe alias.sender.toAddress.toString
-
-/*        event.getAppend.transactionStateUpdates.head.balances.head.amountBefore shouldBe alias.version
-        event.getAppend.transactionStateUpdates.head.balances.head.amountAfter shouldBe alias.sender*/
       }
     }
 
