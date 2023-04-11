@@ -14,6 +14,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
   "return correct data for alias tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
     d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+    d.appendKeyBlock()
 
     val testAlias     = "test"
     val balanceBefore = d.balance(defaultAddress)
@@ -23,21 +24,19 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     d.appendMicroBlock(alias)
 
     val balanceAfter                    = d.balance(defaultAddress)
-    val append                          = subscription.values.head.update.get.getAppend
-    val tx                              = append.getBlock.getBlock.transactions
+    val append                          = subscription.values.head.getUpdate.getAppend
+    val tx                              = append.getMicroBlock.getMicroBlock.getMicroBlock.transactions
     val txId                            = append.transactionIds.head.toByteArray
     val transactionsMetadata            = append.transactionsMetadata
     val transactionStateUpdates         = append.transactionStateUpdates
     val transactionStateUpdatesBalances = transactionStateUpdates.head.balances.head
 
-    if (subscription.completed) {
-      tx.head.transaction.wavesTransaction.get.getFee.amount shouldEqual alias.fee.value
-      tx.head.transaction.wavesTransaction.get.getCreateAlias.alias shouldBe testAlias
-      txId shouldBe alias.id.apply().arr
-      transactionsMetadata.head.senderAddress.toByteArray shouldBe alias.sender.toAddress.bytes
-      transactionStateUpdatesBalances.address.toByteArray shouldBe alias.sender.toAddress.toString
-      transactionStateUpdatesBalances.amountBefore shouldEqual balanceBefore
-      transactionStateUpdatesBalances.amountAfter shouldEqual balanceAfter
-    }
+    tx.head.transaction.wavesTransaction.get.getFee.amount shouldEqual alias.fee.value
+    tx.head.transaction.wavesTransaction.get.getCreateAlias.alias shouldBe testAlias
+    txId shouldBe alias.id.apply().arr
+    transactionsMetadata.head.senderAddress.toByteArray shouldBe alias.sender.toAddress.bytes
+    transactionStateUpdatesBalances.address.toByteArray shouldBe alias.sender.toAddress.bytes
+    transactionStateUpdatesBalances.amountBefore shouldEqual balanceBefore
+    transactionStateUpdatesBalances.amountAfter shouldEqual balanceAfter
   }
 }
