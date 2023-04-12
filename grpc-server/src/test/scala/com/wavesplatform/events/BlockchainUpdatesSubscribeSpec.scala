@@ -1,13 +1,13 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.events.FakeObserver.{E, UpdatesRepoExt}
-import com.wavesplatform.events.api.grpc.protobuf.{SubscribeEvent, SubscribeRequest}
+import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{CreateAliasTransaction, TxHelpers}
-import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
+import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner, signer}
 import org.scalatest.concurrent.ScalaFutures
 
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
@@ -37,14 +37,28 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     d.appendKeyBlock()
     d.appendBlock(TxHelpers.transfer())
 
+    val script = TxHelpers.script(
+      """
+        |{-# STDLIB_VERSION 5 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable(inv)
+        |func foo() = {
+        |  strict ii = invoke(this, "bar", [1], [])
+        |  [IntegerEntry("test1", 1)]
+        |}
+        |
+        |@Callable(inv)
+        |func bar(i: Int) = [IntegerEntry("test", 2)]
+        |""".stripMargin)
+
+    d.appendBlock(TxHelpers.setScript(secondSigner, script))
 
     balanceBefore = d.balance(secondAddress)
-    val alias = TxHelpers.createAlias(testAlias, secondSigner)
+    val alias        = TxHelpers.createAlias(testAlias, secondSigner)
     val subscription = repo.createFakeObserver(SubscribeRequest(2))
     d.appendMicroBlock(alias)
     val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
-
-    println(alias.fee.value)
 
     balanceAfter = balanceBefore - alias.fee.value
     assertions(append, alias)
