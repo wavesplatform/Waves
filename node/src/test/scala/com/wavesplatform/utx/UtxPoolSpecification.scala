@@ -92,7 +92,15 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
     Using.resource(TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)) { dbContext =>
       val (bcu, _) = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
-      bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
+      bcu.processBlock(
+        Block
+          .genesis(
+            genesisSettings,
+            bcu.isFeatureActivated(BlockchainFeatures.RideV6),
+            bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)
+          )
+          .explicitGet()
+      ) should beRight
       test(bcu)
     }
   }

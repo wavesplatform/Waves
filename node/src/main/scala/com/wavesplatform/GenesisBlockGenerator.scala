@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.block.Block
@@ -11,7 +10,6 @@ import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.state.TxStateSnapshotHashBuilder
 import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
@@ -134,7 +132,6 @@ object GenesisBlockGenerator {
                         |  transactions = [
                         |    ${settings.transactions.map(x => s"""{recipient = "${x.recipient}", amount = ${x.amount}}""").mkString(",\n    ")}
                         |  ]
-                        |  ${settings.stateHash.map(sh => s"state-hash = $sh")}
                         |}
                         |""".stripMargin
 
@@ -182,7 +179,7 @@ object GenesisBlockGenerator {
           signer = genesisSigner,
           featureVotes = Seq.empty,
           rewardVote = -1L,
-          computeStateHash(genesisTxs)
+          stateHash = None
         )
         .explicitGet()
 
@@ -195,7 +192,6 @@ object GenesisBlockGenerator {
           GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
         },
         genesis.header.baseTarget,
-        genesis.header.stateHash,
         settings.averageBlockDelay
       )
     }
@@ -289,25 +285,6 @@ object GenesisBlockGenerator {
       val baseTargets = calc(Seq(startHitSource), Seq(0), Seq(startBaseTarget), 1, totalCount)
       baseTargets.take(significantCount).sum / significantCount
     }
-
-    def computeStateHash(txs: Seq[GenesisTransaction]): Option[ByteStr] =
-      if (settings.preActivated(BlockchainFeatures.TransactionStateSnapshot)) {
-        Some(
-          ByteStr(
-            txs
-              .foldLeft(TxStateSnapshotHashBuilder.InitStateHash.arr -> Map.empty[Address, Long]) { case ((prevStateHash, balances), tx) =>
-                val newBalance = balances.getOrElse(tx.recipient, 0L) + tx.amount.value
-                val tsh =
-                  crypto.fastHash(
-                    Array(TxStateSnapshotHashBuilder.KeyType.WavesBalance.id.toByte) ++ tx.recipient.bytes ++ Longs.toByteArray(newBalance)
-                  )
-                val newStateHash = crypto.fastHash(prevStateHash ++ tsh)
-                newStateHash -> balances.updated(tx.recipient, newBalance)
-              }
-              ._1
-          )
-        )
-      } else None
 
     generateAndReport(
       addrInfos = shares.map(_._1),

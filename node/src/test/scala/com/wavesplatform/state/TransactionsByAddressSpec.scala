@@ -50,10 +50,10 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
           None,
           Seq(GenesisTransactionSettings(sender.toAddress.toString, Constants.TotalWaves)),
           1000,
-          None,
           1.minute
         ),
-        rideV6Activated = false
+        rideV6Activated = false,
+        txStateSnapshotActivated = false
       )
       .explicitGet()
 

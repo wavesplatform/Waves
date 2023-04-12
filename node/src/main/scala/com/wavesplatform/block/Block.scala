@@ -132,7 +132,7 @@ object Block {
       .parseBytes(bytes)
       .flatMap(_.validateToTry)
 
-  def genesis(genesisSettings: GenesisSettings, rideV6Activated: Boolean): Either[ValidationError, Block] = {
+  def genesis(genesisSettings: GenesisSettings, rideV6Activated: Boolean, txStateSnapshotActivated: Boolean): Either[ValidationError, Block] = {
     import cats.instances.either.*
     import cats.instances.list.*
     import cats.syntax.traverse.*
@@ -156,13 +156,16 @@ object Block {
         Seq(),
         -1L,
         txs,
-        genesisSettings.stateHash
+        None
       )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)
         case Some(predefined) => block.copy(signature = predefined)
       }
-      validBlock <- signedBlock.validateGenesis(genesisSettings, rideV6Activated)
+      signedBlockWithStateHash = signedBlock.copy(header =
+        signedBlock.header.copy(stateHash = Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)))
+      )
+      validBlock <- signedBlockWithStateHash.validateGenesis(genesisSettings, rideV6Activated)
     } yield validBlock
   }
 

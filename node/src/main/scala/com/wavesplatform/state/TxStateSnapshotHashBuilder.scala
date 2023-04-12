@@ -5,10 +5,12 @@ import cats.data.Ior
 import java.nio.charset.StandardCharsets
 import cats.syntax.monoid.*
 import com.google.common.primitives.{Ints, Longs}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.GenesisTransaction
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
 import scala.collection.mutable
@@ -120,6 +122,21 @@ object TxStateSnapshotHashBuilder {
 
     Result(createHash(changedKeys.toSeq.sortBy(_._1).flatMap { case (k, v) => Seq(k, ByteStr(v)) }))
   }
+
+  def createGenesisStateHash(txs: Seq[GenesisTransaction]): ByteStr =
+    ByteStr(
+      txs
+        .foldLeft(InitStateHash.arr -> Map.empty[Address, Long]) { case ((prevStateHash, balances), tx) =>
+          val newBalance = balances.getOrElse(tx.recipient, 0L) + tx.amount.value
+          val tsh =
+            crypto.fastHash(
+              Array(TxStateSnapshotHashBuilder.KeyType.WavesBalance.id.toByte) ++ tx.recipient.bytes ++ Longs.toByteArray(newBalance)
+            )
+          val newStateHash = crypto.fastHash(prevStateHash ++ tsh)
+          newStateHash -> balances.updated(tx.recipient, newBalance)
+        }
+        ._1
+    )
 
   private def booleanToBytes(flag: Boolean): Array[Byte] =
     if (flag) Array(1: Byte) else Array(0: Byte)

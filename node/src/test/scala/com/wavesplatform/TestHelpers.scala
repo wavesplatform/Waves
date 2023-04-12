@@ -8,7 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings, WavesSettings}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 object TestHelpers {
   def genesisSettings(balances: Map[Address, Long], blockTimestamp: Long = System.currentTimeMillis()): GenesisSettings = {
@@ -17,7 +17,7 @@ object TestHelpers {
       GenesisTransactionSettings(account.toString, amount)
     }.toSeq
 
-    GenesisSettings(blockTimestamp, blockTimestamp, totalAmount, None, transactions, 1000, None, 60.seconds)
+    GenesisSettings(blockTimestamp, blockTimestamp, totalAmount, None, transactions, 1000, 60.seconds)
   }
 
   def enableNG(settings: FunctionalitySettings): FunctionalitySettings =

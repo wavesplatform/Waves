@@ -145,7 +145,6 @@ case class GenesisSettings(
     signature: Option[ByteStr],
     transactions: Seq[GenesisTransactionSettings],
     initialBaseTarget: Long,
-    stateHash: Option[ByteStr],
     averageBlockDelay: FiniteDuration
 )
 
@@ -164,7 +163,6 @@ object GenesisSettings { // TODO: Move to network-defaults.conf
       GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", Constants.UnitsInWave)
     ),
     153722867L,
-    None,
     60.seconds
   )
 
@@ -184,7 +182,6 @@ object GenesisSettings { // TODO: Move to network-defaults.conf
       )
     ),
     153722867L,
-    None,
     60.seconds
   )
 
@@ -197,7 +194,6 @@ object GenesisSettings { // TODO: Move to network-defaults.conf
       GenesisTransactionSettings("3Mi63XiwniEj6mTC557pxdRDddtpj7fZMMw", Constants.UnitsInWave * Constants.TotalWaves)
     ),
     5000,
-    None,
     1.minute
   )
 }

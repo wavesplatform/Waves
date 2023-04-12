@@ -1,22 +1,22 @@
 package com.wavesplatform.state.diffs
 
-import com.google.common.primitives.Longs
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
+
+import scala.concurrent.duration.*
 
 class BlockDifferTest extends FreeSpec with WithDomain {
   private val TransactionFee = 10
@@ -102,23 +102,29 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     }
 
     "correctly computes state hash" - {
-      "genesis block" in withDomain(DomainPresets.TransactionStateSnapshot) { d =>
+      "genesis block" in {
         val txs = (1 to 10).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 100.waves)) ++
           (1 to 5).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 1.waves))
+        withDomain(DomainPresets.TransactionStateSnapshot) { d =>
+          val block = createGenesisWithStateHash(txs, txStateSnapshotActivated = true)
 
-        val correctBlock = createGenesisWithStateHash(txs)
-        BlockDiffer
-          .fromBlock(d.blockchain, None, correctBlock, MiningConstraint.Unlimited, correctBlock.header.generationSignature) should beRight
+          block.header.stateHash shouldBe defined
+          BlockDiffer
+            .fromBlock(d.blockchain, None, block, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
+        }
 
-        val incorrectBlock = createGenesisWithStateHash(txs, Some(ByteStr.fill(DigestLength)(1)))
-        BlockDiffer.fromBlock(d.blockchain, None, incorrectBlock, MiningConstraint.Unlimited, correctBlock.header.generationSignature) shouldBe Left(
-          InvalidStateHash
-        )
+        withDomain(DomainPresets.RideV6) { d =>
+          val block = createGenesisWithStateHash(txs, txStateSnapshotActivated = false)
+
+          block.header.stateHash shouldBe None
+          BlockDiffer
+            .fromBlock(d.blockchain, None, block, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
+        }
       }
 
       "arbitrary block/microblock" in
         withDomain(DomainPresets.TransactionStateSnapshot) { d =>
-          val genesis = createGenesisWithStateHash(Seq(TxHelpers.genesis(TxHelpers.address(1))))
+          val genesis = createGenesisWithStateHash(Seq(TxHelpers.genesis(TxHelpers.address(1))), txStateSnapshotActivated = true)
           d.appendBlock(genesis)
 
           val txs = (1 to 10).map(idx => TxHelpers.transfer(TxHelpers.signer(idx), TxHelpers.address(idx + 1), (100 - idx).waves))
@@ -194,30 +200,20 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     }
   }
 
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], stateHash: Option[ByteStr] = None): Block = {
-    val sh = stateHash.getOrElse {
-      ByteStr(
-        txs
-          .foldLeft(TxStateSnapshotHashBuilder.InitStateHash.arr -> Map.empty[Address, Long]) { case ((prevStateHash, balances), tx) =>
-            val newBalance = balances.getOrElse(tx.recipient, 0L) + tx.amount.value
-            val tsh =
-              crypto.fastHash(
-                Array(TxStateSnapshotHashBuilder.KeyType.WavesBalance.id.toByte) ++ tx.recipient.bytes ++ Longs.toByteArray(newBalance)
-              )
-            val newStateHash = crypto.fastHash(prevStateHash ++ tsh)
-            newStateHash -> balances.updated(tx.recipient, newBalance)
-          }
-          ._1
-      )
-    }
-
-    TestBlock.create(
-      txs.map(_.timestamp).max,
-      Block.GenesisReference,
-      txs,
-      signer = Block.GenesisGenerator,
-      version = Block.GenesisBlockVersion,
-      stateHash = Some(sh)
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean): Block = {
+    val timestamp = txs.map(_.timestamp).max
+    val genesisSettings = GenesisSettings(
+      timestamp,
+      timestamp,
+      txs.map(_.amount.value).sum,
+      None,
+      txs.map { tx =>
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
+      },
+      2L,
+      60.seconds
     )
+
+    Block.genesis(genesisSettings, rideV6Activated = true, txStateSnapshotActivated).explicitGet()
   }
 }

@@ -23,7 +23,6 @@ object BaseTargetChecker {
       .withFallback(defaultReference())
       .resolve()
 
-
     val settings               = WavesSettings.fromRootConfig(sharedConfig)
     val db                     = RDB.open(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
     val ntpTime                = new NTP("ntp.pool.org")
@@ -32,7 +31,13 @@ object BaseTargetChecker {
 
     try {
       val genesisBlock =
-        Block.genesis(settings.blockchainSettings.genesisSettings, blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()
+        Block
+          .genesis(
+            settings.blockchainSettings.genesisSettings,
+            blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6),
+            blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)
+          )
+          .explicitGet()
       blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {

@@ -7,7 +7,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.{NgBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto.{DigestLength, SignatureLength}
+import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
@@ -131,8 +131,7 @@ object BlockSerializer {
       featureVotesBytes,
       rewardVoteBytes,
       header.generator.arr,
-      signature.arr,
-      header.stateHash.map(_.arr).getOrElse(Array.empty)
+      signature.arr
     )
   }
 
@@ -140,12 +139,12 @@ object BlockSerializer {
     Try {
       val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
 
-      val Prefix(version, timestamp, reference, baseTarget, generationSignature)              = parsePrefix(buf)
-      val transactionData                                                                     = parseTxs(buf, version)
-      val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature, stateHash) = parseSuffix(buf, version)
+      val Prefix(version, timestamp, reference, baseTarget, generationSignature)   = parsePrefix(buf)
+      val transactionData                                                          = parseTxs(buf, version)
+      val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(buf, version)
 
       val header =
-        BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, stateHash)
+        BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, None)
 
       Block(header, signature, transactionData)
     }
@@ -172,8 +171,7 @@ object BlockSerializer {
     val generator        = buf.getPublicKey
     val transactionsRoot = ByteStr.empty
     val signature        = ByteStr(buf.getByteArray(SignatureLength))
-    val stateHash        = buf.getByteArrayOpt(DigestLength).map(ByteStr(_))
-    Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature, stateHash)
+    Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature)
   }
 
   case class Prefix(
@@ -189,8 +187,7 @@ object BlockSerializer {
       featureVotes: Seq[Short],
       rewardVote: Long,
       transactionsRoot: ByteStr,
-      signature: ByteStr,
-      stateHash: Option[ByteStr]
+      signature: ByteStr
   )
 
   def transactionField(transactions: Seq[Transaction]): JsObject = Json.obj(
