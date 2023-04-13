@@ -1,83 +1,99 @@
 package com.wavesplatform.events
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.events.FakeObserver.{E, UpdatesRepoExt}
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.{CreateAliasTransaction, TxHelpers}
-import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner, signer}
+import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
 import org.scalatest.concurrent.ScalaFutures
 
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = RideV6
   val testAlias                      = "test"
-  var balanceBefore                  = 0L
-  var balanceAfter                   = 0L
+  var amount                         = 1000
+  var senderBalanceBefore            = 0L
+  var senderBalanceAfter             = 0L
+  var recipientBalanceBefore         = 0L
+  var recipientBalanceAfter          = 0L
+  val emptyAddressBytes: Array[Byte] = "".getBytes()
 
-  "return correct data for alias tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
-    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
-    d.appendKeyBlock()
-    d.appendBlock(TxHelpers.transfer())
+  "BlockchainUpdates subscribe tests" - {
+    val recipient        = TxHelpers.signer(1234)
+    val recipientAddress = recipient.toAddress
 
-    balanceBefore = d.balance(secondAddress)
-    val alias        = TxHelpers.createAlias(testAlias, secondSigner)
-    val subscription = repo.createFakeObserver(SubscribeRequest(2))
-    d.appendMicroBlock(alias)
-    val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
+    "return correct data for alias tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+      d.appendKeyBlock()
+      d.appendBlock(TxHelpers.transfer())
 
-    balanceAfter = balanceBefore - alias.fee.value
-    assertions(append, alias)
+      senderBalanceBefore = d.balance(secondAddress)
+
+      val alias        = TxHelpers.createAlias(testAlias, secondSigner)
+      val subscription = repo.createFakeObserver(SubscribeRequest(2))
+      d.appendMicroBlock(alias)
+      val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
+
+      senderBalanceAfter = senderBalanceBefore - alias.fee.value
+
+      val tx   = append.getMicroBlock.getMicroBlock.getMicroBlock.transactions.head.transaction.wavesTransaction.get
+      val txId = append.transactionIds.head.toByteArray
+
+      tx.getFee.amount shouldEqual alias.fee.value
+      tx.getCreateAlias.alias shouldBe testAlias
+      txId shouldBe alias.id.apply().arr
+
+      assertionsTransactionsMetadata(append, emptyAddressBytes)
+      assertionsTransactionStateUpdatesBalances(append, 0, 0, secondAddress, senderBalanceBefore, senderBalanceAfter, "")
+    }
+
+    "return correct data for transfer tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
+      d.appendKeyBlock()
+      d.appendBlock(TxHelpers.transfer())
+
+      senderBalanceBefore = d.balance(secondAddress)
+
+      val transfer     = TxHelpers.transfer(secondSigner, recipientAddress, amount)
+      val subscription = repo.createFakeObserver(SubscribeRequest(2))
+      d.appendMicroBlock(transfer)
+      val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
+
+      senderBalanceAfter = senderBalanceBefore - transfer.fee.value - amount
+      recipientBalanceAfter = recipientBalanceBefore + amount
+
+      val tx   = append.getMicroBlock.getMicroBlock.getMicroBlock.transactions.head.transaction.wavesTransaction.get
+      val txId = append.transactionIds.head.toByteArray
+
+      tx.getFee.amount shouldEqual transfer.fee.value
+      tx.getTransfer.amount.get.amount shouldBe transfer.amount.value
+      tx.getTransfer.recipient.get.recipient.publicKeyHash.get.toByteArray shouldBe recipientAddress.publicKeyHash
+
+      txId shouldBe transfer.id.apply().arr
+
+      assertionsTransactionsMetadata(append, recipientAddress.bytes)
+      assertionsTransactionStateUpdatesBalances(append, 0, 0, secondAddress, senderBalanceBefore, senderBalanceAfter, "")
+      assertionsTransactionStateUpdatesBalances(append, 0, 1, recipientAddress, recipientBalanceBefore, recipientBalanceAfter, "")
+    }
+
   }
 
-  // TODO - Доработать тест, сейчас нужно научиться создавать dApp account
-  "return correct data for alias tx for smart account" in withDomainAndRepo(currentSettings) { case (d, repo) =>
-    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
-    d.appendKeyBlock()
-    d.appendBlock(TxHelpers.transfer())
-
-    val script = TxHelpers.script(
-      """
-        |{-# STDLIB_VERSION 5 #-}
-        |{-# CONTENT_TYPE DAPP #-}
-        |
-        |@Callable(inv)
-        |func foo() = {
-        |  strict ii = invoke(this, "bar", [1], [])
-        |  [IntegerEntry("test1", 1)]
-        |}
-        |
-        |@Callable(inv)
-        |func bar(i: Int) = [IntegerEntry("test", 2)]
-        |""".stripMargin)
-
-    d.appendBlock(TxHelpers.setScript(secondSigner, script))
-
-    balanceBefore = d.balance(secondAddress)
-    val alias        = TxHelpers.createAlias(testAlias, secondSigner)
-    val subscription = repo.createFakeObserver(SubscribeRequest(2))
-    d.appendMicroBlock(alias)
-    val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
-
-    balanceAfter = balanceBefore - alias.fee.value
-    assertions(append, alias)
-  }
-
-  def assertions(append: Append, alias: CreateAliasTransaction): Unit = {
-    val tx                              = append.getMicroBlock.getMicroBlock.getMicroBlock.transactions
-    val txId                            = append.transactionIds.head.toByteArray
-    val transactionsMetadata            = append.transactionsMetadata
-    val transactionStateUpdates         = append.transactionStateUpdates
-    val transactionStateUpdatesBalances = transactionStateUpdates.head.balances.head
-
-    tx.head.transaction.wavesTransaction.get.getFee.amount shouldEqual alias.fee.value
-    tx.head.transaction.wavesTransaction.get.getCreateAlias.alias shouldBe testAlias
-    txId shouldBe alias.id.apply().arr
+  def assertionsTransactionsMetadata(append: Append, recipientAddress: Array[Byte]): Unit = {
+    val transactionsMetadata = append.transactionsMetadata
     transactionsMetadata.head.senderAddress.toByteArray shouldBe secondAddress.bytes
-    transactionStateUpdatesBalances.address.toByteArray shouldBe secondAddress.bytes
-    transactionStateUpdatesBalances.amountBefore shouldEqual balanceBefore
-    transactionStateUpdatesBalances.amountAfter.get.amount shouldEqual balanceAfter
-    transactionStateUpdatesBalances.amountAfter.get.assetId.isEmpty shouldBe true
+    transactionsMetadata.head.getTransfer.recipientAddress.toByteArray shouldBe recipientAddress
+  }
+
+  def assertionsTransactionStateUpdatesBalances
+  (append: Append, txUpdIndex: Int, balanceIndex: Int, address: Address, before: Long, after: Long, assetId: String): Unit = {
+    val transactionStateUpdatesBalances = append.transactionStateUpdates.apply(txUpdIndex).balances
+
+    transactionStateUpdatesBalances.apply(balanceIndex).address.toByteArray shouldBe address.bytes
+    transactionStateUpdatesBalances.apply(balanceIndex).amountBefore shouldEqual before
+    transactionStateUpdatesBalances.apply(balanceIndex).amountAfter.get.amount shouldEqual after
+    transactionStateUpdatesBalances.apply(balanceIndex).amountAfter.get.assetId.toStringUtf8 shouldBe assetId
   }
 }
