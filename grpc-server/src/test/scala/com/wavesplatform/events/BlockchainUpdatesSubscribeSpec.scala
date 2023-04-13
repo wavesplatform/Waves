@@ -7,6 +7,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
 import org.scalatest.concurrent.ScalaFutures
@@ -20,6 +21,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
   var recipientBalanceBefore         = 0L
   var recipientBalanceAfter          = 0L
   val emptyAddressBytes: Array[Byte] = "".getBytes()
+  val customFee = 123456L
 
   "BlockchainUpdates subscribe tests" - {
     val recipient        = TxHelpers.signer(1234)
@@ -32,7 +34,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
       senderBalanceBefore = d.balance(secondAddress)
 
-      val alias        = TxHelpers.createAlias(testAlias, secondSigner)
+      val alias        = TxHelpers.createAlias(testAlias, secondSigner, customFee)
       val subscription = repo.createFakeObserver(SubscribeRequest(2))
       d.appendMicroBlock(alias)
       val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
@@ -57,7 +59,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
       senderBalanceBefore = d.balance(secondAddress)
 
-      val transfer     = TxHelpers.transfer(secondSigner, recipientAddress, amount)
+      val transfer     = TxHelpers.transfer(secondSigner, recipientAddress, amount, Waves, customFee)
       val subscription = repo.createFakeObserver(SubscribeRequest(2))
       d.appendMicroBlock(transfer)
       val append = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend).last
@@ -78,6 +80,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       assertionsTransactionStateUpdatesBalances(append, 0, 0, secondAddress, senderBalanceBefore, senderBalanceAfter, "")
       assertionsTransactionStateUpdatesBalances(append, 0, 1, recipientAddress, recipientBalanceBefore, recipientBalanceAfter, "")
     }
+
+
 
   }
 
