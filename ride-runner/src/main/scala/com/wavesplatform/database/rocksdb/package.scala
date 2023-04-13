@@ -631,12 +631,6 @@ package object rocksdb {
       h <- resource.get(historyKey).headOption
     } yield resource.get(valueKey(h))
 
-  object AddressId extends TaggedType[Long] {
-    def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))
-  }
-
-  type AddressId = AddressId.Type
-
   implicit final class Ops(private val value: AddressId) extends AnyVal {
     def toByteArray: Array[Byte] = Longs.toByteArray(AddressId.raw(value))
   }

@@ -49,7 +49,7 @@ class SharedBlockchainStorage[TagT] private (
   val height = new HeightTagsStorage[TagT](heightUntagged)
 
   // Ride: wavesBalance, height, lastBlock
-  def heightUntagged: Int = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
+  def heightUntagged: Height = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
     db.readWrite { implicit ctx =>
@@ -58,7 +58,7 @@ class SharedBlockchainStorage[TagT] private (
 
   // No way to get this from blockchain updates
   var activatedFeatures =
-    load[Unit, Map[Short, Int]](
+    load[Unit, Map[Short, Height]](
       _ => persistentCaches.getActivatedFeatures(),
       _ => blockchainApi.getActivatedFeatures(heightUntagged).some,
       (_, xs) => xs.mayBeValue.foreach(persistentCaches.setActivatedFeatures)
@@ -72,7 +72,7 @@ class SharedBlockchainStorage[TagT] private (
   def resolveAlias(a: Alias): Either[ValidationError, Address] =
     // TODO Remove readWrite!
     db.readWrite { implicit rw =>
-      aliases.getUntagged(Height(heightUntagged), a).toRight(AliasDoesNotExist(a): ValidationError)
+      aliases.getUntagged(heightUntagged, a).toRight(AliasDoesNotExist(a): ValidationError)
     }
 
   val accountBalances = new AccountBalanceStorage[TagT](settings.caches.accountBalance, chainId, blockchainApi, persistentCaches.accountBalances)
@@ -95,8 +95,14 @@ class SharedBlockchainStorage[TagT] private (
       .mayBeValue
 
   def removeAllFrom(height: Height): Unit = db.readWrite { implicit ctx =>
-    // TODO #99 Remove all keys from height
     blockHeaders.removeFrom(height)
+    data.removeFrom(height)
+    accountScripts.removeFrom(height)
+    assets.removeFrom(height)
+    aliases.removeFrom(height)
+    accountBalances.removeFrom(height)
+    accountLeaseBalances.removeFrom(height)
+    transactions.removeFrom(height)
   }
 
   private val empty = AffectedTags[TagT](Set.empty)
@@ -106,7 +112,7 @@ class SharedBlockchainStorage[TagT] private (
       val affected = event.update match {
         case Update.Empty         => AffectedTags.empty[TagT] // Ignore
         case Update.Append(evt)   => append(toHeight, evt)
-        case Update.Rollback(evt) => rollback(Height(heightUntagged), toHeight, evt)
+        case Update.Rollback(evt) => rollback(heightUntagged, toHeight, evt)
       }
 
       blockHeaders.update(event)

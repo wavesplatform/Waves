@@ -1,11 +1,17 @@
 package com.wavesplatform.ride.runner.db
 
+import com.google.common.primitives.Ints
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats.DbHistogramExt
+import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtRollback}
 import com.wavesplatform.ride.runner.storage.RemoteData
+import com.wavesplatform.ride.runner.storage.persistent.KvPair
+import com.wavesplatform.state.Height
 import com.wavesplatform.utils.OptimisticLockable
 import org.rocksdb.*
+
+import scala.collection.mutable
 
 class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteBatch) extends ReadOnly(db, readOptions) with OptimisticLockable {
   def put[V](key: Key[V], value: V): Int = {
@@ -24,74 +30,107 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
   def delete[V](key: Key[V]): Unit =
     batch.use(_.delete(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes))
 
-  def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
-    val newValue = get(key).filterNot(_ == heightToRemove)
-    if (newValue.nonEmpty) put(key, newValue)
+  def writeToDb[T](key: Key[Option[T]], data: RemoteData[T]): Unit =
+    if (data.loaded) put(key, data.mayBeValue)
     else delete(key)
-  }
 
-  def writeToDb[T](dbKey: Key[Option[T]], data: RemoteData[T]): Unit = {
-    if (data.loaded) put(dbKey, data.mayBeValue)
-    else delete(dbKey)
-  }
-
-  // TODO cleanup < 100
+  // TODO #112 currentHeight, because height could >> currentHeight
   def writeHistoricalToDbOpt[T](
-      historyKey: Key[Seq[Int]],
-      dataOnHeightKey: Int => Key[Option[T]],
-      height: Int,
+      historyKey: Key[Heights],
+      dataOnHeightKey: Height => Key[Option[T]],
+      height: Height,
       data: RemoteData[T]
   ): Unit = {
-    put(historyKey, getOpt(historyKey).getOrElse(Seq.empty).prepended(height))
+    // TODO duplicate
+    val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
+    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+
+    put(historyKey, preservedHistory.prepended(height))
     put(dataOnHeightKey(height), data.mayBeValue)
   }
 
   def writeHistoricalToDb[T](
-      historyKey: Key[Seq[Int]],
-      dataOnHeightKey: Int => Key[T],
-      height: Int,
+      historyKey: Key[Heights],
+      dataOnHeightKey: Height => Key[T],
+      height: Height,
       data: RemoteData[T],
       default: => T
   ): Unit = {
-    put(historyKey, getOpt(historyKey).getOrElse(Seq.empty).prepended(height))
+    val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
+    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+
+    put(historyKey, preservedHistory.prepended(height))
     put(dataOnHeightKey(height), data.mayBeValue.getOrElse(default))
   }
 
-  def removeAfterAndGetLatestExistedOpt[T](
-      historyKey: Key[Seq[Int]],
-      dataOnHeightKey: Int => Key[Option[T]],
-      fromHeight: Int
+  def removeFromAndGetLatestExistedOpt[T](
+      historyKey: Key[Heights],
+      dataOnHeightKey: Height => Key[Option[T]],
+      fromHeight: Height
   ): RemoteData[T] = {
-    val history = getOpt(historyKey).getOrElse(Seq.empty)
+    val history = getOpt(historyKey).getOrElse(Vector.empty)
     if (history.isEmpty) RemoteData.Unknown
     else {
-      val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO #13 Better search for height
-      put(historyKey, updatedHistory) // not deleting, because it will be added with a high probability
+      val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
       removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
-      updatedHistory.headOption match {
-        case None    => RemoteData.Unknown
-        case Some(h) => readFromDbOpt(dataOnHeightKey(h))
+      preservedHistory.headOption match {
+        case None =>
+          delete(historyKey)
+          RemoteData.Unknown
+
+        case Some(h) =>
+          put(historyKey, preservedHistory)
+          getRemoteDataOpt(dataOnHeightKey(h))
       }
     }
   }
 
-  def removeAfterAndGetLatestExisted[T](
-      historyKey: Key[Seq[Int]],
-      dataOnHeightKey: Int => Key[T],
-      fromHeight: Int
+  // TODO duplicate
+  def removeFromAndGetLatestExisted[T](
+      historyKey: Key[Heights],
+      dataOnHeightKey: Height => Key[T],
+      fromHeight: Height
   ): RemoteData[T] = {
-    val history = getOpt(historyKey).getOrElse(Seq.empty)
+    val history = getOpt(historyKey).getOrElse(Vector.empty)
     if (history.isEmpty) RemoteData.Unknown
     else {
-      val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO #13: binary search
-      put(historyKey, updatedHistory) // not deleting, because it will be added with a high probability
+      val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
       removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
-      updatedHistory.headOption match {
-        case None    => RemoteData.Unknown
-        case Some(h) => readFromDb(dataOnHeightKey(h))
+      preservedHistory.headOption match {
+        case None =>
+          delete(historyKey)
+          RemoteData.Unknown
+
+        case Some(h) =>
+          put(historyKey, preservedHistory)
+          getRemoteData(dataOnHeightKey(h))
       }
     }
+  }
+
+  def removeFrom[K, V](
+      historyKey: KvPair[K, Heights],
+      entriesKey: KvPair[(Height, K), V],
+      fromHeight: Height
+  )(implicit ctx: ReadWrite): List[K] = {
+    val affectedEntryKeys = mutable.Set.empty[K]
+
+    ctx.iterateFrom(entriesKey.prefixBytes, entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
+      val rawKey        = e.getKey
+      val keyWithHeight = entriesKey.parseKey(rawKey)
+      val (_, key)      = keyWithHeight
+      ctx.delete(rawKey)
+
+      affectedEntryKeys.add(key)
+      true
+    }
+
+    affectedEntryKeys.foreach { k =>
+      ctx.update(historyKey.at(k))(_.dropWhile(_ >= fromHeight))
+    }
+
+    affectedEntryKeys.toList
   }
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import com.google.common.io.MoreFiles
+import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.db.RideRocksDb
@@ -115,13 +115,14 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
         }
       }
 
-      val cleanTo = 2 // Increase if you want to clean the database
+      val cleanTo = 4 // Increase if you want to clean the database
       if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
         log.info(
           s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
         )
         rootPath.toFile.listFiles().foreach { file =>
-          if (file.getAbsolutePath != cleanupIterationPath.toAbsolutePath.toString) MoreFiles.deleteRecursively(file.toPath)
+          if (file.getAbsolutePath != cleanupIterationPath.toAbsolutePath.toString)
+            MoreFiles.deleteRecursively(file.toPath, RecursiveDeleteOption.ALLOW_INSECURE)
         }
         Files.writeString(cleanupIterationPath, cleanTo.toString)
       }
@@ -147,7 +148,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, rideDb.access, dbCaches, blockchainApi)
     }
 
-    val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
+    val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
     log.info(s"Current height: shared (local or network)=${sharedBlockchain.heightUntagged}, network=$lastHeightAtStart")
 
     val requestService = new DefaultRequestService(
@@ -196,7 +197,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
-    blockchainUpdatesStream.start(lastSafeKnownHeight + 1)
+    blockchainUpdatesStream.start(Height(lastSafeKnownHeight + 1))
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(

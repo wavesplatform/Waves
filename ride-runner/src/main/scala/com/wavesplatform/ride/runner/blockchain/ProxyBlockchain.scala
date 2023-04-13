@@ -46,13 +46,13 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest])(
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
   // Ride: blockInfoByHeight, lastBlock
-  override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(height).map(_.header)
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
 
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(height).map(_.vrf)
+  override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(Height(height)).map(_.vrf)
 
   // TODO #?, tag)
-  private def blockHeaderWithVrf(height: Int): Option[SignedBlockHeaderWithVrf] = sharedBlockchain.blockHeaders.get(height)
+  private def blockHeaderWithVrf(height: Height): Option[SignedBlockHeaderWithVrf] = sharedBlockchain.blockHeaders.get(height)
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = sharedBlockchain.heightUntagged

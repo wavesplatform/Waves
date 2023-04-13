@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
-import com.google.common.io.MoreFiles
+import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.ride.runner.db.RideRocksDb.newColumnFamilyOptions
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
@@ -28,7 +28,7 @@ object HasDb {
 
     override def close(): Unit = {
       db.close()
-      if (clean) MoreFiles.deleteRecursively(path)
+      if (clean) MoreFiles.deleteRecursively(path, RecursiveDeleteOption.ALLOW_INSECURE)
     }
   }
 

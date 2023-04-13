@@ -11,6 +11,7 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.jdk.CollectionConverters.SeqHasAsJava
 import scala.util.chaining.*
 
 /** Exact, because stores not only a value, but an absence of it too
@@ -111,7 +112,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   def rollback(toHeight: Height, key: KeyT, afterRollback: Option[ValueT])(implicit ctx: ReadWrite): AffectedTags[TagT] = tagsOf(key) match {
     case None => AffectedTags.empty
     case Some(tags) =>
-      val beforeRollback = persistentCache.remove(fromHeight = toHeight + 1, key)
+      val beforeRollback = persistentCache.removeFrom(fromHeight = Height(toHeight + 1), key)
       afterRollback match {
         case None =>
           log.debug(if (beforeRollback.loaded) s"$key reloaded: ${beforeRollback.mayBeValue}" else s"$key: unknown")
@@ -126,6 +127,8 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
       }
       AffectedTags(tags)
   }
+
+  def removeFrom(height: Height)(implicit ctx: ReadWrite): Unit = values.invalidateAll(persistentCache.removeAllFrom(height).asJava)
 }
 
 object ExactWithHeightStorage {

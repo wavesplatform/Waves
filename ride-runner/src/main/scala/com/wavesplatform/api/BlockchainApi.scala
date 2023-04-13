@@ -15,13 +15,13 @@ import monix.reactive.Observable
 
 trait BlockchainApi {
   def mkBlockchainUpdatesStream(scheduler: Scheduler): BlockchainUpdatesStream
-  def getCurrentBlockchainHeight(): Int
-  def getActivatedFeatures(height: Int): Map[Short, Int]
+  def getCurrentBlockchainHeight(): Height
+  def getActivatedFeatures(height: Height): Map[Short, Height]
   def getAccountDataEntries(address: Address): Seq[DataEntry[?]]
   def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]]
   def getAccountScript(address: Address): Option[Script]
-  def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf]
-  def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeaderWithVrf]
+  def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf]
+  def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf]
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription]
   def resolveAlias(alias: Alias): Option[Address]
   def getBalance(address: Address, asset: Asset): Long
@@ -33,8 +33,8 @@ object BlockchainApi {
   trait BlockchainUpdatesStream extends AutoCloseable {
     val downstream: Observable[WrappedEvent[SubscribeEvent]]
 
-    def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
-    def start(fromHeight: Int, toHeight: Int): Unit
+    def start(fromHeight: Height): Unit = start(fromHeight, toHeight = Height(0))
+    def start(fromHeight: Height, toHeight: Height): Unit
 
     def closeUpstream(): Unit
     def closeDownstream(): Unit

@@ -42,7 +42,7 @@ class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasDb with HasT
         }
       }
 
-      def setOnDisk(key: String, value: Int): Unit = persistent.set(0, key, RemoteData.Cached(value))
+      def setOnDisk(key: String, value: Int): Unit = persistent.set(Height(0), key, RemoteData.Cached(value))
 
       storage.get("1") shouldBe 1
       storage.get("2") shouldBe 2

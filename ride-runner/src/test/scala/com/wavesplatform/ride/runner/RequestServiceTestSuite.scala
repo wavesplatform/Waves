@@ -88,10 +88,11 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     implicit val testScheduler = TestScheduler()
 
     val blockchainApi = new TestBlockchainApi() {
-      override def getCurrentBlockchainHeight(): Int = 2
-      override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf] =
+      override def getCurrentBlockchainHeight(): Height = Height(2)
+      override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
         toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
-      override def getActivatedFeatures(height: Int): Map[Short, Int] = blockchainSettings.functionalitySettings.preActivatedFeatures
+      override def getActivatedFeatures(height: Height): Map[Short, Height] =
+        blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
       override def getAccountScript(address: Address): Option[Script] = accountScripts.get(address)
       override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
         if (address == aliceAddr && key == "x") IntegerDataEntry("x", 0).some
@@ -144,7 +145,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       .lastL
       .runToFuture
 
-    blockchainUpdatesStream.start(1)
+    blockchainUpdatesStream.start(Height(1))
 
     testScheduler.tick()
     f(

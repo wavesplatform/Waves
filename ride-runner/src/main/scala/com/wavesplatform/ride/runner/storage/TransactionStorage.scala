@@ -10,6 +10,7 @@ import com.wavesplatform.ride.runner.storage.persistent.TransactionPersistentCac
 import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.utils.ScorexLogging
 
+import scala.jdk.CollectionConverters.SeqHasAsJava
 import scala.util.chaining.scalaUtilChainingOps
 
 // TODO #97 Settings and metrics
@@ -102,4 +103,6 @@ class TransactionStorage[TagT](
       AffectedTags(tags)
     }
   }
+
+  def removeFrom(height: Int)(implicit ctx: ReadWrite): Unit = values.invalidateAll(persistentCache.removeAllFrom(height).asJava)
 }

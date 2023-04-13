@@ -35,12 +35,15 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     implicit val testScheduler = TestScheduler()
 
     val blockchainApi = new TestBlockchainApi() {
-      override def getCurrentBlockchainHeight(): Int = 1
+      override def getCurrentBlockchainHeight(): Height = Height(1)
 
-      override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf] =
+      override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
         toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
 
-      override def getActivatedFeatures(height: Int): Map[Short, Int] = blockchainSettings.functionalitySettings.preActivatedFeatures
+      override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] = ???
+
+      override def getActivatedFeatures(height: Height): Map[Short, Height] =
+        blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
 
       override def getAccountScript(address: Address): Option[Script] =
         if (address == aliceAddr) aliceScript.some
@@ -117,7 +120,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     // We don't have a correct mock for getFromBlockchain, so we need to track changes from BlockchainUpdates
 
-    blockchainUpdatesStream.start(1)
+    blockchainUpdatesStream.start(Height(1))
     events.foreach { evt =>
       blockchainApi.blockchainUpdatesUpstream.onNext(evt)
       testScheduler.tick()

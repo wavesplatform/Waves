@@ -2,11 +2,13 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.AddressId
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.db.RideDbAccess
+import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
 import com.wavesplatform.state.AccountScriptInfo
 
-class AccountScriptPersistentCacheTestSuite extends PersistentCacheTestSuite[Address, AccountScriptInfo] {
+class AccountScriptPersistentCacheTestSuite extends PersistentCacheWithHistoryTestSuite[Address, AccountScriptInfo] {
+  private val defaultAddressId      = AddressId(0L) // There is only one addressId
   protected override val defaultKey = alice.toAddress
   protected override val defaultValue = AccountScriptInfo(
     publicKey = alice.publicKey,
@@ -19,4 +21,9 @@ class AccountScriptPersistentCacheTestSuite extends PersistentCacheTestSuite[Add
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountScripts)
   }
+
+  override protected def getHistory(implicit ctx: ReadOnly): Heights =
+    ctx
+      .getOpt(KvPairs.AccountScriptsHistory.at(defaultAddressId))
+      .getOrElse(Vector.empty)
 }

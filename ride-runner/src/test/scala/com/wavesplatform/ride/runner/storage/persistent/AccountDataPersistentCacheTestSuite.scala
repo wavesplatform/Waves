@@ -1,10 +1,12 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
-import com.wavesplatform.ride.runner.db.RideDbAccess
+import com.wavesplatform.database.AddressId
+import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
 import com.wavesplatform.ride.runner.storage.AccountDataKey
 import com.wavesplatform.state.{BooleanDataEntry, DataEntry}
 
-class AccountDataPersistentCacheTestSuite extends PersistentCacheTestSuite[AccountDataKey, DataEntry[?]] {
+class AccountDataPersistentCacheTestSuite extends PersistentCacheWithHistoryTestSuite[AccountDataKey, DataEntry[?]] {
+  private val defaultAddressId        = AddressId(0L) // There is only one addressId
   private val defaultPairDataKey      = "foo"
   protected override val defaultKey   = (alice.publicKey.toAddress, defaultPairDataKey)
   protected override val defaultValue = BooleanDataEntry(defaultPairDataKey, value = true)
@@ -13,4 +15,9 @@ class AccountDataPersistentCacheTestSuite extends PersistentCacheTestSuite[Accou
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountDataEntries)
   }
+
+  override protected def getHistory(implicit ctx: ReadOnly): Heights =
+    ctx
+      .getOpt(KvPairs.AccountDataEntriesHistory.at((defaultAddressId, defaultPairDataKey)))
+      .getOrElse(Vector.empty)
 }

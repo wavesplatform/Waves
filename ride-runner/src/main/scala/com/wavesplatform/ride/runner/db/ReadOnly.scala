@@ -1,11 +1,13 @@
 package com.wavesplatform.ride.runner.db
 
 import com.google.common.collect.Maps
+import com.wavesplatform.database.DBEntry
+import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats.DbHistogramExt
-import com.wavesplatform.database.rocksdb.{DBExt, Key}
-import com.wavesplatform.database.{DBEntry, KeyTags}
 import com.wavesplatform.ride.runner.storage.RemoteData
+import com.wavesplatform.ride.runner.storage.persistent.{AsBytes, KvPair}
+import com.wavesplatform.state.Height
 import org.rocksdb.*
 
 import scala.annotation.tailrec
@@ -25,29 +27,13 @@ class ReadOnly(db: RocksDB, readOptions: ReadOptions) {
     if (bytes == null) None else Some(key.parse(bytes))
   }
 
-  def multiGetOpt[V](keys: Seq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
-    db.multiGetOpt(readOptions, keys, valBufferSize)
-
-  def multiGet[V](keys: Seq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
-    db.multiGet(readOptions, keys, valBufferSize)
-
-  def multiGetOpt[V](keys: Seq[Key[Option[V]]], valBufSizes: Seq[Int]): Seq[Option[V]] =
-    db.multiGetOpt(readOptions, keys, valBufSizes)
-
-  def multiGetInts(keys: Seq[Key[Int]]): Seq[Option[Int]] =
-    db.multiGetInts(readOptions, keys.map(_.keyBytes))
-
   def has[V](key: Key[V]): Boolean = {
-    val bytes = db.get(readOptions, key.keyBytes)
+    val bytes = db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes)
     RocksDBStats.read.recordTagged(key, bytes)
     bytes != null
   }
 
-  def newIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
-
-  def newPrefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
-
-  def iterateOverPrefix(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOverPrefix(tag.prefixBytes)(f)
+  private def newPrefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 
   def iterateOverPrefix(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
     @tailrec
@@ -60,7 +46,7 @@ class ReadOnly(db: RocksDB, readOptions: ReadOptions) {
       } else ()
     }
 
-    Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) { iter =>
+    Using.resource(newPrefixIterator) { iter =>
       iter.seek(prefix)
       loop(iter)
     }
@@ -75,51 +61,55 @@ class ReadOnly(db: RocksDB, readOptions: ReadOptions) {
       }
     }
 
-  def iterateFrom(prefix: Array[Byte], first: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit = {
+  def iterateFrom(prefix: Array[Byte], first: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit =
     Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
       iter.seek(first)
-      while (iter.isValid && iter.key().startsWith(prefix)) {
-        f(Maps.immutableEntry(iter.key(), iter.value()))
+      var goNext = true
+      while (goNext && iter.isValid && iter.key().startsWith(prefix)) {
+        goNext = f(Maps.immutableEntry(iter.key(), iter.value()))
         iter.next()
       }
     }
+
+  def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(true))) { iter =>
+    iter.seek(prefix)
+    iter.isValid
   }
 
-  def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
-    iter =>
-      iter.seek(prefix)
-      iter.isValid
+  def readKeys[KeyT](kvPair: KvPair[KeyT, ?])(implicit ctx: ReadOnly): List[KeyT] =
+    readKeys(kvPair.prefixBytes)(ctx, kvPair.prefixedKeyAsBytes)
+
+  def readKeys[KeyT](prefixBytes: Array[Byte])(implicit ctx: ReadOnly, keyAsBytes: AsBytes[KeyT]): List[KeyT] = {
+    var r = List.empty[KeyT]
+    ctx.iterateOverPrefix(prefixBytes) { dbEntry =>
+      val key = keyAsBytes.read(dbEntry.getKey)
+      r = key :: r
+    }
+    r
   }
 
   def readHistoricalFromDbOpt[T](
-      historyKey: Key[Seq[Int]],
-      dataOnHeightKey: Int => Key[Option[T]],
-      maxHeight: Int
+      historyKey: Key[Heights],
+      dataOnHeightKey: Height => Key[Option[T]],
+      maxHeight: Height
   ): RemoteData[T] = {
-    val height = getOpt(historyKey).getOrElse(Seq.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
+    val height = getOpt(historyKey).getOrElse(Vector.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
     height
       .flatMap(height => getOpt(dataOnHeightKey(height)))
       .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
   }
 
   def readHistoricalFromDb[T](
-      historyKey: Key[Seq[Int]],
-      dataOnHeightKey: Int => Key[T],
-      maxHeight: Int
+      historyKey: Key[Heights],
+      dataOnHeightKey: Height => Key[T],
+      maxHeight: Height
   ): RemoteData[T] = {
-    val height = getOpt(historyKey).getOrElse(Seq.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
+    val height = getOpt(historyKey).getOrElse(Vector.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
     height
       .map(height => get(dataOnHeightKey(height)))
       .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
   }
 
-  def readFromDbOpt[T](dbKey: Key[Option[T]]): RemoteData[T] = {
-    val x = getOpt(dbKey)
-    x.fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
-  }
-
-  def readFromDb[T](dbKey: Key[T]): RemoteData[T] = {
-    val x = getOpt(dbKey)
-    x.fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
-  }
+  def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
+  def getRemoteData[T](key: Key[T]): RemoteData[T]            = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
 }

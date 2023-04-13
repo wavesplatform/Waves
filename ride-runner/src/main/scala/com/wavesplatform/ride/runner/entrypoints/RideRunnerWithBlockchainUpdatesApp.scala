@@ -118,7 +118,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, db.access, dbCaches, blockchainApi)
     }
 
-    val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
+    val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
     log.info(s"Current height: shared (local or network)=${sharedBlockchain.heightUntagged}, network=$lastHeightAtStart")
 
     val requestService = new DefaultRequestService(
@@ -166,7 +166,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
-    blockchainUpdates.start(lastSafeKnownHeight + 1, endHeight)
+    blockchainUpdates.start(Height(lastSafeKnownHeight + 1), endHeight)
 
     // TODO
     val task = Task.parTraverseUnordered(scripts)(requestService.trackAndRun).runToFuture(rideScheduler)

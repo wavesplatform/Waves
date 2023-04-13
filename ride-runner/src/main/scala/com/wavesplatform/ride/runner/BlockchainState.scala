@@ -108,7 +108,9 @@ object BlockchainState extends ScorexLogging {
       log.warn(s"Closed by a remote part, restarting. Reason: $event")
 
       Task {
-        blockchainUpdatesStream.start(r.processedHeight + 1)
+        val startHeight = Height(r.processedHeight + 1)
+        processor.removeAllFrom(startHeight)
+        blockchainUpdatesStream.start(startHeight)
         r
       }.delayExecution(settings.delayBeforeForceRestart)
     }
@@ -141,7 +143,7 @@ object BlockchainState extends ScorexLogging {
     RideRunnerStats.lastKnownHeight.update(h)
 
     val currBlockId = event.getUpdate.id.toByteStr
-    val updateType = UpdateType.from(update)
+    val updateType  = UpdateType.from(update)
     log.info(s"$orig + $updateType(id=$currBlockId, h=$h)")
     def logStatusChanged(updated: BlockchainState): Unit =
       log.info(s"Status changed: ${getSimpleName(orig)} -> ${getSimpleName(updated)}")
@@ -181,7 +183,7 @@ object BlockchainState extends ScorexLogging {
 
       case orig: Working =>
         update match {
-          case update: Update.Append =>
+          case _: Update.Append =>
             processor.process(event.getUpdate)
             log.info("Running affected scripts...")
             processor.runAffectedScripts(updateType).as(orig.withHeight(h))

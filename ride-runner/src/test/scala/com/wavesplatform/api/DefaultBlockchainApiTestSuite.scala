@@ -5,6 +5,7 @@ import com.wavesplatform.api.DefaultBlockchainApiTestSuite.EmptyChannel
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated
+import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, ClientCall, MethodDescriptor}
@@ -76,7 +77,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
                 // 1. We won't receive a message with height of 3 from a stale gRPC stream
                 // 2. An upstream timeout during reconnecting doesn't affect whole behaviour
                 Task {
-                  stream.start(currentHeight.get() - 1)
+                  stream.start(Height(currentHeight.get() - 1))
                 }.delayExecution(upstreamTimeout - 50.millis).runToFuture(testScheduler)
 
                 Task.unit // Otherwise the stream waits
@@ -86,7 +87,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
             .toListL
             .runToFuture(testScheduler)
 
-          stream.start(1)
+          stream.start(Height(1))
 
           testScheduler.tickOne()        // Subscribe
           testScheduler.tick(1.milli)    // Sending "1"
@@ -174,7 +175,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
                 if (subscriptions.get() == 2) Task(stream.close())
                 else {
                   Task {
-                    stream.start(currentHeight.get() - 1)
+                    stream.start(Height(currentHeight.get() - 1))
                   }.delayExecution(900.millis).runToFuture
                   Task.unit
                 }
@@ -183,7 +184,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
             .toListL
             .runToFuture
 
-          stream.start(1)
+          stream.start(Height(1))
 
           testScheduler.tickOne()        // Subscribe
           testScheduler.tick(1.milli)    // Sending "1"
@@ -265,13 +266,13 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
             .doOnNext {
               case WrappedEvent.Next(x)                             => Task(currentHeight.set(x.getUpdate.height))
               case WrappedEvent.Closed                              => Task(stream.close())
-              case WrappedEvent.Failed(_: UpstreamTimeoutException) => Task { stream.start(currentHeight.get() - 1) }
+              case WrappedEvent.Failed(_: UpstreamTimeoutException) => Task { stream.start(Height(currentHeight.get() - 1)) }
               case x                                                => fail(s"Unexpected message: $x")
             }
             .toListL
             .runToFuture(testScheduler)
 
-          stream.start(1)
+          stream.start(Height(1))
 
           testScheduler.tickOne()       // Subscribe
           testScheduler.tick(1.milli)   // Sending "1"

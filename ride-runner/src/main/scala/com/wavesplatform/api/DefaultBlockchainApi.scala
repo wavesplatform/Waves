@@ -96,7 +96,7 @@ class DefaultBlockchainApi(
 
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream
 
-      override def start(fromHeight: Int, toHeight: Int): Unit = {
+      override def start(fromHeight: Height, toHeight: Height): Unit = {
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
         currentUpstream.getAndSet(observer).close(ReplaceWithNewException)
 
@@ -125,16 +125,16 @@ class DefaultBlockchainApi(
     }
   }
 
-  override def getCurrentBlockchainHeight(): Int =
+  override def getCurrentBlockchainHeight(): Height =
     grpcCall("getCurrentBlockchainHeight") {
-      ClientCalls.blockingUnaryCall(
+      Height(ClientCalls.blockingUnaryCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
         Empty()
-      )
+      ))
     }
       .tap { r => log.trace(s"getCurrentBlockchainHeight: $r") }
 
-  override def getActivatedFeatures(height: Int): Map[Short, Int] =
+  override def getActivatedFeatures(height: Height): Map[Short, Height] =
     grpcCall("getActivatedFeatures") {
       ClientCalls
         .blockingUnaryCall(
@@ -142,7 +142,7 @@ class DefaultBlockchainApi(
           ActivationStatusRequest(height)
         )
     }.features
-      .map(x => x.id.toShort -> x.activationHeight) // TODO #3 is this correct?
+      .map(x => x.id.toShort -> Height(x.activationHeight)) // TODO #3 is this correct?
       .toMap
       .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
@@ -183,7 +183,7 @@ class DefaultBlockchainApi(
     toVanillaScript(as.scriptBytes).tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.hashCode())}"))
   }
 
-  override def getBlockHeader(height: Int): Option[SignedBlockHeaderWithVrf] = {
+  override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] = {
     val x = grpcCall("getBlockHeader") {
       ClientCalls.blockingUnaryCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
@@ -194,7 +194,7 @@ class DefaultBlockchainApi(
     toVanilla(x).tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.header.id())}"))
   }
 
-  override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeaderWithVrf] = {
+  override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] = {
     val xs = grpcCall("getBlockHeaderRange") {
       ClientCalls.blockingServerStreamingCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),

@@ -2,13 +2,13 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.runner.db.RideDbAccess
+import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
 import com.wavesplatform.state.{AssetDescription, Height}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
 import java.nio.charset.StandardCharsets
 
-class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheTestSuite[Asset.IssuedAsset, AssetDescription] {
+class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheWithHistoryTestSuite[Asset.IssuedAsset, AssetDescription] {
   protected override val defaultKey = Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0)))
   protected override val defaultValue = AssetDescription(
     originTransactionId = defaultKey.id,
@@ -30,4 +30,9 @@ class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheTestSuit
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.assetDescriptions)
   }
+
+  override protected def getHistory(implicit ctx: ReadOnly): Heights =
+    ctx
+      .getOpt(KvPairs.AssetDescriptionsHistory.at(defaultKey))
+      .getOrElse(Vector.empty)
 }

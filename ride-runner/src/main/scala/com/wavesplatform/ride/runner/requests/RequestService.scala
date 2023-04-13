@@ -131,7 +131,7 @@ class DefaultRequestService(
         case None =>
           Task {
             db.readWrite { implicit ctx =>
-              sharedBlockchain.accountScripts.getUntagged(Height(sharedBlockchain.heightUntagged), request.address)
+              sharedBlockchain.accountScripts.getUntagged(sharedBlockchain.heightUntagged, request.address)
             }
           }.flatMap {
             // TODO #19 Change/move an error to an appropriate layer

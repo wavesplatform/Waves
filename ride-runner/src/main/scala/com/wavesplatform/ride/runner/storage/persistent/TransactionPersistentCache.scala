@@ -8,4 +8,5 @@ trait TransactionPersistentCache {
   def getHeight(txId: TransactionId)(implicit ctx: ReadOnly): RemoteData[Height]
   def setHeight(txId: TransactionId, height: RemoteData[Height])(implicit ctx: ReadWrite): Unit
   def remove(txId: TransactionId)(implicit ctx: ReadWrite): Unit
+  def removeAllFrom(fromHeight: Int)(implicit ctx: ReadWrite): List[TransactionId]
 }
