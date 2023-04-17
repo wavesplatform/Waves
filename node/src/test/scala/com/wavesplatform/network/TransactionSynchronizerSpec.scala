@@ -25,12 +25,14 @@ class TransactionSynchronizerSpec extends PropSpec with WithDomain {
       val txs = Observable.repeatEval(tx)
 
       val broadcastCount = AtomicInt(0)
-      TransactionSynchronizer(
+
+      val scheduler = Schedulers.fixedPool(4, "synchronizer")
+      val synchronizer = TransactionSynchronizer(
         UtxSynchronizerSettings(1000000, 8, 5000, true),
         blockIds,
         txs.map((null, _)),
         (_, _) => Future.successful { broadcastCount.increment(); TracedResult(Right(true)) }
-      )(Schedulers.fixedPool(4, "synchronizer"))
+      )(scheduler)
 
       val appends = 20
       (1 to appends).foreach { i =>
@@ -43,6 +45,9 @@ class TransactionSynchronizerSpec extends PropSpec with WithDomain {
       }
 
       broadcastCount.get() shouldBe appends + 1
+
+      synchronizer.cancel()
+      scheduler.shutdown()
     }
   }
 }

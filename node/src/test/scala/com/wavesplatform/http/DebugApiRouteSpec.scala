@@ -1,9 +1,10 @@
 package com.wavesplatform.http
 
+import java.util.concurrent.TimeUnit
+
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
-import com.wavesplatform.*
 import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -40,16 +41,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
+import com.wavesplatform.*
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
-import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -62,7 +61,8 @@ class DebugApiRouteSpec
     with PathMockFactory
     with BlockchainStubHelpers
     with WithDomain
-    with OptionValues {
+    with OptionValues
+    with SharedSchedulerMixin {
   import DomainPresets.*
 
   val wavesSettings: WavesSettings = WavesSettings.default().copy(restAPISettings = restAPISettings)
@@ -89,8 +89,7 @@ class DebugApiRouteSpec
     StateHash(randomHash, hashes)
   }
 
-  val scheduler: SchedulerService = Schedulers.fixedPool(1, "heavy-request-scheduler")
-  val wallet: Wallet              = Wallet(WalletSettings(None, Some("password"), Some(ByteStr(TxHelpers.defaultSigner.seed))))
+  val wallet: Wallet = Wallet(WalletSettings(None, Some("password"), Some(ByteStr(TxHelpers.defaultSigner.seed))))
   val debugApiRoute: DebugApiRoute =
     DebugApiRoute(
       wavesSettings,
@@ -116,8 +115,8 @@ class DebugApiRouteSpec
         case _ => None
       },
       () => blockchain,
-      new RouteTimeout(60.seconds)(scheduler),
-      scheduler
+      new RouteTimeout(60.seconds)(sharedScheduler),
+      sharedScheduler
     )
   import debugApiRoute.*
 
