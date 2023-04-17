@@ -2,7 +2,7 @@ package com.wavesplatform.events
 
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.FakeObserver.*
+import FakeObserver.*
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
