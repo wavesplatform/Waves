@@ -189,7 +189,10 @@ trait WithDomain extends WithState { _: Suite =>
         domain.appendBlock(genesis*)
       }
       try test(domain)
-      finally bcu.shutdown()
+      finally {
+        domain.utxPool.close()
+        bcu.shutdown()
+      }
     }
 
   private val allVersions = DirectiveDictionary[StdLibVersion].all

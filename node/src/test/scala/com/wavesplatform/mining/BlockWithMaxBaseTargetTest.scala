@@ -159,9 +159,9 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
       bcu.processBlock(firstBlock, firstBlock.header.generationSignature).explicitGet()
 
       f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
-
-      bcu.shutdown()
     } finally {
+      schedulerService.shutdown()
+      utxPoolStub.close()
       bcu.shutdown()
     }
   }
