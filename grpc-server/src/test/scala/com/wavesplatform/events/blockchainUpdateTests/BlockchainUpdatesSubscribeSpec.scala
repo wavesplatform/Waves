@@ -15,7 +15,6 @@ import org.scalatest.concurrent.ScalaFutures
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = RideV6
   val customFee: Long                = 1234567L
-  val emptyAddressBytes: Array[Byte] = "".getBytes()
 
   "BlockchainUpdates subscribe tests" - {
     "return correct data for alias tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
