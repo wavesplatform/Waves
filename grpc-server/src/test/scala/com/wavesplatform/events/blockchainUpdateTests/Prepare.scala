@@ -35,8 +35,4 @@ case class Prepare(d: Domain, repo: Repo, fee: Long) {
     d.appendMicroBlock(transfer)
     transfer
   }
-
-  def getBalance(senderAddress: Address = secondAddress): Long = {
-    d.balance(senderAddress)
-  }
 }
