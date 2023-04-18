@@ -8,6 +8,7 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
 import com.wavesplatform.test.*
@@ -61,7 +62,9 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val dAppAddress = master.toAddress
 
         def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
-          Vector(NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
+          Vector(
+            NewTransactionInfo(invoke, TransactionStateSnapshot(), Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L)
+          )
 
         val expectedResult =
           if (activated) {

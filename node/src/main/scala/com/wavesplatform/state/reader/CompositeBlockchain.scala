@@ -82,7 +82,7 @@ final class CompositeBlockchain private (
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     diff
       .transaction(id)
-      .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
+      .collect { case NewTransactionInfo(tx: TransferTransaction, _, _, true, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))

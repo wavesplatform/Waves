@@ -252,7 +252,7 @@ abstract class Caches extends Blockchain with Storage {
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for (NewTransactionInfo(_, addresses, _, _) <- diff.transactions; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for (NewTransactionInfo(_, _, addresses, _, _) <- diff.transactions; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
 
@@ -408,13 +408,13 @@ abstract class Caches extends Blockchain with Storage {
 
   override def append(
       txInfo: NewTransactionInfo,
-      snapshot: TransactionStateSnapshot,
       carryFee: Long,
       totalFee: Long,
       reward: Option[Long],
       hitSource: ByteStr,
       block: Block
   ): Unit = {
+    val snapshot = txInfo.snapshot
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
     val blockMeta = PBBlockMeta(
