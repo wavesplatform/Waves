@@ -11,9 +11,6 @@ import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 case class Prepare(d: Domain, repo: Repo, fee: Long) {
-  val recipient: KeyPair           = TxHelpers.signer(1234)
-  val recipientAddress: Address    = recipient.toAddress
-
   d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
   d.appendKeyBlock()
   d.appendBlock(TxHelpers.transfer())
@@ -33,17 +30,13 @@ case class Prepare(d: Domain, repo: Repo, fee: Long) {
     alias
   }
 
-  def createTransferTransaction(amount: Long, assetId: Asset): TransferTransaction = {
+  def createTransferTransaction(recipientAddress: Address, amount: Long, assetId: Asset): TransferTransaction = {
     val transfer = TxHelpers.transfer(secondSigner, recipientAddress, amount, assetId, fee)
     d.appendMicroBlock(transfer)
     transfer
   }
 
-  def getSenderBalance(senderAddress: Address = secondAddress): Long = {
+  def getBalance(senderAddress: Address = secondAddress): Long = {
     d.balance(senderAddress)
-  }
-
-  def getRecipientBalance(recipientAddress: Address = recipientAddress): Long = {
-    d.balance(recipientAddress)
   }
 }
