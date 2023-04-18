@@ -20,6 +20,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     "return correct data for alias tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       val testAlias: String                      = "test"
       val prepare: Prepare                       = Prepare(d, repo, customFee)
+      val senderBalanceBefore                    = prepare.getSenderBalance()
       val aliasTx: CreateAliasTransaction        = prepare.createAliasTransaction(testAlias)
       val aliasTxId: Array[Byte]                 = aliasTx.id.value().arr
       val handler: SubscribeHandler              = prepare.appendedSubscriptionState(aliasTxId, 2, 0)
@@ -30,18 +31,14 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
       txCheckers.baseTxCheckers(aliasTx, txIndex)
       txCheckers.checkAliasTx(aliasTx)
-      txStateUpdateInfo.balancesCheckers(
-        0,
-        secondAddress,
-        prepare.getSenderBalanceBefore(),
-        prepare.getSenderBalanceAfter(),
-        _
-      )
+      txStateUpdateInfo.balancesCheckers(0, secondAddress, senderBalanceBefore, prepare.getSenderBalance(), _)
     }
 
     "return correct data for transfer tx" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       val amount: Long                           = 1000L
       val prepare: Prepare                       = Prepare(d, repo, customFee)
+      val senderBalanceBefore                    = prepare.getSenderBalance()
+      val recipientBalanceBefore                 = prepare.getRecipientBalance()
       val transferTx: TransferTransaction        = prepare.createTransferTransaction(amount, Waves)
       val transferTxId                           = transferTx.id.value().arr
       val handler: SubscribeHandler              = prepare.appendedSubscriptionState(transferTxId, 2, 0)
@@ -52,8 +49,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
       txCheckers.baseTxCheckers(transferTx, txIndex)
       txCheckers.checkTransferTx(amount, prepare.recipientAddress)
-      txStateUpdateInfo.balancesCheckers(0, secondAddress, prepare.getSenderBalanceBefore(), prepare.getSenderBalanceAfter(amount), _)
-      txStateUpdateInfo.balancesCheckers(1, prepare.recipientAddress, prepare.getRecipientBalanceBefore(), prepare.getRecipientBalanceAfter(amount), _)
+      txStateUpdateInfo.balancesCheckers(0, secondAddress, senderBalanceBefore, prepare.getSenderBalance(), _)
+      txStateUpdateInfo.balancesCheckers(1, prepare.recipientAddress, recipientBalanceBefore, prepare.getRecipientBalance(), _)
     }
   }
 }

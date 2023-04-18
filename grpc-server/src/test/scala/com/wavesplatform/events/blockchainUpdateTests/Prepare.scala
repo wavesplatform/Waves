@@ -39,21 +39,11 @@ case class Prepare(d: Domain, repo: Repo, fee: Long) {
     transfer
   }
 
-  def getRecipientBalanceBefore(recipientAddress: Address = recipientAddress): Long = {
-    d.balance(recipientAddress)
-  }
-
-  def getRecipientBalanceAfter(amount: Long, recipientAddress: Address = recipientAddress): Long = {
-    val recipientBalanceAfter = getRecipientBalanceBefore(recipientAddress) - amount
-    recipientBalanceAfter
-  }
-
-  def getSenderBalanceBefore(senderAddress: Address = secondAddress): Long = {
+  def getSenderBalance(senderAddress: Address = secondAddress): Long = {
     d.balance(senderAddress)
   }
 
-  def getSenderBalanceAfter(amount: Long = 0, senderAddress: Address = secondAddress): Long = {
-    val senderBalanceAfter = getSenderBalanceBefore(senderAddress) - amount - fee
-    senderBalanceAfter
+  def getRecipientBalance(recipientAddress: Address = recipientAddress): Long = {
+    d.balance(recipientAddress)
   }
 }
