@@ -146,7 +146,7 @@ object StateSnapshot {
 
   private def accountData(diff: Diff): Seq[S.AccountData] =
     diff.accountData.map { case (address, data) =>
-      S.AccountData(address.toByteString, data.data.values.map(PBTransactions.toPBDataEntry).toSeq)
+      S.AccountData(address.toByteString, data.values.map(PBTransactions.toPBDataEntry).toSeq)
     }.toSeq
 
   private def sponsorships(diff: Diff): Seq[S.Sponsorship] =
