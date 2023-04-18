@@ -1,31 +1,34 @@
 package com.wavesplatform.events.blockchainUpdateTests.fixtures
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.protobuf.block.{Block, MicroBlock}
-import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, IssueTransactionData, ReissueTransactionData, Transaction, TransferTransactionData}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionBase}
+import com.wavesplatform.protobuf.transaction.{
+  CreateAliasTransactionData,
+  IssueTransactionData,
+  ReissueTransactionData,
+  Transaction,
+  TransferTransactionData
+}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
 import org.scalatest.matchers.should.Matchers
 
-class WavesTxChecks(append: Append, index: Int = 0) extends BlockInfo with Matchers {
-  override var blockInfo: Block           = append.getBlock.getBlock
-  override var microBlockInfo: MicroBlock = append.getMicroBlock.getMicroBlock.getMicroBlock
-  var wavesTransaction: Transaction       = _
+case class WavesTxChecks(append: Append, index: Int = 0) extends Matchers {
+  val blockInfo: Block           = append.getBlock.getBlock
+  val microBlockInfo: MicroBlock = append.getMicroBlock.getMicroBlock.getMicroBlock
+  val wavesTransaction: Transaction =
+    if (blockInfo.serializedSize.==(index)) microBlockInfo.transactions.apply(index).transaction.wavesTransaction.get
+    else blockInfo.transactions.apply(index).transaction.wavesTransaction.get
 
-  if (blockInfo.serializedSize.==(index)) {
-    wavesTransaction = microBlockInfo.transactions.apply(index).transaction.wavesTransaction.get
-  } else {
-    wavesTransaction = blockInfo.transactions.apply(index).transaction.wavesTransaction.get
-  }
+  val txFeeAsset: Asset =
+    if (wavesTransaction.getFee.assetId.isEmpty) Waves
+    else IssuedAsset.apply(ByteStr(wavesTransaction.getFee.assetId.toByteArray))
 
   def txId(index: Int): Array[Byte] = append.transactionIds.apply(index).toByteArray
 
   def txFeeAmount: Long = wavesTransaction.getFee.amount
-
-  def txFeeAsset: String = {
-    if (wavesTransaction.getFee.assetId.isEmpty) Waves.toString else wavesTransaction.getFee.assetId.toString
-  }
 
   def issueTxData: IssueTransactionData = wavesTransaction.getIssue
 
@@ -38,7 +41,7 @@ class WavesTxChecks(append: Append, index: Int = 0) extends BlockInfo with Match
   def baseTxCheckers(transaction: TransactionBase, txIndex: Int): Unit = {
     txId(txIndex) shouldBe transaction.id.apply().arr
     txFeeAmount shouldEqual transaction.fee
-    txFeeAsset shouldBe transaction.feeAssetId.toString
+    txFeeAsset shouldBe transaction.feeAssetId
   }
 
   def checkAliasTx(alias: CreateAliasTransaction): Unit = aliasTxData.alias shouldBe alias.alias.name

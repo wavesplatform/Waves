@@ -6,7 +6,7 @@ import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.lang.v1.traits.Environment.AssetId
 import org.scalatest.matchers.should.Matchers
 
-class TxStateUpdateChecks(append: Append, index: Int = 0) extends Matchers {
+case class TxStateUpdateChecks(append: Append, index: Int = 0) extends Matchers {
   val txStateUpdates: Seq[StateUpdate] = append.transactionStateUpdates
 
   def balancesCheckers(bIndex: Int, address: Address, before: Long, after: Long, assetId: AssetId): Unit = {
