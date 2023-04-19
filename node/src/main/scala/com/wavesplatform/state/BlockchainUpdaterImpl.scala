@@ -24,8 +24,8 @@ import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.Observable
 import monix.reactive.subjects.ReplaySubject
+import monix.reactive.Observable
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
@@ -355,12 +355,7 @@ class BlockchainUpdaterImpl(
 
                         blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
 
-                        if (liquidDiffWithCancelledLeases.transactions.isEmpty)
-                          rocksdb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
-                        else
-                          liquidDiffWithCancelledLeases.transactions
-                            .foreach(tx => rocksdb.append(tx, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock))
-
+                        rocksdb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
                         val (discardedMbs, discardedDiffs) = discarded.unzip
