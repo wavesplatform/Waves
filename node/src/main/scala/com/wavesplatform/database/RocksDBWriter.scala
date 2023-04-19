@@ -446,7 +446,7 @@ class RocksDBWriter(
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
       scriptResults: Map[ByteStr, InvokeScriptResult],
-      transactionMeta: Seq[(TxMeta, Transaction)],
+      transactionMeta: Seq[(TxMeta, Transaction, TransactionStateSnapshot)],
       stateHash: StateHashBuilder.Result,
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit = {
@@ -463,9 +463,10 @@ class RocksDBWriter(
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
       }
 
-      val transactions: Map[TransactionId, (TxMeta, Transaction, TxNum)] = transactionMeta.zipWithIndex.map { case ((tm, tx), idx) =>
-        TransactionId(tx.id()) -> ((tm, tx, TxNum(idx.toShort)))
-      }.toMap
+      val transactions: Map[TransactionId, (TxMeta, Transaction, TransactionStateSnapshot, TxNum)] =
+        transactionMeta.zipWithIndex.map { case ((tm, tx, snapshot), idx) =>
+          TransactionId(tx.id()) -> ((tm, tx, snapshot, TxNum(idx.toShort)))
+        }.toMap
 
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
@@ -556,8 +557,9 @@ class RocksDBWriter(
 
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
-      val txSizes = transactions.map { case (id, (txm, tx, num)) =>
+      val txSizes = transactions.map { case (id, (txm, tx, snapshot, num)) =>
         val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
+        rw.put(Keys.transactionStateSnapshotAt(Height(height), num), Some(snapshot))
 
         targetBf.put(tx.id().arr)
 
@@ -574,8 +576,8 @@ class RocksDBWriter(
           .foreach { case (prevSeqNr, (addressId, txIds, txSeqNrKey)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
             val txTypeNumSeq = txIds.asScala.map { txId =>
-              val (_, tx, num) = transactions(txId)
-              val size         = txSizes(txId)
+              val (_, tx, _, num) = transactions(txId)
+              val size            = txSizes(txId)
               (tx.tpe.id.toByte, num, size)
             }.toSeq
             rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
@@ -626,7 +628,7 @@ class RocksDBWriter(
       if (dbSettings.storeInvokeScriptResults) scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactions
           .get(TransactionId(txId))
-          .map { case (_, _, txNum) => (height, txNum) }
+          .map { case (_, _, _, txNum) => (height, txNum) }
           .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId), rdb.txMetaHandle)).map { tm =>
             (tm.height, TxNum(tm.num.toShort))
           })
@@ -640,7 +642,7 @@ class RocksDBWriter(
       }
 
       for ((id, meta) <- ethereumTransactionMeta) {
-        rw.put(Keys.ethereumTransactionMeta(Height(height), transactions(TransactionId(id))._3), Some(meta))
+        rw.put(Keys.ethereumTransactionMeta(Height(height), transactions(TransactionId(id))._4), Some(meta))
       }
 
       expiredKeys.foreach(rw.delete)

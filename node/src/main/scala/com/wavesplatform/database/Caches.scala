@@ -226,7 +226,7 @@ abstract class Caches extends Blockchain with Storage {
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
       scriptResults: Map[ByteStr, InvokeScriptResult],
-      transactionMeta: Seq[(TxMeta, Transaction)],
+      transactionMeta: Seq[(TxMeta, Transaction, TransactionStateSnapshot)],
       stateHash: StateHashBuilder.Result,
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit
@@ -284,10 +284,11 @@ abstract class Caches extends Blockchain with Storage {
       ))
     }
 
-    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
+    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction, TransactionStateSnapshot)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     for (nti <- diff.transactions) {
-      transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
+      val entry = (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity), nti.transaction, nti.snapshot)
+      transactionMeta += entry
       for (addr <- nti.affected) {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
       }
@@ -414,7 +415,7 @@ abstract class Caches extends Blockchain with Storage {
       hitSource: ByteStr,
       block: Block
   ): Unit = {
-    val snapshot = txInfo.snapshot
+    val snapshot  = txInfo.snapshot
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
     val blockMeta = PBBlockMeta(
