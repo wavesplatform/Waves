@@ -670,11 +670,10 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  override protected def doAppend(
-      blockMeta: PBBlockMeta,
-      carry: Long,
+  override protected def doAppendSnapshot(
       snapshot: TransactionStateSnapshot,
-      transactionMeta: Seq[(TxMeta, Transaction)],
+      tx: Transaction,
+      txMeta: TxMeta,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -682,10 +681,8 @@ class RocksDBWriter(
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-      stateHash: StateHashBuilder.Result
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]]
   ): Unit = {
-    log.trace(s"Persisting block ${blockMeta.id} at height $height")
     readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
 
@@ -698,17 +695,7 @@ class RocksDBWriter(
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
       }
 
-      val transactions: Map[TransactionId, (TxMeta, Transaction, TxNum)] =
-        transactionMeta.zipWithIndex.map { case ((tm, tx), idx) =>
-          TransactionId(tx.id()) -> ((tm, tx, TxNum(idx.toShort)))
-        }.toMap
-
-      rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
-      rw.put(Keys.heightOf(blockMeta.id), Some(height))
-      blockHeightCache.put(blockMeta.id, Some(height))
-
       val lastAddressId = loadMaxAddressId() + newAddresses.size
-
       rw.put(Keys.lastAddressId, Some(lastAddressId))
 
       for ((address, id) <- newAddresses) {
@@ -813,14 +800,15 @@ class RocksDBWriter(
 
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
-      val txSizes = transactions.map { case (id, (txm, tx, num)) =>
-        val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
+      val txNum  = TxNum(0.toShort)
+      val txId   = TransactionId @@ tx.id()
+      val txSize = rw.put(Keys.transactionAt(Height(height), txNum, rdb.txHandle), Some((txMeta, tx)))
 
-        targetBf.put(tx.id().arr)
-
-        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
-        id -> size
-      }
+      targetBf.put(txId.arr)
+      rw.put(
+        Keys.transactionMetaById(txId, rdb.txMetaHandle),
+        Some(TransactionMeta(height, txNum, tx.tpe.id, !txMeta.succeeded, 0, txSize))
+      )
 
       if (dbSettings.storeTransactionsByAddress) {
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
@@ -829,12 +817,8 @@ class RocksDBWriter(
         rw.multiGetInts(addressTxs.map(_._3))
           .zip(addressTxs)
           .foreach { case (prevSeqNr, (addressId, txIds, txSeqNrKey)) =>
-            val nextSeqNr = prevSeqNr.getOrElse(0) + 1
-            val txTypeNumSeq = txIds.asScala.map { txId =>
-              val (_, tx, num) = transactions(txId)
-              val size         = txSizes(txId)
-              (tx.tpe.id.toByte, num, size)
-            }.toSeq
+            val nextSeqNr    = prevSeqNr.getOrElse(0) + 1
+            val txTypeNumSeq = txIds.asScala.map { txId => (tx.tpe.id.toByte, txNum, txSize) }.toSeq
             rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
             rw.put(txSeqNrKey, nextSeqNr)
           }
@@ -844,27 +828,6 @@ class RocksDBWriter(
         val key   = Alias.create(alias.alias).explicitGet()
         val value = addressIdWithFallback(alias.address.toAddress, newAddresses)
         rw.put(Keys.addressIdOfAlias(key), Some(value))
-      }
-
-      val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
-      if (height % activationWindowSize == 0) {
-        val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
-        val newlyApprovedFeatures = featureVotes(height)
-          .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-          .collect {
-            case (featureId, voteCount) if voteCount + (if (blockMeta.getHeader.featureVotes.contains(featureId.toInt)) 1 else 0) >= minVotes =>
-              featureId -> height
-          }
-
-        if (newlyApprovedFeatures.nonEmpty) {
-          approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
-          rw.put(Keys.approvedFeatures, approvedFeaturesCache)
-
-          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
-
-          activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
-          rw.put(Keys.activatedFeatures, featuresToSave)
-        }
       }
 
       for (case sp <- snapshot.sponsorships) {
@@ -877,24 +840,23 @@ class RocksDBWriter(
       rw.put(Keys.updatedAssets(height), updatedAssetSet.toSeq)
       rw.put(Keys.sponsorshipAssets(height), snapshot.sponsorships.map(_.assetId.toIssuedAssetId))
 
-      rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
       if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { pbResult =>
-        val txId = TransactionId(pbResult.transactionId.toByteStr)
-        val (txHeight, txNum) = transactions
-          .get(txId)
-          .map { case (_, _, txNum) => (height, txNum) }
-          .orElse(rw.get(Keys.transactionMetaById(txId, rdb.txMetaHandle)).map { tm =>
-            (tm.height, TxNum(tm.num.toShort))
-          })
-          .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
+        val scriptTxId = TransactionId(pbResult.transactionId.toByteStr)
+        val (scriptTxHeight, scriptTxNum) =
+          Option
+            .when(scriptTxId == txId)((height, txNum))
+            .orElse(rw.get(Keys.transactionMetaById(scriptTxId, rdb.txMetaHandle)).map { tm =>
+              (tm.height, TxNum(tm.num.toShort))
+            })
+            .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $scriptTxId"))
 
         val result = InvokeScriptResult.fromPB(pbResult.getResult)
-        try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
+        try rw.put(Keys.invokeScriptResult(scriptTxHeight, scriptTxNum), Some(result))
         catch {
           case NonFatal(e) =>
-            throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
+            throw new RuntimeException(s"Error storing invoke script result for $scriptTxId: $result", e)
         }
       }
 
@@ -908,35 +870,12 @@ class RocksDBWriter(
           case M.Payload.Transfer(M.Transfer(publicKeyHash, amount, _)) =>
             Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
         }
-        val meta  = EthereumTransactionMeta(payload)
-        val txId  = TransactionId(pbMeta.transactionId.toByteStr)
-        val txNum = transactions(txId)._3
+        val meta = EthereumTransactionMeta(payload)
         rw.put(Keys.ethereumTransactionMeta(Height(height), txNum), Some(meta))
       }
 
       expiredKeys.foreach(rw.delete)
-
-      if (DisableHijackedAliases.height == height) {
-        disabledAliases = DisableHijackedAliases(rw)
-      }
-
-      if (dbSettings.storeStateHashes) {
-        val prevStateHash =
-          if (height == 1) ByteStr.empty
-          else
-            rw.get(Keys.stateHash(height - 1))
-              .fold(
-                throw new IllegalStateException(
-                  s"Couldn't load state hash for ${height - 1}. Please rebuild the state or disable db.store-state-hashes"
-                )
-              )(_.totalHash)
-
-        val newStateHash = stateHash.createStateHash(prevStateHash)
-        rw.put(Keys.stateHash(height), Some(newStateHash))
-      }
     }
-
-    log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
   override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)] = {
