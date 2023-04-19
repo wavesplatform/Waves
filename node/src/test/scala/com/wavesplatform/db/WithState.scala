@@ -90,7 +90,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, enableExecutionLog = enableExecutionLog)
 
     preconditions.foreach { precondition =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, precondition).explicitGet()
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
@@ -114,7 +114,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       )
 
     preconditions.foreach { precondition =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, precondition).resultE.explicitGet()
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
@@ -128,12 +128,12 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-      val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
+      val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, prevBlock, curBlock).explicitGet()
       state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, curBlock)
       Some(curBlock)
     }
 
-    val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
+    val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
     val ngState = NgState(block, diff, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
     val cb      = CompositeBlockchain(state, ngState)
     assertion(diff, cb)

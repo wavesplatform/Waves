@@ -6,6 +6,7 @@ import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.*
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl.*
@@ -66,7 +67,7 @@ class MicroBlockMinerImpl(
       restTotalConstraint: MiningConstraint,
       lastMicroBlock: Long
   ): Task[MicroBlockMiningResult] = {
-    val packTask = Task.cancelable[(Option[Seq[Transaction]], MiningConstraint)] { cb =>
+    val packTask = Task.cancelable[(Option[Seq[Transaction]], MiningConstraint, Option[ByteStr])] { cb =>
       @volatile var cancelled = false
       minerScheduler.execute { () =>
         val mdConstraint = MultiDimensionalMiningConstraint(
@@ -81,11 +82,12 @@ class MicroBlockMinerImpl(
           if (accumulatedBlock.transactionData.isEmpty) PackStrategy.Limit(settings.microBlockInterval)
           else PackStrategy.Estimate(settings.microBlockInterval)
         log.trace(s"Starting pack for ${accumulatedBlock.id()} with $packStrategy, initial constraint is $mdConstraint")
-        val (unconfirmed, updatedMdConstraint) =
+        val (unconfirmed, updatedMdConstraint, stateHash) =
           concurrent.blocking(
             Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock")(
               utx.packUnconfirmed(
                 mdConstraint,
+                accumulatedBlock.header.stateHash,
                 packStrategy,
                 () => cancelled
               )
@@ -93,7 +95,7 @@ class MicroBlockMinerImpl(
           )
         log.trace(s"Finished pack for ${accumulatedBlock.id()}")
         val updatedTotalConstraint = updatedMdConstraint.head
-        cb.onSuccess(unconfirmed -> updatedTotalConstraint)
+        cb.onSuccess((unconfirmed, updatedTotalConstraint, stateHash))
       }
       Task.eval {
         cancelled = true
@@ -101,7 +103,7 @@ class MicroBlockMinerImpl(
     }
 
     packTask.flatMap {
-      case (Some(unconfirmed), updatedTotalConstraint) if unconfirmed.nonEmpty =>
+      case (Some(unconfirmed), updatedTotalConstraint, stateHash) if unconfirmed.nonEmpty =>
         val delay = {
           val delay         = System.nanoTime() - lastMicroBlock
           val requiredDelay = settings.microBlockInterval.toNanos
@@ -112,7 +114,7 @@ class MicroBlockMinerImpl(
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
           _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed)
+          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash)
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
@@ -124,7 +126,7 @@ class MicroBlockMinerImpl(
           else Success(signedBlock, updatedTotalConstraint)
         }
 
-      case (_, updatedTotalConstraint) =>
+      case (_, updatedTotalConstraint, _) =>
         if (updatedTotalConstraint.isFull) {
           log.trace(s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint")
           Task.now(Stop)
@@ -153,7 +155,8 @@ class MicroBlockMinerImpl(
   private def forgeBlocks(
       account: KeyPair,
       accumulatedBlock: Block,
-      unconfirmed: Seq[Transaction]
+      unconfirmed: Seq[Transaction],
+      stateHash: Option[ByteStr]
   ): Either[MicroBlockMiningError, (Block, MicroBlock)] =
     microBlockBuildTimeStats.measureSuccessful {
       for {
@@ -167,11 +170,12 @@ class MicroBlockMinerImpl(
             txs = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account,
             featureVotes = accumulatedBlock.header.featureVotes,
-            rewardVote = accumulatedBlock.header.rewardVote
+            rewardVote = accumulatedBlock.header.rewardVote,
+            stateHash = stateHash
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock
-          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature)
+          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature, stateHash)
           .leftMap(MicroBlockBuildError)
       } yield (signedBlock, microBlock)
     }

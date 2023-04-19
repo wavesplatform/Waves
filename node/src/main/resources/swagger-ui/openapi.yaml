@@ -3888,6 +3888,8 @@ components:
           type: string
         transactionsRoot:
           type: string
+        stateHash:
+          type: string
     BlockHeaderLSF:
       required:
         - blocksize
@@ -3954,6 +3956,8 @@ components:
         VRF:
           type: string
         transactionsRoot:
+          type: string
+        stateHash:
           type: string
     Block:
       allOf:

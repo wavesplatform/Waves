@@ -8,6 +8,7 @@ import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{chainBaseAndMicro, defaultSigner}
@@ -47,7 +48,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   }
 
   "Proto block" should "be serialized" in {
-    val features = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
+    val stateHash = ByteStr.fill(DigestLength)(1)
+    val features  = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
     val block =
       Block
         .buildAndSign(
@@ -59,7 +61,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           Seq.empty,
           defaultSigner,
           features.sorted,
-          -1
+          -1,
+          Some(stateHash)
         )
         .explicitGet()
 
@@ -94,6 +97,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = ByteStr(new Array[Byte](32))))
         )
         .explicitGet()
+      Validators.validateBlock(updateHeader(block, _.copy(stateHash = Some(ByteStr.fill(DigestLength - 1)(1))))).left.value
     }
 
     withClue("preserve feature order") {
@@ -413,7 +417,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           block3.id() should have length crypto.DigestLength
 
           val keyBlock = d.appendKeyBlock()
-          val mb1      = d.createMicroBlock(TxHelpers.transfer())
+          val mb1      = d.createMicroBlock(None, TxHelpers.transfer())
           d.blockchain.processMicroBlock(mb1)
           d.appendMicroBlock(TxHelpers.transfer())
 

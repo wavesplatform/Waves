@@ -27,7 +27,8 @@ case class BlockHeader(
     generator: PublicKey,
     featureVotes: Seq[Short],
     rewardVote: Long,
-    transactionsRoot: ByteStr
+    transactionsRoot: ByteStr,
+    stateHash: Option[ByteStr]
 ) {
   val score: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / baseTarget).ensuring(_ > 0))
 }
@@ -93,21 +94,22 @@ object Block {
       generator: PublicKey,
       featureVotes: Seq[Short],
       rewardVote: Long,
-      transactionData: Seq[Transaction]
+      transactionData: Seq[Transaction],
+      stateHash: Option[ByteStr]
   ): Block = {
     val transactionsRoot = mkTransactionsRoot(version, transactionData)
     Block(
-      BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot),
+      BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, stateHash),
       ByteStr.empty,
       transactionData
     )
   }
 
-  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr): Block =
+  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr, stateHash: Option[ByteStr]): Block =
     base.copy(
       signature = signature,
       transactionData = transactionData,
-      header = base.header.copy(transactionsRoot = mkTransactionsRoot(base.header.version, transactionData))
+      header = base.header.copy(transactionsRoot = mkTransactionsRoot(base.header.version, transactionData), stateHash = stateHash)
     )
 
   def buildAndSign(
@@ -119,9 +121,10 @@ object Block {
       txs: Seq[Transaction],
       signer: KeyPair,
       featureVotes: Seq[Short],
-      rewardVote: Long
+      rewardVote: Long,
+      stateHash: Option[ByteStr]
   ): Either[GenericError, Block] =
-    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs).validate
+    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs, stateHash).validate
       .map(_.sign(signer.privateKey))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
@@ -129,7 +132,7 @@ object Block {
       .parseBytes(bytes)
       .flatMap(_.validateToTry)
 
-  def genesis(genesisSettings: GenesisSettings, rideV6Activated: Boolean): Either[ValidationError, Block] = {
+  def genesis(genesisSettings: GenesisSettings, rideV6Activated: Boolean, txStateSnapshotActivated: Boolean): Either[ValidationError, Block] = {
     import cats.instances.either.*
     import cats.instances.list.*
     import cats.syntax.traverse.*
@@ -152,13 +155,17 @@ object Block {
         GenesisGenerator.publicKey,
         Seq(),
         -1L,
-        txs
+        txs,
+        None
       )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)
         case Some(predefined) => block.copy(signature = predefined)
       }
-      validBlock <- signedBlock.validateGenesis(genesisSettings, rideV6Activated)
+      signedBlockWithStateHash = signedBlock.copy(header =
+        signedBlock.header.copy(stateHash = Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)))
+      )
+      validBlock <- signedBlockWithStateHash.validateGenesis(genesisSettings, rideV6Activated)
     } yield validBlock
   }
 
