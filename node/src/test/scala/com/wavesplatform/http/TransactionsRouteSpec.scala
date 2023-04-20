@@ -1,11 +1,12 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.{InvalidIds, *}
-import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
+import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
@@ -23,7 +24,9 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -33,7 +36,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
 import org.scalacheck.Gen.*
@@ -43,8 +46,8 @@ import org.scalatest.OptionValues
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
-import scala.concurrent.duration.*
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 import scala.util.Random
 
 class TransactionsRouteSpec
@@ -56,7 +59,8 @@ class TransactionsRouteSpec
     with TestWallet
     with WithDomain
     with EthHelpers
-    with BlockchainStubHelpers {
+    with BlockchainStubHelpers
+    with SharedSchedulerMixin {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -72,7 +76,7 @@ class TransactionsRouteSpec
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   )
 
   private val route = seal(transactionsApiRoute.route)
@@ -129,7 +133,7 @@ class TransactionsRouteSpec
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
     )
 
@@ -273,15 +277,20 @@ class TransactionsRouteSpec
     }
 
     "provides lease and lease cancel actions stateChanges" in {
-      val invokeAddress    = accountGen.sample.get.toAddress
-      val leaseId1         = ByteStr(bytes32gen.sample.get)
-      val leaseId2         = ByteStr(bytes32gen.sample.get)
-      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
-      val recipientAddress = accountGen.sample.get.toAddress
-      val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress)
+      val invokeAddress      = accountGen.sample.get.toAddress
+      val leaseId1           = ByteStr(bytes32gen.sample.get)
+      val leaseId2           = ByteStr(bytes32gen.sample.get)
+      val leaseCancelId      = ByteStr(bytes32gen.sample.get)
+      val recipientAddress   = accountGen.sample.get.toAddress
+      val recipientAlias     = aliasGen.sample.get
+      val invoke             = TxHelpers.invoke(invokeAddress)
+      val leaseActionAmount1 = 100
+      val leaseActionAmount2 = 200
       val scriptResult = InvokeScriptResult(
-        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
+        leases = Seq(
+          InvokeScriptResult.Lease(recipientAddress, leaseActionAmount1, 1, leaseId1),
+          InvokeScriptResult.Lease(recipientAlias, leaseActionAmount2, 3, leaseId2)
+        ),
         leaseCancels = Seq(LeaseCancel(leaseCancelId))
       )
 
@@ -318,6 +327,7 @@ class TransactionsRouteSpec
         .expects(invokeAddress, *, *, None)
         .returning(Observable(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
         .once()
+      (blockchain.resolveAlias _).expects(recipientAlias).returning(Right(recipientAddress))
 
       Get(routePath(s"/address/${invokeAddress}/limit/1")) ~> route ~> check {
         status shouldEqual StatusCodes.OK
@@ -334,8 +344,8 @@ class TransactionsRouteSpec
                                  |      "id": "$leaseId1",
                                  |      "originTransactionId": "$leaseId1",
                                  |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |      "amount": 123,
+                                 |      "recipient": "$recipientAddress",
+                                 |      "amount": $leaseActionAmount1,
                                  |      "height": 1,
                                  |      "status":"active",
                                  |      "cancelHeight" : null,
@@ -345,8 +355,8 @@ class TransactionsRouteSpec
                                  |      "id": "$leaseId2",
                                  |      "originTransactionId": "$leaseId2",
                                  |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |      "amount": 123,
+                                 |      "recipient": "$recipientAddress",
+                                 |      "amount": $leaseActionAmount2,
                                  |      "height": 1,
                                  |      "status":"active",
                                  |      "cancelHeight" : null,
@@ -368,6 +378,25 @@ class TransactionsRouteSpec
                                  |  ],
                                  |  "invokes": []
                                  |}""".stripMargin)
+      }
+    }
+
+    "large-significand-format" in {
+      withDomain(RideV6) { d =>
+        val tx = TxHelpers.transfer()
+        d.appendBlock(tx)
+        val route = seal(transactionsApiRoute.copy(blockchain = d.blockchain, commonApi = d.transactionsApi).route)
+        Get(routePath(s"/address/$defaultAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          val result = responseAs[JsArray] \ 0 \ 0
+          (result \ "amount").as[String] shouldBe tx.amount.value.toString
+          (result \ "fee").as[String] shouldBe tx.fee.value.toString
+
+          (result \ "height").as[Int] shouldBe 1
+          (result \ "spentComplexity").as[Int] shouldBe 0
+          (result \ "version").as[Int] shouldBe tx.version
+          (result \ "type").as[Int] shouldBe tx.tpe.id
+          (result \ "timestamp").as[Long] shouldBe tx.timestamp
+        }
       }
     }
   }
@@ -618,9 +647,16 @@ class TransactionsRouteSpec
       val nestedLeaseId       = ByteStr(bytes32gen.sample.get)
       val nestedLeaseCancelId = ByteStr(bytes32gen.sample.get)
 
-      val invoke = TxHelpers.invoke(invokeAddress)
+      val leaseActionAmount1        = 100
+      val leaseActionAmount2        = 200
+      val innerLeaseActionAmount    = 777
+      val innerLeaseActionRecipient = accountGen.sample.get.toAddress
+
       val scriptResult = InvokeScriptResult(
-        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
+        leases = Seq(
+          InvokeScriptResult.Lease(recipientAddress, leaseActionAmount1, 1, leaseId1),
+          InvokeScriptResult.Lease(recipientAlias, leaseActionAmount2, 3, leaseId2)
+        ),
         leaseCancels = Seq(LeaseCancel(leaseCancelId)),
         invokes = Seq(
           InvokeScriptResult.Invocation(
@@ -628,7 +664,7 @@ class TransactionsRouteSpec
             InvokeScriptResult.Call("nested", Nil),
             Nil,
             InvokeScriptResult(
-              leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, nestedLeaseId)),
+              leases = Seq(InvokeScriptResult.Lease(innerLeaseActionRecipient, innerLeaseActionAmount, 1, nestedLeaseId)),
               leaseCancels = Seq(LeaseCancel(nestedLeaseCancelId))
             )
           )
@@ -685,6 +721,9 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).expects(nestedLeaseCancelId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
+      (blockchain.resolveAlias _).expects(recipientAlias).returning(Right(recipientAddress))
+
+      val invoke = TxHelpers.invoke(invokeAddress)
       (addressTransactions.transactionById _)
         .expects(invoke.id())
         .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
@@ -704,8 +743,8 @@ class TransactionsRouteSpec
                                  |    "id" : "$leaseId1",
                                  |    "originTransactionId" : "$leaseId1",
                                  |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "amount" : 123,
+                                 |    "recipient" : "$recipientAddress",
+                                 |    "amount" : $leaseActionAmount1,
                                  |    "height" : 1,
                                  |    "status":"active",
                                  |    "cancelHeight" : null,
@@ -714,8 +753,8 @@ class TransactionsRouteSpec
                                  |    "id" : "$leaseId2",
                                  |    "originTransactionId" : "$leaseId2",
                                  |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "amount" : 123,
+                                 |    "recipient" : "$recipientAddress",
+                                 |    "amount" : $leaseActionAmount2,
                                  |    "height" : 1,
                                  |    "status":"active",
                                  |    "cancelHeight" : null,
@@ -750,8 +789,8 @@ class TransactionsRouteSpec
                                  |        "id" : "$nestedLeaseId",
                                  |        "originTransactionId" : "$nestedLeaseId",
                                  |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |        "amount" : 123,
+                                 |        "recipient" : "$innerLeaseActionRecipient",
+                                 |        "amount" : $innerLeaseActionAmount,
                                  |        "height" : 1,
                                  |        "status":"active",
                                  |        "cancelHeight" : null,

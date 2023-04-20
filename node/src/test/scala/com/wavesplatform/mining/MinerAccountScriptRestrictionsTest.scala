@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -36,7 +36,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
   type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
 
   val time: TestTime            = TestTime()
-  val minerAcc: KeyPair         = TxHelpers.signer(1)
+  val minerAcc: SeedKeyPair     = TxHelpers.signer(1)
   val invoker: KeyPair          = TxHelpers.signer(2)
   val allowedRecipient: KeyPair = TxHelpers.signer(3)
 
@@ -117,6 +117,9 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
     val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, appenderScheduler) _
 
     f(miner, appender, appenderScheduler)
+
+    appenderScheduler.shutdown()
+    utx.close()
   }
 
   private def forgeAndAppendBlock(d: Domain, miner: MinerImpl, appender: Appender)(implicit scheduler: Scheduler) = {

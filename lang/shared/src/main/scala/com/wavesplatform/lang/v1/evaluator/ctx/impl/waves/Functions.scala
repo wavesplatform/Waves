@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransfer as _, *}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, GlobalValNames, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
@@ -156,7 +156,7 @@ object Functions {
             List(REF("@val"), CONST_STRING(dataType.innerType.name).explicitGet())
           ),
           REF("@val"),
-          REF("unit")
+          REF(GlobalValNames.Unit)
         )
       )
     }
@@ -334,13 +334,13 @@ object Functions {
                   IF(
                     verifyAddressChecksumExpr(REF("@afs_addrBytes"), version),
                     FUNCTION_CALL(FunctionHeader.User("Address"), List(REF("@afs_addrBytes"))),
-                    REF("unit")
+                    REF(GlobalValNames.Unit)
                   ),
-                  REF("unit")
+                  REF(GlobalValNames.Unit)
                 ),
-                REF("unit")
+                REF(GlobalValNames.Unit)
               ),
-              REF("unit")
+              REF(GlobalValNames.Unit)
             )
           )
       }
@@ -523,7 +523,7 @@ object Functions {
 
   val wavesBalanceF: BaseFunction[Environment] =
     UserFunction("wavesBalance", 109, LONG, ("@addressOrAlias", addressOrAliasType)) {
-      FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF("unit")))
+      FUNCTION_CALL(assetBalanceF.header, List(REF("@addressOrAlias"), REF(GlobalValNames.Unit)))
     }
 
   val txHeightByIdF: BaseFunction[Environment] =

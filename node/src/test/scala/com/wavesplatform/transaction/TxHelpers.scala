@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.directives.values.*
@@ -32,17 +32,17 @@ import com.wavesplatform.transaction.utils.Signed
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
-  def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
-  def address(i: Int): Address = signer(i).toAddress
+  def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
+  def address(i: Int): Address    = signer(i).toAddress
 
-  def defaultSigner: KeyPair  = signer(0)
-  def defaultAddress: Address = defaultSigner.toAddress
-  def secondSigner: KeyPair   = signer(1)
-  def secondAddress: Address  = secondSigner.toAddress
+  def defaultSigner: SeedKeyPair = signer(0)
+  def defaultAddress: Address    = defaultSigner.toAddress
+  def secondSigner: SeedKeyPair  = signer(1)
+  def secondAddress: Address     = secondSigner.toAddress
 
   def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
-  val matcher: KeyPair = defaultSigner
+  val matcher: SeedKeyPair = defaultSigner
 
   private[this] var lastTimestamp = System.currentTimeMillis()
   def timestamp: Long = {

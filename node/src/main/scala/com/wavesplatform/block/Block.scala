@@ -59,7 +59,7 @@ case class Block(
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     crypto.verify(signature, bodyBytes(), header.generator, checkWeakPk = true) &&
-      (header.version < Block.ProtoBlockVersion || transactionsMerkleTree().transactionsRoot == header.transactionsRoot)
+    (header.version < Block.ProtoBlockVersion || transactionsMerkleTree().transactionsRoot == header.transactionsRoot)
   }
 
   override def toString: String =

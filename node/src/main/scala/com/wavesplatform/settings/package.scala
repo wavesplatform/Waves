@@ -2,9 +2,9 @@ package com.wavesplatform
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
-
 import cats.data.NonEmptyList
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
@@ -46,6 +46,8 @@ package object settings {
     val uri = new URI(s"my://${config.getString(path)}")
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
+
+  implicit val privateKeyReader: ValueReader[PrivateKey] = byteStrReader.map(PrivateKey(_))
 
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")

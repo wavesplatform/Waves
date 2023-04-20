@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, ScriptResultSource, 
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
@@ -108,7 +108,7 @@ class ContractCompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -133,7 +133,7 @@ class ContractCompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet())),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -204,7 +204,7 @@ class ContractCompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet())),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )

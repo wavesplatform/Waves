@@ -99,7 +99,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
               diff.parentDiff.portfolios.head._2.balance == 0 &&
@@ -108,7 +108,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, _, bc) =>
               val txDiff = diff.transactionDiffs.head
               val tx     = txDiff.transactions.head.transaction.asInstanceOf[TransferTransaction]
 
@@ -123,7 +123,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             })
             .once()
 
-          (triggersMock.onProcessBlock _).expects(*, *, *, *).once()
+          (triggersMock.onProcessBlock _).expects(*, *, *, *, *).once()
         }
 
         baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, triggersMock)((_, _) => ())
@@ -136,7 +136,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
               diff.parentDiff.portfolios.head._2.balance == 0 &&
@@ -145,7 +145,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, _, bc) =>
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
@@ -155,7 +155,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, _, bc) =>
               bc.height == 2 &&
               block.transactionData.length == 4 &&
               // miner reward, no NG — all txs fees
@@ -199,7 +199,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         inSequence {
           // genesis
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, bc) =>
+            .expects(where { (block, diff, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
               diff.parentDiff.portfolios.head._2.balance == 0 &&
@@ -238,7 +238,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
           // next keyblock
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, _, _, bc) =>
+            .expects(where { (block, _, _, _, bc) =>
               bc.height == 1 &&
               block.header.reference == microBlocks1And2.head.totalResBlockSig
             })

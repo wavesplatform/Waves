@@ -7,7 +7,7 @@ import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, EXPR, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.test.produce
 
@@ -25,7 +25,7 @@ class MakeStringTest extends EvaluatorSpec {
   property("makeString rejects non-string types in V6") {
     def mkConsList(values: List[EXPR]): EXPR = values match {
       case Nil =>
-        REF("nil")
+        REF(GlobalValNames.Nil)
 
       case value :: rest =>
         FUNCTION_CALL(

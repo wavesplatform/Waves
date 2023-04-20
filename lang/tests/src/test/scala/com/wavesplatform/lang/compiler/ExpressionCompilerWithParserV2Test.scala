@@ -169,7 +169,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
                         PART.VALID(AnyPos, "cons"),
                         List(
                           CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Array())), Some(BYTESTR), None),
-                          REF(AnyPos, PART.VALID(AnyPos, "nil"), Some(LIST(NOTHING)), None)
+                          REF(AnyPos, PART.VALID(AnyPos, GlobalValNames.Nil), Some(LIST(NOTHING)), None)
                         ),
                         Some(LIST(BYTESTR)),
                         None

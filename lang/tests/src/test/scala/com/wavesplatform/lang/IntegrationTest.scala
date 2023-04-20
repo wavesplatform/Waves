@@ -1603,7 +1603,7 @@ class IntegrationTest extends PropSpec with Inside {
         ("true", "Boolean"),
         ("123", "Int"),
         ("base58'aaaa'", "ByteVector"),
-        ("unit", "Unit")
+        (GlobalValNames.Unit, "Unit")
       ) #::: getElement
 
     /*  Example for size = 2

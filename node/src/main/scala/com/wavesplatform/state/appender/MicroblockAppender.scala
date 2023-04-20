@@ -11,7 +11,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -23,7 +23,7 @@ import scala.util.{Left, Right}
 object MicroblockAppender extends ScorexLogging {
   private val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
 
-  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPoolImpl, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
       microBlock: MicroBlock
   ): Task[Either[ValidationError, BlockId]] =
     Task(microblockProcessingTimeStats.measureSuccessful {
@@ -44,7 +44,7 @@ object MicroblockAppender extends ScorexLogging {
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
       scheduler: Scheduler

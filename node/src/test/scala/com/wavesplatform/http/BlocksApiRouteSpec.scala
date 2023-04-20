@@ -4,8 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.{BlocksApiRoute, RouteTimeout}
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.{BlocksApiRoute, RouteTimeout}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -13,7 +13,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.{Schedulers, SystemTime}
+import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
@@ -21,10 +21,16 @@ import play.api.libs.json.*
 import scala.concurrent.duration.*
 import scala.util.Random
 
-class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
+class BlocksApiRouteSpec
+    extends RouteSpec("/blocks")
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with TestWallet
+    with WithDomain
+    with SharedSchedulerMixin {
   private val blocksApi = mock[CommonBlocksApi]
   private val blocksApiRoute: BlocksApiRoute =
-    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")))
+    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler))
   private val route = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)

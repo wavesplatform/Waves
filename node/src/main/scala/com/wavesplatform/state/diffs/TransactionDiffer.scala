@@ -169,7 +169,7 @@ object TransactionDiffer {
     }
   }
 
-  private def validateBalance(blockchain: Blockchain, txType: Transaction.Type, diff: Diff): Either[ValidationError, Unit] =
+  def validateBalance(blockchain: Blockchain, txType: Transaction.Type, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
   private def transactionDiff(

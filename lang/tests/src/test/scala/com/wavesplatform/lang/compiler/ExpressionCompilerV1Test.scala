@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -594,7 +594,10 @@ class ExpressionCompilerV1Test extends PropSpec {
                 CONST_LONG(1),
                 FUNCTION_CALL(
                   Native(1100),
-                  List(CONST_LONG(2), FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF("nil"))))))
+                  List(
+                    CONST_LONG(2),
+                    FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF(GlobalValNames.Nil)))))
+                  )
                 ),
                 CONST_LONG(5)
               )
@@ -777,10 +780,10 @@ class ExpressionCompilerV1Test extends PropSpec {
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
       Expressions.PART.VALID(AnyPos, idOptionLong.name),
-      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "unit")))
+      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, GlobalValNames.Unit)))
     ),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
-      res shouldBe Right((FUNCTION_CALL(idOptionLong.header, List(REF("unit"))), UNIT))
+      res shouldBe Right((FUNCTION_CALL(idOptionLong.header, List(REF(GlobalValNames.Unit))), UNIT))
     }
   )
 
@@ -1129,7 +1132,7 @@ class ExpressionCompilerV1Test extends PropSpec {
                 FunctionHeader.Native(1100),
                 List(
                   CONST_STRING("").explicitGet(),
-                  REF("nil")
+                  REF(GlobalValNames.Nil)
                 )
               )
             )

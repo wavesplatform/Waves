@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
@@ -28,6 +27,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
+import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
@@ -37,11 +37,14 @@ import play.api.libs.json.*
 import scala.concurrent.duration.*
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside with WithDomain {
-  implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(10.seconds)
-  implicit val timeout: FiniteDuration            = routeTestTimeout.duration
-
   private val estimator = ScriptEstimatorV2
 
+  private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
+    new HashedWheelTimer(),
+    5.seconds,
+    1,
+    "rest-time-limited"
+  )
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
@@ -51,14 +54,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     restAPISettings,
     Int.MaxValue,
     () => estimator,
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ),
+    timeBounded,
     stub[Blockchain]("globalBlockchain")
   )
+
+  override def afterAll(): Unit = {
+    timeBounded.shutdown()
+    super.afterAll()
+  }
 
   (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
   private val route = seal(utilsApi.route)
