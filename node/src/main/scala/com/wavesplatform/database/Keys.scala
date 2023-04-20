@@ -171,12 +171,13 @@ object Keys {
       Some(cfHandle.handle)
     )
 
-  def transactionStateSnapshotAt(height: Height, n: TxNum): Key[Option[TransactionStateSnapshot]] =
+  def transactionStateSnapshotAt(height: Height, n: TxNum, cfHandle: RDB.TxHandle): Key[Option[TransactionStateSnapshot]] =
     Key.opt[TransactionStateSnapshot](
       NthTransactionStateSnapshotAtHeight,
       hNum(height, n),
       TransactionStateSnapshot.parseFrom,
-      _.toByteArray
+      _.toByteArray,
+      Some(cfHandle.handle)
     )
 
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =

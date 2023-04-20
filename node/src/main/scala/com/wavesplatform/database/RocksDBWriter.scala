@@ -6,7 +6,7 @@ import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Ints, Shorts}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
 import com.wavesplatform.api.common.WavesBalanceIterator
@@ -559,7 +559,7 @@ class RocksDBWriter(
 
       val txSizes = transactions.map { case (id, (txm, tx, snapshot, num)) =>
         val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
-        rw.put(Keys.transactionStateSnapshotAt(Height(height), num), Some(snapshot))
+        rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(snapshot))
 
         targetBf.put(tx.id().arr)
 
@@ -800,7 +800,14 @@ class RocksDBWriter(
 
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
-      val txNum  = TxNum(0.toShort)
+      val txNum = {
+        var r: Short = 0
+        rdb.db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
+          val numData = e.getKey.drop(10)
+          if (numData.nonEmpty) r = Shorts.fromByteArray(numData)
+        }
+        TxNum(r)
+      }
       val txId   = TransactionId @@ tx.id()
       val txSize = rw.put(Keys.transactionAt(Height(height), txNum, rdb.txHandle), Some((txMeta, tx)))
 

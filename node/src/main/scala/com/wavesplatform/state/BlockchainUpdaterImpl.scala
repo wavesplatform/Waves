@@ -355,7 +355,8 @@ class BlockchainUpdaterImpl(
 
                         blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
 
-                        rocksdb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                        rocksdb.append(differResult.detailedDiff.parentDiff, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                        referencedLiquidDiff.transactions.foreach(rocksdb.appendSnapshot)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
                         val (discardedMbs, discardedDiffs) = discarded.unzip
