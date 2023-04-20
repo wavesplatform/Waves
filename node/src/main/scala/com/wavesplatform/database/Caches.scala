@@ -424,10 +424,11 @@ abstract class Caches extends Blockchain with Storage {
     val leaseBalancesWithNodes = snapshot.leaseBalances.map { lb =>
       val address                 = lb.address.toAddress
       val prevCurrentLeaseBalance = leaseBalanceCache.get(address)
+      val prevHeight = if (prevCurrentLeaseBalance.height == height) prevCurrentLeaseBalance.prevHeight else prevCurrentLeaseBalance.height
       address ->
         (
-          CurrentLeaseBalance(lb.in, lb.out, Height(height), prevCurrentLeaseBalance.height),
-          LeaseBalanceNode(lb.in, lb.out, prevCurrentLeaseBalance.height)
+          CurrentLeaseBalance(lb.in, lb.out, Height(height), prevHeight),
+          LeaseBalanceNode(lb.in, lb.out, prevHeight)
         )
     }
     val leaseBalances = leaseBalancesWithNodes.map { case (address, (balance, _)) =>
@@ -442,14 +443,16 @@ abstract class Caches extends Blockchain with Storage {
     val updatedBalanceNodes = for {
       balance <- snapshot.balances
     } yield {
-      val address            = balance.address.toAddress
-      val asset              = balance.getAmount.assetId.toAssetId
-      val amount             = balance.getAmount.amount
-      val key                = (address, asset)
-      val prevCurrentBalance = balancesCache.get(key)
-      val currentBalance     = CurrentBalance(amount, Height(height), prevCurrentBalance.height)
-      val node               = BalanceNode(amount, prevCurrentBalance.height)
-      key -> (currentBalance, node)
+      val address     = balance.address.toAddress
+      val asset       = balance.getAmount.assetId.toAssetId
+      val amount      = balance.getAmount.amount
+      val key         = (address, asset)
+      val prevBalance = balancesCache.get(key)
+      val prevHeight  = if (prevBalance.height == height) prevBalance.prevHeight else prevBalance.height
+      key -> (
+        CurrentBalance(amount, Height(height), prevHeight),
+        BalanceNode(amount, prevHeight)
+      )
     }
 
     val updatedDataWithNodes = for {
@@ -459,20 +462,25 @@ abstract class Caches extends Blockchain with Storage {
       val address    = data.address.toAddress
       val entry      = PBTransactions.toVanillaDataEntry(pbEntry)
       val entryKey   = (address, entry.key)
-      val prevHeight = accountDataCache.get(entryKey).height
-      entryKey -> (CurrentData(entry, Height(height), prevHeight) -> DataNode(entry, prevHeight))
+      val prevData   = accountDataCache.get(entryKey)
+      val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
+      entryKey -> (
+        CurrentData(entry, Height(height), prevHeight),
+        DataNode(entry, prevHeight)
+      )
     }
 
     val newFills = for {
       orderFill <- snapshot.orderFills
     } yield {
-      val orderId = orderFill.orderId.toByteStr
-      val prev    = volumeAndFeeCache.get(orderId)
-      val current = CurrentVolumeAndFee(prev.volume + orderFill.volume, prev.fee + orderFill.fee, Height(height), prev.height)
+      val orderId    = orderFill.orderId.toByteStr
+      val prevData   = volumeAndFeeCache.get(orderId)
+      val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
+      val current    = CurrentVolumeAndFee(prevData.volume + orderFill.volume, prevData.fee + orderFill.fee, Height(height), prevHeight)
       val node = VolumeAndFeeNode(
-        prev.volume + orderFill.volume,
-        prev.fee + orderFill.fee,
-        prev.height
+        prevData.volume + orderFill.volume,
+        prevData.fee + orderFill.fee,
+        prevHeight
       )
       orderId -> (current, node)
     }
