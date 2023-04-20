@@ -73,11 +73,12 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkBalances(actual: Seq[BalanceUpdate], expected: Map[Address, (Asset, Long, Long)])(implicit pos: Position): Unit = {
+  def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
     actual.map { bu =>
-      Address.fromBytes(bu.address.toByteArray).explicitGet() -> (toVanillaAssetId(bu.amountAfter.value.assetId),
-      bu.amountBefore,
-      bu.amountAfter.value.amount)
+      (
+        (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
+        (bu.amountBefore, bu.amountAfter.value.amount)
+      )
     }.toMap shouldEqual expected
   }
 }

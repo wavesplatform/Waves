@@ -34,7 +34,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
-          Map(aliasSender.toAddress -> (Waves, aliasSenderBalanceBefore, aliasSenderBalanceBefore - customFee))
+          Map((aliasSender.toAddress, Waves) -> (aliasSenderBalanceBefore, aliasSenderBalanceBefore - customFee))
         )
       }
     }
