@@ -104,10 +104,13 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             )
           }
 
+        def noSnapshot(d: Diff) =
+          d.copy(transactions = d.transactions.map(_.copy(snapshot = TransactionStateSnapshot())))
+
         withDomain(if (activated) RideV5 else RideV4, balances) { d =>
           d.appendBlock(setScriptTx)
           d.appendBlock(invoke)
-          d.liquidDiff shouldBe expectedResult
+          noSnapshot(d.liquidDiff) shouldBe expectedResult
         }
       }
     }
