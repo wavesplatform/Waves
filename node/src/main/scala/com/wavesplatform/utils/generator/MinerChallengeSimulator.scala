@@ -16,7 +16,7 @@ import com.wavesplatform.settings.*
 import com.wavesplatform.state.{BalanceSnapshot, BlockchainUpdaterImpl}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
@@ -26,85 +26,91 @@ import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.apache.commons.io.FileUtils
 
-import java.io.File
+import java.io.{File, FileNotFoundException}
 import scala.concurrent.duration.*
 import scala.language.reflectiveCalls
 
-object MinerChallengeSimulator extends App with ScorexLogging {
-  implicit val scheduler = Schedulers.singleThread("blockchain-generator")
+object MinerChallengeSimulator {
+  implicit val scheduler = Schedulers.singleThread("miner-challenge-simulator")
   sys.addShutdownHook(synchronized {
     scheduler.shutdown()
     scheduler.awaitTermination(10 seconds)
   })
 
-  def readConfFile(f: File) = ConfigFactory.parseFile(f, ConfigParseOptions.defaults().setAllowMissing(false))
-
-  val config      = readConfFile(new File("genesis.conf"))
-  val genSettings = GenesisBlockGenerator.parseSettings(config)
-  val genesis     = ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)).as[GenesisSettings]("genesis")
-
-  val blockchainSettings = BlockchainSettings(
-    genSettings.chainId.toChar,
-    genSettings.functionalitySettings.copy(preActivatedFeatures = BlockchainFeatures.implemented.map(_ -> 0).toMap),
-    genesis,
-    RewardsSettings.MAINNET
-  )
-  val wavesSettings = {
-    val settings = WavesSettings.fromRootConfig(loadConfig(Some(new File("config.conf")).map(readConfFile)))
-    settings.copy(blockchainSettings = blockchainSettings, minerSettings = settings.minerSettings.copy(quorum = 0))
-  }
-
-  val forkHeight = 500000
-
-  val miners = genSettings.distributions.collect {
-    case item if item.miner =>
-      val info = GenesisBlockGenerator.toFullAddressInfo(item)
-      info.account
-  }
-
-  val maliciousMiner   = miners.head
-  val challengingMiner = miners(1)
-
-  val wallet: Wallet = new Wallet {
-    private[this] val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
-    override def seed: Array[Byte]                                   = Array.emptyByteArray
-    override def nonce: Int                                          = miners.length
-    override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
-    override def generateNewAccounts(howMany: Int): Seq[SeedKeyPair] = ???
-    override def generateNewAccount(): Option[SeedKeyPair]           = ???
-    override def generateNewAccount(nonce: Int): Option[SeedKeyPair] = ???
-    override def deleteAccount(account: SeedKeyPair): Boolean        = ???
-    override def privateKeyAccount(account: Address): Either[ValidationError, SeedKeyPair] =
-      map.get(account).toRight(GenericError(s"No key for $account"))
-  }
-
-  var originalBlockchain                               = BlockchainObjects.createOriginal()
-  var challengingBlockchain: Option[BlockchainObjects] = None
+  val forkHeight = 1000000
 
   var quit = false
   sys.addShutdownHook {
     quit = true
   }
 
-  while (!Thread.currentThread().isInterrupted && !quit) synchronized {
-    val prevTime         = originalBlockchain.fakeTime
-    val originalScore    = originalBlockchain.forgeAndAppendBlock().get
-    val challengingScore = challengingBlockchain.flatMap(_.forgeAndAppendBlock())
+  def main(args: Array[String]): Unit = {
+    val genesisConfFile = new File(args.headOption.getOrElse(throw new IllegalArgumentException("Specify a path to genesis generator config file")))
+    if (!genesisConfFile.exists()) throw new FileNotFoundException(genesisConfFile.getCanonicalPath)
+    val nodeConfFile = new File(args.tail.headOption.getOrElse(throw new IllegalArgumentException("Specify a path to node config file")))
+    if (!nodeConfFile.exists()) throw new FileNotFoundException(nodeConfFile.getCanonicalPath)
+    val challengingMinerIdx = args.drop(2).headOption.map(_.toInt).getOrElse(1)
 
-    if (originalBlockchain.blockchain.height > forkHeight - 1) {
-      if (challengingScore.exists(_ <= originalScore)) {
-        println(s"Original score = $originalScore, challenging score = ${challengingScore.get} on height ${originalBlockchain.blockchain.height}")
-      } else if (challengingScore.isDefined) {
-        println(s"Original score ($originalScore) < challenging score (${challengingScore.get}) on height ${originalBlockchain.blockchain.height}")
-        quit = true
-      }
+    val config      = readConfFile(genesisConfFile)
+    val genSettings = GenesisBlockGenerator.parseSettings(config)
+    val genesis     = ConfigFactory.parseString(GenesisBlockGenerator.createConfig(genSettings)).as[GenesisSettings]("genesis")
+
+    val blockchainSettings = BlockchainSettings(
+      genSettings.chainId.toChar,
+      genSettings.functionalitySettings.copy(preActivatedFeatures = BlockchainFeatures.implemented.map(_ -> 0).toMap),
+      genesis,
+      RewardsSettings.MAINNET
+    )
+    val wavesSettings = {
+      val settings = WavesSettings.fromRootConfig(loadConfig(Some(nodeConfFile).map(readConfFile)))
+      settings.copy(blockchainSettings = blockchainSettings, minerSettings = settings.minerSettings.copy(quorum = 0))
     }
 
-    if (originalBlockchain.blockchain.height == forkHeight + 1 && challengingBlockchain.isEmpty) {
-      originalBlockchain.blockchain.shutdown()
-      originalBlockchain.rdb.close()
-      challengingBlockchain = Some(BlockchainObjects.createChallenging())
-      originalBlockchain = BlockchainObjects.createOriginal(prevTime.time)
+    val miners = genSettings.distributions.collect {
+      case item if item.miner =>
+        val info = GenesisBlockGenerator.toFullAddressInfo(item)
+        info.account
+    }
+
+    val maliciousMiner   = miners.head
+    val challengingMiner = miners(challengingMinerIdx)
+
+    val wallet: Wallet = new Wallet {
+      private[this] val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      override def seed: Array[Byte]                                   = Array.emptyByteArray
+      override def nonce: Int                                          = miners.length
+      override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
+      override def generateNewAccounts(howMany: Int): Seq[SeedKeyPair] = ???
+      override def generateNewAccount(): Option[SeedKeyPair]           = ???
+      override def generateNewAccount(nonce: Int): Option[SeedKeyPair] = ???
+      override def deleteAccount(account: SeedKeyPair): Boolean        = ???
+      override def privateKeyAccount(account: Address): Either[ValidationError, SeedKeyPair] =
+        map.get(account).toRight(GenericError(s"No key for $account"))
+    }
+
+    var originalBlockchain = BlockchainObjects.createOriginal(wavesSettings, wallet, genSettings.timestamp.getOrElse(System.currentTimeMillis()))
+    var challengingBlockchain: Option[BlockchainObjects] = None
+
+    while (!Thread.currentThread().isInterrupted && !quit) synchronized {
+      val prevTime         = originalBlockchain.fakeTime
+      val originalScore    = originalBlockchain.forgeAndAppendBlock(miners, challengingMiner, maliciousMiner).get
+      val challengingScore = challengingBlockchain.flatMap(_.forgeAndAppendBlock(miners, challengingMiner, maliciousMiner))
+
+      if (originalBlockchain.blockchain.height > forkHeight - 1) {
+        if (challengingScore.exists(_ <= originalScore)) {
+          println(s"Original score = $originalScore, challenging score = ${challengingScore.get} on height ${originalBlockchain.blockchain.height}")
+        } else if (challengingScore.isDefined) {
+          println(s"Original score ($originalScore) < challenging score (${challengingScore.get}) on height ${originalBlockchain.blockchain.height}")
+          quit = true
+        }
+      }
+
+      if (originalBlockchain.blockchain.height == forkHeight + 1 && challengingBlockchain.isEmpty) {
+        originalBlockchain.blockchain.shutdown()
+        originalBlockchain.rdb.close()
+        challengingBlockchain = Some(BlockchainObjects.createChallenging(wavesSettings, wallet, challengingMiner, maliciousMiner))
+        originalBlockchain = BlockchainObjects.createOriginal(wavesSettings, wallet, prevTime.time)
+      }
     }
   }
 
@@ -113,10 +119,18 @@ object MinerChallengeSimulator extends App with ScorexLogging {
       rdb: RDB,
       miner: MinerImpl,
       blockAppender: Block => Task[Either[ValidationError, Option[BigInt]]],
-      fakeTime: Time & Object { var time: Long }
+      fakeTime: Time & Object { var time: Long },
+      isChallenging: Boolean
   ) {
-    def forgeAndAppendBlock(): Option[BigInt] = {
-      val (bestMiner, nextTime) = getBlockMiningTimes.minBy(_._2)
+    def forgeAndAppendBlock(miners: List[SeedKeyPair], challengingMiner: SeedKeyPair, maliciousMiner: SeedKeyPair): Option[BigInt] = {
+      val miningTimes = getBlockMiningTimes(miners)
+      val (bestMiner, nextTime) = if (blockchain.height == forkHeight && isChallenging) {
+        miningTimes.find(_._1 == challengingMiner).get
+      } else if (blockchain.height == forkHeight) {
+        miningTimes.find(_._1 == maliciousMiner).get
+      } else {
+        miningTimes.minBy(_._2)
+      }
       fakeTime.time = nextTime
 
       miner.forgeBlock(bestMiner) match {
@@ -124,19 +138,19 @@ object MinerChallengeSimulator extends App with ScorexLogging {
           blockAppender(block).runSyncUnsafe() match {
             case Right(score) => score
             case Left(err) =>
-              log.error(s"Error appending block: $err")
+              println(s"Error appending block: $err")
               quit = true
               Some(0)
           }
 
         case Left(err) =>
-          log.error(s"Error generating block: $err")
+          println(s"Error generating block: $err")
           quit = true
           Some(0)
       }
     }
 
-    private def getBlockMiningTimes: Seq[(SeedKeyPair, Long)] =
+    private def getBlockMiningTimes(miners: List[SeedKeyPair]): Seq[(SeedKeyPair, Long)] =
       miners.flatMap { kp =>
         val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
         time.toOption.map(kp -> _)
@@ -144,7 +158,7 @@ object MinerChallengeSimulator extends App with ScorexLogging {
   }
 
   object BlockchainObjects {
-    def createOriginal(startTime: Long = genSettings.timestamp.getOrElse(System.currentTimeMillis())): BlockchainObjects = {
+    def createOriginal(wavesSettings: WavesSettings, wallet: Wallet, startTime: Long): BlockchainObjects = {
       val rdb      = RDB.open(wavesSettings.dbSettings)
       val fakeTime = createFakeTime(startTime)
       val (blockchainUpdater, _) =
@@ -154,11 +168,16 @@ object MinerChallengeSimulator extends App with ScorexLogging {
         blockchainUpdater.shutdown()
         rdb.close()
       })
-      val (miner, appender) = createMinerAndAppender(blockchainUpdater, fakeTime)
-      BlockchainObjects(blockchainUpdater, rdb, miner, appender, fakeTime)
+      val (miner, appender) = createMinerAndAppender(blockchainUpdater, fakeTime, wavesSettings, wallet)
+      BlockchainObjects(blockchainUpdater, rdb, miner, appender, fakeTime, false)
     }
 
-    def createChallenging(): BlockchainObjects = {
+    def createChallenging(
+        wavesSettings: WavesSettings,
+        wallet: Wallet,
+        challengingMiner: SeedKeyPair,
+        maliciousMiner: SeedKeyPair
+    ): BlockchainObjects = {
       val correctBlockchainDbDir = wavesSettings.dbSettings.directory + "/../challenged"
       FileUtils.copyDirectory(new File(wavesSettings.dbSettings.directory), new File(correctBlockchainDbDir))
       val dbSettings         = wavesSettings.dbSettings.copy(directory = correctBlockchainDbDir)
@@ -196,13 +215,15 @@ object MinerChallengeSimulator extends App with ScorexLogging {
         rdb.close()
       })
 
-      val (miner, appender) = createMinerAndAppender(blockchainUpdater, fakeTime)
-      BlockchainObjects(blockchainUpdater, rdb, miner, appender, fakeTime)
+      val (miner, appender) = createMinerAndAppender(blockchainUpdater, fakeTime, wavesSettings, wallet)
+      BlockchainObjects(blockchainUpdater, rdb, miner, appender, fakeTime, true)
     }
 
     private def createMinerAndAppender(
         blockchain: BlockchainUpdaterImpl,
-        fakeTime: Time
+        fakeTime: Time,
+        wavesSettings: WavesSettings,
+        wallet: Wallet
     ): (MinerImpl, Block => Task[Either[ValidationError, Option[BigInt]]]) = {
       val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
       val posSelector = PoSSelector(blockchain, None)
@@ -233,4 +254,6 @@ object MinerChallengeSimulator extends App with ScorexLogging {
         override def getTimestamp(): Long  = time
       }
   }
+
+  private def readConfFile(f: File) = ConfigFactory.parseFile(f, ConfigParseOptions.defaults().setAllowMissing(false))
 }

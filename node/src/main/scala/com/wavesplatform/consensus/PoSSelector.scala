@@ -2,7 +2,7 @@ package com.wavesplatform.consensus
 
 import scala.concurrent.duration.FiniteDuration
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -16,8 +16,8 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{forceStopApplication, BaseTargetReachedMaximum, ScorexLogging}
 
 case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) extends ScorexLogging {
-  import PoSCalculator._
-  import blockchain.{settings => blockchainSettings}
+  import PoSCalculator.*
+  import blockchain.settings as blockchainSettings
 
   protected def posCalculator(height: Int): PoSCalculator =
     if (fairPosActivated(height))
@@ -35,8 +35,6 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       currentTime: Long
   ): Either[ValidationError, NxtLikeConsensusBlockData] = {
     val bt = posCalculator(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
-
-    println(s"$height      $refBlockBT     $refBlockTS        $greatGrandParentTS        $currentTime    $bt")
 
     checkBaseTargetLimit(bt, height).flatMap(_ =>
       if (vrfActivated(height + 1))
