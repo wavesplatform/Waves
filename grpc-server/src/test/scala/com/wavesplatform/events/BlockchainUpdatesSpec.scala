@@ -753,7 +753,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         startRead.lock()
 
-        val subscription = Future(repo.createSubscriptionObserver(SubscribeRequest.of(1, toHeight)))
+        val subscription = Future(repo.createFakeObserver(SubscribeRequest.of(1, toHeight)))
 
         appendExtraBlocks(d)
 

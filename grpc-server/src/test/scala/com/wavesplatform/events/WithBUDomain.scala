@@ -3,6 +3,7 @@ package com.wavesplatform.events
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
 import FakeObserver.*
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
@@ -16,8 +17,11 @@ import org.iq80.leveldb.DB
 import org.scalatest.Suite
 
 trait WithBUDomain extends WithDomain { _: Suite =>
-  def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
-    withDomain(settings) { d =>
+  def withDomainAndRepo(
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq.empty
+  )(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
+    withDomain(settings, balances) { d =>
       tempDb { db =>
         val repo = new Repo(wrapDB(db), d.blocksApi)
         d.triggers = Seq(repo)
@@ -48,11 +52,13 @@ trait WithBUDomain extends WithDomain { _: Suite =>
       }
     }
 
-  def withGenerateSubscription(request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue), settings: WavesSettings)(
-      generateBlocks: Domain => Unit
-  )(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
+  def withGenerateSubscription(
+      request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue),
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+  )(generateBlocks: Domain => Unit)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
     withDomainAndRepo(settings) { (d, repo) =>
-      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance)) *)
 
       val subscription = repo.createFakeObserver(request)
       generateBlocks(d)
