@@ -4,11 +4,15 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.*
 import com.wavesplatform.events.blockchainupdatetests.fixtures.WavesTxChecks.*
+import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest.concurrent.ScalaFutures
+
+import java.util.concurrent.ThreadLocalRandom.current
 
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = DomainPresets.RideV6
@@ -24,7 +28,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(aliasSender.toAddress, aliasSenderBalanceBefore))
-      )(_.appendBlock(aliasTx)) { updates =>
+      )(_.appendMicroBlock(aliasTx)) { updates =>
         val append = updates(1).append
         checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
         checkBalances(
@@ -61,6 +65,35 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
             (recipientAddress, Waves)         -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter)
           )
         )
+      }
+    }
+
+    "return correct data for issue tx" in {
+      val customAssetIssueFee      = 234567654L
+      val issueSender              = TxHelpers.signer(58)
+      val issueSenderBalanceBefore = 10.waves
+      val script                   = Option(TxHelpers.script("true"))
+      val amount: Long             = current.nextInt(1, 9999999)
+      val decimals: Byte           = current.nextInt(0, 8).toByte
+      val name: String             = "Test_asset"
+      val description: String      = name + "|_|_|_|_|_|" + current.nextInt(1111111, 9999999)
+      val issueTx                  = TxHelpers.issue(issueSender, amount, decimals, name, description, customAssetIssueFee, script)
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(issueSender.toAddress, issueSenderBalanceBefore))
+      )(_.appendMicroBlock(issueTx)) { updates =>
+        val append = updates(1).append
+        checkIssue(append.transactionIds.head, append.transactionAt(0), issueTx)
+        checkBalances(
+          append.transactionStateUpdates.head.balances,
+          Map(
+            (issueSender.toAddress, Waves)         -> (issueSenderBalanceBefore, issueSenderBalanceBefore - customAssetIssueFee),
+            (issueSender.toAddress, issueTx.asset) -> (0, amount)
+          )
+        )
+        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
       }
     }
   }
