@@ -247,8 +247,8 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update asset info after rollback to issue height") {
-    val assetId                                       = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
-    val issueHeight                                   = sender.transactionInfo[TransactionInfo](assetId).height
+    val assetId     = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
+    val issueHeight = sender.transactionInfo[TransactionInfo](assetId).height
     val (firstUpdatedName, firstUpdatedDescription)   = ("updatedName", "updatedDescription")
     val (secondUpdatedName, secondUpdatedDescription) = ("updatedName2", "updatedDescription2")
 
@@ -290,7 +290,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("can update asset only with description which have valid length") {
     val invalidDescs = Seq("a" * (MaxAssetDescriptionLength + 1))
-    val validDescs = Seq("", "a" * MaxAssetDescriptionLength)
+    val validDescs   = Seq("", "a" * MaxAssetDescriptionLength)
     invalidDescs.foreach { desc =>
       assertApiError(
         sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee),
@@ -335,33 +335,33 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val smartAssetId1 =
       sender.broadcastIssue(issuer, "smartAsset", "description", someAssetAmount, 8, reissuable = true, script = Some(scriptT), waitForTx = true).id
     val scriptText1 = s"""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE EXPRESSION #-}
-          |{-# SCRIPT_TYPE ASSET #-}
+                         |{-# STDLIB_VERSION 4 #-}
+                         |{-# CONTENT_TYPE EXPRESSION #-}
+                         |{-# SCRIPT_TYPE ASSET #-}
 
-          |match assetInfo(fromBase58String("$smartAssetId1")) {
-          |case a:Asset =>
-          | a.name == "smartAsset" &&
-          | this.name == "smartAsset" &&
-          | a.description == "description" &&
-          | this.description == "description" &&
-          | a.quantity == $someAssetAmount &&
-          | a.quantity == $someAssetAmount &&
-          | this.id == fromBase58String("$smartAssetId1") &&
-          | a.decimals == 8 &&
-          | this.decimals == 8 &&
-          | a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
-          | this.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
-          | a.issuerPublicKey == this.issuerPublicKey &&
-          | a.reissuable == true &&
-          | this.reissuable == true &&
-          | a.scripted == true &&
-          | this.scripted == true &&
-          | a.minSponsoredFee == unit &&
-          | this.minSponsoredFee == unit
-          |case _ => false
-          |}""".stripMargin
-    val script1     = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+                         |match assetInfo(fromBase58String("$smartAssetId1")) {
+                         |case a:Asset =>
+                         | a.name == "smartAsset" &&
+                         | this.name == "smartAsset" &&
+                         | a.description == "description" &&
+                         | this.description == "description" &&
+                         | a.quantity == $someAssetAmount &&
+                         | a.quantity == $someAssetAmount &&
+                         | this.id == fromBase58String("$smartAssetId1") &&
+                         | a.decimals == 8 &&
+                         | this.decimals == 8 &&
+                         | a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+                         | this.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&
+                         | a.issuerPublicKey == this.issuerPublicKey &&
+                         | a.reissuable == true &&
+                         | this.reissuable == true &&
+                         | a.scripted == true &&
+                         | this.scripted == true &&
+                         | a.minSponsoredFee == unit &&
+                         | this.minSponsoredFee == unit
+                         |case _ => false
+                         |}""".stripMargin
+    val script1 = ScriptCompiler(scriptText1, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setAssetScript(smartAssetId1, issuer, setAssetScriptFee, Some(script1), waitForTx = true)
 
     sender.burn(issuer, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)

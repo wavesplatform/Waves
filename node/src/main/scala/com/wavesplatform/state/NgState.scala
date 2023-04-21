@@ -108,7 +108,7 @@ case class NgState(
           cachedBlock
 
         case None =>
-          val block = Block.create(base, transactions, microBlocks.head.microBlock.totalResBlockSig)
+          val block = Block.create(base, transactions, microBlocks.head.microBlock.totalResBlockSig, microBlocks.head.microBlock.stateHash)
           internalCaches.bestBlockCache = Some(block)
           block
       }
@@ -165,7 +165,7 @@ case class NgState(
       base.copy(
         transactionData = newTransactions,
         signature = microBlock.totalResBlockSig,
-        header = base.header.copy(transactionsRoot = createTransactionsRoot(microBlock))
+        header = base.header.copy(transactionsRoot = createTransactionsRoot(microBlock), stateHash = microBlock.stateHash)
       )
     fullBlock.id()
   }
@@ -193,21 +193,22 @@ case class NgState(
           )
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
-          val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
-            case ((accumulated, Some((sig, discarded))), MicroBlockInfo(mbId, micro)) =>
-              val discDiff = microDiffs(mbId).diff
-              (accumulated, Some((sig, discarded :+ (micro -> discDiff))))
+          val (accumulatedTxs, maybeFound) =
+            microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, Option[ByteStr], DiscardedMicroBlocks)])) {
+              case ((accumulated, Some((sig, stateHash, discarded))), MicroBlockInfo(mbId, micro)) =>
+                val discDiff = microDiffs(mbId).diff
+                (accumulated, Some((sig, stateHash, discarded :+ (micro -> discDiff))))
 
-            case ((accumulated, None), mb) if mb.idEquals(blockId) =>
-              val found = Some((mb.microBlock.totalResBlockSig, Seq.empty[(MicroBlock, Diff)]))
-              (accumulated ++ mb.microBlock.transactionData, found)
+              case ((accumulated, None), mb) if mb.idEquals(blockId) =>
+                val found = Some((mb.microBlock.totalResBlockSig, mb.microBlock.stateHash, Seq.empty[(MicroBlock, Diff)]))
+                (accumulated ++ mb.microBlock.transactionData, found)
 
-            case ((accumulated, None), MicroBlockInfo(_, mb)) =>
-              (accumulated ++ mb.transactionData, None)
-          }
+              case ((accumulated, None), MicroBlockInfo(_, mb)) =>
+                (accumulated ++ mb.transactionData, None)
+            }
 
-          maybeFound.map { case (sig, discarded) =>
-            (Block.create(base, base.transactionData ++ accumulatedTxs, sig), discarded)
+          maybeFound.map { case (sig, stateHash, discarded) =>
+            (Block.create(base, base.transactionData ++ accumulatedTxs, sig, stateHash), discarded)
           }
         }
       }

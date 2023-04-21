@@ -1,13 +1,14 @@
 package com.wavesplatform.protobuf.block
 
 import scala.util.Try
-
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.protobuf.ByteStrExt
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.block.Block.{Header => PBHeader}
+import com.wavesplatform.protobuf.block.Block.Header as PBHeader
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 
@@ -22,7 +23,8 @@ object PBBlocks {
       header.generator.toPublicKey,
       header.featureVotes.map(_.toShort),
       header.rewardVote,
-      header.transactionsRoot.toByteStr
+      header.transactionsRoot.toByteStr,
+      Option.unless(header.stateHash.isEmpty)(header.stateHash.toByteStr)
     )
 
   def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
@@ -32,19 +34,20 @@ object PBBlocks {
 
   def protobuf(header: BlockHeader): PBHeader = PBBlock.Header(
     AddressScheme.current.chainId,
-    ByteString.copyFrom(header.reference.arr),
+    header.reference.toByteString,
     header.baseTarget,
-    ByteString.copyFrom(header.generationSignature.arr),
+    header.generationSignature.toByteString,
     header.featureVotes.map(_.toInt),
     header.timestamp,
     header.version,
     ByteString.copyFrom(header.generator.arr),
     header.rewardVote,
-    ByteString.copyFrom(header.transactionsRoot.arr)
+    header.transactionsRoot.toByteString,
+    header.stateHash.getOrElse(ByteStr.empty).toByteString
   )
 
   def protobuf(block: VanillaBlock): PBBlock = {
-    import block._
+    import block.*
 
     new PBBlock(
       Some(protobuf(header)),
