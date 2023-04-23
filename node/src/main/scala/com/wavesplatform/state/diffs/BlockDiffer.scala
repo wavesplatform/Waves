@@ -17,8 +17,8 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, Transaction}
 
 object BlockDiffer {
@@ -126,15 +126,14 @@ object BlockDiffer {
   ): Either[ValidationError, Result] =
     fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, loadCacheData, verify, enableExecutionLog).resultE
 
-  def fromMicroBlockTraced(
+  private def fromMicroBlockTraced(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
-      verify: Boolean = true,
-      enableExecutionLog: Boolean = false,
-      txSignParCheck: Boolean = true
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
+      verify: Boolean,
+      enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
@@ -156,7 +155,7 @@ object BlockDiffer {
         loadCacheData,
         verify = verify,
         enableExecutionLog = enableExecutionLog,
-        txSignParCheck = txSignParCheck
+        txSignParCheck = true
       )
     } yield r
   }
