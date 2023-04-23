@@ -801,21 +801,20 @@ class RocksDBWriter(
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
       val txNum = {
-        var r: Short = 0
+        var r = 0
         rdb.db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
-          val numData = e.getKey.drop(10)
-          if (numData.nonEmpty) r = Shorts.fromByteArray(numData)
+          val numData = e.getKey.drop(6)
+          if (numData.nonEmpty) r = Shorts.fromByteArray(numData) + 1
         }
-        TxNum(r)
+        TxNum(r.toShort)
       }
       val txId   = TransactionId @@ tx.id()
       val txSize = rw.put(Keys.transactionAt(Height(height), txNum, rdb.txHandle), Some((txMeta, tx)))
-
-      targetBf.put(txId.arr)
       rw.put(
         Keys.transactionMetaById(txId, rdb.txMetaHandle),
         Some(TransactionMeta(height, txNum, tx.tpe.id, !txMeta.succeeded, 0, txSize))
       )
+      targetBf.put(txId.arr)
 
       if (dbSettings.storeTransactionsByAddress) {
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
