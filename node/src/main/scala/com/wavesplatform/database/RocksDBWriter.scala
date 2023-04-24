@@ -706,8 +706,9 @@ class RocksDBWriter(
 
       val threshold = newSafeRollbackHeight
 
-      val assetStatics = snapshot.assetStatics.map(static => (static.assetId.toIssuedAssetId, static)).toMap
-      appendBalancesSnapshot(balances, assetStatics, rw)
+      val assetStatics    = snapshot.assetStatics.map(static => (static.assetId.toIssuedAssetId, static))
+      val assetStaticsMap = assetStatics.toMap
+      appendBalancesSnapshot(balances, assetStaticsMap, rw)
       appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
@@ -724,13 +725,22 @@ class RocksDBWriter(
         rw.put(Keys.filledVolumeAndFeeAt(orderId, currentVolumeAndFee.height), volumeAndFeeNode)
       }
 
+      val lastAssetNum = {
+        var r = 0
+        rdb.db.iterateOver(KeyTags.AssetStaticInfo) { e =>
+          val info = StaticAssetInfo.parseFrom(e.getValue)
+          if (info.height == height && r < info.sequenceInBlock)
+            r = info.sequenceInBlock
+        }
+        r
+      }
       for (((asset, assetStatic), assetNum) <- assetStatics.zipWithIndex) {
         val pbAssetStatic = StaticAssetInfo(
           assetStatic.sourceTransactionId,
           assetStatic.issuer,
           assetStatic.decimals,
           assetStatic.nft,
-          assetNum + 1,
+          assetNum + lastAssetNum + 1,
           height
         )
         rw.put(Keys.assetStaticInfo(asset), Some(pbAssetStatic))
@@ -756,7 +766,7 @@ class RocksDBWriter(
           .foreach(rw.put(Keys.assetDetails(asset)(height), _))
       }
 
-      for (asset <- assetStatics.keySet ++ updatedAssetSet) {
+      for (asset <- assetStaticsMap.keySet ++ updatedAssetSet) {
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
@@ -842,7 +852,7 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
       }
 
-      rw.put(Keys.issuedAssets(height), assetStatics.keySet.toSeq)
+      rw.put(Keys.issuedAssets(height), assetStaticsMap.keySet.toSeq)
       rw.put(Keys.updatedAssets(height), updatedAssetSet.toSeq)
       rw.put(Keys.sponsorshipAssets(height), snapshot.sponsorships.map(_.assetId.toIssuedAssetId))
 
