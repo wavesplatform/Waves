@@ -9,7 +9,7 @@ import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
 import org.scalactic.source.Position
@@ -48,7 +48,7 @@ object WavesTxChecks extends Matchers with OptionValues {
       case Data.Transfer(value) =>
         value.amount.get.amount shouldEqual expected.amount.value
         value.recipient.get.recipient.publicKeyHash.get.toByteArray shouldBe publicKeyHash
-      case _ => fail("not a transfer transaction")
+      case _ => fail("not a Transfer transaction")
     }
   }
 
@@ -64,7 +64,20 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.description shouldBe expected.description.toStringUtf8
         if (!value.script.isEmpty) value.script.toByteArray shouldBe expected.script.head.bytes.apply().arr
 
-      case _ => fail("not a transfer transaction")
+      case _ => fail("not a Issue transaction")
+    }
+  }
+
+  def checkReissue(actualId: ByteString, actual: SignedTransaction, expected: ReissueTransaction)(implicit
+                                                                                              pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.Reissue(value) =>
+        value.assetAmount.get.assetId.toByteArray shouldEqual expected.asset.id.arr
+        value.assetAmount.get.amount shouldEqual expected.quantity.value
+        value.reissuable shouldBe expected.reissuable
+      case _ => fail("not a Reissue transaction")
     }
   }
 

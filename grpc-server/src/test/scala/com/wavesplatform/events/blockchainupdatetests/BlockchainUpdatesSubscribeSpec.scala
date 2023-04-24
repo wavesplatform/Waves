@@ -136,5 +136,36 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkAssetsAfter(append.transactionStateUpdates.head.assets, issueNftTx, isNft = true)
       }
     }
+
+    "return correct data for reissue tx" in {
+      val issueSender = TxHelpers.signer(58)
+      val senderBalanceBefore = 4.waves
+      val senderBalanceBeforeReissue = 3.waves
+      val senderBalanceAfterReissue = senderBalanceBeforeReissue - customAssetIssueFee
+      val script = Option(TxHelpers.script("true"))
+      val amount: Long = current.nextInt(1, 9999999)
+      val decimals: Byte = current.nextInt(0, 8).toByte
+      val name: String = "reissue_asset"
+      val description: String = s"$name-$amount"
+      val issueTx = TxHelpers.issue(issueSender, 1000, decimals, name, description, 1.waves, script)
+      val reissueTx = TxHelpers.reissue(issueTx.asset, issueSender, amount, reissuable = false, customAssetIssueFee)
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(issueSender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(issueTx, reissueTx)) { updates =>
+        val append = updates(1).append
+        checkReissue(append.transactionIds.apply(1), append.transactionAt(1), reissueTx)
+        checkBalances(
+          append.transactionStateUpdates.apply(1).balances,
+          Map(
+            (issueSender.toAddress, Waves) -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (issueSender.toAddress, reissueTx.asset) -> (1000, 1000 + amount)
+          )
+        )
+        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+      }
+    }
   }
 }
