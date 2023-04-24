@@ -87,22 +87,22 @@ object WavesTxChecks extends Matchers with OptionValues {
     after.nft shouldBe isNft
     after.volume shouldBe expected.quantity.value
     after.decimals shouldBe expected.decimals.value
-    after.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
     after.reissuable shouldBe expected.reissuable
+    if (after.scriptInfo.isDefined) after.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
   }
 
   def checkAssetsBefore(actual: Seq[AssetStateUpdate], expected: IssueTransaction, isNft: Boolean): Unit = {
     val before = actual.head.before
-      if (before.isDefined) {
-        before.get.assetId.toByteArray shouldBe expected.asset.id.arr
-        before.get.issuer.toByteArray shouldBe expected.sender.arr
-        before.get.name shouldBe expected.name.toStringUtf8
-        before.get.description shouldBe expected.description.toStringUtf8
-        before.get.nft shouldBe isNft
-        before.get.volume shouldBe expected.quantity.value
-        before.get.decimals shouldBe expected.decimals.value
-        before.get.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
-        before.get.reissuable shouldBe expected.reissuable
-      }
+    if (before.isDefined) {
+      before.get.assetId.toByteArray shouldBe expected.asset.id.arr
+      before.get.issuer.toByteArray shouldBe expected.sender.arr
+      before.get.name shouldBe expected.name.toStringUtf8
+      before.get.description shouldBe expected.description.toStringUtf8
+      before.get.nft shouldBe isNft
+      before.get.volume shouldBe expected.quantity.value
+      before.get.decimals shouldBe expected.decimals.value
+      before.get.reissuable shouldBe expected.reissuable
+      if (before.get.scriptInfo.isDefined) before.get.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
+    }
   }
 }

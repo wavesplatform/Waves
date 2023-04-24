@@ -5,12 +5,14 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.*
 import com.wavesplatform.events.blockchainupdatetests.fixtures.WavesTxChecks.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest.concurrent.ScalaFutures
+import DomainPresets.*
 
 import java.util.concurrent.ThreadLocalRandom.current
 
@@ -118,7 +120,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         .explicitGet()
 
       withGenerateSubscription(
-        settings = currentSettings,
+        settings = currentSettings.addFeatures(BlockchainFeatures.ReduceNFTFee),
         balances = Seq(AddrWithBalance(issueSender.toAddress, issueSenderBalanceBefore))
       )(_.appendMicroBlock(issueNftTx)) { updates =>
         val append = updates(1).append
