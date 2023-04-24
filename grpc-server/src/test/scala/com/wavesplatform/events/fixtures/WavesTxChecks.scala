@@ -1,4 +1,4 @@
-package com.wavesplatform.events.blockchainupdatetests.fixtures
+package com.wavesplatform.events.fixtures
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
@@ -9,7 +9,7 @@ import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
 import org.scalactic.source.Position
@@ -69,7 +69,7 @@ object WavesTxChecks extends Matchers with OptionValues {
   }
 
   def checkReissue(actualId: ByteString, actual: SignedTransaction, expected: ReissueTransaction)(implicit
-                                                                                              pos: Position
+      pos: Position
   ): Unit = {
     checkBaseTx(actualId, actual, expected)
     actual.transaction.wavesTransaction.value.data match {
@@ -77,6 +77,18 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.assetAmount.get.assetId.toByteArray shouldEqual expected.asset.id.arr
         value.assetAmount.get.amount shouldEqual expected.quantity.value
         value.reissuable shouldBe expected.reissuable
+      case _ => fail("not a Reissue transaction")
+    }
+  }
+
+  def checkBurn(actualId: ByteString, actual: SignedTransaction, expected: BurnTransaction)(implicit
+      pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.Burn(value) =>
+        value.assetAmount.get.assetId.toByteArray shouldEqual expected.asset.id.arr
+        value.assetAmount.get.amount shouldEqual expected.quantity.value
       case _ => fail("not a Reissue transaction")
     }
   }
