@@ -813,8 +813,7 @@ class RocksDBWriter(
       val txNum = {
         var r = 0
         rdb.db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txHandle.handle)) { e =>
-          val numData = e.getKey.drop(6)
-          if (numData.nonEmpty) r = Shorts.fromByteArray(numData) + 1
+          r = Shorts.fromByteArray(e.getKey.drop(6)) + 1
         }
         TxNum(r.toShort)
       }
