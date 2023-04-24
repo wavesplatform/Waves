@@ -62,7 +62,7 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.decimals shouldBe expected.decimals.value
         value.name shouldBe expected.name.toStringUtf8
         value.description shouldBe expected.description.toStringUtf8
-        value.script.toByteArray shouldBe expected.script.head.bytes.apply().arr
+        if (!value.script.isEmpty) value.script.toByteArray shouldBe expected.script.head.bytes.apply().arr
 
       case _ => fail("not a transfer transaction")
     }

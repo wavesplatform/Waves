@@ -1,14 +1,14 @@
 package com.wavesplatform.events.blockchainupdatetests
 
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.*
 import com.wavesplatform.events.blockchainupdatetests.fixtures.WavesTxChecks.*
-import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest.concurrent.ScalaFutures
 
@@ -17,6 +17,7 @@ import java.util.concurrent.ThreadLocalRandom.current
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = DomainPresets.RideV6
   val customFee: Long                = 1234567L
+  val customAssetIssueFee            = 234567654L
   val recipient: KeyPair             = TxHelpers.signer(1234)
   val recipientAddress: Address      = recipient.toAddress
 
@@ -69,7 +70,6 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for issue tx" in {
-      val customAssetIssueFee      = 234567654L
       val issueSender              = TxHelpers.signer(58)
       val issueSenderBalanceBefore = 10.waves
       val script                   = Option(TxHelpers.script("true"))
@@ -94,6 +94,44 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         )
         checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
         checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+      }
+    }
+
+    "return correct data for issue NFT tx" in {
+      val issueSender              = TxHelpers.signer(58)
+      val issueSenderBalanceBefore = 3.waves
+      val name: String             = "Nft_test_asset"
+      val description: String      = name + "__" + current.nextInt(1111, 999999)
+      val issueNftTx = IssueTransaction
+        .selfSigned(
+          TxVersion.V3,
+          issueSender,
+          name,
+          description,
+          quantity = 1,
+          decimals = 0,
+          reissuable = false,
+          script = None,
+          0.001.waves,
+          System.currentTimeMillis()
+        )
+        .explicitGet()
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(issueSender.toAddress, issueSenderBalanceBefore))
+      )(_.appendMicroBlock(issueNftTx)) { updates =>
+        val append = updates(1).append
+        checkIssue(append.transactionIds.head, append.transactionAt(0), issueNftTx)
+        checkBalances(
+          append.transactionStateUpdates.head.balances,
+          Map(
+            (issueSender.toAddress, Waves)            -> (issueSenderBalanceBefore, issueSenderBalanceBefore - 0.001.waves),
+            (issueSender.toAddress, issueNftTx.asset) -> (0, 1)
+          )
+        )
+        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueNftTx, isNft = true)
+        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueNftTx, isNft = true)
       }
     }
   }
