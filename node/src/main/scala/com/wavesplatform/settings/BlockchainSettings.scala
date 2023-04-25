@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -62,7 +63,9 @@ case class FunctionalitySettings(
     estimationOverflowFixHeight: Int = 0,
     estimatorSumOverflowFixHeight: Int = 0,
     enforceTransferValidationAfter: Int = 0,
-    ethInvokePaymentsCheckHeight: Int = 0
+    ethInvokePaymentsCheckHeight: Int = 0,
+    daoAddress: Option[Address] = None,
+    xtnBuybackAddress: Option[Address] = None
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
