@@ -80,23 +80,23 @@ class BlockchainUpdaterImpl(
     readLock(
       ngState
         .flatMap(_.totalDiffOf(id))
-        .map { case (_, diff, _, _, _, _) =>
+        .map { case (_, diff, _, _, _) =>
           diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 
   def liquidBlockMeta: Option[BlockMeta] =
     readLock(ngState.map { ng =>
-      val totalFee = ng.bestLiquidDiffAndFees._4
-      val b        = ng.bestLiquidBlock
-      val vrf      = if (b.header.version >= Block.ProtoBlockVersion) hitSource(height) else None
+      val (_, _, totalFee) = ng.bestLiquidDiffAndFees
+      val b                = ng.bestLiquidBlock
+      val vrf              = if (b.header.version >= Block.ProtoBlockVersion) hitSource(height) else None
       BlockMeta.fromBlock(b, height, totalFee, ng.reward, vrf)
     })
 
   @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
 
-  def bestLiquidDiffAndFees: Option[(Diff, Diff, Long, Long)] = readLock(ngState.map(_.bestLiquidDiffAndFees))
+  def bestLiquidDiffAndFees: Option[(Diff, Long, Long)] = readLock(ngState.map(_.bestLiquidDiffAndFees))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
@@ -301,7 +301,7 @@ class BlockchainUpdaterImpl(
               } else
                 metrics.forgeBlockTimeStats.measureOptional(ng.totalDiffOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                  case Some((referencedForgedBlock, referencedLiquidDiff, referencedMinerDiff, carry, totalFee, discarded)) =>
+                  case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
@@ -323,7 +323,6 @@ class BlockchainUpdaterImpl(
 
                       for {
                         liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
-                        minerDiffWithCancelledLeases  <- ng.cancelExpiredLeases(referencedMinerDiff).leftMap(GenericError(_))
                         referencedBlockchain = CompositeBlockchain(
                           rocksdb,
                           liquidDiffWithCancelledLeases,
@@ -356,7 +355,8 @@ class BlockchainUpdaterImpl(
 
                         blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
 
-                        rocksdb.append(minerDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                        val minerDiff = Diff(liquidDiffWithCancelledLeases.portfolios.filter(_._1 == referencedForgedBlock.sender.toAddress))
+                        rocksdb.append(minerDiff, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                         referencedLiquidDiff.transactions.foreach(rocksdb.appendSnapshot)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
@@ -374,7 +374,7 @@ class BlockchainUpdaterImpl(
                     }
                 }
           }).map {
-            _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discDiffs, reward, hitSource) =>
+            _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
               val newHeight = rocksdb.height + 1
 
               restTotalConstraint = updatedTotalConstraint
@@ -382,7 +382,6 @@ class BlockchainUpdaterImpl(
                 new NgState(
                   block,
                   newBlockDiff,
-                  detailedDiff.parentDiff,
                   carry,
                   totalFee,
                   featuresApprovedWithBlock(block),
@@ -495,7 +494,7 @@ class BlockchainUpdaterImpl(
               totalSignatureValid <- ng
                 .totalDiffOf(microBlock.reference)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
-                .map { case (accumulatedBlock, _, _, _, _, _) =>
+                .map { case (accumulatedBlock, _, _, _, _) =>
                   Block
                     .create(accumulatedBlock, accumulatedBlock.transactionData ++ microBlock.transactionData, microBlock.totalResBlockSig)
                     .signatureValid()
@@ -517,7 +516,7 @@ class BlockchainUpdaterImpl(
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
 
-              this.ngState = Some(ng.append(microBlock, diff, detailedDiff.parentDiff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
+              this.ngState = Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))

@@ -133,8 +133,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       Some(curBlock)
     }
 
-    val BlockDiffer.Result(diff, fees, totalFee, _, detailedDiff) = differ(state, preconditions.lastOption, block).explicitGet()
-    val ngState = NgState(block, diff, detailedDiff.parentDiff, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
+    val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
+    val ngState = NgState(block, diff, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
     val cb      = CompositeBlockchain(state, ngState)
     assertion(diff, cb)
 

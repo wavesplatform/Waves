@@ -16,14 +16,14 @@ object NgState {
     def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
 
-  case class CachedMicroDiff(diff: Diff, minerDiff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
+  case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
 
   class NgStateCaches {
     val blockDiffCache = CacheBuilder
       .newBuilder()
       .maximumSize(NgState.MaxTotalDiffs)
       .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, (Diff, Diff, Long, Long)]()
+      .build[BlockId, (Diff, Long, Long)]()
 
     val forgedBlockCache = CacheBuilder
       .newBuilder()
@@ -47,7 +47,6 @@ object NgState {
 case class NgState(
     base: Block,
     baseBlockDiff: Diff,
-    baseMinerDiff: Diff,
     baseBlockCarry: Long,
     baseBlockTotalFee: Long,
     approvedFeatures: Set[Short],
@@ -69,29 +68,26 @@ case class NgState(
 
   def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
-  def diffFor(totalResBlockRef: BlockId): (Diff, Diff, Long, Long) = {
-    if (totalResBlockRef == base.id())
-      (baseBlockDiff, baseMinerDiff, baseBlockCarry, baseBlockTotalFee)
-    else
-      internalCaches.blockDiffCache.get(
-        totalResBlockRef,
-        { () =>
-          microBlocks.find(_.idEquals(totalResBlockRef)) match {
-            case Some(MicroBlockInfo(blockId, current)) =>
-              val (prevDiff, prevMinerDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
-              val CachedMicroDiff(currDiff, currMinerDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
-              (
-                prevDiff.combineF(currDiff).explicitGet(),
-                prevMinerDiff.combineF(currMinerDiff).explicitGet(),
-                prevCarry + currCarry,
-                prevTotalFee + currTotalFee
-              )
+  def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
+    val (diff, carry, totalFee) =
+      if (totalResBlockRef == base.id())
+        (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
+      else
+        internalCaches.blockDiffCache.get(
+          totalResBlockRef,
+          { () =>
+            microBlocks.find(_.idEquals(totalResBlockRef)) match {
+              case Some(MicroBlockInfo(blockId, current)) =>
+                val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
+                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
+                (prevDiff.combineF(currDiff).explicitGet(), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
-            case None =>
-              (Diff.empty, Diff.empty, 0L, 0L)
+              case None =>
+                (Diff.empty, 0L, 0L)
+            }
           }
-        }
-      )
+        )
+    (diff, carry, totalFee)
   }
 
   def bestLiquidBlockId: BlockId =
@@ -117,13 +113,13 @@ case class NgState(
           block
       }
 
-  def totalDiffOf(id: BlockId): Option[(Block, Diff, Diff, Long, Long, DiscardedMicroBlocks)] =
+  def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (block, discarded) =>
-      val (diff, minerDiff, carry, totalFee) = this.diffFor(id)
-      (block, diff, minerDiff, carry, totalFee, discarded)
+      val (diff, carry, totalFee) = this.diffFor(id)
+      (block, diff, carry, totalFee, discarded)
     }
 
-  def bestLiquidDiffAndFees: (Diff, Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
+  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
@@ -147,7 +143,6 @@ case class NgState(
   def append(
       microBlock: MicroBlock,
       diff: Diff,
-      minerDiff: Diff,
       microblockCarry: Long,
       microblockTotalFee: Long,
       timestamp: Long,
@@ -155,7 +150,7 @@ case class NgState(
   ): NgState = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
-    val microDiffs  = this.microDiffs + (blockId -> CachedMicroDiff(diff, minerDiff, microblockCarry, microblockTotalFee, timestamp))
+    val microDiffs  = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
     val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
     this.copy(microDiffs = microDiffs, microBlocks = microBlocks)
