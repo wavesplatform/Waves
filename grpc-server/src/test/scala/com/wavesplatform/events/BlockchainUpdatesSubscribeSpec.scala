@@ -10,6 +10,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
@@ -50,7 +51,6 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val transferRecipientBalanceBefore = 1.waves
       val transferRecipientBalanceAfter  = transferRecipientBalanceBefore + amount
       val transferTx                     = TxHelpers.transfer(transferSender, recipientAddress, amount, Waves, customFee)
-
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(
@@ -137,13 +137,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for reissue tx" in {
-      val issueSender = TxHelpers.signer(58)
-      val senderBalanceBefore = 4.waves
+      val issueSender                = TxHelpers.signer(58)
+      val senderBalanceBefore        = 4.waves
       val senderBalanceBeforeReissue = 3.waves
-      val senderBalanceAfterReissue = senderBalanceBeforeReissue - customAssetIssueFee
-      val amount: Long = current.nextInt(1, 9999999)
-      val issueTx = TxHelpers.issue(issueSender, amount)
-      val reissueTx = TxHelpers.reissue(issueTx.asset, issueSender, amount, reissuable = false, customAssetIssueFee)
+      val senderBalanceAfterReissue  = senderBalanceBeforeReissue - customAssetIssueFee
+      val amount: Long               = current.nextInt(1, 9999999)
+      val issueTx                    = TxHelpers.issue(issueSender, amount)
+      val reissueTx                  = TxHelpers.reissue(issueTx.asset, issueSender, amount, reissuable = false, customAssetIssueFee)
 
       withGenerateSubscription(
         settings = currentSettings,
@@ -154,7 +154,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           append.transactionStateUpdates.apply(1).balances,
           Map(
-            (issueSender.toAddress, Waves) -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (issueSender.toAddress, Waves)           -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
             (issueSender.toAddress, reissueTx.asset) -> (amount, amount * 2)
           )
         )
@@ -164,13 +164,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for burn tx" in {
-      val issueSender = TxHelpers.signer(58)
-      val senderBalanceBefore = 4.waves
+      val issueSender                = TxHelpers.signer(58)
+      val senderBalanceBefore        = 4.waves
       val senderBalanceBeforeReissue = 3.waves
-      val senderBalanceAfterReissue = senderBalanceBeforeReissue - customAssetIssueFee
-      val amount: Long = current.nextInt(1, 9999999)
-      val issueTx = TxHelpers.issue(issueSender, amount)
-      val burnTx = TxHelpers.burn(issueTx.asset, amount, issueSender, customAssetIssueFee)
+      val senderBalanceAfterReissue  = senderBalanceBeforeReissue - customAssetIssueFee
+      val amount: Long               = current.nextInt(1, 9999999)
+      val issueTx                    = TxHelpers.issue(issueSender, amount)
+      val burnTx                     = TxHelpers.burn(issueTx.asset, amount, issueSender, customAssetIssueFee)
 
       withGenerateSubscription(
         settings = currentSettings,
@@ -181,13 +181,47 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           append.transactionStateUpdates.apply(1).balances,
           Map(
-            (issueSender.toAddress, Waves) -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (issueSender.toAddress, Waves)        -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
             (issueSender.toAddress, burnTx.asset) -> (amount, 0)
           )
         )
         checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
         checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
       }
+    }
+
+    "return correct data for exchange tx" in {
+      val buyer                       = TxHelpers.signer(58)
+      val seller                      = TxHelpers.signer(189)
+      val buyerBalanceBefore          = 4.waves
+      val buyerBalanceBeforeExchange  = 3.waves
+      val sellerBalanceBefore         = 4.waves
+      val sellerBalanceBeforeExchange = 3.waves
+      val priceAsset                  = TxHelpers.issue(buyer)
+      val amountAsset                 = TxHelpers.issue(seller)
+
+      val order1     = TxHelpers.order(OrderType.BUY, amountAsset.asset, priceAsset.asset, Waves, 500L, 10000L, sender = buyer)
+      val order2     = TxHelpers.order(OrderType.SELL, amountAsset.asset, priceAsset.asset, Waves, 500L, 10000L, sender = seller)
+      val exchangeTx = TxHelpers.exchangeFromOrders(order1, order2)
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(
+          AddrWithBalance(buyer.toAddress, buyerBalanceBefore),
+          AddrWithBalance(seller.toAddress, sellerBalanceBefore)
+        )
+      )(_.appendMicroBlock(priceAsset, amountAsset, exchangeTx)) { updates =>
+        val append = updates(1).append
+        checkExchange(append.transactionIds.apply(2), append.transactionAt(2), exchangeTx)
+      /*        checkBalances(
+          append.transactionStateUpdates.apply(2).balances,
+          Map(
+            (buyer.toAddress, Waves)        -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (issueSender.toAddress, burnTx.asset) -> (amount, 0)
+          )
+        )*/
+      }
+
     }
   }
 }

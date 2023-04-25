@@ -9,6 +9,7 @@ import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
@@ -89,7 +90,52 @@ object WavesTxChecks extends Matchers with OptionValues {
       case Data.Burn(value) =>
         value.assetAmount.get.assetId.toByteArray shouldEqual expected.asset.id.arr
         value.assetAmount.get.amount shouldEqual expected.quantity.value
-      case _ => fail("not a Reissue transaction")
+      case _ => fail("not a Burn transaction")
+    }
+  }
+
+  def checkExchange(actualId: ByteString, actual: SignedTransaction, expected: ExchangeTransaction)(implicit pos: Position): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.Exchange(value) =>
+        value.amount shouldEqual expected.amount.value
+        value.price shouldEqual expected.price.value
+        value.buyMatcherFee shouldEqual expected.buyMatcherFee
+        value.sellMatcherFee shouldEqual expected.sellMatcherFee
+
+        value.orders.head.chainId shouldEqual expected.chainId
+        value.orders.head.sender.senderPublicKey.get.toByteArray shouldBe expected.order1.sender.arr
+        value.orders.head.matcherPublicKey.toByteArray shouldBe expected.order1.matcherPublicKey.arr
+/*
+        value.orders.head.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order1.assetPair.amountAsset.byteRepr
+        value.orders.head.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order1.assetPair.priceAsset.byteRepr
+        value.orders.head.orderSide.toString() shouldBe expected.order1.orderType.toString
+*/
+        value.orders.head.amount shouldEqual expected.order1.amount.value
+        value.orders.head.price shouldEqual expected.order1.price.value
+        value.orders.head.timestamp shouldEqual expected.order1.timestamp
+        value.orders.head.expiration shouldEqual expected.order1.expiration
+        value.orders.head.matcherFee.get.amount shouldEqual expected.order1.matcherFee.value
+//        value.orders.head.matcherFee.get.assetId.toByteArray shouldBe expected.order1.matcherFeeAssetId.byteRepr
+        value.orders.head.version shouldEqual expected.order1.version
+
+
+        value.orders.last.chainId shouldEqual expected.chainId
+        value.orders.last.sender.senderPublicKey.get.toByteArray shouldBe expected.order2.sender.arr
+        value.orders.last.matcherPublicKey.toByteArray shouldBe expected.order2.matcherPublicKey.arr
+        /*
+                value.orders.last.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order2.assetPair.amountAsset.byteRepr
+                value.orders.last.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order2.assetPair.priceAsset.byteRepr
+                value.orders.last.orderSide.toString() shouldBe expected.order2.orderType.toString
+        */
+        value.orders.last.amount shouldEqual expected.order2.amount.value
+        value.orders.last.price shouldEqual expected.order2.price.value
+        value.orders.last.timestamp shouldEqual expected.order2.timestamp
+        value.orders.last.expiration shouldEqual expected.order2.expiration
+        value.orders.last.matcherFee.get.amount shouldEqual expected.order2.matcherFee.value
+//         value.orders.last.matcherFee.get.assetId.toByteArray shouldBe expected.order2.matcherFeeAssetId.byteRepr
+        value.orders.last.version shouldEqual expected.order2.version
+      case _ => fail("not a Exchange transaction")
     }
   }
 
