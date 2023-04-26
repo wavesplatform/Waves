@@ -1,17 +1,18 @@
 package com.wavesplatform.events.fixtures
 
-import ch.qos.logback.core.encoder.ByteArrayUtil
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.events.protobuf.StateUpdate.BalanceUpdate
-import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, LeasingUpdate}
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
 import org.scalactic.source.Position
@@ -137,19 +138,25 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkLease(actualId: ByteString, actual: SignedTransaction, expected: LeaseTransaction, publicKeyHash: Array[Byte])(implicit
+      pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.Lease(value) =>
+        value.recipient.get.recipient.publicKeyHash.get.toByteArray shouldBe publicKeyHash
+        value.amount shouldBe expected.amount.value
+      case _ => fail("not a Burn transaction")
+    }
+  }
+
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
-   val map = actual.map { bu =>
+    actual.map { bu =>
       (
         (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
         (bu.amountBefore, bu.amountAfter.value.amount)
       )
-    }.toMap
-
-
-    println("БУ: " + map)
-    println("ТРАНЗА: " + expected)
-
-    map shouldEqual expected
+    }.toMap shouldEqual expected
   }
 
   def checkAssetsAfter(actual: Seq[AssetStateUpdate], expected: IssueTransaction, isNft: Boolean): Unit = {
@@ -179,5 +186,24 @@ object WavesTxChecks extends Matchers with OptionValues {
       before.get.reissuable shouldBe expected.reissuable
       if (before.get.scriptInfo.isDefined) before.get.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
     }
+  }
+
+  def checkLeasingForAddress(actual: Seq[LeasingUpdate], expected: LeaseTransaction): Unit = {
+    actual.head.address.toByteArray shouldBe expected.sender.toAddress.bytes
+    actual.head.inAfter shouldEqual 0
+    actual.head.outAfter shouldEqual expected.amount.value
+
+    actual.last.address.toByteArray shouldBe expected.recipient.bytes
+    actual.last.inAfter shouldEqual expected.amount.value
+    actual.last.outAfter shouldEqual 0
+  }
+
+  def checkIndividualLeases(actual: Seq[LeaseUpdate], expected: LeaseTransaction, leaseStatus: LeaseStatus): Unit = {
+    actual.head.leaseId.toByteArray shouldBe expected.id.value().arr
+    actual.head.statusAfter.toString() equalsIgnoreCase leaseStatus.toString
+    actual.head.amount shouldBe expected.amount.value
+    actual.head.sender.toByteArray shouldBe expected.sender.arr
+    actual.head.recipient.toByteArray shouldBe expected.recipient.bytes
+    actual.head.originTransactionId.toByteArray shouldBe expected.id.value().arr
   }
 }

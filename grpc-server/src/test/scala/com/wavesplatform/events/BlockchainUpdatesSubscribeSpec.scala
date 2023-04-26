@@ -1,24 +1,21 @@
 package com.wavesplatform.events
 
-import com.wavesplatform.TestValues
 import com.wavesplatform.TestValues.fee
-import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, secondAddress, secondSigner}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
 import java.util.concurrent.ThreadLocalRandom.current
-import scala.collection.immutable.HashMap
 
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = DomainPresets.RideV6
@@ -242,7 +239,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkExchange(append.transactionIds.apply(2), append.transactionAt(2), exchangeTx)
         checkBalances(
           append.transactionStateUpdates.apply(2).balances,
-          HashMap(
+          Map(
             (buyer.toAddress, Waves)              -> (buyerBalanceBeforeExchange, buyerBalanceBeforeExchange - fee + customFee),
             (seller.toAddress, priceAsset.asset)  -> (0, exchangedAssets),
             (buyer.toAddress, amountAsset.asset)  -> (0, order1.amount.value),
@@ -304,7 +301,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkExchange(append.transactionIds.apply(2), append.transactionAt(2), exchangeTx)
         checkBalances(
           append.transactionStateUpdates.apply(2).balances,
-          HashMap(
+          Map(
             (buyer.toAddress, Waves)              -> (buyerBalanceBeforeExchange, buyerBalanceBeforeExchange - fee + customFee),
             (seller.toAddress, priceAsset.asset)  -> (0, exchangedAssets),
             (buyer.toAddress, amountAsset.asset)  -> (0, order1.amount.value),
@@ -313,6 +310,30 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
             (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - order1.amount.value)
           )
         )
+      }
+    }
+
+    "return correct data for lease tx" in {
+      val sender              = TxHelpers.signer(33)
+      val recipient           = TxHelpers.signer(123)
+      val senderBalanceBefore = 10.waves
+      val amount              = 5.waves
+      val leaseTx             = TxHelpers.lease(sender, recipient.toAddress, amount, customFee)
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(leaseTx)) { updates =>
+        val append = updates(1).append
+        checkLease(append.transactionIds.head, append.transactionAt(0), leaseTx, recipient.toAddress.publicKeyHash)
+        checkBalances(
+          append.transactionStateUpdates.head.balances,
+          Map(
+            (sender.toAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee)
+          )
+        )
+        checkLeasingForAddress(append.transactionStateUpdates.head.leasingForAddress, leaseTx)
+        checkIndividualLeases(append.transactionStateUpdates.head.individualLeases, leaseTx, LeaseStatus.Active)
       }
     }
   }
