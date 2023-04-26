@@ -14,7 +14,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -169,7 +169,7 @@ case class UtxPoolImpl(
     removeIds(ids)
   }
 
-  def setPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
+  def setPriorityDiffs(discDiffs: Seq[StateSnapshot]): Unit = {
     val txs = priorityPool.setPriorityDiffs(discDiffs)
     txs.foreach(addTransaction(_, verify = false, canLock = false))
   }

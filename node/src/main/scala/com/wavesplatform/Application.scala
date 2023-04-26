@@ -1,10 +1,5 @@
 package com.wavesplatform
 
-import java.io.File
-import java.security.Security
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.{TimeUnit, *}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -36,7 +31,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, TxMeta}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -59,6 +54,10 @@ import org.influxdb.dto.Point
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
+import java.io.File
+import java.security.Security
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{TimeUnit, *}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -221,7 +220,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utxEvents: Observable[UtxEvent] = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
-        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
         rdb,
         blockchainUpdater,
         utxStorage,
@@ -233,7 +232,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val accountsApi: CommonAccountsApi =
         CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, rdb, blockchainUpdater)
       override val assetsApi: CommonAssetsApi =
-        CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), rdb.db, blockchainUpdater)
+        CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty), rdb.db, blockchainUpdater)
     }
 
     extensions = settings.extensions.map { extensionClassName =>

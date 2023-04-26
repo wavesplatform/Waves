@@ -11,7 +11,7 @@ import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot}
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, transfer}
@@ -142,7 +142,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         override def transactionById(transactionId: ByteStr)           = inner.transactionById(transactionId)
         override def close(): Unit                                     = inner.close()
         override def scheduleCleanup(): Unit                           = inner.scheduleCleanup()
-        override def setPriorityDiffs(diffs: Seq[Diff]): Unit          = inner.setPriorityDiffs(diffs)
+        override def setPriorityDiffs(diffs: Seq[StateSnapshot]): Unit = inner.setPriorityDiffs(diffs)
       }
 
       val microBlockMiner = new MicroBlockMinerImpl(

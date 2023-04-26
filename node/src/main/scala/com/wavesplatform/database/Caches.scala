@@ -392,9 +392,10 @@ abstract class Caches extends Blockchain with Storage {
   }
 
   protected def doAppendSnapshot(
+      blockMeta: PBBlockMeta,
       snapshot: TransactionStateSnapshot,
-      tx: Transaction,
-      txMeta: TxMeta,
+      carry: Long,
+      transactionMeta: Seq[(TxMeta, Transaction, TransactionStateSnapshot)],
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -402,17 +403,36 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]]
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
+      stateHash: StateHashBuilder.Result
   ): Unit
 
-  override def appendSnapshot(txInfo: NewTransactionInfo): Unit = {
-    val snapshot     = txInfo.snapshot
+  override def append(stateSnapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
+    val transactions = stateSnapshot.transactions
+    val snapshot     = stateSnapshot.current
+    val newHeight    = current.height + 1
     val newAddresses = Set.newBuilder[Address]
+    val newScore     = block.blockScore() + current.score
+    val newMeta = PBBlockMeta(
+      Some(PBBlocks.protobuf(block.header)),
+      ByteString.copyFrom(block.signature.arr),
+      if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(block.id().arr) else ByteString.EMPTY,
+      newHeight,
+      block.bytes().length,
+      block.transactionData.size,
+      totalFee,
+      reward.getOrElse(0),
+      if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(hitSource.arr) else ByteString.EMPTY,
+      ByteString.copyFrom(newScore.toByteArray),
+      current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) + reward.getOrElse(0L)
+    )
+    current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
+
     newAddresses ++=
       (snapshot.balances.map(_.address.toAddress) ++ snapshot.leaseBalances.map(_.address.toAddress))
         .filter(addressIdCache.get(_).isEmpty)
 
-    for (address <- txInfo.affected if addressIdCache.get(address).isEmpty)
+    for (address <- transactions.flatMap(_.affected) if addressIdCache.get(address).isEmpty)
       newAddresses += address
 
     val newAddressIds = (for {
@@ -424,20 +444,24 @@ abstract class Caches extends Blockchain with Storage {
     val leaseBalancesWithNodes = snapshot.leaseBalances.map { lb =>
       val address                 = lb.address.toAddress
       val prevCurrentLeaseBalance = leaseBalanceCache.get(address)
-      val prevHeight = if (prevCurrentLeaseBalance.height == height) prevCurrentLeaseBalance.prevHeight else prevCurrentLeaseBalance.height
       address ->
         (
-          CurrentLeaseBalance(lb.in, lb.out, Height(height), prevHeight),
-          LeaseBalanceNode(lb.in, lb.out, prevHeight)
+          CurrentLeaseBalance(lb.in, lb.out, Height(height), prevCurrentLeaseBalance.height),
+          LeaseBalanceNode(lb.in, lb.out, prevCurrentLeaseBalance.height)
         )
     }
     val leaseBalances = leaseBalancesWithNodes.map { case (address, (balance, _)) =>
       (address, balance)
     }.toMap
 
+    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction, TransactionStateSnapshot)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for (addr <- txInfo.affected) {
-      addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(txInfo.transaction.id()))
+    for (nti <- transactions) {
+      val entry = (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity), nti.transaction, nti.snapshot)
+      transactionMeta += entry
+      for (addr <- nti.affected) {
+        addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
+      }
     }
 
     val updatedBalanceNodes = for {
@@ -527,9 +551,10 @@ abstract class Caches extends Blockchain with Storage {
     for (alias                      <- snapshot.aliases) stateHash.addAlias(alias.address.toAddress, alias.alias)
 
     doAppendSnapshot(
+      newMeta,
       snapshot,
-      txInfo.transaction,
-      TxMeta(Height(height), txInfo.applied, txInfo.spentComplexity),
+      carryFee,
+      transactionMeta.result(),
       newAddressIds,
       updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v }.toMap,
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance }.toMap,
@@ -537,7 +562,8 @@ abstract class Caches extends Blockchain with Storage {
       updatedDataWithNodes.toMap,
       addressTransactions.asMap(),
       accountScripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
-      assetScripts
+      assetScripts,
+      stateHash.result()
     )
 
     val assetsToInvalidate =

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.{toBifunctorOps, toFoldableOps}
+import cats.implicits.{catsSyntaxSemigroup, toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -9,8 +9,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state.*
+import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.state.patch.*
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.{CompositeBlockchain, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -23,7 +24,9 @@ import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, Pay
 
 object BlockDiffer {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
-  final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
+  final case class Result(snapshot: StateSnapshot, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff) {
+    def diff = detailedDiff.transactionDiffs.foldLeft(detailedDiff.parentDiff)(_.combineF(_).right.get)
+  }
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
@@ -196,10 +199,12 @@ object BlockDiffer {
     prepareCaches(blockGenerator, txs, loadCacheData)
 
     txs
-      .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
+      .foldLeft(
+        TracedResult(Result(StateSnapshot.create(initDiff, blockchain), 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])
+      ) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
-        case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _, _), tx) =>
-          val currBlockchain = CompositeBlockchain(blockchain, currDiff)
+        case (TracedResult(Right(Result(currSnapshot, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _, _), tx) =>
+          val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
             val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
             if (updatedConstraint.isOverfilled)
@@ -220,11 +225,14 @@ object BlockDiffer {
               val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
               val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
 
+              val txSnapshot           = StateSnapshot.create(thisTxDiff, currBlockchain)
+              val txSnapshotBlockchain = SnapshotBlockchain(currBlockchain, txSnapshot)
+              val minerSnapshot        = StateSnapshot.create(minerDiff, txSnapshotBlockchain)
+              val snapshot             = currSnapshot |+| txSnapshot |+| minerSnapshot
               val result = for {
-                diff          <- currDiff.combineF(thisTxDiff).flatMap(_.combineF(minerDiff))
                 newParentDiff <- parentDiff.combineF(minerDiff)
               } yield Result(
-                diff,
+                snapshot,
                 carryFee + carry,
                 totalWavesFee,
                 updatedConstraint,

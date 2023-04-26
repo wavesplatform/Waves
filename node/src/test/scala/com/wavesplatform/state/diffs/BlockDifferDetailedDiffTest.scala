@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings as TFS}
@@ -29,7 +30,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
       }
 
       val BlockDiffer.Result(diff, _, _, _, detailedDiff) = differ(state, preconditions.lastOption, block).explicitGet()
-      assertion(diff, detailedDiff)
+      assertion(diff.toDiff, detailedDiff)
     }
 
   "BlockDiffer DetailedDiff" - {

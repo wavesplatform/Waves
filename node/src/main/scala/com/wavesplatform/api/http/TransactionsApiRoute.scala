@@ -17,22 +17,21 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
-import play.api.libs.json.*
 import monix.reactive.Observable
+import play.api.libs.json.*
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
-    compositeBlockchain: () => CompositeBlockchain,
+    compositeBlockchain: () => Blockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
     time: Time,

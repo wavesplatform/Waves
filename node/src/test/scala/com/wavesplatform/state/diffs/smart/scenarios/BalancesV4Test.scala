@@ -19,10 +19,10 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.*
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.*
 
 class BalancesV4Test extends PropSpec with WithState {
 
@@ -96,7 +96,10 @@ class BalancesV4Test extends PropSpec with WithState {
       rideV4Activated
     ) { case (d, s) =>
       val apiBalance =
-        com.wavesplatform.api.common.CommonAccountsApi(() => CompositeBlockchain(s, d), rdb, s).balanceDetails(acc1.toAddress).explicitGet()
+        com.wavesplatform.api.common
+          .CommonAccountsApi(() => SnapshotBlockchain(s, StateSnapshot.create(d, s)), rdb, s)
+          .balanceDetails(acc1.toAddress)
+          .explicitGet()
       val data = d.accountData(dapp.toAddress)
       data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
       apiBalance.available shouldBe 16 * Constants.UnitsInWave

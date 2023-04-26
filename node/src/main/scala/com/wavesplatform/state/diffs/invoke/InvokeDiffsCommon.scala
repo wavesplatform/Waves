@@ -147,7 +147,7 @@ object InvokeDiffsCommon {
       dAppAddress: Address
   ): Either[ValidationError, Long] = {
     for {
-      complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).toRight {
+      complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).orElse(callableComplexities.get(3)).toRight {
         GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
       }
       complexity <- complexitiesByCallable.get(call.function.funcName).toRight {

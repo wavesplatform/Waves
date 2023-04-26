@@ -15,7 +15,7 @@ package object utils {
 
   def addressTransactions(
       rdb: RDB,
-      diff: => Option[(Height, Diff)],
+      diff: => Option[(Height, StateSnapshot)],
       address: Address,
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]

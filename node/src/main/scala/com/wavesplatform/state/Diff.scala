@@ -141,7 +141,7 @@ case class NewTransactionInfo(
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
-case class Diff private[state] (
+case class Diff (
     transactions: Vector[NewTransactionInfo],
     portfolios: Map[Address, Portfolio],
     issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
@@ -349,7 +349,7 @@ object Diff {
       val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
 
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, StateSnapshot.create(d, blockchain), affectedAddresses, applied, d.scriptsComplexity)),
+        transactions = Vector(NewTransactionInfo(tx, StateSnapshot.create(d, blockchain).current, affectedAddresses, applied, d.scriptsComplexity)),
         transactionFilter = mkFilterForTransactions(tx)
       )
     }

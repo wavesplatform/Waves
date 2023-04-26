@@ -1,35 +1,171 @@
 package com.wavesplatform.state
 import cats.data.Ior
 import cats.implicits.catsSyntaxSemigroup
+import cats.kernel.Monoid
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
+import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
+import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
+
+case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: TransactionStateSnapshot) {
+  lazy val balances: Map[(Address, Asset), Long] =
+    current.balances
+      .map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
+      .toMap
+
+  lazy val leaseBalances: Map[Address, LeaseBalance] =
+    current.leaseBalances
+      .map(b => b.address.toAddress -> LeaseBalance(b.in, b.out))
+      .toMap
+
+  lazy val assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] =
+    current.assetScripts.map { s =>
+      val info =
+        if (s.script.isEmpty)
+          None
+        else
+          Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), s.complexity))
+      s.assetId.toIssuedAssetId -> info
+    }.toMap
+
+  lazy val indexedIssuedAssets: Map[IssuedAsset, (AssetStatic, Int)] =
+    current.assetStatics.zipWithIndex.map { case (info, i) => info.assetId.toIssuedAssetId -> (info, i + 1) }.toMap
+
+  lazy val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =
+    current.assetVolumes
+      .map(v => v.assetId.toIssuedAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray)))
+      .toMap
+
+  lazy val assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] =
+    current.assetNamesAndDescriptions
+      .map(i => i.assetId.toIssuedAssetId -> AssetInfo(i.name, i.description, Height @@ i.lastUpdated))
+      .toMap
+
+  lazy val sponsorships: Map[IssuedAsset, SponsorshipValue] =
+    current.sponsorships
+      .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
+      .toMap
+
+  lazy val leaseStates: Map[ByteStr, LeaseDetails] =
+    current.leaseStates
+      .map(ls =>
+        ls.leaseId.toByteStr -> LeaseDetails(
+          ls.sender.toPublicKey,
+          PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
+          ls.amount,
+          ls.status match {
+            case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>
+              LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
+            case _ =>
+              LeaseDetails.Status.Active
+          },
+          ls.originTransactionId.toByteStr,
+          ls.height
+        )
+      )
+      .toMap
+
+  lazy val aliases: Map[Alias, Address] =
+    current.aliases
+      .map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress)
+      .toMap
+
+  lazy val orderFills: Map[ByteStr, VolumeAndFee] =
+    current.orderFills
+      .map(of => of.orderId.toByteStr -> VolumeAndFee(of.volume, of.fee))
+      .toMap
+
+  lazy val scripts: Map[Address, Option[AccountScriptInfo]] =
+    current.accountScripts.map { pbInfo =>
+      val info =
+        if (pbInfo.script.isEmpty)
+          None
+        else
+          Some(
+            AccountScriptInfo(
+              pbInfo.senderPublicKey.toPublicKey,
+              ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
+              pbInfo.verifierComplexity,
+              if (pbInfo.callableComplexities.nonEmpty) Map(3 -> pbInfo.callableComplexities)
+              else Map()
+            )
+          )
+      pbInfo.senderAddress.toAddress -> info
+    }.toMap
+
+  lazy val accountData: Map[Address, Map[String, DataEntry[?]]] =
+    current.accountData.map { data =>
+      val entries =
+        data.entry.map { pbEntry =>
+          val entry = PBTransactions.toVanillaDataEntry(pbEntry)
+          entry.key -> entry
+        }.toMap
+      data.address.toAddress -> entries
+    }.toMap
+
+  lazy val scriptResults: Map[ByteStr, InvokeScriptResult] =
+    current.scriptResults.map { pbResult =>
+      val txId   = pbResult.transactionId.toByteStr
+      val result = InvokeScriptResult.fromPB(pbResult.getResult)
+      txId -> result
+    }.toMap
+
+  lazy val ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] =
+    current.ethereumTransactionMeta.map { pbMeta =>
+      import TransactionStateSnapshot.EthereumTransactionMeta as M
+      val payload = pbMeta.payload match {
+        case M.Payload.Empty =>
+          Payload.Empty
+        case M.Payload.Invocation(M.Invocation(functionCall, payments, _)) =>
+          Payload.Invocation(EthereumTransactionMeta.Invocation(functionCall, payments))
+        case M.Payload.Transfer(M.Transfer(publicKeyHash, amount, _)) =>
+          Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
+      }
+      pbMeta.transactionId.toByteStr -> EthereumTransactionMeta(payload)
+    }.toMap
+
+  val scriptsComplexity: Long =
+    current.totalComplexity
+
+  def hashString: String =
+    Integer.toHexString(hashCode())
+}
 
 object StateSnapshot {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
   private val lastEstimator = 3
 
-  def create(diff: Diff, blockchain: Blockchain): TransactionStateSnapshot =
-    TransactionStateSnapshot(
-      balances(diff, blockchain),
-      leaseBalances(diff, blockchain),
-      assetStatics(diff),
-      assetVolumes(diff, blockchain),
-      assetNamesAndDescriptions(diff),
-      assetScripts(diff),
-      aliases(diff),
-      orderFills(diff, blockchain),
-      leaseStates(diff),
-      accountScripts(diff),
-      accountData(diff),
-      sponsorships(diff),
-      scriptResults(diff),
-      ethereumTransactionMeta(diff),
-      diff.scriptsComplexity
+  def create(diff: Diff, blockchain: Blockchain): StateSnapshot =
+    StateSnapshot(
+      diff.transactions,
+      TransactionStateSnapshot(
+        balances(diff, blockchain),
+        leaseBalances(diff, blockchain),
+        assetStatics(diff),
+        assetVolumes(diff, blockchain),
+        assetNamesAndDescriptions(diff),
+        assetScripts(diff),
+        aliases(diff),
+        orderFills(diff, blockchain),
+        leaseStates(diff),
+        accountScripts(diff),
+        accountData(diff),
+        sponsorships(diff),
+        scriptResults(diff),
+        ethereumTransactionMeta(diff),
+        diff.scriptsComplexity
+      )
     )
 
   private def balances(diff: Diff, blockchain: Blockchain): Seq[S.Balance] =
@@ -171,4 +307,35 @@ object StateSnapshot {
       }
       S.EthereumTransactionMeta(txId.toByteString, payload)
     }.toSeq
+
+  implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
+    override val empty = StateSnapshot(Vector(), TransactionStateSnapshot())
+    override def combine(s1: StateSnapshot, s2: StateSnapshot): StateSnapshot = {
+      def displaceBy[A, B](f: TransactionStateSnapshot => Seq[A], k: A => B): Seq[A] = {
+        val values1 = f(s1.current)
+        val values2 = f(s2.current)
+        values1.filterNot(v1 => values2.exists(v2 => k(v2) == k(v1))) ++ values2
+      }
+      StateSnapshot(
+        s1.transactions ++ s2.transactions,
+        TransactionStateSnapshot(
+          displaceBy[S.Balance, (ByteString, ByteString)](_.balances, b => (b.address, b.getAmount.assetId)),
+          displaceBy[S.LeaseBalance, ByteString](_.leaseBalances, _.address),
+          displaceBy[S.AssetStatic, ByteString](_.assetStatics, _.assetId),
+          displaceBy[S.AssetVolume, ByteString](_.assetVolumes, _.assetId),
+          displaceBy[S.AssetNameAndDescription, ByteString](_.assetNamesAndDescriptions, _.assetId),
+          displaceBy[S.AssetScript, ByteString](_.assetScripts, _.assetId),
+          displaceBy[S.Alias, ByteString](_.aliases, _.address),
+          displaceBy[S.OrderFill, ByteString](_.orderFills, _.orderId),
+          displaceBy[S.LeaseState, ByteString](_.leaseStates, _.leaseId),
+          displaceBy[S.AccountScript, ByteString](_.accountScripts, _.senderAddress),
+          displaceBy[S.AccountData, ByteString](_.accountData, _.address),
+          displaceBy[S.Sponsorship, ByteString](_.sponsorships, _.assetId),
+          displaceBy[S.ScriptResult, ByteString](_.scriptResults, _.transactionId),
+          displaceBy[S.EthereumTransactionMeta, ByteString](_.ethereumTransactionMeta, _.transactionId),
+          s2.scriptsComplexity
+        )
+      )
+    }
+  }
 }

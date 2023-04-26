@@ -12,6 +12,7 @@ import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -89,7 +90,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
 
     lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
-      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+      blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
       rdb,
       blockchain,
       utxPool,
@@ -139,15 +140,15 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+    blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty).toDiff
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): Seq[StateSnapshot] = blockchainUpdater.processBlock(b).explicitGet()
 
-  def appendBlockE(b: Block): Either[ValidationError, Seq[Diff]] = blockchainUpdater.processBlock(b)
+  def appendBlockE(b: Block): Either[ValidationError, Seq[StateSnapshot]] = blockchainUpdater.processBlock(b)
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -162,7 +163,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = rdb.db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty).toDiff, None, blockchainUpdater.assetDescription)
       .toSeq
       .flatten
   }
@@ -171,7 +172,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     AddressTransactions
       .allAddressTransactions(
         rdb,
-        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
         address,
         None,
         Set.empty,
@@ -223,7 +224,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     lastBlock
   }
 
-  def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
+  def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[StateSnapshot]] =
     appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
   def appendBlock(version: Byte, txs: Transaction*): Block = {
@@ -399,7 +400,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
-    blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
+    blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
     rdb,
     blockchain,
     utxPool,
@@ -414,7 +415,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
-    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    () => blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty),
     rdb.db,
     blockchain
   )
@@ -422,7 +423,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
+    def processBlock(block: Block): Either[ValidationError, Seq[StateSnapshot]] = {
       val hitSource =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           block.header.generationSignature
@@ -439,7 +440,7 @@ object Domain {
       .assetBalanceIterator(
         resource,
         address,
-        blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+        blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty).toDiff,
         id => blockchainUpdater.assetDescription(id).exists(!_.nft)
       )
       .toSeq

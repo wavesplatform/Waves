@@ -4,7 +4,8 @@ import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{AddressId, DBResource, Keys}
-import com.wavesplatform.state.{Portfolio, safeSum}
+import com.wavesplatform.state.safeSum
+import com.wavesplatform.transaction.Asset
 
 import scala.annotation.tailrec
 
@@ -13,9 +14,9 @@ object BalanceDistribution {
       resource: DBResource,
       globalPrefix: Array[Byte],
       addressId: Array[Byte] => AddressId,
-      balanceOf: Portfolio => Long,
+      asset: Asset,
       height: Int,
-      private var pendingPortfolios: Map[Address, Portfolio]
+      private var pendingPortfolios: Map[(Address, Asset), Long]
   ) extends AbstractIterator[(Address, Long)] {
     @inline
     private def stillSameAddress(expected: AddressId): Boolean = resource.fullIterator.isValid && {
@@ -44,8 +45,8 @@ object BalanceDistribution {
             resource.fullIterator.next()
           }
 
-          val adjustedBalanceE = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance")
-          pendingPortfolios -= address
+          val adjustedBalanceE = safeSum(balance, pendingPortfolios.getOrElse((address, asset), 0L), "Next distribution balance")
+          pendingPortfolios = pendingPortfolios.removed((address, asset))
 
           adjustedBalanceE match {
             case Right(adjustedBalance) if currentHeight <= height && adjustedBalance > 0 => Some(address -> adjustedBalance)
@@ -59,9 +60,9 @@ object BalanceDistribution {
       case Some(balance) => balance
       case None =>
         if (pendingPortfolios.nonEmpty) {
-          val (address, portfolio) = pendingPortfolios.head
-          pendingPortfolios -= address
-          address -> balanceOf(portfolio)
+          val (key @ (address, _), balance) = pendingPortfolios.head
+          pendingPortfolios -= key
+          address -> balance
         } else {
           endOfData()
         }

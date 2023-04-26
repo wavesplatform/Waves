@@ -10,7 +10,7 @@ import com.wavesplatform.database.RDB
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
@@ -45,7 +45,7 @@ trait CommonTransactionsApi {
 
 object CommonTransactionsApi {
   def apply(
-      maybeDiff: => Option[(Height, Diff)],
+      maybeDiff: => Option[(Height, StateSnapshot)],
       rdb: RDB,
       blockchain: Blockchain,
       utx: UtxPool,

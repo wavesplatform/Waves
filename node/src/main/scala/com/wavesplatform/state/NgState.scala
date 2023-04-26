@@ -1,12 +1,14 @@
 package com.wavesplatform.state
 
+import cats.implicits.catsSyntaxSemigroup
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.NgState.{CachedMicroDiff, MicroBlockInfo, NgStateCaches}
+import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import java.util.concurrent.TimeUnit
@@ -16,14 +18,14 @@ object NgState {
     def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
 
-  case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
+  case class CachedMicroDiff(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, timestamp: Long)
 
   class NgStateCaches {
     val blockDiffCache = CacheBuilder
       .newBuilder()
       .maximumSize(NgState.MaxTotalDiffs)
       .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, (Diff, Long, Long)]()
+      .build[BlockId, (StateSnapshot, Long, Long)]()
 
     val forgedBlockCache = CacheBuilder
       .newBuilder()
@@ -46,32 +48,29 @@ object NgState {
 
 case class NgState(
     base: Block,
-    baseBlockDiff: Diff,
+    baseBlockSnapshot: StateSnapshot,
     baseBlockCarry: Long,
     baseBlockTotalFee: Long,
     approvedFeatures: Set[Short],
     reward: Option[Long],
     hitSource: ByteStr,
-    leasesToCancel: Map[ByteStr, Diff],
-    microDiffs: Map[BlockId, CachedMicroDiff] = Map.empty,
+    leasesToCancel: Map[ByteStr, StateSnapshot],
+    microSnapshots: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty,
     internalCaches: NgStateCaches = new NgStateCaches
 ) {
-  def cancelExpiredLeases(diff: Diff): Either[String, Diff] =
+  def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
     leasesToCancel
-      .collect { case (id, ld) if diff.leaseState.get(id).forall(_.isActive) => ld }
+      .collect { case (id, ld) if snapshot.current.leaseStates.find(_.leaseId.toByteStr == id).forall(_.status.isActive) => ld }
       .toList
-      .foldLeft[Either[String, Diff]](Right(diff)) {
-        case (Right(d1), d2) => d1.combineF(d2)
-        case (r, _)          => r
-      }
+      .foldLeft(snapshot)(_ |+| _)
 
   def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
-  def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
+  def diffFor(totalResBlockRef: BlockId): (StateSnapshot, Long, Long) = {
     val (diff, carry, totalFee) =
       if (totalResBlockRef == base.id())
-        (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
+        (baseBlockSnapshot, baseBlockCarry, baseBlockTotalFee)
       else
         internalCaches.blockDiffCache.get(
           totalResBlockRef,
@@ -79,11 +78,11 @@ case class NgState(
             microBlocks.find(_.idEquals(totalResBlockRef)) match {
               case Some(MicroBlockInfo(blockId, current)) =>
                 val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
-                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
-                (prevDiff.combineF(currDiff).explicitGet(), prevCarry + currCarry, prevTotalFee + currTotalFee)
+                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microSnapshots(blockId)
+                (prevDiff |+| currDiff, prevCarry + currCarry, prevTotalFee + currTotalFee)
 
               case None =>
-                (Diff.empty, 0L, 0L)
+                (StateSnapshot.monoid.empty, 0L, 0L)
             }
           }
         )
@@ -113,18 +112,18 @@ case class NgState(
           block
       }
 
-  def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, Long, DiscardedMicroBlocks)] =
+  def snapshotOf(id: BlockId): Option[(Block, StateSnapshot, Long, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (block, discarded) =>
       val (diff, carry, totalFee) = this.diffFor(id)
       (block, diff, carry, totalFee, discarded)
     }
 
-  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
+  def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
 
-  def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
+  def bestLiquidSnapshot: StateSnapshot = bestLiquidSnapshotAndFees._1
 
-  def allDiffs: Seq[(MicroBlock, Diff)] =
-    microBlocks.toVector.map(mb => mb.microBlock -> microDiffs(mb.totalBlockId).diff).reverse
+  def allSnapshots: Seq[(MicroBlock, StateSnapshot)] =
+    microBlocks.toVector.map(mb => mb.microBlock -> microSnapshots(mb.totalBlockId).snapshot).reverse
 
   def contains(blockId: BlockId): Boolean =
     base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
@@ -134,7 +133,7 @@ case class NgState(
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
-      .find(mi => microDiffs(mi.totalBlockId).timestamp <= maxTimeStamp)
+      .find(mi => microSnapshots(mi.totalBlockId).timestamp <= maxTimeStamp)
       .fold(base.id())(_.totalBlockId)
 
     BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)
@@ -142,7 +141,7 @@ case class NgState(
 
   def append(
       microBlock: MicroBlock,
-      diff: Diff,
+      snapshot: StateSnapshot,
       microblockCarry: Long,
       microblockTotalFee: Long,
       timestamp: Long,
@@ -150,14 +149,14 @@ case class NgState(
   ): NgState = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
-    val microDiffs  = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
-    val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
+    val microSnapshots = this.microSnapshots + (blockId -> CachedMicroDiff(snapshot, microblockCarry, microblockTotalFee, timestamp))
+    val microBlocks    = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
-    this.copy(microDiffs = microDiffs, microBlocks = microBlocks)
+    this.copy(microSnapshots = microSnapshots, microBlocks = microBlocks)
   }
 
   def carryFee: Long =
-    baseBlockCarry + microDiffs.values.map(_.carryFee).sum
+    baseBlockCarry + microSnapshots.values.map(_.carryFee).sum
 
   def createBlockId(microBlock: MicroBlock): BlockId = {
     val newTransactions = this.transactions ++ microBlock.transactionData
@@ -186,7 +185,7 @@ case class NgState(
             (
               base,
               microBlocksAsc.toVector.map { mb =>
-                val diff = microDiffs(mb.totalBlockId).diff
+                val diff = microSnapshots(mb.totalBlockId).snapshot
                 (mb.microBlock, diff)
               }
             )
@@ -195,11 +194,11 @@ case class NgState(
         else {
           val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
             case ((accumulated, Some((sig, discarded))), MicroBlockInfo(mbId, micro)) =>
-              val discDiff = microDiffs(mbId).diff
+              val discDiff = microSnapshots(mbId).snapshot
               (accumulated, Some((sig, discarded :+ (micro -> discDiff))))
 
             case ((accumulated, None), mb) if mb.idEquals(blockId) =>
-              val found = Some((mb.microBlock.totalResBlockSig, Seq.empty[(MicroBlock, Diff)]))
+              val found = Some((mb.microBlock.totalResBlockSig, Seq.empty[(MicroBlock, StateSnapshot)]))
               (accumulated ++ mb.microBlock.transactionData, found)
 
             case ((accumulated, None), MicroBlockInfo(_, mb)) =>

@@ -4,13 +4,13 @@ import scala.concurrent.duration.FiniteDuration
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{MiningConstraint, MultiDimensionalMiningConstraint}
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.{Diff, StateSnapshot}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool.PackStrategy
 
 trait UtxForAppender {
-  def setPriorityDiffs(diffs: Seq[Diff]): Unit
+  def setPriorityDiffs(diffs: Seq[StateSnapshot]): Unit
 }
 
 trait UtxPool extends UtxForAppender with AutoCloseable {
