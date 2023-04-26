@@ -315,25 +315,78 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
     "return correct data for lease tx" in {
       val sender              = TxHelpers.signer(33)
+      val senderAddress       = sender.toAddress
       val recipient           = TxHelpers.signer(123)
+      val recipientAddress    = recipient.toAddress
       val senderBalanceBefore = 10.waves
       val amount              = 5.waves
-      val leaseTx             = TxHelpers.lease(sender, recipient.toAddress, amount, customFee)
+      val leaseTx             = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseId             = leaseTx.id.value().arr
 
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       )(_.appendMicroBlock(leaseTx)) { updates =>
         val append = updates(1).append
-        checkLease(append.transactionIds.head, append.transactionAt(0), leaseTx, recipient.toAddress.publicKeyHash)
+        checkLease(append.transactionIds.head, append.transactionAt(0), leaseTx, recipientAddress.publicKeyHash)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (sender.toAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee)
+            (senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee)
           )
         )
-        checkLeasingForAddress(append.transactionStateUpdates.head.leasingForAddress, leaseTx)
-        checkIndividualLeases(append.transactionStateUpdates.head.individualLeases, leaseTx, LeaseStatus.Active)
+        checkLeasingForAddress(
+          append.transactionStateUpdates.head.leasingForAddress,
+          Map(
+            (senderAddress, 0L, amount)    -> (0L, 0L),
+            (recipientAddress, amount, 0L) -> (0L, 0L)
+          )
+        )
+        checkIndividualLeases(
+          append.transactionStateUpdates.head.individualLeases,
+          Map(
+            (LeaseStatus.Active.toString.toLowerCase(), amount) -> (leaseId, leaseTx.sender.arr, leaseTx.recipient.bytes, leaseId)
+          )
+        )
+      }
+    }
+
+    "return correct data for lease cancel tx" in {
+      val sender              = TxHelpers.signer(33)
+      val senderAddress       = sender.toAddress
+      val recipient           = TxHelpers.signer(123)
+      val recipientAddress    = recipient.toAddress
+      val senderBalanceBefore = 10.waves
+      val amount              = 5.waves
+      val leaseTx             = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseCancelTx       = TxHelpers.leaseCancel(leaseTx.id.value(), sender, customFee)
+      val leaseId             = leaseCancelTx.leaseId.arr
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(leaseTx, leaseCancelTx)) { updates =>
+        val append = updates(1).append
+        checkLeaseCancel(append.transactionIds.apply(1), append.transactionAt(1), leaseCancelTx)
+        checkBalances(
+          append.transactionStateUpdates.head.balances,
+          Map(
+            (senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee)
+          )
+        )
+        checkLeasingForAddress(
+          append.transactionStateUpdates.apply(1).leasingForAddress,
+          Map(
+            (senderAddress, 0L, 0L)    -> (0L, amount),
+            (recipientAddress, 0L, 0L) -> (amount, 0L)
+          )
+        )
+        checkIndividualLeases(
+          append.transactionStateUpdates.apply(1).individualLeases,
+          Map(
+            (LeaseStatus.Inactive.toString, amount) -> (leaseId, leaseTx.sender.arr, leaseTx.recipient.bytes, leaseId)
+          )
+        )
       }
     }
   }

@@ -5,14 +5,13 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, LeasingUpdate}
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
-import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
 import org.scalactic.source.Position
@@ -150,6 +149,17 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkLeaseCancel(actualId: ByteString, actual: SignedTransaction, expected: LeaseCancelTransaction)(implicit
+      pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.LeaseCancel(value) =>
+        value.leaseId.toByteArray shouldBe expected.leaseId.arr
+      case _ => fail("not a Burn transaction")
+    }
+  }
+
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
     actual.map { bu =>
       (
@@ -188,22 +198,26 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkLeasingForAddress(actual: Seq[LeasingUpdate], expected: LeaseTransaction): Unit = {
-    actual.head.address.toByteArray shouldBe expected.sender.toAddress.bytes
-    actual.head.inAfter shouldEqual 0
-    actual.head.outAfter shouldEqual expected.amount.value
-
-    actual.last.address.toByteArray shouldBe expected.recipient.bytes
-    actual.last.inAfter shouldEqual expected.amount.value
-    actual.last.outAfter shouldEqual 0
+  def checkLeasingForAddress(actual: Seq[LeasingUpdate], expected: Map[(Address, Long, Long), (Long, Long)]): Unit = {
+    actual.map { bu =>
+      (
+        (Address.fromBytes(bu.address.toByteArray).explicitGet(), bu.inAfter, bu.outAfter),
+        (bu.inBefore, bu.outBefore)
+      )
+    }.toMap shouldBe expected
   }
 
-  def checkIndividualLeases(actual: Seq[LeaseUpdate], expected: LeaseTransaction, leaseStatus: LeaseStatus): Unit = {
-    actual.head.leaseId.toByteArray shouldBe expected.id.value().arr
-    actual.head.statusAfter.toString() equalsIgnoreCase leaseStatus.toString
-    actual.head.amount shouldBe expected.amount.value
-    actual.head.sender.toByteArray shouldBe expected.sender.arr
-    actual.head.recipient.toByteArray shouldBe expected.recipient.bytes
-    actual.head.originTransactionId.toByteArray shouldBe expected.id.value().arr
+  def checkIndividualLeases(actual: Seq[LeaseUpdate], expected: Map[(String, Long), (Array[Byte], Array[Byte], Array[Byte], Array[Byte])]): Unit = {
+    actual.map { bu =>
+      (
+        (bu.statusAfter.toString().toLowerCase(), bu.amount),
+        (
+          bu.leaseId.toByteArray,
+          bu.sender.toByteArray,
+          bu.recipient.toByteArray,
+          bu.originTransactionId.toByteArray
+        )
+      )
+    }.toMap equals expected
   }
 }
