@@ -21,6 +21,8 @@ object RemoteData {
     override val mayBeValue = None
   }
 
+  def loaded[T](x: T): RemoteData[T] = Cached(x)
+
   def loaded[T](x: Option[T]): RemoteData[T] = x match {
     case Some(x) => Cached(x)
     case None    => Absence

@@ -23,7 +23,7 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
 
   def put(key: Array[Byte], value: Array[Byte]): Unit = batch.use(_.put(key, value))
 
-  def update[V](key: Key[V])(f: V => V): Unit = put(key, f(get(key)))
+  def update[V](key: Key[V], default: => V)(f: V => V): Unit = put(key, f(getOpt(key).getOrElse(default)))
 
   def delete(key: Array[Byte]): Unit = batch.use(_.delete(key))
 
@@ -117,18 +117,17 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
   )(implicit ctx: ReadWrite): List[K] = {
     val affectedEntryKeys = mutable.Set.empty[K]
 
-    ctx.iterateFrom(entriesKey.prefixBytes, entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
+    ctx.iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)
       val (_, key)      = keyWithHeight
       ctx.delete(rawKey)
 
       affectedEntryKeys.add(key)
-      true
     }
 
     affectedEntryKeys.foreach { k =>
-      ctx.update(historyKey.at(k))(_.dropWhile(_ >= fromHeight))
+      ctx.update(historyKey.at(k), EmptyHeights)(_.dropWhile(_ >= fromHeight))
     }
 
     affectedEntryKeys.toList

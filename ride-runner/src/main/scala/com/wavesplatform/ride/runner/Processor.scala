@@ -39,8 +39,9 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
     extends Processor
     with ScorexLogging {
 
-  private val accumulatedChanges   = new AtomicReference(new ProcessResult[ScriptRequest]())
-  @volatile private var lastEvents = List.empty[BlockchainUpdated]
+  private val accumulatedChanges = new AtomicReference(new ProcessResult[ScriptRequest]())
+
+  @volatile private var lastLiquidBlockEvents = List.empty[BlockchainUpdated]
 
   override def startScripts(): Unit = requestsService.start()
 
@@ -49,15 +50,13 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
     event.update match {
       case Update.Append(append) =>
         append.body match {
-          case _: Body.Block      => lastEvents = List(event)
-          case _: Body.MicroBlock => lastEvents = event :: lastEvents
+          case _: Body.Block      => lastLiquidBlockEvents = List(event)
+          case _: Body.MicroBlock => lastLiquidBlockEvents = event :: lastLiquidBlockEvents
           case Body.Empty         =>
         }
 
       case _: Update.Rollback =>
-        lastEvents = lastEvents.dropWhile(x => x.height >= height && x.id != event.id)
-        // It wasn't a micro fork, so we have a useful information about changed keys
-        if (lastEvents.isEmpty) lastEvents = List(event)
+        lastLiquidBlockEvents = lastLiquidBlockEvents.dropWhile(x => x.height >= height && x.id != event.id)
 
       case Update.Empty => // Ignore
     }
@@ -84,17 +83,22 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
   /** Includes removeBlocksFrom
     */
   override def forceRollbackLiquid(): Unit =
-    lastEvents match {
-      case Nil => throw new RuntimeException("Can't force rollback one")
+    lastLiquidBlockEvents match {
+      case Nil =>
+      // Either:
+      // a. On start - we have nothing to do
+      // b. After a rollback to a full block - we don't need to make a synthetic rollback
+
       case last :: _ => // a liquid block with same height
         val rollbackToHeight = Height(last.height - 1)
-        val affected         = sharedBlockchain.undo(lastEvents)
+
+        // We have to do this for all liquid block events, because we can't receive all micro blocks after restart
+        val affected = sharedBlockchain.undo(lastLiquidBlockEvents)
         if (!affected.isEmpty)
           accumulatedChanges.getAndAccumulate(
             ProcessResult(rollbackToHeight, affected),
             (orig, update) => update.combine(orig)
           )
-        removeAllFrom(Height(last.height))
     }
 
   override def removeAllFrom(height: Height): Unit = sharedBlockchain.removeAllFrom(height)

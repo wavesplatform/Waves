@@ -6,15 +6,15 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
 import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction
@@ -24,7 +24,6 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.*
 import sun.nio.ch.Util
-import supertagged.TaggedType
 
 import java.nio.ByteBuffer
 import java.util
@@ -579,8 +578,8 @@ package object rocksdb {
   def writeAccountScriptInfo(scriptInfo: AccountScriptInfo): Array[Byte] =
     pb.AccountScriptInfo.toByteArray(
       pb.AccountScriptInfo(
-        ByteString.copyFrom(scriptInfo.publicKey.arr),
-        ByteString.copyFrom(scriptInfo.script.bytes().arr),
+        scriptInfo.publicKey.toByteString,
+        scriptInfo.script.bytes().toByteString,
         scriptInfo.verifierComplexity,
         scriptInfo.complexitiesByEstimator.map { case (version, complexities) =>
           pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
@@ -594,7 +593,7 @@ package object rocksdb {
     val asi = pb.AccountScriptInfo.parseFrom(b)
     scriptInterner.intern(
       AccountScriptInfo(
-        PublicKey(asi.publicKey.toByteArray),
+        asi.publicKey.toPublicKey,
         ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),
         asi.maxComplexity,
         asi.callableComplexity.map { c =>

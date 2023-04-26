@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import cats.syntax.option.*
 import com.wavesplatform.events.WrappedEvent
 import monix.execution.exceptions.UpstreamTimeoutException
 
@@ -14,7 +15,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 2))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 2L.some))
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
@@ -22,7 +23,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 2,
             forkNumber = 2,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(mkMicroBlockAppendEvent(2, 1, 2)) // Resolved a synthetic fork
@@ -39,7 +40,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 2,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
@@ -49,7 +50,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 2,
             forkNumber = 2,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         )
       ),
@@ -66,14 +67,14 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 3,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(
           mkRollbackEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1L.some, initX.some))
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
@@ -83,7 +84,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 2,
             forkNumber = 2,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(mkBlockAppendEvent(3, 2))
@@ -100,7 +101,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)), // Removes the last block, so we didn't see the data update
@@ -119,7 +120,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 2,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 2)),
@@ -141,14 +142,14 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
               height = 3,
               forkNumber = 1,
               microBlockNumber = 1,
-              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
             )
           ),
           WrappedEvent.Next(
             mkRollbackEvent(
               height = 2,
               forkNumber = 1,
-              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1L.some, initX.some))
             )
           ),
           WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
@@ -171,7 +172,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
                 height = 2,
                 forkNumber = 1,
                 microBlockNumber = 1,
-                dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+                dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
               )
             ),
             WrappedEvent.Next(mkMicroBlockAppendEvent(2, 1, 2)),
@@ -194,7 +195,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
                 height = 2,
                 forkNumber = 1,
                 microBlockNumber = 2,
-                dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+                dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
               )
             ),
             WrappedEvent.Next(
@@ -202,7 +203,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
                 height = 2,
                 forkNumber = 1,
                 microBlockNumber = 1,
-                dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+                dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1L.some, initX.some))
               )
             ),
             WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
@@ -224,7 +225,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(mkBlockAppendEvent(3, 1)),
@@ -242,7 +243,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             mkBlockAppendEvent(
               height = 2,
               forkNumber = 1,
-              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
             )
           ),
           WrappedEvent.Next(mkBlockAppendEvent(3, 1)),
@@ -262,7 +263,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             mkBlockAppendEvent(
               height = 2,
               forkNumber = 1,
-              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
             )
           ),
           WrappedEvent.Next(mkBlockAppendEvent(3, 1)),

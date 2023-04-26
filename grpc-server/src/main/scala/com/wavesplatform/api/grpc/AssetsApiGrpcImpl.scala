@@ -25,7 +25,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
   }
 
   override def getNFTList(request: NFTRequest, responseObserver: StreamObserver[NFTResponse]): Unit = responseObserver.interceptErrors {
-    val addressOption: Option[Address]    = if (request.address.isEmpty) None else Some(request.address.toAddress)
+    val addressOption: Option[Address]    = if (request.address.isEmpty) None else Some(request.address.toAddress())
     val afterAssetId: Option[IssuedAsset] = if (request.afterAssetId.isEmpty) None else Some(IssuedAsset(request.afterAssetId.toByteStr))
 
     val responseStream = addressOption match {

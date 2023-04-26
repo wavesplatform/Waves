@@ -21,7 +21,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
           val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
-          processor.actions shouldBe Vector(Process(event))
+          processor.actions shouldBe Vector(RemoveFrom(10), Process(event))
         }
 
         "not reaching the blockchain height - still Starting" in {
@@ -30,22 +30,22 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           updatedState shouldBe a[BlockchainState.Starting]
         }
 
-        "not found a block - only process the event" in {
+        "not found a block - remove all data on higher heights and process the event" in {
           val event     = mkBlockAppendEvent(9)
           val processor = new TestProcessor
 
           val _ = nextState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
-          processor.actions shouldBe Vector(Process(event))
+          processor.actions shouldBe Vector(RemoveFrom(9), Process(event))
         }
 
-        "found the same block - only process the event" in {
+        "found the same block - ignore" in {
           val event = mkBlockAppendEvent(9)
           val processor = new TestProcessor {
             override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = Some(true)
           }
 
           val _ = nextState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
-          processor.actions shouldBe Vector(Process(event))
+          processor.actions shouldBe Vector.empty
         }
 
         "found a difference - remove old fork data and process the event" in {
@@ -62,16 +62,13 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         }
       }
 
-      "rollback - remove old fork data and process the event" in {
+      "rollback - process the event" in {
         val event     = mkRollbackEvent(1)
         val processor = new TestProcessor
 
         val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
         updatedState shouldBe a[BlockchainState.Starting]
-        processor.actions shouldBe Vector(
-          RemoveFrom.next(event),
-          Process(event)
-        )
+        processor.actions shouldBe Vector(Process(event))
       }
     }
 
@@ -96,16 +93,13 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         }
       }
 
-      "rollback - become ResolvingFork, remove old fork data and process the event" in {
+      "rollback - become ResolvingFork, process the event" in {
         val event     = mkRollbackEvent(1)
         val processor = new TestProcessor
 
         val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
         updatedState shouldBe a[BlockchainState.ResolvingFork]
-        processor.actions shouldBe Vector(
-          RemoveFrom.next(event),
-          Process(event)
-        )
+        processor.actions shouldBe Vector(Process(event))
       }
     }
 
@@ -116,10 +110,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
         val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(10), 0, Height(10)), event)
         updatedState shouldBe a[BlockchainState.ResolvingFork]
-        processor.actions shouldBe Vector(
-          RemoveFrom.next(event),
-          Process(event)
-        )
+        processor.actions shouldBe Vector(Process(event))
       }
 
       "fork resolution" - {

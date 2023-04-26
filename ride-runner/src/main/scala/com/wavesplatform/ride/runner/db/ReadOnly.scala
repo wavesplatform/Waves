@@ -5,6 +5,7 @@ import com.wavesplatform.database.DBEntry
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats.DbHistogramExt
+import com.wavesplatform.ride.runner.db.ReadOnly.DbPair
 import com.wavesplatform.ride.runner.storage.RemoteData
 import com.wavesplatform.ride.runner.storage.persistent.{AsBytes, KvPair}
 import com.wavesplatform.state.Height
@@ -33,59 +34,83 @@ class ReadOnly(db: RocksDB, readOptions: ReadOptions) {
     bytes != null
   }
 
-  private def newPrefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
-
-  def iterateOverPrefix(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
-    @tailrec
-    def loop(iter: RocksIterator): Unit = {
-      val key = iter.key()
-      if (iter.isValid) {
-        f(Maps.immutableEntry(key, iter.value()))
-        iter.next()
-        loop(iter)
-      } else ()
+  def collect[KeyT, ValueT, T](
+      kvPair: KvPair[KeyT, ValueT],
+      seekKey: KeyT
+  )(f: DbPair[KeyT, ValueT] => IterableOnce[T]): List[T] = {
+    val r = List.newBuilder[T]
+    iterateOverPrefix(kvPair.at(seekKey)) { p =>
+      r.addAll(f(new DbPair(kvPair, p)))
     }
-
-    Using.resource(newPrefixIterator) { iter =>
-      iter.seek(prefix)
-      loop(iter)
-    }
+    r.result()
   }
 
-  def iterateOver(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
-    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
-      iter.seek(prefix)
-      while (iter.isValid && iter.key().startsWith(prefix)) {
-        f(Maps.immutableEntry(iter.key(), iter.value()))
-        iter.next()
-      }
-    }
+  def collectKeys[KeyT](kvPair: KvPair[KeyT, ?])(implicit ctx: ReadOnly): List[KeyT] =
+    collectKeys(kvPair.prefixBytes)(ctx, kvPair.prefixedKeyAsBytes)
 
-  def iterateFrom(prefix: Array[Byte], first: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit =
-    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
-      iter.seek(first)
-      var goNext = true
-      while (goNext && iter.isValid && iter.key().startsWith(prefix)) {
-        goNext = f(Maps.immutableEntry(iter.key(), iter.value()))
-        iter.next()
-      }
-    }
-
-  def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(true))) { iter =>
-    iter.seek(prefix)
-    iter.isValid
-  }
-
-  def readKeys[KeyT](kvPair: KvPair[KeyT, ?])(implicit ctx: ReadOnly): List[KeyT] =
-    readKeys(kvPair.prefixBytes)(ctx, kvPair.prefixedKeyAsBytes)
-
-  def readKeys[KeyT](prefixBytes: Array[Byte])(implicit ctx: ReadOnly, keyAsBytes: AsBytes[KeyT]): List[KeyT] = {
+  def collectKeys[KeyT](
+      prefixBytes: Array[Byte],
+      cfh: Option[ColumnFamilyHandle] = None
+  )(implicit
+      ctx: ReadOnly,
+      keyAsBytes: AsBytes[KeyT]
+  ): List[KeyT] = {
     var r = List.empty[KeyT]
-    ctx.iterateOverPrefix(prefixBytes) { dbEntry =>
+    ctx.iterateOverPrefix(prefixBytes, cfh) { dbEntry =>
       val key = keyAsBytes.read(dbEntry.getKey)
       r = key :: r
     }
     r
+  }
+
+  def iterateOverPrefix[KeyT, ValueT](
+      kvPair: KvPair[KeyT, ValueT],
+      seekKey: KeyT
+  )(f: DbPair[KeyT, ValueT] => Unit): Unit = iterateOverPrefixContinue(kvPair, seekKey) { p => f(p); true }
+
+  def iterateOverPrefix[ValueT](seekKey: Key[ValueT])(f: DBEntry => Unit): Unit =
+    iterateOverPrefixContinue(seekKey.keyBytes, seekKey.columnFamilyHandle) { p =>
+      f(p)
+      true
+    }
+
+  def iterateOverPrefix(keyBytes: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
+    iterateOverPrefixContinue(keyBytes, cfh) { x =>
+      f(x)
+      true
+    }
+
+  def iterateOverPrefixContinue[KeyT, ValueT](
+      kvPair: KvPair[KeyT, ValueT],
+      seekKey: KeyT
+  )(f: DbPair[KeyT, ValueT] => Boolean): Unit = iterateOverPrefixContinue(kvPair.at(seekKey).keyBytes, kvPair.columnFamilyHandle) { p =>
+    f(new DbPair(kvPair, p))
+  }
+
+  /** Iterate from seekKeyBytes with a prefix of short size
+    * @see
+    *   RideRocksDb#newColumnFamilyOptions useFixedLengthPrefixExtractor
+    */
+  def iterateOverPrefixContinue(seekKeyBytes: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit = {
+    @tailrec
+    def loop(iter: RocksIterator): Unit = if (iter.isValid) {
+      val key = iter.key()
+      if (f(Maps.immutableEntry(key, iter.value()))) {
+        iter.next()
+        loop(iter)
+      }
+    }
+
+    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
+      iter =>
+        iter.seek(seekKeyBytes)
+        loop(iter)
+    }
+  }
+
+  def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(true))) { iter =>
+    iter.seek(prefix)
+    iter.isValid
   }
 
   def readHistoricalFromDbOpt[T](
@@ -112,4 +137,11 @@ class ReadOnly(db: RocksDB, readOptions: ReadOptions) {
 
   def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
   def getRemoteData[T](key: Key[T]): RemoteData[T]            = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
+}
+
+object ReadOnly {
+  class DbPair[KeyT, ValueT](kvPair: KvPair[KeyT, ValueT], val dbEntry: DBEntry) {
+    lazy val key: KeyT     = kvPair.parseKey(dbEntry.getKey)
+    lazy val value: ValueT = kvPair.parseValue(dbEntry.getValue)
+  }
 }

@@ -30,7 +30,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
             .fold(e => throw new IllegalArgumentException(e.toString), identity)
 
           val maybeSender = Option(request.sender)
-            .collect { case s if !s.isEmpty => s.toAddress }
+            .collect { case s if !s.isEmpty => s.toAddress() }
 
           Observable.fromIterator(
             commonApi
@@ -46,7 +46,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
         // By sender
         case None if !request.sender.isEmpty =>
-          val senderAddress = request.sender.toAddress
+          val senderAddress = request.sender.toAddress()
           Observable.fromIterator(
             commonApi
               .transactionsByAddress(
@@ -77,7 +77,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
       val unconfirmedTransactions = if (!request.sender.isEmpty) {
-        val senderAddress = request.sender.toAddress
+        val senderAddress = request.sender.toAddress()
         commonApi.unconfirmedTransactions.collect {
           case a: Authorized if a.sender.toAddress == senderAddress => a
         }

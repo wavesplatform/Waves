@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import cats.syntax.option.*
 import com.wavesplatform.events.WrappedEvent
 
 class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
@@ -11,7 +12,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         )
       ),
@@ -27,7 +28,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 2,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         )
       ),
@@ -46,14 +47,14 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 3,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(
           mkRollbackEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1L.some, initX.some))
           )
         ),
         WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
@@ -61,7 +62,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 4,
             forkNumber = 2,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1))
@@ -79,7 +80,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 3,
             forkNumber = 1,
             microBlockNumber = 2,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         ),
         WrappedEvent.Next(
@@ -87,7 +88,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 3,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1L.some, initX.some))
           )
         ),
         WrappedEvent.Next(mkBlockAppendEvent(4, 1)),
@@ -96,7 +97,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
             height = 4,
             forkNumber = 1,
             microBlockNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX.some, 1L.some))
           )
         )
       ),

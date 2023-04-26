@@ -9,11 +9,21 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
-import com.wavesplatform.database.rocksdb.{Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
+import com.wavesplatform.database.rocksdb.{
+  Key,
+  readAccountScriptInfo,
+  readAssetDetails,
+  readAssetScript,
+  readBlockMeta,
+  writeAccountScriptInfo,
+  writeAssetDetails,
+  writeAssetScript,
+  writeBlockMeta
+}
 import com.wavesplatform.database.{AddressId, toPbTransaction, toVanillaTransaction, protobuf as pb}
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.ride.runner.db.Heights
 import com.wavesplatform.ride.runner.storage.DbKeyIndex
 import com.wavesplatform.ride.runner.storage.persistent.AsBytes.*
@@ -22,11 +32,15 @@ import com.wavesplatform.state
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetVolumeInfo, DataEntry, LeaseBalance, TransactionId, TxMeta}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, AssetIdLength, Transaction}
+import org.rocksdb.ColumnFamilyHandle
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
 
-sealed abstract class KvPair[KeyT, ValueT](prefix: Short)(implicit keyAsBytes: AsBytes[KeyT], valueAsBytes: AsBytes[ValueT]) {
+sealed abstract class KvPair[KeyT, ValueT](
+    prefix: Short,
+    val columnFamilyHandle: Option[ColumnFamilyHandle] = None
+)(implicit keyAsBytes: AsBytes[KeyT], valueAsBytes: AsBytes[ValueT]) {
   val name        = getSimpleName(this)
   val prefixBytes = Shorts.toByteArray(prefix)
 
@@ -35,7 +49,7 @@ sealed abstract class KvPair[KeyT, ValueT](prefix: Short)(implicit keyAsBytes: A
   def at(key: KeyT): Key[ValueT] = {
     val keyBytesStream = new ByteArrayOutputStream()
     keyAsBytes.write(keyBytesStream, key)
-    new Key[ValueT](prefix, name, keyBytesStream.toByteArray) {
+    new Key[ValueT](prefix, name, keyBytesStream.toByteArray, columnFamilyHandle) {
       override def parse(bytes: Array[Byte]): ValueT = valueAsBytes.read(bytes)
       override def encode(v: ValueT): Array[Byte]    = valueAsBytes.asBytes(v)
     }
@@ -43,6 +57,10 @@ sealed abstract class KvPair[KeyT, ValueT](prefix: Short)(implicit keyAsBytes: A
 
   def parseKey(xs: Array[Byte]): KeyT     = prefixedKeyAsBytes.read(ByteBuffer.wrap(xs))
   def parseValue(xs: Array[Byte]): ValueT = valueAsBytes.read(ByteBuffer.wrap(xs))
+}
+
+object KvPair {
+  val PrefixSize = Shorts.BYTES
 }
 
 sealed abstract class KvHistoryPair[KeyT](prefix: Short)(implicit keyAsBytes: AsBytes[KeyT])
@@ -127,8 +145,8 @@ object KvPairs {
             // id is empty, now it is used to optimize reads in NODE for Blockchain.resolveERC20Address.
             // we don't need it, because we have it in a key.
             StaticAssetInfo(
-              sourceId = UnsafeByteOperations.unsafeWrap(x.originTransactionId.arr),
-              issuerPublicKey = UnsafeByteOperations.unsafeWrap(x.issuer.arr),
+              sourceId = x.originTransactionId.toByteString,
+              issuerPublicKey = x.issuer.toByteString,
               decimals = x.decimals,
               isNft = x.nft
             )
@@ -152,9 +170,11 @@ object KvPairs {
         AsBytes.optional(assetDescriptionAsBytes)
       )
 
-  val aliasAsBytes: AsBytes[Alias] = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
+  val aliasAsBytes: AsBytes[Alias]                = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
+  private val aliasWithLenAsBytes: AsBytes[Alias] = AsBytes.byteArrayAsBytes.withIntLen.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
+  object AliasesByHeight extends KvPair[state.Height, List[Alias]](79)(implicitly, AsBytes.listAsBytes.consumeAll(aliasWithLenAsBytes))
   // TODO #25 Store AddressId
-  object Aliases extends KvPair[Alias, Option[Address]](80)(aliasAsBytes, implicitly)
+  object Aliases extends KvPair[Alias, (state.Height, Option[Address])](80)(aliasAsBytes, implicitly)
 
   object AccountAssetsHistory extends KvHistoryPair[(AddressId, Asset)](91)
   object AccountAssets        extends KvPair[(state.Height, (AddressId, Asset)), Long](92)
@@ -162,8 +182,11 @@ object KvPairs {
   object AccountLeaseBalancesHistory extends KvHistoryPair[AddressId](101)
   object AccountLeaseBalances        extends KvPair[(state.Height, AddressId), LeaseBalance](102)
 
-  implicit val transactionIdAsBytes: AsBytes[TransactionId] = AsBytes.byteArrayAsBytes.consumeAll.toByteStr.transform(TransactionId(_), x => x)
-  object Transactions extends KvPair[TransactionId, Option[Int]](110)
+  implicit val transactionIdAsBytes: AsBytes[TransactionId]       = AsBytes.byteArrayAsBytes.consumeAll.toByteStr.transform(TransactionId(_), x => x)
+  private val transactionIdWithLenAsBytes: AsBytes[TransactionId] = AsBytes.byteArrayAsBytes.withIntLen.toByteStr.transform(TransactionId(_), x => x)
+  object TransactionsByHeight
+      extends KvPair[state.Height, List[TransactionId]](109)(implicitly, AsBytes.listAsBytes.consumeAll(transactionIdWithLenAsBytes))
+  object Transactions extends KvPair[TransactionId, Option[state.Height]](110)
 
   implicit val dbKeyIndex: AsBytes[DbKeyIndex] = AsBytes.intAsBytes.transform(DbKeyIndex(_), x => x)
 

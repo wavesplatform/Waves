@@ -103,7 +103,9 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
 
     // TODO HACK: Remove when the storage format cemented
     {
-      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
+      val rootPath = Paths.get(settings.rideRunner.db.directory, "..").normalize()
+      Files.createDirectories(rootPath)
+
       val cleanupIterationPath = rootPath.resolve("cleanup")
       val cleanupIteration =
         if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
@@ -111,17 +113,18 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
 
       if (cleanupIteration == "-1") {
         rootPath.toFile.listFiles().foreach { file =>
-          println(s"File before: $file")
+          log.info(s"File before: $file")
         }
       }
 
-      val cleanTo = 4 // Increase if you want to clean the database
+      val cleanTo = 7 // Increase if you want to clean the database
       if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
         log.info(
           s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
         )
+        val logPath = rootPath.resolve("log.txt").toAbsolutePath.toString
         rootPath.toFile.listFiles().foreach { file =>
-          if (file.getAbsolutePath != cleanupIterationPath.toAbsolutePath.toString)
+          if (file.getAbsolutePath != cleanupIterationPath.toAbsolutePath.toString && file.getAbsolutePath != logPath)
             MoreFiles.deleteRecursively(file.toPath, RecursiveDeleteOption.ALLOW_INSECURE)
         }
         Files.writeString(cleanupIterationPath, cleanTo.toString)
@@ -129,7 +132,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
 
       if (cleanupIteration == "-1") {
         rootPath.toFile.listFiles().foreach { file =>
-          println(s"File after: $file")
+          log.info(s"File after: $file")
         }
       }
     }
@@ -153,7 +156,6 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
 
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
-      rideDb.access,
       sharedBlockchain,
       new SynchronizedJobScheduler()(rideScheduler),
       rideScheduler
@@ -175,6 +177,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
         BlockchainState(settings.rideRunner.blockchainState, processor, blockchainUpdatesStream, _, _)
       }
+//      .takeWhile(_.processedHeight < workingHeight) // !
       .doOnNext { state =>
         Task {
           lastServiceStatus = ServiceStatus(
@@ -236,6 +239,24 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)
 
+//    log.info(
+//      "Result: " + Await
+//        .result(
+//          requestService
+//            .trackAndRun(
+//              ScriptRequest(
+//                Address.fromString("3PKpsc1TNquw4HAF62pWK8ka1DBz9vyEBkt").explicitGet(),
+//                Json.obj(
+//                  "expr" -> "claimV2READONLY(\"Atqv59EYzjFGuitKVnMRk6H8FukjoV3ktPorbEys25on\", \"3PNvVEgRuy1gQcU5zeAxZEcP1AMLTK6LxJk\")"
+//                )
+//              )
+//            )
+//            .runToFuture(blockchainEventsStreamScheduler),
+//          1.minute
+//        )
+//        .toString()
+//    )
+//
     log.info("Done")
     cs.forceStop()
   }

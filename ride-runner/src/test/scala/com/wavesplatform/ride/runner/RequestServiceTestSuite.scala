@@ -4,11 +4,10 @@ import cats.syntax.option.*
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
-import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
+import com.wavesplatform.api.{HasBasicGrpcConverters, HasGrpc, TestBlockchainApi}
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
@@ -24,7 +23,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
+class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasDb {
   private val aRequest = ScriptRequest(aliceAddr, Json.obj("expr" -> "default()"))
   private val bRequest = ScriptRequest(bobAddr, Json.obj("expr" -> "default()"))
   private val cRequest = ScriptRequest(carlAddr, Json.obj("expr" -> "default()"))
@@ -50,7 +49,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
 
         d.blockchainApi.blockchainUpdatesUpstream.onNext(
           WrappedEvent.Next(
-            mkBlockAppendEvent(2, 0, List(mkDataEntryUpdate(aliceAddr, "x", 0, 1)))
+            mkBlockAppendEvent(2, 0, List(mkDataEntryUpdate(aliceAddr, "x", 0L.some, 1L.some)))
           )
         )
         d.scheduler.tick()
@@ -117,7 +116,6 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     val requestsService = use(
       new DefaultRequestService(
         settings = requestServiceSettings,
-        db = testDb.storage,
         sharedBlockchain = sharedBlockchain,
         use(new TestJobScheduler()),
         runScriptScheduler = testScheduler

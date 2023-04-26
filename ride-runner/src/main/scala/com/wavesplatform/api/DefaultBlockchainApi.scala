@@ -3,7 +3,7 @@ package com.wavesplatform.api
 import cats.syntax.option.*
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
@@ -38,7 +38,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, StringBytes}
 import io.grpc.*
 import io.grpc.stub.ClientCalls
 import monix.eval.Task
@@ -48,7 +48,6 @@ import monix.reactive.operators.extraSyntax.*
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
 
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
@@ -127,10 +126,12 @@ class DefaultBlockchainApi(
 
   override def getCurrentBlockchainHeight(): Height =
     grpcCall("getCurrentBlockchainHeight") {
-      Height(ClientCalls.blockingUnaryCall(
-        grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
-        Empty()
-      ))
+      Height(
+        ClientCalls.blockingUnaryCall(
+          grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
+          Empty()
+        )
+      )
     }
       .tap { r => log.trace(s"getCurrentBlockchainHeight: $r") }
 
@@ -225,9 +226,9 @@ class DefaultBlockchainApi(
     val r = xs.map { x =>
       AssetDescription(
         originTransactionId = asset.id,
-        issuer = PublicKey(x.issuer.toByteArray),
-        name = UnsafeByteOperations.unsafeWrap(x.name.getBytes(StandardCharsets.UTF_8)),
-        description = UnsafeByteOperations.unsafeWrap(x.description.getBytes(StandardCharsets.UTF_8)),
+        issuer = x.issuer.toPublicKey,
+        name = x.name.toByteString,
+        description = x.description.toByteString,
         decimals = x.decimals,
         reissuable = x.reissuable,
         totalVolume = x.totalVolume,
@@ -355,7 +356,7 @@ object DefaultBlockchainApi {
         reference = header.reference.toByteStr,
         baseTarget = header.baseTarget,
         generationSignature = header.generationSignature.toByteStr,
-        generator = PublicKey(header.generator.toByteArray),
+        generator = header.generator.toPublicKey,
         featureVotes = header.featureVotes.map(_.toShort),
         rewardVote = header.rewardVote,
         transactionsRoot = header.transactionsRoot.toByteStr

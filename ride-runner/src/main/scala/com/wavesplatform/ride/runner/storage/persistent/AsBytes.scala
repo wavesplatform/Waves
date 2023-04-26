@@ -7,6 +7,7 @@ import com.wavesplatform.state.Height
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import scala.collection.Factory
 
 trait AsBytes[T] {
   def read(from: Array[Byte]): T = read(ByteBuffer.wrap(from))
@@ -115,17 +116,25 @@ object AsBytes {
   implicit def tuple3[A, B, C](implicit aAsBytes: AsBytes[A], bAsBytes: AsBytes[B], cAsBytes: AsBytes[C]): AsBytes[(A, B, C)] =
     tuple(aAsBytes, bAsBytes, cAsBytes)
 
-  object vecAsBytes {
-    def consumeAll[V](implicit vAsBytes: AsBytes[V]): AsBytes[Vector[V]] = AsBytes.mk[Vector[V]](
+  object colAsBytes {
+    def consumeAll[V, C <: Seq[V]](implicit vAsBytes: AsBytes[V], factory: Factory[V, C]): AsBytes[C] = AsBytes.mk[C](
       w = { (os, xs) => xs.foreach(vAsBytes.write(os, _)) },
       r = xs => {
-        val r = Vector.newBuilder[V]
+        val r = factory.newBuilder
         while (xs.hasRemaining) {
           r.addOne(vAsBytes.read(xs))
         }
         r.result()
       }
     )
+  }
+
+  object vecAsBytes {
+    def consumeAll[V](implicit vAsBytes: AsBytes[V]): AsBytes[Vector[V]] = colAsBytes.consumeAll[V, Vector[V]]
+  }
+
+  object listAsBytes {
+    def consumeAll[V](implicit vAsBytes: AsBytes[V]): AsBytes[List[V]] = colAsBytes.consumeAll[V, List[V]]
   }
 
   object mapAsBytes {

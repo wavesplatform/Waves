@@ -1,7 +1,6 @@
-package com.wavesplatform.it
+package com.wavesplatform.api
 
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.api.grpc.BalanceResponse
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr

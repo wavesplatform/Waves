@@ -5,13 +5,11 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
-import com.wavesplatform.ride.runner.db.{ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.requests.DefaultRequestService.RideScriptRunEnvironment
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
-import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
-import com.wavesplatform.state.Height
+import com.wavesplatform.ride.runner.storage.{CacheKey, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelablePromise, Scheduler}
@@ -41,7 +39,6 @@ object RequestJob {
 
 class DefaultRequestService(
     settings: DefaultRequestService.Settings,
-    db: RideDbAccess,
     sharedBlockchain: SharedBlockchainStorage[ScriptRequest],
     requestScheduler: JobScheduler[ScriptRequest],
     runScriptScheduler: Scheduler
@@ -63,7 +60,8 @@ class DefaultRequestService(
   override def start(): Unit = {
     val task =
       if (!isWorking.get()) Task.unit
-      else
+      else {
+        log.info("Starting...")
         requestScheduler.jobs
           .takeWhile(_ => isWorking.get())
           .mapParallelUnordered(3) { toRun =>
@@ -75,13 +73,11 @@ class DefaultRequestService(
                   if (updated.isAvailable) {
                     // We don't need to cache an empty value, so we use getOrElse here
                     val origEnv = Option(requests.getIfPresent(toRun)).getOrElse(RideScriptRunEnvironment(toRun))
-                    db.asyncReadWrite { implicit ctx =>
-                      runOne(sharedBlockchain.heightUntagged, origEnv, hasCaches = true).tapEval { r =>
-                        Task {
-                          requests.put(r.key, r)
-                          updated.result.trySuccess(r.lastResult)
-                          currJobs.remove(toRun)
-                        }
+                    runOne(sharedBlockchain.heightUntagged, origEnv, hasCaches = true).tapEval { r =>
+                      Task {
+                        requests.put(r.key, r)
+                        updated.result.trySuccess(r.lastResult)
+                        currJobs.remove(toRun)
                       }
                     }
                   } else {
@@ -96,6 +92,7 @@ class DefaultRequestService(
           .logErr
           .lastL
           .as(())
+      }
 
     // TODO cancel?
     task.runToFuture(runScriptScheduler)
@@ -130,14 +127,12 @@ class DefaultRequestService(
         case Some(job) => Task.fromCancelablePromise(job.result)
         case None =>
           Task {
-            db.readWrite { implicit ctx =>
-              sharedBlockchain.accountScripts.getUntagged(sharedBlockchain.heightUntagged, request.address)
-            }
+            sharedBlockchain.getOrFetch(CacheKey.AccountScript(request.address))
           }.flatMap {
             // TODO #19 Change/move an error to an appropriate layer
             case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
-              log.info(s"Adding ${request.logPrefix} as $request")
+              log.info(s"Added ${request.detailedLogPrefix}")
               val job = RequestJob.mk()
               currJobs.putIfAbsent(request, job)
               requestScheduler.add(request)
@@ -146,7 +141,7 @@ class DefaultRequestService(
       }
   }
 
-  private def runManyAll(height: Int, scripts: Iterable[RideScriptRunEnvironment])(implicit ctx: ReadWrite): Task[Unit] = {
+  private def runManyAll(height: Int, scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
 //    val r = Task
 //      .parTraverseUnordered(scripts) { script =>
 //        runOne(height, script, hasCaches = true)
@@ -159,7 +154,7 @@ class DefaultRequestService(
     Task.unit
   }
 
-  private def runMany(height: Int, scripts: Iterable[RideScriptRunEnvironment])(implicit ctx: ReadWrite): Task[Unit] = {
+  private def runMany(height: Int, scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
 //    val r = Task
 //      .parTraverseUnordered(scripts)((script: RideScriptRunEnvironment) => runOne(height, script, hasCaches = true))
 //      .as(())
@@ -170,7 +165,7 @@ class DefaultRequestService(
     Task.unit
   }
 
-  private def runOne(height: Int, scriptEnv: RideScriptRunEnvironment, hasCaches: Boolean)(implicit ctx: ReadWrite): Task[RideScriptRunEnvironment] =
+  private def runOne(height: Int, scriptEnv: RideScriptRunEnvironment, hasCaches: Boolean): Task[RideScriptRunEnvironment] =
     Task
       .evalAsync {
         val updatedResult = rideRequestRunTime.withTag("has-caches", hasCaches).measure {
@@ -180,17 +175,17 @@ class DefaultRequestService(
         val origResult      = scriptEnv.lastResult
         lazy val complexity = (updatedResult \ "complexity").as[Int]
         if ((updatedResult \ "error").isDefined) {
-          log.trace(f"result=failed; ${scriptEnv.key} errorCode=${(updatedResult \ "error").as[Int]}")
+          log.trace(f"result=failed; ${scriptEnv.key.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
           rideScriptFailedCalls.increment()
         } else if (
           origResult == JsObject.empty ||
           updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
         ) {
           rideScriptOkCalls.increment()
-          log.trace(f"result=ok; ${scriptEnv.key} complexity=$complexity")
+          log.trace(f"result=ok; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
         } else {
           rideScriptUnnecessaryCalls.increment()
-          log.trace(f"result=unnecessary; ${scriptEnv.key} complexity=$complexity")
+          log.trace(f"result=unnecessary; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
         }
 
         scriptEnv.copy(
@@ -202,7 +197,7 @@ class DefaultRequestService(
       .tapError { e => Task(log.error(s"An error during running ${scriptEnv.key}", e)) }
       .executeOn(runScriptScheduler)
 
-  private def evaluate(script: RideScriptRunEnvironment)(implicit ctx: ReadWrite): JsObject = UtilsApiRoute.evaluate(
+  private def evaluate(script: RideScriptRunEnvironment): JsObject = UtilsApiRoute.evaluate(
     settings.evaluateScriptComplexityLimit,
     new ProxyBlockchain(sharedBlockchain),
     script.key.address,

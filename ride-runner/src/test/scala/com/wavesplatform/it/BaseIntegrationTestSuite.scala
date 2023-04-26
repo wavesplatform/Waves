@@ -3,8 +3,8 @@ package com.wavesplatform.it
 import cats.syntax.option.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
-import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
+import com.wavesplatform.api.{HasBasicGrpcConverters, HasGrpc, TestBlockchainApi}
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
@@ -25,8 +25,8 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasDb with HasMonixHelpers {
-  protected val initX = 0
+abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasDb with HasMonixHelpers {
+  protected val initX = 0L
 
   /** @param xPlusHeight
     *   An expected script result, x > 0? The initial value is 0
@@ -74,7 +74,6 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val requestService = use(
       new DefaultRequestService(
         settings = requestServiceSettings,
-        db = testDb.storage,
         sharedBlockchain = sharedBlockchain,
         requestScheduler = use(new TestJobScheduler()),
         runScriptScheduler = testScheduler

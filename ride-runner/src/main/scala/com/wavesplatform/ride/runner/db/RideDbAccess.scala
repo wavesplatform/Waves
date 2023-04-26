@@ -16,45 +16,48 @@ trait RideDbAccess {
 
 object RideDbAccess {
   def fromRocksDb(db: RocksDB): RideDbAccess = new RideDbAccess with ScorexLogging {
-    override def readOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T =
-      Using.resource(db.getSnapshot) { s =>
-        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
-          f(new ReadOnly(db, ro))
+    override def readOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
+      f(new ReadOnly(db, ro))
+    }
+
+    override def readWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
+      Using.resource(mkWriteOptions()) { wo =>
+        Using.resource(SynchronizedWriteBatch()) { wb =>
+          val r = f(new ReadWrite(db, ro, wb))
+          db.write(wo, wb.underlying)
+          r
         }
+      }
+    }
+
+    private def withReadOptions[T](use: ReadOptions => T): T =
+      // Snapshot.close does nothing, see https://github.com/facebook/rocksdb/blob/601320164b41643e39851245ee90a90caa61d311/java/src/main/java/org/rocksdb/Snapshot.java#L31
+      Using.resource(db.getSnapshot) { s =>
+        Using.resource(mkReadOptions(s))(use)
       }((resource: Snapshot) => db.releaseSnapshot(resource))
 
-    override def readWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T =
-      Using.resource(db.getSnapshot) { s =>
-        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
-          Using.resource(new WriteOptions().setSync(false).setDisableWAL(true)) { wo =>
-            Using.resource(SynchronizedWriteBatch()) { wb =>
-              val r = f(new ReadWrite(db, ro, wb))
-              db.write(wo, wb.underlying)
-              r
-            }
-          }
-        }
-      }((resource: Snapshot) => db.releaseSnapshot(resource))
+    override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = withAsyncReadOptions { ro =>
+      f(new ReadOnly(db, ro))
+    }
 
-    override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] =
-      withReadOption { ro => f(new ReadOnly(db, ro)) }
-
-    override def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T] =
-      withReadOption { ro =>
-        withResource(new WriteOptions().setSync(false).setDisableWAL(true))(_.close()) { wo =>
-          withResource(SynchronizedWriteBatch())(_.close()) { wb =>
-            f(new ReadWrite(db, ro, wb)).tapEval { _ =>
-              Task.evalAsync(db.write(wo, wb.underlying))
-            }
+    override def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T] = withAsyncReadOptions { ro =>
+      withResource(mkWriteOptions())(_.close()) { wo =>
+        withResource(SynchronizedWriteBatch())(_.close()) { wb =>
+          f(new ReadWrite(db, ro, wb)).tapEval { _ =>
+            Task.evalAsync(db.write(wo, wb.underlying))
           }
         }
       }
+    }
 
-    private def withReadOption[T](use: ReadOptions => Task[T]): Task[T] =
+    private def withAsyncReadOptions[T](use: ReadOptions => Task[T]): Task[T] =
       // Snapshot.close does nothing, see https://github.com/facebook/rocksdb/blob/601320164b41643e39851245ee90a90caa61d311/java/src/main/java/org/rocksdb/Snapshot.java#L31
       withResource(db.getSnapshot)(db.releaseSnapshot) { s =>
-        withResource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false))(_.close())(use)
+        withResource(mkReadOptions(s))(_.close())(use)
       }
+
+    private def mkReadOptions(s: Snapshot): ReadOptions = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
+    private def mkWriteOptions(): WriteOptions          = new WriteOptions().setSync(false).setDisableWAL(false)
 
     private def withResource[R, T](acquire: => R)(release: R => Unit)(use: R => Task[T]): Task[T] =
       Task

@@ -1,10 +1,12 @@
 package com.wavesplatform.ride.runner.db
 
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.{columnFamilyProperties, dbStats}
+import com.wavesplatform.ride.runner.storage.persistent.KvPair
 import com.wavesplatform.utils.*
 import org.rocksdb.{ColumnFamilyHandle, RocksDB, Statistics, TickerType, *}
 
 import java.io.File
+import java.nio.file.Paths
 import java.util
 import scala.jdk.CollectionConverters.{CollectionHasAsScala, SeqHasAsJava}
 import scala.util.Try
@@ -64,6 +66,7 @@ object RideRocksDb extends ScorexLogging {
       // .setBytesPerSync(2 << 20)
       .setMaxBackgroundJobs(4)
       .setCreateMissingColumnFamilies(true)
+      .setWalSizeLimitMB(1 << 20) // 1MiB
       //      .setWriteBufferManager(new WriteBufferManager())
       .setMaxOpenFiles(50)
 
@@ -84,7 +87,7 @@ object RideRocksDb extends ScorexLogging {
           RocksDB.DEFAULT_COLUMN_FAMILY,
           // TODO Settings
           newColumnFamilyOptions(12.0, 16 << 10, 256 << 20, 8 << 20, 0.6)
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "ride").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(Paths.get(settings.directory, "ride"), 0L)).asJava)
         )
       ).asJava,
       handles
@@ -123,7 +126,7 @@ object RideRocksDb extends ScorexLogging {
       )
       .setWriteBufferSize(writeBufferSizeInBytes)
       .setLevelCompactionDynamicLevelBytes(true)
-      .useCappedPrefixExtractor(10)
+      .useFixedLengthPrefixExtractor(KvPair.PrefixSize)
       .setMemtablePrefixBloomSizeRatio(0.25)
       .setCompressionType(CompressionType.LZ4_COMPRESSION)
       .setSstPartitionerFactory(new SstPartitionerFixedPrefixFactory(2))

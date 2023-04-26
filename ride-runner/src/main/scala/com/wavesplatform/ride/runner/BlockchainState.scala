@@ -109,7 +109,6 @@ object BlockchainState extends ScorexLogging {
 
       Task {
         val startHeight = Height(r.processedHeight + 1)
-        processor.removeAllFrom(startHeight)
         blockchainUpdatesStream.start(startHeight)
         r
       }.delayExecution(settings.delayBeforeForceRestart)
@@ -157,15 +156,17 @@ object BlockchainState extends ScorexLogging {
               if (orig.foundDifferentBlocks) orig
               else
                 processor.hasLocalBlockAt(h, currBlockId) match {
-                  case Some(true) | None => orig // true - same blocks
+                  case Some(true) => orig
                   case _ =>
+                    log.info(s"Blocks on $h are different")
                     processor.removeAllFrom(h)
                     orig.withDifferentBlocks
                 }
 
-            processor.process(event.getUpdate)
+            if (comparedBlocks.foundDifferentBlocks) processor.process(event.getUpdate)
+
             if (h >= comparedBlocks.workingHeight) {
-              log.info(s"[$h] Reached the current height")
+              log.info(s"[$h] Reached current height")
               val r = Working(h)
               logStatusChanged(r)
               processor.startScripts()
@@ -174,7 +175,6 @@ object BlockchainState extends ScorexLogging {
 
           case _: Update.Rollback =>
             // It works even for micro blocks, because we have a restored version of data in event
-            processor.removeAllFrom(Height(h + 1))
             processor.process(event.getUpdate)
             ignore
 
@@ -189,7 +189,6 @@ object BlockchainState extends ScorexLogging {
             processor.runAffectedScripts(updateType).as(orig.withHeight(h))
 
           case _: Update.Rollback =>
-            processor.removeAllFrom(Height(h + 1))
             processor.process(event.getUpdate)
             val r = ResolvingFork.from(Height(event.getUpdate.height), orig.processedHeight)
             logStatusChanged(r)
@@ -213,7 +212,6 @@ object BlockchainState extends ScorexLogging {
             } else Task.now(updated)
 
           case _: Update.Rollback =>
-            processor.removeAllFrom(Height(h + 1))
             processor.process(event.getUpdate)
             Task.now(orig.apply(event))
 

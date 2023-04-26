@@ -5,7 +5,8 @@ import com.wavesplatform.account.Address
 import play.api.libs.json.*
 
 final case class ScriptRequest(address: Address, requestBody: JsObject) {
-  val logPrefix: String = s"[$address, $requestBody]"
+  val detailedLogPrefix: String = s"[$address, hash=${requestBody.hashCode()}, $requestBody]"
+  val shortLogPrefix: String    = s"[$address, ${requestBody.hashCode()}]"
 }
 
 object ScriptRequest {
