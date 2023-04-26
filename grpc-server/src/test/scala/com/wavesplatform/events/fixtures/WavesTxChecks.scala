@@ -1,9 +1,10 @@
 package com.wavesplatform.events.fixtures
 
+import ch.qos.logback.core.encoder.ByteArrayUtil
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.events.protobuf.StateUpdate.BalanceUpdate
 import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
 import com.wavesplatform.protobuf.transaction.*
@@ -103,49 +104,52 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.buyMatcherFee shouldEqual expected.buyMatcherFee
         value.sellMatcherFee shouldEqual expected.sellMatcherFee
 
+        // order1
         value.orders.head.chainId shouldEqual expected.chainId
         value.orders.head.sender.senderPublicKey.get.toByteArray shouldBe expected.order1.sender.arr
         value.orders.head.matcherPublicKey.toByteArray shouldBe expected.order1.matcherPublicKey.arr
-/*
-        value.orders.head.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order1.assetPair.amountAsset.byteRepr
-        value.orders.head.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order1.assetPair.priceAsset.byteRepr
-        value.orders.head.orderSide.toString() shouldBe expected.order1.orderType.toString
-*/
+        value.orders.head.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order1.assetPair.amountAsset.compatId.get.arr
+        value.orders.head.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order1.assetPair.priceAsset.compatId.get.arr
+        value.orders.head.orderSide.toString() equalsIgnoreCase expected.order1.orderType.toString
         value.orders.head.amount shouldEqual expected.order1.amount.value
         value.orders.head.price shouldEqual expected.order1.price.value
         value.orders.head.timestamp shouldEqual expected.order1.timestamp
         value.orders.head.expiration shouldEqual expected.order1.expiration
         value.orders.head.matcherFee.get.amount shouldEqual expected.order1.matcherFee.value
-//        value.orders.head.matcherFee.get.assetId.toByteArray shouldBe expected.order1.matcherFeeAssetId.byteRepr
+        toVanillaAssetId(value.orders.head.matcherFee.get.assetId) shouldBe expected.order1.matcherFeeAssetId
         value.orders.head.version shouldEqual expected.order1.version
 
-
+        // order2
         value.orders.last.chainId shouldEqual expected.chainId
         value.orders.last.sender.senderPublicKey.get.toByteArray shouldBe expected.order2.sender.arr
         value.orders.last.matcherPublicKey.toByteArray shouldBe expected.order2.matcherPublicKey.arr
-        /*
-                value.orders.last.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order2.assetPair.amountAsset.byteRepr
-                value.orders.last.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order2.assetPair.priceAsset.byteRepr
-                value.orders.last.orderSide.toString() shouldBe expected.order2.orderType.toString
-        */
+        value.orders.last.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order2.assetPair.amountAsset.compatId.get.arr
+        value.orders.last.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order2.assetPair.priceAsset.compatId.get.arr
+        value.orders.last.orderSide.toString() equalsIgnoreCase expected.order2.orderType.toString
         value.orders.last.amount shouldEqual expected.order2.amount.value
         value.orders.last.price shouldEqual expected.order2.price.value
         value.orders.last.timestamp shouldEqual expected.order2.timestamp
         value.orders.last.expiration shouldEqual expected.order2.expiration
         value.orders.last.matcherFee.get.amount shouldEqual expected.order2.matcherFee.value
-//         value.orders.last.matcherFee.get.assetId.toByteArray shouldBe expected.order2.matcherFeeAssetId.byteRepr
+        toVanillaAssetId(value.orders.last.matcherFee.get.assetId) shouldBe expected.order2.matcherFeeAssetId
         value.orders.last.version shouldEqual expected.order2.version
       case _ => fail("not a Exchange transaction")
     }
   }
 
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
-    actual.map { bu =>
+   val map = actual.map { bu =>
       (
         (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
         (bu.amountBefore, bu.amountAfter.value.amount)
       )
-    }.toMap shouldEqual expected
+    }.toMap
+
+
+    println("БУ: " + map)
+    println("ТРАНЗА: " + expected)
+
+    map shouldEqual expected
   }
 
   def checkAssetsAfter(actual: Seq[AssetStateUpdate], expected: IssueTransaction, isNft: Boolean): Unit = {
