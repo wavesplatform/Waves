@@ -311,6 +311,17 @@ object StateSnapshot {
   implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
     override val empty = StateSnapshot(Vector(), TransactionStateSnapshot())
     override def combine(s1: StateSnapshot, s2: StateSnapshot): StateSnapshot = {
+
+      // todo optimize
+      def displaceData = {
+        val updatedS2 = s1.current.accountData.map(d1 =>
+          s2.current.accountData
+            .find(d2 => d1.address == d2.address)
+            .fold(d1)(d2 => d2.copy(entry = d1.entry.filterNot(e => d2.entry.exists(_.key == e.key)) ++ d2.entry))
+        )
+        updatedS2 ++ s2.current.accountData.filterNot(e => updatedS2.exists(_.address == e.address))
+      }
+
       def displaceBy[A, B](f: TransactionStateSnapshot => Seq[A], k: A => B): Seq[A] = {
         val values1 = f(s1.current)
         val values2 = f(s2.current)
@@ -329,7 +340,7 @@ object StateSnapshot {
           displaceBy[S.OrderFill, ByteString](_.orderFills, _.orderId),
           displaceBy[S.LeaseState, ByteString](_.leaseStates, _.leaseId),
           displaceBy[S.AccountScript, ByteString](_.accountScripts, _.senderAddress),
-          displaceBy[S.AccountData, ByteString](_.accountData, _.address),
+          displaceData,
           displaceBy[S.Sponsorship, ByteString](_.sponsorships, _.assetId),
           displaceBy[S.ScriptResult, ByteString](_.scriptResults, _.transactionId),
           displaceBy[S.EthereumTransactionMeta, ByteString](_.ethereumTransactionMeta, _.transactionId),
