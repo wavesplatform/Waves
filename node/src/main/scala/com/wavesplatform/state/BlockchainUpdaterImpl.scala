@@ -80,8 +80,8 @@ class BlockchainUpdaterImpl(
     readLock(
       ngState
         .flatMap(_.snapshotOf(id))
-        .map { case (_, diff, _, _, _) =>
-          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+        .map { case (_, snapshot, _, _, _) =>
+          snapshot.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 

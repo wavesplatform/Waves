@@ -41,7 +41,7 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).flatten.to(VectorMap))
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.monoid.empty, _ => true).flatten.to(VectorMap))
     )
 
   def main(argsRaw: Array[String]): Unit = {

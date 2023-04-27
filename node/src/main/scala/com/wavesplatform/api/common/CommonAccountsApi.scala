@@ -14,7 +14,7 @@ import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -94,14 +94,14 @@ object CommonAccountsApi {
 
       rdb.db.resourceObservable.flatMap { resource =>
         Observable
-          .fromIterator(Task(assetBalanceIterator(resource, address, Diff(), includeNft)))
+          .fromIterator(Task(assetBalanceIterator(resource, address, compositeBlockchain().snapshot, includeNft)))
       }
     }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
       rdb.db.resourceObservable.flatMap { resource =>
         Observable
-          .fromIterator(Task(nftIterator(resource, address, Diff(), after, blockchain.assetDescription)))
+          .fromIterator(Task(nftIterator(resource, address, compositeBlockchain().snapshot, after, blockchain.assetDescription)))
       }
     }
 
@@ -112,7 +112,7 @@ object CommonAccountsApi {
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
-      val entriesFromDiff = Diff().accountData
+      val entriesFromDiff = compositeBlockchain().snapshot.accountData
         .get(address)
         .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 

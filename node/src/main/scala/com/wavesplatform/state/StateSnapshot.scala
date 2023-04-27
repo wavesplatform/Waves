@@ -138,7 +138,7 @@ case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: Tran
   val scriptsComplexity: Long =
     current.totalComplexity
 
-  def hashString: String =
+  lazy val hashString: String =
     Integer.toHexString(hashCode())
 }
 

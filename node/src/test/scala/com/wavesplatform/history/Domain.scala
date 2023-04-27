@@ -1,5 +1,6 @@
 package com.wavesplatform.history
 
+import cats.implicits.catsSyntaxOption
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
@@ -163,7 +164,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = rdb.db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty).toDiff, None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty), None, blockchainUpdater.assetDescription)
       .toSeq
       .flatten
   }
@@ -415,7 +416,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
-    () => blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty),
+    () => blockchainUpdater.bestLiquidSnapshot.orEmpty,
     rdb.db,
     blockchain
   )
@@ -440,7 +441,7 @@ object Domain {
       .assetBalanceIterator(
         resource,
         address,
-        blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty).toDiff,
+        blockchainUpdater.bestLiquidSnapshot.orEmpty,
         id => blockchainUpdater.assetDescription(id).exists(!_.nft)
       )
       .toSeq
