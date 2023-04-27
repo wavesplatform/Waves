@@ -122,7 +122,9 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 817380,
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
-    enforceTransferValidationAfter = 1698800
+    enforceTransferValidationAfter = 1698800,
+    daoAddress = Address.fromString("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS", Some('T'.toByte)).toOption,
+    xtnBuybackAddress = Address.fromString("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT", Some('T'.toByte)).toOption
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -133,7 +135,9 @@ object FunctionalitySettings {
     minAssetInfoUpdateInterval = 10,
     estimationOverflowFixHeight = 1078680,
     estimatorSumOverflowFixHeight = 1097419,
-    ethInvokePaymentsCheckHeight = 1311110
+    ethInvokePaymentsCheckHeight = 1311110,
+    daoAddress = Address.fromString("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic", Some('S'.toByte)).toOption,
+    xtnBuybackAddress = Address.fromString("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM", Some('S'.toByte)).toOption
   )
 
   val configPath = "waves.blockchain.custom.functionality"
