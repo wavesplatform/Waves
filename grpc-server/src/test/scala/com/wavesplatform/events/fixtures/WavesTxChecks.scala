@@ -7,7 +7,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, LeasingUpdate}
 import com.wavesplatform.protobuf.transaction.*
-import com.wavesplatform.protobuf.transaction.Recipient.Recipient.PublicKeyHash
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -175,8 +174,8 @@ object WavesTxChecks extends Matchers with OptionValues {
         )
 
         value.transfers.foreach(actualTransfer =>
-          expected.transfers.foreach(expectedTransfer =>
-            actualTransfer.recipient.get.recipient.publicKeyHash.get.toByteArray shouldBe pkHashes
+          pkHashes.foreach(publicKeyHash =>
+            actualTransfer.getRecipient.getPublicKeyHash.toByteArray shouldBe publicKeyHash
           )
         )
       case _ => fail("not a MassTransfer transaction")
