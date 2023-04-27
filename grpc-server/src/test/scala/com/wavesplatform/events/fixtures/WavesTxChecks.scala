@@ -7,12 +7,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, LeasingUpdate}
 import com.wavesplatform.protobuf.transaction.*
+import com.wavesplatform.protobuf.transaction.Recipient.Recipient.PublicKeyHash
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
 import org.scalactic.source.Position
 import org.scalatest.OptionValues
@@ -145,7 +146,7 @@ object WavesTxChecks extends Matchers with OptionValues {
       case Data.Lease(value) =>
         value.recipient.get.recipient.publicKeyHash.get.toByteArray shouldBe publicKeyHash
         value.amount shouldBe expected.amount.value
-      case _ => fail("not a Burn transaction")
+      case _ => fail("not a Lease transaction")
     }
   }
 
@@ -156,7 +157,29 @@ object WavesTxChecks extends Matchers with OptionValues {
     actual.transaction.wavesTransaction.value.data match {
       case Data.LeaseCancel(value) =>
         value.leaseId.toByteArray shouldBe expected.leaseId.arr
-      case _ => fail("not a Burn transaction")
+      case _ => fail("not a LeaseCancel transaction")
+    }
+  }
+
+  def checkMassTransfer(actualId: ByteString, actual: SignedTransaction, expected: MassTransferTransaction, pkHashes: Seq[Array[Byte]])(implicit
+                                                                                                                                          pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.MassTransfer(value) =>
+        value.assetId.toByteArray shouldBe expected.assetId.compatId.get.arr
+        value.transfers.foreach(actualTransfer =>
+          expected.transfers.foreach(expectedTransfer =>
+            actualTransfer.amount shouldBe expectedTransfer.amount.value
+          )
+        )
+
+        value.transfers.foreach(actualTransfer =>
+          expected.transfers.foreach(expectedTransfer =>
+            actualTransfer.recipient.get.recipient.publicKeyHash.get.toByteArray shouldBe pkHashes
+          )
+        )
+      case _ => fail("not a MassTransfer transaction")
     }
   }
 

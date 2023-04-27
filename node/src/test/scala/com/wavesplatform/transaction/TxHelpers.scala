@@ -31,6 +31,9 @@ import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
 import org.web3j.crypto.ECKeyPair
 
+import java.util.concurrent.ThreadLocalRandom.current
+import scala.collection.mutable.ListBuffer
+
 object TxHelpers {
   def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
   def address(i: Int): Address    = signer(i).toAddress
@@ -41,6 +44,21 @@ object TxHelpers {
   def secondAddress: Address     = secondSigner.toAddress
 
   def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
+
+  var publicKeyHashes: Seq[Array[Byte]] = Seq[Array[Byte]]()
+
+  def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
+    val accountsList = ListBuffer[ParsedTransfer]()
+    for (i <- 0 until numberAccounts) {
+      val recipient = signer(current.nextInt(1, 9999999)).toAddress
+      val temp  = ListBuffer[Array[Byte]]()
+      temp += recipient.publicKeyHash
+      publicKeyHashes = temp.toSeq
+
+      accountsList += ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
+    }
+    accountsList.toSeq
+  }
 
   val matcher: SeedKeyPair = defaultSigner
 

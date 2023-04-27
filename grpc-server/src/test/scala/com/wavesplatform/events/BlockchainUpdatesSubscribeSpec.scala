@@ -10,9 +10,10 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.publicKeyHashes
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
 import java.util.concurrent.ThreadLocalRandom.current
@@ -320,15 +321,15 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val recipientAddress    = recipient.toAddress
       val senderBalanceBefore = 10.waves
       val amount              = 5.waves
-      val leaseTx             = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseId             = leaseTx.id.value().arr
+      val lease               = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseId             = lease.id.value().arr
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
-      )(_.appendMicroBlock(leaseTx)) { updates =>
+      )(_.appendMicroBlock(lease)) { updates =>
         val append = updates(1).append
-        checkLease(append.transactionIds.head, append.transactionAt(0), leaseTx, recipientAddress.publicKeyHash)
+        checkLease(append.transactionIds.head, append.transactionAt(0), lease, recipientAddress.publicKeyHash)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
@@ -345,7 +346,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkIndividualLeases(
           append.transactionStateUpdates.head.individualLeases,
           Map(
-            (LeaseStatus.Active.toString.toLowerCase(), amount) -> (leaseId, leaseTx.sender.arr, leaseTx.recipient.bytes, leaseId)
+            (LeaseStatus.Active.toString.toLowerCase(), amount) -> (leaseId, lease.sender.arr, lease.recipient.bytes, leaseId)
           )
         )
       }
@@ -358,16 +359,16 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val recipientAddress    = recipient.toAddress
       val senderBalanceBefore = 10.waves
       val amount              = 5.waves
-      val leaseTx             = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseCancelTx       = TxHelpers.leaseCancel(leaseTx.id.value(), sender, customFee)
-      val leaseId             = leaseCancelTx.leaseId.arr
+      val lease               = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseCancel         = TxHelpers.leaseCancel(lease.id.value(), sender, customFee)
+      val leaseId             = leaseCancel.leaseId.arr
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
-      )(_.appendMicroBlock(leaseTx, leaseCancelTx)) { updates =>
+      )(_.appendMicroBlock(lease, leaseCancel)) { updates =>
         val append = updates(1).append
-        checkLeaseCancel(append.transactionIds.apply(1), append.transactionAt(1), leaseCancelTx)
+        checkLeaseCancel(append.transactionIds.apply(1), append.transactionAt(1), leaseCancel)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
@@ -384,9 +385,25 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkIndividualLeases(
           append.transactionStateUpdates.apply(1).individualLeases,
           Map(
-            (LeaseStatus.Inactive.toString, amount) -> (leaseId, leaseTx.sender.arr, leaseTx.recipient.bytes, leaseId)
+            (LeaseStatus.Inactive.toString, amount) -> (leaseId, lease.sender.arr, lease.recipient.bytes, leaseId)
           )
         )
+      }
+    }
+
+    "return correct data for massTransfer https://app.qase.io/case/BU-16" in {
+      val sender              = TxHelpers.signer(33)
+      val senderBalanceBefore = 10.waves
+      val recipients          = TxHelpers.accountSeqGenerator(10, 500000)
+      val issue               = TxHelpers.issue(sender, 1000000000L)
+      val massTransfer        = TxHelpers.massTransfer(sender, recipients, Asset.fromCompatId(issue.asset.compatId), fee * 6)
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(issue, massTransfer)) { updates =>
+        val append = updates(1).append
+        checkMassTransfer(append.transactionIds.apply(1), append.transactionAt(1), massTransfer, publicKeyHashes)
       }
     }
   }
