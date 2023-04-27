@@ -14,12 +14,19 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
   val daoAddress: Address        = TxHelpers.address(100)
   val xtnBuybackAddress: Address = TxHelpers.address(101)
 
-  val settingsWithOnlyDaoAddress: WavesSettings = RideV6.copy(blockchainSettings =
-    RideV6.blockchainSettings.copy(functionalitySettings = RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress)))
-  )
-  val settingsWithOnlyDevSupportAddress: WavesSettings = RideV6.copy(blockchainSettings =
+  val settingsWithoutAddresses: WavesSettings = RideV6.copy(blockchainSettings =
     RideV6.blockchainSettings.copy(functionalitySettings =
-      RideV6.blockchainSettings.functionalitySettings.copy(xtnBuybackAddress = Some(xtnBuybackAddress))
+      RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = None, xtnBuybackAddress = None)
+    )
+  )
+  val settingsWithOnlyDaoAddress: WavesSettings = RideV6.copy(blockchainSettings =
+    RideV6.blockchainSettings.copy(functionalitySettings =
+      RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress), xtnBuybackAddress = None)
+    )
+  )
+  val settingsWithOnlyXtnBuybackAddress: WavesSettings = RideV6.copy(blockchainSettings =
+    RideV6.blockchainSettings.copy(functionalitySettings =
+      RideV6.blockchainSettings.functionalitySettings.copy(xtnBuybackAddress = Some(xtnBuybackAddress), daoAddress = None)
     )
   )
   val settingsWithBothAddresses: WavesSettings = RideV6.copy(blockchainSettings =
@@ -29,16 +36,16 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
   )
 
   routePath("/rewards") in {
-    checkWithSettings(RideV6)
+    checkWithSettings(settingsWithoutAddresses)
     checkWithSettings(settingsWithOnlyDaoAddress)
-    checkWithSettings(settingsWithOnlyDevSupportAddress)
+    checkWithSettings(settingsWithOnlyXtnBuybackAddress)
     checkWithSettings(settingsWithBothAddresses)
   }
 
   routePath("/rewards/{height}") in {
-    checkWithSettings(RideV6, Some(1))
+    checkWithSettings(settingsWithoutAddresses, Some(1))
     checkWithSettings(settingsWithOnlyDaoAddress, Some(1))
-    checkWithSettings(settingsWithOnlyDevSupportAddress, Some(1))
+    checkWithSettings(settingsWithOnlyXtnBuybackAddress, Some(1))
     checkWithSettings(settingsWithBothAddresses, Some(1))
   }
 

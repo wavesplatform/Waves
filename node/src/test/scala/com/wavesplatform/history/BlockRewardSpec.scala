@@ -572,12 +572,19 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     val daoAddress        = TxHelpers.address(101)
     val xtnBuybackAddress = TxHelpers.address(102)
 
+    val setttingsWithoutAddresses = RideV6.copy(blockchainSettings =
+      RideV6.blockchainSettings.copy(functionalitySettings =
+        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = None, xtnBuybackAddress = None)
+      )
+    )
     val settingsWithOnlyDaoAddress = RideV6.copy(blockchainSettings =
-      RideV6.blockchainSettings.copy(functionalitySettings = RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress)))
+      RideV6.blockchainSettings.copy(functionalitySettings =
+        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress), xtnBuybackAddress = None)
+      )
     )
     val settingsWithOnlyXtnBuybackAddress = RideV6.copy(blockchainSettings =
       RideV6.blockchainSettings.copy(functionalitySettings =
-        RideV6.blockchainSettings.functionalitySettings.copy(xtnBuybackAddress = Some(xtnBuybackAddress))
+        RideV6.blockchainSettings.functionalitySettings.copy(xtnBuybackAddress = Some(xtnBuybackAddress), daoAddress = None)
       )
     )
     val settingsWithBothAddresses = RideV6.copy(blockchainSettings =
@@ -592,7 +599,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     )
 
     // BlockRewardDistribution is activated, BlockReward is not
-    withDomain(RideV6.setFeaturesHeight(BlockRewardDistribution -> 2, BlockReward -> Int.MaxValue)) { d =>
+    withDomain(settingsWithBothAddresses.setFeaturesHeight(BlockRewardDistribution -> 2, BlockReward -> Int.MaxValue)) { d =>
       d.appendBlock()
       val miner = d.appendBlock().sender.toAddress
 
@@ -602,7 +609,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
 
     // both daoAddress and xtnBuybackAddress are not defined
-    withDomain(RideV6.setFeaturesHeight(BlockRewardDistribution -> 2)) { d =>
+    withDomain(setttingsWithoutAddresses.setFeaturesHeight(BlockRewardDistribution -> 2)) { d =>
       val firstBlock       = d.appendBlock()
       val prevMinerBalance = d.balance(firstBlock.sender.toAddress)
       val miner            = d.appendBlock().sender.toAddress
