@@ -161,23 +161,16 @@ object WavesTxChecks extends Matchers with OptionValues {
   }
 
   def checkMassTransfer(actualId: ByteString, actual: SignedTransaction, expected: MassTransferTransaction, pkHashes: Seq[Array[Byte]])(implicit
-                                                                                                                                          pos: Position
+      pos: Position
   ): Unit = {
     checkBaseTx(actualId, actual, expected)
     actual.transaction.wavesTransaction.value.data match {
       case Data.MassTransfer(value) =>
         value.assetId.toByteArray shouldBe expected.assetId.compatId.get.arr
         value.transfers.foreach(actualTransfer =>
-          expected.transfers.foreach(expectedTransfer =>
-            actualTransfer.amount shouldBe expectedTransfer.amount.value
-          )
+          expected.transfers.foreach(expectedTransfer => actualTransfer.amount shouldBe expectedTransfer.amount.value)
         )
-
-        value.transfers.foreach(actualTransfer =>
-          pkHashes.foreach(publicKeyHash =>
-            actualTransfer.getRecipient.getPublicKeyHash.toByteArray shouldBe publicKeyHash
-          )
-        )
+        value.transfers.zip(pkHashes).foreach(item => item._1.getRecipient.getPublicKeyHash.toByteArray shouldBe item._2)
       case _ => fail("not a MassTransfer transaction")
     }
   }
@@ -189,6 +182,19 @@ object WavesTxChecks extends Matchers with OptionValues {
         (bu.amountBefore, bu.amountAfter.value.amount)
       )
     }.toMap shouldEqual expected
+  }
+
+  def checkMassTransferBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
+    actual.map { bu =>
+      (
+        (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
+        (bu.amountBefore, bu.amountAfter.value.amount)
+      )
+    }.zip(expected).foreach { case ((actualKey, actualValue), expectedValue) =>
+      if (actualKey == expectedValue._1) {
+        actualValue shouldEqual expectedValue._2
+      }
+    }
   }
 
   def checkAssetsAfter(actual: Seq[AssetStateUpdate], expected: IssueTransaction, isNft: Boolean): Unit = {

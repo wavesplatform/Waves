@@ -1,6 +1,7 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
@@ -10,7 +11,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.publicKeyHashes
+import com.wavesplatform.transaction.TxHelpers.recipientAddresses
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
@@ -78,23 +79,23 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val decimals: Byte           = current.nextInt(0, 8).toByte
       val name: String             = "Test_asset"
       val description: String      = name + "|_|_|_|_|_|" + current.nextInt(1111111, 9999999)
-      val issueTx                  = TxHelpers.issue(issueSender, amount, decimals, name, description, customAssetIssueFee, script)
+      val issue                    = TxHelpers.issue(issueSender, amount, decimals, name, description, customAssetIssueFee, script)
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(issueSender.toAddress, issueSenderBalanceBefore))
-      )(_.appendMicroBlock(issueTx)) { updates =>
+      )(_.appendMicroBlock(issue)) { updates =>
         val append = updates(1).append
-        checkIssue(append.transactionIds.head, append.transactionAt(0), issueTx)
+        checkIssue(append.transactionIds.head, append.transactionAt(0), issue)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (issueSender.toAddress, Waves)         -> (issueSenderBalanceBefore, issueSenderBalanceBefore - customAssetIssueFee),
-            (issueSender.toAddress, issueTx.asset) -> (0, amount)
+            (issueSender.toAddress, Waves)       -> (issueSenderBalanceBefore, issueSenderBalanceBefore - customAssetIssueFee),
+            (issueSender.toAddress, issue.asset) -> (0, amount)
           )
         )
-        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
-        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+        checkAssetsBefore(append.transactionStateUpdates.head.assets, issue, isNft = false)
+        checkAssetsAfter(append.transactionStateUpdates.head.assets, issue, isNft = false)
       }
     }
 
@@ -392,18 +393,41 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for massTransfer https://app.qase.io/case/BU-16" in {
-      val sender              = TxHelpers.signer(33)
-      val senderBalanceBefore = 10.waves
-      val recipients          = TxHelpers.accountSeqGenerator(10, 500000)
-      val issue               = TxHelpers.issue(sender, 1000000000L)
-      val massTransfer        = TxHelpers.massTransfer(sender, recipients, Asset.fromCompatId(issue.asset.compatId), fee * 6)
+      val sender                  = TxHelpers.signer(33)
+      val senderBalanceBefore     = 10.waves
+      val massTransferFee         = fee * 6
+      val senderBalanceAfterIssue = senderBalanceBefore - 1.waves
+      val senderBalanceAfter      = senderBalanceAfterIssue - massTransferFee
+      val transferAmount          = 500000
+      val recipients              = TxHelpers.accountSeqGenerator(10, transferAmount)
+      val issue                   = TxHelpers.issue(sender, 1000000000L)
+      val massTransfer            = TxHelpers.massTransfer(sender, recipients, Asset.fromCompatId(issue.asset.compatId), massTransferFee)
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issue, massTransfer)) { updates =>
         val append = updates(1).append
-        checkMassTransfer(append.transactionIds.apply(1), append.transactionAt(1), massTransfer, publicKeyHashes)
+        checkMassTransfer(
+          append.transactionIds.apply(1),
+          append.transactionAt(1),
+          massTransfer,
+          recipients.map(r =>
+            r.address match {
+              case addr: Address => Some(addr.publicKeyHash).get
+              case _             => fail("not an address")
+            }
+          )
+        )
+
+        checkMassTransferBalances(
+          append.transactionStateUpdates.apply(1).balances,
+          Map(
+            (sender.toAddress, Waves)       -> (senderBalanceAfterIssue, senderBalanceAfter),
+            (sender.toAddress, issue.asset) -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
+            (recipientAddresses.head, issue.asset) -> (0, transferAmount)
+          )
+        )
       }
     }
   }

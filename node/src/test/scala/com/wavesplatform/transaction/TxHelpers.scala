@@ -45,19 +45,17 @@ object TxHelpers {
 
   def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
-  var publicKeyHashes: Seq[Array[Byte]] = Seq[Array[Byte]]()
+  var publicKeyHashes: Seq[Array[Byte]] = Seq.empty
+  var recipientAddresses: Seq[Address] = Seq.empty
 
   def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
-    val accountsList = ListBuffer[ParsedTransfer]()
-    for (i <- 0 until numberAccounts) {
+    val accountsList = (0 until numberAccounts).map { _ =>
       val recipient = signer(current.nextInt(1, 9999999)).toAddress
-      val temp  = ListBuffer[Array[Byte]]()
-      temp += recipient.publicKeyHash
-      publicKeyHashes = temp.toSeq
-
-      accountsList += ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
+      publicKeyHashes :+= recipient.publicKeyHash
+      recipientAddresses :+= recipient
+      ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
     }
-    accountsList.toSeq
+    accountsList
   }
 
   val matcher: SeedKeyPair = defaultSigner
