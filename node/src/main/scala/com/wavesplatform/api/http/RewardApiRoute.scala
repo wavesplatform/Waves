@@ -49,8 +49,8 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
       rewardsSettings.votingInterval,
       votingThreshold,
       RewardVotes(votes.count(_ > reward), votes.count(_ < reward)),
-      funcSettings.daoAddress.map(_.toString),
-      funcSettings.xtnBuybackAddress.map(_.toString)
+      funcSettings.daoAddress,
+      funcSettings.xtnBuybackAddress
     )
 }
 

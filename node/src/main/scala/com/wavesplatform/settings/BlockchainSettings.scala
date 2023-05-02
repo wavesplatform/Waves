@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -64,8 +66,8 @@ case class FunctionalitySettings(
     estimatorSumOverflowFixHeight: Int = 0,
     enforceTransferValidationAfter: Int = 0,
     ethInvokePaymentsCheckHeight: Int = 0,
-    daoAddress: Option[Address] = None,
-    xtnBuybackAddress: Option[Address] = None
+    daoAddress: Option[String] = None,
+    xtnBuybackAddress: Option[String] = None
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -74,6 +76,11 @@ case class FunctionalitySettings(
   val allowUnissuedAssetsUntil: Long                          = lastTimeBasedForkParameter
   val allowInvalidReissueInSameBlockUntilTimestamp: Long      = lastTimeBasedForkParameter
   val allowMultipleLeaseCancelTransactionUntilTimestamp: Long = lastTimeBasedForkParameter
+
+  lazy val daoAddressParsed: Either[String, Option[Address]] =
+    daoAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect dao-address")
+  lazy val xtnBuybackAddressParsed: Either[String, Option[Address]] =
+    xtnBuybackAddress.traverse(Address.fromString(_)).leftMap(_ => "Incorrect xtn-buyback-address")
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require(
@@ -123,8 +130,8 @@ object FunctionalitySettings {
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
     enforceTransferValidationAfter = 1698800,
-    daoAddress = Address.fromString("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS", Some('T'.toByte)).toOption,
-    xtnBuybackAddress = Address.fromString("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT", Some('T'.toByte)).toOption
+    daoAddress = Some("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS"),
+    xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT")
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -136,8 +143,8 @@ object FunctionalitySettings {
     estimationOverflowFixHeight = 1078680,
     estimatorSumOverflowFixHeight = 1097419,
     ethInvokePaymentsCheckHeight = 1311110,
-    daoAddress = Address.fromString("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic", Some('S'.toByte)).toOption,
-    xtnBuybackAddress = Address.fromString("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM", Some('S'.toByte)).toOption
+    daoAddress = Some("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic"),
+    xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM")
   )
 
   val configPath = "waves.blockchain.custom.functionality"

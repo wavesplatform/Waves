@@ -579,22 +579,23 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     )
     val settingsWithOnlyDaoAddress = RideV6.copy(blockchainSettings =
       RideV6.blockchainSettings.copy(functionalitySettings =
-        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress), xtnBuybackAddress = None)
+        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = None)
       )
     )
     val settingsWithOnlyXtnBuybackAddress = RideV6.copy(blockchainSettings =
       RideV6.blockchainSettings.copy(functionalitySettings =
-        RideV6.blockchainSettings.functionalitySettings.copy(xtnBuybackAddress = Some(xtnBuybackAddress), daoAddress = None)
+        RideV6.blockchainSettings.functionalitySettings.copy(xtnBuybackAddress = Some(xtnBuybackAddress.toString), daoAddress = None)
       )
     )
     val settingsWithBothAddresses = RideV6.copy(blockchainSettings =
       RideV6.blockchainSettings.copy(functionalitySettings =
-        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress), xtnBuybackAddress = Some(xtnBuybackAddress))
+        RideV6.blockchainSettings.functionalitySettings
+          .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString))
       )
     )
     val settingsWithEqualAddresses = RideV6.copy(blockchainSettings =
       RideV6.blockchainSettings.copy(functionalitySettings =
-        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress), xtnBuybackAddress = Some(daoAddress))
+        RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(daoAddress.toString))
       )
     )
 

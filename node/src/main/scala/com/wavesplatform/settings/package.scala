@@ -49,14 +49,6 @@ package object settings {
 
   implicit val privateKeyReader: ValueReader[PrivateKey] = byteStrReader.map(PrivateKey(_))
 
-//  def addressReader(chainId: Byte): ValueReader[Address] =
-//    (config: Config, path: String) =>
-//      Address.fromString(config.getString(path), Some(chainId)) match {
-//        case Right(addr)                  => addr
-//        case Left(InvalidAddress(reason)) => throw new ConfigException.BadValue(config.origin(), path, reason)
-//        case Left(err)                    => throw new ConfigException.BadValue(config.origin(), path, err.toString)
-//      }
-
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")
     case x :: xs => NonEmptyList(x, xs)

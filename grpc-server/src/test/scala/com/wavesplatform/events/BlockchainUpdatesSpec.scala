@@ -810,7 +810,8 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val settings = RideV6
         .copy(blockchainSettings =
           RideV6.blockchainSettings.copy(functionalitySettings =
-            RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = Some(daoAddress), xtnBuybackAddress = Some(xtnBuybackAddress))
+            RideV6.blockchainSettings.functionalitySettings
+              .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString))
           )
         )
         .setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 2)

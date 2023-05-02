@@ -249,8 +249,8 @@ class WavesEnvironment(
   private def getRewards(generator: PublicKey, height: Int): List[(Address, Long)] = {
     blockchain.blockReward(height).fold(List.empty[(Address, Long)]) { reward =>
       val configAddressesReward =
-        (blockchain.settings.functionalitySettings.daoAddress.toList ++
-          blockchain.settings.functionalitySettings.xtnBuybackAddress).map { addr =>
+        (blockchain.settings.functionalitySettings.daoAddressParsed.toList.flatten ++
+          blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toList.flatten).map { addr =>
           Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(reward)
         }
 

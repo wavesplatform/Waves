@@ -515,7 +515,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .copy(blockchainSettings =
         RideV6.blockchainSettings.copy(functionalitySettings =
           RideV6.blockchainSettings.functionalitySettings
-            .copy(daoAddress = Some(daoAddress), xtnBuybackAddress = Some(xtnBuybackAddress))
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString))
         )
       )
       .setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 4)
