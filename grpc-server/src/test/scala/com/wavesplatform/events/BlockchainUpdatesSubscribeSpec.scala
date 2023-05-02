@@ -2,12 +2,14 @@ package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -437,6 +439,32 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
             (recipientAddresses.apply(9), issue.asset) -> (0, transferAmount)
           )
         )
+      }
+    }
+
+    "return correct data for data tx https://app.qase.io/case/BU-5" in {
+      val sender              = TxHelpers.signer(12)
+      val senderBalanceBefore = 5.waves
+      val integerDataEntry    = IntegerDataEntry.apply("Integer", current.nextLong(0, 9292929L))
+      val booleanDataEntry    = BooleanDataEntry.apply("Boolean", value = true)
+      val stringDataEntry     = StringDataEntry.apply("String", "test")
+      val binaryDataEntry     = BinaryDataEntry.apply("Binary", ByteStr.apply(sender.toAddress.bytes))
+      val entries             = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
+      val dataTxVersion       = current().nextInt(1, 2).toByte
+      val dataTx              = TxHelpers.data(sender, entries, customFee, dataTxVersion)
+
+      withGenerateSubscription(
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(dataTx)) { updates =>
+        val append    = updates(1).append
+        val txUpdates = append.transactionStateUpdates.head
+        checkDataTransaction(append.transactionIds.head, append.transactionAt(0), dataTx)
+        checkBalances(
+          txUpdates.balances,
+          Map((sender.toAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
+        )
+        checkDataEntriesStateUpdate(txUpdates.dataEntries, dataTx)
       }
     }
   }

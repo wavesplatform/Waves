@@ -3,17 +3,18 @@ package com.wavesplatform.events.fixtures
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate
-import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, LeasingUpdate}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate}
+import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TransactionBase}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, TransactionBase}
 import org.scalactic.source.Position
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should.Matchers
@@ -103,36 +104,8 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.price shouldEqual expected.price.value
         value.buyMatcherFee shouldEqual expected.buyMatcherFee
         value.sellMatcherFee shouldEqual expected.sellMatcherFee
-
-        // order1
-        value.orders.head.chainId shouldEqual expected.chainId
-        value.orders.head.sender.senderPublicKey.get.toByteArray shouldBe expected.order1.sender.arr
-        value.orders.head.matcherPublicKey.toByteArray shouldBe expected.order1.matcherPublicKey.arr
-        value.orders.head.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order1.assetPair.amountAsset.compatId.get.arr
-        value.orders.head.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order1.assetPair.priceAsset.compatId.get.arr
-        value.orders.head.orderSide.toString() equalsIgnoreCase expected.order1.orderType.toString
-        value.orders.head.amount shouldEqual expected.order1.amount.value
-        value.orders.head.price shouldEqual expected.order1.price.value
-        value.orders.head.timestamp shouldEqual expected.order1.timestamp
-        value.orders.head.expiration shouldEqual expected.order1.expiration
-        value.orders.head.matcherFee.get.amount shouldEqual expected.order1.matcherFee.value
-        toVanillaAssetId(value.orders.head.matcherFee.get.assetId) shouldBe expected.order1.matcherFeeAssetId
-        value.orders.head.version shouldEqual expected.order1.version
-
-        // order2
-        value.orders.last.chainId shouldEqual expected.chainId
-        value.orders.last.sender.senderPublicKey.get.toByteArray shouldBe expected.order2.sender.arr
-        value.orders.last.matcherPublicKey.toByteArray shouldBe expected.order2.matcherPublicKey.arr
-        value.orders.last.assetPair.get.amountAssetId.toByteArray shouldEqual expected.order2.assetPair.amountAsset.compatId.get.arr
-        value.orders.last.assetPair.get.priceAssetId.toByteArray shouldEqual expected.order2.assetPair.priceAsset.compatId.get.arr
-        value.orders.last.orderSide.toString() equalsIgnoreCase expected.order2.orderType.toString
-        value.orders.last.amount shouldEqual expected.order2.amount.value
-        value.orders.last.price shouldEqual expected.order2.price.value
-        value.orders.last.timestamp shouldEqual expected.order2.timestamp
-        value.orders.last.expiration shouldEqual expected.order2.expiration
-        value.orders.last.matcherFee.get.amount shouldEqual expected.order2.matcherFee.value
-        toVanillaAssetId(value.orders.last.matcherFee.get.assetId) shouldBe expected.order2.matcherFeeAssetId
-        value.orders.last.version shouldEqual expected.order2.version
+        checkOrders(value.orders.head, expected.order1)
+        checkOrders(value.orders.last, expected.order2)
       case _ => fail("not a Exchange transaction")
     }
   }
@@ -175,22 +148,68 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkDataTransaction(actualId: ByteString, actual: SignedTransaction, expected: DataTransaction)(implicit pos: Position): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.DataTransaction(value) =>
+        val actualData   = value.data.map(entry => (entry.key, entry.value.value)).toMap
+        val expectedData = expected.data.map(entry => (entry.key, entry.value)).toMap
+
+        actualData.keySet shouldBe expectedData.keySet
+
+        for ((key, actualValue) <- actualData) {
+          val expectedValue = expectedData(key)
+
+          if (key == "Binary") {
+            actualValue shouldBe ByteString.copyFrom(Base58.decode(expectedValue.toString))
+          } else {
+            actualValue shouldBe expectedValue
+          }
+        }
+      case _ => fail("not a create alias transaction")
+    }
+  }
+
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
     actual.map { bu =>
       (
         (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
         (bu.amountBefore, bu.amountAfter.value.amount)
       )
-    }.toMap shouldEqual expected
+    }.toMap shouldBe expected
   }
 
-  def checkMassTransferBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
+  def checkMassTransferBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)]): Unit = {
     val actualBalances = actual.map { bu =>
-      ((Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)), (bu.amountBefore, bu.amountAfter.value.amount))
+      (
+        (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
+        (bu.amountBefore, bu.amountAfter.value.amount)
+      )
     }.toMap
     val matchingKeys = actualBalances.keySet.intersect(expected.keySet)
     matchingKeys.foreach { key =>
-      actualBalances(key) shouldEqual expected(key)
+      actualBalances(key) shouldBe expected(key)
+    }
+  }
+
+  def checkDataEntriesStateUpdate(actual: Seq[DataEntryUpdate], expected: DataTransaction): Unit = {
+    val expectAddress = expected.sender.toAddress.bytes
+    val expectedData  = expected.data
+    actual.zip(expectedData).foreach { case (actualUpdate, expectedEntry) =>
+      val actualEntry   = actualUpdate.dataEntry.get
+      val actualKey     = actualEntry.key
+      val actualValue   = actualEntry.value.value
+      val expectedKey   = expectedEntry.key
+      val expectedValue = expectedEntry.value
+
+      actualUpdate.address.toByteArray shouldBe expectAddress
+      actualKey shouldBe expectedKey
+
+      if (actualKey == "Binary") {
+        actualValue shouldBe ByteString.copyFrom(Base58.decode(expectedValue.toString))
+      } else {
+        actualValue shouldBe expectedValue
+      }
     }
   }
 
@@ -244,5 +263,20 @@ object WavesTxChecks extends Matchers with OptionValues {
         )
       )
     }.toMap equals expected
+  }
+
+  private def checkOrders(order: Order, expected: exchange.Order): Unit = {
+    order.sender.senderPublicKey.get.toByteArray shouldBe expected.sender.arr
+    order.matcherPublicKey.toByteArray shouldBe expected.matcherPublicKey.arr
+    order.assetPair.get.amountAssetId.toByteArray shouldBe expected.assetPair.amountAsset.compatId.get.arr
+    order.assetPair.get.priceAssetId.toByteArray shouldBe expected.assetPair.priceAsset.compatId.get.arr
+    order.orderSide.toString() equalsIgnoreCase expected.orderType.toString
+    order.amount shouldBe expected.amount.value
+    order.price shouldBe expected.price.value
+    order.timestamp shouldBe expected.timestamp
+    order.expiration shouldBe expected.expiration
+    order.matcherFee.get.amount shouldBe expected.matcherFee.value
+    toVanillaAssetId(order.matcherFee.get.assetId) shouldBe expected.matcherFeeAssetId
+    order.version shouldBe expected.version
   }
 }
