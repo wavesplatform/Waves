@@ -4,9 +4,8 @@ import java.io.File
 import java.net.{InetSocketAddress, URI}
 import cats.data.NonEmptyList
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
-import com.wavesplatform.account.{Address, PrivateKey}
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
@@ -50,13 +49,13 @@ package object settings {
 
   implicit val privateKeyReader: ValueReader[PrivateKey] = byteStrReader.map(PrivateKey(_))
 
-  implicit val addressReader: ValueReader[Address] =
-    (config: Config, path: String) =>
-      Address.fromString(config.getString(path)) match {
-        case Right(addr)                  => addr
-        case Left(InvalidAddress(reason)) => throw new ConfigException.BadValue(config.origin(), path, reason)
-        case Left(err)                    => throw new ConfigException.BadValue(config.origin(), path, err.toString)
-      }
+//  def addressReader(chainId: Byte): ValueReader[Address] =
+//    (config: Config, path: String) =>
+//      Address.fromString(config.getString(path), Some(chainId)) match {
+//        case Right(addr)                  => addr
+//        case Left(InvalidAddress(reason)) => throw new ConfigException.BadValue(config.origin(), path, reason)
+//        case Left(err)                    => throw new ConfigException.BadValue(config.origin(), path, err.toString)
+//      }
 
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")

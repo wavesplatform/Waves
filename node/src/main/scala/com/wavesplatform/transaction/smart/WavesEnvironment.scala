@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.*
@@ -199,7 +200,10 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
       generatorPublicKey = blockH.generator,
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
+        getRewards(blockH.generator, bHeight)
+      else List.empty
     )
   }
 
@@ -241,6 +245,20 @@ class WavesEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+
+  private def getRewards(generator: PublicKey, height: Int): List[(Address, Long)] = {
+    blockchain.blockReward(height).fold(List.empty[(Address, Long)]) { reward =>
+      val configAddressesReward =
+        (blockchain.settings.functionalitySettings.daoAddress.toList ++
+          blockchain.settings.functionalitySettings.xtnBuybackAddress).map { addr =>
+          Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(reward)
+        }
+
+      val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (reward - configAddressesReward.map(_._2).sum)
+
+      (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
+    }
+  }
 }
 
 object DAppEnvironment {

@@ -93,7 +93,7 @@ object BlockDiffer {
       } else
         Right(Portfolio.empty)
 
-    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, blockchain.lastBlockReward)
     val initDiffE =
       for {
         feeFromPreviousBlock    <- feeFromPreviousBlockE
