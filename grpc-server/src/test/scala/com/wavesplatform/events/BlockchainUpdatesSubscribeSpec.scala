@@ -423,9 +423,18 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkMassTransferBalances(
           append.transactionStateUpdates.apply(1).balances,
           Map(
-            (sender.toAddress, Waves)       -> (senderBalanceAfterIssue, senderBalanceAfter),
-            (sender.toAddress, issue.asset) -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
-            (recipientAddresses.head, issue.asset) -> (0, transferAmount)
+            (sender.toAddress, Waves)                  -> (senderBalanceAfterIssue, senderBalanceAfter),
+            (sender.toAddress, issue.asset)            -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
+            (recipientAddresses.head, issue.asset)     -> (0, transferAmount),
+            (recipientAddresses.apply(1), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(2), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(3), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(4), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(5), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(6), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(7), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(8), issue.asset) -> (0, transferAmount),
+            (recipientAddresses.apply(9), issue.asset) -> (0, transferAmount)
           )
         )
       }

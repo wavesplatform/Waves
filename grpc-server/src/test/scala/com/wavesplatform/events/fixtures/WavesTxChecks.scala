@@ -185,15 +185,12 @@ object WavesTxChecks extends Matchers with OptionValues {
   }
 
   def checkMassTransferBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
-    actual.map { bu =>
-      (
-        (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
-        (bu.amountBefore, bu.amountAfter.value.amount)
-      )
-    }.zip(expected).foreach { case ((actualKey, actualValue), expectedValue) =>
-      if (actualKey == expectedValue._1) {
-        actualValue shouldEqual expectedValue._2
-      }
+    val actualBalances = actual.map { bu =>
+      ((Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)), (bu.amountBefore, bu.amountAfter.value.amount))
+    }.toMap
+    val matchingKeys = actualBalances.keySet.intersect(expected.keySet)
+    matchingKeys.foreach { key =>
+      actualBalances(key) shouldEqual expected(key)
     }
   }
 
