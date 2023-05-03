@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate}
+import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, TransactionBase}
 import org.scalactic.source.Position
@@ -170,6 +171,14 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkSetScriptTransaction(actualId: ByteString, actual: SignedTransaction, expected: SetScriptTransaction)(implicit pos: Position): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.SetScript(value) =>
+        value.script.toByteArray shouldBe expected.script.get.bytes.value().arr
+    }
+  }
+
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
     actual.map { bu =>
       (
@@ -263,6 +272,12 @@ object WavesTxChecks extends Matchers with OptionValues {
         )
       )
     }.toMap equals expected
+  }
+
+  def checkSetScriptStateUpdate(actual: ScriptUpdate, expected: SetScriptTransaction)(implicit pos: Position): Unit = {
+    actual.address.toByteArray shouldBe expected.sender.toAddress.bytes
+    actual.after.toByteArray shouldBe expected.script.get.bytes.value().arr
+    actual.before.toByteArray.isEmpty shouldBe true
   }
 
   private def checkOrders(order: Order, expected: exchange.Order): Unit = {

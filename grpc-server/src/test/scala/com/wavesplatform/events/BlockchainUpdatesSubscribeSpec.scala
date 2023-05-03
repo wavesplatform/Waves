@@ -467,5 +467,36 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkDataEntriesStateUpdate(txUpdates.dataEntries, dataTx)
       }
     }
+
+    "return correct data for setScript tx https://app.qase.io/case/BU-21" in {
+      val sender              = TxHelpers.signer(12)
+      val senderBalanceBefore = 5.waves
+      val complexScript = TxHelpers.script(s"""{-# STDLIB_VERSION 5 #-}
+                                              |{-# CONTENT_TYPE DAPP #-}
+                                              |{-# SCRIPT_TYPE ACCOUNT #-}
+                                              |
+                                              |@Verifier(tx)
+                                              |func verify () = match(tx) {
+                                              |    case _ =>
+                                              |      if (
+                                              |        ${(1 to 9).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || \n")}
+                                              |      ) then true else true
+                                              |}""".stripMargin)
+      val setScript = TxHelpers.setScript(sender, complexScript, customFee)
+
+      withGenerateSubscription(
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(setScript)) { updates =>
+        val append    = updates(1).append
+        val txUpdates = append.transactionStateUpdates.head
+        checkSetScriptTransaction(append.transactionIds.head, append.transactionAt(0), setScript)
+        checkBalances(
+          txUpdates.balances,
+          Map((sender.toAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
+        )
+        checkSetScriptStateUpdate(txUpdates.scripts.head, setScript)
+      }
+    }
   }
 }
