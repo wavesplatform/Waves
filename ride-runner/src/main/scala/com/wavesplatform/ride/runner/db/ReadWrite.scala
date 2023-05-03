@@ -43,7 +43,7 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
   ): Unit = {
     // TODO duplicate
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
-    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+    removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
 
     put(historyKey, preservedHistory.prepended(height))
     put(dataOnHeightKey(height), data.mayBeValue)
@@ -57,7 +57,7 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
       default: => T
   ): Unit = {
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
-    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+    removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
 
     put(historyKey, preservedHistory.prepended(height))
     put(dataOnHeightKey(height), data.mayBeValue.getOrElse(default))
@@ -72,7 +72,7 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
     if (history.isEmpty) RemoteData.Unknown
     else {
       val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
-      removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+      removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
 
       preservedHistory.headOption match {
         case None =>
@@ -96,7 +96,7 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
     if (history.isEmpty) RemoteData.Unknown
     else {
       val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
-      removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+      removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
 
       preservedHistory.headOption match {
         case None =>
@@ -117,6 +117,7 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
   )(implicit ctx: ReadWrite): List[K] = {
     val affectedEntryKeys = mutable.Set.empty[K]
 
+    // TODO #123 Use deleteRange
     ctx.iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)

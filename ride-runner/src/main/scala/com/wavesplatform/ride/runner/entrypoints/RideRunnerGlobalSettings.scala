@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue}
+import com.typesafe.config.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.BlockchainState
@@ -23,6 +23,8 @@ case class RideRunnerGlobalSettings(
 
 object RideRunnerGlobalSettings {
   def fromRootConfig(config: Config): RideRunnerGlobalSettings = config.getConfig("waves").as[RideRunnerGlobalSettings]
+
+  implicit val configMemorySizeValueReader: ValueReader[ConfigMemorySize] = (config: Config, path: String) => config.getMemorySize(path)
 
   implicit val testRequestsValueReader: ValueReader[List[(Address, JsObject)]] = CollectionReaders
     .traversableReader[List, ConfigValue]
@@ -52,17 +54,17 @@ object RideRunnerGlobalSettings {
 }
 
 case class RideRunnerCommonSettings(
-                                     db: RideRocksDb.Settings,
-                                     unhealthyIdleTimeout: FiniteDuration,
-                                     rideSchedulerThreads: Option[Int],
-                                     immutableBlockchain: BlockchainSettings,
-                                     sharedBlockchain: SharedBlockchainStorage.Settings,
-                                     blockchainState: BlockchainState.Settings,
-                                     requestsService: DefaultRequestService.Settings,
-                                     blockchainApi: DefaultBlockchainApi.Settings,
-                                     grpcConnector: GrpcConnector.Settings,
-                                     grpcApiChannel: GrpcChannelSettings,
-                                     blockchainUpdatesApiChannel: GrpcChannelSettings
+    db: RideRocksDb.Settings,
+    unhealthyIdleTimeout: FiniteDuration,
+    rideSchedulerThreads: Option[Int],
+    immutableBlockchain: BlockchainSettings,
+    sharedBlockchain: SharedBlockchainStorage.Settings,
+    blockchainState: BlockchainState.Settings,
+    requestsService: DefaultRequestService.Settings,
+    blockchainApi: DefaultBlockchainApi.Settings,
+    grpcConnector: GrpcConnector.Settings,
+    grpcApiChannel: GrpcChannelSettings,
+    blockchainUpdatesApiChannel: GrpcChannelSettings
 ) {
   val unhealthyIdleTimeoutMs    = unhealthyIdleTimeout.toMillis
   val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)

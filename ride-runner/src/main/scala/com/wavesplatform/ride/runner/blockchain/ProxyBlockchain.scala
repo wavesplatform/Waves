@@ -30,7 +30,8 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest]) 
   override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.getOrFetch(CacheKey.AccountData(address, key))
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = sharedBlockchain.getOrFetch(CacheKey.AccountScript(address))
+  override def accountScript(address: Address): Option[AccountScriptInfo] =
+    sharedBlockchain.getOrFetch(CacheKey.AccountScript(address)).map(_.scriptInfo)
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
@@ -47,7 +48,8 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest]) 
   override def activatedFeatures: Map[Short, Int] = sharedBlockchain.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = sharedBlockchain.getOrFetch(CacheKey.Asset(id))
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] =
+    sharedBlockchain.getOrFetch(CacheKey.Asset(id)).map(_.assetDescription)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)

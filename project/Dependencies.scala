@@ -1,5 +1,5 @@
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.{Def, _}
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.{Def, *}
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -157,12 +157,13 @@ object Dependencies {
 
   lazy val rideRunner = Def.setting(
     Seq(
-      "com.wavesplatform" % "rocksdbjni" % "7.10.0",
+      "com.wavesplatform"     % "rocksdbjni"     % "7.10.0",
       "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1",
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",
       "net.logstash.logback"          % "logstash-logback-encoder" % "7.2" % Runtime,
+      "org.openjdk.jol"               % "jol-core"                 % "0.17", // Weighing scripts
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       Dependencies.sttp3,

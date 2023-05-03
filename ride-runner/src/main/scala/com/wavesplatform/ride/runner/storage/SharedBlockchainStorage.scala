@@ -23,9 +23,10 @@ import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage.Settings
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, DataEntry, Height, LeaseBalance}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, LeaseBalance}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
+import org.openjdk.jol.info.GraphLayout
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.util.chaining.scalaUtilChainingOps
@@ -61,7 +62,7 @@ class SharedBlockchainStorage[TagT] private (
 
   def addDependent(key: CacheKey, tag: TagT): Unit = tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
 
-  private val commonCache = new CommonCache
+  private val commonCache = new CommonCache(settings.commonCache)
 
   def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.readWrite { implicit ctx =>
     blockHeaders.getOrFetch(atHeight)
@@ -128,6 +129,7 @@ class SharedBlockchainStorage[TagT] private (
           else
             RemoteData
               .loaded(blockchainApi.getAssetDescription(key.asset))
+              .map(toWeightedAssetDescription)
               .tap { r =>
                 persistentCaches.assetDescriptions.set(atMaxHeight, key.asset, r)
               // numberCounter.increment()
@@ -168,7 +170,7 @@ class SharedBlockchainStorage[TagT] private (
           else
             RemoteData
               .loaded(blockchainApi.getAccountScript(key.address))
-              .map(toAccountScriptInfo)
+              .map(toWeightedAccountScriptInfo)
               .tap { r =>
                 persistentCaches.accountScripts.set(atMaxHeight, key.address, r)
               // numberCounter.increment()
@@ -318,7 +320,7 @@ class SharedBlockchainStorage[TagT] private (
           stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.assetKey(x)
             r ++ tagsOf(cacheKey).fold(empty) { tags =>
-              val v = RemoteData.loaded(conv.assetValue(cacheKey.asset, x))
+              val v = RemoteData.loaded(conv.assetValue(cacheKey.asset, x).map(toWeightedAssetDescription))
               commonCache.set(cacheKey, v)
               persistentCaches.assetDescriptions.set(atHeight, cacheKey.asset, v)
               AffectedTags(tags).logDep("asset")
@@ -354,7 +356,7 @@ class SharedBlockchainStorage[TagT] private (
           stateUpdate.flatMap(_.scripts).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.accountScriptKey(x)
             r ++ tagsOf(cacheKey).fold(empty) { tags =>
-              val v = RemoteData.loaded(toVanillaScript(x.after).map(toAccountScriptInfo))
+              val v = RemoteData.loaded(toVanillaScript(x.after).map(toWeightedAccountScriptInfo))
               commonCache.set(cacheKey, v)
               persistentCaches.accountScripts.set(atHeight, cacheKey.address, v)
               AffectedTags(tags).logDep("accountScript")
@@ -405,7 +407,7 @@ class SharedBlockchainStorage[TagT] private (
         stateUpdate.assets.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.assetKey(x)
           r ++ tagsOf(cacheKey).fold(empty) { tags =>
-            val v = RemoteData.loaded(conv.assetValue(cacheKey.asset, x))
+            val v = RemoteData.loaded(conv.assetValue(cacheKey.asset, x).map(toWeightedAssetDescription))
             commonCache.set(cacheKey, v)
             persistentCaches.assetDescriptions.set(toHeight, cacheKey.asset, v)
             AffectedTags(tags).logDep("asset")
@@ -457,7 +459,7 @@ class SharedBlockchainStorage[TagT] private (
         stateUpdate.scripts.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.accountScriptKey(x)
           r ++ tagsOf(cacheKey).fold(empty) { tags =>
-            val v = RemoteData.loaded(toVanillaScript(x.after).map(toAccountScriptInfo))
+            val v = RemoteData.loaded(toVanillaScript(x.after).map(toWeightedAccountScriptInfo))
             commonCache.set(cacheKey, v)
             persistentCaches.accountScripts.set(toHeight, cacheKey.address, v)
             AffectedTags(tags).logDep("accountScript")
@@ -504,7 +506,7 @@ class SharedBlockchainStorage[TagT] private (
         val cacheKey = conv.assetKey(x)
         r ++ tagsOf(cacheKey).fold(empty) { tags =>
           x.before match {
-            case Some(before) => commonCache.set(cacheKey, RemoteData.loaded(conv.assetValue(cacheKey.asset, before)))
+            case Some(before) => commonCache.set(cacheKey, RemoteData.loaded(toWeightedAssetDescription(conv.assetValue(cacheKey.asset, before))))
             case None         => commonCache.remove(cacheKey)
           }
           AffectedTags(tags).logDep("asset")
@@ -539,7 +541,7 @@ class SharedBlockchainStorage[TagT] private (
         r ++ tagsOf(cacheKey).fold(empty) { tags =>
           if (x.before.isEmpty) commonCache.remove(cacheKey)
           else {
-            val v = toVanillaScript(x.before).map(toAccountScriptInfo)
+            val v = toVanillaScript(x.before).map(toWeightedAccountScriptInfo)
             commonCache.set(cacheKey, RemoteData.loaded(v))
           }
           AffectedTags(tags).logDep("script")
@@ -577,6 +579,27 @@ class SharedBlockchainStorage[TagT] private (
     }
   }
 
+  private def toWeightedAssetDescription(x: AssetDescription): WeighedAssetDescription =
+    WeighedAssetDescription(
+      x.script.fold(0) { x =>
+        val r = GraphLayout.parseInstance(x).totalSize()
+        if (r.isValidInt) r.toInt
+        else throw new ArithmeticException(s"Weight of Script overflow: $r")
+      },
+      x
+    )
+
+  private def toWeightedAccountScriptInfo(x: Script): WeighedAccountScriptInfo = {
+    val info = toAccountScriptInfo(x)
+
+    val longWeight = GraphLayout.parseInstance(x).totalSize()
+    val weight =
+      if (longWeight.isValidInt) longWeight.toInt
+      else throw new ArithmeticException(s"Weight of AccountScriptInfo overflow: $longWeight")
+
+    WeighedAccountScriptInfo(weight, info)
+  }
+
   private def toAccountScriptInfo(script: Script): AccountScriptInfo = {
     val estimated = Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, script, isAsset = false))
     AccountScriptInfo(
@@ -597,5 +620,5 @@ object SharedBlockchainStorage {
   )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] =
     new SharedBlockchainStorage[TagT](settings, db, persistentCaches, blockchainApi).tap(_.load())
 
-  case class Settings(blockchain: BlockchainSettings, cacheSize: Int)
+  case class Settings(blockchain: BlockchainSettings, commonCache: CommonCache.Settings)
 }

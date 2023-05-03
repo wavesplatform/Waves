@@ -25,9 +25,9 @@ import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.ride.runner.db.Heights
-import com.wavesplatform.ride.runner.storage.DbKeyIndex
 import com.wavesplatform.ride.runner.storage.persistent.AsBytes.*
 import com.wavesplatform.ride.runner.storage.persistent.syntax.*
+import com.wavesplatform.ride.runner.storage.{DbKeyIndex, WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.state
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetVolumeInfo, DataEntry, LeaseBalance, TransactionId, TxMeta}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
@@ -82,8 +82,10 @@ object KvPairs {
   object AccountScriptsHistory extends KvHistoryPair[AddressId](21)
   val accountScriptInfoAsBytes: AsBytes[AccountScriptInfo] =
     AsBytes.byteArrayAsBytes.consumeAll.transform(readAccountScriptInfo, writeAccountScriptInfo)
+  val weighedAccountScriptInfoAsBytes: AsBytes[WeighedAccountScriptInfo] =
+    AsBytes.tuple2(intAsBytes, accountScriptInfoAsBytes).transform(Function.tupled(WeighedAccountScriptInfo), x => (x.scriptInfoWeight, x.scriptInfo))
   object AccountScripts
-      extends KvPair[(state.Height, AddressId), Option[AccountScriptInfo]](22)(implicitly, AsBytes.optional(accountScriptInfoAsBytes))
+      extends KvPair[(state.Height, AddressId), Option[WeighedAccountScriptInfo]](22)(implicitly, AsBytes.optional(weighedAccountScriptInfoAsBytes))
 
   val blockHeaderAsBytes: AsBytes[SignedBlockHeaderWithVrf] =
     AsBytes.byteArrayAsBytes.consumeAll.transform(
@@ -164,10 +166,13 @@ object KvPairs {
         .writeBool(x.script.nonEmpty)
         .writeOpt(x.script.map(writeAssetScript))
   }
+
+  val weighedAssetDescriptionAsBytes: AsBytes[WeighedAssetDescription] =
+    AsBytes.tuple2(intAsBytes, assetDescriptionAsBytes).transform(Function.tupled(WeighedAssetDescription), x => (x.scriptWeight, x.assetDescription))
   object AssetDescriptions
-      extends KvPair[(state.Height, Asset.IssuedAsset), Option[AssetDescription]](72)(
+      extends KvPair[(state.Height, Asset.IssuedAsset), Option[WeighedAssetDescription]](72)(
         implicitly,
-        AsBytes.optional(assetDescriptionAsBytes)
+        AsBytes.optional(weighedAssetDescriptionAsBytes)
       )
 
   val aliasAsBytes: AsBytes[Alias]                = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_).explicitGet(), _.bytes)

@@ -9,7 +9,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.DataTransactionData
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{account, state, transaction}
 
@@ -18,39 +18,62 @@ import java.nio.charset.StandardCharsets
 // TODO Use KvPair instead?
 sealed trait CacheKey extends Product with Serializable {
   type ValueT
+  def keyWeight: Int
+  def valueWeight(value: ValueT): Int
 }
 
 object CacheKey {
   case class AccountData(address: Address, dataKey: String) extends CacheKey {
     override type ValueT = DataEntry[?]
+    // 24 = 12 (header) + 4 (ref) + 4 (ref) + 4 (align)
+    override def keyWeight: Int                        = 24 + CacheWeights.OfAddress + CacheWeights.ofAsciiString(dataKey)
+    override def valueWeight(value: DataEntry[?]): Int = CacheWeights.ofDataEntry(value)
   }
 
   case class Transaction(id: TransactionId) extends CacheKey {
     override type ValueT = state.Height
+    override def keyWeight: Int                  = 16 + CacheWeights.OfTransactionId // 16 = 12 (header) + 4 (ref) + id
+    override def valueWeight(value: Height): Int = 16                                // 12 (header) + 4 (int value)
   }
 
   case object Height extends CacheKey {
     override type ValueT = state.Height
+    override def keyWeight: Int                  = 0
+    override def valueWeight(value: Height): Int = 16 // 12 (header) + 4 (int value)
   }
 
   case class Alias(alias: account.Alias) extends CacheKey {
     override type ValueT = Address
+    override def keyWeight: Int                   = 16 + CacheWeights.ofAlias(alias) // 16 = 12 (header) + 4 (ref) + alias
+    override def valueWeight(value: Address): Int = CacheWeights.OfAddress
   }
 
   case class Asset(asset: IssuedAsset) extends CacheKey {
-    override type ValueT = AssetDescription
+    override type ValueT = WeighedAssetDescription
+    override def keyWeight: Int                                   = CacheWeights.OfIssuedAsset
+    override def valueWeight(value: WeighedAssetDescription): Int = CacheWeights.ofWeighedAssetDescription(value)
   }
 
   case class AccountBalance(address: Address, asset: transaction.Asset) extends CacheKey {
     override type ValueT = Long
+    // 24 = 12 (header) + 4*2 (ref: address, asset) + 4 (align)
+    override def keyWeight: Int                = 24 + CacheWeights.OfAddress + CacheWeights.ofAsset(asset)
+    override def valueWeight(value: Long): Int = 8
   }
 
   case class AccountLeaseBalance(address: Address) extends CacheKey {
     override type ValueT = LeaseBalance
+    // 16 = 12 (header) + 4 (ref)
+    override def keyWeight: Int                        = 16 + CacheWeights.OfAddress
+    override def valueWeight(value: LeaseBalance): Int = CacheWeights.OfLeaseBalance
   }
 
   case class AccountScript(address: Address) extends CacheKey {
-    override type ValueT = AccountScriptInfo
+    override type ValueT = WeighedAccountScriptInfo
+    // 16 = 12 (header) + 4 (ref)
+    override def keyWeight: Int = 16 + CacheWeights.OfAddress
+    // 24 = 12 (header) + 4 (size) + 4 (ref: scriptInfo) + 4 (align)
+    override def valueWeight(value: WeighedAccountScriptInfo): Int = 24 + value.scriptInfoWeight
   }
 }
 
