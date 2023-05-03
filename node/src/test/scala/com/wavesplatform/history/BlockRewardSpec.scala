@@ -16,7 +16,7 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.test.DomainPresets.{RideV6, WavesSettingsOps}
+import com.wavesplatform.test.DomainPresets.{RideV6, WavesSettingsOps, BlockRewardDistribution as BlockRewardDistributionSettings}
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -572,7 +572,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     val daoAddress        = TxHelpers.address(101)
     val xtnBuybackAddress = TxHelpers.address(102)
 
-    val setttingsWithoutAddresses = RideV6.copy(blockchainSettings =
+    val settingsWithoutAddresses = RideV6.copy(blockchainSettings =
       RideV6.blockchainSettings.copy(functionalitySettings =
         RideV6.blockchainSettings.functionalitySettings.copy(daoAddress = None, xtnBuybackAddress = None)
       )
@@ -610,7 +610,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
 
     // both daoAddress and xtnBuybackAddress are not defined
-    withDomain(setttingsWithoutAddresses.setFeaturesHeight(BlockRewardDistribution -> 2)) { d =>
+    withDomain(settingsWithoutAddresses.setFeaturesHeight(BlockRewardDistribution -> 2)) { d =>
       val firstBlock       = d.appendBlock()
       val prevMinerBalance = d.balance(firstBlock.sender.toAddress)
       val miner            = d.appendBlock().sender.toAddress
@@ -697,6 +697,54 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.balance(
         miner
       ) - beforeActivationMinerBalance shouldBe (d.blockchain.settings.rewardsSettings.initial - daoAddressBalance)
+    }
+  }
+
+  "Rewards for miner, daoAddress and xtnBuybackAddress should be changed after voting" in {
+    val daoAddress        = TxHelpers.address(100)
+    val xtnBuybackAddress = TxHelpers.address(101)
+
+    val votingInterval = 10
+    val term           = 10
+
+    val settings = BlockRewardDistributionSettings
+      .copy(blockchainSettings =
+        BlockRewardDistributionSettings.blockchainSettings.copy(
+          functionalitySettings = BlockRewardDistributionSettings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString)),
+          rewardsSettings = BlockRewardDistributionSettings.blockchainSettings.rewardsSettings.copy(votingInterval = votingInterval, term = term)
+        )
+      )
+      .setFeaturesHeight(BlockReward -> 1)
+
+    withDomain(settings) { d =>
+      val initReward              = d.settings.blockchainSettings.rewardsSettings.initial
+      val rewardDelta             = d.settings.blockchainSettings.rewardsSettings.minIncrement
+      val initialConfigAddrReward = initReward / 3
+      val miner                   = d.appendBlock().sender.toAddress
+      (1 until votingInterval).foreach { _ =>
+        val prevMinerBalance      = d.balance(miner)
+        val prevDaoBalance        = d.balance(daoAddress)
+        val prevXtnBuybackBalance = d.balance(xtnBuybackAddress)
+        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, rewardVote = initReward - 1))
+
+        d.balance(miner) shouldBe prevMinerBalance + initReward - 2 * initialConfigAddrReward
+        d.balance(daoAddress) shouldBe prevDaoBalance + initialConfigAddrReward
+        d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackBalance + initialConfigAddrReward
+      }
+
+      val prevMinerBalance      = d.balance(miner)
+      val prevDaoBalance        = d.balance(daoAddress)
+      val prevXtnBuybackBalance = d.balance(xtnBuybackAddress)
+
+      val newReward           = initReward - rewardDelta
+      val newConfigAddrReward = newReward / 3
+
+      d.appendBlock()
+
+      d.balance(miner) shouldBe prevMinerBalance + newReward - 2 * newConfigAddrReward
+      d.balance(daoAddress) shouldBe prevDaoBalance + newConfigAddrReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackBalance + newConfigAddrReward
     }
   }
 }
