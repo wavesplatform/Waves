@@ -542,7 +542,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
            | }
            |""".stripMargin
 
-      Seq(V5, V6).foreach(v => TestCompiler(v).compile(script(v)) should produce("Undefined field `rewards` of variable of type `BlockInfo`"))
+      Seq(V4, V5, V6).foreach(v => TestCompiler(v).compile(script(v)) should produce("Undefined field `rewards` of variable of type `BlockInfo`"))
 
       val compiledDapp = TestCompiler(V7).compile(script(V7))
       compiledDapp should beRight
