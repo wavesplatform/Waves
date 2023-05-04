@@ -185,7 +185,6 @@ object BlockchainState extends ScorexLogging {
         update match {
           case _: Update.Append =>
             processor.process(event.getUpdate)
-            log.info("Running affected scripts...")
             processor.runAffectedScripts(updateType).as(orig.withHeight(h))
 
           case _: Update.Rollback =>
@@ -204,7 +203,6 @@ object BlockchainState extends ScorexLogging {
             val updated = orig.apply(event)
             if (updated.isRollbackResolved) {
               val r = Working(updated.processedHeight)
-              log.info("Running affected scripts...")
               processor.runAffectedScripts(updateType).as {
                 logStatusChanged(r)
                 r

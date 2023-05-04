@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.ride.runner.db.RideRocksDb
-import com.wavesplatform.ride.runner.requests.DefaultRequestService
+import com.wavesplatform.ride.runner.requests.{DefaultRequestService, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
 import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
@@ -38,6 +38,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       .parse(Using(Source.fromFile(inputFile))(_.getLines().mkString("\n")).get)
       .as[List[ScriptRequest]]
 
+    log.info(s"Found ${scripts.size} scripts")
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = new Cleanup(actorSystem)
@@ -126,7 +127,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       sharedBlockchain,
-      null, // TODO
+      new SynchronizedJobScheduler()(rideScheduler),
       rideScheduler
     )
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
