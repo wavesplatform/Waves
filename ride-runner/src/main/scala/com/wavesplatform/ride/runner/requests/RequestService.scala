@@ -13,7 +13,7 @@ import com.wavesplatform.ride.runner.storage.{CacheKey, ScriptRequest, SharedBlo
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, Json}
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -122,29 +122,37 @@ class DefaultRequestService(
   private def runOne(height: Int, scriptEnv: RideScriptRunEnvironment): Task[RideScriptRunEnvironment] =
     Task
       .evalAsync {
-        val updatedResult = rideRequestRunTime.measure {
-          evaluate(scriptEnv) - "stateChanges" // Not required for now
-        }
+        try {
+          val updatedResult = rideRequestRunTime.measure {
+            evaluate(scriptEnv) - "stateChanges" // Not required for now
+          }
 
-        val origResult      = scriptEnv.lastResult
-        lazy val complexity = (updatedResult \ "complexity").as[Int]
-        if ((updatedResult \ "error").isDefined) {
-          log.trace(s"result=failed; ${scriptEnv.key.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
-          rideScriptFailedCalls.increment()
-        } else if (
-          origResult == JsObject.empty ||
-          updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
-        ) {
-          rideScriptOkCalls.increment()
-          log.trace(s"result=ok; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
-        } else {
-          rideScriptUnnecessaryCalls.increment()
-          log.trace(s"result=unnecessary; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
-        }
+          val origResult      = scriptEnv.lastResult
+          lazy val complexity = (updatedResult \ "complexity").as[Int]
+          if ((updatedResult \ "error").isDefined) {
+            log.trace(s"result=failed; ${scriptEnv.key.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
+            rideScriptFailedCalls.increment()
+          } else if (
+            origResult == JsObject.empty ||
+            updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
+          ) {
+            rideScriptOkCalls.increment()
+            log.trace(s"result=ok; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
+          } else {
+            rideScriptUnnecessaryCalls.increment()
+            log.trace(s"result=unnecessary; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
+          }
 
-        scriptEnv.copy(lastResult = updatedResult, updateHeight = height)
+          scriptEnv.copy(lastResult = updatedResult, updateHeight = height)
+        } catch {
+          case e: Throwable =>
+            log.error(s"An error during running ${scriptEnv.key}: ${e.getMessage}")
+            scriptEnv.copy(
+              lastResult = Json.obj("error" -> 119, "message" -> e.getMessage),
+              updateHeight = height
+            )
+        }
       }
-      .tapError { e => Task(log.error(s"An error during running ${scriptEnv.key}", e)) }
       .executeOn(runScriptScheduler)
 
   private def evaluate(script: RideScriptRunEnvironment): JsObject = UtilsApiRoute.evaluate(

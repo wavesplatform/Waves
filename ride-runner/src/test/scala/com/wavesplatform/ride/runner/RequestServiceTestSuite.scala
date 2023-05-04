@@ -17,7 +17,7 @@ import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
-import play.api.libs.json.Json
+import play.api.libs.json.{JsValue, Json}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -63,6 +63,24 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         d.scheduler.tick()
         checkExpectedResults(1, 4, 1)
       }
+
+      "returns an error if the provided expr is wrong" in test { d =>
+        val request = ScriptRequest(
+          address = aliceAddr,
+          requestBody = Json.obj("expr" -> "buyNsbtREADONLY(10000000000000000000)")
+        )
+
+        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
+        d.scheduler.tick()
+
+        d.checkFull(
+          request,
+          Json.obj(
+            "error"   -> 119,
+            "message" -> "For input string: \"10000000000000000000\""
+          )
+        )
+      }
     }
   }
 
@@ -79,6 +97,15 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val r = Await.result(task, 5.seconds)
       withClue(s"$r:") {
         (r \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
+      }
+    }
+
+    def checkFull(request: ScriptRequest, json: JsValue): Unit = {
+      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      scheduler.tick()
+      val r = Await.result(task, 5.seconds)
+      withClue(s"$r:") {
+        r shouldBe json
       }
     }
   }
