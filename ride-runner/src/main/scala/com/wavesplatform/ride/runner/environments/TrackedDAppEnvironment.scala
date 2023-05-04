@@ -68,6 +68,7 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
     tracker.lastBlockOpt()
     underlying.lastBlockOpt()
   }
+
   override def blockInfoByHeight(height: Int): Id[Option[BlockInfo]] = {
     tracker.blockInfoByHeight(height)
     underlying.blockInfoByHeight(height)
