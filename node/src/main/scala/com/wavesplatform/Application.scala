@@ -31,7 +31,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, StateSnapshot, TxMeta}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -230,9 +230,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val blocksApi: CommonBlocksApi =
         CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb, blockchainUpdater))
       override val accountsApi: CommonAccountsApi =
-        CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, rdb, blockchainUpdater)
+        CommonAccountsApi(() => blockchainUpdater.compositeBlockchain, rdb, blockchainUpdater)
       override val assetsApi: CommonAssetsApi =
-        CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty), rdb.db, blockchainUpdater)
+        CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -359,7 +359,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           extensionContext.transactionsApi,
           wallet,
           blockchainUpdater,
-          () => blockchainUpdater.getCompositeBlockchain,
+          () => blockchainUpdater.compositeBlockchain,
           () => utxStorage.size,
           transactionPublisher,
           time,
@@ -415,7 +415,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           wallet,
           transactionPublisher,
           blockchainUpdater,
-          () => blockchainUpdater.getCompositeBlockchain,
+          () => blockchainUpdater.compositeBlockchain,
           time,
           extensionContext.accountsApi,
           extensionContext.assetsApi,

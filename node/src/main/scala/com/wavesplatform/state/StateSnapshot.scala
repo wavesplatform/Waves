@@ -206,10 +206,11 @@ object StateSnapshot {
       case (asset, Ior.Both(_, volume)) => (asset, volume)
     }
     (issued |+| updated).map { case (asset, volume) =>
-      val bVolume        = blockchain.assetDescription(asset).map(_.totalVolume).getOrElse(BigInt(0))
-      val newVolume      = bVolume + volume.volume
-      val newVolumeBytes = ByteString.copyFrom(newVolume.toByteArray)
-      S.AssetVolume(asset.id.toByteString, volume.isReissuable, newVolumeBytes)
+      val blockchainAsset = blockchain.assetDescription(asset)
+      val newIsReissuable = blockchainAsset.map(_.reissuable && volume.isReissuable).getOrElse(volume.isReissuable)
+      val newVolume       = blockchainAsset.map(_.totalVolume + volume.volume).getOrElse(volume.volume)
+      val newVolumeBytes  = ByteString.copyFrom(newVolume.toByteArray)
+      S.AssetVolume(asset.id.toByteString, newIsReissuable, newVolumeBytes)
     }.toSeq
   }
 
@@ -327,6 +328,7 @@ object StateSnapshot {
         val values2 = f(s2.current)
         values1.filterNot(v1 => values2.exists(v2 => k(v2) == k(v1))) ++ values2
       }
+
       StateSnapshot(
         s1.transactions ++ s2.transactions,
         TransactionStateSnapshot(

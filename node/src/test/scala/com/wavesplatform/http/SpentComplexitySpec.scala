@@ -72,7 +72,7 @@ class SpentComplexitySpec
         d.transactionsApi,
         testWallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain.compositeBlockchain,
         () => 0,
         DummyTransactionPublisher.accepting,
         ntpTime,

@@ -137,7 +137,7 @@ class TransactionsRouteSpec
         d.commonApi.transactions,
         testWallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain.compositeBlockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
@@ -397,7 +397,7 @@ class TransactionsRouteSpec
         d.appendBlock(tx)
         val route = seal(
           transactionsApiRoute
-            .copy(blockchain = d.blockchain, compositeBlockchain = () => d.blockchain.getCompositeBlockchain, commonApi = d.transactionsApi)
+            .copy(blockchain = d.blockchain, compositeBlockchain = () => d.blockchain.compositeBlockchain, commonApi = d.transactionsApi)
             .route
         )
         Get(routePath(s"/address/$defaultAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {

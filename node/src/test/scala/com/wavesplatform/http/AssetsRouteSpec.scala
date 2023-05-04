@@ -56,7 +56,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             testWallet,
             DummyTransactionPublisher.accepting,
             d.blockchain,
-            () => d.blockchain.getCompositeBlockchain,
+            () => d.blockchain.compositeBlockchain,
             TestTime(),
             d.accountsApi,
             d.assetsApi,

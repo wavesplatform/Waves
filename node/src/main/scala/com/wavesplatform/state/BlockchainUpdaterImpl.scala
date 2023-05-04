@@ -741,11 +741,8 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.resolveERC20Address(address)
   }
 
-  def getCompositeBlockchain: SnapshotBlockchain =
+  def compositeBlockchain: SnapshotBlockchain =
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.monoid.empty))(SnapshotBlockchain(rocksdb, _))
-
-  private[this] def compositeBlockchain: Blockchain =
-    ngState.fold(rocksdb: Blockchain)(CompositeBlockchain(rocksdb, _))
 
   // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {

@@ -141,7 +141,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty).toDiff
+    blockchainUpdater.bestLiquidSnapshot.orEmpty.toDiff
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
@@ -164,7 +164,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = rdb.db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidSnapshot.getOrElse(StateSnapshot.monoid.empty), None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidSnapshot.orEmpty, None, blockchainUpdater.assetDescription)
       .toSeq
       .flatten
   }
@@ -410,7 +410,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   )
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
-    () => blockchainUpdater.getCompositeBlockchain,
+    () => blockchainUpdater.compositeBlockchain,
     rdb,
     blockchain
   )
