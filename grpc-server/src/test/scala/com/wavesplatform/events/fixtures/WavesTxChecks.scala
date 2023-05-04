@@ -190,6 +190,17 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkUpdateAssetInfoTransaction(actualId: ByteString, actual: SignedTransaction, expected: UpdateAssetInfoTransaction)(implicit
+      pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.UpdateAssetInfo(value) =>
+        value.assetId.toByteArray shouldBe expected.assetId.id.arr
+        value.name shouldBe expected.name
+    }
+  }
+
   def checkSponsorFeeTransaction(actualId: ByteString, actual: SignedTransaction, expected: SponsorFeeTransaction)(implicit pos: Position): Unit = {
     checkBaseTx(actualId, actual, expected)
     val expectedAmount = expected.minSponsoredAssetFee.map(_.toString.toLong).getOrElse(0L)
@@ -254,6 +265,11 @@ object WavesTxChecks extends Matchers with OptionValues {
       actual.get.decimals shouldBe expected.decimals.value
       actual.get.reissuable shouldBe expected.reissuable
     }
+  }
+
+  def checkAssetUpdatesStateUpdates(actual: Option[AssetDetails], expected: UpdateAssetInfoTransaction): Unit = {
+    actual.get.name shouldBe expected.name
+    actual.get.description shouldBe expected.description
   }
 
   def checkAssetsScriptStateUpdates(actual: Option[AssetScriptInfo], expected: Array[Byte]): Unit = {

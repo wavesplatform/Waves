@@ -546,8 +546,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
         balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issue, setAssetScript)) { updates =>
-        val append    = updates(1).append
-        val txUpdates = append.transactionStateUpdates.apply(1)
+        val append       = updates(1).append
+        val txUpdates    = append.transactionStateUpdates.apply(1)
         val assetDetails = txUpdates.assets.head
         checkSetAssetScriptTransaction(append.transactionIds.apply(1), append.transactionAt(1), setAssetScript)
         checkBalances(
@@ -560,6 +560,37 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkAssetsScriptStateUpdates(assetDetails.before.get.scriptInfo, complexScriptBefore.get.bytes.value().arr)
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false)
         checkAssetsScriptStateUpdates(assetDetails.after.get.scriptInfo, complexScriptAfter.bytes.value().arr)
+      }
+    }
+
+    "return correct data for UpdateAssetInfo" in {
+      val senderBalanceAfterIssue           = senderBalanceBefore - 1.waves
+      val senderBalanceAfterUpdateAssetInfo = senderBalanceAfterIssue - fee
+      val newName                           = "new_name"
+      val newDescription                    = "new_description"
+      val issue                             = TxHelpers.issue(sender, 99900000L)
+      val updateAssetInfo                   = TxHelpers.updateAssetInfo(issue.assetId, newName, newDescription, sender)
+
+      withGenerateSubscription(
+        settings = currentSettings.configure(_.copy(minAssetInfoUpdateInterval = 1)),
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      ) { d =>
+        d.appendBlock(issue)
+        d.appendBlock()
+        d.appendMicroBlock(updateAssetInfo)
+      } { updates =>
+        val append       = updates(3).append
+        val txUpdates    = append.transactionStateUpdates.head
+        val assetDetails = txUpdates.assets.head
+        checkUpdateAssetInfoTransaction(append.transactionIds.head, append.transactionAt(0), updateAssetInfo)
+        checkBalances(
+          txUpdates.balances,
+          Map(
+            (sender.toAddress, Waves) -> (senderBalanceAfterIssue, senderBalanceAfterUpdateAssetInfo)
+          )
+        )
+        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false)
+        checkAssetUpdatesStateUpdates(assetDetails.after, updateAssetInfo)
       }
     }
   }
