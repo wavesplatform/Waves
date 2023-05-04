@@ -4,14 +4,14 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.events.protobuf.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
+import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
+import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -179,6 +179,27 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkSetAssetScriptTransaction(actualId: ByteString, actual: SignedTransaction, expected: SetAssetScriptTransaction)(implicit
+      pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.SetAssetScript(value) =>
+        value.assetId.toByteArray shouldBe expected.asset.id.arr
+        value.script.toByteArray shouldBe expected.script.get.bytes.value().arr
+    }
+  }
+
+  def checkSponsorFeeTransaction(actualId: ByteString, actual: SignedTransaction, expected: SponsorFeeTransaction)(implicit pos: Position): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    val expectedAmount = expected.minSponsoredAssetFee.map(_.toString.toLong).getOrElse(0L)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.SponsorFee(value) =>
+        value.minFee.value.assetId.toByteArray shouldBe expected.asset.id.arr
+        value.minFee.value.amount shouldBe expectedAmount
+    }
+  }
+
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
     actual.map { bu =>
       (
@@ -222,33 +243,21 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkAssetsAfter(actual: Seq[AssetStateUpdate], expected: IssueTransaction, isNft: Boolean): Unit = {
-    val after = actual.head.after.get
-
-    after.assetId.toByteArray shouldBe expected.asset.id.arr
-    after.issuer.toByteArray shouldBe expected.sender.arr
-    after.name shouldBe expected.name.toStringUtf8
-    after.description shouldBe expected.description.toStringUtf8
-    after.nft shouldBe isNft
-    after.volume shouldBe expected.quantity.value
-    after.decimals shouldBe expected.decimals.value
-    after.reissuable shouldBe expected.reissuable
-    if (after.scriptInfo.isDefined) after.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
+  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: IssueTransaction, isNft: Boolean): Unit = {
+    if (actual.isDefined) {
+      actual.get.assetId.toByteArray shouldBe expected.asset.id.arr
+      actual.get.issuer.toByteArray shouldBe expected.sender.arr
+      actual.get.name shouldBe expected.name.toStringUtf8
+      actual.get.description shouldBe expected.description.toStringUtf8
+      actual.get.nft shouldBe isNft
+      actual.get.volume shouldBe expected.quantity.value
+      actual.get.decimals shouldBe expected.decimals.value
+      actual.get.reissuable shouldBe expected.reissuable
+    }
   }
 
-  def checkAssetsBefore(actual: Seq[AssetStateUpdate], expected: IssueTransaction, isNft: Boolean): Unit = {
-    val before = actual.head.before
-    if (before.isDefined) {
-      before.get.assetId.toByteArray shouldBe expected.asset.id.arr
-      before.get.issuer.toByteArray shouldBe expected.sender.arr
-      before.get.name shouldBe expected.name.toStringUtf8
-      before.get.description shouldBe expected.description.toStringUtf8
-      before.get.nft shouldBe isNft
-      before.get.volume shouldBe expected.quantity.value
-      before.get.decimals shouldBe expected.decimals.value
-      before.get.reissuable shouldBe expected.reissuable
-      if (before.get.scriptInfo.isDefined) before.get.scriptInfo.get.script.toByteArray shouldBe expected.script.get.bytes.value().arr
-    }
+  def checkAssetsScriptStateUpdates(actual: Option[AssetScriptInfo], expected: Array[Byte]): Unit = {
+    actual.get.script.toByteArray shouldBe expected
   }
 
   def checkLeasingForAddress(actual: Seq[LeasingUpdate], expected: Map[(Address, Long, Long), (Long, Long)]): Unit = {

@@ -1,13 +1,14 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
@@ -23,41 +24,51 @@ import java.util.concurrent.ThreadLocalRandom.current
 
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = DomainPresets.RideV6
-  val customFee: Long                = 1234567L
+  val customFee: Long                = 5234567L
   val customAssetIssueFee            = 234567654L
+  val sender: SeedKeyPair            = TxHelpers.signer(12)
+  val senderBalanceBefore: Long      = 20.waves
+  val testScript: Script = TxHelpers.script(s"""{-# STDLIB_VERSION 6 #-}
+                                               |{-# CONTENT_TYPE DAPP #-}
+                                               |{-# SCRIPT_TYPE ACCOUNT #-}
+                                               |
+                                               |@Verifier(tx)
+                                               |func verify () = match(tx) {
+                                               |    case _ =>
+                                               |      if (
+                                               |        ${(1 to 9).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || \n")}
+                                               |      ) then true else true
+                                               |}""".stripMargin)
 
   "BlockchainUpdates subscribe tests" - {
-    "return correct data for alias tx" in {
-      val aliasSender              = TxHelpers.signer(125)
-      val aliasSenderBalanceBefore = 100.waves
-      val aliasTx                  = TxHelpers.createAlias("test", sender = aliasSender, fee = customFee)
+    "return correct data for alias https://app.qase.io/case/BU-1" in {
+      val aliasTx = TxHelpers.createAlias("test", sender, fee = customFee)
+
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(aliasSender.toAddress, aliasSenderBalanceBefore))
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(aliasTx)) { updates =>
         val append = updates(1).append
         checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
-          Map((aliasSender.toAddress, Waves) -> (aliasSenderBalanceBefore, aliasSenderBalanceBefore - customFee))
+          Map((sender.toAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
         )
       }
     }
 
-    "return correct data for transfer tx" in {
+    "return correct data for transfer https://app.qase.io/case/BU-28" in {
       val amount: Long                   = 1000L
-      val transferSender                 = TxHelpers.signer(155)
-      val transferSenderBalanceBefore    = 5.waves
-      val transferSenderBalanceAfter     = transferSenderBalanceBefore - customFee - amount
+      val transferSenderBalanceAfter     = senderBalanceBefore - customFee - amount
       val transferRecipient              = TxHelpers.signer(123)
       val recipientAddress               = transferRecipient.toAddress
       val transferRecipientBalanceBefore = 1.waves
       val transferRecipientBalanceAfter  = transferRecipientBalanceBefore + amount
-      val transferTx                     = TxHelpers.transfer(transferSender, recipientAddress, amount, Waves, customFee)
+      val transferTx                     = TxHelpers.transfer(sender, recipientAddress, amount, Waves, customFee)
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(
-          AddrWithBalance(transferSender.toAddress, transferSenderBalanceBefore),
+          AddrWithBalance(sender.toAddress, senderBalanceBefore),
           AddrWithBalance(transferRecipient.toAddress, transferRecipientBalanceBefore)
         )
       )(_.appendMicroBlock(transferTx)) { updates =>
@@ -66,50 +77,50 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (transferSender.toAddress, Waves) -> (transferSenderBalanceBefore, transferSenderBalanceAfter),
-            (recipientAddress, Waves)         -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter)
+            (sender.toAddress, Waves) -> (senderBalanceBefore, transferSenderBalanceAfter),
+            (recipientAddress, Waves) -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter)
           )
         )
       }
     }
 
-    "return correct data for issue tx" in {
-      val issueSender              = TxHelpers.signer(58)
-      val issueSenderBalanceBefore = 10.waves
-      val script                   = Option(TxHelpers.script("true"))
-      val amount: Long             = current.nextInt(1, 9999999)
-      val decimals: Byte           = current.nextInt(0, 8).toByte
-      val name: String             = "Test_asset"
-      val description: String      = name + "|_|_|_|_|_|" + current.nextInt(1111111, 9999999)
-      val issue                    = TxHelpers.issue(issueSender, amount, decimals, name, description, customAssetIssueFee, script)
+    "return correct data for issue https://app.qase.io/case/BU-9" in {
+      val script              = Option(TxHelpers.script("true"))
+      val amount: Long        = current.nextInt(1, 9999999)
+      val decimals: Byte      = current.nextInt(0, 8).toByte
+      val name: String        = "Test_asset"
+      val description: String = name + "|_|_|_|_|_|" + current.nextInt(1111111, 9999999)
+      val issue               = TxHelpers.issue(sender, amount, decimals, name, description, customAssetIssueFee, script)
+      val issueScript         = issue.script.get.bytes.value().arr
 
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(issueSender.toAddress, issueSenderBalanceBefore))
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issue)) { updates =>
-        val append = updates(1).append
+        val append       = updates(1).append
+        val assetDetails = append.transactionStateUpdates.head.assets.head
+
         checkIssue(append.transactionIds.head, append.transactionAt(0), issue)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (issueSender.toAddress, Waves)       -> (issueSenderBalanceBefore, issueSenderBalanceBefore - customAssetIssueFee),
-            (issueSender.toAddress, issue.asset) -> (0, amount)
+            (sender.toAddress, Waves)       -> (senderBalanceBefore, senderBalanceBefore - customAssetIssueFee),
+            (sender.toAddress, issue.asset) -> (0, amount)
           )
         )
-        checkAssetsBefore(append.transactionStateUpdates.head.assets, issue, isNft = false)
-        checkAssetsAfter(append.transactionStateUpdates.head.assets, issue, isNft = false)
+        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false)
+        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false)
+        checkAssetsScriptStateUpdates(assetDetails.after.get.scriptInfo, issueScript)
       }
     }
 
-    "return correct data for issue NFT tx" in {
-      val issueSender              = TxHelpers.signer(58)
-      val issueSenderBalanceBefore = 3.waves
-      val name: String             = "Nft_test_asset"
-      val description: String      = name + "__" + current.nextInt(1111, 999999)
+    "return correct data for issue NFT https://app.qase.io/case/BU-11" in {
+      val name: String        = "Nft_test_asset"
+      val description: String = name + "__" + current.nextInt(1111, 999999)
       val issueNftTx = IssueTransaction
         .selfSigned(
           TxVersion.V3,
-          issueSender,
+          sender,
           name,
           description,
           quantity = 1,
@@ -123,77 +134,78 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.ReduceNFTFee),
-        balances = Seq(AddrWithBalance(issueSender.toAddress, issueSenderBalanceBefore))
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issueNftTx)) { updates =>
-        val append = updates(1).append
+        val append       = updates(1).append
+        val assetDetails = append.transactionStateUpdates.head.assets.head
+
         checkIssue(append.transactionIds.head, append.transactionAt(0), issueNftTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (issueSender.toAddress, Waves)            -> (issueSenderBalanceBefore, issueSenderBalanceBefore - 0.001.waves),
-            (issueSender.toAddress, issueNftTx.asset) -> (0, 1)
+            (sender.toAddress, Waves)            -> (senderBalanceBefore, senderBalanceBefore - 0.001.waves),
+            (sender.toAddress, issueNftTx.asset) -> (0, 1)
           )
         )
-        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueNftTx, isNft = true)
-        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueNftTx, isNft = true)
+        checkAssetsStateUpdates(assetDetails.before, issueNftTx, isNft = true)
+        checkAssetsStateUpdates(assetDetails.after, issueNftTx, isNft = true)
       }
     }
 
-    "return correct data for reissue tx" in {
-      val issueSender                = TxHelpers.signer(58)
-      val senderBalanceBefore        = 4.waves
-      val senderBalanceBeforeReissue = 3.waves
+    "return correct data for reissue https://app.qase.io/case/BU-19" in {
+      val senderBalanceBeforeReissue = senderBalanceBefore - 1.waves
       val senderBalanceAfterReissue  = senderBalanceBeforeReissue - customAssetIssueFee
       val amount: Long               = current.nextInt(1, 9999999)
-      val issueTx                    = TxHelpers.issue(issueSender, amount)
-      val reissueTx                  = TxHelpers.reissue(issueTx.asset, issueSender, amount, reissuable = false, customAssetIssueFee)
+      val issueTx                    = TxHelpers.issue(sender, amount)
+      val reissueTx                  = TxHelpers.reissue(issueTx.asset, sender, amount, reissuable = false, customAssetIssueFee)
 
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(issueSender.toAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issueTx, reissueTx)) { updates =>
-        val append = updates(1).append
+        val append       = updates(1).append
+        val assetDetails = append.transactionStateUpdates.head.assets.head
+
         checkReissue(append.transactionIds.apply(1), append.transactionAt(1), reissueTx)
         checkBalances(
           append.transactionStateUpdates.apply(1).balances,
           Map(
-            (issueSender.toAddress, Waves)           -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
-            (issueSender.toAddress, reissueTx.asset) -> (amount, amount * 2)
+            (sender.toAddress, Waves)           -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (sender.toAddress, reissueTx.asset) -> (amount, amount * 2)
           )
         )
-        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
-        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+        checkAssetsStateUpdates(assetDetails.before, issueTx, isNft = false)
+        checkAssetsStateUpdates(assetDetails.after, issueTx, isNft = false)
       }
     }
 
-    "return correct data for burn tx" in {
-      val issueSender                = TxHelpers.signer(58)
-      val senderBalanceBefore        = 4.waves
-      val senderBalanceBeforeReissue = 3.waves
+    "return correct data for burn https://app.qase.io/case/BU-4" in {
+      val senderBalanceBeforeReissue = senderBalanceBefore - 1.waves
       val senderBalanceAfterReissue  = senderBalanceBeforeReissue - customAssetIssueFee
       val amount: Long               = current.nextInt(1, 9999999)
-      val issueTx                    = TxHelpers.issue(issueSender, amount)
-      val burnTx                     = TxHelpers.burn(issueTx.asset, amount, issueSender, customAssetIssueFee)
+      val issueTx                    = TxHelpers.issue(sender, amount)
+      val burnTx                     = TxHelpers.burn(issueTx.asset, amount, sender, customAssetIssueFee)
 
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(issueSender.toAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issueTx, burnTx)) { updates =>
-        val append = updates(1).append
+        val append       = updates(1).append
+        val assetDetails = append.transactionStateUpdates.head.assets.head
         checkBurn(append.transactionIds.apply(1), append.transactionAt(1), burnTx)
         checkBalances(
           append.transactionStateUpdates.apply(1).balances,
           Map(
-            (issueSender.toAddress, Waves)        -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
-            (issueSender.toAddress, burnTx.asset) -> (amount, 0)
+            (sender.toAddress, Waves)        -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (sender.toAddress, burnTx.asset) -> (amount, 0)
           )
         )
-        checkAssetsBefore(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
-        checkAssetsAfter(append.transactionStateUpdates.head.assets, issueTx, isNft = false)
+        checkAssetsStateUpdates(assetDetails.before, issueTx, isNft = false)
+        checkAssetsStateUpdates(assetDetails.after, issueTx, isNft = false)
       }
     }
 
-    "return correct data for exchange tx order V3, exchange V2" in {
+    "return correct data for exchange tx order V3, exchange V2 https://app.qase.io/case/BU-6" in {
       val buyer                       = TxHelpers.signer(58)
       val seller                      = TxHelpers.signer(189)
       val buyerBalanceBefore          = 4.waves
@@ -255,7 +267,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for exchange tx order V4, exchange V3" in {
+    "return correct data for exchange tx order V4, exchange V3 https://app.qase.io/case/BU-120" in {
       val buyer                       = TxHelpers.signer(58)
       val seller                      = TxHelpers.signer(189)
       val buyerBalanceBefore          = 4.waves
@@ -317,15 +329,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for lease tx" in {
-      val sender              = TxHelpers.signer(33)
-      val senderAddress       = sender.toAddress
-      val recipient           = TxHelpers.signer(123)
-      val recipientAddress    = recipient.toAddress
-      val senderBalanceBefore = 10.waves
-      val amount              = 5.waves
-      val lease               = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseId             = lease.id.value().arr
+    "return correct data for lease https://app.qase.io/case/BU-12" in {
+      val senderAddress    = sender.toAddress
+      val recipient        = TxHelpers.signer(123)
+      val recipientAddress = recipient.toAddress
+      val amount           = 5.waves
+      val lease            = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseId          = lease.id.value().arr
 
       withGenerateSubscription(
         settings = currentSettings,
@@ -355,16 +365,14 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for lease cancel tx" in {
-      val sender              = TxHelpers.signer(33)
-      val senderAddress       = sender.toAddress
-      val recipient           = TxHelpers.signer(123)
-      val recipientAddress    = recipient.toAddress
-      val senderBalanceBefore = 10.waves
-      val amount              = 5.waves
-      val lease               = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseCancel         = TxHelpers.leaseCancel(lease.id.value(), sender, customFee)
-      val leaseId             = leaseCancel.leaseId.arr
+    "return correct data for lease cancel https://app.qase.io/case/BU-14" in {
+      val senderAddress    = sender.toAddress
+      val recipient        = TxHelpers.signer(123)
+      val recipientAddress = recipient.toAddress
+      val amount           = 5.waves
+      val lease            = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseCancel      = TxHelpers.leaseCancel(lease.id.value(), sender, customFee)
+      val leaseId          = leaseCancel.leaseId.arr
 
       withGenerateSubscription(
         settings = currentSettings,
@@ -395,12 +403,10 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for massTransfer https://app.qase.io/case/BU-16" in {
-      val sender                  = TxHelpers.signer(33)
-      val senderBalanceBefore     = 10.waves
       val massTransferFee         = fee * 6
       val senderBalanceAfterIssue = senderBalanceBefore - 1.waves
       val senderBalanceAfter      = senderBalanceAfterIssue - massTransferFee
-      val transferAmount          = 500000
+      val transferAmount          = 500000L
       val recipients              = TxHelpers.accountSeqGenerator(10, transferAmount)
       val issue                   = TxHelpers.issue(sender, 1000000000L)
       val massTransfer            = TxHelpers.massTransfer(sender, recipients, Asset.fromCompatId(issue.asset.compatId), massTransferFee)
@@ -416,8 +422,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           massTransfer,
           recipients.map(r =>
             r.address match {
-              case addr: Address => Some(addr.publicKeyHash).get
-              case _             => fail("not an address")
+              case address: Address => Some(address.publicKeyHash).get
+              case _                => fail("not an address")
             }
           )
         )
@@ -443,15 +449,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for data tx https://app.qase.io/case/BU-5" in {
-      val sender              = TxHelpers.signer(12)
-      val senderBalanceBefore = 5.waves
-      val integerDataEntry    = IntegerDataEntry.apply("Integer", current.nextLong(0, 9292929L))
-      val booleanDataEntry    = BooleanDataEntry.apply("Boolean", value = true)
-      val stringDataEntry     = StringDataEntry.apply("String", "test")
-      val binaryDataEntry     = BinaryDataEntry.apply("Binary", ByteStr.apply(sender.toAddress.bytes))
-      val entries             = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
-      val dataTxVersion       = current().nextInt(1, 2).toByte
-      val dataTx              = TxHelpers.data(sender, entries, customFee, dataTxVersion)
+      val integerDataEntry = IntegerDataEntry.apply("Integer", current.nextLong(0, 9292929L))
+      val booleanDataEntry = BooleanDataEntry.apply("Boolean", value = true)
+      val stringDataEntry  = StringDataEntry.apply("String", "test")
+      val binaryDataEntry  = BinaryDataEntry.apply("Binary", ByteStr.apply(sender.toAddress.bytes))
+      val entries          = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
+      val dataTxVersion    = current().nextInt(1, 2).toByte
+      val dataTx           = TxHelpers.data(sender, entries, customFee, dataTxVersion)
 
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
@@ -469,20 +473,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "return correct data for setScript tx https://app.qase.io/case/BU-21" in {
-      val sender              = TxHelpers.signer(12)
-      val senderBalanceBefore = 5.waves
-      val complexScript = TxHelpers.script(s"""{-# STDLIB_VERSION 5 #-}
-                                              |{-# CONTENT_TYPE DAPP #-}
-                                              |{-# SCRIPT_TYPE ACCOUNT #-}
-                                              |
-                                              |@Verifier(tx)
-                                              |func verify () = match(tx) {
-                                              |    case _ =>
-                                              |      if (
-                                              |        ${(1 to 9).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || \n")}
-                                              |      ) then true else true
-                                              |}""".stripMargin)
-      val setScript = TxHelpers.setScript(sender, complexScript, customFee)
+      val setScript = TxHelpers.setScript(sender, testScript, customFee)
 
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
@@ -496,6 +487,79 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           Map((sender.toAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
         )
         checkSetScriptStateUpdate(txUpdates.scripts.head, setScript)
+      }
+    }
+
+    "return correct data for sponsorFee" - {
+      val senderBalanceAfterIssue            = senderBalanceBefore - 1.waves
+      val senderBalanceAfterSponsorFee       = senderBalanceAfterIssue - 1.waves
+      val senderBalanceAfterSponsorFeeCancel = senderBalanceAfterSponsorFee - 1.waves
+      val sponsorshipFee                     = Option.apply(current.nextLong(100000L, 9990000L))
+      val issue                              = TxHelpers.issue(sender, 99900000L)
+      val sponsorFee                         = TxHelpers.sponsor(issue.asset, sponsorshipFee, sender)
+      val sponsorFeeCancel                   = TxHelpers.sponsor(issue.asset, None, sender)
+
+      "sponsorFee tx https://app.qase.io/case/BU-25" in withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(issue, sponsorFee)) { updates =>
+        val append       = updates(1).append
+        val txUpdates    = append.transactionStateUpdates.apply(1)
+        val assetDetails = txUpdates.assets.head
+
+        checkSponsorFeeTransaction(append.transactionIds.apply(1), append.transactionAt(1), sponsorFee)
+        checkBalances(
+          txUpdates.balances,
+          Map((sender.toAddress, Waves) -> (senderBalanceAfterIssue, senderBalanceAfterSponsorFee))
+        )
+        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false)
+        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false)
+      }
+
+      "sponsorFee cancel tx https://app.qase.io/case/BU-27" in withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(issue, sponsorFee, sponsorFeeCancel)) { updates =>
+        val append       = updates(1).append
+        val txUpdates    = append.transactionStateUpdates.apply(2)
+        val assetDetails = txUpdates.assets.head
+
+        checkSponsorFeeTransaction(append.transactionIds.apply(2), append.transactionAt(2), sponsorFeeCancel)
+        checkBalances(
+          txUpdates.balances,
+          Map((sender.toAddress, Waves) -> (senderBalanceAfterSponsorFee, senderBalanceAfterSponsorFeeCancel))
+        )
+        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false)
+        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false)
+      }
+    }
+
+    "return correct data for setAssetScript https://app.qase.io/case/BU-20" in {
+      val senderBalanceAfterIssue          = senderBalanceBefore - 1.waves
+      val senderBalanceAfterSetAssetScript = senderBalanceAfterIssue - 1.waves
+      val complexScriptBefore              = Option.apply(TxHelpers.script("true".stripMargin))
+      val complexScriptAfter               = TxHelpers.script("false".stripMargin)
+      val issue                            = TxHelpers.issue(sender, 99900000L, script = complexScriptBefore)
+      val setAssetScript                   = TxHelpers.setAssetScript(sender, issue.asset, complexScriptAfter, 1.waves)
+
+      withGenerateSubscription(
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(issue, setAssetScript)) { updates =>
+        val append    = updates(1).append
+        val txUpdates = append.transactionStateUpdates.apply(1)
+        val assetDetails = txUpdates.assets.head
+        checkSetAssetScriptTransaction(append.transactionIds.apply(1), append.transactionAt(1), setAssetScript)
+        checkBalances(
+          txUpdates.balances,
+          Map(
+            (sender.toAddress, Waves) -> (senderBalanceAfterIssue, senderBalanceAfterSetAssetScript)
+          )
+        )
+        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false)
+        checkAssetsScriptStateUpdates(assetDetails.before.get.scriptInfo, complexScriptBefore.get.bytes.value().arr)
+        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false)
+        checkAssetsScriptStateUpdates(assetDetails.after.get.scriptInfo, complexScriptAfter.bytes.value().arr)
       }
     }
   }
