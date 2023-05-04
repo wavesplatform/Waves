@@ -37,7 +37,7 @@ object RideRunnerStats {
   val rideRequestTotalNumber = Kamon.gauge("ride.request.total", "Total registered unique RIDE requests").withoutTags()
   val rideRequestCacheHits   = Kamon.counter("ride.request.cache.hit", "Cache hits for whole request").withoutTags()
   val rideRequestCacheMisses = Kamon.counter("ride.request.cache.miss", "Cache misses for whole request").withoutTags()
-  val rideRequestRunTime     = Kamon.timer("ride.request.run", "Request running time")
+  val rideRequestRunTime     = Kamon.timer("ride.request.run", "Request running time").withoutTags()
 
   private val rideStorageKeyNumber          = Kamon.counter("ride.storage.number", "Number of unique keys in storage")
   def rideStorageKeyNumberFor(name: String) = rideStorageKeyNumber.withTag("name", name)

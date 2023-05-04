@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.storage
 
 import cats.syntax.option.*
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
+import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.account.Alias
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.api.{HasGrpc, TestBlockchainApi}
@@ -506,7 +507,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           val blockchain = SharedBlockchainStorage[Tag](
             settings = SharedBlockchainStorage.Settings(
               blockchain = DefaultBlockchainSettings,
-              cacheSize = 1000
+              commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
             ),
             db = db,
             persistentCaches = DefaultPersistentCaches(db),
@@ -603,7 +604,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       }
 
       withClue("asset") {
-        access.get(CacheKey.Asset(asset)) shouldBe RemoteData.Cached(assetDescription)
+        access.get(CacheKey.Asset(asset)).map(_.assetDescription) shouldBe RemoteData.Cached(assetDescription)
       }
 
       withClue("waves balance") {
@@ -619,7 +620,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       }
 
       withClue("account script") {
-        access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Cached(accountScript)
+        access.get(CacheKey.AccountScript(aliceAddr)).map(_.scriptInfo) shouldBe RemoteData.Cached(accountScript)
       }
     }
   }

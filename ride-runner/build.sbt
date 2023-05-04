@@ -25,6 +25,9 @@ inConfig(Compile)(
   )
 )
 
+Test / javaOptions += "-Djol.magicFieldOffset=true" // Cannot get the field offset
+Test / fork := true
+
 bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
 
 linuxScriptReplacements += ("network" -> network.value.toString)
