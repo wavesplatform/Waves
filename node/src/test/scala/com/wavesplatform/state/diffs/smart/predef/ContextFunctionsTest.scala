@@ -503,6 +503,80 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     }
   }
 
+  property(
+    s"blockInfoByHeight(height) and lastBlock result contains rewards field in Ride V7 after ${BlockchainFeatures.BlockRewardDistribution.description} activation"
+  ) {
+    val invoker           = TxHelpers.signer(1)
+    val dApp              = TxHelpers.signer(2)
+    val daoAddress        = TxHelpers.address(3)
+    val xtnBuybackAddress = TxHelpers.address(4)
+
+    val rideV6Settings = RideV6
+      .copy(blockchainSettings =
+        RideV6.blockchainSettings.copy(functionalitySettings =
+          RideV6.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString))
+        )
+      )
+      .setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 4)
+
+    Seq("value(blockInfoByHeight(2)).rewards", "lastBlock.rewards").foreach { getRewardsCode =>
+      def script(version: StdLibVersion): String =
+        s"""
+           |{-# STDLIB_VERSION ${version.id} #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           | @Callable(i)
+           | func foo() = {
+           |   let r = $getRewardsCode
+           |   [
+           |     IntegerEntry("size", r.size()),
+           |     BinaryEntry("addr1", r[0]._1.bytes),
+           |     IntegerEntry("reward1", r[0]._2),
+           |     BinaryEntry("addr2", r[1]._1.bytes),
+           |     IntegerEntry("reward2", r[1]._2),
+           |     BinaryEntry("addr3", r[2]._1.bytes),
+           |     IntegerEntry("reward3", r[2]._2)
+           |   ]
+           | }
+           |""".stripMargin
+
+      Seq(V4, V5, V6).foreach(v => TestCompiler(v).compile(script(v)) should produce("Undefined field `rewards` of variable of type `BlockInfo`"))
+
+      val compiledDapp = TestCompiler(V7).compile(script(V7))
+      compiledDapp should beRight
+
+      withDomain(rideV6Settings, balances = AddrWithBalance.enoughBalances(invoker, dApp)) { d =>
+        val invoke = () => TxHelpers.invoke(dApp.toAddress, Some("foo"), invoker = invoker)
+
+        val miner = d.appendBlock(TxHelpers.setScript(dApp, ContractScript(V6, compiledDapp.explicitGet()).explicitGet())).sender.toAddress
+        d.appendBlockE(invoke()) should produce("key not found: rewards")
+
+        d.appendBlockE(TxHelpers.setScript(dApp, ContractScript(V7, compiledDapp.explicitGet()).explicitGet())) should produce(
+          "Block Reward Distribution feature has not been activated yet"
+        )
+
+        d.appendBlock()
+        d.appendBlockE(TxHelpers.setScript(dApp, ContractScript(V7, compiledDapp.explicitGet()).explicitGet())) should beRight
+        d.appendBlockE(invoke()) should beRight
+
+        val configAddressReward = d.blockchain.settings.rewardsSettings.initial / 3
+        d.blockchain.accountData(dApp.toAddress, "size") shouldBe Some(IntegerDataEntry("size", 3))
+        (1 to 3).map { idx =>
+          (
+            d.blockchain.accountData(dApp.toAddress, s"addr$idx").get.asInstanceOf[BinaryDataEntry].value,
+            d.blockchain.accountData(dApp.toAddress, s"reward$idx").get.asInstanceOf[IntegerDataEntry].value
+          )
+        } shouldBe Seq(
+          ByteStr(miner.bytes)             -> (d.blockchain.settings.rewardsSettings.initial - 2 * configAddressReward),
+          ByteStr(daoAddress.bytes)        -> configAddressReward,
+          ByteStr(xtnBuybackAddress.bytes) -> configAddressReward
+        ).sortBy(_._1)
+      }
+    }
+  }
+
   property("transfer transaction by id") {
     val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
     setScriptTransactions.foreach { setScriptTransaction =>

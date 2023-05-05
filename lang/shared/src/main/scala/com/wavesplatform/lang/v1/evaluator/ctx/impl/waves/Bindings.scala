@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V7}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.{DataEntrySize, NoLimit}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -13,11 +13,11 @@ import com.wavesplatform.lang.v1.traits.domain.*
 
 object Bindings {
 
-  import converters._
+  import converters.*
 
   private def combine(m0: Map[String, EVALUATED], m1: Map[String, EVALUATED]*) = m1.toList.fold(m0)(_ ++ _)
 
-  import Types._
+  import Types.*
 
   private def headerPart(tx: Header): Map[String, EVALUATED] = Map(
     "id"        -> tx.id,
@@ -29,7 +29,7 @@ object Bindings {
   private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
     "proofs" -> ARR(
       existingProofs.map(b => CONST_BYTESTR(b).explicitGet()) ++ Seq.fill(8 - existingProofs.size)(CONST_BYTESTR(ByteStr.empty).explicitGet()),
-      false
+      limited = false
     ).explicitGet()
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean, version: StdLibVersion): Map[String, EVALUATED] = {
@@ -49,7 +49,7 @@ object Bindings {
     if (proofsEnabled) combine(commonPart, Map(proofsPart(tx.proofs)))
     else commonPart
   }
-  def mapRecipient(r: Recipient) =
+  def mapRecipient(r: Recipient): (String, CaseObj) =
     "recipient" -> (r match {
       case Recipient.Alias(name) => CaseObj(aliasType, Map("alias" -> name))
       case x: Recipient.Address  => senderObject(x)
@@ -66,17 +66,17 @@ object Bindings {
 
   def ordType(o: OrdType): CaseObj =
     CaseObj(
-      (o match {
+      o match {
         case OrdType.Buy  => buyType
         case OrdType.Sell => sellType
-      }),
+      },
       Map.empty
     )
 
   private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
     payments match {
       case AttachedPayments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
-      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector, false).explicitGet()
+      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector, limited = false).explicitGet()
     }
 
   private def mapPayment(payment: (Long, Option[ByteStr])): CaseObj = {
@@ -302,7 +302,7 @@ object Bindings {
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         sponsorshipTransactionObject(proofsEnabled, p, assetId, minSponsoredAssetFee, version)
       case Data(p, data) =>
-        def mapValue(e: DataItem[_]): (EVALUATED, CASETYPEREF) =
+        def mapValue(e: DataItem[?]): (EVALUATED, CASETYPEREF) =
           e match {
             case DataItem.Str(_, s)  => (c(s), stringDataEntry)
             case DataItem.Bool(_, s) => (c(s), booleanDataEntry)
@@ -314,7 +314,7 @@ object Bindings {
           d match {
             case DataItem.Delete(key) =>
               CaseObj(deleteDataEntry, Map("key" -> CONST_STRING(key).explicitGet()))
-            case writeItem: DataItem[_] =>
+            case writeItem: DataItem[?] =>
               val (entryValue, entryType) = mapValue(writeItem)
               val fields                  = Map("key" -> CONST_STRING(writeItem.key).explicitGet(), "value" -> entryValue)
               if (version >= V4)
@@ -463,7 +463,7 @@ object Bindings {
       )
     )
 
-  def buildAssetInfo(sAInfo: ScriptAssetInfo, version: StdLibVersion) = {
+  def buildAssetInfo(sAInfo: ScriptAssetInfo, version: StdLibVersion): CaseObj = {
     val commonFields: Map[String, EVALUATED] =
       Map(
         "id"              -> sAInfo.id,
@@ -487,7 +487,7 @@ object Bindings {
     )
   }
 
-  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion): CaseObj = {
     val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
@@ -502,6 +502,18 @@ object Bindings {
       if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
       else Map()
 
-    CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)
+    val rewardsFieldOpt: Map[String, EVALUATED] =
+      if (version >= V7) {
+        val arrOpt = ARR(
+          blockInf.rewards.map { case (addr, reward) =>
+            CaseObj(runtimeTupleType, Map("_1" -> CaseObj(addressType, Map("bytes" -> addr.bytes)), "_2" -> reward))
+          }.toIndexedSeq,
+          limited = false
+        ).toOption
+
+        arrOpt.map("rewards" -> _).toMap
+      } else Map()
+
+    CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt ++ rewardsFieldOpt)
   }
 }
