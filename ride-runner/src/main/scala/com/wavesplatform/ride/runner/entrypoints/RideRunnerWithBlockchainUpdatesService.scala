@@ -10,7 +10,7 @@ import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, 
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -148,7 +148,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     log.info("Loading data from caches...")
     val sharedBlockchain = rideDb.access.readWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(rideDb.access)
-      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, rideDb.access, dbCaches, blockchainApi)
+      SharedBlockchainStorage[RideScriptRunRequest](settings.rideRunner.sharedBlockchain, rideDb.access, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
@@ -177,7 +177,6 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
         BlockchainState(settings.rideRunner.blockchainState, processor, blockchainUpdatesStream, _, _)
       }
-//      .takeWhile(_.processedHeight < workingHeight) // !
       .doOnNext { state =>
         Task {
           lastServiceStatus = ServiceStatus(
@@ -239,24 +238,6 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)
 
-//    log.info(
-//      "Result: " + Await
-//        .result(
-//          requestService
-//            .trackAndRun(
-//              ScriptRequest(
-//                Address.fromString("3PKpsc1TNquw4HAF62pWK8ka1DBz9vyEBkt").explicitGet(),
-//                Json.obj(
-//                  "expr" -> "claimV2READONLY(\"Atqv59EYzjFGuitKVnMRk6H8FukjoV3ktPorbEys25on\", \"3PNvVEgRuy1gQcU5zeAxZEcP1AMLTK6LxJk\")"
-//                )
-//              )
-//            )
-//            .runToFuture(blockchainEventsStreamScheduler),
-//          1.minute
-//        )
-//        .toString()
-//    )
-//
     log.info("Done")
     cs.forceStop()
   }

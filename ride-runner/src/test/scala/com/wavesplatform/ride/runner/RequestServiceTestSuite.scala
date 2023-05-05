@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner
 
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import cats.syntax.option.*
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
@@ -12,7 +13,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
 import monix.eval.Task
@@ -24,9 +25,9 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasDb {
-  private val aRequest = ScriptRequest(aliceAddr, Json.obj("expr" -> "default()"))
-  private val bRequest = ScriptRequest(bobAddr, Json.obj("expr" -> "default()"))
-  private val cRequest = ScriptRequest(carlAddr, Json.obj("expr" -> "default()"))
+  private val aRequest = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "default()"))
+  private val bRequest = RideScriptRunRequest(bobAddr, Json.obj("expr" -> "default()"))
+  private val cRequest = RideScriptRunRequest(carlAddr, Json.obj("expr" -> "default()"))
 
   private val accountScripts = Map(
     aliceAddr -> mkScript(aliceScriptSrc),
@@ -65,7 +66,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       }
 
       "returns an error if the provided expr is wrong" in test { d =>
-        val request = ScriptRequest(
+        val request = RideScriptRunRequest(
           address = aliceAddr,
           requestBody = Json.obj("expr" -> "buyNsbtREADONLY(10000000000000000000)")
         )
@@ -78,7 +79,8 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
           Json.obj(
             "error"   -> 119,
             "message" -> "For input string: \"10000000000000000000\""
-          )
+          ),
+          StatusCodes.BadRequest
         )
       }
     }
@@ -91,21 +93,23 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       blockchainApi: TestBlockchainApi,
       scheduler: TestScheduler
   ) {
-    def check(request: ScriptRequest, expectedValue: Int): Unit = {
+    def check(request: RideScriptRunRequest, expectedValue: Int): Unit = {
       val task = requests.trackAndRun(request).runToFuture(scheduler)
       scheduler.tick()
       val r = Await.result(task, 5.seconds)
       withClue(s"$r:") {
-        (r \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
+        r.lastStatus shouldBe StatusCodes.OK
+        (r.lastResult \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
       }
     }
 
-    def checkFull(request: ScriptRequest, json: JsValue): Unit = {
+    def checkFull(request: RideScriptRunRequest, json: JsValue, status: StatusCode): Unit = {
       val task = requests.trackAndRun(request).runToFuture(scheduler)
       scheduler.tick()
       val r = Await.result(task, 5.seconds)
       withClue(s"$r:") {
-        r shouldBe json
+        r.lastStatus shouldBe status
+        r.lastResult shouldBe json
       }
     }
   }
@@ -131,7 +135,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
 
     val testDb = use(TestDb.mk())
     val sharedBlockchain = testDb.storage.readWrite { implicit ctx =>
-      SharedBlockchainStorage[ScriptRequest](
+      SharedBlockchainStorage[RideScriptRunRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,
         DefaultPersistentCaches(testDb.storage),

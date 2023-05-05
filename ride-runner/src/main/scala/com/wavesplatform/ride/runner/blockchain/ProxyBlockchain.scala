@@ -6,7 +6,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.ride.runner.storage.{CacheKey, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKey, RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{
   AccountScriptInfo,
@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 
 // TODO It seems we can remove this
-class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest]) extends SupportedBlockchain {
+class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest]) extends SupportedBlockchain {
   override def settings: BlockchainSettings = sharedBlockchain.blockchainSettings
 
   // Ride: get*Value (data), get* (data)

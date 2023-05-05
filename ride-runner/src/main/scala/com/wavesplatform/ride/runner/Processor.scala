@@ -7,7 +7,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.ride.runner.requests.RequestService
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
-import com.wavesplatform.ride.runner.storage.{AffectedTags, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{AffectedTags, RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
@@ -35,11 +35,11 @@ trait Processor {
   def runAffectedScripts(updateType: UpdateType): Task[Unit]
 }
 
-class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptRequest], requestsService: RequestService)
+class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest], requestsService: RequestService)
     extends Processor
     with ScorexLogging {
 
-  private val accumulatedChanges = new AtomicReference(new ProcessResult[ScriptRequest]())
+  private val accumulatedChanges = new AtomicReference(new ProcessResult[RideScriptRunRequest]())
 
   @volatile private var lastLiquidBlockEvents = List.empty[BlockchainUpdated]
 

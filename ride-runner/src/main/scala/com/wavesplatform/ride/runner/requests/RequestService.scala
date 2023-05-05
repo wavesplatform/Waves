@@ -1,15 +1,15 @@
 package com.wavesplatform.ride.runner.requests
 
+import akka.http.scaladsl.model.StatusCodes
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
-import com.wavesplatform.ride.runner.requests.DefaultRequestService.RideScriptRunEnvironment
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
-import com.wavesplatform.ride.runner.storage.{CacheKey, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKey, RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -21,14 +21,14 @@ import scala.concurrent.duration.FiniteDuration
 
 trait RequestService extends AutoCloseable {
   def start(): Unit
-  def runAffected(affected: Set[ScriptRequest]): Task[Unit]
-  def trackAndRun(request: ScriptRequest): Task[JsObject]
+  def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit]
+  def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult]
 }
 
 class DefaultRequestService(
     settings: DefaultRequestService.Settings,
-    sharedBlockchain: SharedBlockchainStorage[ScriptRequest],
-    requestScheduler: JobScheduler[ScriptRequest],
+    sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest],
+    requestScheduler: JobScheduler[RideScriptRunRequest],
     runScriptScheduler: Scheduler
 ) extends RequestService
     with ScorexLogging {
@@ -39,9 +39,9 @@ class DefaultRequestService(
     .maximumSize(10000) // TODO #96 Weighed cache
     .expireAfterWrite(settings.cacheTtl.length, settings.cacheTtl.unit)
     .recordStats(() => new KamonCaffeineStats("Requests"))
-    .build[ScriptRequest, RideScriptRunEnvironment]()
+    .build[RideScriptRunRequest, RideScriptRunResult]()
 
-  private val currJobs = new ConcurrentHashMap[ScriptRequest, RequestJob]()
+  private val currJobs = new ConcurrentHashMap[RideScriptRunRequest, RequestJob]()
 
   override def start(): Unit = {
     val task =
@@ -57,11 +57,11 @@ class DefaultRequestService(
                 case Some(updated) =>
                   if (updated.isAvailable) {
                     // We don't need to cache an empty value, so we use getOrElse here
-                    val origEnv = Option(requests.getIfPresent(request)).getOrElse(RideScriptRunEnvironment(request))
+                    val origEnv = Option(requests.getIfPresent(request)).getOrElse(RideScriptRunResult(request))
                     runOne(sharedBlockchain.heightUntagged, origEnv).tapEval { r =>
                       Task {
-                        requests.put(r.key, r)
-                        updated.result.trySuccess(r.lastResult)
+                        requests.put(r.request, r)
+                        updated.result.trySuccess(r)
                         currJobs.remove(request)
                       }
                     }
@@ -88,15 +88,15 @@ class DefaultRequestService(
 //    Await.result(currTask)
   }
 
-  override def runAffected(affected: Set[ScriptRequest]): Task[Unit] = Task {
+  override def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit] = Task {
     requestScheduler.addMultiple(affected)
     RideRunnerStats.rideRequestTotalNumber.update(requests.estimatedSize().toDouble)
   }
 
-  override def trackAndRun(request: ScriptRequest): Task[JsObject] = Option(requests.getIfPresent(request)) match {
+  override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {
     case Some(cache) =>
       rideRequestCacheHits.increment()
-      Task.now(cache.lastResult)
+      Task.now(cache)
 
     case _ =>
       rideRequestCacheMisses.increment()
@@ -117,56 +117,62 @@ class DefaultRequestService(
       }
   }
 
-  private def createJob(request: ScriptRequest): RequestJob = currJobs.computeIfAbsent(request, _ => RequestJob.mk())
+  private def createJob(request: RideScriptRunRequest): RequestJob = currJobs.computeIfAbsent(request, _ => RequestJob.mk())
 
-  private def runOne(height: Int, scriptEnv: RideScriptRunEnvironment): Task[RideScriptRunEnvironment] =
+  private def runOne(height: Int, scriptEnv: RideScriptRunResult): Task[RideScriptRunResult] =
     Task
       .evalAsync {
         try {
           val updatedResult = rideRequestRunTime.measure {
-            evaluate(scriptEnv) - "stateChanges" // Not required for now
+            evaluate(scriptEnv.request) - "stateChanges" // Not required for now
           }
 
           val origResult      = scriptEnv.lastResult
           lazy val complexity = (updatedResult \ "complexity").as[Int]
           if ((updatedResult \ "error").isDefined) {
-            log.trace(s"result=failed; ${scriptEnv.key.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
+            log.trace(s"result=failed; ${scriptEnv.request.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
             rideScriptFailedCalls.increment()
           } else if (
             origResult == JsObject.empty ||
             updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
           ) {
             rideScriptOkCalls.increment()
-            log.trace(s"result=ok; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
+            log.trace(s"result=ok; ${scriptEnv.request.shortLogPrefix} complexity=$complexity")
           } else {
             rideScriptUnnecessaryCalls.increment()
-            log.trace(s"result=unnecessary; ${scriptEnv.key.shortLogPrefix} complexity=$complexity")
+            log.trace(s"result=unnecessary; ${scriptEnv.request.shortLogPrefix} complexity=$complexity")
           }
 
-          scriptEnv.copy(lastResult = updatedResult, updateHeight = height)
+          scriptEnv.copy(
+            lastResult = updatedResult,
+            lastStatus = StatusCodes.OK,
+            updateHeight = height
+          )
         } catch {
           case e: Throwable =>
-            log.error(s"An error during running ${scriptEnv.key}: ${e.getMessage}")
+            log.error(s"An error during running ${scriptEnv.request}: ${e.getMessage}")
+            rideScriptFailedCalls.increment()
             scriptEnv.copy(
               lastResult = Json.obj("error" -> 119, "message" -> e.getMessage),
+              lastStatus = StatusCodes.BadRequest,
               updateHeight = height
             )
         }
       }
       .executeOn(runScriptScheduler)
 
-  private def evaluate(script: RideScriptRunEnvironment): JsObject = UtilsApiRoute.evaluate(
+  private def evaluate(request: RideScriptRunRequest): JsObject = UtilsApiRoute.evaluate(
     settings.evaluateScriptComplexityLimit,
     new ProxyBlockchain(sharedBlockchain),
-    script.key.address,
-    script.key.requestBody,
+    request.address,
+    request.requestBody,
     settings.enableTraces,
     settings.maxTxErrorLogSize,
     intAsString = true, // TODO #110 Int as string in evaluate
     wrapDAppEnv = underlying =>
       new TrackedDAppEnvironment(
         underlying,
-        new DefaultDAppEnvironmentTracker(sharedBlockchain, script.key)
+        new DefaultDAppEnvironmentTracker(sharedBlockchain, request)
       )
   )
 }
@@ -179,10 +185,4 @@ object DefaultRequestService {
       parallelization: Int,
       cacheTtl: FiniteDuration
   )
-
-  private final case class RideScriptRunEnvironment(key: ScriptRequest, lastResult: JsObject, updateHeight: Int)
-
-  private object RideScriptRunEnvironment {
-    def apply(key: ScriptRequest): RideScriptRunEnvironment = new RideScriptRunEnvironment(key, JsObject.empty, 0)
-  }
 }

@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -61,7 +61,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val testDb = use(TestDb.mk())
     val sharedBlockchain = testDb.storage.readWrite { implicit ctx =>
-      SharedBlockchainStorage[ScriptRequest](
+      SharedBlockchainStorage[RideScriptRunRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,
         DefaultPersistentCaches(testDb.storage),
@@ -69,7 +69,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
     }
 
-    val request                = ScriptRequest(aliceAddr, Json.obj("expr" -> "foo()"))
+    val request                = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "foo()"))
     val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds)
     val requestService = use(
       new DefaultRequestService(
@@ -91,7 +91,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     def getScriptResult: JsObject = {
       val r = requestService.trackAndRun(request).runToFuture
       testScheduler.tick()
-      Await.result(r, 5.seconds)
+      Await.result(r, 5.seconds).lastResult
     }
 
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))

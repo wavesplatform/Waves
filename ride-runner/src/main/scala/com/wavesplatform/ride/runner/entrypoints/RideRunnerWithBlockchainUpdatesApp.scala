@@ -7,7 +7,7 @@ import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{RideScriptRunRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -36,7 +36,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
 
     val scripts = Json
       .parse(Using(Source.fromFile(inputFile))(_.getLines().mkString("\n")).get)
-      .as[List[ScriptRequest]]
+      .as[List[RideScriptRunRequest]]
 
     log.info(s"Found ${scripts.size} scripts")
     log.info("Starting...")
@@ -116,7 +116,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
 
     val sharedBlockchain = db.access.readWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(db.access)
-      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, db.access, dbCaches, blockchainApi)
+      SharedBlockchainStorage[RideScriptRunRequest](settings.rideRunner.sharedBlockchain, db.access, dbCaches, blockchainApi)
     }
 
     val localHeightAtStart          = sharedBlockchain.heightUntaggedOpt
