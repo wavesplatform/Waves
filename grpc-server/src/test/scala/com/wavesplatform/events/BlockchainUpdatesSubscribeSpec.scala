@@ -44,7 +44,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
                                                |}""".stripMargin)
 
   "BlockchainUpdates subscribe tests" - {
-    "return correct data for alias https://app.qase.io/case/BU-1" in {
+    "BU-1. Return correct data for alias" in {
       val aliasTx = TxHelpers.createAlias("test", sender, fee = customFee)
 
       withGenerateSubscription(
@@ -60,7 +60,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for transfer https://app.qase.io/case/BU-28" in {
+    "BU-28. Return correct data for transfer" in {
       val amount: Long                   = 1000L
       val transferSenderBalanceAfter     = senderBalanceBefore - customFee - amount
       val transferRecipient              = TxHelpers.signer(123)
@@ -88,7 +88,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for issue https://app.qase.io/case/BU-9" in {
+    "BU-9. Return correct data for issue" in {
       val script              = Option(TxHelpers.script("true"))
       val amount: Long        = current.nextInt(1, 9999999)
       val decimals: Byte      = current.nextInt(0, 8).toByte
@@ -118,7 +118,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for issue NFT https://app.qase.io/case/BU-11" in {
+    "BU-11. Return correct data for issue NFT" in {
       val name: String        = "Nft_test_asset"
       val description: String = name + "__" + current.nextInt(1111, 999999)
       val issueNftTx = IssueTransaction
@@ -156,7 +156,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for reissue https://app.qase.io/case/BU-19" in {
+    "BU-19. Return correct data for reissue" in {
       val senderBalanceBeforeReissue = senderBalanceBefore - 1.waves
       val senderBalanceAfterReissue  = senderBalanceBeforeReissue - customAssetIssueFee
       val amount: Long               = current.nextInt(1, 9999999)
@@ -183,7 +183,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for burn https://app.qase.io/case/BU-4" in {
+    "BU-4. Return correct data for burn" in {
       val senderBalanceBeforeReissue = senderBalanceBefore - 1.waves
       val senderBalanceAfterReissue  = senderBalanceBeforeReissue - customAssetIssueFee
       val amount: Long               = current.nextInt(1, 9999999)
@@ -209,7 +209,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for exchange tx order V3, exchange V2 https://app.qase.io/case/BU-6" in {
+    "BU-6. Return correct data for exchange tx order V3, exchange V2" in {
       val buyer                       = TxHelpers.signer(58)
       val seller                      = TxHelpers.signer(189)
       val buyerBalanceBefore          = 4.waves
@@ -271,7 +271,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for exchange tx order V4, exchange V3 https://app.qase.io/case/BU-120" in {
+    "BU-120. Return correct data for exchange tx order V4, exchange V3" in {
       val buyer                       = TxHelpers.signer(58)
       val seller                      = TxHelpers.signer(189)
       val buyerBalanceBefore          = 4.waves
@@ -333,7 +333,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for lease https://app.qase.io/case/BU-12" in {
+    "BU-12. Return correct data for lease" in {
       val senderAddress    = sender.toAddress
       val recipient        = TxHelpers.signer(123)
       val recipientAddress = recipient.toAddress
@@ -369,7 +369,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for lease cancel https://app.qase.io/case/BU-14" in {
+    "BU-14. Return correct data for lease cancel" in {
       val senderAddress    = sender.toAddress
       val recipient        = TxHelpers.signer(123)
       val recipientAddress = recipient.toAddress
@@ -406,7 +406,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for massTransfer https://app.qase.io/case/BU-16" in {
+    "BU-16. Return correct data for massTransfer" in {
       val massTransferFee         = fee * 6
       val senderBalanceAfterIssue = senderBalanceBefore - 1.waves
       val senderBalanceAfter      = senderBalanceAfterIssue - massTransferFee
@@ -452,7 +452,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for data tx https://app.qase.io/case/BU-5" in {
+    "BU-5. Return correct data for data" in {
       val integerDataEntry = IntegerDataEntry.apply("Integer", current.nextLong(0, 9292929L))
       val booleanDataEntry = BooleanDataEntry.apply("Boolean", value = true)
       val stringDataEntry  = StringDataEntry.apply("String", "test")
@@ -476,7 +476,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for setScript tx https://app.qase.io/case/BU-21" in {
+    "BU-21. Return correct data for setScript" in {
       val setScript = TxHelpers.setScript(sender, testScript, customFee)
 
       withGenerateSubscription(
@@ -494,7 +494,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for sponsorFee" - {
+    "Return correct data for sponsorFee" - {
       val senderBalanceAfterIssue            = senderBalanceBefore - 1.waves
       val senderBalanceAfterSponsorFee       = senderBalanceAfterIssue - 1.waves
       val senderBalanceAfterSponsorFeeCancel = senderBalanceAfterSponsorFee - 1.waves
@@ -503,7 +503,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val sponsorFee                         = TxHelpers.sponsor(issue.asset, sponsorshipFee, sender)
       val sponsorFeeCancel                   = TxHelpers.sponsor(issue.asset, None, sender)
 
-      "sponsorFee tx https://app.qase.io/case/BU-25" in withGenerateSubscription(
+      "BU-25 sponsorFee" in withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issue, sponsorFee)) { updates =>
@@ -520,7 +520,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false)
       }
 
-      "sponsorFee cancel tx https://app.qase.io/case/BU-27" in withGenerateSubscription(
+      "BU-27 sponsorFee cancel" in withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(sender.toAddress, senderBalanceBefore))
       )(_.appendMicroBlock(issue, sponsorFee, sponsorFeeCancel)) { updates =>
@@ -538,7 +538,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for setAssetScript https://app.qase.io/case/BU-20" in {
+    "BU-20. Return correct data for setAssetScript" in {
       val senderBalanceAfterIssue          = senderBalanceBefore - 1.waves
       val senderBalanceAfterSetAssetScript = senderBalanceAfterIssue - 1.waves
       val complexScriptBefore              = Option.apply(TxHelpers.script("true".stripMargin))
@@ -567,7 +567,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for UpdateAssetInfo https://app.qase.io/case/BU-121" in {
+    "BU-121. Return correct data for UpdateAssetInfo" in {
       val senderBalanceAfterIssue           = senderBalanceBefore - 1.waves
       val senderBalanceAfterUpdateAssetInfo = senderBalanceAfterIssue - fee
       val newName                           = "new_name"
@@ -598,7 +598,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for EthereumTransfer https://app.qase.io/case/BU-122" in {
+    "BU-122. Return correct data for EthereumTransfer" in {
       val ethSender = sender.toEthKeyPair
       val amount: Long = 1000L
       val transferSenderBalanceAfter = senderBalanceBefore - customFee - amount
