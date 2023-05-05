@@ -35,6 +35,7 @@ import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
+import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
@@ -323,13 +324,12 @@ class DefaultBlockchainApi(
 
   private def firstOf[T](xs: java.util.Iterator[T]): Option[T] = if (xs.hasNext) xs.next().some else none
 
-  private def grpcCall[T](methodName: String)(f: => T): T = {
-    grpcCallTimerFor(methodName, raw = false).measure {
+  private def grpcCall[T](methodName: String)(f: => T): T =
+    RideRunnerStats.grpcCallTimerFor(methodName, raw = false).measure {
       grpcApiCalls.limited {
-        grpcCallTimerFor(methodName, raw = true).measure(f)
+        RideRunnerStats.grpcCallTimerFor(methodName, raw = true).measure(f)
       }
     }
-  }
 }
 
 object DefaultBlockchainApi {

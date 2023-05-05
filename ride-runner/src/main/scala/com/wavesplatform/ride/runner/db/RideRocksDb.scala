@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.db
 
-import com.wavesplatform.ride.runner.stats.RideRunnerStats.{columnFamilyProperties, dbStats}
+import com.wavesplatform.ride.runner.stats.RideRunnerStats
+import com.wavesplatform.ride.runner.stats.RideRunnerStats.dbStats
 import com.wavesplatform.ride.runner.storage.persistent.KvPair
 import com.wavesplatform.utils.*
 import org.rocksdb.{ColumnFamilyHandle, RocksDB, Statistics, TickerType, *}
@@ -24,14 +25,14 @@ class RideRocksDb(
     RocksDbProperties.All.foreach { propName =>
       Try {
         val propValue = db.getAggregatedLongProperty(propName)
-        dbStats.withTag("name", propName).update(propValue.toDouble)
+        RideRunnerStats.dbStats.withTag("name", propName).update(propValue.toDouble)
       }
 
       handles.foreach { cfh =>
         val cfName = new String(cfh.getName)
         Try {
           val propValue = db.getLongProperty(cfh, propName)
-          columnFamilyProperties
+          RideRunnerStats.columnFamilyProperties
             .withTag("cf", cfName)
             .withTag("name", propName)
             .update(propValue.toDouble)

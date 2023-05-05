@@ -19,6 +19,7 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.ride.runner.db.Heights.SafeHeightOffset
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.estimate
+import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage.Settings
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCaches
@@ -307,8 +308,8 @@ class SharedBlockchainStorage[TagT] private (
   def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (initialAffectedTags, txs, timer) = evt.body match {
       case Body.Block(block) =>
-        (tagsOf(CacheKey.Height).logIfNonEmpty("append.height"), block.getBlock.transactions, blockProcessingTime.some)
-      case Body.MicroBlock(microBlock) => (empty, microBlock.getMicroBlock.getMicroBlock.transactions, microBlockProcessingTime.some)
+        (tagsOf(CacheKey.Height).logIfNonEmpty("append.height"), block.getBlock.transactions, RideRunnerStats.blockProcessingTime.some)
+      case Body.MicroBlock(microBlock) => (empty, microBlock.getMicroBlock.getMicroBlock.transactions, RideRunnerStats.microBlockProcessingTime.some)
       case Body.Empty                  => (empty, Seq.empty, none)
     }
 
@@ -393,7 +394,7 @@ class SharedBlockchainStorage[TagT] private (
   }
 
   private def rollback(toHeight: Height, rollback: BlockchainUpdated.Rollback)(implicit ctx: ReadWrite): AffectedTags[TagT] =
-    rollbackProcessingTime.measure {
+    RideRunnerStats.rollbackProcessingTime.measure {
       removeAllFrom(Height(toHeight + 1))
 
       val stateUpdate = rollback.getRollbackStateUpdate

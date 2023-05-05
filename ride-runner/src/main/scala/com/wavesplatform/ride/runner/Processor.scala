@@ -72,8 +72,7 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
     val last = accumulatedChanges.getAndUpdate(orig => orig.withoutAffectedTags)
     if (last.isEmpty) Task(log.info(s"[${last.newHeight}] No changes"))
     else {
-      log.info(s"Running ${last.affected.size} affected scripts...")
-      RideRunnerStats.rideRequestAffectedNumber(updateType).update(last.affected.size.toDouble)
+      RideRunnerStats.rideRequestTotalAffectedNumber(updateType).update(last.affected.size.toDouble)
       requestsService.runAffected(last.affected)
     }
   }

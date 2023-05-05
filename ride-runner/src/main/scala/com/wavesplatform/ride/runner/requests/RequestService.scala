@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.StatusCodes
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.{Caffeine, RemovalCause}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.utils.UtilsApiRoute
@@ -34,10 +34,14 @@ class DefaultRequestService(
     with ScorexLogging {
   private val isWorking = new AtomicBoolean(true)
 
+  // TODO limit size
+  private val ignoredRequests = ConcurrentHashMap.newKeySet[RideScriptRunRequest]()
+
   private val requests = Caffeine
     .newBuilder()
     .maximumSize(10000) // TODO #96 Weighed cache
     .expireAfterWrite(settings.cacheTtl.length, settings.cacheTtl.unit)
+    .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignoredRequests.add(key) }
     .recordStats(() => new KamonCaffeineStats("Requests"))
     .build[RideScriptRunRequest, RideScriptRunResult]()
 
@@ -50,6 +54,7 @@ class DefaultRequestService(
         log.info("Starting...")
         requestScheduler.jobs
           .takeWhile(_ => isWorking.get())
+          .filterNot(ignoredRequests.contains)
           .mapParallelUnordered(settings.parallelization) { request =>
             if (createJob(request).inProgress) Task.unit
             else
@@ -89,17 +94,21 @@ class DefaultRequestService(
   }
 
   override def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit] = Task {
-    requestScheduler.addMultiple(affected)
+    val toRun = affected.filterNot(ignoredRequests.contains)
+    RideRunnerStats.rideRequestActiveAffectedNumberByTypes.update(toRun.size.toDouble)
+
+    log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
+    requestScheduler.addMultiple(toRun)
     RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize().toDouble)
   }
 
   override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {
     case Some(cache) =>
-      rideRequestCacheHits.increment()
+      RideRunnerStats.rideRequestCacheHits.increment()
       Task.now(cache)
 
     case _ =>
-      rideRequestCacheMisses.increment()
+      RideRunnerStats.rideRequestCacheMisses.increment()
       Option(currJobs.get(request)) match {
         case Some(job) => Task.fromCancelablePromise(job.result)
         case None =>
@@ -108,7 +117,14 @@ class DefaultRequestService(
           }.flatMap {
             case None => Task.now(fail(request, CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
-              log.info(s"Added ${request.detailedLogPrefix}")
+              if (ignoredRequests.remove(request)) {
+                RideRunnerStats.rideRequestTrackReAdded.increment()
+                log.info(s"Re-added ${request.shortLogPrefix}")
+              } else {
+                RideRunnerStats.rideRequestTrackNew.increment()
+                log.info(s"Added ${request.detailedLogPrefix}")
+              }
+
               val job = createJob(request)
               requestScheduler.add(request, prioritized = true)
               Task.fromCancelablePromise(job.result)
@@ -125,7 +141,7 @@ class DefaultRequestService(
     Task
       .evalAsync {
         try {
-          val updatedResult = rideRequestRunTime.measure {
+          val updatedResult = RideRunnerStats.rideRequestRunTime.measure {
             evaluate(scriptEnv.request) - "stateChanges" // Not required for now
           }
 
@@ -133,15 +149,15 @@ class DefaultRequestService(
           lazy val complexity = (updatedResult \ "complexity").as[Int]
           if ((updatedResult \ "error").isDefined) {
             log.trace(s"result=failed; ${scriptEnv.request.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
-            rideScriptFailedCalls.increment()
+            RideRunnerStats.rideScriptFailedCalls.increment()
           } else if (
             origResult == JsObject.empty ||
             updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
           ) {
-            rideScriptOkCalls.increment()
+            RideRunnerStats.rideScriptOkCalls.increment()
             log.trace(s"result=ok; ${scriptEnv.request.shortLogPrefix} complexity=$complexity")
           } else {
-            rideScriptUnnecessaryCalls.increment()
+            RideRunnerStats.rideScriptUnnecessaryCalls.increment()
             log.trace(s"result=unnecessary; ${scriptEnv.request.shortLogPrefix} complexity=$complexity")
           }
 
