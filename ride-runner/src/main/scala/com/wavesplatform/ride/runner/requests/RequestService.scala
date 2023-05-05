@@ -90,7 +90,7 @@ class DefaultRequestService(
 
   override def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit] = Task {
     requestScheduler.addMultiple(affected)
-    RideRunnerStats.rideRequestTotalNumber.update(requests.estimatedSize().toDouble)
+    RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize().toDouble)
   }
 
   override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {

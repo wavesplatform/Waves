@@ -1208,12 +1208,12 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "ride_request_total{job=\"$job\", instance=~\"$instance\"}",
+          "expr": "ride_request_active{job=\"$job\", instance=~\"$instance\"}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Total known requests",
+      "title": "Active requests",
       "type": "stat"
     },
     {
@@ -7549,7 +7549,7 @@
       },
       {
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
             "ride-runner"
           ],
@@ -7585,8 +7585,8 @@
         "allValue": ".*",
         "current": {
           "selected": false,
-          "text": "ride-runner-service:9095",
-          "value": "ride-runner-service:9095"
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
