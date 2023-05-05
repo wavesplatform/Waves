@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, TransactionBase}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, EthereumTransaction, TransactionBase}
 import org.scalactic.source.Position
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should.Matchers
@@ -209,6 +209,11 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.minFee.value.assetId.toByteArray shouldBe expected.asset.id.arr
         value.minFee.value.amount shouldBe expectedAmount
     }
+  }
+
+  def checkEthereumTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction)(implicit pos: Position): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.ethereumTransaction.value.toByteArray shouldBe expected.bytes.value()
   }
 
   def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {

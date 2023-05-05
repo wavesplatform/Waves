@@ -8,6 +8,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.settingsWithFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
@@ -17,6 +18,8 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.recipientAddresses
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.transaction.utils.EthConverters.EthereumKeyPairExt
+import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
@@ -65,6 +68,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val transferRecipientBalanceBefore = 1.waves
       val transferRecipientBalanceAfter  = transferRecipientBalanceBefore + amount
       val transferTx                     = TxHelpers.transfer(sender, recipientAddress, amount, Waves, customFee)
+
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(
@@ -563,7 +567,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "return correct data for UpdateAssetInfo" in {
+    "return correct data for UpdateAssetInfo https://app.qase.io/case/BU-121" in {
       val senderBalanceAfterIssue           = senderBalanceBefore - 1.waves
       val senderBalanceAfterUpdateAssetInfo = senderBalanceAfterIssue - fee
       val newName                           = "new_name"
@@ -591,6 +595,30 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false)
         checkAssetUpdatesStateUpdates(assetDetails.after, updateAssetInfo)
+      }
+    }
+
+    "return correct data for EthereumTransfer https://app.qase.io/case/BU-122" in {
+      val ethSender = sender.toEthKeyPair
+      val amount: Long = 1000L
+      val transferSenderBalanceAfter = senderBalanceBefore - customFee - amount
+      val transferRecipient = TxHelpers.signer(123)
+      val recipientAddress = transferRecipient.toAddress
+      val transferRecipientBalanceBefore = 1.waves
+      val transferRecipientBalanceAfter = transferRecipientBalanceBefore + amount
+      val issue = TxHelpers.issue()
+
+      val ethereumTransfer = EthTxGenerator.generateEthTransfer(ethSender, recipientAddress, amount, issue.asset)
+      val senderAddress = ethereumTransfer.senderAddress.value()
+
+      withGenerateSubscription(
+        settings = settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6),
+        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+      )(_.appendMicroBlock(issue, ethereumTransfer)) { updates =>
+        val append = updates(1).append
+        val txUpdates = append.transactionStateUpdates.apply(1)
+        val assetDetails = txUpdates.assets.head
+        checkEthereumTransaction(append.transactionIds.apply(1), append.transactionAt(1), ethereumTransfer)
       }
     }
   }
