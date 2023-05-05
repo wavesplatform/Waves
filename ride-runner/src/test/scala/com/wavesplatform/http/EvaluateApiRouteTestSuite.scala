@@ -29,8 +29,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
               "expr"       -> "1 + 1",
               "address"    -> defaultAddr.toString
             ),
-            lastStatus = StatusCodes.OK,
-            updateHeight = 1
+            lastStatus = StatusCodes.OK
           )
         )
       })
@@ -54,8 +53,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
           RideScriptRunResult(
             request = request,
             lastResult = JsObject.empty,
-            lastStatus = StatusCodes.BadRequest,
-            updateHeight = 1
+            lastStatus = StatusCodes.BadRequest
           )
         )
       })

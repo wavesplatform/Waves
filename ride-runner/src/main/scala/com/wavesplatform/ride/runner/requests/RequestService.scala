@@ -2,8 +2,8 @@ package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.StatusCodes
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
-import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
@@ -13,7 +13,7 @@ import com.wavesplatform.ride.runner.storage.{CacheKey, RideScriptRunRequest, Sh
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -58,7 +58,7 @@ class DefaultRequestService(
                   if (updated.isAvailable) {
                     // We don't need to cache an empty value, so we use getOrElse here
                     val origEnv = Option(requests.getIfPresent(request)).getOrElse(RideScriptRunResult(request))
-                    runOne(sharedBlockchain.heightUntagged, origEnv).tapEval { r =>
+                    runOne(origEnv).tapEval { r =>
                       Task {
                         requests.put(r.request, r)
                         updated.result.trySuccess(r)
@@ -106,20 +106,22 @@ class DefaultRequestService(
           Task {
             sharedBlockchain.getOrFetch(CacheKey.AccountScript(request.address))
           }.flatMap {
-            // TODO #19 Change/move an error to an appropriate layer
-            case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
+            case None => Task.now(fail(request, CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
               log.info(s"Added ${request.detailedLogPrefix}")
               val job = createJob(request)
               requestScheduler.add(request, prioritized = true)
               Task.fromCancelablePromise(job.result)
+          }.onErrorHandle { e =>
+            log.warn("Can't run, got an error", e)
+            fail(request, ApiError.Unknown)
           }
       }
   }
 
   private def createJob(request: RideScriptRunRequest): RequestJob = currJobs.computeIfAbsent(request, _ => RequestJob.mk())
 
-  private def runOne(height: Int, scriptEnv: RideScriptRunResult): Task[RideScriptRunResult] =
+  private def runOne(scriptEnv: RideScriptRunResult): Task[RideScriptRunResult] =
     Task
       .evalAsync {
         try {
@@ -145,18 +147,13 @@ class DefaultRequestService(
 
           scriptEnv.copy(
             lastResult = updatedResult,
-            lastStatus = StatusCodes.OK,
-            updateHeight = height
+            lastStatus = StatusCodes.OK
           )
         } catch {
           case e: Throwable =>
             log.error(s"An error during running ${scriptEnv.request}: ${e.getMessage}")
             rideScriptFailedCalls.increment()
-            scriptEnv.copy(
-              lastResult = Json.obj("error" -> 119, "message" -> e.getMessage),
-              lastStatus = StatusCodes.BadRequest,
-              updateHeight = height
-            )
+            fail(scriptEnv.request, CustomValidationError(e.getMessage))
         }
       }
       .executeOn(runScriptScheduler)
@@ -174,6 +171,13 @@ class DefaultRequestService(
         underlying,
         new DefaultDAppEnvironmentTracker(sharedBlockchain, request)
       )
+  )
+
+  // TODO #19 Change/move an error to an appropriate layer
+  private def fail(request: RideScriptRunRequest, reason: ApiError): RideScriptRunResult = RideScriptRunResult(
+    request = request,
+    lastResult = reason.json,
+    lastStatus = reason.code
   )
 }
 

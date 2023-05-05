@@ -6,6 +6,7 @@ import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
 import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.{HasBasicGrpcConverters, HasGrpc, TestBlockchainApi}
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
@@ -77,7 +78,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         d.checkFull(
           request,
           Json.obj(
-            "error"   -> 119,
+            "error"   -> CustomValidationError.Id,
             "message" -> "For input string: \"10000000000000000000\""
           ),
           StatusCodes.BadRequest
