@@ -1,7 +1,6 @@
 package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.ride.runner.storage.RideScriptRunRequest
 import play.api.libs.json.JsObject
 
 final case class RideScriptRunResult(request: RideScriptRunRequest, lastResult: JsObject, lastStatus: StatusCode)

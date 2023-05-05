@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.storage
+package com.wavesplatform.ride.runner.requests
 
 import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address

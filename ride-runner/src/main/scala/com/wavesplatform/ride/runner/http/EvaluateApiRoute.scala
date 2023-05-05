@@ -2,8 +2,7 @@ package com.wavesplatform.ride.runner.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*
-import com.wavesplatform.ride.runner.requests.RideScriptRunResult
-import com.wavesplatform.ride.runner.storage.RideScriptRunRequest
+import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import play.api.libs.json.*
 
 import scala.concurrent.Future
