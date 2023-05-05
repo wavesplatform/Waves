@@ -33,8 +33,10 @@ object RideRunnerStats {
 
   val rideRequestActiveAffectedNumberByTypes = Kamon.gauge("ride.affected.active", "Affected and active unique RIDE requests").withoutTags()
 
-  val rideRequestTrackNew     = Kamon.counter("ride.request.track", "Cache hits for whole request").withTag("tpe", "new")
-  val rideRequestTrackReAdded = Kamon.counter("ride.request.track", "Cache hits for whole request").withTag("tpe", "re-added")
+  val rideRequestTrackNew = Kamon.counter("ride.request.track", "New requests").withTag("tpe", "new")
+  val rideRequestTrackReAdded = Kamon
+    .counter("ride.request.track", "Requests those became ignore and now is active after a user's request")
+    .withTag("tpe", "re-added")
   val rideRequestActiveNumber = Kamon.gauge("ride.request.active", "Total number of active unique RIDE requests").withoutTags()
   val rideRequestCacheHits    = Kamon.counter("ride.request.cache.hit", "Cache hits for whole request").withoutTags()
   val rideRequestCacheMisses  = Kamon.counter("ride.request.cache.miss", "Cache misses for whole request").withoutTags()

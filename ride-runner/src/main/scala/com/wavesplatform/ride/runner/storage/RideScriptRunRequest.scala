@@ -5,8 +5,8 @@ import com.wavesplatform.account.Address
 import play.api.libs.json.*
 
 final case class RideScriptRunRequest(address: Address, requestBody: JsObject) {
-  val detailedLogPrefix: String = s"[$address, hash=${requestBody.hashCode()}, $requestBody]"
-  val shortLogPrefix: String    = s"[$address, ${requestBody.hashCode()}]"
+  val detailedLogPrefix: String = s"[hash=${requestBody.hashCode()}, $address, $requestBody]"
+  val shortLogPrefix: String    = s"[${requestBody.hashCode()}]"
   override def toString: String = shortLogPrefix
 }
 

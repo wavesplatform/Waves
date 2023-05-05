@@ -168,6 +168,7 @@
       "description": "Tracks the current time the CPU is busy on user mode.",
       "fieldConfig": {
         "defaults": {
+          "decimals": 1,
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -240,6 +241,7 @@
       "description": "Tracks the current time the CPU is busy on system mode.",
       "fieldConfig": {
         "defaults": {
+          "decimals": 1,
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -312,6 +314,7 @@
       "description": "Tracks the current time the CPU is stuck waiting for IO.\n\nIf this value is high, the disk might be the bottleneck.",
       "fieldConfig": {
         "defaults": {
+          "decimals": 1,
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -567,7 +570,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 2,
+        "w": 3,
         "x": 18,
         "y": 1
       },
@@ -641,8 +644,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 1
       },
       "id": 70,
@@ -768,6 +771,7 @@
       "description": "Tracks the current time the CPU is busy by the process in user mode.",
       "fieldConfig": {
         "defaults": {
+          "decimals": 1,
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -840,6 +844,7 @@
       "description": "Tracks the current time the CPU is busy by the process in kernel mode.",
       "fieldConfig": {
         "defaults": {
+          "decimals": 1,
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -912,6 +917,7 @@
       "description": "Tracks the current time the CPU is stolen by some process outside the VM.\n\nIf this value is high, it could be caused either by the supervisor is very busy, by a noisy neighbor or by some limitation on the quota assigned by the virtualization service.",
       "fieldConfig": {
         "defaults": {
+          "decimals": 1,
           "mappings": [],
           "max": 100,
           "min": 0,
@@ -1120,7 +1126,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 2,
+        "w": 3,
         "x": 18,
         "y": 4
       },
@@ -1181,8 +1187,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 4,
-        "x": 20,
+        "w": 3,
+        "x": 21,
         "y": 4
       },
       "id": 158,
@@ -4594,7 +4600,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 12
       },
       "id": 77,
       "panels": [
@@ -4788,7 +4794,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 13
       },
       "id": 143,
       "panels": [
@@ -5484,7 +5490,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 14
       },
       "id": 161,
       "panels": [
@@ -5533,7 +5539,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -5549,7 +5556,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 16
+            "y": 15
           },
           "id": 159,
           "links": [],
@@ -5628,7 +5635,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 15
       },
       "id": 157,
       "panels": [
@@ -6325,7 +6332,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 16
       },
       "id": 135,
       "panels": [
@@ -6718,7 +6725,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 17
       },
       "id": 127,
       "panels": [
@@ -7014,7 +7021,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 18
       },
       "id": 111,
       "panels": [
@@ -7272,7 +7279,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 19
       },
       "id": 117,
       "panels": [
