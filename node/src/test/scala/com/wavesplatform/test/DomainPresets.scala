@@ -108,6 +108,7 @@ object DomainPresets {
       case V4 => RideV4
       case V5 => RideV5
       case V6 => RideV6
+      case V7 => BlockRewardDistribution
     }
 
   def mostRecent: WavesSettings = RideV6

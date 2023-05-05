@@ -284,7 +284,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       txs: Seq[Transaction],
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
-      generator: KeyPair = defaultSigner
+      generator: KeyPair = defaultSigner,
+      rewardVote: Long = -1L
   ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
@@ -331,7 +332,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
-        rewardVote = -1L,
+        rewardVote = rewardVote,
         signer = generator
       )
       .explicitGet()

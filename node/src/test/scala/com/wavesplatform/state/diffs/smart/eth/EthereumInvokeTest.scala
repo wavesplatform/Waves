@@ -142,7 +142,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
 
   private def assert(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean = false) = {
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
-    withDomain(RideV6) { d =>
+    withDomain(BlockRewardDistribution) { d =>
       d.appendBlock(preparingTxs*)
       d.appendBlock(ethInvoke)
 
