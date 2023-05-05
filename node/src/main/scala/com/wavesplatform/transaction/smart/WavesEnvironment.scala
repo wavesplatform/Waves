@@ -10,6 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
@@ -25,6 +26,7 @@ import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
@@ -323,6 +325,23 @@ object DAppEnvironment {
       call: FUNCTION_CALL,
       payments: Seq[InvokeScriptTransaction.Payment]
   )
+
+  case class ActionLimits(
+      nonDataActions: Int,
+      balanceActions: Int,
+      assetActions: Int,
+      data: Int,
+      dataSize: Int
+  ) {
+    def decrease(nonDataActionsCount: Int, balanceActionsCount: Int, assetActionsCount: Int, dataCount: Int, dataSize: Int): ActionLimits =
+      ActionLimits(
+        nonDataActions - nonDataActionsCount,
+        balanceActions - balanceActionsCount,
+        assetActions - assetActionsCount,
+        data - dataCount,
+        this.dataSize - dataSize
+      )
+  }
 }
 
 // Not thread safe
@@ -333,6 +352,7 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
+    rootVersion: StdLibVersion,
     tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
@@ -340,12 +360,8 @@ class DAppEnvironment(
     limitedExecution: Boolean,
     totalComplexityLimit: Int,
     var remainingCalls: Int,
-    var availableActions: Int,
-    var availableBalanceActions: Int,
-    var availableAssetActions: Int,
+    var availableActions: ActionLimits,
     var availablePayments: Int,
-    var availableData: Int,
-    var availableDataSize: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
@@ -391,20 +407,22 @@ class DAppEnvironment(
         payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
         InvokeScriptResult.empty
       )
-      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingPayments, remainingData, remainingDataSize) <-
+      (
+        diff,
+        evaluated,
+        remainingActions,
+        remainingPayments
+      ) <-
         InvokeScriptDiff( // This is a recursive call
           mutableBlockchain,
           blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+          rootVersion,
           limitedExecution,
           totalComplexityLimit,
           availableComplexity,
           remainingCalls,
           availableActions,
-          availableBalanceActions,
-          availableAssetActions,
           availablePayments,
-          availableData,
-          availableDataSize,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
@@ -417,11 +435,7 @@ class DAppEnvironment(
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
-      availableBalanceActions = remainingBalanceActions
-      availableAssetActions = remainingAssetActions
       availablePayments = remainingPayments
-      availableData = remainingData
-      availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
     }
 

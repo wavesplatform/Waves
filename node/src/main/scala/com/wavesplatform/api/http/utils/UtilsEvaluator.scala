@@ -28,6 +28,7 @@ import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio}
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -86,6 +87,7 @@ object UtilsEvaluator {
         blockchain,
         Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
         ds,
+        script.stdLibVersion,
         invoke,
         dAppAddress,
         dAppPk,
@@ -93,12 +95,14 @@ object UtilsEvaluator {
         limitedExecution = false,
         limit,
         remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-        availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
-        availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
-        availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
+        availableActions = ActionLimits(
+          ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
+          ContractLimits.MaxBalanceScriptActionsAmountV6,
+          ContractLimits.MaxAssetScriptActionsAmountV6,
+          ContractLimits.MaxWriteSetSize,
+          ContractLimits.MaxTotalWriteSetSizeInBytes
+        ),
         availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
-        availableData = ContractLimits.MaxWriteSetSize,
-        availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
         currentDiff = paymentsDiff,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
@@ -127,26 +131,29 @@ object UtilsEvaluator {
         .bimap(
           _ => Right(Diff.empty),
           r =>
-            InvokeDiffsCommon.processActions(
-              StructuredCallableActions(r.actions, blockchain),
-              ds.stdLibVersion,
-              dAppAddress,
-              dAppPk,
-              usedComplexity,
-              invoke,
-              CompositeBlockchain(blockchain, paymentsDiff),
-              System.currentTimeMillis(),
-              isSyncCall = false,
-              limitedExecution = false,
-              limit,
-              Nil,
-              log
-            ).resultE
+            InvokeDiffsCommon
+              .processActions(
+                StructuredCallableActions(r.actions, blockchain),
+                ds.stdLibVersion,
+                script.stdLibVersion,
+                dAppAddress,
+                dAppPk,
+                usedComplexity,
+                invoke,
+                CompositeBlockchain(blockchain, paymentsDiff),
+                System.currentTimeMillis(),
+                isSyncCall = false,
+                limitedExecution = false,
+                limit,
+                Nil,
+                log
+              )
+              .resultE
         )
         .merge
       totalDiff <- diff.combineE(paymentsDiff)
-      _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
-      _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
+      _         <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
+      _         <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
       rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
       innerScriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
     } yield (evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)
