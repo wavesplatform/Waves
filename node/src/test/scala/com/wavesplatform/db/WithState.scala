@@ -20,7 +20,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
@@ -161,9 +161,10 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val nextHeight = state.height + 1
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
-        differ(state, block).map(diff =>
-          state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
-        )
+        differ(state, block).map { diff =>
+          val snapshot = StateSnapshot.create(diff.diff, state)
+          state.append(snapshot, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
+        }
       })
     }
 
