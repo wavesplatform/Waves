@@ -34,14 +34,25 @@ class DefaultRequestService(
     with ScorexLogging {
   private val isWorking = new AtomicBoolean(true)
 
-  // TODO limit size
-  private val ignoredRequests = ConcurrentHashMap.newKeySet[RideScriptRunRequest]()
+  private val ignoredRequests = Caffeine
+    .newBuilder()
+    .maximumSize(20000) // TODO #96 Weighed cache or setting
+    .recordStats(() => new KamonCaffeineStats("IgnoredRequests"))
+    .build[RideScriptRunRequest, java.lang.Boolean]()
+
+  private def ignore(request: RideScriptRunRequest): Unit       = ignoredRequests.put(request, true)
+  private def isIgnored(request: RideScriptRunRequest): Boolean = Option(ignoredRequests.getIfPresent(request)).nonEmpty
+  private def removeFromIgnored(request: RideScriptRunRequest): Boolean = {
+    val r = isIgnored(request)
+    ignoredRequests.invalidate(request)
+    r
+  }
 
   private val requests = Caffeine
     .newBuilder()
     .maximumSize(10000) // TODO #96 Weighed cache
     .expireAfterWrite(settings.cacheTtl.length, settings.cacheTtl.unit)
-    .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignoredRequests.add(key) }
+    .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignore(key) }
     .recordStats(() => new KamonCaffeineStats("Requests"))
     .build[RideScriptRunRequest, RideScriptRunResult]()
 
@@ -54,7 +65,7 @@ class DefaultRequestService(
         log.info("Starting...")
         requestScheduler.jobs
           .takeWhile(_ => isWorking.get())
-          .filterNot(ignoredRequests.contains)
+          .filterNot(isIgnored)
           .mapParallelUnordered(settings.parallelization) { request =>
             if (createJob(request).inProgress) Task.unit
             else
@@ -94,7 +105,7 @@ class DefaultRequestService(
   }
 
   override def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit] = Task {
-    val toRun = affected.filterNot(ignoredRequests.contains)
+    val toRun = affected.filterNot(isIgnored)
     RideRunnerStats.rideRequestActiveAffectedNumberByTypes.update(toRun.size.toDouble)
 
     log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
@@ -117,7 +128,7 @@ class DefaultRequestService(
           }.flatMap {
             case None => Task.now(fail(request, CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
-              if (ignoredRequests.remove(request)) {
+              if (removeFromIgnored(request)) {
                 RideRunnerStats.rideRequestTrackReAdded.increment()
                 log.info(s"Re-added ${request.shortLogPrefix}")
               } else {
