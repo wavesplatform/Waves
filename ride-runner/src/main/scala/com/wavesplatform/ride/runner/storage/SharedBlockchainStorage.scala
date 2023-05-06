@@ -230,10 +230,7 @@ class SharedBlockchainStorage[TagT] private (
 //  val aliases = new AliasStorage[TagT](ExactWithHeightStorage.Settings(1000), chainId, blockchainApi, persistentCaches.aliases)
 
   def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    // TODO Remove readWrite!
-    db.readWrite { implicit rw =>
-      getOrFetch(heightUntagged, CacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
-    }
+    getOrFetch(CacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
 
 //  val accountBalances =
 //    new AccountBalanceStorage[TagT](ExactWithHeightStorage.Settings(1000), chainId, blockchainApi, persistentCaches.accountBalances)

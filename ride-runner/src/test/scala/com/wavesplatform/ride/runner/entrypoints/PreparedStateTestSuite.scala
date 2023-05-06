@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import com.wavesplatform.api.http.utils.UtilsApiRoute
+import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.ride.runner.TestScript
@@ -67,7 +67,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       val input      = defaultInput
       val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
 
-      val apiResult = UtilsApiRoute.evaluate(
+      val apiResult = UtilsEvaluator.evaluate(
         evaluateScriptComplexityLimit = Int.MaxValue,
         blockchain = blockchain,
         address = input.address,
@@ -112,7 +112,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       )
       val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
 
-      val apiResult = UtilsApiRoute.evaluate(
+      val apiResult = UtilsEvaluator.evaluate(
         evaluateScriptComplexityLimit = Int.MaxValue,
         blockchain = blockchain,
         address = input.address,

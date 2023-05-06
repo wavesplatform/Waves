@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.utils.UtilsApiRoute
+import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -96,7 +96,7 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
     val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
 //    val counter = new CountedHeightCalls(scriptsSrcs)
     val counter = new CountedHeightCallsTracker
-    val r = UtilsApiRoute.evaluate(
+    val r = UtilsEvaluator.evaluate(
       evaluateScriptComplexityLimit = Int.MaxValue,
       blockchain = blockchain,
       address = aliceAddr,

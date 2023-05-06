@@ -21,9 +21,7 @@ import com.wavesplatform.state.{
   TxMeta
 }
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 
-// TODO It seems we can remove this
 class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest]) extends SupportedBlockchain {
   override def settings: BlockchainSettings = sharedBlockchain.blockchainSettings
 
@@ -56,8 +54,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
-  override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    sharedBlockchain.getOrFetch(CacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
+  override def resolveAlias(a: Alias): Either[ValidationError, Address] = sharedBlockchain.resolveAlias(a)
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance =

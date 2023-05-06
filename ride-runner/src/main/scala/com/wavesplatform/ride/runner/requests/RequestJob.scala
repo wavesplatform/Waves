@@ -10,5 +10,5 @@ class RequestJob private (workers: Int, val result: CancelablePromise[RideScript
 }
 
 object RequestJob {
-  def mk(): RequestJob = new RequestJob(workers = 0, CancelablePromise[RideScriptRunResult]())
+  def apply(): RequestJob = new RequestJob(workers = 0, CancelablePromise[RideScriptRunResult]())
 }

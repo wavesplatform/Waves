@@ -19,6 +19,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
         Future.successful(
           RideScriptRunResult(
             request = request,
+            evaluation = None,
             lastResult = Json.obj(
               "result" -> Json.obj(
                 "type"  -> "Int",
@@ -52,6 +53,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
         Future.successful(
           RideScriptRunResult(
             request = request,
+            evaluation = None,
             lastResult = JsObject.empty,
             lastStatus = StatusCodes.BadRequest
           )

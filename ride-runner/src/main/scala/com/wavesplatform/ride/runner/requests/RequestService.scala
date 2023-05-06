@@ -4,7 +4,9 @@ import akka.http.scaladsl.model.StatusCodes
 import com.github.benmanes.caffeine.cache.{Caffeine, RemovalCause}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
-import com.wavesplatform.api.http.utils.UtilsApiRoute
+import com.wavesplatform.api.http.utils.UtilsEvaluator
+import com.wavesplatform.api.http.utils.UtilsEvaluator.Evaluation
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
@@ -146,63 +148,82 @@ class DefaultRequestService(
       }
   }
 
-  private def createJob(request: RideScriptRunRequest): RequestJob = currJobs.computeIfAbsent(request, _ => RequestJob.mk())
+  private def createJob(request: RideScriptRunRequest): RequestJob = currJobs.computeIfAbsent(request, _ => RequestJob())
 
-  private def runOne(scriptEnv: RideScriptRunResult): Task[RideScriptRunResult] =
+  private def runOne(prevResult: RideScriptRunResult): Task[RideScriptRunResult] =
     Task
       .evalAsync {
         try {
-          val updatedResult = RideRunnerStats.rideRequestRunTime.measure {
-            evaluate(scriptEnv.request) - "stateChanges" // Not required for now
-          }
+          val (evaluation, updatedResult) = RideRunnerStats.rideRequestRunTime.measure(evaluate(prevResult))
 
-          val origResult      = scriptEnv.lastResult
+          val origResult      = prevResult.lastResult
           lazy val complexity = (updatedResult \ "complexity").as[Int]
           if ((updatedResult \ "error").isDefined) {
-            log.trace(s"result=failed; ${scriptEnv.request.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
+            log.trace(s"result=failed; ${prevResult.request.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
             RideRunnerStats.rideScriptFailedCalls.increment()
           } else if (
             origResult == JsObject.empty ||
             updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
           ) {
             RideRunnerStats.rideScriptOkCalls.increment()
-            log.trace(s"result=ok; ${scriptEnv.request.shortLogPrefix} complexity=$complexity")
+            log.trace(s"result=ok; ${prevResult.request.shortLogPrefix} complexity=$complexity")
           } else {
             RideRunnerStats.rideScriptUnnecessaryCalls.increment()
-            log.trace(s"result=unnecessary; ${scriptEnv.request.shortLogPrefix} complexity=$complexity")
+            log.trace(s"result=unnecessary; ${prevResult.request.shortLogPrefix} complexity=$complexity")
           }
 
-          scriptEnv.copy(
+          prevResult.copy(
+            evaluation = evaluation,
             lastResult = updatedResult,
             lastStatus = StatusCodes.OK
           )
         } catch {
           case e: Throwable =>
-            log.error(s"An error during running ${scriptEnv.request}: ${e.getMessage}")
+            log.error(s"An error during running ${prevResult.request}: ${e.getMessage}")
             rideScriptFailedCalls.increment()
-            fail(scriptEnv.request, CustomValidationError(e.getMessage))
+            fail(prevResult.request, CustomValidationError(e.getMessage))
         }
       }
       .executeOn(runScriptScheduler)
 
-  private def evaluate(request: RideScriptRunRequest): JsObject = UtilsApiRoute.evaluate(
-    settings.evaluateScriptComplexityLimit,
-    new ProxyBlockchain(sharedBlockchain),
-    request.address,
-    request.requestBody,
-    settings.enableTraces,
-    settings.maxTxErrorLogSize,
-    intAsString = true, // TODO #110 Int as string in evaluate
-    wrapDAppEnv = underlying =>
-      new TrackedDAppEnvironment(
-        underlying,
-        new DefaultDAppEnvironmentTracker(sharedBlockchain, request)
-      )
-  )
+  private def evaluate(prevResult: RideScriptRunResult): (Option[Evaluation], JsObject) = {
+    val (evaluation, failJson) =
+      if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
+      else // TODO: is the latest version okay here?
+        UtilsEvaluator.Evaluation(StdLibVersion.VersionDic.latest, prevResult.request.address, prevResult.request.requestBody) match {
+          case Right(x) => (Some(x), JsObject.empty)
+          case Left(e)  => (None, UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize))
+        }
+
+    evaluation match {
+      case None => (evaluation, failJson)
+      case Some(ev) =>
+        val blockchain = new ProxyBlockchain(sharedBlockchain)
+        val address    = prevResult.request.address
+        val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
+        val jsResult = UtilsEvaluator.evaluate(
+          settings.evaluateScriptComplexityLimit,
+          blockchain,
+          scriptInfo,
+          ev,
+          address,
+          settings.enableTraces,
+          settings.maxTxErrorLogSize,
+          intAsString = true, // TODO #110 Int as string in evaluate
+          wrapDAppEnv = underlying =>
+            new TrackedDAppEnvironment(
+              underlying,
+              new DefaultDAppEnvironmentTracker(sharedBlockchain, prevResult.request)
+            )
+        )
+        (evaluation, jsResult - "stateChanges") // Not required for now
+    }
+  }
 
   // TODO #19 Change/move an error to an appropriate layer
   private def fail(request: RideScriptRunRequest, reason: ApiError): RideScriptRunResult = RideScriptRunResult(
     request = request,
+    evaluation = None,
     lastResult = reason.json,
     lastStatus = reason.code
   )

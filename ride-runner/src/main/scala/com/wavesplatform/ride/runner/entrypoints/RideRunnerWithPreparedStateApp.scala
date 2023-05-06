@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import com.wavesplatform.api.http.utils.UtilsApiRoute
+import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInput
 import play.api.libs.json.Json
@@ -22,7 +22,7 @@ object RideRunnerWithPreparedStateApp {
 
     val blockchain = new ImmutableBlockchain(globalSettings.rideRunner.immutableBlockchain, input)
 
-    val apiResult = UtilsApiRoute.evaluate(
+    val apiResult = UtilsEvaluator.evaluate(
       evaluateScriptComplexityLimit = globalSettings.rideRunner.requestsService.evaluateScriptComplexityLimit,
       blockchain = blockchain,
       address = input.address,
