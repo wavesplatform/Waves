@@ -296,7 +296,7 @@ class RocksDBWriter(
     c2.drop(1).map(kf(_).keyBytes)
   }
 
-  private def appendBalancesSnapshot(
+  private def appendBalances(
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       assetStatics: Map[IssuedAsset, TransactionStateSnapshot.AssetStatic],
       rw: RW
@@ -428,7 +428,7 @@ class RocksDBWriter(
 
       val assetStatics    = snapshot.assetStatics.map(static => (static.assetId.toIssuedAssetId, static))
       val assetStaticsMap = assetStatics.toMap
-      appendBalancesSnapshot(balances, assetStaticsMap, rw)
+      appendBalances(balances, assetStaticsMap, rw)
       appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
