@@ -20,7 +20,7 @@ object SnapshotOps {
     import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
     def toDiff: Diff =
-      new Diff(
+      Diff.withTransactions(
         s.transactions,
         portfolios,
         issuedAssets,
@@ -35,8 +35,7 @@ object SnapshotOps {
         scriptsRun = 0,
         s.current.totalComplexity,
         scriptResults,
-        ethereumTransactionMeta,
-        None
+        ethereumTransactionMeta
       )
 
     private def portfolios: Map[Address, Portfolio] =
