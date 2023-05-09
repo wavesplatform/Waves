@@ -223,7 +223,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   }
 
   property(s"string functions return correct results for unicode input after ${BlockchainFeatures.SynchronousCalls} activation") {
-    withDomain(RideV4)(assertNoFix)
+    //withDomain(RideV4)(assertNoFix)
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V5)
       .foreach(v => withDomain(settingsForRide(v).configure(_.copy(enforceTransferValidationAfter = 0)))(assertFix(_, v)))

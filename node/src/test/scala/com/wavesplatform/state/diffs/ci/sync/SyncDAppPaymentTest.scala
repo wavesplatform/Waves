@@ -30,12 +30,15 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
       withDomain(RideV5.configure(_.copy(enforceTransferValidationAfter = 4)), balances) { d =>
         d.appendBlock(preparingTxs*)
 
+        val dApp1Balance = d.balance(dApp1, asset)
+        val dApp2Balance = d.balance(dApp2, asset)
+
         val invoke1 = invoke()
         d.appendBlock(invoke1)
         d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
-        d.liquidDiff.portfolios(dApp1) shouldBe Portfolio.build(asset, 1)
-        d.liquidDiff.portfolios(dApp2) shouldBe Portfolio.build(asset, -1)
+        d.balance(dApp1, asset) - dApp1Balance shouldBe 1
+        d.balance(dApp2, asset) - dApp2Balance shouldBe -1
 
         val invoke2 = invoke()
         d.appendBlockE(invoke2) should produce {
