@@ -346,7 +346,7 @@ object StateSnapshot {
           displaceBy[S.Sponsorship, ByteString](_.sponsorships, _.assetId),
           displaceBy[S.ScriptResult, ByteString](_.scriptResults, _.transactionId),
           displaceBy[S.EthereumTransactionMeta, ByteString](_.ethereumTransactionMeta, _.transactionId),
-          s2.scriptsComplexity
+          s1.scriptsComplexity + s2.scriptsComplexity
         )
       )
     }
