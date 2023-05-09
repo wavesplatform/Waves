@@ -39,7 +39,7 @@ case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: Tran
       s.assetId.toIssuedAssetId -> info
     }.toMap
 
-  lazy val indexedIssuedAssets: Map[IssuedAsset, (AssetStatic, Int)] =
+  lazy val issuedAssets: Map[IssuedAsset, (AssetStatic, Int)] =
     current.assetStatics.zipWithIndex.map { case (info, i) => info.assetId.toIssuedAssetId -> (info, i + 1) }.toMap
 
   lazy val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =

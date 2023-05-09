@@ -186,7 +186,7 @@ case class SnapshotBlockchain(
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     inner
       .resolveERC20Address(address)
-      .orElse(snapshot.indexedIssuedAssets.keys.find(id => ERC20Address(id) == address))
+      .orElse(snapshot.issuedAssets.keys.find(id => ERC20Address(id) == address))
 }
 
 object SnapshotBlockchain {
@@ -228,7 +228,7 @@ object SnapshotBlockchain {
     lazy val info        = snapshot.assetNamesAndDescriptions.get(asset)
     lazy val sponsorship = snapshot.sponsorships.get(asset).map(_.minFee)
     lazy val script      = snapshot.assetScripts.get(asset)
-    snapshot.indexedIssuedAssets
+    snapshot.issuedAssets
       .get(asset)
       .map { case (static, assetNum) =>
         AssetDescription(
