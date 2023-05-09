@@ -13,6 +13,7 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
+import com.wavesplatform.state.StateSnapshot.lastEstimator
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset
@@ -97,7 +98,7 @@ case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: Tran
               pbInfo.senderPublicKey.toPublicKey,
               ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
               pbInfo.verifierComplexity,
-              if (pbInfo.callableComplexities.nonEmpty) Map(3 -> pbInfo.callableComplexities)
+              if (pbInfo.callableComplexities.nonEmpty) Map(lastEstimator -> pbInfo.callableComplexities)
               else Map()
             )
           )
