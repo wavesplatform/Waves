@@ -22,8 +22,8 @@ case class InterferableDB(db: RocksDB, startRead: ReentrantLock) extends RocksDB
     override def seek(key: Array[Byte]): Unit = super.seek(key)
     override def isValid: Boolean             = super.isValid
 
-    override def seekToFirst(): Unit = ???
-    override def prev(): Unit        = ???
-    override def seekToLast(): Unit  = ???
+    override def seekToFirst(): Unit = super.seekToFirst()
+    override def prev(): Unit        = super.prev()
+    override def seekToLast(): Unit  = super.seekToLast()
   }
 }

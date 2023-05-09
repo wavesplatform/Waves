@@ -379,8 +379,8 @@ class BlockchainUpdaterImpl(
                     }
                 }
           }).map {
-            _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
-              val newHeight = rocksdb.height + 1
+            _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, _), discDiffs, reward, hitSource) =>
+              val newHeight   = rocksdb.height + 1
 
               restTotalConstraint = updatedTotalConstraint
               ngState = Some(
@@ -501,13 +501,18 @@ class BlockchainUpdaterImpl(
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
-              totalSignatureValid <- ng
+              (totalSignatureValid, prevStateHash) <- ng
                 .snapshotOf(microBlock.reference)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
                 .map { case (accumulatedBlock, _, _, _, _) =>
                   Block
-                    .create(accumulatedBlock, accumulatedBlock.transactionData ++ microBlock.transactionData, microBlock.totalResBlockSig)
-                    .signatureValid()
+                    .create(
+                      accumulatedBlock,
+                      accumulatedBlock.transactionData ++ microBlock.transactionData,
+                      microBlock.totalResBlockSig,
+                      microBlock.stateHash
+                    )
+                    .signatureValid() -> accumulatedBlock.header.stateHash
                 }
               _ <- Either
                 .cond(
@@ -516,10 +521,10 @@ class BlockchainUpdaterImpl(
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
-                BlockDiffer.fromMicroBlock(this, rocksdb.lastBlockTimestamp, microBlock, restTotalConstraint, rocksdb.loadCacheData, verify)
+                BlockDiffer.fromMicroBlock(this, rocksdb.lastBlockTimestamp, prevStateHash, microBlock, restTotalConstraint, rocksdb.loadCacheData, verify)
               }
             } yield {
-              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _) = blockDifferResult
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)
 

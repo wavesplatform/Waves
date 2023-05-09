@@ -1,7 +1,6 @@
 package com.wavesplatform.block.serialization
 
 import java.nio.ByteBuffer
-
 import com.google.common.io.ByteStreams.newDataOutput
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.PublicKey
@@ -63,11 +62,17 @@ object BlockHeaderSerializer {
     val generatorJson =
       Json.obj("generator" -> blockHeader.generator.toAddress.toString, "generatorPublicKey" -> blockHeader.generator)
 
+    val stateHashJson =
+      blockHeader.stateHash match {
+        case Some(sh) => Json.obj("stateHash" -> sh.toString)
+        case None     => JsObject.empty
+      }
+
     Json.obj(
       "version"   -> blockHeader.version,
       "timestamp" -> blockHeader.timestamp,
       "reference" -> blockHeader.reference.toString
-    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson
+    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson ++ stateHashJson
   }
 
   def toJson(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
@@ -138,7 +143,8 @@ object BlockSerializer {
       val transactionData                                                          = parseTxs(buf, version)
       val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(buf, version)
 
-      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot)
+      val header =
+        BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, None)
 
       Block(header, signature, transactionData)
     }

@@ -23,9 +23,10 @@ trait UtxPool extends UtxForAppender with AutoCloseable {
   def scheduleCleanup(): Unit
   def packUnconfirmed(
       rest: MultiDimensionalMiningConstraint,
+      prevStateHash: Option[ByteStr],
       strategy: PackStrategy = PackStrategy.Unlimited,
       cancelled: () => Boolean = () => false
-  ): (Option[Seq[Transaction]], MiningConstraint)
+  ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr])
 }
 
 object UtxPool {

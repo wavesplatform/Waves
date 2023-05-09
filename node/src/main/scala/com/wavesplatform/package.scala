@@ -35,7 +35,11 @@ package object wavesplatform {
 
   def checkGenesis(settings: WavesSettings, blockchainUpdater: Blockchain & BlockchainUpdater, miner: Miner): Unit = {
     Block
-      .genesis(settings.blockchainSettings.genesisSettings, blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6))
+      .genesis(
+        settings.blockchainSettings.genesisSettings,
+        blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6),
+        blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)
+      )
       .flatMap { genesis =>
         logger.trace(s"Genesis block json: ${genesis.json()}")
         checkOrAppend(genesis, blockchainUpdater, miner)

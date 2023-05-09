@@ -9,14 +9,14 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import org.scalatest.EitherValues
 
 class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValues {
-  import ReissueTransactionDiffTest._
+  import ReissueTransactionDiffTest.*
 
   private val beforeActivationScenario = {
     val (issuer, b1) = genesis
@@ -79,7 +79,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
   private def checkFee(preconditions: Seq[Block], txs: TransactionsForCheck)(f: ValidationResults => Any): Unit =
     withRocksDBWriter(fs) { blockchain =>
       preconditions.foreach { block =>
-        val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
+        val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) =
           BlockDiffer.fromBlock(blockchain, blockchain.lastBlock, block, MiningConstraint.Unlimited, block.header.generationSignature).explicitGet()
         blockchain.append(preconditionDiff, preconditionFees, totalFee, None, block.header.generationSignature, block)
       }

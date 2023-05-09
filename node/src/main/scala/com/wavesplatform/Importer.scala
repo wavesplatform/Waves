@@ -362,7 +362,8 @@ object Importer extends ScorexLogging {
               lastHeader.generator,
               Nil,
               0,
-              ByteStr.empty
+              ByteStr.empty,
+              None
             ),
             ByteStr.empty,
             Nil
