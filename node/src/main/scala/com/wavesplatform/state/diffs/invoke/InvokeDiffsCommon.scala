@@ -146,7 +146,7 @@ object InvokeDiffsCommon {
       callableComplexities: Map[Int, Map[String, Long]],
       dAppAddress: Address
   ): Either[ValidationError, Long] = {
-    for {
+    for {                                                                             //TODO adaptation for snapshot
       complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).orElse(callableComplexities.get(3)).toRight {
         GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
       }

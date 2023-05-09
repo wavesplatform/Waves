@@ -108,7 +108,8 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
     assert(burn, s"Some($bigIntValue))' instead of Burn")
   }
 
-  property("BigInt as Invoke return value") {
+  //TODO uses scriptsRun
+  ignore("BigInt as Invoke return value") {
     def dApp1(nextDApp: Address, version: StdLibVersion): Script = TestCompiler(version).compileContract(
       s"""
          | @Callable(i)

@@ -242,7 +242,7 @@ object InvokeScriptTransactionDiff {
         stepLimit = ContractLimits.MaxCallableComplexityByVersion(version)
 
         fixedInvocationComplexity =
-          if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
+          if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) //TODO adaptation for snapshot
             Math.min(invocationComplexity, stepLimit)
           else
             invocationComplexity
