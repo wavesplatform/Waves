@@ -1,8 +1,6 @@
 package com.wavesplatform.db
 
 import com.google.common.primitives.Shorts
-
-import java.nio.file.Files
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -11,6 +9,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -18,7 +17,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot}
 import com.wavesplatform.test.*
@@ -28,6 +27,8 @@ import com.wavesplatform.{NTPTime, TestHelpers}
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
+
+import java.nio.file.Files
 
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
@@ -133,13 +134,14 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       Some(curBlock)
     }
 
-    val r@BlockDiffer.Result(snapshot, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
+    val BlockDiffer.Result(snapshot, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
     val ngState = NgState(block, snapshot, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
-    val cb      = CompositeBlockchain(state, ngState)
-    assertion(r.diff, cb)
+    val cb      = SnapshotBlockchain(state, ngState)
+    val diff    = snapshot.toDiff
+    assertion(diff, cb)
 
     state.append(snapshot, fees, totalFee, None, block.header.generationSignature, block)
-    assertion(r.diff, state)
+    assertion(diff, state)
   }
 
   def assertNgDiffState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
