@@ -18,11 +18,11 @@ import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
+import scala.collection.immutable.VectorMap
+
 case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: TransactionStateSnapshot) {
   lazy val balances: Map[(Address, Asset), Long] =
-    current.balances
-      .map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
-      .toMap
+    VectorMap() ++ current.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
   lazy val leaseBalances: Map[Address, LeaseBalance] =
     current.leaseBalances

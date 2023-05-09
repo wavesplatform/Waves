@@ -21,6 +21,7 @@ import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
 import java.{lang, util}
+import scala.collection.immutable.VectorMap
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
@@ -369,7 +370,7 @@ abstract class Caches extends Blockchain with Storage {
       carryFee,
       transactionMeta.result(),
       newAddressIds,
-      updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v }.toMap,
+      VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance }.toMap,
       newFills.toMap,
       updatedDataWithNodes.toMap,
