@@ -4,7 +4,7 @@ import java.nio.file.{Files, Paths}
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
 import cats.Show
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.generator.utils.{Gen, Universe}
@@ -16,7 +16,7 @@ import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.{EthTxGenerator, *}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -37,12 +37,12 @@ import scala.util.Random.*
 class NarrowTransactionGenerator(
     settings: NarrowTransactionGenerator.Settings,
     preconditions: NarrowTransactionGenerator.Preconditions,
-    accounts: Seq[KeyPair],
+    accounts: Seq[SeedKeyPair],
     estimator: ScriptEstimator,
     override val initial: Seq[Transaction],
     override val tailInitial: Seq[Transaction]
 ) extends TransactionGenerator {
-  import NarrowTransactionGenerator._
+  import NarrowTransactionGenerator.*
 
   private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
@@ -159,28 +159,32 @@ class NarrowTransactionGenerator(
               buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
               pair    <- preconditions.tradeAsset.map(a => AssetPair(Waves, IssuedAsset(a.id())))
               delta = random.nextLong(10000)
-              sellOrder = Order.sell(
-                Order.V2,
-                seller,
-                matcher.publicKey,
-                pair,
-                10000000 + delta,
-                10,
-                timestamp,
-                timestamp + 30.days.toMillis,
-                300000L
-              )
-              buyOrder = Order.buy(
-                Order.V2,
-                buyer,
-                matcher.publicKey,
-                pair,
-                10000000 + delta,
-                10 + random.nextLong(10),
-                timestamp,
-                timestamp + 1.day.toMillis,
-                300000L
-              )
+              sellOrder = Order
+                .sell(
+                  Order.V2,
+                  seller,
+                  matcher.publicKey,
+                  pair,
+                  10000000 + delta,
+                  10,
+                  timestamp,
+                  timestamp + 30.days.toMillis,
+                  300000L
+                )
+                .explicitGet()
+              buyOrder = Order
+                .buy(
+                  Order.V2,
+                  buyer,
+                  matcher.publicKey,
+                  pair,
+                  10000000 + delta,
+                  10 + random.nextLong(10),
+                  timestamp,
+                  timestamp + 1.day.toMillis,
+                  300000L
+                )
+                .explicitGet()
               tx <- logOption(
                 ExchangeTransaction.signed(
                   correctVersion(TxVersion.V2),
@@ -236,7 +240,7 @@ class NarrowTransactionGenerator(
                 val useAlias  = random.nextBoolean()
                 val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
                 val amount    = 1000 / (transferCount + 1)
-                ParsedTransfer(recipient, amount)
+                ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
               }
               tx <- logOption(
                 MassTransferTransaction
@@ -529,7 +533,7 @@ object NarrowTransactionGenerator {
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(random.nextInt(c.size))) else None
 
-  def apply(settings: Settings, accounts: Seq[KeyPair], time: NTP, estimator: ScriptEstimator): NarrowTransactionGenerator = {
+  def apply(settings: Settings, accounts: Seq[SeedKeyPair], time: NTP, estimator: ScriptEstimator): NarrowTransactionGenerator = {
 
     val (setScriptInitTxs, setScriptTailInitTxs, setScriptAccounts, setScriptAssets) =
       if (
@@ -622,7 +626,7 @@ object NarrowTransactionGenerator {
               trader,
               acc.toAddress,
               IssuedAsset(tradeAsset.id()),
-              tradeAsset.quantity / Universe.Accounts.size,
+              tradeAsset.quantity.value / Universe.Accounts.size,
               Waves,
               900000,
               ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
@@ -638,7 +642,7 @@ object NarrowTransactionGenerator {
     val leaseRecipient = GeneratorSettings.toKeyPair("lease recipient")
 
     val fundEthereumAddresses = accounts.map { kp =>
-      import com.wavesplatform.transaction.utils.EthConverters._
+      import com.wavesplatform.transaction.utils.EthConverters.*
       val ethAccount = kp.toEthWavesAddress
       TransferTransaction
         .selfSigned(TxVersion.V1, accounts.head, ethAccount, Waves, 100_0000_0000L, Waves, 500000L, ByteStr.empty, System.currentTimeMillis())

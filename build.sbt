@@ -66,7 +66,7 @@ lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node)
+lazy val `node-generator` = project.dependsOn(node % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
@@ -202,6 +202,7 @@ checkPRRaw := Def
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
+      (`node-generator` / Compile / compile).value
     }
   )
   .value
