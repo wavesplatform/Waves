@@ -68,7 +68,25 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     }
   }
 
-  "Ethereum transfer" should "preserve waves and asset invariant" in {
+  "Ethereum transfer" should "work correctly for issued assets" in {
+    val senderKp  = TxHelpers.secondSigner.toEthKeyPair
+    val recipient = TxHelpers.address(2)
+    val issuer    = TxHelpers.signer(3)
+
+    withDomain(DomainPresets.RideV6, Seq(AddrWithBalance(senderKp.toWavesAddress), AddrWithBalance(issuer.toAddress))) { d =>
+      val issue          = TxHelpers.issue(issuer)
+      val nativeTransfer = TxHelpers.transfer(issuer, senderKp.toWavesAddress, issue.quantity.value, issue.asset)
+      val ethTransfer    = () => EthTxGenerator.generateEthTransfer(senderKp, recipient, 1, issue.asset, 100000)
+
+      d.appendBlock(issue, nativeTransfer)
+      // check resolveERC20Address for liquid and solid states
+      d.liquidAndSolidAssert { () =>
+        d.appendAndAssertSucceed(ethTransfer())
+      }
+    }
+  }
+
+  it should "preserve waves and asset invariant" in {
     val senderKp  = TxHelpers.secondSigner.toEthKeyPair
     val recipient = TxHelpers.address(2)
     val issuer    = TxHelpers.signer(3)
