@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.StatusCodes
-import com.github.benmanes.caffeine.cache.{Caffeine, RemovalCause}
+import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.utils.UtilsEvaluator
@@ -47,10 +47,23 @@ class DefaultRequestService(
     r
   }
 
+  private val requestsExpiry = new Expiry[RideScriptRunRequest, RideScriptRunResult] {
+    private val duration = settings.cacheTtl.toNanos
+
+    override def expireAfterRead(key: RideScriptRunRequest, value: RideScriptRunResult, currentTime: Long, currentDuration: Long): Long =
+      duration
+    override def expireAfterCreate(key: RideScriptRunRequest, value: RideScriptRunResult, currentTime: Long): Long =
+      duration
+
+    // Not modify the current expiration time
+    override def expireAfterUpdate(key: RideScriptRunRequest, value: RideScriptRunResult, currentTime: Long, currentDuration: Long): Long =
+      currentDuration
+  }
+
   private val requests = Caffeine
     .newBuilder()
     .maximumSize(800) // TODO #96 Weighed cache
-    .expireAfterWrite(settings.cacheTtl.length, settings.cacheTtl.unit)
+    .expireAfter(requestsExpiry)
     .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignore(key) }
     .recordStats(() => new KamonCaffeineStats("Requests"))
     .build[RideScriptRunRequest, RideScriptRunResult]()
@@ -72,7 +85,7 @@ class DefaultRequestService(
                 case Some(updated) =>
                   if (updated.isAvailable) {
                     // We don't need to cache an empty value, so we use getOrElse here
-                    val origEnv = Option(requests.getIfPresent(request)).getOrElse(RideScriptRunResult(request))
+                    val origEnv = Option(requests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
                     runOne(origEnv).tapEval { r =>
                       Task {
                         requests.put(r.request, r)
@@ -82,7 +95,8 @@ class DefaultRequestService(
                     }
                   } else {
                     log.info(s"$request is already running")
-                    Task(requestScheduler.add(request)) // A job is being processed now, but it can use stale data
+                    requestScheduler.add(request) // A job is being processed now, but it can use stale data
+                    Task.unit
                   }
 
                 case _ => Task.unit
@@ -114,7 +128,7 @@ class DefaultRequestService(
 
     log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
     requestScheduler.addMultiple(toRun)
-    RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize().toDouble)
+    RideRunnerStats.rideRequestActiveNumber.update((requests.estimatedSize() - ignoredRequests.size()).toDouble)
   }
 
   override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {
