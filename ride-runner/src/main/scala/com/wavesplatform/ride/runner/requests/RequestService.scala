@@ -90,7 +90,7 @@ class DefaultRequestService(
                       Task {
                         requests.put(r.request, r)
                         updated.result.trySuccess(r)
-                        currJobs.remove(request)
+                        Option(currJobs.remove(request)).foreach(_.timer.stop())
                       }
                     }
                   } else {

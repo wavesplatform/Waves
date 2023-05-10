@@ -42,6 +42,8 @@ object RideRunnerStats {
   val rideRequestCacheMisses  = Kamon.counter("ride.request.cache.miss", "Cache misses for whole request").withoutTags()
   val rideRequestRunTime      = Kamon.timer("ride.request.run", "Request running time").withoutTags()
 
+  val rideRequestTimeInQueue = Kamon.timer("ride.request.in-queue", "Time in queue").withoutTags()
+
   private val rideScriptCalls    = Kamon.counter("ride.script.calls", "Ride calls")
   val rideScriptOkCalls          = rideScriptCalls.withTag("type", "ok")
   val rideScriptUnnecessaryCalls = rideScriptCalls.withTag("type", "unnecessary")

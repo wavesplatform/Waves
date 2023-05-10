@@ -624,6 +624,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "The last processed height",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -676,7 +677,7 @@
           "refId": "A"
         }
       ],
-      "title": "The last processed height",
+      "title": "Height",
       "type": "stat"
     },
     {
@@ -1167,12 +1168,14 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
+      "description": "Those we run if them are affected by blockchain updates",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1181,7 +1184,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "none"
         },
         "overrides": []
       },
@@ -1215,6 +1219,7 @@
           },
           "editorMode": "builder",
           "expr": "ride_request_active{job=\"$job\", instance=~\"$instance\"}",
+          "legendFormat": "Active requests",
           "range": true,
           "refId": "A"
         }
@@ -1276,7 +1281,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -1473,7 +1479,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -2694,10 +2701,6 @@
                   {
                     "color": "green",
                     "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
                   }
                 ]
               },
@@ -2735,7 +2738,7 @@
               },
               "editorMode": "builder",
               "exemplar": false,
-              "expr": "ride_affected_total{instance=~\"$instance\", job=\"$job\"}",
+              "expr": "ride_affected_total{instance=~\"$instance\", job=\"$job\"} > 0",
               "hide": false,
               "interval": "30s",
               "legendFormat": "affected {{tpe}}",
@@ -2751,7 +2754,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Either new or re-added again (ignored then added).",
+          "description": "Either new or re-added again: ignored then added during a short period of time.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3163,6 +3166,135 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "description": "How long a request is processed in the queue",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisGridShow": true,
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "axisWidth": 60,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 2,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 7,
+            "x": 10,
+            "y": 19
+          },
+          "id": 337,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "mean"
+              ],
+              "displayMode": "hidden",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.95, sum by(le) (rate(ride_request_in_queue_seconds_bucket{instance=~\"$instance\", job=\"$job\"}[$__rate_interval])))",
+              "hide": false,
+              "interval": "30s",
+              "legendFormat": "95ᵗʰ",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.75, sum by(le) (rate(ride_request_in_queue_seconds_bucket{instance=~\"$instance\", job=\"$job\"}[$__rate_interval])))",
+              "hide": false,
+              "interval": "30s",
+              "legendFormat": "75ᵗʰ",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "exemplar": false,
+              "expr": "histogram_quantile(0.5, sum by(le) (rate(ride_request_in_queue_seconds_bucket{instance=~\"$instance\", job=\"$job\"}[$__rate_interval])))",
+              "hide": false,
+              "interval": "30s",
+              "legendFormat": "50ᵗʰ",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Time in queue",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3246,8 +3378,8 @@
           },
           "gridPos": {
             "h": 9,
-            "w": 14,
-            "x": 10,
+            "w": 7,
+            "x": 17,
             "y": 19
           },
           "id": 16,
@@ -3787,107 +3919,6 @@
                 "lineWidth": 1,
                 "pointSize": 5,
                 "scaleDistribution": {
-                  "log": 2,
-                  "type": "log"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "none"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 16,
-            "w": 24,
-            "x": 0,
-            "y": 53
-          },
-          "id": 247,
-          "options": {
-            "legend": {
-              "calcs": [
-                "min",
-                "max"
-              ],
-              "displayMode": "table",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
-              },
-              "editorMode": "builder",
-              "exemplar": false,
-              "expr": "ride_storage_number_total{job=\"$job\", instance=~\"$instance\"}",
-              "format": "time_series",
-              "hide": false,
-              "instant": false,
-              "interval": "1m",
-              "legendFormat": "{{name}}",
-              "range": true,
-              "rawQuery": false,
-              "refId": "B"
-            }
-          ],
-          "title": "Known entries",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "description": "",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
                   "type": "linear"
                 },
                 "showPoints": "auto",
@@ -3905,8 +3936,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3922,7 +3952,7 @@
             "h": 25,
             "w": 24,
             "x": 0,
-            "y": 69
+            "y": 53
           },
           "id": 60,
           "options": {
