@@ -339,7 +339,7 @@ object StateSnapshot {
           displaceBy[S.AssetVolume, ByteString](_.assetVolumes, _.assetId),
           displaceBy[S.AssetNameAndDescription, ByteString](_.assetNamesAndDescriptions, _.assetId),
           displaceBy[S.AssetScript, ByteString](_.assetScripts, _.assetId),
-          displaceBy[S.Alias, ByteString](_.aliases, _.address),
+          s1.current.aliases ++ s2.current.aliases,
           displaceBy[S.OrderFill, ByteString](_.orderFills, _.orderId),
           displaceBy[S.LeaseState, ByteString](_.leaseStates, _.leaseId),
           displaceBy[S.AccountScript, ByteString](_.accountScripts, _.senderAddress),
