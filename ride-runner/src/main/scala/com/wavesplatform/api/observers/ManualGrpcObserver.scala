@@ -10,11 +10,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[RequestT, EventT] with ScorexLogging {
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"${getSimpleName(this)}#${hashCode()}"))
 
-  private val working                                           = new AtomicBoolean(true)
+  private val working                                           = new AtomicBoolean(false)
   private var requestStream: ClientCallStreamObserver[RequestT] = null
 
   override def beforeStart(requestStream: ClientCallStreamObserver[RequestT]): Unit = {
     log.info("Starting...")
+    working.set(true)
     this.requestStream = requestStream
     requestStream.disableAutoRequestWithInitial(1)
 
