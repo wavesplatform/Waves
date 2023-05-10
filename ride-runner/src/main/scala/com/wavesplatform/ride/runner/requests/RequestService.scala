@@ -120,6 +120,7 @@ class DefaultRequestService(
   override def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit = {
     val toRun = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
       sharedBlockchain.removeTags(ignoredRequests.asScala)
+      ignoredRequests.clear()
       affected
     } else affected.filterNot(isIgnored)
 
