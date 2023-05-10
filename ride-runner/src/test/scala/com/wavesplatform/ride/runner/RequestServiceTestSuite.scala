@@ -144,7 +144,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       )
     }
 
-    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds)
+    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds, 100)
     val requestsService = use(
       new DefaultRequestService(
         settings = requestServiceSettings,
@@ -164,7 +164,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         }
       )
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState(BlockchainState.Settings(1.second), processor, blockchainUpdatesStream, _, _)
+        BlockchainState.applyWithRestarts(BlockchainState.Settings(1.second), processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {

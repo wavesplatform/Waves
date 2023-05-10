@@ -4,12 +4,8 @@ import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
-import com.wavesplatform.ride.runner.{BlockchainState, Processor}
+import com.wavesplatform.ride.runner.BlockchainState
 import com.wavesplatform.state.Height
-import monix.execution.Scheduler.Implicits.global
-
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
 
 class BlockchainStateTestSuite extends BaseTestSuite {
   "BlockchainState.apply" - {
@@ -19,14 +15,14 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           val event     = mkBlockAppendEvent(10)
           val processor = new TestProcessor
 
-          val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
+          val updatedState = BlockchainState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
           processor.actions shouldBe Vector(RemoveFrom(10), Process(event))
         }
 
         "not reaching the blockchain height - still Starting" in {
           val event        = mkBlockAppendEvent(9)
-          val updatedState = nextState(new TestProcessor, BlockchainState.Starting(Height(9), Height(10)), event)
+          val updatedState = BlockchainState(new TestProcessor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Starting]
         }
 
@@ -34,7 +30,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           val event     = mkBlockAppendEvent(9)
           val processor = new TestProcessor
 
-          val _ = nextState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
+          val _ = BlockchainState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
           processor.actions shouldBe Vector(RemoveFrom(9), Process(event))
         }
 
@@ -44,7 +40,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
             override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = Some(true)
           }
 
-          val _ = nextState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
+          val _ = BlockchainState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
           processor.actions shouldBe Vector.empty
         }
 
@@ -54,7 +50,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
             override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = Some(false)
           }
 
-          val _ = nextState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
+          val _ = BlockchainState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
           processor.actions shouldBe Vector(
             RemoveFrom(event),
             Process(event)
@@ -66,7 +62,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         val event     = mkRollbackEvent(1)
         val processor = new TestProcessor
 
-        val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
+        val updatedState = BlockchainState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
         updatedState shouldBe a[BlockchainState.Starting]
         processor.actions shouldBe Vector(Process(event))
       }
@@ -78,7 +74,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           val event     = mkBlockAppendEvent(11)
           val processor = new TestProcessor
 
-          val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
+          val updatedState = BlockchainState(processor, BlockchainState.Working(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
           processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
         }
@@ -87,7 +83,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           val event     = mkMicroBlockAppendEvent(10)
           val processor = new TestProcessor
 
-          val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
+          val updatedState = BlockchainState(processor, BlockchainState.Working(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
           processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
         }
@@ -97,7 +93,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         val event     = mkRollbackEvent(1)
         val processor = new TestProcessor
 
-        val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
+        val updatedState = BlockchainState(processor, BlockchainState.Working(Height(10)), event)
         updatedState shouldBe a[BlockchainState.ResolvingFork]
         processor.actions shouldBe Vector(Process(event))
       }
@@ -108,7 +104,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         val event     = mkRollbackEvent(1)
         val processor = new TestProcessor
 
-        val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(10), 0, Height(10)), event)
+        val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), 0, Height(10)), event)
         updatedState shouldBe a[BlockchainState.ResolvingFork]
         processor.actions shouldBe Vector(Process(event))
       }
@@ -118,7 +114,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
           val event     = mkBlockAppendEvent(11)
           val processor = new TestProcessor
 
-          val updatedState = nextState(
+          val updatedState = BlockchainState(
             processor,
             BlockchainState.ResolvingFork.from(rollbackHeight = Height(10), origForkHeight = Height(10)),
             event
@@ -133,7 +129,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
             val event     = mkBlockAppendEvent(12)
             val processor = new TestProcessor
 
-            val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
+            val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
             updatedState shouldBe a[BlockchainState.Working]
             processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
           }
@@ -142,7 +138,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
             val event     = mkMicroBlockAppendEvent(11)
             val processor = new TestProcessor
 
-            val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
+            val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
             updatedState shouldBe a[BlockchainState.Working]
             processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
           }
@@ -188,7 +184,4 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         )
       )
   )
-
-  private def nextState(processor: Processor, orig: BlockchainState, event: SubscribeEvent): BlockchainState =
-    Await.result(BlockchainState(processor, orig, event).runToFuture, 10.seconds)
 }

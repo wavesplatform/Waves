@@ -47,6 +47,8 @@ object RideRunnerStats {
   val rideScriptUnnecessaryCalls = rideScriptCalls.withTag("type", "unnecessary")
   val rideScriptFailedCalls      = rideScriptCalls.withTag("type", "failed")
 
+  val requestServiceIgnoredNumber = Kamon.gauge("ride.request.ignored.total", "Total number of ignored requests").withoutTags()
+
   private val anyEventProcessingTime = Kamon.timer("blockchain.event.process", "Blockchain events processing time")
   val blockProcessingTime            = anyEventProcessingTime.withTag("tpe", "b")
   val microBlockProcessingTime       = anyEventProcessingTime.withTag("tpe", "mb")

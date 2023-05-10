@@ -10,7 +10,6 @@ import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.{AffectedTags, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
-import monix.eval.Task
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -32,7 +31,7 @@ trait Processor {
 
   def process(event: BlockchainUpdated): Unit
 
-  def runAffectedScripts(updateType: UpdateType): Task[Unit]
+  def scheduleAffectedScripts(updateType: UpdateType): Unit
 }
 
 class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest], requestsService: RequestService)
@@ -68,12 +67,12 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
     )
   }
 
-  override def runAffectedScripts(updateType: UpdateType): Task[Unit] = {
+  override def scheduleAffectedScripts(updateType: UpdateType): Unit = {
     val last = accumulatedChanges.getAndUpdate(orig => orig.withoutAffectedTags)
-    if (last.isEmpty) Task(log.info(s"[${last.newHeight}] No changes"))
+    if (last.isEmpty) log.info(s"[${last.newHeight}] No changes")
     else {
       RideRunnerStats.rideRequestTotalAffectedNumber(updateType).update(last.affected.size.toDouble)
-      requestsService.runAffected(last.affected)
+      requestsService.scheduleAffected(last.affected)
     }
   }
 

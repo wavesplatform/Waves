@@ -6,7 +6,6 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.ride.runner.Processor
 import com.wavesplatform.state.Height
-import monix.eval.Task
 
 class TestProcessor extends Processor {
   var actions: Vector[ProcessorAction] = Vector.empty
@@ -17,20 +16,16 @@ class TestProcessor extends Processor {
     */
   override def forceRollbackLiquid(): Unit = {}
 
-  override def removeAllFrom(height: Height): Unit = {
+  override def removeAllFrom(height: Height): Unit =
     actions = actions.appended(RemoveFrom(height))
-  }
 
   override def startScripts(): Unit = {}
 
-  override def process(event: BlockchainUpdated): Unit = {
+  override def process(event: BlockchainUpdated): Unit =
     actions = actions.appended(Process(event))
-  }
 
-  override def runAffectedScripts(updateType: UpdateType): Task[Unit] = {
+  override def scheduleAffectedScripts(updateType: UpdateType): Unit =
     actions = actions.appended(RunAffectedScripts)
-    Task.now(())
-  }
 
   override def toString: String = s"TestProcessor(${actions.mkString(", ")})"
 }

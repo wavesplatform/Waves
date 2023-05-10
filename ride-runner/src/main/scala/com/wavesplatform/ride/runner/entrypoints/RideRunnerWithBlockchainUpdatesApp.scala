@@ -142,13 +142,13 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val endHeight           = Height(workingHeight + 1)                                  // 101 // lastHeightAtStart
 
     log.info(s"Watching blockchain updates...")
-    val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
+    val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) {
-      blockchainUpdates.close()
+      blockchainUpdatesStream.close()
     }
 
     val processor = new BlockchainProcessor(sharedBlockchain, requestService)
-    val events = blockchainUpdates.downstream
+    val events = blockchainUpdatesStream.downstream
       .doOnError(e =>
         Task {
           log.error("Error!", e)
@@ -164,11 +164,11 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
           false
       }
       .collect { case WrappedEvent.Next(event) => event }
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(BlockchainState(processor, _, _))
+      .scan(BlockchainState.Starting(lastSafeKnownHeight, workingHeight): BlockchainState)(BlockchainState(processor, _, _))
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
-    blockchainUpdates.start(Height(lastSafeKnownHeight + 1), endHeight)
+    blockchainUpdatesStream.start(Height(lastSafeKnownHeight + 1), endHeight)
 
     // TODO
     val task = Task.parTraverseUnordered(scripts)(requestService.trackAndRun).runToFuture(rideScheduler)

@@ -84,7 +84,7 @@ object BlockchainState extends ScorexLogging {
     Status.Code.UNAVAILABLE // Failed keepalives or something, let's try again
   )
 
-  def apply(
+  def applyWithRestarts(
       settings: Settings,
       processor: Processor,
       blockchainUpdatesStream: BlockchainUpdatesStream,
@@ -115,7 +115,7 @@ object BlockchainState extends ScorexLogging {
     }
 
     event match {
-      case WrappedEvent.Next(event) => apply(processor, orig, event)
+      case WrappedEvent.Next(event) => Task(apply(processor, orig, event))
       case WrappedEvent.Closed      => forceRestart()
       case WrappedEvent.Failed(e) =>
         e match {
@@ -136,7 +136,7 @@ object BlockchainState extends ScorexLogging {
     }
   }
 
-  def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): Task[BlockchainState] = {
+  def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): BlockchainState = {
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
     RideRunnerStats.lastKnownHeight.update(h)
@@ -147,7 +147,6 @@ object BlockchainState extends ScorexLogging {
     def logStatusChanged(updated: BlockchainState): Unit =
       log.info(s"Status changed: ${getSimpleName(orig)} -> ${getSimpleName(updated)}")
 
-    val ignore = Task.now(orig)
     orig match {
       case orig: Starting =>
         update match {
@@ -170,30 +169,31 @@ object BlockchainState extends ScorexLogging {
               val r = Working(h)
               logStatusChanged(r)
               processor.startScripts()
-              Task.now(r)
-            } else Task.now(comparedBlocks.copy(processedHeight = h))
+              r
+            } else comparedBlocks.copy(processedHeight = h)
 
           case _: Update.Rollback =>
             // It works even for micro blocks, because we have a restored version of data in event
             processor.process(event.getUpdate)
-            ignore
+            orig
 
-          case Update.Empty => ignore
+          case Update.Empty => orig
         }
 
       case orig: Working =>
         update match {
           case _: Update.Append =>
             processor.process(event.getUpdate)
-            processor.runAffectedScripts(updateType).as(orig.withHeight(h))
+            processor.scheduleAffectedScripts(updateType)
+            orig.withHeight(h)
 
           case _: Update.Rollback =>
             processor.process(event.getUpdate)
             val r = ResolvingFork.from(Height(event.getUpdate.height), orig.processedHeight)
             logStatusChanged(r)
-            Task.now(r)
+            r
 
-          case Update.Empty => Task.now(orig.withHeight(h))
+          case Update.Empty => orig.withHeight(h)
         }
 
       case orig: ResolvingFork =>
@@ -203,17 +203,16 @@ object BlockchainState extends ScorexLogging {
             val updated = orig.apply(event)
             if (updated.isRollbackResolved) {
               val r = Working(updated.processedHeight)
-              processor.runAffectedScripts(updateType).as {
-                logStatusChanged(r)
-                r
-              }
-            } else Task.now(updated)
+              processor.scheduleAffectedScripts(updateType)
+              logStatusChanged(r)
+              r
+            } else updated
 
           case _: Update.Rollback =>
             processor.process(event.getUpdate)
-            Task.now(orig.apply(event))
+            orig.apply(event)
 
-          case Update.Empty => Task.now(orig.withProcessedHeight(h))
+          case Update.Empty => orig.withProcessedHeight(h)
         }
     }
   }

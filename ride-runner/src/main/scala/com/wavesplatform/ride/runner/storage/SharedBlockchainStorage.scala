@@ -45,6 +45,12 @@ class SharedBlockchainStorage[TagT] private (
   //   exist, but empty - we known this key, but doesn't remember why
   //   exist and non-empty - we know, why do we need this key (but there are probably more tags)
   private val tags = new ConcurrentHashMap[CacheKey, Set[TagT]]()
+
+  def removeTags(xs: collection.Set[TagT]): Unit = tags.replaceAll { (_: CacheKey, orig: Set[TagT]) =>
+    if (orig.size >= xs.size) orig -- xs
+    else orig.diff(xs)
+  }
+
   def load()(implicit ctx: ReadOnly): Unit = {
     blockHeaders.load()
 

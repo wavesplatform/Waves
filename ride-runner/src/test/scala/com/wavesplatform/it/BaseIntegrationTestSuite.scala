@@ -70,7 +70,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
 
     val request                = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "foo()"))
-    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds)
+    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds, 100)
     val requestService = use(
       new DefaultRequestService(
         settings = requestServiceSettings,
@@ -106,7 +106,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
       .take(events.size)
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState(blockchainStateSettings, processor, blockchainUpdatesStream, _, _)
+        BlockchainState.applyWithRestarts(blockchainStateSettings, processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {

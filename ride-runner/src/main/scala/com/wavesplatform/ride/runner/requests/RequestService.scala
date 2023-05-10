@@ -20,10 +20,11 @@ import play.api.libs.json.JsObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.FiniteDuration
+import scala.jdk.CollectionConverters.SetHasAsScala
 
 trait RequestService extends AutoCloseable {
   def start(): Unit
-  def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit]
+  def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit
   def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult]
 }
 
@@ -36,23 +37,19 @@ class DefaultRequestService(
     with ScorexLogging {
   private val isWorking = new AtomicBoolean(true)
 
-  private val ignoredRequests = Caffeine
-    .newBuilder()
-    .maximumSize(20000) // TODO #96 Weighed cache or setting
-    .recordStats(() => new KamonCaffeineStats("IgnoredRequests"))
-    .build[RideScriptRunRequest, java.lang.Boolean]()
+  private val ignoredRequests = ConcurrentHashMap.newKeySet[RideScriptRunRequest]()
 
-  private def ignore(request: RideScriptRunRequest): Unit       = ignoredRequests.put(request, true)
-  private def isIgnored(request: RideScriptRunRequest): Boolean = Option(ignoredRequests.getIfPresent(request)).nonEmpty
+  private def ignore(request: RideScriptRunRequest): Unit       = ignoredRequests.add(request)
+  private def isIgnored(request: RideScriptRunRequest): Boolean = ignoredRequests.contains(request)
   private def removeFromIgnored(request: RideScriptRunRequest): Boolean = {
     val r = isIgnored(request)
-    ignoredRequests.invalidate(request)
+    ignoredRequests.remove(request)
     r
   }
 
   private val requests = Caffeine
     .newBuilder()
-    .maximumSize(10000) // TODO #96 Weighed cache
+    .maximumSize(800) // TODO #96 Weighed cache
     .expireAfterWrite(settings.cacheTtl.length, settings.cacheTtl.unit)
     .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignore(key) }
     .recordStats(() => new KamonCaffeineStats("Requests"))
@@ -106,8 +103,13 @@ class DefaultRequestService(
 //    Await.result(currTask)
   }
 
-  override def runAffected(affected: Set[RideScriptRunRequest]): Task[Unit] = Task {
-    val toRun = affected.filterNot(isIgnored)
+  override def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit = {
+    val toRun = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
+      sharedBlockchain.removeTags(ignoredRequests.asScala)
+      affected
+    } else affected.filterNot(isIgnored)
+
+    RideRunnerStats.requestServiceIgnoredNumber.update(ignoredRequests.size())
     RideRunnerStats.rideRequestActiveAffectedNumberByTypes.update(toRun.size.toDouble)
 
     log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
@@ -235,6 +237,7 @@ object DefaultRequestService {
       evaluateScriptComplexityLimit: Int,
       maxTxErrorLogSize: Int,
       parallelization: Int,
-      cacheTtl: FiniteDuration
+      cacheTtl: FiniteDuration,
+      ignoredCleanupThreshold: Int
   )
 }
