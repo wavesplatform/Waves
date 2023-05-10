@@ -98,7 +98,7 @@ object DomainPresets {
 
   val ConsensusImprovements: WavesSettings = RideV6.addFeatures(BlockchainFeatures.ConsensusImprovements)
 
-  val TransactionStateSnapshot: WavesSettings = ConsensusImprovements.addFeatures(BlockchainFeatures.TransactionStateSnapshot)
+  val TransactionStateSnapshotP: WavesSettings = ConsensusImprovements.addFeatures(BlockchainFeatures.TransactionStateSnapshot)
 
   def settingsForRide(version: StdLibVersion): WavesSettings =
     version match {

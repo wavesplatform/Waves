@@ -5,6 +5,7 @@ import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
@@ -31,7 +32,7 @@ object BlockDiffer {
       constraint: MiningConstraint,
       detailedDiff: DetailedDiff,
       stateHash: Option[ByteStr]) {
-    def diff = detailedDiff.transactionDiffs.foldLeft(detailedDiff.parentDiff)(_.combineF(_).right.get)
+    def diff = detailedDiff.transactionDiffs.foldLeft(detailedDiff.parentDiff)(_.combineF(_).explicitGet())
   }
 
   case class Fraction(dividend: Int, divider: Int) {

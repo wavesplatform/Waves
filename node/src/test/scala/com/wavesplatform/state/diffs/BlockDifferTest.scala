@@ -105,7 +105,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       "genesis block" in {
         val txs = (1 to 10).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 100.waves)) ++
           (1 to 5).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 1.waves))
-        withDomain(DomainPresets.TransactionStateSnapshot) { d =>
+        withDomain(DomainPresets.TransactionStateSnapshotP) { d =>
           val block = createGenesisWithStateHash(txs, txStateSnapshotActivated = true)
 
           block.header.stateHash shouldBe defined
@@ -123,7 +123,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       }
 
       "arbitrary block/microblock" in
-        withDomain(DomainPresets.TransactionStateSnapshot) { d =>
+        withDomain(DomainPresets.TransactionStateSnapshotP) { d =>
           val genesis = createGenesisWithStateHash(Seq(TxHelpers.genesis(TxHelpers.address(1))), txStateSnapshotActivated = true)
           d.appendBlock(genesis)
 
