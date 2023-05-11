@@ -59,13 +59,12 @@ object BalanceDistribution {
     override def computeNext(): (Address, Long) = findNextBalance() match {
       case Some(balance) => balance
       case None =>
-        if (pendingPortfolios.nonEmpty) {
-          val (key @ (address, _), balance) = pendingPortfolios.head
-          pendingPortfolios -= key
-          address -> balance
-        } else {
-          endOfData()
-        }
+        pendingPortfolios.headOption
+          .collect { case (key @ (address, `asset`), balance) =>
+            pendingPortfolios -= key
+            address -> balance
+          }
+          .getOrElse(endOfData())
     }
   }
 }
