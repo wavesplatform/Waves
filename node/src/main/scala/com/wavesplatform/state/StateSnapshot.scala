@@ -63,7 +63,7 @@ case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: Tran
       .map(ls =>
         ls.leaseId.toByteStr -> LeaseDetails(
           ls.sender.toPublicKey,
-          PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
+          PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
           ls.amount,
           ls.status match {
             case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>
@@ -108,7 +108,7 @@ case class StateSnapshot(transactions: Vector[NewTransactionInfo], current: Tran
   lazy val accountData: Map[Address, Map[String, DataEntry[?]]] =
     current.accountData.map { data =>
       val entries =
-        data.entry.map { pbEntry =>
+        data.entries.map { pbEntry =>
           val entry = PBTransactions.toVanillaDataEntry(pbEntry)
           entry.key -> entry
         }.toMap
@@ -159,7 +159,7 @@ object StateSnapshot {
         assetScripts(diff),
         aliases(diff),
         orderFills(diff, blockchain),
-        leaseStates(diff),
+        leaseStates(diff, blockchain),
         accountScripts(diff),
         accountData(diff),
         sponsorships(diff),
@@ -240,7 +240,7 @@ object StateSnapshot {
       S.OrderFill(orderId.toByteString, newVolume, newFee)
     }.toSeq
 
-  private def leaseStates(diff: Diff): Seq[S.LeaseState] =
+  private def leaseStates(diff: Diff, blockchain: Blockchain): Seq[S.LeaseState] =
     diff.leaseState.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, sourceId, height)) =>
       val pbStatus = status match {
         case Status.Active =>
@@ -255,7 +255,7 @@ object StateSnapshot {
         pbStatus,
         amount,
         sender.toByteString,
-        Some(PBRecipients.create(recipient)),
+        ByteString.copyFrom(blockchain.resolveAlias(recipient).explicitGet().bytes),
         sourceId.toByteString,
         height
       )
@@ -319,7 +319,7 @@ object StateSnapshot {
         val updatedS2 = s1.current.accountData.map(d1 =>
           s2.current.accountData
             .find(d2 => d1.address == d2.address)
-            .fold(d1)(d2 => d2.copy(entry = d1.entry.filterNot(e => d2.entry.exists(_.key == e.key)) ++ d2.entry))
+            .fold(d1)(d2 => d2.copy(entries = d1.entries.filterNot(e => d2.entries.exists(_.key == e.key)) ++ d2.entries))
         )
         updatedS2 ++ s2.current.accountData.filterNot(e => updatedS2.exists(_.address == e.address))
       }

@@ -97,7 +97,7 @@ object SnapshotOps {
           ls.leaseId.toByteStr ->
             LeaseDetails(
               PublicKey @@ ls.sender.toByteStr,
-              PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
+              PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
               ls.amount,
               ls.status match {
                 case S.LeaseState.Status.Cancelled(c) =>
@@ -140,7 +140,7 @@ object SnapshotOps {
 
     private def accountData: Map[Address, Map[String, DataEntry[_]]] =
       s.current.accountData
-        .map(data => data.address.toAddress -> data.entry.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap)
+        .map(data => data.address.toAddress -> data.entries.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap)
         .toMap
 
     private def sponsorships: Map[IssuedAsset, SponsorshipValue] =

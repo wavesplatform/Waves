@@ -494,7 +494,7 @@ class RocksDBWriter(
         val newDetails =
           LeaseDetails(
             PublicKey @@ ls.sender.toByteStr,
-            PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
+            PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
             ls.amount,
             ls.status match {
               case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>

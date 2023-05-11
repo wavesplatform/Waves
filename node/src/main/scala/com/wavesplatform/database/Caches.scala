@@ -295,7 +295,7 @@ abstract class Caches extends Blockchain with Storage {
 
     val updatedDataWithNodes = for {
       data    <- snapshot.accountData
-      pbEntry <- data.entry
+      pbEntry <- data.entries
     } yield {
       val address    = data.address.toAddress
       val entry      = PBTransactions.toVanillaDataEntry(pbEntry)
