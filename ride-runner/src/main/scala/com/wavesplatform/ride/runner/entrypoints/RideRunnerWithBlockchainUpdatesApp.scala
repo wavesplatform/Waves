@@ -132,14 +132,15 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     )
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
 
-    // TODO #100 Fix App with BlockchainUpdates
-    // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    // Await.result(requestService.runAll().runToFuture(rideScheduler), Duration.Inf)
-
     // TODO #100 Settings?
+    // Start from this height
     val lastSafeKnownHeight = Height(math.max(1, localOrNetworkHeightAtStart - 100 - 1)) // A rollback is not possible
-    val workingHeight       = Height(math.max(localOrNetworkHeightAtStart, networkHeightAtStart))
-    val endHeight           = Height(workingHeight + 1)                                  // 101 // lastHeightAtStart
+
+    // When to run scripts
+    val workingHeight = Height(math.max(localOrNetworkHeightAtStart, networkHeightAtStart))
+
+    // When to stop the app
+    val endHeight = Height(workingHeight + 1) // 101 // lastHeightAtStart
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
@@ -148,6 +149,8 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     }
 
     val processor = new BlockchainProcessor(sharedBlockchain, requestService)
+
+    val scriptsTask = Task.parTraverseUnordered(scripts)(requestService.trackAndRun)
     val events = blockchainUpdatesStream.downstream
       .doOnError(e =>
         Task {
@@ -164,18 +167,28 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
           false
       }
       .collect { case WrappedEvent.Next(event) => event }
-      .scan(BlockchainState.Starting(lastSafeKnownHeight, workingHeight): BlockchainState)(BlockchainState(processor, _, _))
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) { case (origState, evt) =>
+        val updatedState = BlockchainState(processor, origState, evt)
+        (origState, updatedState) match {
+          case (_: BlockchainState.Starting, _: BlockchainState.Working) => scriptsTask.runToFuture(rideScheduler)
+          case _                                                         =>
+        }
+        Task.now(updatedState)
+      }
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
     blockchainUpdatesStream.start(Height(lastSafeKnownHeight + 1), endHeight)
 
-    // TODO
-    val task = Task.parTraverseUnordered(scripts)(requestService.trackAndRun).runToFuture(rideScheduler)
-    Await.result(task, Duration.Inf)
-
-    log.info("Initialization completed")
     Await.result(events, Duration.Inf)
+    log.info("Running scripts...")
+
+    val task = scriptsTask.runToFuture(rideScheduler)
+    val resultsStr = Await
+      .result(task, Duration.Inf)
+      .map { r => s"${r.request.detailedLogPrefix}: status=${r.lastStatus}, result=${r.lastResult}" }
+      .mkString("\n")
+    log.info(s"Results:\n$resultsStr")
 
     log.info("Done")
     cs.forceStop()

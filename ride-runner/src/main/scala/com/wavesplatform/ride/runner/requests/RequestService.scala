@@ -14,12 +14,13 @@ import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
 import com.wavesplatform.ride.runner.storage.{CacheKey, SharedBlockchainStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{CancelableFuture, Scheduler}
 import play.api.libs.json.JsObject
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.Await
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters.SetHasAsScala
 
 trait RequestService extends AutoCloseable {
@@ -35,7 +36,8 @@ class DefaultRequestService(
     runScriptScheduler: Scheduler
 ) extends RequestService
     with ScorexLogging {
-  private val isWorking = new AtomicBoolean(true)
+  private val isWorking           = new AtomicBoolean(true)
+  @volatile private var queueTask = CancelableFuture.unit
 
   private val ignoredRequests = ConcurrentHashMap.newKeySet[RideScriptRunRequest]()
 
@@ -70,51 +72,46 @@ class DefaultRequestService(
 
   private val currJobs = new ConcurrentHashMap[RideScriptRunRequest, RequestJob]()
 
-  override def start(): Unit = {
-    val task =
-      if (!isWorking.get()) Task.unit
-      else {
-        log.info("Starting...")
-        requestScheduler.jobs
-          .takeWhile(_ => isWorking.get())
-          .filterNot(isIgnored)
-          .mapParallelUnordered(settings.parallelization) { request =>
-            if (createJob(request).inProgress) Task.unit
-            else
-              Option(currJobs.computeIfPresent(request, (_, x) => x.proceed())) match {
-                case Some(updated) =>
-                  if (updated.isAvailable) {
-                    // We don't need to cache an empty value, so we use getOrElse here
-                    val origEnv = Option(requests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
-                    runOne(origEnv).tapEval { r =>
-                      Task {
-                        requests.put(r.request, r)
-                        updated.result.trySuccess(r)
-                        Option(currJobs.remove(request)).foreach(_.timer.stop())
-                      }
-                    }
-                  } else {
-                    log.info(s"$request is already running")
-                    requestScheduler.add(request) // A job is being processed now, but it can use stale data
-                    Task.unit
+  override def start(): Unit = if (isWorking.get()) {
+    log.info("Starting queue...")
+    queueTask = requestScheduler.jobs
+      .takeWhile(_ => isWorking.get())
+      .filterNot(isIgnored)
+      .mapParallelUnordered(settings.parallelization) { request =>
+        log.debug(s"Processing ${request.shortLogPrefix}")
+        if (createJob(request).inProgress) Task.unit
+        else
+          Option(currJobs.computeIfPresent(request, (_, x) => x.proceed())) match {
+            case Some(updated) =>
+              if (updated.isAvailable) {
+                // We don't need to cache an empty value, so we use getOrElse here
+                val origEnv = Option(requests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
+                runOne(origEnv).tapEval { r =>
+                  Task {
+                    requests.put(r.request, r)
+                    updated.result.trySuccess(r)
+                    Option(currJobs.remove(request)).foreach(_.timer.stop())
                   }
-
-                case _ => Task.unit
+                }
+              } else {
+                log.info(s"$request is already running")
+                requestScheduler.add(request) // A job is being processed now, but it can use stale data
+                Task.unit
               }
-          }
-          .logErr
-          .lastL
-          .as(())
-      }
 
-    // TODO cancel?
-    task.runToFuture(runScriptScheduler)
+            case _ => Task.unit
+          }
+      }
+      .logErr
+      .lastL
+      .as(())
+      .runToFuture(runScriptScheduler)
   }
 
-  override def close(): Unit = {
-    isWorking.set(false)
+  override def close(): Unit = if (isWorking.compareAndSet(true, false)) {
+    queueTask.cancel()
+    Await.ready(queueTask, 5.seconds) // Enough to complete all tasks
     requestScheduler.close()
-//    Await.result(currTask)
   }
 
   override def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit = {
@@ -206,7 +203,7 @@ class DefaultRequestService(
   private def evaluate(prevResult: RideScriptRunResult): (Option[Evaluation], JsObject) = {
     val (evaluation, failJson) =
       if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
-      else // TODO: is the latest version okay here?
+      else // Note: the latest version here for simplicity
         UtilsEvaluator.Evaluation(StdLibVersion.VersionDic.latest, prevResult.request.address, prevResult.request.requestBody) match {
           case Right(x) => (Some(x), JsObject.empty)
           case Left(e)  => (None, UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize))
