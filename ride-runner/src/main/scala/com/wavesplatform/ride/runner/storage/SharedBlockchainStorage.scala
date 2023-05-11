@@ -30,6 +30,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.openjdk.jol.info.GraphLayout
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT] private (
@@ -184,7 +185,7 @@ class SharedBlockchainStorage[TagT] private (
               }
         }
 
-      case _ => ???
+      case CacheKey.Height => RemoteData.loaded(Some(height)) // TODO remove this
     }
 
     // TODO types!
@@ -197,18 +198,6 @@ class SharedBlockchainStorage[TagT] private (
 
   private val conv = new GrpcCacheKeyConverters(chainId)
 
-//  val data = new AccountDataStorage[TagT](settings.caches.accountData, chainId, blockchainApi, persistentCaches.accountDataEntries)
-
-//  val accountScripts = new AccountScriptStorage[TagT](
-//    ExactWithHeightStorage.Settings(1000),
-//    chainId,
-//    script => Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, script, isAsset = false)),
-//    blockchainApi,
-//    persistentCaches.accountScripts
-//  )
-
-  val heightTagged = new HeightTagsStorage[TagT](heightUntagged)
-
   def height: Int = heightUntagged
 
   // Ride: wavesBalance, height, lastBlock
@@ -220,43 +209,26 @@ class SharedBlockchainStorage[TagT] private (
       blockHeaders.getLocal(height).map(_.header.id() == id)
     }
 
-  // TODO Get from blockchain updates, var
-  private lazy val activatedFeatures_ =
-    load[Unit, Map[Short, Height]](
-      _ => persistentCaches.getActivatedFeatures(),
-      _ => blockchainApi.getActivatedFeatures(heightUntagged).some,
-      (_, xs) => xs.mayBeValue.foreach(persistentCaches.setActivatedFeatures)
-    )(())
+  private val activatedFeatures_ = new AtomicReference(
+    persistentCaches
+      .getActivatedFeatures()
+      .orElse(RemoteData.loaded(blockchainApi.getActivatedFeatures(heightUntagged).tap(persistentCaches.setActivatedFeatures)))
+      .mayBeValue
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
+  )
 
-  def activatedFeatures = activatedFeatures_
+  private def updateFeatures(xs: Map[Short, Height]): Unit = {
+    activatedFeatures_.set(xs)
+    persistentCaches.setActivatedFeatures(xs)
+  }
 
-//  val assets = new AssetStorage[TagT](ExactWithHeightStorage.Settings(1000), blockchainApi, persistentCaches.assetDescriptions)
-
-//  val aliases = new AliasStorage[TagT](ExactWithHeightStorage.Settings(1000), chainId, blockchainApi, persistentCaches.aliases)
+  def activatedFeatures = activatedFeatures_.get()
 
   def resolveAlias(a: Alias): Either[ValidationError, Address] =
     getOrFetch(CacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
 
-//  val accountBalances =
-//    new AccountBalanceStorage[TagT](ExactWithHeightStorage.Settings(1000), chainId, blockchainApi, persistentCaches.accountBalances)
-
-//  val accountLeaseBalances =
-//    new AccountLeaseBalanceStorage[TagT](ExactWithHeightStorage.Settings(1000), chainId, blockchainApi, persistentCaches.accountLeaseBalances)
-
-//  val transactions = new TransactionStorage[TagT](ExactWithHeightStorage.Settings(1000), blockchainApi, persistentCaches.transactions)
-
   private def estimator: ScriptEstimator =
     EstimatorProvider.byActivatedFeatures(blockchainSettings.functionalitySettings, activatedFeatures, heightUntagged)
-
-  private def load[KeyT, ValueT](
-      fromCache: KeyT => RemoteData[ValueT],
-      fromBlockchain: KeyT => Option[ValueT],
-      updateCache: (KeyT, RemoteData[ValueT]) => Unit
-  )(key: KeyT): Option[ValueT] =
-    fromCache(key)
-      .orElse(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
-      .mayBeValue
 
   def removeAllFrom(height: Height): Unit = db.readWrite { implicit ctx =>
     blockHeaders
@@ -290,6 +262,9 @@ class SharedBlockchainStorage[TagT] private (
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed transactions: $x") }
       .foreach(x => commonCache.remove(CacheKey.Transaction(x)))
+
+    val filteredFeatures = activatedFeatures.filterNot { case (_, featureHeight) => featureHeight >= height }
+    if (filteredFeatures.size != activatedFeatures.size) updateFeatures(filteredFeatures)
   }
 
   private val empty = AffectedTags[TagT](Set.empty)
@@ -315,6 +290,9 @@ class SharedBlockchainStorage[TagT] private (
       case Body.MicroBlock(microBlock) => (empty, microBlock.getMicroBlock.getMicroBlock.transactions, RideRunnerStats.microBlockProcessingTime.some)
       case Body.Empty                  => (empty, Seq.empty, none)
     }
+
+    if (evt.getBlock.activatedFeatures.nonEmpty)
+      updateFeatures(activatedFeatures ++ evt.getBlock.activatedFeatures.map(featureId => featureId.toShort -> atHeight))
 
     timer.fold(empty) { timer =>
       timer.measure {

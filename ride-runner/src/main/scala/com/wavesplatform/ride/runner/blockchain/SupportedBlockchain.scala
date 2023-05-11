@@ -87,8 +87,7 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
-  // GET /eth/assets
-  // TODO #99 see Keys.assetStaticInfo
+  // Not needed for now
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
 
   private def kill(methodName: String) = throw new RuntimeException(s"$methodName is not supported, contact with developers")

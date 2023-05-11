@@ -46,6 +46,34 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               allDataIsCachedCheck(access)
             }
           }.runTest()
+
+          "updates activated features" in withDb { db =>
+            db.readWrite { implicit rw =>
+              val blockchain = SharedBlockchainStorage[Tag](
+                settings = SharedBlockchainStorage.Settings(
+                  blockchain = DefaultBlockchainSettings,
+                  commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+                ),
+                db = db,
+                persistentCaches = DefaultPersistentCaches(db),
+                blockchainApi = testBlockchainApi
+              )
+
+              blockchain.activatedFeatures shouldBe DefaultBlockchainSettings.functionalitySettings.preActivatedFeatures
+
+              val newFeatureId = Short.MaxValue
+              blockchain.process(
+                mkBlockAppendEvent(
+                  height = 1,
+                  forkNumber = 1,
+                  modAppend = x => x.withBlock(x.getBlock.copy(activatedFeatures = Seq(newFeatureId)))
+                )
+              )
+
+              blockchain.activatedFeatures shouldBe DefaultBlockchainSettings.functionalitySettings.preActivatedFeatures
+                .updated(newFeatureId, 1)
+            }
+          }
         }
 
         "micro block" - {
