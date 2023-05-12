@@ -144,7 +144,10 @@ class DefaultBlockchainApi(
           ActivationStatusRequest(height)
         )
     }.features
-      .map(x => x.id.toShort -> Height(x.activationHeight)) // TODO #3 is this correct?
+      .flatMap { x =>
+        if (x.blockchainStatus.isActivated) (x.id.toShort -> Height(x.activationHeight)).some
+        else none
+      }
       .toMap
       .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
