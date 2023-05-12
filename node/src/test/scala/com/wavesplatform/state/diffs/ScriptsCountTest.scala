@@ -58,7 +58,8 @@ object ScriptsCountTest {
 //noinspection NameBooleanParameters
 class ScriptsCountTest extends PropSpec with WithState with Inside {
 
-  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
+  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+    Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
       BlockchainFeatures.SmartAccountTrading.id -> 0,
@@ -67,9 +68,11 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
       BlockchainFeatures.Ride4DApps.id          -> Int.MaxValue
-    ))
+    )
+  )
 
-  private val fs1 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
+  private val fs1 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+    Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
       BlockchainFeatures.SmartAccountTrading.id -> 0,
@@ -78,27 +81,29 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       BlockchainFeatures.MassTransfer.id        -> 0,
       BlockchainFeatures.FeeSponsorship.id      -> 0,
       BlockchainFeatures.Ride4DApps.id          -> 0
-    ))
+    )
+  )
 
   val allAllowed: Script = ExprScript(TRUE).explicitGet()
 
   property("check pre-Ride4DApps scripts run count") {
     val (genesis, txs) = preconditions
 
-    assertDiffAndState(Nil, TestBlock.create(Seq(genesis)), fs) {
-      case (_, state) =>
-        txs.foldLeft(Diff.empty) { (diff, tx) =>
-          val newState = CompositeBlockchain(state, diff)
-          val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
-          val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
-          if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
-          diff.combineF(newDiff).explicitGet()
-        }
+    assertDiffAndState(Nil, TestBlock.create(Seq(genesis)), fs) { case (_, state) =>
+      txs.foldLeft(Diff.empty) { (diff, tx) =>
+        val newState = CompositeBlockchain(state, diff)
+        val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
+        val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
+        if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
+        diff.combineF(newDiff).explicitGet()
+      }
     }
 
-    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(txs), fs) {
-      case (blockDiff, _) =>
-        blockDiff.scriptsRun shouldBe 26
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(txs), fs) { case (blockDiff, _) =>
+      // blockDiff.scriptsRun shouldBe 26 — unsupported for snapshot
+      blockDiff.scriptsComplexity shouldBe (Script
+        .estimate(allAllowed, ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
+        .explicitGet() * 31)
     }
   }
 
@@ -109,10 +114,11 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       Seq(TestBlock.create(Seq(genesis))),
       TestBlock.create(txs),
       fs1
-    ) {
-      case (blockDiff, _) =>
-        blockDiff.scriptsRun shouldBe 31
-        blockDiff.scriptsComplexity shouldBe (Script.estimate(allAllowed, ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false).explicitGet() * 31)
+    ) { case (blockDiff, _) =>
+      // blockDiff.scriptsRun shouldBe 31 — unsupported for snapshot
+      blockDiff.scriptsComplexity shouldBe (Script
+        .estimate(allAllowed, ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
+        .explicitGet() * 31)
     }
   }
 

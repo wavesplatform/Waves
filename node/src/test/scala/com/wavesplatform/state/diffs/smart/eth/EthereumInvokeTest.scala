@@ -13,10 +13,10 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
+import com.wavesplatform.state.{InvokeScriptResult, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
@@ -24,8 +24,9 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
+import org.scalatest.Inside
 
-class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
+class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with Inside {
   import DomainPresets.*
 
   private val time = new TestTime
@@ -153,7 +154,15 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
       val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
       d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio
       d.liquidDiff.portfolios(ethInvoke.senderAddress()) shouldBe Portfolio(-ethInvoke.underlying.getGasPrice.longValue()).minus(assetsPortfolio)
-      d.liquidDiff.scriptsRun shouldBe paymentCount + 1 + (if (syncCall) 1 else 0)
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
+        if (syncCall)
+          inside(sync1.invokes) { case Seq(sync2) =>
+            sync2.stateChanges.error shouldBe empty
+            sync2.stateChanges.invokes shouldBe empty
+          }
+        else
+          sync1.invokes shouldBe empty
+      }
     }
   }
 

@@ -137,7 +137,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
     val BlockDiffer.Result(snapshot, fees, totalFee, _, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
     val ngState = NgState(block, snapshot, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
     val cb      = SnapshotBlockchain(state, ngState)
-    val diff    = snapshot.toDiff
+    val diff    = snapshot.toDiff(state)
     assertion(diff, cb)
 
     state.append(snapshot, fees, totalFee, None, block.header.generationSignature, block)

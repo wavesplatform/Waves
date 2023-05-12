@@ -5,11 +5,13 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
+
+import scala.collection.immutable.VectorMap
 
 class InvokeFeeTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -71,9 +73,8 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       val transferTx = transfer(issuer, invoker.toAddress, asset = asset)
       d.appendBlock(issueTx, sponsorTx, transferTx, setScript(dAppAcc, dApp))
       d.appendAndAssertFailed(invoke(invoker = invoker, dApp = dAppAcc.toAddress, fee = invokeFee / coeff, feeAssetId = asset))
-      d.liquidDiff.portfolios(invoker.toAddress).assets(asset) shouldBe transferTx.amount.value - invokeFee / coeff
-      d.liquidDiff.portfolios(issuer.toAddress).assets(asset) shouldBe issueTx.quantity.value - transferTx.amount.value + invokeFee / coeff
-      d.liquidDiff.portfolios(issuer.toAddress).balance shouldBe ENOUGH_AMT - issueTx.fee.value - sponsorTx.fee.value - transferTx.fee.value - invokeFee
+      d.liquidDiff.portfolios(invoker.toAddress) shouldBe Portfolio.build(asset, -invokeFee / coeff)
+      d.liquidDiff.portfolios(issuer.toAddress) shouldBe Portfolio(-invokeFee, assets = VectorMap(asset -> invokeFee / coeff))
       d.liquidDiff.portfolios.get(dAppAcc.toAddress) shouldBe None
     }
   }

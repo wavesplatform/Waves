@@ -30,7 +30,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
       }
 
       val BlockDiffer.Result(diff, _, _, _, detailedDiff, _) = differ(state, preconditions.lastOption, block).explicitGet()
-      assertion(diff.toDiff, detailedDiff)
+      assertion(diff.toDiff(state), detailedDiff)
     }
 
   "BlockDiffer DetailedDiff" - {

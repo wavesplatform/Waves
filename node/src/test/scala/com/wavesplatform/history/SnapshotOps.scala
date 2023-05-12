@@ -19,10 +19,10 @@ object SnapshotOps {
   implicit class TransactionStateSnapshotExt(val s: StateSnapshot) extends AnyVal {
     import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
-    def toDiff: Diff =
+    def toDiff(blockchain: Blockchain): Diff =
       Diff.withTransactions(
         s.transactions,
-        portfolios,
+        portfolios(blockchain),
         issuedAssets,
         updatedAssets,
         aliases,
@@ -38,23 +38,27 @@ object SnapshotOps {
         ethereumTransactionMeta
       )
 
-    private def portfolios: Map[Address, Portfolio] =
-      Diff.combine(balancePortfolios, leasePortfolios).explicitGet()
+    private def portfolios(blockchain: Blockchain): Map[Address, Portfolio] =
+      Diff.combine(balancePortfolios(blockchain), leasePortfolios(blockchain)).explicitGet()
 
-    private def balancePortfolios: Map[Address, Portfolio] =
+    private def balancePortfolios(blockchain: Blockchain): Map[Address, Portfolio] =
       s.current.balances
         .foldLeft(Map[Address, Portfolio]()) { (portfolios, nextBalance) =>
           val asset =
             if (nextBalance.getAmount.assetId.isEmpty) Waves
             else nextBalance.getAmount.assetId.toAssetId
-          val portfolio = Portfolio.build(asset, nextBalance.getAmount.amount)
           val address   = nextBalance.address.toAddress
+          val portfolio = Portfolio.build(asset, nextBalance.getAmount.amount - blockchain.balance(address, asset))
           Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
         }
 
-    private def leasePortfolios: Map[Address, Portfolio] =
+    private def leasePortfolios(blockchain: Blockchain): Map[Address, Portfolio] =
       s.current.leaseBalances
-        .map(b => b.address.toAddress -> Portfolio(lease = LeaseBalance(in = b.in, out = b.out)))
+        .map {
+          current =>
+            val init = blockchain.leaseBalance(current.address.toAddress)
+            current.address.toAddress -> Portfolio(lease = LeaseBalance(in = current.in - init.in, out = current.out - init.out))
+        }
         .toMap
 
     private def issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] =

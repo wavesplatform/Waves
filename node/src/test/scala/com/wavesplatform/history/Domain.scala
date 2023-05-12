@@ -141,7 +141,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidSnapshot.orEmpty.toDiff
+    blockchainUpdater.bestLiquidSnapshot.orEmpty.toDiff(rocksDBWriter)
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 

@@ -18,13 +18,15 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, TxHelpers}
+import org.scalatest.Inside
 
-class SyncDAppTransferTest extends PropSpec with WithDomain {
+class SyncDAppTransferTest extends PropSpec with WithDomain with Inside {
 
   property("negative transfer amount") {
     for {
@@ -124,7 +126,12 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      blockDiff.scriptsRun shouldBe 2
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
+        inside(sync1.invokes) { case Seq(sync2) =>
+          sync2.stateChanges.error shouldBe empty
+          sync2.stateChanges.invokes shouldBe empty
+        }
+      }
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
       blockDiff.portfolios(senderDApp.toAddress).balance shouldBe -transferAmount
       blockDiff.transaction(invoke.id()) shouldBe defined
@@ -149,7 +156,12 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      blockDiff.scriptsRun shouldBe 2
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
+        inside(sync1.invokes) { case Seq(sync2) =>
+          sync2.stateChanges.error shouldBe empty
+          sync2.stateChanges.invokes shouldBe empty
+        }
+      }
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
       blockDiff.portfolios(senderDApp.toAddress).balance shouldBe -transferAmount
       blockDiff.transaction(invoke.id()) shouldBe defined
@@ -193,7 +205,12 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      blockDiff.scriptsRun shouldBe 2
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
+        inside(sync1.invokes) { case Seq(sync2) =>
+          sync2.stateChanges.error shouldBe empty
+          sync2.stateChanges.invokes shouldBe empty
+        }
+      }
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
       blockDiff.portfolios(invokerDApp.toAddress).balance shouldBe -transferAmount
       blockDiff.transaction(invoke.id()) shouldBe defined

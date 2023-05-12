@@ -104,7 +104,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
 
         if (version >= V6) {
           d.appendBlock(setVerifier()) // just for account script execution
-          d.liquidDiff.scriptsRun shouldBe 1
+          d.liquidDiff.scriptsComplexity should be > 0L
         } else if (version >= V3) {
           (the[Exception] thrownBy d.appendBlock(setVerifier())).getMessage should include(
             "value() called on unit value on function 'transferTransactionById' call"

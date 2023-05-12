@@ -73,7 +73,6 @@ class SyncInvokeFailAndRejectTest extends PropSpec with WithDomain {
       d.appendBlock(leaseTx, dataTx)
       d.appendBlock(setScript(dApp1Signer, dApp1))
       d.appendBlock(setScript(dApp2Signer, dApp2))
-      val snapshotBeforeInvoke = d.liquidDiff.portfolios(defaultAddress)
       d.appendBlock(invokeTx)
       d.blockchain.transactionInfo(invokeTx.id()).get._1.succeeded shouldBe false
       d.liquidDiff.sponsorship shouldBe Map()
@@ -87,8 +86,8 @@ class SyncInvokeFailAndRejectTest extends PropSpec with WithDomain {
         val setScriptFee        = FeeConstants(TransactionType.SetScript) * FeeUnit
         val previousBlockReward = (0.6 * setScriptFee).toLong
         val currentBlockReward  = (0.4 * invokeFee).toLong
-        val balanceDiff         = reward + previousBlockReward + currentBlockReward - invokeFee
-        Map(defaultAddress -> Portfolio.waves(balanceDiff + snapshotBeforeInvoke.balance))
+        val total               = reward + previousBlockReward + currentBlockReward - invokeFee
+        Map(defaultAddress -> Portfolio.waves(total))
       }
     }
   }
