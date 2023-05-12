@@ -112,10 +112,10 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
       case (diff, _) =>
         diff.errorMessage(invoke.id()) shouldBe None
         diff.scriptsComplexity shouldBe 108
-        inside(diff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
-          inside(sync1.invokes) { case Seq(sync2) =>
-            sync2.stateChanges.error shouldBe empty
-            sync2.stateChanges.invokes shouldBe empty
+        inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+          inside(call1.invokes) { case Seq(call2) =>
+            call2.stateChanges.error shouldBe empty
+            call2.stateChanges.invokes shouldBe empty
           }
         }
     }

@@ -149,10 +149,10 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
       d.appendBlock(invoke)
 
       d.liquidDiff.errorMessage(invoke.id()) shouldBe None
-      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
-        inside(sync1.invokes) { case Seq(sync2) =>
-          sync2.stateChanges.error shouldBe empty
-          sync2.stateChanges.invokes shouldBe empty
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
         }
       }
       d.liquidDiff.accountData.head._2("key").value shouldBe 1

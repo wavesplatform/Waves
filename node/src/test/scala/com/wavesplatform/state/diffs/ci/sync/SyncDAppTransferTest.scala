@@ -126,10 +126,10 @@ class SyncDAppTransferTest extends PropSpec with WithDomain with Inside {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      inside(blockDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
-        inside(sync1.invokes) { case Seq(sync2) =>
-          sync2.stateChanges.error shouldBe empty
-          sync2.stateChanges.invokes shouldBe empty
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
         }
       }
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
@@ -156,10 +156,10 @@ class SyncDAppTransferTest extends PropSpec with WithDomain with Inside {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      inside(blockDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
-        inside(sync1.invokes) { case Seq(sync2) =>
-          sync2.stateChanges.error shouldBe empty
-          sync2.stateChanges.invokes shouldBe empty
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
         }
       }
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
@@ -205,10 +205,10 @@ class SyncDAppTransferTest extends PropSpec with WithDomain with Inside {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      inside(blockDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
-        inside(sync1.invokes) { case Seq(sync2) =>
-          sync2.stateChanges.error shouldBe empty
-          sync2.stateChanges.invokes shouldBe empty
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
         }
       }
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount

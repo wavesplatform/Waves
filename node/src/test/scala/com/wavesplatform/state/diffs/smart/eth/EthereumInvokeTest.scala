@@ -13,10 +13,10 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
-import com.wavesplatform.state.{InvokeScriptResult, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
@@ -154,14 +154,14 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
       val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
       d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio
       d.liquidDiff.portfolios(ethInvoke.senderAddress()) shouldBe Portfolio(-ethInvoke.underlying.getGasPrice.longValue()).minus(assetsPortfolio)
-      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
         if (syncCall)
-          inside(sync1.invokes) { case Seq(sync2) =>
-            sync2.stateChanges.error shouldBe empty
-            sync2.stateChanges.invokes shouldBe empty
+          inside(call1.invokes) { case Seq(call2) =>
+            call2.stateChanges.error shouldBe empty
+            call2.stateChanges.invokes shouldBe empty
           }
         else
-          sync1.invokes shouldBe empty
+          call1.invokes shouldBe empty
       }
     }
   }
