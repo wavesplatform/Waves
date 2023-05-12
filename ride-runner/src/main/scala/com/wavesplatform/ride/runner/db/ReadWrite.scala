@@ -2,33 +2,19 @@ package com.wavesplatform.ride.runner.db
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.database.rocksdb.Key
-import com.wavesplatform.database.rocksdb.stats.RocksDBStats
-import com.wavesplatform.database.rocksdb.stats.RocksDBStats.DbHistogramExt
 import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtRollback}
 import com.wavesplatform.ride.runner.storage.RemoteData
 import com.wavesplatform.ride.runner.storage.persistent.KvPair
 import com.wavesplatform.state.Height
-import com.wavesplatform.utils.OptimisticLockable
-import org.rocksdb.*
 
 import scala.collection.mutable
 
-class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteBatch) extends ReadOnly(db, readOptions) with OptimisticLockable {
-  def put[V](key: Key[V], value: V): Int = {
-    val bytes = key.encode(value)
-    RocksDBStats.write.recordTagged(key, bytes)
-    batch.use(_.put(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes, bytes))
-    bytes.length
-  }
-
-  def put(key: Array[Byte], value: Array[Byte]): Unit = batch.use(_.put(key, value))
-
-  def update[V](key: Key[V], default: => V)(f: V => V): Unit = put(key, f(getOpt(key).getOrElse(default)))
-
-  def delete(key: Array[Byte]): Unit = batch.use(_.delete(key))
-
-  def delete[V](key: Key[V]): Unit =
-    batch.use(_.delete(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes))
+trait ReadWrite extends ReadOnly {
+  def put[V](key: Key[V], value: V): Int
+  def put(key: Array[Byte], value: Array[Byte]): Unit
+  def update[V](key: Key[V], default: => V)(f: V => V): Unit
+  def delete(key: Array[Byte]): Unit
+  def delete[V](key: Key[V]): Unit
 
   def writeToDb[T](key: Key[Option[T]], data: RemoteData[T]): Unit =
     if (data.loaded) put(key, data.mayBeValue)
@@ -114,21 +100,21 @@ class ReadWrite(db: RocksDB, readOptions: ReadOptions, batch: SynchronizedWriteB
       historyKey: KvPair[K, Heights],
       entriesKey: KvPair[(Height, K), V],
       fromHeight: Height
-  )(implicit ctx: ReadWrite): List[K] = {
+  ): List[K] = {
     val affectedEntryKeys = mutable.Set.empty[K]
 
     // TODO #123 Use deleteRange
-    ctx.iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
+    iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)
       val (_, key)      = keyWithHeight
-      ctx.delete(rawKey)
+      delete(rawKey)
 
       affectedEntryKeys.add(key)
     }
 
     affectedEntryKeys.foreach { k =>
-      ctx.update(historyKey.at(k), EmptyHeights)(_.dropWhile(_ >= fromHeight))
+      update(historyKey.at(k), EmptyHeights)(_.dropWhile(_ >= fromHeight))
     }
 
     affectedEntryKeys.toList

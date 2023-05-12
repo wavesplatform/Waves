@@ -31,7 +31,7 @@ class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheWithHist
   )
 
   protected override def test(f: (RideDbAccess, PersistentCache[Asset.IssuedAsset, WeighedAssetDescription]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
+    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.assetDescriptions)
   }
 

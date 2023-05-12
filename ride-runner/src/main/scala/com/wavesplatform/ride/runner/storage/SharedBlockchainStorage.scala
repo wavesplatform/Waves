@@ -72,19 +72,16 @@ class SharedBlockchainStorage[TagT] private (
 
   private val commonCache = new CommonCache(settings.commonCache)
 
-  def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.readWrite { implicit ctx =>
+  def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.directReadWrite { implicit ctx =>
     blockHeaders.getOrFetch(atHeight)
   }
 
   // Only for tests
   def getCached[T <: CacheKey](key: T): RemoteData[T#ValueT] = commonCache.get(key)
 
-  def getOrFetch[T <: CacheKey](key: T): Option[T#ValueT] = db.readWrite { implicit ctx =>
-    getOrFetch(heightUntagged, key)
+  def getOrFetch[T <: CacheKey](key: T): Option[T#ValueT] = db.directReadWrite { implicit ctx =>
+    getLatestInternal(heightUntagged, key)
   }
-
-  private def getOrFetch[T <: CacheKey](atMaxHeight: Height, key: T)(implicit ctx: ReadWrite): Option[T#ValueT] =
-    getLatestInternal(atMaxHeight, key)
 
   private def getLatestInternal[T <: CacheKey](atMaxHeight: Height, key: T)(implicit ctx: ReadWrite): Option[T#ValueT] = {
     val r = key match {
@@ -205,7 +202,7 @@ class SharedBlockchainStorage[TagT] private (
   def heightUntagged: Height            = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
-    db.readWrite { implicit ctx =>
+    db.directReadWrite { implicit ctx =>
       blockHeaders.getLocal(height).map(_.header.id() == id)
     }
 
@@ -230,7 +227,7 @@ class SharedBlockchainStorage[TagT] private (
   private def estimator: ScriptEstimator =
     EstimatorProvider.byActivatedFeatures(blockchainSettings.functionalitySettings, activatedFeatures, heightUntagged)
 
-  def removeAllFrom(height: Height): Unit = db.readWrite { implicit ctx =>
+  def removeAllFrom(height: Height): Unit = db.batchedReadWrite { implicit ctx =>
     blockHeaders
       .removeFrom(height)
 //      .tap { x => log.trace(s"removedBlocks: $x") }
@@ -269,7 +266,7 @@ class SharedBlockchainStorage[TagT] private (
 
   private val empty = AffectedTags[TagT](Set.empty)
   def process(event: BlockchainUpdated): AffectedTags[TagT] =
-    db.readWrite { implicit ctx =>
+    db.batchedReadWrite { implicit ctx =>
       val toHeight = Height(event.height)
       val affected = event.update match {
         case Update.Empty         => empty // Ignore
@@ -436,7 +433,7 @@ class SharedBlockchainStorage[TagT] private (
         }
     }
 
-  def undo(events: List[BlockchainUpdated]): AffectedTags[TagT] = db.readWrite { implicit ctx =>
+  def undo(events: List[BlockchainUpdated]): AffectedTags[TagT] = db.batchedReadWrite { implicit ctx =>
     val filteredEvents = events.collect { case x if x.update.isAppend => x }
     filteredEvents match {
       case last :: _ =>

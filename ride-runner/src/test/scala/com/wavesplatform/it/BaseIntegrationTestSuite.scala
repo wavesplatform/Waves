@@ -60,7 +60,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
 
     val testDb = use(TestDb.mk())
-    val sharedBlockchain = testDb.storage.readWrite { implicit ctx =>
+    val sharedBlockchain = testDb.storage.batchedReadWrite { implicit ctx =>
       SharedBlockchainStorage[RideScriptRunRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,

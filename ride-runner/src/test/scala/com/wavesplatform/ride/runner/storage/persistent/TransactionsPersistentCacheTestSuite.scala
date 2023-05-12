@@ -14,21 +14,21 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
   "TransactionsPersistentCache" - {
     "set and get" - {
       "last set wins" in test { (db, cache) =>
-        db.readWrite { implicit ctx =>
+        db.batchedReadWrite { implicit ctx =>
           cache.setHeight(defaultTxId, defaultCachedValue)
         }
 
-        db.readWrite { implicit ctx =>
+        db.batchedReadWrite { implicit ctx =>
           cache.setHeight(defaultTxId, RemoteData.Absence)
         }
 
-        db.readOnly { implicit ctx =>
+        db.batchedReadOnly { implicit ctx =>
           cache.getHeight(defaultTxId) shouldBe RemoteData.Absence
         }
       }
 
       "unknown on empty" in test { (db, cache) =>
-        db.readOnly { implicit ctx =>
+        db.batchedReadOnly { implicit ctx =>
           cache.getHeight(defaultTxId) shouldBe RemoteData.Unknown
         }
       }
@@ -38,17 +38,17 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
       val tx1 = mkTxId(1)
       val tx2 = mkTxId(2)
 
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.setHeight(defaultTxId, RemoteData.Cached(Height(1)))
         cache.setHeight(tx1, RemoteData.Cached(Height(3)))
       // TODO #121 move tx2 here
       }
 
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.setHeight(tx2, RemoteData.Cached(Height(3)))
       }
 
-      db.readOnly { implicit ctx =>
+      db.batchedReadOnly { implicit ctx =>
         withClue("from 1") { cache.getAllKeys(Height(1)) should contain theSameElementsAs List(defaultTxId, tx1, tx2) }
         withClue("from 2") { cache.getAllKeys(Height(2)) should contain theSameElementsAs List(tx1, tx2) }
       }
@@ -58,21 +58,21 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
       val tx1 = mkTxId(1)
       val tx2 = mkTxId(2)
 
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.setHeight(defaultTxId, RemoteData.Cached(Height(1)))
         cache.setHeight(tx1, RemoteData.Cached(Height(3)))
       // TODO #121 move tx2 here
       }
 
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.setHeight(tx2, RemoteData.Cached(Height(3)))
       }
 
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.removeAllFrom(Height(2)) should contain theSameElementsAs List(tx1, tx2)
       }
 
-      db.readOnly { implicit ctx =>
+      db.batchedReadOnly { implicit ctx =>
         cache.getHeight(defaultTxId) shouldBe RemoteData.Cached(Height(1))
         cache.getHeight(tx1) shouldBe RemoteData.Unknown
         cache.getHeight(tx2) shouldBe RemoteData.Unknown
@@ -85,7 +85,7 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
   private def mkTxId(n: Byte) = TransactionId(ByteStr(Array.fill[Byte](DigestLength)(n)))
 
   private def test(f: (RideDbAccess, TransactionPersistentCache) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
+    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.transactions)
   }
 }

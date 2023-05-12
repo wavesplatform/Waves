@@ -8,60 +8,60 @@ abstract class PersistentCacheWithHistoryTestSuite[KeyT, ValueT] extends Persist
   s"$testedClassName" - {
     "history" - {
       "empty" in test { (db, _) =>
-        db.readOnly { implicit ctx =>
+        db.batchedReadOnly { implicit ctx =>
           getHistory shouldBe empty
         }
       }
 
       "after set" in test { (db, cache) =>
-        db.readWrite { implicit ctx =>
+        db.batchedReadWrite { implicit ctx =>
           cache.set(Height(9), defaultKey, RemoteData.Absence)
         }
 
-        db.readOnly { implicit ctx =>
+        db.batchedReadOnly { implicit ctx =>
           getHistory shouldBe Vector(9)
         }
       }
 
       def removeTests(removeF: (ReadWrite, PersistentCache[KeyT, ValueT], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(8))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe empty
           }
         }
 
         "same height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(9))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe empty
           }
         }
 
         "greater height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(10))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe Vector(9)
           }
         }
@@ -77,12 +77,12 @@ abstract class PersistentCacheWithHistoryTestSuite[KeyT, ValueT] extends Persist
 
       "keeps a number of records limited by a maximum possible rollback" in test { (db, cache) =>
         (2 to 104 by 2).foreach { h =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(h), defaultKey, RemoteData.Cached(defaultValue))
           }
         }
 
-        db.readWrite { implicit ctx =>
+        db.batchedReadWrite { implicit ctx =>
           (2 to 3).foreach { h =>
             cache.get(Height(h), defaultKey) shouldBe RemoteData.Unknown
           }

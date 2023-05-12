@@ -10,21 +10,21 @@ import com.wavesplatform.state.Height
 class BlockPersistentCacheTestSuite extends PersistentTestSuite {
   "BlockPersistentCache" - {
     "get on empty return None" in test { (db, cache) =>
-      db.readOnly { implicit ctx =>
+      db.batchedReadOnly { implicit ctx =>
         cache.get(Height(1)) shouldBe empty
       }
     }
 
     "setLastHeight" in test { (db, cache) =>
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.getLastHeight shouldBe empty
       }
 
-      db.readWrite { implicit ctx =>
+      db.batchedReadWrite { implicit ctx =>
         cache.setLastHeight(Height(2))
       }
 
-      db.readOnly { implicit ctx =>
+      db.batchedReadOnly { implicit ctx =>
         cache.getLastHeight.value shouldBe 2
       }
     }
@@ -32,15 +32,15 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
     "set" - {
       "known height" - {
         "affects get" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(1), defaultHeader(2))
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(1), defaultHeader(20))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             cache.get(Height(1)).value.header.header.timestamp shouldBe 20
           }
         }
@@ -49,11 +49,11 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
       "new height" - {
         "to empty" - {
           "affects get" in test { (db, cache) =>
-            db.readWrite { implicit ctx =>
+            db.batchedReadWrite { implicit ctx =>
               cache.set(Height(1), defaultHeader(2))
             }
 
-            db.readOnly { implicit ctx =>
+            db.batchedReadOnly { implicit ctx =>
               cache.get(Height(1)).value.header.header.timestamp shouldBe 2
             }
           }
@@ -61,15 +61,15 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
 
         "to not empty" - {
           "affects get" in test { (db, cache) =>
-            db.readWrite { implicit ctx =>
+            db.batchedReadWrite { implicit ctx =>
               cache.set(Height(1), defaultHeader(2))
             }
 
-            db.readWrite { implicit ctx =>
+            db.batchedReadWrite { implicit ctx =>
               cache.set(Height(2), defaultHeader(4))
             }
 
-            db.readOnly { implicit ctx =>
+            db.batchedReadOnly { implicit ctx =>
               cache.get(Height(2)).value.header.header.timestamp shouldBe 4
             }
           }
@@ -80,19 +80,19 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
     "remove" - {
       "known height" - {
         "affects get" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(1), defaultHeader(2))
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(2), defaultHeader(4))
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(2))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             cache.get(Height(2)) shouldBe empty
             cache.get(Height(1)).value.header.header.timestamp shouldBe 2
           }
@@ -101,15 +101,15 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
 
       "new height" - {
         "doesn't affect get" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(1), defaultHeader(2))
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(2))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             cache.get(Height(1)).value.header.header.timestamp shouldBe 2
           }
         }
@@ -117,15 +117,15 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
 
       "clears" - {
         "affects get" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(1), defaultHeader(2))
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(1))
           }
 
-          db.readOnly { implicit ctx =>
+          db.batchedReadOnly { implicit ctx =>
             cache.get(Height(1)) shouldBe empty
           }
         }
@@ -134,18 +134,18 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
 
     "getFrom" - {
       "returns Nil if empty" in test { (db, cache) =>
-        db.readOnly { implicit ctx =>
+        db.batchedReadOnly { implicit ctx =>
           cache.getFrom(Height(1), 100) shouldBe empty
         }
       }
 
       "returns headers if non empty" in test { (db, cache) =>
-        db.readWrite { implicit ctx =>
+        db.batchedReadWrite { implicit ctx =>
           (1 to 25).foreach(i => cache.set(Height(i), defaultHeader(i)))
         }
 
         val expected = (5L until 15).map(defaultHeader).toList
-        db.readOnly { implicit ctx =>
+        db.batchedReadOnly { implicit ctx =>
           cache.getFrom(Height(5), 10) shouldBe expected
         }
       }
@@ -161,7 +161,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
   )
 
   private def test(f: (RideDbAccess, BlockPersistentCache) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
+    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.blockHeaders)
   }
 }

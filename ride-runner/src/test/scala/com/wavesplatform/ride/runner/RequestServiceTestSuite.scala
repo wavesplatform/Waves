@@ -135,7 +135,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     }
 
     val testDb = use(TestDb.mk())
-    val sharedBlockchain = testDb.storage.readWrite { implicit ctx =>
+    val sharedBlockchain = testDb.storage.directReadWrite { implicit ctx =>
       SharedBlockchainStorage[RideScriptRunRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,

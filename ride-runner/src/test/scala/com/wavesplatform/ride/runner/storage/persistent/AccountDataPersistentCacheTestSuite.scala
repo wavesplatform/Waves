@@ -12,7 +12,7 @@ class AccountDataPersistentCacheTestSuite extends PersistentCacheWithHistoryTest
   protected override val defaultValue = BooleanDataEntry(defaultPairDataKey, value = true)
 
   protected override def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountData, DataEntry[?]]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
+    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountDataEntries)
   }
 

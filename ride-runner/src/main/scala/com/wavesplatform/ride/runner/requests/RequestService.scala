@@ -15,12 +15,12 @@ import com.wavesplatform.ride.runner.storage.{CacheKey, SharedBlockchainStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
+import monix.reactive.Observable
 import play.api.libs.json.JsObject
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import scala.concurrent.Await
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.SetHasAsScala
 
 trait RequestService extends AutoCloseable {
@@ -102,7 +102,12 @@ class DefaultRequestService(
             case _ => Task.unit
           }
       }
-      .logErr
+      .onErrorHandleWith { ex =>
+        if (isWorking.get()) {
+          log.error(s"Error observing item", ex)
+          Observable.raiseError(ex)
+        } else Observable.unit
+      }
       .lastL
       .as(())
       .runToFuture(runScriptScheduler)
@@ -110,7 +115,6 @@ class DefaultRequestService(
 
   override def close(): Unit = if (isWorking.compareAndSet(true, false)) {
     queueTask.cancel()
-    Await.ready(queueTask, 5.seconds) // Enough to complete all tasks
     requestScheduler.close()
   }
 

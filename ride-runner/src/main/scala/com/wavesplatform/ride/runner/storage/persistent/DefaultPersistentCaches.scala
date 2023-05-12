@@ -24,7 +24,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     with ScorexLogging {
   override val addressIds: AddressIdPersistentCache = new AddressIdPersistentCache {
     private val lastAddressIdKey = KvPairs.LastAddressId.at(())
-    private val lastAddressId    = new AtomicLong(storage.readOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
+    private val lastAddressId    = new AtomicLong(storage.directReadOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
     private val addressIdCache: Cache[Address, java.lang.Long] =
       Caffeine
@@ -463,7 +463,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
   private val activatedFeaturesDbKey = KvPairs.ActivatedFeatures.at(())
 
   override def getActivatedFeatures(): RemoteData[Map[Short, Height]] = {
-    val r = storage.readOnly(_.getOpt(activatedFeaturesDbKey)) match {
+    val r = storage.directReadOnly(_.getOpt(activatedFeaturesDbKey)) match {
       case None     => RemoteData.Unknown
       case Some(xs) => RemoteData.Cached(xs)
     }
@@ -473,7 +473,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
   }
 
   override def setActivatedFeatures(data: Map[Short, Height]): Unit = {
-    storage.readWrite(_.put(activatedFeaturesDbKey, data))
+    storage.directReadWrite(_.put(activatedFeaturesDbKey, data))
     log.trace("setActivatedFeatures")
   }
 

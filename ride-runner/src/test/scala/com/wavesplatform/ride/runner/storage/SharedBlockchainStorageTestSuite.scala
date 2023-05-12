@@ -48,7 +48,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           }.runTest()
 
           "updates activated features" in withDb { db =>
-            db.readWrite { implicit rw =>
+            db.batchedReadWrite { implicit rw =>
               val blockchain = SharedBlockchainStorage[Tag](
                 settings = SharedBlockchainStorage.Settings(
                   blockchain = DefaultBlockchainSettings,
@@ -528,7 +528,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
     def doOnComplete(access: Access): Unit
     def runTest(): Unit = {
       withDb { db =>
-        db.readWrite { implicit rw =>
+        db.batchedReadWrite { implicit rw =>
           val blockchain = SharedBlockchainStorage[Tag](
             settings = SharedBlockchainStorage.Settings(
               blockchain = DefaultBlockchainSettings,

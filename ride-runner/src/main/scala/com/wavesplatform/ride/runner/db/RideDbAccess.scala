@@ -8,27 +8,31 @@ import shapeless.<:!<
 import scala.util.Using
 
 trait RideDbAccess {
-  def readOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T
-  def readWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T
-  def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T]
-  def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T]
+  def batchedReadOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T
+  def batchedReadWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T
+  def directReadOnly[T](f: ReadOnly => T): T
+  def directReadWrite[T](f: ReadWrite => T): T
 }
 
 object RideDbAccess {
   def fromRocksDb(db: RocksDB): RideDbAccess = new RideDbAccess with ScorexLogging {
-    override def readOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
-      f(new ReadOnly(db, ro))
+    override def batchedReadOnly[T](f: ReadOnly => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
+      f(new BatchedReadOnly(db, ro))
     }
 
-    override def readWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
+    override def batchedReadWrite[T](f: ReadWrite => T)(implicit ev: T <:!< Task[?]): T = withReadOptions { ro =>
       Using.resource(mkWriteOptions()) { wo =>
         Using.resource(SynchronizedWriteBatch()) { wb =>
-          val r = f(new ReadWrite(db, ro, wb))
+          val r = f(new BatchedReadWrite(db, ro, wb))
           db.write(wo, wb.underlying)
           r
         }
       }
     }
+
+    private val direct                                    = new DirectReadWrite(db)
+    override def directReadOnly[T](f: ReadOnly => T): T   = f(direct)
+    override def directReadWrite[T](f: ReadWrite => T): T = f(direct)
 
     private def withReadOptions[T](use: ReadOptions => T): T =
       // Snapshot.close does nothing, see https://github.com/facebook/rocksdb/blob/601320164b41643e39851245ee90a90caa61d311/java/src/main/java/org/rocksdb/Snapshot.java#L31
@@ -36,32 +40,7 @@ object RideDbAccess {
         Using.resource(mkReadOptions(s))(use)
       }((resource: Snapshot) => db.releaseSnapshot(resource))
 
-    override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = withAsyncReadOptions { ro =>
-      f(new ReadOnly(db, ro))
-    }
-
-    override def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T] = withAsyncReadOptions { ro =>
-      withResource(mkWriteOptions())(_.close()) { wo =>
-        withResource(SynchronizedWriteBatch())(_.close()) { wb =>
-          f(new ReadWrite(db, ro, wb)).tapEval { _ =>
-            Task.evalAsync(db.write(wo, wb.underlying))
-          }
-        }
-      }
-    }
-
-    private def withAsyncReadOptions[T](use: ReadOptions => Task[T]): Task[T] =
-      // Snapshot.close does nothing, see https://github.com/facebook/rocksdb/blob/601320164b41643e39851245ee90a90caa61d311/java/src/main/java/org/rocksdb/Snapshot.java#L31
-      withResource(db.getSnapshot)(db.releaseSnapshot) { s =>
-        withResource(mkReadOptions(s))(_.close())(use)
-      }
-
     private def mkReadOptions(s: Snapshot): ReadOptions = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
     private def mkWriteOptions(): WriteOptions          = new WriteOptions().setSync(false).setDisableWAL(false)
-
-    private def withResource[R, T](acquire: => R)(release: R => Unit)(use: R => Task[T]): Task[T] =
-      Task
-        .evalAsync(acquire) // evalAsync is not evaluated immediately
-        .bracket(use(_).doOnCancel(Task(log.error("Cancelled, a resource may be leak"))))(r => Task.evalAsync(release(r)))
   }
 }

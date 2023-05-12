@@ -12,53 +12,53 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
     "set and get" - {
       "cached" - {
         "on the first height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(8), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(8), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "before the max height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(8), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "on the max height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "after the max height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(11), defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -66,43 +66,43 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
 
       "absence" - {
         "before the max height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(8), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Absence
           }
         }
 
         "on the max height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Absence
           }
         }
 
         "after the max height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(11), defaultKey) shouldBe RemoteData.Absence
           }
         }
@@ -110,17 +110,17 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
 
       "unknown" - {
         "on empty" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
 
         "before the first known height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -130,29 +130,29 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
     "remove" - {
       "the data is not available for 'get' after deletion" - {
         "on removed height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(9), defaultKey)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
 
         "on next height" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(1), defaultKey)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(11), defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -160,55 +160,55 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
 
       "returns the last known value before deleted heights" - {
         "cached" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(10), defaultKey)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "absence" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(10), defaultKey)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Absence
           }
         }
 
         "unknown if empty" in test { (db, cache) =>
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, RemoteData.Absence)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, defaultCachedValue)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(10), defaultKey)
           }
 
-          db.readWrite { implicit ctx =>
+          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }

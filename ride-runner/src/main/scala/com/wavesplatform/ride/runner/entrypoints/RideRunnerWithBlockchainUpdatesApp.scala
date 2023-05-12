@@ -114,7 +114,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val db = RideRocksDb.open(settings.rideRunner.db)
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
-    val sharedBlockchain = db.access.readWrite { implicit rw =>
+    val sharedBlockchain = db.access.directReadWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(db.access)
       SharedBlockchainStorage[RideScriptRunRequest](settings.rideRunner.sharedBlockchain, db.access, dbCaches, blockchainApi)
     }

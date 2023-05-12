@@ -3,19 +3,23 @@ package com.wavesplatform.ride.runner.db
 import com.google.common.primitives.Shorts
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.storage.persistent.HasDb
 
-class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
+abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
+  private val testName      = getSimpleName(this).replace("TestSuite", "")
   private val defaultPrefix = Shorts.toByteArray(1)
+  private val otherPrefix   = Shorts.toByteArray(2)
   private val defaultValue  = Array[Byte](3)
 
-  "ReadOnly" - {
+  testName - {
     "iterateOverPrefix" in withDb { db =>
-      val k1 = mkKey(1)
-      val k2 = mkKey(2)
-      val k3 = mkKey(3)
+      val k1                 = mkKey(1)
+      val k2                 = mkKey(2)
+      val k3                 = mkKey(3)
+      val keyWithOtherPrefix = mkKey(4, otherPrefix)
 
-      def check(clue: String, prefix: Array[Byte] = defaultPrefix, expectedKeys: List[ByteStr]): Unit = db.readOnly { ro =>
+      def check(clue: String, prefix: Array[Byte] = defaultPrefix, expectedKeys: List[ByteStr]): Unit = readOnly(db) { ro =>
         withClue(s"$clue:") {
           var keys = List.empty[ByteStr]
           ro.iterateOverPrefix(prefix) { x =>
@@ -28,7 +32,13 @@ class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
 
       check("before insert", expectedKeys = List.empty)
 
-      db.readWrite { rw =>
+      readWrite(db) { rw =>
+        rw.put(keyWithOtherPrefix.arr, defaultValue)
+      }
+
+      check("after insert with other prefix", expectedKeys = List.empty)
+
+      readWrite(db) { rw =>
         rw.put(k1.arr, defaultValue)
         rw.put(k2.arr, defaultValue)
         rw.put(k3.arr, defaultValue)
@@ -37,7 +47,7 @@ class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
       check("after insert with 2-byte prefix", expectedKeys = List(k1, k2, k3))
       check("after insert with a key", k2.arr, expectedKeys = List(k2, k3))
 
-      db.readWrite { rw =>
+      readWrite(db) { rw =>
         rw.delete(k2.arr)
       }
 
@@ -47,7 +57,7 @@ class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
     "prefixExists" in withDb { db =>
       val rawKey = mkKey(2)
 
-      def check(clue: String, exist: Boolean): Unit = db.readOnly { ro =>
+      def check(clue: String, exist: Boolean): Unit = readOnly(db) { ro =>
         withClue(s"$clue:") {
           ro.prefixExists(rawKey.arr) shouldBe exist
           ro.prefixExists(defaultPrefix) shouldBe exist
@@ -56,13 +66,19 @@ class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
 
       check("before insert", exist = false)
 
-      db.readWrite { rw =>
+      readWrite(db) { rw =>
+        rw.put(mkKey(3, otherPrefix).arr, defaultValue)
+      }
+
+      check("after insert with other prefix", exist = false)
+
+      readWrite(db) { rw =>
         rw.put(rawKey.arr, defaultValue)
       }
 
-      check("after insert", exist = true)
+      check("after insert with expected prefix", exist = true)
 
-      db.readWrite { rw =>
+      readWrite(db) { rw =>
         rw.delete(rawKey.arr)
       }
 
@@ -71,4 +87,7 @@ class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
   }
 
   private def mkKey(x: Byte, prefix: Array[Byte] = defaultPrefix) = ByteStr(prefix ++ Array[Byte](x))
+
+  protected def readOnly[T](dbAccess: RideDbAccess)(f: ReadOnly => T): T
+  protected def readWrite[T](dbAccess: RideDbAccess)(f: ReadWrite => T): T
 }

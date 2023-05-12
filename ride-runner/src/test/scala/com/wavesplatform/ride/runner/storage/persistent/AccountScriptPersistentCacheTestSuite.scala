@@ -22,7 +22,7 @@ class AccountScriptPersistentCacheTestSuite extends PersistentCacheWithHistoryTe
   )
 
   protected override def test(f: (RideDbAccess, PersistentCache[Address, WeighedAccountScriptInfo]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
+    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountScripts)
   }
 
