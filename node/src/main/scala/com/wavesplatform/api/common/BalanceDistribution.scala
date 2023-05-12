@@ -4,7 +4,6 @@ import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{AddressId, DBResource, Keys}
-import com.wavesplatform.state.safeSum
 import com.wavesplatform.transaction.Asset
 
 import scala.annotation.tailrec
@@ -45,13 +44,13 @@ object BalanceDistribution {
             resource.fullIterator.next()
           }
 
-          val adjustedBalanceE = safeSum(balance, pendingPortfolios.getOrElse((address, asset), 0L), "Next distribution balance")
+          val adjustedBalance = pendingPortfolios.getOrElse((address, asset), balance)
           pendingPortfolios = pendingPortfolios.removed((address, asset))
 
-          adjustedBalanceE match {
-            case Right(adjustedBalance) if currentHeight <= height && adjustedBalance > 0 => Some(address -> adjustedBalance)
-            case _                                                                        => findNextBalance()
-          }
+          if (currentHeight <= height && adjustedBalance > 0)
+            Some(address -> adjustedBalance)
+          else
+            findNextBalance()
         }
       }
     }
