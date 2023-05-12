@@ -178,8 +178,7 @@ object KvPairs {
   val aliasAsBytes: AsBytes[Alias]                = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
   private val aliasWithLenAsBytes: AsBytes[Alias] = AsBytes.byteArrayAsBytes.withIntLen.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
   object AliasesByHeight extends KvPair[state.Height, List[Alias]](79)(implicitly, AsBytes.listAsBytes.consumeAll(aliasWithLenAsBytes))
-  // TODO #25 Store AddressId
-  object Aliases extends KvPair[Alias, (state.Height, Option[Address])](80)(aliasAsBytes, implicitly)
+  object Aliases         extends KvPair[Alias, (state.Height, Option[AddressId])](80)(aliasAsBytes, implicitly)
 
   object AccountAssetsHistory extends KvHistoryPair[(AddressId, Asset)](91)
   object AccountAssets        extends KvPair[(state.Height, (AddressId, Asset)), Long](92)

@@ -222,17 +222,17 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
       .map(CacheKey.Alias)
 
     override def getAddress(key: CacheKey.Alias)(implicit ctx: ReadOnly): RemoteData[Address] =
-      getRemoteDataOpt(key)._2.tap { r => log.trace(s"get($key): ${r.toFoundStr()}") }
+      getRemoteDataOpt(key)._2.tap { r => log.trace(s"getAddress($key): ${r.toFoundStr()}") }
 
-    override def setAddress(atHeight: Height, key: CacheKey.Alias, data: RemoteData[Address])(implicit ctx: ReadWrite): Unit = {
+    override def setAddress(atHeight: Height, key: CacheKey.Alias, address: RemoteData[Address])(implicit ctx: ReadWrite): Unit = {
       val (prevHeight, _) = getRemoteDataOpt(key)
       prevHeight.foreach { prevHeight =>
         updateEntriesOnHeight(prevHeight)(_.filterNot(_ == key.alias))
       }
       updateEntriesOnHeight(atHeight)(key.alias :: _)
 
-      writeToDb(atHeight, key, data)
-      log.trace(s"set($key, $data)")
+      writeToDb(atHeight, key, address.map(addressIds.getOrMkAddressId))
+      log.trace(s"set($key, $address)")
     }
 
     // TODO same as in transactions
@@ -254,14 +254,16 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     private def getRemoteDataOpt(key: CacheKey.Alias)(implicit ctx: ReadOnly): (Option[Height], RemoteData[Address]) =
       ctx
         .getOpt(dataKey(key))
-        .fold[(Option[Height], RemoteData[Address])]((none, RemoteData.Unknown)) { case (h, x) => (h.some, RemoteData.loaded(x)) }
+        .fold[(Option[Height], RemoteData[Address])]((none, RemoteData.Unknown)) { case (h, x) =>
+          (h.some, RemoteData.loaded(x.flatMap(addressIds.getAddress)))
+        }
 
-    private def writeToDb(atHeight: Height, key: CacheKey.Alias, data: RemoteData[Address])(implicit ctx: ReadWrite): Unit =
+    private def writeToDb(atHeight: Height, key: CacheKey.Alias, data: RemoteData[AddressId])(implicit ctx: ReadWrite): Unit =
       if (data.loaded) ctx.put(dataKey(key), (atHeight, data.mayBeValue))
       else ctx.delete(dataKey(key))
 
-    private def onHeightKey(height: Height): Key[List[Alias]]                = KvPairs.AliasesByHeight.at(height)
-    private def dataKey(key: CacheKey.Alias): Key[(Height, Option[Address])] = KvPairs.Aliases.at(key.alias)
+    private def onHeightKey(height: Height): Key[List[Alias]]                  = KvPairs.AliasesByHeight.at(height)
+    private def dataKey(key: CacheKey.Alias): Key[(Height, Option[AddressId])] = KvPairs.Aliases.at(key.alias)
   }
 
   override val accountBalances: PersistentCache[AccountAssetKey, Long] = new PersistentCache[AccountAssetKey, Long] {
