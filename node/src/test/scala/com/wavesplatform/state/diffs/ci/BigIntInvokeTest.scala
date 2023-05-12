@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{EitherValues, Inside}
@@ -108,8 +109,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
     assert(burn, s"Some($bigIntValue))' instead of Burn")
   }
 
-  //TODO uses scriptsRun
-  ignore("BigInt as Invoke return value") {
+  property("BigInt as Invoke return value") {
     def dApp1(nextDApp: Address, version: StdLibVersion): Script = TestCompiler(version).compileContract(
       s"""
          | @Callable(i)
@@ -149,7 +149,12 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
       d.appendBlock(invoke)
 
       d.liquidDiff.errorMessage(invoke.id()) shouldBe None
-      d.liquidDiff.scriptsRun shouldBe 2
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, sync1: InvokeScriptResult)) =>
+        inside(sync1.invokes) { case Seq(sync2) =>
+          sync2.stateChanges.error shouldBe empty
+          sync2.stateChanges.invokes shouldBe empty
+        }
+      }
       d.liquidDiff.accountData.head._2("key").value shouldBe 1
     }
   }

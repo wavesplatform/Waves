@@ -28,8 +28,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
   private val lengthError      = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
   private val nonExistentError = s"Transfer error: asset '$nonExistentAsset' is not found on the blockchain"
 
-  //TODO uses scriptsRun
-  ignore("invoke asset checks") {
+  property("invoke asset checks") {
     val dApp = TestCompiler(V4).compileContract(
       s"""
          |@Callable(i)
@@ -92,7 +91,6 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
                 dAppAddress          -> Portfolio.build(asset, 0),
                 miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
-              scriptsRun = 1,
               scriptsComplexity = 18,
               scriptResults = Map(
                 invoke.id() -> InvokeScriptResult(

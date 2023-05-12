@@ -644,8 +644,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  //TODO needs scriptsRun
-  ignore("invoking contract receive payment") {
+  property("invoking contract receive payment") {
     testDomain { (version, d) =>
       val issue = TxHelpers.issue(script = Some(assetAllowed))
       val asset = IssuedAsset(issue.id())
@@ -658,7 +657,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       d.appendBlock(genesis*)
       d.appendBlock(issue, setScript)
       d.appendBlock(ci)
-      d.liquidDiff.scriptsRun shouldBe 2
+      inside(d.liquidDiff.scriptResults.toSeq) {
+        case Seq((_, i: InvokeScriptResult)) =>
+          i.transfers.size shouldBe 1
+      }
       d.blockchain.balance(thirdAddress, Waves) shouldBe amount
       d.blockchain.balance(invokerAddress, asset) shouldBe (issue.quantity.value - 1)
       d.blockchain.balance(dAppAddress, asset) shouldBe 1
