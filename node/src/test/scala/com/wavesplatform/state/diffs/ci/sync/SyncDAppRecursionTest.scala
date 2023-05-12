@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.Inside

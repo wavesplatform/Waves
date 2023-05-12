@@ -18,7 +18,6 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{EitherValues, Inside}

@@ -18,7 +18,6 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*

@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
-import com.wavesplatform.state.{IntegerDataEntry, InvokeScriptResult, StringDataEntry}
+import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
