@@ -145,7 +145,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
             maxHeight
           )
         }
-        .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("hash", _.scriptInfo.script.hashCode())}") }
+        .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("hash", _.hashCode())}") }
 
     override def set(atHeight: Height, key: Address, data: RemoteData[WeighedAccountScriptInfo])(implicit ctx: ReadWrite): Unit = {
       val addressId = addressIds.getOrMkAddressId(key)

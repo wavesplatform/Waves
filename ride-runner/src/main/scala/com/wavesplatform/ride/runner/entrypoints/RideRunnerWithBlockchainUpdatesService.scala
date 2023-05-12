@@ -117,7 +117,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
         }
       }
 
-      val cleanTo = 9 // Increase if you want to clean the database
+      val cleanTo = 10 // Increase if you want to clean the database
       if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
         log.info(
           s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."

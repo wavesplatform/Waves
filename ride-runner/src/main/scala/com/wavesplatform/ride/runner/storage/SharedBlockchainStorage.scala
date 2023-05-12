@@ -1,7 +1,6 @@
 package com.wavesplatform.ride.runner.storage
 
 import cats.syntax.option.*
-import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
@@ -24,7 +23,7 @@ import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage.Settings
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, LeaseBalance}
+import com.wavesplatform.state.{AssetDescription, DataEntry, Height, LeaseBalance}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
 import org.openjdk.jol.info.GraphLayout
@@ -557,21 +556,15 @@ class SharedBlockchainStorage[TagT] private (
     )
 
   private def toWeightedAccountScriptInfo(x: Script): WeighedAccountScriptInfo = {
-    val info = toAccountScriptInfo(x)
-
     val longWeight = GraphLayout.parseInstance(x).totalSize()
     val weight =
       if (longWeight.isValidInt) longWeight.toInt
       else throw new ArithmeticException(s"Weight of AccountScriptInfo overflow: $longWeight")
 
-    WeighedAccountScriptInfo(weight, info)
-  }
-
-  private def toAccountScriptInfo(script: Script): AccountScriptInfo = {
-    val estimated = Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, script, isAsset = false))
-    AccountScriptInfo(
-      publicKey = EmptyPublicKey,
-      script = script, // See WavesEnvironment.accountScript
+    val estimated = Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, x, isAsset = false))
+    WeighedAccountScriptInfo(
+      scriptInfoWeight = weight,
+      script = x, // See WavesEnvironment.accountScript
       verifierComplexity = estimated.maxBy { case (version, _) => version }._2.verifierComplexity,
       complexitiesByEstimator = estimated.map { case (version, x) => version -> x.callableComplexities } // "Cannot find complexity storage" if empty
     )

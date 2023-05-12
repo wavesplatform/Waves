@@ -646,7 +646,14 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       }
 
       withClue("account script") {
-        access.get(CacheKey.AccountScript(aliceAddr)).map(_.scriptInfo) shouldBe RemoteData.Cached(accountScript)
+        access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Cached(
+          WeighedAccountScriptInfo(
+            scriptInfoWeight = 512,
+            script = accountScript.script,
+            verifierComplexity = accountScript.verifierComplexity,
+            complexitiesByEstimator = accountScript.complexitiesByEstimator
+          )
+        )
       }
     }
   }

@@ -4,6 +4,7 @@ import cats.syntax.option.*
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream
 import com.google.common.primitives.Shorts
 import com.google.protobuf.UnsafeByteOperations
+import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
@@ -80,10 +81,18 @@ object KvPairs {
       )
 
   object AccountScriptsHistory extends KvHistoryPair[AddressId](21)
+
   val accountScriptInfoAsBytes: AsBytes[AccountScriptInfo] =
     AsBytes.byteArrayAsBytes.consumeAll.transform(readAccountScriptInfo, writeAccountScriptInfo)
+
   val weighedAccountScriptInfoAsBytes: AsBytes[WeighedAccountScriptInfo] =
-    AsBytes.tuple2(intAsBytes, accountScriptInfoAsBytes).transform(Function.tupled(WeighedAccountScriptInfo), x => (x.scriptInfoWeight, x.scriptInfo))
+    AsBytes
+      .tuple2(intAsBytes, accountScriptInfoAsBytes)
+      .transform(
+        { case (weight, x) => WeighedAccountScriptInfo(weight, x.script, x.verifierComplexity, x.complexitiesByEstimator) },
+        x => (x.scriptInfoWeight, AccountScriptInfo(EmptyPublicKey, x.script, x.verifierComplexity, x.complexitiesByEstimator))
+      )
+
   object AccountScripts
       extends KvPair[(state.Height, AddressId), Option[WeighedAccountScriptInfo]](22)(implicitly, AsBytes.optional(weighedAccountScriptInfoAsBytes))
 

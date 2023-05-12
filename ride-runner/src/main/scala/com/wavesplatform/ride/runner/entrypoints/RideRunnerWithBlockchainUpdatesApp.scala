@@ -132,7 +132,6 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     )
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
 
-    // TODO #100 Settings?
     // Start from this height
     val lastSafeKnownHeight = Height(math.max(1, localOrNetworkHeightAtStart - 100 - 1)) // A rollback is not possible
 

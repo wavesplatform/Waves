@@ -30,7 +30,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
 
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] =
-    sharedBlockchain.getOrFetch(CacheKey.AccountScript(address)).map(_.scriptInfo)
+    sharedBlockchain.getOrFetch(CacheKey.AccountScript(address)).map(_.accountScriptInfo)
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
