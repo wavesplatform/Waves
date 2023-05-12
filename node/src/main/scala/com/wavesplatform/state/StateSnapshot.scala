@@ -250,12 +250,16 @@ object StateSnapshot {
         case Status.Expired(expiredHeight) =>
           S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(expiredHeight))
       }
+      val resolvedRecipient = recipient match {
+        case address: Address => address
+        case alias: Alias     => diff.aliases.getOrElse(alias, blockchain.resolveAlias(recipient).explicitGet())
+      }
       S.LeaseState(
         leaseId.toByteString,
         pbStatus,
         amount,
         sender.toByteString,
-        ByteString.copyFrom(blockchain.resolveAlias(recipient).explicitGet().bytes),
+        ByteString.copyFrom(resolvedRecipient.bytes),
         sourceId.toByteString,
         height
       )
