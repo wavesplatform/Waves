@@ -12,6 +12,7 @@ case class WeighedAccountScriptInfo private (
     complexitiesByEstimator: Map[Int, Map[String, Long]]
 ) {
   val accountScriptInfo = AccountScriptInfo(
+    // It doesn't have this, because we expect that a user doesn't run scripts with actions
     publicKey = EmptyPublicKey,
     script = script,
     verifierComplexity = verifierComplexity,

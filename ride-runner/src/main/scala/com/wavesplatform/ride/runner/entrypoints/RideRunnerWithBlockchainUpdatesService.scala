@@ -101,42 +101,6 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       blockchainUpdatesApiChannel = blockchainUpdatesApiChannel
     )
 
-    // TODO HACK: Remove when the storage format cemented
-    {
-      val rootPath = Paths.get(settings.rideRunner.db.directory, "..").normalize()
-      Files.createDirectories(rootPath)
-
-      val cleanupIterationPath = rootPath.resolve("cleanup")
-      val cleanupIteration =
-        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
-        else "-1" // to differ cases
-
-      if (cleanupIteration == "-1") {
-        rootPath.toFile.listFiles().foreach { file =>
-          log.info(s"File before: $file")
-        }
-      }
-
-      val cleanTo = 10 // Increase if you want to clean the database
-      if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
-        log.info(
-          s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
-        )
-        val logPath = rootPath.resolve("log.txt").toAbsolutePath.toString
-        rootPath.toFile.listFiles().foreach { file =>
-          if (file.getAbsolutePath != cleanupIterationPath.toAbsolutePath.toString && file.getAbsolutePath != logPath)
-            MoreFiles.deleteRecursively(file.toPath, RecursiveDeleteOption.ALLOW_INSECURE)
-        }
-        Files.writeString(cleanupIterationPath, cleanTo.toString)
-      }
-
-      if (cleanupIteration == "-1") {
-        rootPath.toFile.listFiles().foreach { file =>
-          log.info(s"File after: $file")
-        }
-      }
-    }
-
     log.info("Opening a DB with caches...")
     val rideDb          = RideRocksDb.open(settings.rideRunner.db)
     val sendDbStatsTask = blockchainEventsStreamScheduler.scheduleAtFixedRate(30.seconds, 30.seconds) { rideDb.sendStats() }

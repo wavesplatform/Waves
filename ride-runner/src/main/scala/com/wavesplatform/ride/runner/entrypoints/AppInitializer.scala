@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner.entrypoints
 
+import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.account.AddressScheme
@@ -7,6 +8,8 @@ import com.wavesplatform.settings.*
 import com.wavesplatform.utils.{Misconfiguration, ScorexLogging, forceStopApplication}
 
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths}
 
 object AppInitializer extends ScorexLogging {
   def init(externalConfig: Option[File] = None): (Config, RideRunnerGlobalSettings) = {
@@ -37,6 +40,48 @@ object AppInitializer extends ScorexLogging {
 
     val settings = RideRunnerGlobalSettings.fromRootConfig(config)
     log.info(s"Starting ${Version.VersionString}...")
+
+    checkDbVersion(settings)
     (config, settings)
+  }
+
+  private def checkDbVersion(settings: RideRunnerGlobalSettings): Unit = {
+    val rootPath = Paths.get(settings.rideRunner.db.directory, "..").normalize()
+    Files.createDirectories(rootPath)
+
+    val versionFilePath = rootPath.resolve("version")
+    val (cleanup, updateVersion) =
+      if (versionFilePath.toFile.exists()) {
+        val rawVersion = Files.readString(versionFilePath, StandardCharsets.UTF_8).trim
+        rawVersion.toIntOption match {
+          case Some(version) =>
+            if (version != settings.rideRunner.db.version) {
+              log.info(s"Database version upgraded from $version to ${settings.rideRunner.db.version}, removing...")
+              (true, true)
+            } else {
+              log.info(s"Current database version: $version")
+              (false, false)
+            }
+          case None =>
+            log.error(
+              s"Database version file $versionFilePath contains invalid content! " +
+                s"Please contact with an administrator, content: ${rawVersion.take(100)}..."
+            )
+            (true, true)
+        }
+      } else {
+        log.info("Database version file doesn't exist, creating...")
+        (false, true)
+      }
+
+    if (cleanup) {
+      val logPath = rootPath.resolve("log.txt").toAbsolutePath.toString
+      rootPath.toFile.listFiles().foreach { file =>
+        if (file.getAbsolutePath != versionFilePath.toAbsolutePath.toString && file.getAbsolutePath != logPath)
+          MoreFiles.deleteRecursively(file.toPath, RecursiveDeleteOption.ALLOW_INSECURE)
+      }
+    }
+
+    if (updateVersion) Files.writeString(versionFilePath, settings.rideRunner.db.version.toString)
   }
 }

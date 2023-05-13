@@ -51,7 +51,7 @@ class RideRocksDb(
 
 // TODO #101 Settings (those won't break a DB)
 object RideRocksDb extends ScorexLogging {
-  case class Settings(directory: String)
+  case class Settings(directory: String, version: Int)
 
   def open(settings: Settings): RideDb = {
     log.debug(s"Open DB at ${settings.directory}")
