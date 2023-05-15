@@ -224,9 +224,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     amount = TxPositiveAmount.from(tx.amount).explicitGet(),
     feeAssetId = tx.feeAssetId,
     fee = TxPositiveAmount.from(tx.fee).explicitGet(),
-    attachment = ByteStr(tx.attachment.getBytes(StandardCharsets.UTF_8)), // TODO
+    attachment = tx.attachment,
     timestamp = tx.timestamp,
-    proofs = Proofs(tx.proofs.map(x => ByteStr(x.getBytes(StandardCharsets.UTF_8)))), // TODO
+    proofs = Proofs(tx.proofs),
     chainId = chainId
   )
 

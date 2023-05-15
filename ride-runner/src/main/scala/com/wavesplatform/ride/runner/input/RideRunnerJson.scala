@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxPositiveAmount, TxValidationError}
 import play.api.libs.json.*
 
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import scala.util.Try
 
@@ -58,6 +59,16 @@ object RideRunnerJson extends DefaultReads {
   implicit val byteStrReads = byteArrayReads("ByteStr").map(ByteStr(_))
 
   implicit val byteStringReads: Reads[ByteString] = byteArrayReads("ByteString").map(unsafeWrap)
+
+  implicit val stringOrBytesReads: Reads[StringOrBytes] = StringReads.flatMapResult { x =>
+    val bytes = Try {
+      if (x.startsWith("base58:")) Base58.decode(x.substring(7))
+      else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
+      else x.getBytes(StandardCharsets.UTF_8)
+    }.getOrElse(x.getBytes(StandardCharsets.UTF_8))
+
+    JsSuccess(StringOrBytes(ByteStr(bytes)))
+  }
 
   implicit val scriptReads: Reads[Script] = StringReads.flatMapResult { x =>
     parseByteArray(x, "Script").flatMap { bytes =>

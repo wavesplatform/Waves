@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.input
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 
@@ -11,10 +12,10 @@ case class RunnerTransactionInfo(
     fee: Long = 100_000,
     feeAssetId: Asset = Waves,
     recipient: Option[String] = None,
-    attachment: String = "",
+    attachment: StringOrBytes = StringOrBytes(ByteStr.empty),
     timestamp: Long = System.currentTimeMillis(),
     version: Byte = 3,
     senderPublicKey: PublicKey = EmptyPublicKey,
-    proofs: List[String] = Nil,
+    proofs: List[StringOrBytes] = Nil,
     height: Option[Int] = None
 )
