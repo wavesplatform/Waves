@@ -94,7 +94,7 @@ class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues wi
         )
         Case(
           "NODE-124 Asset script can forbid reissue",
-          "asdasdas",
+          "Transaction is not allowed by script of the asset",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for strict, 1 for list, 1 for Reissue, 1 for asset script
             mkFooScript(
