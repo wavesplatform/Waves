@@ -1,7 +1,7 @@
 package com.wavesplatform.report
 
 import io.qase.api.QaseClient
-import io.qase.api.config.QaseConfig.{API_TOKEN_KEY, ENABLE_KEY, PROJECT_CODE_KEY, RUN_ID_KEY, RUN_NAME_KEY, USE_BULK_KEY}
+import io.qase.api.config.QaseConfig.RUN_ID_KEY
 import io.qase.client.ApiClient
 import io.qase.client.api.RunsApi
 import io.qase.client.model.RunCreate
