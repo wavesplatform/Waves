@@ -16,7 +16,7 @@ object MiningConstraints {
   }
 
   val ClassicAmountOfTxsInBlock = 100
-  val MaxTxsSizeInBytes         = Int.MaxValue
+  val MaxTxsSizeInBytes         = 500 * 1024 * 1024
 
   def apply(blockchain: Blockchain, height: Int, minerSettings: Option[MinerSettings] = None): MiningConstraints = {
     val activatedFeatures     = blockchain.activatedFeaturesAt(height)
