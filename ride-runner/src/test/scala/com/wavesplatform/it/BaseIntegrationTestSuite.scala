@@ -9,6 +9,7 @@ import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
@@ -140,7 +141,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
   }.get
 
-  private lazy val aliceScript: Script = mkScript(s"""
+  private lazy val aliceScript: Script = ScriptUtil.from(s"""
 {-#STDLIB_VERSION 6 #-}
 {-#SCRIPT_TYPE ACCOUNT #-}
 {-#CONTENT_TYPE DAPP #-}

@@ -4,6 +4,7 @@ import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.{JsString, JsSuccess}
 
@@ -84,6 +85,31 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
       }
 
       def parse(rawAlias: String) = RideRunnerJson.aliasReads.reads(JsString(rawAlias))
+    }
+
+    "scriptReads" - {
+      val scriptSrc = s"""
+{-#STDLIB_VERSION 6 #-}
+{-#SCRIPT_TYPE ACCOUNT #-}
+{-#CONTENT_TYPE DAPP #-}
+
+@Callable(inv)
+func foo() = {
+let alice = Address(base58'$aliceAddr')
+let x = getIntegerValue(alice, "x")
+([], x + height)
+}"""
+      val script = ScriptUtil.from(scriptSrc)
+
+      "allows bytes" in {
+        parse(script.bytes().base64) shouldBe JsSuccess(script)
+      }
+
+      "source code by default" in {
+        parse(scriptSrc) shouldBe JsSuccess(script)
+      }
+
+      def parse(rawContent: String) = RideRunnerJson.scriptReads.reads(JsString(rawContent))
     }
   }
 }

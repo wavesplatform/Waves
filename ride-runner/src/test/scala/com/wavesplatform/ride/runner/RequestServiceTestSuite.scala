@@ -11,6 +11,7 @@ import com.wavesplatform.api.{HasBasicGrpcConverters, HasGrpc, TestBlockchainApi
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
@@ -31,9 +32,9 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
   private val cRequest = RideScriptRunRequest(carlAddr, Json.obj("expr" -> "default()"))
 
   private val accountScripts = Map(
-    aliceAddr -> mkScript(aliceScriptSrc),
-    bobAddr   -> mkScript(bobScriptSrc),
-    carlAddr  -> mkScript(carlScriptSrc)
+    aliceAddr -> ScriptUtil.from(aliceScriptSrc),
+    bobAddr   -> ScriptUtil.from(bobScriptSrc),
+    carlAddr  -> ScriptUtil.from(carlScriptSrc)
   )
 
   "RequestsService" - {

@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner.input
 
+import cats.syntax.option.*
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
@@ -10,6 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
@@ -69,8 +71,13 @@ object RideRunnerJson extends DefaultReads {
   }
 
   implicit val scriptReads: Reads[Script] = StringReads.flatMapResult { x =>
-    parseByteArrayBase58(x, "Script").flatMap { bytes =>
-      ScriptReader.fromBytes(bytes).successOr(e => mkError("Script", e.m))
+    Try {
+      if (x.startsWith(Base64.Prefix)) Base64.decode(x).some
+      else none
+    }.toEither match {
+      case Left(e)            => mkError("Script", e.getMessage)
+      case Right(Some(bytes)) => ScriptReader.fromBytes(bytes).successOr(e => mkError("Script", e.m))
+      case Right(None)        => Try(ScriptUtil.from(x)).toEither.successOr(e => mkError("Script", e.getMessage))
     }
   }
 
