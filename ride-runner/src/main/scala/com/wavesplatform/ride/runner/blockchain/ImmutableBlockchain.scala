@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.blockchain
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
-import com.wavesplatform.ride.runner.input.RideRunnerInput
+import com.wavesplatform.ride.runner.input.{RideRunnerInput, RunnerAccountState, RunnerScriptInfo}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
@@ -28,7 +28,7 @@ import com.wavesplatform.state.{
   TxMeta,
   VolumeAndFee
 }
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
@@ -39,17 +39,28 @@ import scala.util.chaining.scalaUtilChainingOps
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain {
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
 
+  private lazy val _hasData: Map[Address, Boolean] = mapAccountState(_.data.nonEmpty)
+
   // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = input.hasData.getOrElse(address, false)
+  override def hasData(address: Address): Boolean = _hasData.getOrElse(address, false)
+
+  private lazy val _accountData: Map[Address, Map[String, DataEntry[?]]] = for {
+    (addr, state) <- input.accounts
+    data          <- state.data
+  } yield addr -> data.map { case (key, entry) => key -> entry.toDataEntry(key) }
+
+  private lazy val _accountScript: Map[Address, RunnerScriptInfo] = for {
+    (addr, state) <- input.accounts
+    scriptInfo    <- state.scriptInfo
+  } yield addr -> scriptInfo
 
   // Ride: get*Value (data), get* (data)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def accountData(acc: Address, key: String): Option[DataEntry[?]] =
-    input.accountData.getOrElse(acc, Map.empty).get(key)
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = _accountData.getOrElse(acc, Map.empty).get(key)
 
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] = {
-    input.accountScript.get(address).map { input =>
+    _accountScript.get(address).map { input =>
       val complexityInfo = Set(ScriptEstimatorV1, ScriptEstimatorV2, this.estimator).map { estimator =>
         estimator.version -> complexityInfoOf(isAsset = false, input.script)
       }
@@ -70,18 +81,40 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
+  private lazy val _blockHeader: Map[Int, SignedBlockHeader] = for {
+    (height, blockInfo) <- input.blocks
+  } yield height -> SignedBlockHeader(
+    header = BlockHeader(
+      version = 5,
+      timestamp = blockInfo.timestamp,
+      reference = ByteStr(Array.emptyByteArray),
+      baseTarget = blockInfo.baseTarget,
+      generationSignature = blockInfo.generationSignature,
+      generator = blockInfo.generatorPublicKey,
+      featureVotes = Nil,
+      rewardVote = -1,
+      transactionsRoot = ByteStr(Array.emptyByteArray)
+    ),
+    signature = ByteStr(Array.emptyByteArray)
+  )
+
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
     // Dirty, but we have a clear error instead of "None.get"
     Some(
-      input.blockHeader.getOrElse(
+      _blockHeader.getOrElse(
         height,
         throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
       )
     )
 
+  private lazy val _hitSource: Map[Int, ByteStr] = for {
+    (height, blockInfo) <- input.blocks
+    vrf                 <- blockInfo.VRF
+  } yield height -> vrf
+
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = input.hitSource.get(height) // VRF
+  override def hitSource(height: Int): Option[ByteStr] = _hitSource.get(height) // VRF
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
@@ -127,18 +160,32 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
     resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
 
+  private lazy val _leaseBalance: Map[Address, LeaseBalance] = for {
+    (addr, state) <- input.accounts
+    lease         <- state.leasing
+  } yield addr -> LeaseBalance(lease.in, lease.out)
+
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance = input.leaseBalance.getOrElse(address, LeaseBalance(0, 0))
+  override def leaseBalance(address: Address): LeaseBalance = _leaseBalance.getOrElse(address, LeaseBalance(0, 0))
+
+  private lazy val _balance: Map[Address, Map[Asset, Long]] = mapAccountState(_.balance)
 
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long =
-    input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
+    _balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
+
+  private lazy val _balanceSnapshots: Map[Address, Seq[BalanceSnapshot]] = for {
+    (addr, state) <- input.accounts
+  } yield {
+    val generatingBalance = state.generatingBalance.orElse(state.balance.get(Waves)).getOrElse(0L)
+    addr -> Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
+  }
 
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     // "to" always None
-    input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
+    _balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
   private def complexityInfoOf(isAsset: Boolean, script: Script): ComplexityInfo =
     estimate(height, activatedFeatures, this.estimator, script, isAsset = isAsset, withCombinedContext = true)
@@ -189,6 +236,12 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
       (meta.height, tx)
     }
+
+  private def mapAccountState[T](f: RunnerAccountState => T): Map[Address, T] = for {
+    (addr, state) <- input.accounts
+  } yield addr -> f(state)
+
+  // Not supported
 
   override def score: BigInt = kill("score")
 
