@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
-import com.wavesplatform.ride.runner.input.{RideRunnerInput, decodeStringLikeBytes}
+import com.wavesplatform.ride.runner.input.RideRunnerInput
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
@@ -33,6 +33,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
 
+import java.nio.charset.StandardCharsets
 import scala.util.chaining.scalaUtilChainingOps
 
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain {
@@ -93,8 +94,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     asset -> AssetDescription(
       originTransactionId = asset.id,
       issuer = info.issuerPublicKey,
-      name = UnsafeByteOperations.unsafeWrap(decodeStringLikeBytes(info.name).arr),
-      description = UnsafeByteOperations.unsafeWrap(decodeStringLikeBytes(info.description).arr),
+      name = UnsafeByteOperations.unsafeWrap(info.name.getBytes(StandardCharsets.UTF_8)),
+      description = UnsafeByteOperations.unsafeWrap(info.description.getBytes(StandardCharsets.UTF_8)),
       decimals = info.decimals,
       reissuable = info.reissuable,
       totalVolume = info.quantity,
@@ -120,7 +121,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   private lazy val resolveAlias: Map[Alias, Address] = for {
     (addr, state) <- input.accounts
     alias         <- state.aliases
-  } yield Alias.createWithChainId(alias, chainId).explicitGet() -> addr
+  } yield alias -> addr
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
@@ -176,9 +177,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     amount = TxPositiveAmount.from(tx.amount).explicitGet(),
     feeAssetId = tx.feeAssetId,
     fee = TxPositiveAmount.from(tx.fee).explicitGet(),
-    attachment = decodeStringLikeBytes(tx.attachment),
+    attachment = ByteStr(tx.attachment.getBytes(StandardCharsets.UTF_8)), // TODO
     timestamp = tx.timestamp,
-    proofs = Proofs(tx.proofs.map(decodeStringLikeBytes)),
+    proofs = Proofs(tx.proofs.map(x => ByteStr(x.getBytes(StandardCharsets.UTF_8)))), // TODO
     chainId = chainId
   )
 

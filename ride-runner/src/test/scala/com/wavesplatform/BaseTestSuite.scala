@@ -12,7 +12,8 @@ import scala.reflect.ClassTag
 trait BaseTestSuite extends AnyFreeSpecLike with Matchers with BeforeAndAfterAll with OptionValues with TryValues with ScorexLogging {
   protected def settings           = BaseTestSuite.rideRunnerSettings
   protected def blockchainSettings = settings.rideRunner.immutableBlockchain
-  protected val chainId            = settings.rideRunner.immutableBlockchain.addressSchemeCharacter.toByte
+  protected val chainIdChar        = settings.rideRunner.immutableBlockchain.addressSchemeCharacter
+  protected val chainId            = chainIdChar.toByte
 
   protected def isA[T](x: Any)(implicit ct: ClassTag[T]): T = x match {
     case x: T => x
@@ -21,5 +22,5 @@ trait BaseTestSuite extends AnyFreeSpecLike with Matchers with BeforeAndAfterAll
 }
 
 object BaseTestSuite {
-  val (globalConfig, rideRunnerSettings) = AppInitializer.init()
+  val (globalConfig, rideRunnerSettings) = AppInitializer.init(checkDb = false)
 }

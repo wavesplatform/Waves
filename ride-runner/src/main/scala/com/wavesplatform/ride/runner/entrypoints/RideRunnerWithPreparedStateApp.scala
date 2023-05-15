@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.entrypoints
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
-import com.wavesplatform.ride.runner.input.RideRunnerInput
+import com.wavesplatform.ride.runner.input.RideRunnerJson
 import play.api.libs.json.Json
 
 import java.io.File
@@ -26,8 +26,7 @@ object RideRunnerWithPreparedStateApp {
       else if (inputFileName.endsWith(".json")) Using(Source.fromFile(new File(inputJsonPath)))(_.getLines().mkString("\n")).get
       else throw new IllegalArgumentException("Expected JSON or HOCON file")
 
-    val input = RideRunnerInput.parse(json)
-
+    val input      = RideRunnerJson.parse(json)
     val blockchain = new ImmutableBlockchain(globalSettings.rideRunner.immutableBlockchain, input)
 
     val apiResult = UtilsEvaluator.evaluate(

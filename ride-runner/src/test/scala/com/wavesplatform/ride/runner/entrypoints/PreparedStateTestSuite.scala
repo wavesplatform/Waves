@@ -1,7 +1,9 @@
 package com.wavesplatform.ride.runner.entrypoints
 
+import com.wavesplatform.account.Alias
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.ride.runner.TestScript
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
@@ -27,8 +29,8 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       ),
       aliceAddr -> RunnerAccountState(
         data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
-        aliases = List("carl")
-      ),
+        aliases = List(Alias.create("carl").explicitGet())
+     ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
         balance = Map(
