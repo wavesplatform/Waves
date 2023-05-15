@@ -4,8 +4,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.events.fixtures.PrepareInvokeTestData.dataMap
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
+import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -13,7 +15,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, EthereumTransaction, TransactionBase}
 import org.scalactic.source.Position
@@ -209,6 +211,84 @@ object WavesTxChecks extends Matchers with OptionValues {
         value.minFee.value.assetId.toByteArray shouldBe expected.asset.id.arr
         value.minFee.value.amount shouldBe expectedAmount
     }
+  }
+
+  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: InvokeScriptTransaction, publicKeyHash: Array[Byte])(implicit
+      pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.InvokeScript(value) =>
+        value.dApp.get.getPublicKeyHash.toByteArray shouldBe publicKeyHash
+    }
+  }
+
+  def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction, assetId: ByteStr, address: Array[Byte])(
+      implicit pos: Position
+  ): Unit = {
+    val invokeScript = actual.head.getInvokeScript
+    val arguments    = invokeScript.arguments
+
+    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
+    invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
+    invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
+    arguments.head.value.binaryValue.get.toByteArray shouldBe assetId.arr
+    arguments.apply(1).value.binaryValue.get.toByteArray shouldBe address
+  }
+
+
+  def checkInvokeResultTransactionMetadata(result: Option[InvokeScriptResult], dataMap: Map[String, Any], assetId: ByteStr, address: Address)(
+    implicit pos: Position
+  ): Unit = {
+    val data         = result.get.data
+    val transfers    = result.get.transfers
+    val issues       = result.get.issues
+    val reissues     = result.get.reissues
+    val burns        = result.get.burns
+    val sponsorFees  = result.get.sponsorFees
+    val leases       = result.get.leases
+    val leasesCancel = result.get.leaseCancels
+
+    data.head.key shouldBe "int"
+    data.head.value.intValue.get shouldBe dataMap.apply("intVal")
+    data.apply(1).key shouldBe "byte"
+    data.apply(1).value.binaryValue.value.toByteArray shouldBe assetId.arr
+    data.apply(2).key shouldBe "bool"
+    data.apply(2).value.boolValue.value.toString shouldBe dataMap.apply("booleanVal")
+    data.apply(3).key shouldBe "str"
+    data.apply(3).value.stringValue.value shouldBe dataMap.apply("stringVal")
+    data.apply(4).key shouldBe "int"
+    data.apply(4).value.isEmpty shouldBe true
+
+    transfers.head.address.toByteArray shouldBe address.bytes
+    transfers.head.amount.value.amount shouldBe dataMap.apply("scriptTransferAssetInt")
+    transfers.head.amount.value.assetId.toByteArray shouldBe assetId.arr
+    transfers.apply(1).address.toByteArray shouldBe address.bytes
+    transfers.apply(1).amount.value.amount shouldBe dataMap.apply("scriptTransferIssueAssetInt")
+    transfers.apply(2).address.toByteArray shouldBe address.bytes
+    transfers.apply(2).amount.value.amount shouldBe dataMap.apply("scriptTransferUnitInt")
+
+    issues.head.name shouldBe dataMap.apply("issueAssetName")
+    issues.head.description shouldBe dataMap.apply("issueAssetDescription")
+    issues.head.amount shouldBe dataMap.apply("issueAssetAmount")
+    issues.head.decimals shouldBe dataMap.apply("issueAssetDecimals")
+    issues.head.nonce shouldBe dataMap.apply("issueAssetNonce")
+
+    reissues.head.assetId.toByteArray shouldBe assetId.arr
+    reissues.head.amount shouldBe dataMap.apply("reissueInt")
+    reissues.head.isReissuable shouldBe true
+
+    burns.head.assetId.toByteArray shouldBe assetId.arr
+    burns.head.amount shouldBe dataMap.apply("burnInt")
+
+    sponsorFees.head.minFee.value.assetId.toByteArray shouldBe assetId.arr
+    sponsorFees.head.minFee.value.amount shouldBe dataMap.apply("sponsorFeeAssetInt")
+    sponsorFees.apply(1).minFee.value.amount shouldBe dataMap.apply("sponsorFeeIssueAssetInt")
+
+    leases.head.recipient.get.getPublicKeyHash.toByteArray shouldBe address.publicKeyHash
+    leases.head.amount shouldBe dataMap.apply("leaseInt")
+
+    leasesCancel.head.leaseId shouldBe leases.head.leaseId
   }
 
   def checkEthereumTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction)(implicit pos: Position): Unit = {
