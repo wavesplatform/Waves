@@ -31,12 +31,11 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 
     val script: Script = Gen.script(settings.complexity, estimator)
 
-    val setScripts = Range(0, settings.scripts) flatMap (
-        _ =>
-          accounts.map { i =>
-            SetScriptTransaction.selfSigned(1.toByte, i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
-          }
-      )
+    val setScripts = Range(0, settings.scripts) flatMap (_ =>
+      accounts.map { i =>
+        SetScriptTransaction.selfSigned(1.toByte, i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
+      }
+    )
 
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
@@ -54,10 +53,12 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
       val asset           = randomFrom(settings.assets.toSeq)
       val tradeAssetIssue = ByteStr.decodeBase58(asset.get).toOption
       val pair            = AssetPair(Waves, Asset.fromCompatId(tradeAssetIssue))
-      val sellOrder       = Order.sell(TxVersion.V2, seller, matcher.publicKey, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
-      val buyOrder        = Order.buy(TxVersion.V2, buyer, matcher.publicKey, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
+      val sellOrder = Order.sell(TxVersion.V2, seller, matcher.publicKey, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves).explicitGet()
+      val buyOrder  = Order.buy(TxVersion.V2, buyer, matcher.publicKey, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves).explicitGet()
 
-      ExchangeTransaction.signed(TxVersion.V2, matcher.privateKey, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts).explicitGet()
+      ExchangeTransaction
+        .signed(TxVersion.V2, matcher.privateKey, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts)
+        .explicitGet()
     }
 
     setScripts ++ txs ++ extxs

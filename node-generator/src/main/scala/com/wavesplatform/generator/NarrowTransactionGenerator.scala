@@ -3,9 +3,8 @@ package com.wavesplatform.generator
 import java.nio.file.{Files, Paths}
 import java.util.UUID
 import java.util.concurrent.ThreadLocalRandom
-
 import cats.Show
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.generator.utils.{Gen, Universe}
@@ -17,33 +16,33 @@ import com.wavesplatform.state.DataEntry.{MaxValueSize, Type}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
+import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import org.slf4j.LoggerFactory
 import org.web3j.crypto.Bip32ECKeyPair
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
-import scala.util.Random._
+import scala.util.Random.*
 
 //noinspection ScalaStyle, TypeAnnotation
 class NarrowTransactionGenerator(
     settings: NarrowTransactionGenerator.Settings,
     preconditions: NarrowTransactionGenerator.Preconditions,
-    accounts: Seq[KeyPair],
+    accounts: Seq[SeedKeyPair],
     estimator: ScriptEstimator,
     override val initial: Seq[Transaction],
     override val tailInitial: Seq[Transaction]
 ) extends TransactionGenerator {
-  import NarrowTransactionGenerator._
+  import NarrowTransactionGenerator.*
 
   private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
@@ -65,103 +64,103 @@ class NarrowTransactionGenerator(
         Universe.Leases,
         Seq.empty[CreateAliasTransaction]
       )
-    ) {
-      case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), i) =>
-        val timestamp = now + i
+    ) { case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), i) =>
+      val timestamp = now + i
 
-        val tx: Option[Transaction] = typeGen.getRandom match {
-          case TransactionType.Issue =>
-            val sender      = randomFrom(accounts).get
-            val name        = random.nextString(5)
-            val description = random.nextString(5)
-            val reissuable  = random.nextBoolean()
-            val amount      = 100000000L + Random.nextInt(Int.MaxValue)
-            logOption(
-              IssueTransaction
-                .selfSigned(
-                  correctVersion(TxVersion.V2),
-                  sender,
-                  name,
-                  description,
-                  amount,
-                  Random.nextInt(9).toByte,
-                  reissuable,
-                  None,
-                  100400000L,
-                  timestamp
-                )
-            )
+      val tx: Option[Transaction] = typeGen.getRandom match {
+        case TransactionType.Issue =>
+          val sender      = randomFrom(accounts).get
+          val name        = random.nextString(5)
+          val description = random.nextString(5)
+          val reissuable  = random.nextBoolean()
+          val amount      = 100000000L + Random.nextInt(Int.MaxValue)
+          logOption(
+            IssueTransaction
+              .selfSigned(
+                correctVersion(TxVersion.V2),
+                sender,
+                name,
+                description,
+                amount,
+                Random.nextInt(9).toByte,
+                reissuable,
+                None,
+                100400000L,
+                timestamp
+              )
+          )
 
-          case TransactionType.Transfer =>
-            (
-              for {
-                (sender, asset) <- randomSenderAndAsset(validIssueTxs)
-                useAlias = random.nextBoolean()
-                recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
-                tx <- logOption(
-                  TransferTransaction
-                    .selfSigned(
-                      correctVersion(TxVersion.V2),
-                      sender,
-                      recipient,
-                      Asset.fromCompatId(asset),
-                      500,
-                      Waves,
-                      500000L,
-                      createAttachment(),
-                      timestamp
-                    )
-                )
-              } yield tx
-            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
+        case TransactionType.Transfer =>
+          (
+            for {
+              (sender, asset) <- randomSenderAndAsset(validIssueTxs)
+              useAlias = random.nextBoolean()
+              recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
+              tx <- logOption(
+                TransferTransaction
+                  .selfSigned(
+                    correctVersion(TxVersion.V2),
+                    sender,
+                    recipient,
+                    Asset.fromCompatId(asset),
+                    500,
+                    Waves,
+                    500000L,
+                    createAttachment(),
+                    timestamp
+                  )
+              )
+            } yield tx
+          ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
-          case TransactionType.Reissue =>
-            (
-              for {
-                assetTx <- randomFrom(reissuableIssueTxs) orElse randomFrom(Universe.IssuedAssets.filter(_.reissuable))
-                sender  <- accountByAddress(assetTx.sender.toAddress.toString)
-                tx <- logOption(
-                  ReissueTransaction
-                    .selfSigned(
-                      correctVersion(TxVersion.V2),
-                      sender,
-                      IssuedAsset(assetTx.id()),
-                      Random.nextInt(Int.MaxValue),
-                      true,
-                      100400000L,
-                      timestamp
-                    )
-                )
-              } yield tx
-            ).logNone("There is no reissuable assets, may be you need to increase issue transaction's probability or pre-configure them")
-
-          case TransactionType.Burn =>
-            (
-              for {
-                assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
-                sender  <- accountByAddress(assetTx.sender.toAddress.toString)
-                tx <- logOption(
-                  BurnTransaction.selfSigned(
+        case TransactionType.Reissue =>
+          (
+            for {
+              assetTx <- randomFrom(reissuableIssueTxs) orElse randomFrom(Universe.IssuedAssets.filter(_.reissuable))
+              sender  <- accountByAddress(assetTx.sender.toAddress.toString)
+              tx <- logOption(
+                ReissueTransaction
+                  .selfSigned(
                     correctVersion(TxVersion.V2),
                     sender,
                     IssuedAsset(assetTx.id()),
-                    Random.nextInt(1000),
-                    500000L,
+                    Random.nextInt(Int.MaxValue),
+                    true,
+                    100400000L,
                     timestamp
                   )
-                )
-              } yield tx
-            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
+              )
+            } yield tx
+          ).logNone("There is no reissuable assets, may be you need to increase issue transaction's probability or pre-configure them")
 
-          case TransactionType.Exchange =>
-            (
-              for {
-                matcher <- randomFrom(Universe.Accounts).map(_.keyPair)
-                seller  <- randomFrom(Universe.Accounts).map(_.keyPair)
-                buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
-                pair    <- preconditions.tradeAsset.map(a => AssetPair(Waves, IssuedAsset(a.id())))
-                delta = random.nextLong(10000)
-                sellOrder = Order.sell(
+        case TransactionType.Burn =>
+          (
+            for {
+              assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
+              sender  <- accountByAddress(assetTx.sender.toAddress.toString)
+              tx <- logOption(
+                BurnTransaction.selfSigned(
+                  correctVersion(TxVersion.V2),
+                  sender,
+                  IssuedAsset(assetTx.id()),
+                  Random.nextInt(1000),
+                  500000L,
+                  timestamp
+                )
+              )
+            } yield tx
+          ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
+
+        case TransactionType.Exchange =>
+          (
+            for {
+              matcher <- randomFrom(Universe.Accounts).map(_.keyPair)
+              seller  <- randomFrom(Universe.Accounts).map(_.keyPair)
+              buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
+              pair    <- preconditions.tradeAsset.map(a => AssetPair(Waves, IssuedAsset(a.id())))
+              delta = random.nextLong(10000)
+              sellOrder = Order
+                .sell(
                   Order.V2,
                   seller,
                   matcher.publicKey,
@@ -172,7 +171,9 @@ class NarrowTransactionGenerator(
                   timestamp + 30.days.toMillis,
                   300000L
                 )
-                buyOrder = Order.buy(
+                .explicitGet()
+              buyOrder = Order
+                .buy(
                   Order.V2,
                   buyer,
                   matcher.publicKey,
@@ -183,229 +184,242 @@ class NarrowTransactionGenerator(
                   timestamp + 1.day.toMillis,
                   300000L
                 )
-                tx <- logOption(
-                  ExchangeTransaction.signed(
-                    correctVersion(TxVersion.V2),
-                    matcher.privateKey,
-                    buyOrder,
-                    sellOrder,
-                    10000000L + delta,
-                    10,
-                    300000L,
-                    300000L,
-                    700000L,
-                    timestamp
-                  )
-                )
-              } yield tx
-            ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
-
-          case TransactionType.Lease =>
-            (
-              for {
-                sender <- randomFrom(accounts)
-                useAlias = random.nextBoolean()
-                recipient <- (if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
-                              else randomFrom(accounts.filter(_ != sender).map(_.toAddress))) orElse Some(preconditions.leaseRecipient.toAddress)
-                tx <- logOption(
-                  LeaseTransaction.selfSigned(correctVersion(TxVersion.V2), sender, recipient, random.nextLong(1, 100), 500000L, timestamp)
-                )
-              } yield tx
-            ).logNone("Can't define recipient of transaction, check your configuration")
-
-          case TransactionType.LeaseCancel =>
-            (
-              for {
-                lease  <- activeLeaseTransactions.headOption
-                sender <- accountByAddress(lease.sender.toAddress.toString)
-                tx     <- logOption(LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 500000L, timestamp))
-              } yield tx
-            ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
-
-          case TransactionType.CreateAlias =>
-            val sender      = randomFrom(accounts).get
-            val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(
-              CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, aliasString, 500000L, timestamp)
-            )
-
-          case TransactionType.MassTransfer =>
-            (
-              for {
-                (sender, asset) <- randomSenderAndAsset(validIssueTxs)
-                transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
-                transfers = for (_ <- 0 until transferCount) yield {
-                  val useAlias  = random.nextBoolean()
-                  val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
-                  val amount    = 1000 / (transferCount + 1)
-                  ParsedTransfer(recipient, amount)
-                }
-                tx <- logOption(
-                  MassTransferTransaction
-                    .selfSigned(
-                      correctVersion(TxVersion.V1),
-                      sender,
-                      Asset.fromCompatId(asset),
-                      transfers.toList,
-                      100000L + 50000L * transferCount + 400000L,
-                      timestamp,
-                      createAttachment()
-                    )
-                )
-              } yield tx
-            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
-
-          case TransactionType.Data =>
-            val sender = randomFrom(accounts).get
-            val count  = random.nextInt(10)
-
-            val data = for {
-              _ <- 0 until count
-              etype = random.nextInt(Type.maxId)
-            } yield etype match {
-              case t if t == Type.Integer.id => IntegerDataEntry(Random.nextString(10), random.nextLong)
-              case t if t == Type.Boolean.id => BooleanDataEntry(Random.nextString(10), random.nextBoolean)
-              case t if t == Type.String.id  => StringDataEntry(Random.nextString(10), random.nextLong.toString)
-              case t if t == Type.Binary.id =>
-                val size = random.nextInt(MaxValueSize + 1)
-                val b    = new Array[Byte](size)
-                random.nextBytes(b)
-                BinaryDataEntry(Random.nextString(10), ByteStr(b))
-            }
-            val size = 128 + data.map(_.toBytes.length).sum
-            val fee  = 500000L * (size / 1024 + 1)
-            logOption(DataTransaction.selfSigned(correctVersion(TxVersion.V1), sender, data.toList, fee, timestamp))
-
-          case TransactionType.SponsorFee =>
-            (
-              for {
-                assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
-                sender  <- accountByAddress(assetTx.sender.toAddress.toString)
-                tx <- logOption(
-                  SponsorFeeTransaction.selfSigned(
-                    correctVersion(TxVersion.V1),
-                    sender,
-                    IssuedAsset(assetTx.id()),
-                    Some(Random.nextInt(1000)),
-                    100400000L,
-                    timestamp
-                  )
-                )
-              } yield tx
-            ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
-
-          case TransactionType.InvokeScript =>
-            val script   = randomFrom(settings.scripts).get
-            val function = randomFrom(script.functions).get
-            val sender   = randomFrom(accounts).get
-            val data = for {
-              ScriptSettings.Function.Arg(argType, value) <- function.args
-            } yield argType.toLowerCase match {
-              case "integer" => Terms.CONST_LONG(value.toLong)
-              case "string"  => Terms.CONST_STRING(value).explicitGet()
-              case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
-              case "binary"  => Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
-            }
-
-            val maybeFunctionCall =
-              if (function.name.isEmpty) None
-              else Some(Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList))
-
-            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
-              .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
-
-            logOption(
-              Right(
-                Signed.invokeScript(
-                  correctVersion(TxVersion.V1),
-                  sender,
-                  GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
-                  maybeFunctionCall,
-                  Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
-                  5300000L,
-                  Waves,
-                  timestamp
-                )
-              )
-            )
-
-          case TransactionType.Ethereum =>
-            import EthTxGenerator.Arg
-
-            val script   = randomFrom(settings.scripts).get
-            val function = randomFrom(script.functions).get
-            val sender   = randomFrom(accounts).get
-            val ethArgs = for {
-              ScriptSettings.Function.Arg(argType, value) <- function.args
-            } yield argType.toLowerCase match {
-              case "integer" | "int" | "long" | "int64" | "uint64" => Arg.Integer(value.toLong)
-              case "bigint" | "int256" | "uint256"                 => Arg.BigInteger(BigInt(Base58.decode(value)))
-              case "string"                                        => Arg.Str(value)
-              case "boolean" | "bool"                              => Arg.Bool(value.toBoolean)
-              case "binary"                                        => Arg.Bytes(ByteStr(Base58.decode(value)))
-            }
-
-            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
-              .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
-
-            logOption(
-              Right(
-                EthTxGenerator.generateEthInvoke(Bip32ECKeyPair.generateKeyPair(sender.seed), GeneratorSettings.toKeyPair(script.dappAccount).toAddress, function.name, ethArgs, Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)))
-              )
-            )
-
-          case TransactionType.SetScript =>
-            for {
-              sender <- randomFrom(preconditions.setScriptAccounts)
-              script = Gen.script(complexity = false, estimator)
+                .explicitGet()
               tx <- logOption(
-                SetScriptTransaction.selfSigned(
-                  correctVersion(TxVersion.V1),
-                  sender,
-                  Some(script),
-                  1400000L + random.nextLong(100),
+                ExchangeTransaction.signed(
+                  correctVersion(TxVersion.V2),
+                  matcher.privateKey,
+                  buyOrder,
+                  sellOrder,
+                  10000000L + delta,
+                  10,
+                  300000L,
+                  300000L,
+                  700000L,
                   timestamp
                 )
               )
             } yield tx
+          ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
 
-          case TransactionType.SetAssetScript =>
-            (
-              for {
-                assetTx <- randomFrom(preconditions.setScriptAssets)
-                sender  <- preconditions.setScriptAccounts.find(_.publicKey == assetTx.sender)
-                script = Gen.script(complexity = false, estimator)
-                tx <- logOption(
-                  SetAssetScriptTransaction.selfSigned(
+        case TransactionType.Lease =>
+          (
+            for {
+              sender <- randomFrom(accounts)
+              useAlias = random.nextBoolean()
+              recipient <- (if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
+                            else randomFrom(accounts.filter(_ != sender).map(_.toAddress))) orElse Some(preconditions.leaseRecipient.toAddress)
+              tx <- logOption(
+                LeaseTransaction.selfSigned(correctVersion(TxVersion.V2), sender, recipient, random.nextLong(1, 100), 500000L, timestamp)
+              )
+            } yield tx
+          ).logNone("Can't define recipient of transaction, check your configuration")
+
+        case TransactionType.LeaseCancel =>
+          (
+            for {
+              lease  <- activeLeaseTransactions.headOption
+              sender <- accountByAddress(lease.sender.toAddress.toString)
+              tx     <- logOption(LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 500000L, timestamp))
+            } yield tx
+          ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
+
+        case TransactionType.CreateAlias =>
+          val sender      = randomFrom(accounts).get
+          val aliasString = NarrowTransactionGenerator.generateAlias()
+          logOption(
+            CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, aliasString, 500000L, timestamp)
+          )
+
+        case TransactionType.MassTransfer =>
+          (
+            for {
+              (sender, asset) <- randomSenderAndAsset(validIssueTxs)
+              transferCount = random.nextInt(MassTransferTransaction.MaxTransferCount)
+              transfers = for (_ <- 0 until transferCount) yield {
+                val useAlias  = random.nextBoolean()
+                val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
+                val amount    = 1000 / (transferCount + 1)
+                ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
+              }
+              tx <- logOption(
+                MassTransferTransaction
+                  .selfSigned(
                     correctVersion(TxVersion.V1),
                     sender,
-                    IssuedAsset(assetTx.id()),
-                    Some(script),
-                    100400000L,
-                    timestamp
+                    Asset.fromCompatId(asset),
+                    transfers.toList,
+                    100000L + 50000L * transferCount + 400000L,
+                    timestamp,
+                    createAttachment()
                   )
+              )
+            } yield tx
+          ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
+
+        case TransactionType.Data =>
+          val sender = randomFrom(accounts).get
+          val count  = random.nextInt(10)
+
+          val data = for {
+            _ <- 0 until count
+            etype = random.nextInt(Type.maxId)
+          } yield etype match {
+            case t if t == Type.Integer.id => IntegerDataEntry(Random.nextString(10), random.nextLong)
+            case t if t == Type.Boolean.id => BooleanDataEntry(Random.nextString(10), random.nextBoolean)
+            case t if t == Type.String.id  => StringDataEntry(Random.nextString(10), random.nextLong.toString)
+            case t if t == Type.Binary.id =>
+              val size = random.nextInt(MaxValueSize + 1)
+              val b    = new Array[Byte](size)
+              random.nextBytes(b)
+              BinaryDataEntry(Random.nextString(10), ByteStr(b))
+          }
+          val size = 128 + data.map(_.toBytes.length).sum
+          val fee  = 500000L * (size / 1024 + 1)
+          logOption(DataTransaction.selfSigned(correctVersion(TxVersion.V1), sender, data.toList, fee, timestamp))
+
+        case TransactionType.SponsorFee =>
+          (
+            for {
+              assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
+              sender  <- accountByAddress(assetTx.sender.toAddress.toString)
+              tx <- logOption(
+                SponsorFeeTransaction.selfSigned(
+                  correctVersion(TxVersion.V1),
+                  sender,
+                  IssuedAsset(assetTx.id()),
+                  Some(Random.nextInt(1000)),
+                  100400000L,
+                  timestamp
                 )
-              } yield tx
-            ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
+              )
+            } yield tx
+          ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
-          case _ => ???
-        }
+        case TransactionType.InvokeScript =>
+          val script   = randomFrom(settings.scripts).get
+          val function = randomFrom(script.functions).get
+          val sender   = randomFrom(accounts).get
+          val data = for {
+            ScriptSettings.Function.Arg(argType, value) <- function.args
+          } yield argType.toLowerCase match {
+            case "integer" => Terms.CONST_LONG(value.toLong)
+            case "string"  => Terms.CONST_STRING(value).explicitGet()
+            case "boolean" => Terms.CONST_BOOLEAN(value.toBoolean)
+            case "binary"  => Terms.CONST_BYTESTR(ByteStr.decodeBase58(value).get).explicitGet()
+          }
 
-        (tx.fold(allTxsWithValid)(tx => allTxsWithValid :+ tx), tx match {
+          val maybeFunctionCall =
+            if (function.name.isEmpty) None
+            else Some(Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList))
+
+          val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
+            .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
+
+          logOption(
+            Right(
+              Signed.invokeScript(
+                correctVersion(TxVersion.V1),
+                sender,
+                GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
+                maybeFunctionCall,
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
+                5300000L,
+                Waves,
+                timestamp
+              )
+            )
+          )
+
+        case TransactionType.Ethereum =>
+          import EthTxGenerator.Arg
+
+          val script   = randomFrom(settings.scripts).get
+          val function = randomFrom(script.functions).get
+          val sender   = randomFrom(accounts).get
+          val ethArgs = for {
+            ScriptSettings.Function.Arg(argType, value) <- function.args
+          } yield argType.toLowerCase match {
+            case "integer" | "int" | "long" | "int64" | "uint64" => Arg.Integer(value.toLong)
+            case "bigint" | "int256" | "uint256"                 => Arg.BigInteger(BigInt(Base58.decode(value)))
+            case "string"                                        => Arg.Str(value)
+            case "boolean" | "bool"                              => Arg.Bool(value.toBoolean)
+            case "binary"                                        => Arg.Bytes(ByteStr(Base58.decode(value)))
+          }
+
+          val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
+            .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
+
+          logOption(
+            Right(
+              EthTxGenerator.generateEthInvoke(
+                Bip32ECKeyPair.generateKeyPair(sender.seed),
+                GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
+                function.name,
+                ethArgs,
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset))
+              )
+            )
+          )
+
+        case TransactionType.SetScript =>
+          for {
+            sender <- randomFrom(preconditions.setScriptAccounts)
+            script = Gen.script(complexity = false, estimator)
+            tx <- logOption(
+              SetScriptTransaction.selfSigned(
+                correctVersion(TxVersion.V1),
+                sender,
+                Some(script),
+                1400000L + random.nextLong(100),
+                timestamp
+              )
+            )
+          } yield tx
+
+        case TransactionType.SetAssetScript =>
+          (
+            for {
+              assetTx <- randomFrom(preconditions.setScriptAssets)
+              sender  <- preconditions.setScriptAccounts.find(_.publicKey == assetTx.sender)
+              script = Gen.script(complexity = false, estimator)
+              tx <- logOption(
+                SetAssetScriptTransaction.selfSigned(
+                  correctVersion(TxVersion.V1),
+                  sender,
+                  IssuedAsset(assetTx.id()),
+                  Some(script),
+                  100400000L,
+                  timestamp
+                )
+              )
+            } yield tx
+          ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
+
+        case _ => ???
+      }
+
+      (
+        tx.fold(allTxsWithValid)(tx => allTxsWithValid :+ tx),
+        tx match {
           case Some(tx: IssueTransaction) => validIssueTxs :+ tx
           case _                          => validIssueTxs
-        }, tx match {
+        },
+        tx match {
           case Some(tx: IssueTransaction) if tx.reissuable    => reissuableIssueTxs :+ tx
           case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id() != tx.id())
           case _                                              => reissuableIssueTxs
-        }, tx match {
+        },
+        tx match {
           case Some(tx: LeaseTransaction)       => activeLeaseTransactions :+ tx
           case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id() != tx.leaseId)
           case _                                => activeLeaseTransactions
-        }, tx match {
+        },
+        tx match {
           case Some(tx: CreateAliasTransaction) => aliases :+ tx
           case _                                => aliases
-        })
+        }
+      )
     }
 
     Universe.Leases = generated._4
@@ -519,12 +533,14 @@ object NarrowTransactionGenerator {
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(random.nextInt(c.size))) else None
 
-  def apply(settings: Settings, accounts: Seq[KeyPair], time: NTP, estimator: ScriptEstimator): NarrowTransactionGenerator = {
+  def apply(settings: Settings, accounts: Seq[SeedKeyPair], time: NTP, estimator: ScriptEstimator): NarrowTransactionGenerator = {
 
     val (setScriptInitTxs, setScriptTailInitTxs, setScriptAccounts, setScriptAssets) =
-      if (settings.probabilities
-            .get(TransactionType.SetScript)
-            .exists(_ > 0) || settings.probabilities.get(TransactionType.SetAssetScript).exists(_ > 0)) {
+      if (
+        settings.probabilities
+          .get(TransactionType.SetScript)
+          .exists(_ > 0) || settings.probabilities.get(TransactionType.SetAssetScript).exists(_ > 0)
+      ) {
         require(settings.setScript.isDefined, "SetScript and SetAssetScript generations require additional settings [set-script]")
 
         val accountsSettings = settings.setScript.get.accounts
@@ -556,29 +572,29 @@ object NarrowTransactionGenerator {
 
         val assetTailInitTxs =
           if (settings.probabilities.keySet.contains(TransactionType.SetAssetScript))
-            ((1 to assetsSettings.repeat) foldLeft Seq.empty[IssueTransaction]) {
-              case (txs, i) =>
-                import assetsSettings._
+            ((1 to assetsSettings.repeat) foldLeft Seq.empty[IssueTransaction]) { case (txs, i) =>
+              import assetsSettings._
 
-                val issuer = randomFrom(accounts).get
-                val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
+              val issuer = randomFrom(accounts).get
+              val script = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator).explicitGet()._1
 
-                val tx = IssueTransaction
-                  .selfSigned(
-                    TxVersion.V2,
-                    issuer,
-                    UUID.randomUUID().toString.take(16),
-                    s"$description #$i",
-                    amount,
-                    decimals.toByte,
-                    reissuable,
-                    Some(script),
-                    100000000 + fee,
-                    time.correctedTime()
-                  )
-                  .explicitGet()
-                txs :+ tx
-            } else Seq()
+              val tx = IssueTransaction
+                .selfSigned(
+                  TxVersion.V2,
+                  issuer,
+                  UUID.randomUUID().toString.take(16),
+                  s"$description #$i",
+                  amount,
+                  decimals.toByte,
+                  reissuable,
+                  Some(script),
+                  100000000 + fee,
+                  time.correctedTime()
+                )
+                .explicitGet()
+              txs :+ tx
+            }
+          else Seq()
 
         (accountInitTxs, accountTailInitTxs ++ assetTailInitTxs, accounts, assetTailInitTxs)
       } else (Seq(), Seq(), Seq(), Seq())
@@ -610,7 +626,7 @@ object NarrowTransactionGenerator {
               trader,
               acc.toAddress,
               IssuedAsset(tradeAsset.id()),
-              tradeAsset.quantity / Universe.Accounts.size,
+              tradeAsset.quantity.value / Universe.Accounts.size,
               Waves,
               900000,
               ByteStr(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
@@ -626,7 +642,7 @@ object NarrowTransactionGenerator {
     val leaseRecipient = GeneratorSettings.toKeyPair("lease recipient")
 
     val fundEthereumAddresses = accounts.map { kp =>
-      import com.wavesplatform.transaction.utils.EthConverters._
+      import com.wavesplatform.transaction.utils.EthConverters.*
       val ethAccount = kp.toEthWavesAddress
       TransferTransaction
         .selfSigned(TxVersion.V1, accounts.head, ethAccount, Waves, 100_0000_0000L, Waves, 500000L, ByteStr.empty, System.currentTimeMillis())
