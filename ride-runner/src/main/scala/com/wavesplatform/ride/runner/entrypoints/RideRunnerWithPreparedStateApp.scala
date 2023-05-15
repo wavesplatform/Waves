@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner.entrypoints
 
+import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInput
@@ -11,14 +12,21 @@ import scala.util.Using
 
 object RideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
-    if (args.length < 2) throw new IllegalArgumentException("Usage: <path-to-app.conf> <path-to-input.json>")
+    if (args.length < 2) throw new IllegalArgumentException("Usage: <path-to-app.conf> <path-to-input.json/conf>")
 
     val configPath    = args(0)
     val inputJsonPath = args(1)
 
-    val (_, globalSettings) = AppInitializer.init(Some(new File(configPath)))
+    val (_, globalSettings) = AppInitializer.init(checkDb = false, externalConfig = Some(new File(configPath)))
 
-    val input = RideRunnerInput.parse(Using(Source.fromFile(new File(inputJsonPath)))(_.getLines().mkString("\n")).get)
+    val inputFile     = new File(inputJsonPath)
+    val inputFileName = inputFile.getName
+    val json =
+      if (inputFileName.endsWith(".conf")) ConfigFactory.parseFile(inputFile).resolve().root().render(ConfigRenderOptions.concise())
+      else if (inputFileName.endsWith(".json")) Using(Source.fromFile(new File(inputJsonPath)))(_.getLines().mkString("\n")).get
+      else throw new IllegalArgumentException("Expected JSON or HOCON file")
+
+    val input = RideRunnerInput.parse(json)
 
     val blockchain = new ImmutableBlockchain(globalSettings.rideRunner.immutableBlockchain, input)
 

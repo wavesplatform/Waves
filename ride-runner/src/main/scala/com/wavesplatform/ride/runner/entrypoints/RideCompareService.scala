@@ -31,7 +31,7 @@ object RideCompareService extends ScorexLogging {
   )
 
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
+    val (globalConfig, settings) = AppInitializer.init(checkDb = false, externalConfig = args.headOption.map(new File(_)))
     if (settings.rideCompareService.testRequests.isEmpty) throw new IllegalArgumentException("Specify waves.compare.test-requests in config")
 
     log.info("Starting...")

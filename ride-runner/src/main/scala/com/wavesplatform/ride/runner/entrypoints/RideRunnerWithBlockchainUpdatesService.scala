@@ -2,7 +2,6 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.db.RideRocksDb
@@ -23,15 +22,13 @@ import monix.execution.{ExecutionModel, Scheduler}
 import play.api.libs.json.Json
 
 import java.io.File
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
 import java.util.concurrent.*
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 
 object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
+    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_)))
 
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)

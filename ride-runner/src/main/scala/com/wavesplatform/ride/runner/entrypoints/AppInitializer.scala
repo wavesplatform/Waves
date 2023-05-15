@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
 object AppInitializer extends ScorexLogging {
-  def init(externalConfig: Option[File] = None): (Config, RideRunnerGlobalSettings) = {
+  def init(checkDb: Boolean = true, externalConfig: Option[File] = None): (Config, RideRunnerGlobalSettings) = {
     val maybeExternalConfig =
       try externalConfig.map(f => ConfigFactory.parseFile(f.getAbsoluteFile, ConfigParseOptions.defaults().setAllowMissing(false)))
       catch {
@@ -41,7 +41,7 @@ object AppInitializer extends ScorexLogging {
     val settings = RideRunnerGlobalSettings.fromRootConfig(config)
     log.info(s"Starting ${Version.VersionString}...")
 
-    checkDbVersion(settings)
+    if (checkDb) checkDbVersion(settings)
     (config, settings)
   }
 
