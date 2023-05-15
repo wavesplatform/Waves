@@ -154,7 +154,7 @@ inScope(Global)(
      * F - show full stack traces
      * u - select the JUnit XML reporter with output directory
      */
-    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
+    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports", "-C", "com.wavesplatform.report.QaseReporter"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
@@ -189,22 +189,34 @@ buildTarballsForDocker := {
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := Def
-  .sequential(
-    `waves-node` / clean,
-    Def.task {
-      (`lang-tests` / Test / test).value
-      (`repl-jvm` / Test / test).value
-      (`lang-js` / Compile / fastOptJS).value
-      (`lang-tests-js` / Test / test).value
-      (`grpc-server` / Test / test).value
-      (node / Test / test).value
-      (`repl-js` / Compile / fastOptJS).value
-      (`node-it` / Test / compile).value
-      (benchmark / Test / compile).value
+checkPRRaw := Def.taskDyn {
+  val res = Def
+    .sequential(
+      `waves-node` / clean,
+      (`lang-testkit` / Compile / runMain).toTask(" com.wavesplatform.report.QaseRunCreator"),
+      Def.task {
+        (`lang-tests` / Test / test).value
+        (`repl-jvm` / Test / test).value
+        (`lang-js` / Compile / fastOptJS).value
+        (`lang-tests-js` / Test / test).value
+        (`grpc-server` / Test / test).value
+        (node / Test / test).value
+        (`repl-js` / Compile / fastOptJS).value
+        (`node-it` / Test / compile).value
+        (benchmark / Test / compile).value
+      }
+    )
+    .result
+    .value
+
+  Def.task {
+    (`lang-testkit` / Compile / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
+    res match {
+      case Inc(inc: Incomplete) => throw inc
+      case Value(v)             => v
     }
-  )
-  .value
+  }
+}.value
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val newState = Project

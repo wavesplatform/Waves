@@ -84,7 +84,8 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.17.0",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "5.2.0"
+    "org.scalamock"     %% "scalamock"       % "5.2.0",
+    "io.qase"            % "qase-api"        % "3.0.4"
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
