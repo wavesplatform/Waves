@@ -332,7 +332,7 @@ object Miner {
   private[mining] val blockMiningStarted = Kamon.counter("block-mining-started").withoutTags()
   private[mining] val microMiningStarted = Kamon.counter("micro-mining-started").withoutTags()
 
-  val MaxTransactionsPerMicroblock: Int = 500
+  val MaxTransactionsPerMicroblock: Int = Int.MaxValue
 
   case object Disabled extends Miner with MinerDebugInfo {
     override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
