@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner.entrypoints
 
+import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.common.state.ByteStr
@@ -11,6 +12,8 @@ import com.wavesplatform.ride.runner.input.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
+
+import java.nio.charset.StandardCharsets
 
 class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
   private val btc  = IssuedAsset(ByteStr.decodeBase58("8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get)
@@ -30,7 +33,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       aliceAddr -> RunnerAccountState(
         data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
         aliases = List(Alias.create("carl").explicitGet())
-     ),
+      ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
         balance = Map(
@@ -43,7 +46,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
     height = 3296627,
     assets = Map(
       btc -> RunnerAssetInfo(
-        description = "Bitcoin",
+        description = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("Bitcoin".getBytes(StandardCharsets.UTF_8))),
         reissuable = true,
         quantity = 21000000
       )

@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.runner.blockchain
 
-import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -33,7 +32,6 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
 
-import java.nio.charset.StandardCharsets
 import scala.util.chaining.scalaUtilChainingOps
 
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain {
@@ -127,8 +125,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     asset -> AssetDescription(
       originTransactionId = asset.id,
       issuer = info.issuerPublicKey,
-      name = UnsafeByteOperations.unsafeWrap(info.name.getBytes(StandardCharsets.UTF_8)),
-      description = UnsafeByteOperations.unsafeWrap(info.description.getBytes(StandardCharsets.UTF_8)),
+      name = info.name,
+      description = info.description,
       decimals = info.decimals,
       reissuable = info.reissuable,
       totalVolume = info.quantity,
@@ -138,10 +136,10 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       },
       sponsorship = info.minSponsoredAssetFee,
       // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
-      lastUpdatedAt = Height @@ 0,
+      lastUpdatedAt = Height(0),
       nft = false,
       sequenceInBlock = 0,
-      issueHeight = Height @@ 0
+      issueHeight = Height(0)
     )
   }
 

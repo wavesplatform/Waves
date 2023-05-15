@@ -1,8 +1,9 @@
 package com.wavesplatform.ride.runner.input
 
+import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.{JsString, JsSuccess}
 
@@ -29,7 +30,7 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
       def parse(rawContent: String) = RideRunnerJson.byteStrReads.reads(JsString(rawContent))
     }
 
-    "stringOrBytesReads" - {
+    "stringOrBytesReadsAsByteStr" - {
       "allows Base58" in {
         val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
         parse(s"base58:$rawContent") shouldBe JsSuccess(ByteStr.decodeBase58(rawContent).get)
@@ -45,7 +46,26 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
         parse(rawContent) shouldBe JsSuccess(ByteStr(rawContent.getBytes(StandardCharsets.UTF_8)))
       }
 
-      def parse(rawContent: String) = RideRunnerJson.stringOrBytesReads.reads(JsString(rawContent))
+      def parse(rawContent: String) = RideRunnerJson.stringOrBytesAsByteStrReads.reads(JsString(rawContent))
+    }
+
+    "stringOrBytesReadsAsByteString" - {
+      "allows Base58" in {
+        val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+        parse(s"base58:$rawContent") shouldBe JsSuccess(UnsafeByteOperations.unsafeWrap(Base58.decode(rawContent)))
+      }
+
+      "allows Base64" in {
+        val rawContent = "dGVzdA=="
+        parse(s"base64:$rawContent") shouldBe JsSuccess(UnsafeByteOperations.unsafeWrap(Base64.decode(rawContent)))
+      }
+
+      "string in UTF-8 by default" in {
+        val rawContent = "test"
+        parse(rawContent) shouldBe JsSuccess(UnsafeByteOperations.unsafeWrap(rawContent.getBytes(StandardCharsets.UTF_8)))
+      }
+
+      def parse(rawContent: String) = RideRunnerJson.stringOrBytesAsByteStringReads.reads(JsString(rawContent))
     }
 
     "aliasReads" - {

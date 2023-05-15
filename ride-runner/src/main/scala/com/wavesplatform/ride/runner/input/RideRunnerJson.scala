@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.input
 
-import com.google.protobuf.ByteString
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
+import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.api.http.{DebugApiRoute, requests}
 import com.wavesplatform.block.Block.BlockId
@@ -54,24 +54,22 @@ object RideRunnerJson extends DefaultReads {
     if (x.isEmpty) JsSuccess(None) else parseByteStr(x, "Option[BlockId]").map(Some(_))
   }
 
-  implicit def byteArrayReads(hint: String) = StringReads.flatMapResult(parseByteArray(_, hint))
+  implicit def byteArrayReads(hint: String) = StringReads.flatMapResult(parseByteArrayBase58(_, hint))
 
   implicit val byteStrReads = byteArrayReads("ByteStr").map(ByteStr(_))
 
   implicit val byteStringReads: Reads[ByteString] = byteArrayReads("ByteString").map(unsafeWrap)
 
-  implicit val stringOrBytesReads: Reads[StringOrBytes] = StringReads.flatMapResult { x =>
-    val bytes = Try {
-      if (x.startsWith("base58:")) Base58.decode(x.substring(7))
-      else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
-      else x.getBytes(StandardCharsets.UTF_8)
-    }.getOrElse(x.getBytes(StandardCharsets.UTF_8))
+  implicit val stringOrBytesAsByteStrReads: Reads[StringOrBytesAsByteStr] = StringReads.flatMapResult { x =>
+    JsSuccess(StringOrBytesAsByteStr(ByteStr(decodeBytesFromStrRaw(x))))
+  }
 
-    JsSuccess(StringOrBytes(ByteStr(bytes)))
+  implicit val stringOrBytesAsByteStringReads: Reads[StringOrBytesAsByteString] = StringReads.flatMapResult { x =>
+    JsSuccess(StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap(decodeBytesFromStrRaw(x))))
   }
 
   implicit val scriptReads: Reads[Script] = StringReads.flatMapResult { x =>
-    parseByteArray(x, "Script").flatMap { bytes =>
+    parseByteArrayBase58(x, "Script").flatMap { bytes =>
       ScriptReader.fromBytes(bytes).successOr(e => mkError("Script", e.m))
     }
   }
@@ -146,15 +144,20 @@ object RideRunnerJson extends DefaultReads {
   implicit val proofsReads: Reads[Proofs]                   = requests.proofsReads
   implicit val rideRunnerInputReads: Reads[RideRunnerInput] = Json.reads
 
-  def parseByteStr(x: String, hint: String = "ByteStr"): JsResult[ByteStr] = parseByteArray(x, hint).map(ByteStr(_))
+  def parseByteStr(x: String, hint: String = "ByteStr"): JsResult[ByteStr] = parseByteArrayBase58(x, hint).map(ByteStr(_))
 
-  def parseByteArray(x: String, hint: String = "Array[Byte]"): JsResult[Array[Byte]] =
-    Try(decodeBytesFromStr(x)).toEither.successOr(e => mkError(hint, e.getMessage))
+  def parseByteArrayBase58(x: String, hint: String = "Array[Byte]"): JsResult[Array[Byte]] =
+    Try {
+      if (x.startsWith("base58:")) Base58.decode(x.substring(7))
+      else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
+      else Base58.decode(x)
+    }.toEither.successOr(e => mkError(hint, e.getMessage))
 
-  def decodeBytesFromStr(x: String): Array[Byte] =
+  def decodeBytesFromStrRaw(x: String): Array[Byte] = Try {
     if (x.startsWith("base58:")) Base58.decode(x.substring(7))
     else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
-    else Base58.decode(x)
+    else x.getBytes(StandardCharsets.UTF_8)
+  }.getOrElse(x.getBytes(StandardCharsets.UTF_8))
 
   def parse(str: String): RideRunnerInput = Json.configured.parse(str).as[RideRunnerInput]
 
