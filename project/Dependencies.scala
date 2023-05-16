@@ -170,7 +170,7 @@ object Dependencies {
       Dependencies.sttp3Monix,
       Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
       Dependencies.akkaHttpModule("akka-http-testkit")                % Test
-    ) ++ Dependencies.logDeps ++ Dependencies.test
+    ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
   lazy val circe = Def.setting {
