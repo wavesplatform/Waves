@@ -20,6 +20,8 @@ object RideRunnerWithPreparedStateApp {
     }
 
     OParser.parse(commandParser, args, Args(), setup).foreach { args =>
+      System.setProperty("logback.stdout.level", if (args.verbose) "TRACE" else "OFF")
+
       val inputFileName = args.inputFile.getName
       val inputRawJson =
         if (inputFileName.endsWith(".conf")) ConfigFactory.parseFile(args.inputFile).resolve().root().render(ConfigRenderOptions.concise())
@@ -76,7 +78,8 @@ object RideRunnerWithPreparedStateApp {
 
   private final case class Args(
       configFile: Option[File] = None,
-      inputFile: File = new File("")
+      inputFile: File = new File(""),
+      verbose: Boolean = false
   )
 
   private val commandParser = {
@@ -89,11 +92,14 @@ object RideRunnerWithPreparedStateApp {
       head("RIDE script runner", Version.VersionString),
       opt[File]('c', "config")
         .text("Path to a config. Alternatively you can add settings in the input file.")
-        .action((f, c) => c.copy(configFile = Some(f))),
+        .action((x, c) => c.copy(configFile = Some(x))),
       opt[File]('i', "input")
         .text("Path to JSON or HOCON (conf) file with prepared state and run arguments. It has highest priority than config.")
         .required()
-        .action((f, c) => c.copy(inputFile = f)),
+        .action((x, c) => c.copy(inputFile = x)),
+      opt[Unit]('v', "verbose")
+        .text("Print logs")
+        .action((x, c) => c.copy(verbose = true)),
       help("help").hidden()
     )
   }
