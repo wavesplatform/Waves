@@ -39,8 +39,10 @@ import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import com.wavesplatform.transaction.{Asset, TransactionType}
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, JsReadable, Json}
+import play.api.libs.json.*
 import shapeless.Coproduct
+
+import scala.util.control.NoStackTrace
 
 object UtilsEvaluator {
   def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
@@ -79,8 +81,9 @@ object UtilsEvaluator {
       override val tpe: TransactionType              = TransactionType.InvokeScript
     }
 
-  object WrongJson                   extends ValidationError
-  object ConflictingRequestStructure extends ValidationError
+  private object NoRequestStructure                 extends ValidationError
+  private object ConflictingRequestStructure        extends ValidationError
+  private case class ParseJsonError(error: JsError) extends ValidationError
 
   sealed trait Evaluation extends Product with Serializable {
     def txLike: InvokeScriptTransactionLike
@@ -92,17 +95,18 @@ object UtilsEvaluator {
       apply(scriptInfo.script.stdLibVersion, address, request)
 
     def apply(stdLibVersion: StdLibVersion, address: Address, request: JsObject): Either[ValidationError, Evaluation] = {
-      (request.value.get("expr"), request.asOpt[UtilsInvocationRequest]) match {
-        case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictingRequestStructure)
-        case (None, None)                                  => Left(WrongJson)
+      (request.value.get("expr"), request.validateOpt[UtilsInvocationRequest]) match {
+        case (Some(_), JsSuccess(Some(_), _)) => Left(ConflictingRequestStructure)
         case (Some(exprRequest), _) =>
           parseCall(exprRequest, stdLibVersion).map { expr =>
             ExprEvaluation(expr, UtilsEvaluator.emptyInvokeScriptLike(address))
           }
-        case (None, Some(invocationRequest)) =>
+        case (None, JsSuccess(Some(invocationRequest), _)) =>
           invocationRequest.toInvocation.map { invocation =>
             InvocationEvaluation(invocation, UtilsEvaluator.toInvokeScriptLike(invocation, address))
           }
+        case (None, JsSuccess(None, _)) => Left(NoRequestStructure)
+        case (None, e: JsError)         => Left(ParseJsonError(e))
       }
     }
   }
@@ -132,6 +136,7 @@ object UtilsEvaluator {
     evaluation match {
       case Left(e) => validationErrorToJson(e, maxTxErrorLogSize)
       case Right(evaluation) =>
+        println(evaluation)
         evaluate(
           evaluateScriptComplexityLimit,
           blockchain,
@@ -178,9 +183,15 @@ object UtilsEvaluator {
   }
 
   def validationErrorToJson(e: ValidationError, maxTxErrorLogSize: Int): JsObject = e match {
-    case e: InvokeRejectError        => Json.obj("error" -> ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
-    case WrongJson                   => ApiError.WrongJson().json
+    case e: InvokeRejectError => Json.obj("error" -> ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
+    case NoRequestStructure =>
+      ApiError
+        .WrongJson(cause = Some(new IllegalArgumentException() with NoStackTrace {
+          override def toString: String = "Either expression or invocation structure is required in request"
+        }))
+        .json
     case ConflictingRequestStructure => ApiError.ConflictingRequestStructure.json
+    case e: ParseJsonError           => ApiError.WrongJson(None, e.error.errors).json
     case e                           => ApiError.fromValidationError(e).json
   }
 
