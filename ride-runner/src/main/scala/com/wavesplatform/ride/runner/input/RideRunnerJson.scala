@@ -12,6 +12,8 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
+import com.wavesplatform.ride.runner.entrypoints.RideRunnerWithPreparedStateApp
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings, RewardsSettings}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
@@ -20,6 +22,7 @@ import play.api.libs.json.*
 
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 
 object RideRunnerJson extends DefaultReads {
@@ -148,7 +151,34 @@ object RideRunnerJson extends DefaultReads {
     TxPositiveAmount.from(x).successOrErrorToString("TxPositiveAmount")
   }
 
-  implicit val proofsReads: Reads[Proofs]                   = requests.proofsReads
+  implicit val proofsReads: Reads[Proofs] = requests.proofsReads
+
+  implicit val charReads: Reads[Char] = StringReads.flatMapResult { x =>
+    if (x.length == 1) JsSuccess(x.head)
+    else mkError("Char", s"Expected one char, got: $x")
+  }
+
+  implicit val durationReads: Reads[Duration] = StringReads.flatMapResult { x =>
+    Try(Duration.create(x)).toEither.successOr(e => mkError("Duration", e.getMessage))
+  }
+
+  implicit val finiteDurationReads: Reads[FiniteDuration] = durationReads.flatMapResult {
+    case x: FiniteDuration => JsSuccess(x)
+    case x                 => mkError("FiniteDuration", s"Expected a finite duration, but got: $x")
+  }
+
+  implicit val genesisTransactionSettingsReads: Reads[GenesisTransactionSettings] = Json.reads
+
+  implicit val genesisSettingsReads: Reads[GenesisSettings] = Json.reads
+
+  implicit val rewardsSettingsReads: Reads[RewardsSettings] = Json.reads
+
+  implicit val functionalitySettingsReads: Reads[FunctionalitySettings] = Json.reads
+
+  implicit val blockchainSettingsReads: Reads[BlockchainSettings] = Json.reads
+
+  implicit val rideRunnerWithPreparedStateAppSettingsReads: Reads[RideRunnerWithPreparedStateApp.Settings] = Json.reads
+
   implicit val rideRunnerInputReads: Reads[RideRunnerInput] = Json.reads
 
   def parseByteStr(x: String, hint: String = "ByteStr"): JsResult[ByteStr] = parseByteArrayBase58(x, hint).map(ByteStr(_))
@@ -166,7 +196,8 @@ object RideRunnerJson extends DefaultReads {
     else x.getBytes(StandardCharsets.UTF_8)
   }.getOrElse(x.getBytes(StandardCharsets.UTF_8))
 
-  def parse(str: String): RideRunnerInput = Json.configured.parse(str).as[RideRunnerInput]
+  def parseJson(x: String): JsValue      = Json.configured.parse(x)
+  def parse(x: JsValue): RideRunnerInput = x.as[RideRunnerInput]
 
   private implicit final class ValidationErrorOps[E, T](private val self: Either[E, T]) extends AnyVal {
     def successOr(f: E => JsError): JsResult[T]           = self.fold(f, JsSuccess(_))
