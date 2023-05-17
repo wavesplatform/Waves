@@ -6,11 +6,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
+import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsString, JsSuccess}
 
 import java.nio.charset.StandardCharsets
 
-class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
+class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPropertyChecks with HasTestAccounts {
   "RideRunnerJson" - {
     "bytesStrReads" - {
       "allows Base58" in {
@@ -28,7 +29,7 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
         parse(rawContent) shouldBe JsSuccess(ByteStr.decodeBase58(rawContent).get)
       }
 
-      def parse(rawContent: String) = RideRunnerJson.byteStrReads.reads(JsString(rawContent))
+      def parse(rawContent: String) = RideRunnerInputParser.byteStrReads.reads(JsString(rawContent))
     }
 
     "stringOrBytesReadsAsByteStr" - {
@@ -47,7 +48,7 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
         parse(rawContent) shouldBe JsSuccess(ByteStr(rawContent.getBytes(StandardCharsets.UTF_8)))
       }
 
-      def parse(rawContent: String) = RideRunnerJson.stringOrBytesAsByteStrReads.reads(JsString(rawContent))
+      def parse(rawContent: String) = RideRunnerInputParser.stringOrBytesAsByteStrReads.reads(JsString(rawContent))
     }
 
     "stringOrBytesReadsAsByteString" - {
@@ -66,7 +67,7 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
         parse(rawContent) shouldBe JsSuccess(UnsafeByteOperations.unsafeWrap(rawContent.getBytes(StandardCharsets.UTF_8)))
       }
 
-      def parse(rawContent: String) = RideRunnerJson.stringOrBytesAsByteStringReads.reads(JsString(rawContent))
+      def parse(rawContent: String) = RideRunnerInputParser.stringOrBytesAsByteStringReads.reads(JsString(rawContent))
     }
 
     "aliasReads" - {
@@ -84,7 +85,7 @@ class RideRunnerJsonTestSuite extends BaseTestSuite with HasTestAccounts {
         parse("alias:W:test").isError shouldBe true
       }
 
-      def parse(rawAlias: String) = RideRunnerJson.aliasReads.reads(JsString(rawAlias))
+      def parse(rawAlias: String) = RideRunnerInputParser.aliasReads.reads(JsString(rawAlias))
     }
 
     "scriptReads" - {
@@ -109,7 +110,7 @@ let x = getIntegerValue(alice, "x")
         parse(scriptSrc) shouldBe JsSuccess(script)
       }
 
-      def parse(rawContent: String) = RideRunnerJson.scriptReads.reads(JsString(rawContent))
+      def parse(rawContent: String) = RideRunnerInputParser.scriptReads.reads(JsString(rawContent))
     }
   }
 }

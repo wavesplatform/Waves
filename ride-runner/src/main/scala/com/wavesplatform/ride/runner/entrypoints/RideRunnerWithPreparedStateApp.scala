@@ -4,16 +4,15 @@ import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
-import com.wavesplatform.ride.runner.input.RideRunnerJson
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.ride.runner.input.RideRunnerInputParser
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import play.api.libs.json.*
-import play.api.libs.json.JsError.toJson
 import scopt.{DefaultOParserSetup, OParser, OParserSetup}
 
 import java.io.File
+import scala.concurrent.duration.DurationInt
 import scala.io.Source
 import scala.util.Using
-import scala.util.control.NoStackTrace
 
 object RideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
@@ -29,42 +28,28 @@ object RideRunnerWithPreparedStateApp {
         if (inputFileName.endsWith(".conf")) ConfigFactory.parseFile(args.inputFile).resolve().root().render(ConfigRenderOptions.concise())
         else if (inputFileName.endsWith(".json")) Using(Source.fromFile(args.inputFile))(_.getLines().mkString("\n")).get
         else throw new IllegalArgumentException("Expected JSON or HOCON file")
-      val inputJson = RideRunnerJson.parseJson(inputRawJson)
 
-      val settingsFromInput = Settings.fromInputJson(inputJson)
-      val settings = (settingsFromInput, args.configFile) match {
-        case (JsSuccess(None, _), None) =>
-          throw new IllegalArgumentException("You have to specify either --config with 'waves.blockchain' setting or 'settings' field in input file")
-            with NoStackTrace
+      val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
+      AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
+      val input = RideRunnerInputParser.parse(inputJson)
 
-        case (JsSuccess(Some(settings), _), _) =>
-          AppInitializer.setupChain(settings.blockchain)
-          settings
-
-        case (e: JsError, _) =>
-          System.err.println(toJson(e))
-          throw new IllegalArgumentException("Wrong 'settings' in input") with NoStackTrace
-
-        case (_, configFile) =>
-          val globalConfig = AppInitializer.loadConfig(configFile)
-
-          // Can't use config.getString, because a part of config is hard-coded in BlockchainSettings
-          val blockchainSettings = BlockchainSettings.fromRootConfig(globalConfig)
-          AppInitializer.setupChain(blockchainSettings)
-
-          RideRunnerGlobalSettings.fromRootConfig(globalConfig).rideRunner.withPreparedStateApp
-      }
-
-      val input      = RideRunnerJson.parse(inputJson) // We must setup chain first to parse addresses
-      val blockchain = new ImmutableBlockchain(settings.blockchain, input)
+      val blockchain = new ImmutableBlockchain(
+        settings = BlockchainSettings(
+          addressSchemeCharacter = input.chainId,
+          functionalitySettings = FunctionalitySettings(),
+          genesisSettings = GenesisSettings(0, 0, 0, None, Nil, 0, 0.seconds),
+          rewardsSettings = RewardsSettings(1, 0, 1, 1)
+        ),
+        input
+      )
 
       val apiResult = UtilsEvaluator.evaluate(
-        evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
+        evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
         blockchain = blockchain,
         address = input.address,
         request = input.request,
         trace = input.trace,
-        maxTxErrorLogSize = settings.maxTxErrorLogSize,
+        maxTxErrorLogSize = input.maxTxErrorLogSize,
         intAsString = true // TODO #110 Int as string in evaluate
       )
 
@@ -72,19 +57,7 @@ object RideRunnerWithPreparedStateApp {
     }
   }
 
-  case class Settings(
-      blockchain: BlockchainSettings,
-      evaluateScriptComplexityLimit: Int = Int.MaxValue,
-      maxTxErrorLogSize: Int = 1024
-  )
-
-  object Settings {
-    def fromInputJson(json: JsValue): JsResult[Option[Settings]] =
-      (json \ "settings").validateOpt[Settings](RideRunnerJson.rideRunnerWithPreparedStateAppSettingsReads)
-  }
-
   private final case class Args(
-      configFile: Option[File] = None,
       inputFile: File = new File(""),
       verbose: Boolean = false
   )
@@ -97,9 +70,6 @@ object RideRunnerWithPreparedStateApp {
 
     OParser.sequence(
       head("RIDE script runner", Version.VersionString),
-      opt[File]('c', "config")
-        .text("Path to a config. Alternatively you can add settings in the input file.")
-        .action((x, c) => c.copy(configFile = Some(x))),
       opt[File]('i', "input")
         .text("Path to JSON or HOCON (conf) file with prepared state and run arguments. It has highest priority than config.")
         .required()

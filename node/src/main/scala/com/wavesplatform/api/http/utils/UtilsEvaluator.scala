@@ -95,18 +95,20 @@ object UtilsEvaluator {
       apply(scriptInfo.script.stdLibVersion, address, request)
 
     def apply(stdLibVersion: StdLibVersion, address: Address, request: JsObject): Either[ValidationError, Evaluation] = {
-      (request.value.get("expr"), request.validateOpt[UtilsInvocationRequest]) match {
-        case (Some(_), JsSuccess(Some(_), _)) => Left(ConflictingRequestStructure)
+      (request.value.get("expr"), request.validate[UtilsInvocationRequest]) match {
+        case (Some(_), JsSuccess(_, _)) if request.fields.size > 1 => Left(ConflictingRequestStructure)
+        // Handles if both specified, but UtilsInvocationRequest e.g. has a wrong argument type
+        // TODO ?
+        // case (Some(_), _: JsError) => Left(ConflictingRequestStructure)
         case (Some(exprRequest), _) =>
           parseCall(exprRequest, stdLibVersion).map { expr =>
             ExprEvaluation(expr, UtilsEvaluator.emptyInvokeScriptLike(address))
           }
-        case (None, JsSuccess(Some(invocationRequest), _)) =>
+        case (None, JsSuccess(invocationRequest, _)) =>
           invocationRequest.toInvocation.map { invocation =>
             InvocationEvaluation(invocation, UtilsEvaluator.toInvokeScriptLike(invocation, address))
           }
-        case (None, JsSuccess(None, _)) => Left(NoRequestStructure)
-        case (None, e: JsError)         => Left(ParseJsonError(e))
+        case (None, e: JsError) => Left(ParseJsonError(e))
       }
     }
   }
@@ -136,7 +138,6 @@ object UtilsEvaluator {
     evaluation match {
       case Left(e) => validationErrorToJson(e, maxTxErrorLogSize)
       case Right(evaluation) =>
-        println(evaluation)
         evaluate(
           evaluateScriptComplexityLimit,
           blockchain,

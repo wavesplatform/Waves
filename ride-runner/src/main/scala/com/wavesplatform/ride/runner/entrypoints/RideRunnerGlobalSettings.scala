@@ -57,7 +57,6 @@ case class RideRunnerCommonSettings(
     db: RideRocksDb.Settings,
     unhealthyIdleTimeout: FiniteDuration,
     rideSchedulerThreads: Option[Int],
-    withPreparedStateApp: RideRunnerWithPreparedStateApp.Settings,
     sharedBlockchain: SharedBlockchainStorage.Settings,
     blockchainState: BlockchainState.Settings,
     requestsService: DefaultRequestService.Settings,

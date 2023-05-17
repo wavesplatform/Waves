@@ -21,7 +21,7 @@ object AppInitializer extends ScorexLogging {
 
     // Can't use config.getString, because a part of config is hard-coded in BlockchainSettings
     val blockchainSettings = BlockchainSettings.fromRootConfig(config)
-    setupChain(blockchainSettings)
+    setupChain(blockchainSettings.addressSchemeCharacter)
 
     val settings = RideRunnerGlobalSettings.fromRootConfig(config)
     log.info(s"Starting ${Version.VersionString}...")
@@ -43,8 +43,7 @@ object AppInitializer extends ScorexLogging {
     com.wavesplatform.settings.loadConfig(maybeExternalConfig)
   }
 
-  def setupChain(blockchainSettings: BlockchainSettings): Unit = {
-    val network = blockchainSettings.addressSchemeCharacter
+  def setupChain(network: Char): Unit = {
     log.info(s"Chosen network: $network / ${network.toByte}")
 
     // Initialize global var with actual address scheme
