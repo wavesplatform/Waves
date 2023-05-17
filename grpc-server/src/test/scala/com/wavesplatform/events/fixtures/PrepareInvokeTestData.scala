@@ -56,6 +56,4 @@ object PrepareInvokeTestData {
        |  ]
        |}
        |""".stripMargin
-
-  println(invokeAssetScript)
 }

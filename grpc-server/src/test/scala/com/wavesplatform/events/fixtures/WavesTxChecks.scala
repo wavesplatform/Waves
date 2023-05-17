@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.dataMap
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
@@ -11,6 +12,7 @@ import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -236,9 +238,8 @@ object WavesTxChecks extends Matchers with OptionValues {
     arguments.apply(1).value.binaryValue.get.toByteArray shouldBe address
   }
 
-
-  def checkInvokeResultTransactionMetadata(result: Option[InvokeScriptResult], dataMap: Map[String, Any], assetId: ByteStr, address: Address)(
-    implicit pos: Position
+  def checkInvokeResultTransactionMetadata(result: Option[InvokeScriptResult], dataMap: Map[String, Any], assetId: ByteStr, address: Address)(implicit
+      pos: Position
   ): Unit = {
     val data         = result.get.data
     val transfers    = result.get.transfers
@@ -318,38 +319,58 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkDataEntriesStateUpdate(actual: Seq[DataEntryUpdate], expected: DataTransaction): Unit = {
-    val expectAddress = expected.sender.toAddress.bytes
-    val expectedData  = expected.data
+  def checkDataEntriesStateUpdate(actual: Seq[DataEntryUpdate], expectedData: Seq[DataEntry[?]], expectAddress: Array[Byte]): Unit = {
     actual.zip(expectedData).foreach { case (actualUpdate, expectedEntry) =>
       val actualEntry   = actualUpdate.dataEntry.get
       val actualKey     = actualEntry.key
-      val actualValue   = actualEntry.value.value
+      val actualValue   = if (actualEntry.value.isDefined) actualEntry.value.value else actualEntry.value
       val expectedKey   = expectedEntry.key
       val expectedValue = expectedEntry.value
 
       actualUpdate.address.toByteArray shouldBe expectAddress
       actualKey shouldBe expectedKey
 
-      if (actualKey == "Binary") {
+      if (actualEntry.value.isDefined && actualEntry.value.isBinaryValue) {
         actualValue shouldBe ByteString.copyFrom(Base58.decode(expectedValue.toString))
-      } else {
+      } else if (actualEntry.value.isDefined) {
         actualValue shouldBe expectedValue
       }
     }
   }
 
-  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: IssueTransaction, isNft: Boolean): Unit = {
-    if (actual.isDefined) {
+  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: IssueTransaction, isNft: Boolean, quantityValue: Long): Unit = {
       actual.get.assetId.toByteArray shouldBe expected.asset.id.arr
       actual.get.issuer.toByteArray shouldBe expected.sender.arr
       actual.get.name shouldBe expected.name.toStringUtf8
       actual.get.description shouldBe expected.description.toStringUtf8
       actual.get.nft shouldBe isNft
-      actual.get.volume shouldBe expected.quantity.value
+      actual.get.volume shouldBe quantityValue
       actual.get.decimals shouldBe expected.decimals.value
       actual.get.reissuable shouldBe expected.reissuable
-    }
+  }
+
+  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: BurnTransaction, isNft: Boolean, quantityAfterReissue: Long): Unit = {
+    actual.get.assetId.toByteArray shouldBe expected.asset.id.arr
+    actual.get.issuer.toByteArray shouldBe expected.sender.arr
+    actual.get.nft shouldBe isNft
+    actual.get.volume shouldBe quantityAfterReissue
+  }
+
+  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: ReissueTransaction, isNft: Boolean, quantityAfterReissue: Long): Unit = {
+    actual.get.assetId.toByteArray shouldBe expected.asset.id.arr
+    actual.get.issuer.toByteArray shouldBe expected.sender.arr
+    actual.get.nft shouldBe isNft
+    actual.get.volume shouldBe quantityAfterReissue
+    actual.get.reissuable shouldBe expected.reissuable
+  }
+
+  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected:  Map[String, Any], assetId: Asset, issuer: Array[Byte]): Unit = {
+      toVanillaAssetId(actual.get.assetId) shouldBe assetId
+      actual.get.issuer.toByteArray shouldBe issuer
+      actual.get.name shouldBe expected.apply("issueAssetName")
+      actual.get.description shouldBe expected.apply("issueAssetDescription")
+      actual.get.volume shouldBe expected.apply("issueAssetAmount")
+      actual.get.decimals shouldBe expected.apply("issueAssetDecimals")
   }
 
   def checkAssetUpdatesStateUpdates(actual: Option[AssetDetails], expected: UpdateAssetInfoTransaction): Unit = {
@@ -370,18 +391,17 @@ object WavesTxChecks extends Matchers with OptionValues {
     }.toMap shouldBe expected
   }
 
-  def checkIndividualLeases(actual: Seq[LeaseUpdate], expected: Map[(String, Long), (Array[Byte], Array[Byte], Array[Byte], Array[Byte])]): Unit = {
-    actual.map { bu =>
-      (
-        (bu.statusAfter.toString().toLowerCase(), bu.amount),
-        (
-          bu.leaseId.toByteArray,
-          bu.sender.toByteArray,
-          bu.recipient.toByteArray,
-          bu.originTransactionId.toByteArray
-        )
-      )
-    }.toMap equals expected
+  def checkIndividualLeases(actual: Seq[LeaseUpdate], expected: Map[(LeaseStatus, Long), (Array[Byte], Array[Byte], Array[Byte], Array[Byte])]): Unit = {
+    actual.size shouldBe expected.size
+
+    actual.zip(expected).foreach { case (lease, ((status, amount), (leaseId, sender, recipient, originTransactionId))) =>
+      lease.statusAfter.toString() shouldBe status.toString.toUpperCase
+      lease.amount shouldBe amount
+      lease.leaseId.toByteArray shouldBe leaseId
+      lease.sender.toByteArray shouldBe sender
+      lease.recipient.toByteArray shouldBe recipient
+      lease.originTransactionId.toByteArray shouldBe originTransactionId
+    }
   }
 
   def checkSetScriptStateUpdate(actual: ScriptUpdate, expected: SetScriptTransaction)(implicit pos: Position): Unit = {
