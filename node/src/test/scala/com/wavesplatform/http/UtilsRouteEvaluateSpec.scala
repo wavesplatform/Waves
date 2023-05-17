@@ -1,4 +1,5 @@
 package com.wavesplatform.http
+
 import akka.http.scaladsl.model.headers.Accept
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
@@ -26,7 +27,7 @@ import io.netty.util.HashedWheelTimer
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json.*
 
 import scala.concurrent.duration.DurationInt
 
@@ -356,9 +357,15 @@ class UtilsRouteEvaluateSpec
           )
         }
         evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
-          (responseAs[JsObject] - "stateChanges") should matchJson(
-            s"""{"result":{"type":"BigInt","value":"${PureContext.BigIntMax.toString()}"},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-          )
+          (responseAs[JsObject] - "stateChanges") should matchJson(s"""{
+            "result":{
+              "type":"BigInt",
+              "value":"${PureContext.BigIntMax.toString()}"
+            },
+            "complexity":65,
+            "expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")",
+            "address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+            }""")
         }
 
         val dAppAccount2 = TxHelpers.secondSigner
@@ -470,6 +477,24 @@ class UtilsRouteEvaluateSpec
           val json = responseAs[JsValue]
           (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
           (json \ "error").as[Int] shouldBe 198
+        }
+
+        // wrong invocation format
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("call" -> Json.obj("function" -> 1))) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "message").as[String] shouldBe "failed to parse json message"
+          (json \ "validationErrors") match {
+            case JsDefined(validationErrors) =>
+              validationErrors should matchJson("""{
+                  "obj.call": [
+                    {
+                      "msg": ["Unexpected call function name format"],
+                      "args": []
+                    }
+                  ]
+                }""")
+            case _: JsUndefined => fail("No validation errors")
+          }
         }
 
         // sender address can be calculated from PK
