@@ -9,12 +9,12 @@ import com.wavesplatform.transaction.Asset
   *   Some(Map.empty) means the data was here
   */
 case class RunnerAccountState(
-    scriptInfo: Option[RunnerScriptInfo] = None,
-    data: Option[Map[String, RunnerDataEntry]] = None,
     balance: Map[Asset, Long] = Map.empty,
     leasing: Option[RunnerLeaseBalance] = None,
     generatingBalance: Option[Long] = None,
-    aliases: List[Alias] = Nil
+    data: Option[Map[String, RunnerDataEntry]] = None,
+    aliases: List[Alias] = Nil,
+    scriptInfo: Option[RunnerScriptInfo] = None
 )
 
 case class RunnerScriptInfo(

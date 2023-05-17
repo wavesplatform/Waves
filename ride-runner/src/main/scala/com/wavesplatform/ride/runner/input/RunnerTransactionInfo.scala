@@ -12,10 +12,10 @@ case class RunnerTransactionInfo(
     fee: Long = 100_000,
     feeAssetId: Asset = Waves,
     recipient: Option[String] = None,
-    attachment: StringOrBytesAsByteStr = StringOrBytesAsByteStr(ByteStr.empty),
-    timestamp: Long = System.currentTimeMillis(),
-    version: Byte = 3,
     senderPublicKey: PublicKey = EmptyPublicKey,
+    height: Option[Int] = None,
+    timestamp: Long = System.currentTimeMillis(),
     proofs: List[StringOrBytesAsByteStr] = Nil,
-    height: Option[Int] = None
+    version: Byte = 3,
+    attachment: StringOrBytesAsByteStr = StringOrBytesAsByteStr(ByteStr.empty)
 )

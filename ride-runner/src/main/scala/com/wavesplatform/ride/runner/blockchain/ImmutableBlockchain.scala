@@ -119,7 +119,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   override val activatedFeatures: Map[Short, Int] =
     settings.functionalitySettings.preActivatedFeatures ++
-      input.extraFeatures.map(id => id -> (height - 1))
+      input.features.map(id => id -> (height - 1))
 
   private lazy val assets: Map[IssuedAsset, AssetDescription] = input.assets.map { case (asset, info) =>
     asset -> AssetDescription(
