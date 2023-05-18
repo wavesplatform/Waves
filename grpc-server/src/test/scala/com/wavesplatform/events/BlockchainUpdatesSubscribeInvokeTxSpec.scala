@@ -13,7 +13,6 @@ import com.wavesplatform.events.fixtures.PrepareInvokeTestData.{
   issueAssetAmount,
   mainDAppScript,
   nestedDAppScript,
-  prepareDataForDoubleNestedTest,
   scriptTransferIssueAssetInt,
   scriptTransferUnitInt
 }
@@ -122,7 +121,6 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
   }
 
   "BU- case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
-    prepareDataForDoubleNestedTest("i.caller", "i.caller")
     val assetDappAccount: SeedKeyPair        = TxHelpers.signer(912)
     val assetDappAddress: Address            = assetDappAccount.toAddress
     val assetDappBalance: Long               = 10.waves
@@ -156,8 +154,8 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
       d.appendBlock(
         issue,
         TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript)),
-        TxHelpers.setScript(assetDappAccount, TxHelpers.script(nestedDAppScript)),
-        TxHelpers.setScript(doubleNestedDappAccount, TxHelpers.script(doubleNestedDAppScript))
+        TxHelpers.setScript(assetDappAccount, TxHelpers.script(nestedDAppScript("i.caller"))),
+        TxHelpers.setScript(doubleNestedDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
       )
       d.appendMicroBlock(invoke)
     } { updates =>
