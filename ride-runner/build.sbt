@@ -48,8 +48,7 @@ inConfig(Universal)(
       "-J-XX:+ParallelRefProcEnabled",
       "-J-XX:+UseStringDeduplication",
       // JVM default charset for proper and deterministic getBytes behaviour
-      "-J-Dfile.encoding=UTF-8",
-      "--add-opens=java.base/java.lang=ALL-UNNAMED"
+      "-J-Dfile.encoding=UTF-8"
     )
   )
 )

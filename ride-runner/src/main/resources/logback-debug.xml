@@ -7,7 +7,7 @@
 
     <!-- To stop LoggerContext properly and flush the logging events from the AsyncAppender queue -->
     <shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook">
-        <delay>5000</delay> <!-- milliseconds -->
+        <delay>${logback.shutdown-hook-delay:-5000}</delay> <!-- milliseconds -->
     </shutdownHook>
 
     <property name="default.pattern" value="%date{ISO8601,UTC} %-5level [%.25thread] %logger{26} - %msg%n%ex"/>
