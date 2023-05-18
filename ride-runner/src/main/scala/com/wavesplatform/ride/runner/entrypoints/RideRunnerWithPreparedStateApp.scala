@@ -33,15 +33,20 @@ object RideRunnerWithPreparedStateApp {
       AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
       val input = RideRunnerInputParser.parse(inputJson)
 
-      val blockchain = new ImmutableBlockchain(
-        settings = BlockchainSettings(
-          addressSchemeCharacter = input.chainId,
-          functionalitySettings = FunctionalitySettings(),
-          genesisSettings = GenesisSettings(0, 0, 0, None, Nil, 0, 0.seconds),
-          rewardsSettings = RewardsSettings(1, 0, 1, 1)
-        ),
-        input
-      )
+      val defaultFunctionalitySettings = input.chainId match {
+        case 'W' => BlockchainSettings(input.chainId, FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
+        case 'T' => BlockchainSettings(input.chainId, FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
+        case 'S' => BlockchainSettings(input.chainId, FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
+        case _ =>
+          BlockchainSettings(
+            addressSchemeCharacter = input.chainId,
+            functionalitySettings = FunctionalitySettings(),
+            genesisSettings = GenesisSettings(0, 0, 0, None, Nil, 0, 0.seconds),
+            rewardsSettings = RewardsSettings(1, 0, 1, 1)
+          )
+      }
+
+      val blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input)
 
       val apiResult = UtilsEvaluator.evaluate(
         evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
