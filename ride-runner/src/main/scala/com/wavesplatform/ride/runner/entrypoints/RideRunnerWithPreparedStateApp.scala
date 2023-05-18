@@ -55,7 +55,7 @@ object RideRunnerWithPreparedStateApp {
         request = input.request,
         trace = input.trace,
         maxTxErrorLogSize = input.maxTxErrorLogSize,
-        intAsString = true // TODO #110 Int as string in evaluate
+        intAsString = input.intAsString
       )
 
       println(Json.prettyPrint(apiResult))

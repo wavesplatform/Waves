@@ -10,6 +10,7 @@ case class RideRunnerInput(
     address: Address,
     request: JsObject,
     chainId: Char = DefaultAddressScheme.chainId.toChar,
+    intAsString: Boolean = false,
     trace: Boolean = false,
     evaluateScriptComplexityLimit: Int = Int.MaxValue,
     maxTxErrorLogSize: Int = 1024,
