@@ -6,6 +6,13 @@ object PrepareInvokeTestData {
   val scriptTransferUnitInt: Long       = current.nextLong(21001, 22001)
   val issueAssetAmount: Long            = current.nextInt(416168074, 918171615)
   val scriptTransferIssueAssetInt: Long = current.nextInt(20601, 21000)
+  val payment: Long                     = current.nextLong(12300, 32487)
+  val baz                               = "baz"
+  val bar                               = "bar"
+  val libVersion: Int                   = current.nextInt(5, 7)
+  var mainDAppScript: String            = ""
+  var nestedDAppScript: String          = ""
+  var doubleNestedDAppScript: String    = ""
 
   val dataMap: Map[String, Any] = Map(
     "burnInt"                     -> current.nextInt(1, 10000),
@@ -28,7 +35,7 @@ object PrepareInvokeTestData {
 
   val invokeAssetScript: String =
     s"""
-       |{-# STDLIB_VERSION ${current.nextInt(5, 7)} #-}
+       |{-# STDLIB_VERSION $libVersion #-}
        |{-# CONTENT_TYPE DAPP #-}
        |{-# SCRIPT_TYPE ACCOUNT #-}
        |@Callable(i)
@@ -56,4 +63,60 @@ object PrepareInvokeTestData {
        |  ]
        |}
        |""".stripMargin
+
+  def prepareDataForDoubleNestedTest(firstRecipient: String, secondRecipient: String): Unit = {
+    mainDAppScript = s"""
+                        |{-# STDLIB_VERSION $libVersion #-}
+                        |{-# CONTENT_TYPE DAPP #-}
+                        |{-# SCRIPT_TYPE ACCOUNT #-}
+                        |@Callable(i)
+                        |func setData(acc1:ByteVector, acc2:ByteVector, a:Int, key1:String, assetId:ByteVector)={
+                        |strict res = invoke(Address(acc2),"$bar",[a, assetId, acc1],[AttachedPayment(assetId,$payment)])
+                        |match res {
+                        |   case r : Int =>
+                        |(
+                        | [
+                        |   IntegerEntry(key1, r)
+                        | ]
+                        |)
+                        |	case _ => throw("Incorrect invoke result for res in dApp 1")
+                        | }
+                        |}
+                        |""".stripMargin
+
+    nestedDAppScript = s"""
+                          |{-# STDLIB_VERSION $libVersion #-}
+                          |{-# CONTENT_TYPE DAPP #-}
+                          |{-# SCRIPT_TYPE ACCOUNT #-}
+                          |@Callable(i)
+                          |func $bar(a: Int, assetId: ByteVector, acc1: ByteVector)={
+                          |strict res2 = invoke(Address(acc1),"$baz",[a],[])
+                          |match res2 {
+                          |case r: Int =>
+                          |(
+                          |  [
+                          |    ScriptTransfer($firstRecipient, ${dataMap.apply("scriptTransferAssetInt")}, assetId)
+                          |  ],
+                          | a * 2
+                          |)
+                          | case _ => throw("Incorrect invoke result for res2")
+                          | }
+                          |}
+                          |""".stripMargin
+
+    doubleNestedDAppScript = s"""
+                                |{-# STDLIB_VERSION $libVersion #-}
+                                |{-# CONTENT_TYPE DAPP #-}
+                                |{-# SCRIPT_TYPE ACCOUNT #-}
+                                |@Callable(i)
+                                |func $baz(a: Int) = {
+                                |(
+                                | [
+                                |   ScriptTransfer($secondRecipient, ${dataMap.apply("scriptTransferUnitInt")}, unit)
+                                | ],
+                                |a + 2
+                                |)
+                                |}
+                                |""".stripMargin
+  }
 }
