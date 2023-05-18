@@ -3,8 +3,10 @@ package com.wavesplatform.ride.runner.entrypoints
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser
+import com.wavesplatform.ride.runner.requests.RequestParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import play.api.libs.json.*
 import scopt.{DefaultOParserSetup, OParser, OParserSetup}
@@ -46,19 +48,26 @@ object RideRunnerWithPreparedStateApp {
           )
       }
 
-      val blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input)
+      val runResult = RequestParser.parse(StdLibVersion.VersionDic.latest, input.address, input.request) match {
+        case Left(e) => UtilsEvaluator.validationErrorToJson(e, input.maxTxErrorLogSize)
+        case Right(evaluation) =>
+          val blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input)
+          val address    = input.address
+          val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
+          UtilsEvaluator.evaluate(
+            evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
+            blockchain = blockchain,
+            scriptInfo = scriptInfo,
+            evaluation = evaluation,
+            address = address,
+            trace = input.trace,
+            maxTxErrorLogSize = input.maxTxErrorLogSize,
+            intAsString = input.intAsString,
+            wrapDAppEnv = identity
+          )
+      }
 
-      val apiResult = UtilsEvaluator.evaluate(
-        evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
-        blockchain = blockchain,
-        address = input.address,
-        request = input.request,
-        trace = input.trace,
-        maxTxErrorLogSize = input.maxTxErrorLogSize,
-        intAsString = input.intAsString
-      )
-
-      println(Json.prettyPrint(apiResult))
+      println(Json.prettyPrint(runResult))
     }
   }
 

@@ -208,7 +208,7 @@ class DefaultRequestService(
     val (evaluation, failJson) =
       if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
       else // Note: the latest version here for simplicity
-        UtilsEvaluator.Evaluation(StdLibVersion.VersionDic.latest, prevResult.request.address, prevResult.request.requestBody) match {
+        RequestParser.parse(StdLibVersion.VersionDic.latest, prevResult.request.address, prevResult.request.requestBody) match {
           case Right(x) => (Some(x), JsObject.empty)
           case Left(e)  => (None, UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize))
         }

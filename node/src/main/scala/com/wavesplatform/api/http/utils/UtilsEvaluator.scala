@@ -81,9 +81,9 @@ object UtilsEvaluator {
       override val tpe: TransactionType              = TransactionType.InvokeScript
     }
 
-  private object NoRequestStructure                 extends ValidationError
-  private object ConflictingRequestStructure        extends ValidationError
-  private case class ParseJsonError(error: JsError) extends ValidationError
+  object NoRequestStructure                 extends ValidationError
+  object ConflictingRequestStructure        extends ValidationError
+  case class ParseJsonError(error: JsError) extends ValidationError
 
   sealed trait Evaluation extends Product with Serializable {
     def txLike: InvokeScriptTransactionLike
@@ -97,9 +97,6 @@ object UtilsEvaluator {
     def apply(stdLibVersion: StdLibVersion, address: Address, request: JsObject): Either[ValidationError, Evaluation] = {
       (request.value.get("expr"), request.validate[UtilsInvocationRequest]) match {
         case (Some(_), JsSuccess(_, _)) if request.fields.size > 1 => Left(ConflictingRequestStructure)
-        // Handles if both specified, but UtilsInvocationRequest e.g. has a wrong argument type
-        // TODO ?
-        // case (Some(_), _: JsError) => Left(ConflictingRequestStructure)
         case (Some(exprRequest), _) =>
           parseCall(exprRequest, stdLibVersion).map { expr =>
             ExprEvaluation(expr, UtilsEvaluator.emptyInvokeScriptLike(address))
@@ -290,7 +287,7 @@ object UtilsEvaluator {
     else
       diff.combineE(Diff(Map(UtilsApiRoute.DefaultAddress -> Portfolio.waves(Long.MaxValue / 10)))).explicitGet()
 
-  private def parseCall(js: JsReadable, version: StdLibVersion): Either[GenericError, EXPR] = {
+  def parseCall(js: JsReadable, version: StdLibVersion): Either[GenericError, EXPR] = {
     val binaryCall = js
       .asOpt[ByteStr]
       .toRight(GenericError("Unable to parse expr bytes"))

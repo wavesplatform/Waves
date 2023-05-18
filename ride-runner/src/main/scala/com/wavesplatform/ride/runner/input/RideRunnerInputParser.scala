@@ -4,6 +4,7 @@ import cats.syntax.option.*
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.api.http.utils.UtilsInvocationRequest
 import com.wavesplatform.api.http.{DebugApiRoute, requests}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -14,6 +15,7 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxPositiveAmount, TxValidationError}
 import play.api.libs.json.*
@@ -70,6 +72,12 @@ object RideRunnerInputParser extends DefaultReads {
   implicit val stringOrBytesAsByteStringReads: Reads[StringOrBytesAsByteString] = StringReads.flatMapResult { x =>
     JsSuccess(StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap(decodeBytesFromStrRaw(x))))
   }
+
+  implicit val assetReads: Reads[Asset] = StringReads.flatMapResult(assetKeyReads.readKey)
+
+  implicit val paymentReads: Reads[Payment] = Json.reads
+
+  implicit val utilsInvocationRequestReads: Reads[UtilsInvocationRequest] = Json.reads
 
   implicit val scriptReads: Reads[Script] = StringReads.flatMapResult { x =>
     Try {
