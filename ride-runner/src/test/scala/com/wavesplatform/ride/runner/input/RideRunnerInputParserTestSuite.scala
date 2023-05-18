@@ -12,7 +12,7 @@ import play.api.libs.json.{JsString, JsSuccess}
 import java.nio.charset.StandardCharsets
 
 class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPropertyChecks with HasTestAccounts {
-  "RideRunnerJson" - {
+  "RideRunnerInputParser" - {
     "bytesStrReads" - {
       "allows Base58" in {
         val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
@@ -78,6 +78,10 @@ class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPrope
       }
 
       "allows shortened format" in {
+        parse("alias:test") shouldBe JsSuccess(testAlias)
+      }
+
+      "allows shortest format" in {
         parse("test") shouldBe JsSuccess(testAlias)
       }
 
@@ -86,6 +90,33 @@ class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPrope
       }
 
       def parse(rawAlias: String) = RideRunnerInputParser.aliasReads.reads(JsString(rawAlias))
+    }
+
+    "addressOrAliasReads" - {
+      val address   = aliceAddr
+      val testAlias = Alias.create("test").explicitGet()
+
+      "allows alias full format" in {
+        parse(s"alias:$chainIdChar:test") shouldBe JsSuccess(testAlias)
+      }
+
+      "allows alias shortened format" in {
+        parse("alias:test") shouldBe JsSuccess(testAlias)
+      }
+
+      "checks chain id" in {
+        parse("alias:W:test").isError shouldBe true
+      }
+
+      "address by default" in {
+        parse(address.toString) shouldBe JsSuccess(address)
+      }
+
+      "disallows alias without prefix" in {
+        parse("test").isError shouldBe true
+      }
+
+      def parse(rawAlias: String) = RideRunnerInputParser.addressOrAliasReads.reads(JsString(rawAlias))
     }
 
     "scriptReads" - {

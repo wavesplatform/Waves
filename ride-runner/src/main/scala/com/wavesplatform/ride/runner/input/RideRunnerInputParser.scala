@@ -85,19 +85,35 @@ object RideRunnerInputParser extends DefaultReads {
   implicit val accountScriptInfoReads: Reads[AccountScriptInfo] = Json.reads
 
   implicit val aliasReads: Reads[Alias] = StringReads.flatMapResult { x =>
+    val chainId = AddressScheme.current.chainId
+
+    val separatorNumber = x.count(_ == ':')
     val alias =
-      if (x.count(_ == ':') == 2) Alias.fromString(x)
-      else Alias.createWithChainId(x, AddressScheme.current.chainId)
+      if (separatorNumber == 2) Alias.fromString(x)
+      else if (separatorNumber == 1) Alias.createWithChainId(x.substring(x.indexOf(":") + 1), chainId)
+      else Alias.createWithChainId(x, chainId)
 
     alias
       .flatMap { x =>
-        Either.cond(x.chainId == AddressScheme.current.chainId, x, TxValidationError.WrongChain(AddressScheme.current.chainId, x.chainId))
+        Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId))
       }
       .successOrErrorToString("Alias")
   }
 
-  implicit val addressOrAliasReads: Reads[AddressOrAlias] = byteArrayReads("AddressOrAlias").flatMapResult { x =>
-    AddressOrAlias.fromBytes(x).successOrErrorToString("AddressOrAlias")
+  implicit val addressOrAliasReads: Reads[AddressOrAlias] = StringReads.flatMapResult { x =>
+    val chainId = AddressScheme.current.chainId
+
+    val separatorNumber = x.count(_ == ':')
+    val addressOrAlias =
+      if (separatorNumber == 2) Alias.fromString(x)
+      else if (separatorNumber == 1) Alias.createWithChainId(x.substring(x.indexOf(":") + 1), chainId)
+      else Address.fromString(x)
+
+    addressOrAlias
+      .flatMap { x =>
+        Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId))
+      }
+      .successOrErrorToString("AddressOrAlias")
   }
 
   implicit val heightReads: Reads[Height] = Height.lift

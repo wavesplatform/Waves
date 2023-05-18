@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.entrypoints.AppInitializer
 import com.wavesplatform.utils.ScorexLogging
@@ -10,9 +11,8 @@ import org.scalatest.{BeforeAndAfterAll, OptionValues, TryValues}
 import scala.reflect.ClassTag
 
 trait BaseTestSuite extends AnyFreeSpecLike with Matchers with BeforeAndAfterAll with OptionValues with TryValues with ScorexLogging {
-  protected def settings           = BaseTestSuite.rideRunnerSettings
-  protected def blockchainSettings = settings.rideRunner.immutableBlockchain
-  protected val chainIdChar        = settings.rideRunner.immutableBlockchain.addressSchemeCharacter
+  protected def blockchainSettings = BaseTestSuite.settings
+  protected val chainIdChar        = blockchainSettings.addressSchemeCharacter
   protected val chainId            = chainIdChar.toByte
 
   protected def isA[T](x: Any)(implicit ct: ClassTag[T]): T = x match {
@@ -22,5 +22,6 @@ trait BaseTestSuite extends AnyFreeSpecLike with Matchers with BeforeAndAfterAll
 }
 
 object BaseTestSuite {
-  val (globalConfig, rideRunnerSettings) = AppInitializer.init(checkDb = false)
+  val settings = DefaultBlockchainSettings
+  AppInitializer.setupChain(settings.addressSchemeCharacter)
 }

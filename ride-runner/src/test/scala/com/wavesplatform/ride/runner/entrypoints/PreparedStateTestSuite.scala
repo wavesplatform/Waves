@@ -26,20 +26,21 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       scriptedAccAddr -> RunnerAccountState(
         scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = false))),
         balance = Map(
-          Waves -> (1_300_000 + 2),
-          btc   -> 5
+          Waves -> 500_000,
+          btc   -> 1
         )
       ),
       aliceAddr -> RunnerAccountState(
         data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
-        aliases = List(Alias.create("carl").explicitGet())
+        aliases = List(Alias.create("carl").explicitGet()),
+        balance = Map(
+          Waves -> 1_300_000,
+          btc   -> 2
+        )
       ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
-        balance = Map(
-          Waves -> 2,
-          btc   -> 1
-        ),
+        balance = Map(btc -> 3),
         leasing = Some(RunnerLeaseBalance(in = 10, out = 100))
       )
     ),
@@ -60,7 +61,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
     transactions = Map(
       txId -> RunnerTransactionInfo(
         amount = 93119130,
-        recipient = Some(bobAddr.toString),
+        recipient = bobAddr,
         timestamp = 1663299600039L,
         height = Some(3281000)
       )
@@ -83,7 +84,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       )
 
       withClue(Json.prettyPrint(apiResult)) {
-        (apiResult \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe 9007199361031055L
+        (apiResult \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe 9007199362331057L
       }
     }
 
@@ -94,8 +95,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
             "function" -> "foo",
             "args"     -> List(Json.obj("type" -> "integer", "value" -> 1))
           ),
-          "sender"          -> scriptedAccAddr.toString,
-          "senderPublicKey" -> scriptedAcc.publicKey.toString,
+          "senderPublicKey" -> alice.publicKey.toString,
           "payment"         -> List(Json.obj("amount" -> 1, "assetId" -> btc.toString)),
           "fee"             -> 1_300_000
         ),
@@ -128,7 +128,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       )
 
       withClue(Json.prettyPrint(apiResult)) {
-        (apiResult \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe 9007199361031056L
+        (apiResult \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe 9007199362331058L
       }
     }
   }
@@ -164,7 +164,7 @@ func foo(x: Int) = {
   let y2 = lastBlock.height
   let y3 = size(inv.payments)
 
-  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 +  x6 + x7     + x8    + x9 + x10 + y1 + y2 ${if (hasPayments) "+ y3" else ""} + 9007199254740991)
+  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 +  x6 + x7 + x8 + x9 + x10 + y1 + y2 ${if (hasPayments) "+ y3" else ""} + 9007199254740991)
 }
 
 @Callable(inv)

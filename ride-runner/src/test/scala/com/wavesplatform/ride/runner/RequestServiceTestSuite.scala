@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import cats.syntax.option.*
+import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
@@ -13,9 +14,9 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, RideScriptRunRequest, TestJobScheduler}
-import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
+import com.wavesplatform.ride.runner.storage.{CommonCache, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
 import monix.eval.Task
@@ -138,7 +139,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     val testDb = use(TestDb.mk())
     val sharedBlockchain = testDb.storage.directReadWrite { implicit ctx =>
       SharedBlockchainStorage[RideScriptRunRequest](
-        settings.rideRunner.sharedBlockchain,
+        SharedBlockchainStorage.Settings(blockchainSettings, CommonCache.Settings(ConfigMemorySize.ofBytes(1024))),
         testDb.storage,
         DefaultPersistentCaches(testDb.storage),
         blockchainApi

@@ -32,8 +32,6 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
 
-import scala.util.chaining.scalaUtilChainingOps
-
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain {
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
 
@@ -199,25 +197,12 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = transactionMetaById.get(id)
 
-  private val emptyAddress = Address(new Array[Byte](Address.HashLength), chainId)
-
   private lazy val transferById: Map[ByteStr, TransferTransactionLike] = for {
     (id, tx) <- input.transactions
   } yield id -> TransferTransaction(
     version = tx.version,
     sender = tx.senderPublicKey,
-    recipient = tx.recipient
-      .map { x =>
-        if (x.startsWith("alias:"))
-          Alias.fromString(x).explicitGet().tap { x =>
-            require(
-              x.chainId == settings.addressSchemeCharacter,
-              s"Expected for alias '$x' to be from '${settings.addressSchemeCharacter}' network"
-            )
-          }
-        else Address.fromString(x).left.map(_ => Alias.createWithChainId(x, chainId).explicitGet()).merge
-      }
-      .getOrElse(emptyAddress),
+    recipient = tx.recipient,
     assetId = tx.assetId,
     amount = TxPositiveAmount.from(tx.amount).explicitGet(),
     feeAssetId = tx.feeAssetId,
