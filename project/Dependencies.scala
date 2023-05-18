@@ -151,6 +151,7 @@ object Dependencies {
 
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion,
+    "io.grpc"               % "grpc-services"        % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib         % "protobuf"
   )
