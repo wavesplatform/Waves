@@ -8,7 +8,7 @@ import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
-import com.wavesplatform.utils.EthEncoding
+import com.wavesplatform.utils.{byteStrFormat, EthEncoding}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -33,7 +33,8 @@ object OrderSerializer {
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty) ++
       (if (version >= Order.V4) Json.obj("eip712Signature" -> eip712Signature.map(bs => EthEncoding.toHexString(bs.arr)), "priceMode" -> priceMode)
-       else JsObject.empty)
+       else JsObject.empty) ++
+      attachment.map(attach => Json.obj("attachment" -> attach)).getOrElse(JsObject.empty)
   }
 
   def bodyBytes(order: Order): Array[Byte] = {

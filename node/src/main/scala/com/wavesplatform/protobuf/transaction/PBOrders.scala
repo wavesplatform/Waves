@@ -2,6 +2,7 @@ package com.wavesplatform.protobuf.transaction
 
 import com.wavesplatform.transaction as vt
 import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.order.AssetPair
@@ -12,7 +13,7 @@ import vt.assets.exchange.OrderAuthentication
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.{TxExchangeAmount, TxMatcherFee, TxOrderPrice}
-import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.transaction as vt
 
 object PBOrders {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions.*
@@ -26,11 +27,11 @@ object PBOrders {
     } yield {
       VanillaOrder(
         order.version.toByte,
-      order.sender match {
-        case Sender.SenderPublicKey(value) => OrderAuthentication.OrderProofs(PublicKey(value.toByteStr), order.proofs.map(_.toByteStr))
-        case Sender.Eip712Signature(sig)   => OrderAuthentication.Eip712Signature(sig.toByteStr)
-        case Sender.Empty                  => throw new IllegalArgumentException("Order should have either senderPublicKey or eip712Signature")
-      },
+        order.sender match {
+          case Sender.SenderPublicKey(value) => OrderAuthentication.OrderProofs(PublicKey(value.toByteStr), order.proofs.map(_.toByteStr))
+          case Sender.Eip712Signature(sig)   => OrderAuthentication.Eip712Signature(sig.toByteStr)
+          case Sender.Empty                  => throw new IllegalArgumentException("Order should have either senderPublicKey or eip712Signature")
+        },
         PublicKey(order.matcherPublicKey.toByteArray),
         vt.assets.exchange
           .AssetPair(PBAmounts.toVanillaAssetId(order.getAssetPair.amountAssetId), PBAmounts.toVanillaAssetId(order.getAssetPair.priceAssetId)),
@@ -42,11 +43,12 @@ object PBOrders {
         matcherFee,
         PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId),
         order.priceMode match {
-        case DEFAULT_PRICE_MODE        => DefaultPriceMode
-        case ASSET_DECIMALS            => AssetDecimals
-        case FIXED_DECIMALS            => FixedDecimals
-        case PriceMode.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order price mode: $v")
-      }
+          case DEFAULT_PRICE_MODE        => DefaultPriceMode
+          case ASSET_DECIMALS            => AssetDecimals
+          case FIXED_DECIMALS            => FixedDecimals
+          case PriceMode.Unrecognized(v) => throw new IllegalArgumentException(s"Unknown order price mode: $v")
+        },
+        Option.unless(order.attachment.isEmpty)(order.attachment.toByteStr)
       )
     }
 
@@ -71,6 +73,7 @@ object PBOrders {
         case AssetDecimals    => ASSET_DECIMALS
         case FixedDecimals    => FIXED_DECIMALS
       },
+      order.attachment.getOrElse(ByteStr.empty).toByteString,
       order.orderAuthentication match {
         case OrderAuthentication.OrderProofs(key, _)        => Sender.SenderPublicKey(key.toByteString)
         case OrderAuthentication.Eip712Signature(signature) => Sender.Eip712Signature(signature.toByteString)

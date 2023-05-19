@@ -37,7 +37,8 @@ case class Order(
     expiration: TxTimestamp,
     matcherFee: TxMatcherFee,
     matcherFeeAssetId: Asset = Waves,
-    priceMode: OrderPriceMode = OrderPriceMode.Default
+    priceMode: OrderPriceMode = OrderPriceMode.Default,
+    attachment: Option[ByteStr] = None
 ) extends Proven {
   import Order.*
 
@@ -77,13 +78,8 @@ case class Order(
       case OrderAuthentication.OrderProofs(_, proofs) =>
         Proofs.validate(proofs).fold(e => Validation.failure(e.toString), _ => Validation.success)
       case _ => Validation.success
-    })
-  }
-
-  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
-    (matchAmount > 0) :| "amount should be > 0" &&
-    (matchPrice > 0) :| "price should be > 0" &&
-    (matchAmount < MaxAmount) :| "amount too large"
+    }) &&
+    attachment.forall(_.size <= MaxAttachmentSize) :| "attachment size should be <= 1024 bytes"
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
@@ -128,9 +124,10 @@ object Order {
 
   implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
-  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant     = 100000000L
-  val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
+  val MaxLiveTime: Long       = 30L * 24L * 60L * 60L * 1000L
+  val PriceConstant           = 100000000L
+  val MaxAmount: Long         = 100 * PriceConstant * PriceConstant
+  val MaxAttachmentSize: Long = 1024L
 
   val V1: Version = 1.toByte
   val V2: Version = 2.toByte
