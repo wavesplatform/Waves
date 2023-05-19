@@ -6,6 +6,8 @@ import com.wavesplatform.state.{DataEntry, Height, LeaseBalance}
 import com.wavesplatform.transaction.Asset
 
 trait PersistentCaches {
+  def blockHeaders: BlockPersistentCache
+
   def accountDataEntries: PersistentCache[CacheKey.AccountData, DataEntry[?]]
   def accountScripts: PersistentCache[Address, WeighedAccountScriptInfo]
   def assetDescriptions: PersistentCache[Asset.IssuedAsset, WeighedAssetDescription]
@@ -13,7 +15,7 @@ trait PersistentCaches {
   def accountBalances: PersistentCache[AccountAssetKey, Long]
   def accountLeaseBalances: PersistentCache[Address, LeaseBalance]
   def transactions: TransactionPersistentCache
-  def blockHeaders: BlockPersistentCache
+
   def addressIds: AddressIdPersistentCache
 
   def getActivatedFeatures(): RemoteData[Map[Short, Height]]
