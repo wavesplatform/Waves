@@ -129,18 +129,25 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
     val assetDappBalance: Long        = 10.waves
     val secondAddressBalance: Long    = 10.waves
 
-    val issue                   = TxHelpers.issue(assetDappAccount)
-    val assetDappAddressByteStr = CONST_BYTESTR(ByteStr.apply(assetDappAddress.bytes)).explicitGet()
+    val issue = TxHelpers.issue(assetDappAccount)
+
     val secondAddressByteStr    = CONST_BYTESTR(ByteStr.apply(secondAddress.bytes)).explicitGet()
+    val assetDappAddressByteStr = CONST_BYTESTR(ByteStr.apply(assetDappAddress.bytes)).explicitGet()
     val assetByteStr            = CONST_BYTESTR(issue.asset.id).explicitGet()
     val invokeStr               = CONST_STRING(bar).explicitGet()
     val invokeInt               = CONST_LONG(scriptTransferUnitInt)
-    val args: Seq[EXPR]         = Seq(assetDappAddressByteStr, secondAddressByteStr, invokeInt, invokeStr, assetByteStr)
-    val mainDAppTx              = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript))
-    val nestedDAppTx            = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
-    val doubleNestedDAppTx      = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller")))
 
-    val invoke = TxHelpers.invoke(dAppAddress, Some("setData"), args, Seq.empty, assetDappAccount, fee = 100500000L)
+    val args: Seq[EXPR] = Seq(secondAddressByteStr, assetDappAddressByteStr, invokeInt, invokeStr, assetByteStr)
+
+    val mainDAppTx         = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript))
+    val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller")))
+    val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
+
+    println(mainDAppScript)
+    println(nestedDAppScript("i.caller"))
+    println(doubleNestedDAppScript("i.caller"))
+
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), args, Seq.empty, fee = 100500000L)
 
     withGenerateSubscription(
       settings = currentSettings,

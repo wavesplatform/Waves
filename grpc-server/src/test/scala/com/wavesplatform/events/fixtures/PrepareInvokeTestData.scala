@@ -67,7 +67,7 @@ object PrepareInvokeTestData {
        |{-# CONTENT_TYPE DAPP #-}
        |{-# SCRIPT_TYPE ACCOUNT #-}
        |@Callable(i)
-       |func setData(acc1:ByteVector, acc2:ByteVector, a:Int, key1:String, assetId:ByteVector)={
+       |func foo(acc1:ByteVector, acc2:ByteVector, a:Int, key1:String, assetId:ByteVector)={
        |strict res = invoke(Address(acc2),"$bar",[a, assetId, acc1],[AttachedPayment(assetId,$payment)])
        |match res {
        |   case r : Int =>
