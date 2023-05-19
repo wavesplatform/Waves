@@ -33,7 +33,10 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, Em
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
 import org.scalatest.concurrent.ScalaFutures
+
+import java.util.concurrent.ThreadLocalRandom.current
 
 class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = DomainPresets.RideV6
@@ -121,42 +124,33 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
   }
 
   "BU- case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
-    val assetDappAccount: SeedKeyPair        = TxHelpers.signer(912)
-    val assetDappAddress: Address            = assetDappAccount.toAddress
-    val assetDappBalance: Long               = 10.waves
-    val doubleNestedDappAccount: SeedKeyPair = TxHelpers.signer(12)
-    val doubleNestedDappAddress: Address     = assetDappAccount.toAddress
-    val doubleNestedDappBalance: Long        = 10.waves
-    val issue                                = TxHelpers.issue(assetDappAccount)
-    val assetDappAddressByteStr              = CONST_BYTESTR(ByteStr.apply(assetDappAddress.bytes)).explicitGet()
-    val doubleNestedDappAddressByteStr       = CONST_BYTESTR(ByteStr.apply(doubleNestedDappAddress.bytes)).explicitGet()
-    val assetByteStr                         = CONST_BYTESTR(issue.asset.id).explicitGet()
-    val invokeStr                            = CONST_STRING(bar).explicitGet()
-    val invokeInt                            = CONST_LONG(scriptTransferUnitInt)
-    val args: Seq[EXPR] = Seq(
-      assetDappAddressByteStr,
-      doubleNestedDappAddressByteStr,
-      invokeInt,
-      invokeStr,
-      assetByteStr
-    )
-//  func setData(acc1:ByteVector, acc2:ByteVector, a:Int, key1:String, assetId:ByteVector)
+    val assetDappAccount: SeedKeyPair = TxHelpers.signer(current.nextInt(3000, 22001))
+    val assetDappAddress: Address     = assetDappAccount.toAddress
+    val assetDappBalance: Long        = 10.waves
+    val secondAddressBalance: Long    = 10.waves
+
+    val issue                   = TxHelpers.issue(assetDappAccount)
+    val assetDappAddressByteStr = CONST_BYTESTR(ByteStr.apply(assetDappAddress.bytes)).explicitGet()
+    val secondAddressByteStr    = CONST_BYTESTR(ByteStr.apply(secondAddress.bytes)).explicitGet()
+    val assetByteStr            = CONST_BYTESTR(issue.asset.id).explicitGet()
+    val invokeStr               = CONST_STRING(bar).explicitGet()
+    val invokeInt               = CONST_LONG(scriptTransferUnitInt)
+    val args: Seq[EXPR]         = Seq(assetDappAddressByteStr, secondAddressByteStr, invokeInt, invokeStr, assetByteStr)
+    val mainDAppTx              = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript))
+    val nestedDAppTx            = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
+    val doubleNestedDAppTx      = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller")))
+
     val invoke = TxHelpers.invoke(dAppAddress, Some("setData"), args, Seq.empty, assetDappAccount, fee = 100500000L)
 
     withGenerateSubscription(
       settings = currentSettings,
       balances = Seq(
         AddrWithBalance(dAppAddress, dAppBalanceBefore),
-        AddrWithBalance(assetDappAddress, assetDappBalance),
-        AddrWithBalance(doubleNestedDappAddress, doubleNestedDappBalance)
+        AddrWithBalance(secondAddress, secondAddressBalance),
+        AddrWithBalance(assetDappAddress, assetDappBalance)
       )
     ) { d =>
-      d.appendBlock(
-        issue,
-        TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript)),
-        TxHelpers.setScript(assetDappAccount, TxHelpers.script(nestedDAppScript("i.caller"))),
-        TxHelpers.setScript(doubleNestedDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
-      )
+      d.appendBlock(issue, mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
       d.appendMicroBlock(invoke)
     } { updates =>
       val append = updates(2).append
