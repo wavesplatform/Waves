@@ -2,7 +2,6 @@ package com.wavesplatform.events
 
 import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.openDB
@@ -13,13 +12,14 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Try
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
@@ -53,6 +53,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
+    .addService(ProtoReflectionService.newInstance())
     .build()
 
   override def start(): Unit = {
