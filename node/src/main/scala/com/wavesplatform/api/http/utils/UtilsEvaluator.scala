@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -38,7 +39,7 @@ import shapeless.Coproduct
 object UtilsEvaluator {
   def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
     ExpressionCompiler
-      .compileUntyped(str, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
+      .compileUntyped(str, NoLibraries, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
       .leftMap(GenericError(_))
 
   def toInvokeScriptLike(invocation: Invocation, dAppAddress: Address) =

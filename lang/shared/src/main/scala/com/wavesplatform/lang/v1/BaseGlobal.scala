@@ -24,6 +24,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
 
 import scala.annotation.tailrec
@@ -104,7 +105,7 @@ trait BaseGlobal {
 
   def parseAndCompileExpression(
       input: String,
-      offset: Int,
+      offset: LibrariesOffset,
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
@@ -129,7 +130,7 @@ trait BaseGlobal {
 
   def parseAndCompileContract(
       input: String,
-      offset: Int,
+      offset: LibrariesOffset,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator,
@@ -157,27 +158,31 @@ trait BaseGlobal {
       .leftMap(_._1)
   }
 
-  val compileExpression: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
-    compile(_, _, _, _, _, ExpressionCompiler.compileBoolean)
+  val compileExpression
+      : (String, LibrariesOffset, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
+    compile(_, _, _, _, _, _, ExpressionCompiler.compileBoolean)
 
-  val compileFreeCall: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
-    (input, ctx, version, scriptType, estimator) =>
-      compile(input, ctx, version, scriptType, estimator, ContractCompiler.compileFreeCall(_, _, version))
+  val compileFreeCall
+      : (String, LibrariesOffset, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
+    (input, offset, ctx, version, scriptType, estimator) =>
+      compile(input, offset, ctx, version, scriptType, estimator, ContractCompiler.compileFreeCall(_, _, _, version))
 
-  val compileDecls: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
-    compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
+  val compileDecls
+      : (String, LibrariesOffset, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
+    compile(_, _, _, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
       input: String,
+      offset: LibrariesOffset,
       context: CompilerContext,
       version: StdLibVersion,
       scriptType: ScriptType,
       estimator: ScriptEstimator,
-      compiler: (String, CompilerContext) => Either[String, EXPR]
+      compiler: (String, LibrariesOffset, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], EXPR, Long)] = {
     val isFreeCall = scriptType == Call
     for {
-      expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
+      expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, offset, context, version) else compiler(input, offset, context)
       bytes = serializeExpression(expr, version)
       _          <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimate(expr, version, isFreeCall, estimator, scriptType == Account)
@@ -209,6 +214,7 @@ trait BaseGlobal {
 
   def compileContract(
       input: String,
+      offset: LibrariesOffset,
       ctx: CompilerContext,
       version: StdLibVersion,
       estimator: ScriptEstimator,
@@ -216,7 +222,7 @@ trait BaseGlobal {
       removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp  <- ContractCompiler.compile(input, ctx, version, CallableFunction, needCompaction, removeUnusedCode)
+      dApp  <- ContractCompiler.compile(input, offset, ctx, version, CallableFunction, needCompaction, removeUnusedCode)
       bytes <- serializeContract(dApp, version)
       _     <- ContractScript.validateBytes(bytes)
       de @ DAppEstimation(annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <- ContractScript.estimateFully(version, dApp, estimator)
