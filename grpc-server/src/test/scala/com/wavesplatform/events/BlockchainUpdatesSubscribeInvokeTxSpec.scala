@@ -104,7 +104,6 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
       checkInvokeScriptResultLease(result.leases.head, senderAddress.publicKeyHash, leaseNum)
       checkInvokeScriptResultLeaseCancel(result.leaseCancels.head, invokeLeaseId)
 
-
       checkBalances(
         append.transactionStateUpdates.head.balances,
         Map(
@@ -184,27 +183,37 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
       d.appendBlock(issue, massTx, mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
       d.appendMicroBlock(invoke)
     } { updates =>
-      val append              = updates(2).append
-      val transactionMetadata = append.transactionsMetadata
-      val invokeScript        = transactionMetadata.head.getInvokeScript
-      val arguments           = invokeScript.arguments
-      val result              = invokeScript.result
+      val append                    = updates(2).append
+      val transactionMetadata       = append.transactionsMetadata
+      val invokeScript              = transactionMetadata.head.getInvokeScript
+      val arguments                 = invokeScript.arguments
+      val result                    = invokeScript.result.get
+      val invokes                   = result.invokes
       val expectedValues: List[Any] = List(secondAddress.bytes, assetDappAddress.bytes, scriptTransferUnitNum, bar, asset.id.arr)
       val actualArguments: List[Any] = List(
         arguments.head.value.binaryValue.get.toByteArray,
         arguments(1).value.binaryValue.get.toByteArray,
         arguments(2).value.integerValue.get,
         arguments(3).value.stringValue.get,
-        arguments(4).value.binaryValue.get.toByteArray,
+        arguments(4).value.binaryValue.get.toByteArray
       )
 
       checkInvokeTransaction(append.transactionIds.head, append.transactionAt(0), invoke, dAppAddress.publicKeyHash)
       checkInvokeBaseTransactionMetadata(transactionMetadata, invoke)
       checkArguments(expectedValues, actualArguments)
-      checkInvokeScriptResultData(result.get.data, actualData)
+      checkInvokeScriptResultData(result.data, actualData)
+      checkInvokeScriptBaseInvokes(invokes.head, secondAddress, bar)
+      checkInvokeScriptInvokesArgs(invokes.head.call.get.args.head, scriptTransferUnitNum)
+      checkInvokeScriptInvokesArgs(invokes.head.call.get.args.apply(1), asset.id.arr)
+      checkInvokeScriptInvokesArgs(invokes.head.call.get.args.apply(2), assetDappAddress.bytes)
 
     }
   }
 }
 
-
+/*
+println(assetDappAddress)
+println(dAppAddress)
+println(secondAddress)
+println(invokerDappAddress)
+ */

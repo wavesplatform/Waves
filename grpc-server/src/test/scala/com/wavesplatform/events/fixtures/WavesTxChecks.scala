@@ -1,10 +1,12 @@
 package com.wavesplatform.events.fixtures
 
+import akka.http.scaladsl.model.headers.Expect
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.fixtures.PrepareInvokeTestData.bar
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
@@ -278,8 +280,20 @@ object WavesTxChecks extends Matchers with OptionValues {
   }
 
 
-  def checkInvokeScriptInvokes(invoke: InvokeScriptResult.Invocation, address: Address): Unit = {
-    invoke.dApp.toByteArray shouldBe address
+  def checkInvokeScriptBaseInvokes(invoke: InvokeScriptResult.Invocation, address: Address, funcName: String): Unit = {
+    val actualAddress = Address.fromBytes(invoke.dApp.toByteArray).explicitGet()
+    actualAddress shouldBe address
+    invoke.call.get.function shouldBe funcName
+  }
+
+  def checkInvokeScriptInvokesArgs(actualArgument: InvokeScriptResult.Call.Argument, expectedValue: Any): Unit = {
+    val actualEntry = actualArgument.value
+
+    if (actualEntry.isDefined && actualEntry.isBinaryValue) {
+      actualEntry.binaryValue.get.toByteArray shouldBe expectedValue
+    } else if (actualEntry.isDefined) {
+      actualEntry.value shouldBe expectedValue
+    }
   }
 
   def checkInvokeScriptResultTransfers(transfer: InvokeScriptResult.Payment, address: Address, amount: Long, assetId: Asset)(implicit
