@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.fixtures.PrepareInvokeTestData.dataMap
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
@@ -225,71 +224,108 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction, assetId: ByteStr, address: Array[Byte])(
-      implicit pos: Position
+  def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction)(implicit
+      pos: Position
   ): Unit = {
     val invokeScript = actual.head.getInvokeScript
-    val arguments    = invokeScript.arguments
 
     actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
     invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
     invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
-    arguments.head.value.binaryValue.get.toByteArray shouldBe assetId.arr
-    arguments.apply(1).value.binaryValue.get.toByteArray shouldBe address
   }
 
-  def checkInvokeResultTransactionMetadata(result: Option[InvokeScriptResult], dataMap: Map[String, Any], assetId: ByteStr, address: Address)(implicit
+  def checkArguments(expectedValues: List[Any], actualArguments: List[Any]): Unit = {
+    if (expectedValues.size != actualArguments.size) {
+      throw new IllegalArgumentException("Number of expected values does not match the number of actual arguments.")
+    }
+    expectedValues.zip(actualArguments).foreach(item => item._1 shouldBe item._2)
+  }
+
+  def checkInvokeScriptResultData(result: Seq[DataTransactionData.DataEntry], actualData: Seq[(String, Any)])(implicit pos: Position): Unit = {
+    if (result.length != actualData.length) {
+      throw new IllegalArgumentException("Number of expected values does not match the number of actual data arguments.")
+    }
+
+    result.zip(actualData).foreach { case (entry, (key, expectedValue)) =>
+      if (entry.key != key) {
+        throw new IllegalArgumentException(s"Key mismatch: expected '$key', but got '${entry.key}'.")
+      }
+
+      val actualValue = if (entry.value.isDefined) entry.value.value match {
+        case byteStr: ByteString => byteStr.toByteArray
+        case otherValue          => otherValue
+      }
+      else None
+
+      actualValue shouldBe expectedValue
+    }
+  }
+
+  def checkInvokeScriptResultIssues(actualIssue: InvokeScriptResult.Issue, expectedIssues: Map[String, Any])(implicit
       pos: Position
   ): Unit = {
-    val data         = result.get.data
-    val transfers    = result.get.transfers
-    val issues       = result.get.issues
-    val reissues     = result.get.reissues
-    val burns        = result.get.burns
-    val sponsorFees  = result.get.sponsorFees
-    val leases       = result.get.leases
-    val leasesCancel = result.get.leaseCancels
+    expectedIssues.foreach { case (fieldName, expectedValue) =>
+      val actualValue = fieldName match {
+        case "name"        => actualIssue.name
+        case "description" => actualIssue.description
+        case "amount"      => actualIssue.amount
+        case "decimals"    => actualIssue.decimals
+        case "nonce"       => actualIssue.nonce
+        case _             => throw new IllegalArgumentException(s"Unknown issue field: $fieldName")
+      }
+      actualValue shouldBe expectedValue
+    }
+  }
 
-    data.head.key shouldBe "int"
-    data.head.value.intValue.get shouldBe dataMap.apply("intVal")
-    data.apply(1).key shouldBe "byte"
-    data.apply(1).value.binaryValue.value.toByteArray shouldBe assetId.arr
-    data.apply(2).key shouldBe "bool"
-    data.apply(2).value.boolValue.value.toString shouldBe dataMap.apply("booleanVal")
-    data.apply(3).key shouldBe "str"
-    data.apply(3).value.stringValue.value shouldBe dataMap.apply("stringVal")
-    data.apply(4).key shouldBe "int"
-    data.apply(4).value.isEmpty shouldBe true
 
-    transfers.head.address.toByteArray shouldBe address.bytes
-    transfers.head.amount.value.amount shouldBe dataMap.apply("scriptTransferAssetInt")
-    transfers.head.amount.value.assetId.toByteArray shouldBe assetId.arr
-    transfers.apply(1).address.toByteArray shouldBe address.bytes
-    transfers.apply(1).amount.value.amount shouldBe dataMap.apply("scriptTransferIssueAssetInt")
-    transfers.apply(2).address.toByteArray shouldBe address.bytes
-    transfers.apply(2).amount.value.amount shouldBe dataMap.apply("scriptTransferUnitInt")
+  def checkInvokeScriptInvokes(invoke: InvokeScriptResult.Invocation, address: Address): Unit = {
+    invoke.dApp.toByteArray shouldBe address
+  }
 
-    issues.head.name shouldBe dataMap.apply("issueAssetName")
-    issues.head.description shouldBe dataMap.apply("issueAssetDescription")
-    issues.head.amount shouldBe dataMap.apply("issueAssetAmount")
-    issues.head.decimals shouldBe dataMap.apply("issueAssetDecimals")
-    issues.head.nonce shouldBe dataMap.apply("issueAssetNonce")
+  def checkInvokeScriptResultTransfers(transfer: InvokeScriptResult.Payment, address: Address, amount: Long, assetId: Asset)(implicit
+      pos: Position
+  ): Unit = {
+    val actualAddress = Address.fromBytes(transfer.address.toByteArray).explicitGet()
+    val actualAssetId = toVanillaAssetId(transfer.amount.value.assetId)
 
-    reissues.head.assetId.toByteArray shouldBe assetId.arr
-    reissues.head.amount shouldBe dataMap.apply("reissueInt")
-    reissues.head.isReissuable shouldBe true
+    actualAddress shouldBe address
+    transfer.amount.value.amount shouldBe amount
+    actualAssetId shouldBe assetId
+  }
 
-    burns.head.assetId.toByteArray shouldBe assetId.arr
-    burns.head.amount shouldBe dataMap.apply("burnInt")
+  def checkInvokeScriptResultReissue(reissue: InvokeScriptResult.Reissue, assetId: Asset, amount: Long, reissuable: Boolean)(implicit
+      pos: Position
+  ): Unit = {
+    val actualAssetId = toVanillaAssetId(reissue.assetId)
+    actualAssetId shouldBe assetId
+    reissue.amount shouldBe amount
+    reissue.isReissuable shouldBe reissuable
+  }
 
-    sponsorFees.head.minFee.value.assetId.toByteArray shouldBe assetId.arr
-    sponsorFees.head.minFee.value.amount shouldBe dataMap.apply("sponsorFeeAssetInt")
-    sponsorFees.apply(1).minFee.value.amount shouldBe dataMap.apply("sponsorFeeIssueAssetInt")
+  def checkInvokeScriptResultBurn(burn: InvokeScriptResult.Burn, assetId: Asset, amount: Long)(implicit
+      pos: Position
+  ): Unit = {
+    val actualAssetId = toVanillaAssetId(burn.assetId)
 
-    leases.head.recipient.get.getPublicKeyHash.toByteArray shouldBe address.publicKeyHash
-    leases.head.amount shouldBe dataMap.apply("leaseInt")
+    actualAssetId shouldBe assetId
+    burn.amount shouldBe amount
+  }
 
-    leasesCancel.head.leaseId shouldBe leases.head.leaseId
+  def checkInvokeScriptResultSponsorFee(sponsorFee: InvokeScriptResult.SponsorFee, assetId: Asset, amount: Long)(implicit
+      pos: Position
+  ): Unit = {
+    val actualAssetId = toVanillaAssetId(sponsorFee.minFee.value.assetId)
+    actualAssetId shouldBe assetId
+    sponsorFee.minFee.value.amount shouldBe amount
+  }
+
+  def checkInvokeScriptResultLease(leases: InvokeScriptResult.Lease, publicKeyHash: Array[Byte], amount: Long): Unit = {
+    leases.recipient.value.getPublicKeyHash.toByteArray shouldBe publicKeyHash
+    leases.amount shouldBe amount
+  }
+
+  def checkInvokeScriptResultLeaseCancel(leasesCancel: InvokeScriptResult.LeaseCancel, leaseId: Array[Byte]): Unit = {
+    leasesCancel.leaseId.toByteArray shouldBe leaseId
   }
 
   def checkEthereumTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction)(implicit pos: Position): Unit = {
@@ -339,14 +375,14 @@ object WavesTxChecks extends Matchers with OptionValues {
   }
 
   def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: IssueTransaction, isNft: Boolean, quantityValue: Long): Unit = {
-      actual.get.assetId.toByteArray shouldBe expected.asset.id.arr
-      actual.get.issuer.toByteArray shouldBe expected.sender.arr
-      actual.get.name shouldBe expected.name.toStringUtf8
-      actual.get.description shouldBe expected.description.toStringUtf8
-      actual.get.nft shouldBe isNft
-      actual.get.volume shouldBe quantityValue
-      actual.get.decimals shouldBe expected.decimals.value
-      actual.get.reissuable shouldBe expected.reissuable
+    actual.get.assetId.toByteArray shouldBe expected.asset.id.arr
+    actual.get.issuer.toByteArray shouldBe expected.sender.arr
+    actual.get.name shouldBe expected.name.toStringUtf8
+    actual.get.description shouldBe expected.description.toStringUtf8
+    actual.get.nft shouldBe isNft
+    actual.get.volume shouldBe quantityValue
+    actual.get.decimals shouldBe expected.decimals.value
+    actual.get.reissuable shouldBe expected.reissuable
   }
 
   def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: BurnTransaction, isNft: Boolean, quantityAfterReissue: Long): Unit = {
@@ -364,13 +400,13 @@ object WavesTxChecks extends Matchers with OptionValues {
     actual.get.reissuable shouldBe expected.reissuable
   }
 
-  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected:  Map[String, Any], assetId: Asset, issuer: Array[Byte]): Unit = {
-      toVanillaAssetId(actual.get.assetId) shouldBe assetId
-      actual.get.issuer.toByteArray shouldBe issuer
-      actual.get.name shouldBe expected.apply("issueAssetName")
-      actual.get.description shouldBe expected.apply("issueAssetDescription")
-      actual.get.volume shouldBe expected.apply("issueAssetAmount")
-      actual.get.decimals shouldBe expected.apply("issueAssetDecimals")
+  def checkAssetsStateUpdates(actual: Option[AssetDetails], expected: Map[String, Any], assetId: Asset, issuer: Array[Byte]): Unit = {
+    toVanillaAssetId(actual.get.assetId) shouldBe assetId
+    actual.get.issuer.toByteArray shouldBe issuer
+    actual.get.name shouldBe expected.apply("name")
+    actual.get.description shouldBe expected.apply("description")
+    actual.get.volume shouldBe expected.apply("amount")
+    actual.get.decimals shouldBe expected.apply("decimals")
   }
 
   def checkAssetUpdatesStateUpdates(actual: Option[AssetDetails], expected: UpdateAssetInfoTransaction): Unit = {
@@ -391,7 +427,10 @@ object WavesTxChecks extends Matchers with OptionValues {
     }.toMap shouldBe expected
   }
 
-  def checkIndividualLeases(actual: Seq[LeaseUpdate], expected: Map[(LeaseStatus, Long), (Array[Byte], Array[Byte], Array[Byte], Array[Byte])]): Unit = {
+  def checkIndividualLeases(
+      actual: Seq[LeaseUpdate],
+      expected: Map[(LeaseStatus, Long), (Array[Byte], Array[Byte], Array[Byte], Array[Byte])]
+  ): Unit = {
     actual.size shouldBe expected.size
 
     actual.zip(expected).foreach { case (lease, ((status, amount), (leaseId, sender, recipient, originTransactionId))) =>
