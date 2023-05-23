@@ -1,15 +1,14 @@
 package com.wavesplatform.events.fixtures
 
-import akka.http.scaladsl.model.headers.Expect
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.fixtures.PrepareInvokeTestData.bar
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
+import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -279,7 +278,6 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-
   def checkInvokeScriptBaseInvokes(invoke: InvokeScriptResult.Invocation, address: Address, funcName: String): Unit = {
     val actualAddress = Address.fromBytes(invoke.dApp.toByteArray).explicitGet()
     actualAddress shouldBe address
@@ -294,6 +292,12 @@ object WavesTxChecks extends Matchers with OptionValues {
     } else if (actualEntry.isDefined) {
       actualEntry.value shouldBe expectedValue
     }
+  }
+
+  def checkInvokeScriptInvokesPayments(actualPayment: Amount, asset: Asset, amount: Long): Unit = {
+    val actualAssetId = toVanillaAssetId(actualPayment.assetId)
+    actualAssetId shouldBe asset
+    actualPayment.amount shouldBe amount
   }
 
   def checkInvokeScriptResultTransfers(transfer: InvokeScriptResult.Payment, address: Address, amount: Long, assetId: Asset)(implicit

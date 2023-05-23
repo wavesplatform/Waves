@@ -11,7 +11,7 @@ object PrepareInvokeTestData {
   val scriptTransferIssueAssetNum: Long = current.nextInt(20601, 21000)
   val sponsorFeeAssetNum: Long          = current.nextInt(23001, 24000)
   val sponsorFeeIssueAssetNum: Long     = current.nextInt(25001, 26000)
-  val paymentNum: Long                  = current.nextLong(12300, 32487)
+  val paymentNum: Long                  = current.nextLong(52300, 72487)
   val baz                               = "baz"
   val bar                               = "bar"
   val libVersion: Int                   = current.nextInt(5, 7)
