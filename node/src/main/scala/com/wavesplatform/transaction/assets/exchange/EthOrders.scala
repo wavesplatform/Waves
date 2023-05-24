@@ -45,9 +45,9 @@ object EthOrders extends App {
       "matcherFee"        -> order.matcherFee.value,
       "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId),
       "priceMode"         -> toSnakeCase.convert(priceMode.toString)
-    )
+    ) ++ order.attachment.map(attach => Json.obj("attachment" -> attach.toString)).getOrElse(JsObject.empty)
 
-    Json.parse(orderDomainJson).as[JsObject] ++ Json.obj("message" -> message)
+    Json.parse(orderDomainJson(order)).as[JsObject] ++ Json.obj("message" -> message)
   }
 
   def hashOrderStruct(order: Order): Array[Byte] = {
@@ -97,7 +97,20 @@ object EthOrders extends App {
     new SignatureData(V, R, S)
   }
 
-  def orderDomainJson: String =
+  def orderDomainJson(order: Order): String = {
+    val additionalFields =
+      if (order.attachment.isDefined)
+        s"""
+           |,
+           |  {
+           |    "name": "attachment",
+           |    "type": "string"
+           |  }
+           |""".stripMargin
+      else ""
+
+    val version = if (order.attachment.isDefined) "2" else "1"
+
     s"""
        |{
        |  "types": {
@@ -164,17 +177,19 @@ object EthOrders extends App {
        |        "name": "priceMode",
        |        "type": "string"
        |      }
+       |      $additionalFields
        |    ]
        |  },
        |  "primaryType": "Order",
        |  "domain": {
        |    "name": "Waves Order",
-       |    "version": "1",
+       |    "version": "$version",
        |    "chainId": ${AddressScheme.current.chainId}
        |  },
        |  "message": {}
        |}
        |""".stripMargin
+  }
 
   private def recoverEthSignerKeyBigInt(message: Array[Byte], signature: Array[Byte]): BigInteger = {
     val signatureData = EthOrders.decodeSignature(signature)

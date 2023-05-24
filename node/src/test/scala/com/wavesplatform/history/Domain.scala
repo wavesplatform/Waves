@@ -1,5 +1,7 @@
 package com.wavesplatform.history
 
+import cats.implicits.toFoldableOps
+import cats.syntax.either.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
@@ -17,8 +19,11 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
@@ -292,7 +297,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       txs: Seq[Transaction],
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
-      generator: KeyPair = defaultSigner
+      generator: KeyPair = defaultSigner,
+      stateHash: Option[ByteStr] = None
   ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
@@ -341,7 +347,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         featureVotes = Nil,
         rewardVote = -1L,
         signer = generator,
-        stateHash = None
+        stateHash = stateHash
       )
       .explicitGet()
   }
@@ -422,6 +428,40 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     rdb.db,
     blockchain
   )
+
+  def calculateStateHash(
+      prevStateHash: Option[ByteStr],
+      signer: KeyPair,
+      blockTs: TxTimestamp,
+      txs: Transaction*
+  ): Either[ValidationError, ByteStr] = {
+    val feeFromPreviousBlockE = blocksApi.blockAtHeight(blockchain.height).fold(Portfolio.empty.asRight[String]) { case (_, txs) =>
+      txs
+        .map(_._2)
+        .map { t =>
+          val pf = Portfolio.build(t.assetFee)
+          pf.minus(pf.multiply(CurrentBlockFeePart))
+        }
+        .foldM(Portfolio.empty)(_.combine(_))
+    }
+    val minerReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
+    val totalReward = feeFromPreviousBlockE.flatMap(fee => minerReward.combine(fee)).explicitGet()
+
+    val initStateHash = prevStateHash.getOrElse(TxStateSnapshotHashBuilder.InitStateHash)
+    val txDiffer      = TransactionDiffer(blockchain.lastBlockTimestamp, blockTs) _
+    txs
+      .foldLeft[Either[ValidationError, (ByteStr, Diff)]](Right(initStateHash -> Diff(portfolios = Map(signer.toAddress -> totalReward)))) {
+        case (Right((prevStateHash, accDiff)), tx) =>
+          val compositeBlockchain = CompositeBlockchain(blockchain, accDiff)
+          for {
+            txDiff <- txDiffer(compositeBlockchain, tx).resultE
+            stateHash = TxStateSnapshotHashBuilder.createHashFromTxDiff(compositeBlockchain, txDiff).createHash(prevStateHash)
+            resDiff <- accDiff.combineF(txDiff).leftMap(GenericError(_))
+          } yield (stateHash, resDiff)
+        case (err @ Left(_), _) => err
+      }
+      .map(_._1)
+  }
 }
 
 object Domain {
@@ -434,7 +474,7 @@ object Domain {
           val hs = bcu.hitSource(bcu.height).get
           crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet()
         }
-      bcu.processBlock(block, hitSource)
+      bcu.processBlock(block, hitSource, checkStateHash = false)
     }
   }
 

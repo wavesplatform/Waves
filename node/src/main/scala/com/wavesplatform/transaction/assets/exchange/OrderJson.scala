@@ -7,7 +7,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
 import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
-import com.wavesplatform.utils.EthEncoding
+import com.wavesplatform.utils.{EthEncoding, byteStrFormat}
 import play.api.libs.json.*
 
 import scala.util.{Failure, Success}
@@ -96,7 +96,8 @@ object OrderJson {
       version: TxVersion,
       matcherFeeAssetId: Asset,
       eip712Signature: Option[Array[Byte]],
-      priceMode: OrderPriceMode
+      priceMode: OrderPriceMode,
+      attachment: Option[ByteStr]
   ): Order = {
     val senderCredentials = eip712Signature match {
       case Some(value) =>
@@ -126,7 +127,8 @@ object OrderJson {
       expiration,
       matcherFee,
       matcherFeeAssetId,
-      priceMode
+      priceMode,
+      attachment
     )
   }
 
@@ -210,7 +212,8 @@ object OrderJson {
         .readNullable[String]
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
-        .readWithDefault[OrderPriceMode](OrderPriceMode.Default)
+        .readWithDefault[OrderPriceMode](OrderPriceMode.Default) and
+      (JsPath \ "attachment").readNullable[ByteStr]
     r(readOrderV3V4 _)
   }
 

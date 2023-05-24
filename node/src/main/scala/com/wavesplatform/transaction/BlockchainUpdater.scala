@@ -7,7 +7,13 @@ import com.wavesplatform.state.Diff
 import monix.reactive.Observable
 
 trait BlockchainUpdater {
-  def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true, txSignParCheck: Boolean = true): Either[ValidationError, Seq[Diff]]
+  def processBlock(
+      block: Block,
+      hitSource: ByteStr,
+      verify: Boolean = true,
+      txSignParCheck: Boolean = true,
+      checkStateHash: Boolean = true // TODO: delete after NODE-2568 merge
+  ): Either[ValidationError, Seq[Diff]]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId]
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
   def lastBlockInfo: Observable[LastBlockInfo]

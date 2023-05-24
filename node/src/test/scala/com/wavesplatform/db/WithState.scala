@@ -110,7 +110,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         (_, _) => (),
         verify = true,
         enableExecutionLog = enableExecutionLog,
-        txSignParCheck = true
+        txSignParCheck = true,
+        enableStateHash = false
       )
 
     preconditions.foreach { precondition =>

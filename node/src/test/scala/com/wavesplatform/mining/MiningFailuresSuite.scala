@@ -97,10 +97,10 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
       )
 
     var minedBlock: Block = null
-    (blockchainUpdater.processBlock _).when(*, *, *, *).returning(Left(BlockFromFuture(100))).repeated(10)
+    (blockchainUpdater.processBlock _).when(*, *, *, *, *).returning(Left(BlockFromFuture(100))).repeated(10)
     (blockchainUpdater.processBlock _)
-      .when(*, *, *, *)
-      .onCall { (block, _, _, _) =>
+      .when(*, *, *, *, *)
+      .onCall { (block, _, _, _, _) =>
         minedBlock = block
         Right(Nil)
       }

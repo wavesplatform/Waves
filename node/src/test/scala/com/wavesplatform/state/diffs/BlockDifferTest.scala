@@ -10,8 +10,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
@@ -129,16 +128,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           val txs = (1 to 10).map(idx => TxHelpers.transfer(TxHelpers.signer(idx), TxHelpers.address(idx + 1), (100 - idx).waves))
 
-          val blockTs  = txs.map(_.timestamp).max
-          val txDiffer = TransactionDiffer(d.blockchain.lastBlockTimestamp, blockTs) _
-          val blockStateHash = txs
-            .foldLeft(genesis.header.stateHash.get -> Diff.empty) { case ((prevStateHash, accDiff), tx) =>
-              val blockchain = CompositeBlockchain(d.blockchain, accDiff)
-              val txDiff     = txDiffer(blockchain, tx).resultE.explicitGet()
-              val stateHash  = TxStateSnapshotHashBuilder.createHashFromTxDiff(blockchain, txDiff).createHash(prevStateHash)
-              (stateHash, accDiff.combineF(txDiff).explicitGet())
-            }
-            ._1
+          val blockTs        = txs.map(_.timestamp).max
+          val blockStateHash = d.calculateStateHash(genesis.header.stateHash, TxHelpers.defaultSigner, blockTs, txs*).explicitGet()
 
           val correctBlock =
             TestBlock.create(blockTs, genesis.id(), txs, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))

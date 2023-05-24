@@ -79,7 +79,8 @@ case class Order(
         Proofs.validate(proofs).fold(e => Validation.failure(e.toString), _ => Validation.success)
       case _ => Validation.success
     }) &&
-    attachment.forall(_.size <= MaxAttachmentSize) :| "attachment size should be <= 1024 bytes"
+    (attachment.isEmpty || version >= Order.V4) :| "non-empty attachment field is allowed only for version >= V4" &&
+    attachment.forall(_.size <= MaxAttachmentSize) :| s"attachment size should be <= $MaxAttachmentSize bytes"
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
@@ -104,12 +105,7 @@ case class Order(
   val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))
 
   override protected def verifyFirstProof(isRideV6Activated: Boolean): Either[GenericError, Unit] =
-    eip712Signature match {
-      case Some(ethSignature) =>
-        val signerKey = EthOrders.recoverEthSignerKey(this, ethSignature.arr)
-        Either.cond(signerKey == senderPublicKey, (), GenericError(s"Ethereum signature invalid for $this"))
-      case _ => super.verifyFirstProof(isRideV6Activated)
-    }
+    if (eip712Signature.isDefined) Right(()) else super.verifyFirstProof(isRideV6Activated)
 
   override def toString: String = {
     val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${matcherFeeAssetId.fold("Waves")(_.toString)}," else ""
@@ -124,10 +120,10 @@ object Order {
 
   implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
-  val MaxLiveTime: Long       = 30L * 24L * 60L * 60L * 1000L
-  val PriceConstant           = 100000000L
-  val MaxAmount: Long         = 100 * PriceConstant * PriceConstant
-  val MaxAttachmentSize: Long = 1024L
+  val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
+  val PriceConstant     = 100000000L
+  val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
+  val MaxAttachmentSize = 1024
 
   val V1: Version = 1.toByte
   val V2: Version = 2.toByte
@@ -149,7 +145,8 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: Long,
       matcherFeeAssetId: Asset = Asset.Waves,
-      priceMode: OrderPriceMode = OrderPriceMode.Default
+      priceMode: OrderPriceMode = OrderPriceMode.Default,
+      attachment: Option[ByteStr] = None
   ): Either[ValidationError, Order] =
     for {
       amount     <- TxExchangeAmount(amount)(GenericError(s"Order validation error: ${TxExchangeAmount.errMsg}"))
@@ -168,7 +165,8 @@ object Order {
         expiration,
         matcherFee,
         matcherFeeAssetId,
-        priceMode = priceMode
+        priceMode = priceMode,
+        attachment = attachment
       )
         .signWith(sender.privateKey)
     }
@@ -184,9 +182,24 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: Long,
       matcherFeeAssetId: Asset = Waves,
-      priceMode: OrderPriceMode = OrderPriceMode.Default
+      priceMode: OrderPriceMode = OrderPriceMode.Default,
+      attachment: Option[ByteStr] = None
   ): Either[ValidationError, Order] =
-    Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
+    Order.selfSigned(
+      version,
+      sender,
+      matcher,
+      pair,
+      OrderType.BUY,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      priceMode,
+      attachment
+    )
 
   def sell(
       version: TxVersion,
@@ -199,9 +212,24 @@ object Order {
       expiration: TxTimestamp,
       matcherFee: Long,
       matcherFeeAssetId: Asset = Waves,
-      priceMode: OrderPriceMode = OrderPriceMode.Default
+      priceMode: OrderPriceMode = OrderPriceMode.Default,
+      attachment: Option[ByteStr] = None
   ): Either[ValidationError, Order] =
-    Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
+    Order.selfSigned(
+      version,
+      sender,
+      matcher,
+      pair,
+      OrderType.SELL,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      priceMode,
+      attachment
+    )
 
   def parseBytes(version: Version, bytes: Array[Byte]): Try[Order] =
     OrderSerializer.parseBytes(version, bytes)

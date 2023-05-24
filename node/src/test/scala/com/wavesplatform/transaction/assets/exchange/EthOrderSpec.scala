@@ -395,6 +395,37 @@ class EthOrderSpec
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
+
+  it should "recover signer public key for order with and without attachment correctly" in {
+    val signer = TxHelpers.defaultEthSigner
+
+    def testOrder(attachment: Option[ByteStr]): Order = {
+      val order = Order
+        .buy(
+          Order.V4,
+          TxHelpers.defaultSigner,
+          TxHelpers.secondSigner.publicKey,
+          AssetPair(Waves, IssuedAsset(ByteStr.fill(32)(1))),
+          100,
+          100,
+          100,
+          100,
+          100,
+          attachment = attachment
+        )
+        .explicitGet()
+
+      order.copy(orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(order, signer))))
+    }
+
+    val orderWithoutAttachment = testOrder(None)
+    val orderWithAttachment    = testOrder(Some(ByteStr.fill(1)(1)))
+
+    EthOrders.recoverEthSignerKey(orderWithoutAttachment, orderWithoutAttachment.eip712Signature.get.arr) shouldBe EthOrders.recoverEthSignerKey(
+      orderWithAttachment,
+      orderWithAttachment.eip712Signature.get.arr
+    )
+  }
 }
 
 object EthOrderSpec extends EthHelpers {

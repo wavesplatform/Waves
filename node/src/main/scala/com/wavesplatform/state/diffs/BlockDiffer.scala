@@ -49,9 +49,21 @@ object BlockDiffer {
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
-      txSignParCheck: Boolean = true
+      txSignParCheck: Boolean = true,
+      checkStateHash: Boolean = true
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
+    fromBlockTraced(
+      blockchain,
+      maybePrevBlock,
+      block,
+      constraint,
+      hitSource,
+      loadCacheData,
+      verify,
+      enableExecutionLog,
+      txSignParCheck,
+      checkStateHash
+    ).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
@@ -62,7 +74,8 @@ object BlockDiffer {
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
-      txSignParCheck: Boolean
+      txSignParCheck: Boolean,
+      enableStateHash: Boolean
   ): TracedResult[ValidationError, Result] = {
     val stateHeight = blockchain.height
 
@@ -123,7 +136,7 @@ object BlockDiffer {
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
-      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.stateHash)
+      _ <- if (enableStateHash) checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.stateHash) else TracedResult(Right(()))
     } yield r
   }
 
