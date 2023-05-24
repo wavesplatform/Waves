@@ -14,7 +14,6 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.recipientAddresses
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
@@ -463,16 +462,16 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           Map(
             (senderAddress, Waves)                     -> (senderBalanceBeforeTx, senderBalanceAfterTx),
             (senderAddress, issue.asset)               -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
-            (recipientAddresses.head, issue.asset)     -> (0, transferAmount),
-            (recipientAddresses.apply(1), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(2), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(3), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(4), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(5), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(6), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(7), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(8), issue.asset) -> (0, transferAmount),
-            (recipientAddresses.apply(9), issue.asset) -> (0, transferAmount)
+            (Address.fromBytes(recipients.head.address.bytes).explicitGet(), issue.asset)     -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(1).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(2).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(3).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(4).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(5).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(6).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(7).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(8).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
+            (Address.fromBytes(recipients.apply(9).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount)
           )
         )
       }
@@ -606,8 +605,6 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-121. Return correct data for UpdateAssetInfo" in {
-      val senderBalanceAfterIssue           = senderBalanceBefore - 1.waves
-      val senderBalanceAfterUpdateAssetInfo = senderBalanceAfterIssue - fee
       val newName                           = "new_name"
       val newDescription                    = "new_description"
       val issue                             = TxHelpers.issue(sender, 99900000L)
@@ -637,31 +634,5 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkAssetUpdatesStateUpdates(assetDetails.after, updateAssetInfo)
       }
     }
-
-    /*
-    "BU-122. Return correct data for EthereumTransfer" in {
-      val ethSender                      = sender.toEthKeyPair
-      val amount: Long                   = 1000L
-      val transferSenderBalanceAfter     = senderBalanceBefore - customFee - amount
-      val transferRecipient              = TxHelpers.signer(123)
-      val recipientAddress               = transferRecipient.toAddress
-      val transferRecipientBalanceBefore = 1.waves
-      val transferRecipientBalanceAfter  = transferRecipientBalanceBefore + amount
-      val issue                          = TxHelpers.issue()
-
-      val ethereumTransfer = EthTxGenerator.generateEthTransfer(ethSender, recipientAddress, amount, issue.asset)
-      val senderAddress    = ethereumTransfer.senderAddress.value()
-
-      withGenerateSubscription(
-        settings = settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6),
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
-      )(_.appendMicroBlock(issue, ethereumTransfer)) { updates =>
-        val append       = updates(1).append
-        val txUpdates    = append.transactionStateUpdates.apply(1)
-        val assetDetails = txUpdates.assets.head
-        checkEthereumTransaction(append.transactionIds.apply(1), append.transactionAt(1), ethereumTransfer)
-      }
-    }
-     */
   }
 }
