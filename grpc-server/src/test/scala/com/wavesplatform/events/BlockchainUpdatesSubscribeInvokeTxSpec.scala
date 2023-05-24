@@ -16,7 +16,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, Em
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount}
-import com.wavesplatform.transaction.TxHelpers.{dataEntry, secondAddress, secondSigner}
+import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import org.scalatest.concurrent.ScalaFutures
@@ -173,11 +173,11 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
     var assetDappAddressWavesBalance   = 0L
     var invokerDappAddressWavesBalance = 0L
 
-    "BU- case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
+    "BU-77 case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
       val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller")))
       val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
       val updates            = addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
-      val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
+      val actualDataEntries  = updates(2).getAppend.transactionStateUpdates.head.dataEntries
       val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](
         IntegerDataEntry(bar, scriptTransferUnitNum * 2)
       )
@@ -195,11 +195,11 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
       checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, dAppAddress.bytes)
     }
 
-    "BU- case. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
+    "BU-39 case. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
       val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller")))
       val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.originCaller")))
       val updates            = addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
-      val actualDataEntries        = updates(2).getAppend.transactionStateUpdates.head.dataEntries
+      val actualDataEntries  = updates(2).getAppend.transactionStateUpdates.head.dataEntries
       val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](
         IntegerDataEntry(bar, scriptTransferUnitNum * 2)
       )
@@ -287,4 +287,3 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
     }
   }
 }
-
