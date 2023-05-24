@@ -58,13 +58,29 @@ trait WithBUDomain extends WithDomain { _: Suite =>
       balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
   )(generateBlocks: Domain => Unit)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
     withDomainAndRepo(settings) { (d, repo) =>
-      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance)) *)
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
 
       val subscription = repo.createFakeObserver(request)
       generateBlocks(d)
 
       val result = subscription.fetchAllEvents(d.blockchain, if (request.toHeight > 0) request.toHeight else Int.MaxValue)
       f(result.map(_.getUpdate))
+    }
+  }
+
+  def withGenerateGetBlockUpdate(
+      height: Int = 0,
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+  )(generateBlocks: Domain => Unit)(f: PBBlockchainUpdated => Unit): Unit = {
+    withDomainAndRepo(settings) { (d, repo) =>
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
+
+      val getBlockUpdate = repo.getBlockUpdate(height)
+      generateBlocks(d)
+
+      val result = getBlockUpdate.getUpdate
+      f(result)
     }
   }
 
