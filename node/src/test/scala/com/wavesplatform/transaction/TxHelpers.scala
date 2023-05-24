@@ -32,7 +32,6 @@ import com.wavesplatform.transaction.utils.Signed
 import org.web3j.crypto.ECKeyPair
 
 import java.util.concurrent.ThreadLocalRandom.current
-import scala.collection.mutable.ListBuffer
 
 object TxHelpers {
   def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
