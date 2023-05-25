@@ -6,7 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.fixtures.WavesTxChecks.*
+import com.wavesplatform.events.fixtures.WavesTxChecks.{checkExchange, *}
+import com.wavesplatform.events.protobuf.BlockchainUpdated
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
@@ -15,7 +17,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
@@ -220,7 +222,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
     }
 
-    "BU-6. Return correct data for exchange tx order V3, exchange V2" in {
+    "Exchange transaction subscription tests" - {
       val buyer                       = TxHelpers.signer(58)
       val seller                      = TxHelpers.signer(189)
       val buyerBalanceBefore          = 4.waves
@@ -232,121 +234,97 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val amountAsset                 = TxHelpers.issue(seller, 1000000000, 6)
       val amountAssetQuantity         = amountAsset.quantity.value
 
-      val order1 = TxHelpers.order(
-        OrderType.BUY,
-        amountAsset.asset,
-        priceAsset.asset,
-        Waves,
-        50000L,
-        400000000L,
-        fee = customFee,
-        sender = buyer,
-        matcher = buyer,
-        version = Order.V3
-      )
-      val order2 = TxHelpers.order(
-        OrderType.SELL,
-        amountAsset.asset,
-        priceAsset.asset,
-        Waves,
-        amount = 50000L,
-        price = 400000000L,
-        fee = customFee,
-        sender = seller,
-        matcher = buyer,
-        version = Order.V3
-      )
-      val exchangedAssets = order1.price.value * order1.amount.value / 100000000
-      val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V2)
-
-      withGenerateSubscription(
-        settings = currentSettings,
-        balances = Seq(
-          AddrWithBalance(buyer.toAddress, buyerBalanceBefore),
-          AddrWithBalance(seller.toAddress, sellerBalanceBefore)
+      "BU-6. Return correct data for order V3, exchange V2" in {
+        val order1 = TxHelpers.order(
+          OrderType.BUY,
+          amountAsset.asset,
+          priceAsset.asset,
+          Waves,
+          50000L,
+          400000000L,
+          fee = customFee,
+          sender = buyer,
+          matcher = buyer,
+          version = Order.V3
         )
-      ) { d =>
-        d.appendBlock(priceAsset)
-        d.appendBlock(amountAsset)
-        d.appendMicroBlock(exchangeTx)
-      } { updates =>
-        val append = updates(3).append
-        checkExchange(append.transactionIds.head, append.transactionAt(0), exchangeTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (buyer.toAddress, Waves)              -> (buyerBalanceBeforeExchange, buyerBalanceBeforeExchange - fee + customFee),
-            (seller.toAddress, priceAsset.asset)  -> (0, exchangedAssets),
-            (buyer.toAddress, amountAsset.asset)  -> (0, order1.amount.value),
-            (seller.toAddress, Waves)             -> (sellerBalanceBeforeExchange, sellerBalanceBeforeExchange - customFee),
-            (buyer.toAddress, priceAsset.asset)   -> (priceAssetQuantity, priceAssetQuantity - exchangedAssets),
-            (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - order1.amount.value)
-          )
+        val order2 = TxHelpers.order(
+          OrderType.SELL,
+          amountAsset.asset,
+          priceAsset.asset,
+          Waves,
+          amount = 50000L,
+          price = 400000000L,
+          fee = customFee,
+          sender = seller,
+          matcher = buyer,
+          version = Order.V3
         )
+        val exchangedAssets                           = order1.price.value * order1.amount.value / 100000000
+        val exchangeTx                                = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V2)
+        val blockchainUpdated: Seq[BlockchainUpdated] = addedBlocksAndSubscribe(exchangeTx)
+        checkingSubscribeFields(blockchainUpdated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
       }
-    }
 
-    "BU-120. Return correct data for exchange tx order V4, exchange V3" in {
-      val buyer                       = TxHelpers.signer(58)
-      val seller                      = TxHelpers.signer(189)
-      val buyerBalanceBefore          = 4.waves
-      val buyerBalanceBeforeExchange  = 3.waves
-      val sellerBalanceBefore         = 4.waves
-      val sellerBalanceBeforeExchange = 3.waves
-      val priceAsset                  = TxHelpers.issue(buyer, 2000000000, 4)
-      val priceAssetQuantity          = priceAsset.quantity.value
-      val amountAsset                 = TxHelpers.issue(seller, 1000000000, 6)
-      val amountAssetQuantity         = amountAsset.quantity.value
-
-      val order1 = TxHelpers.order(
-        OrderType.BUY,
-        amountAsset.asset,
-        priceAsset.asset,
-        Waves,
-        50000L,
-        400000000L,
-        fee = customFee,
-        sender = buyer,
-        matcher = buyer,
-        version = Order.V4
-      )
-      val order2 = TxHelpers.order(
-        OrderType.SELL,
-        amountAsset.asset,
-        priceAsset.asset,
-        Waves,
-        amount = 50000L,
-        price = 400000000L,
-        fee = customFee,
-        sender = seller,
-        matcher = buyer,
-        version = Order.V4
-      )
-      val exchangedAssets = order1.price.value * order1.amount.value / 10000000000L
-      val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V3)
-
-      withGenerateSubscription(
-        settings = currentSettings,
-        balances = Seq(
-          AddrWithBalance(buyer.toAddress, buyerBalanceBefore),
-          AddrWithBalance(seller.toAddress, sellerBalanceBefore)
+      "BU-120. Return correct data for order V4, exchange V3" in {
+        val order1 = TxHelpers.order(
+          OrderType.BUY,
+          amountAsset.asset,
+          priceAsset.asset,
+          Waves,
+          50000L,
+          400000000L,
+          fee = customFee,
+          sender = buyer,
+          matcher = buyer,
+          version = Order.V4
         )
-      ) { d =>
-        d.appendBlock(priceAsset)
-        d.appendBlock(amountAsset)
-        d.appendMicroBlock(exchangeTx)
-      } { updates =>
-        val append = updates(3).append
+        val order2 = TxHelpers.order(
+          OrderType.SELL,
+          amountAsset.asset,
+          priceAsset.asset,
+          Waves,
+          amount = 50000L,
+          price = 400000000L,
+          fee = customFee,
+          sender = seller,
+          matcher = buyer,
+          version = Order.V4
+        )
+        val exchangedAssets = order1.price.value / 2 / 10000000
+        val exchangeTx = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V3)
+        val blockchainUpdated: Seq[BlockchainUpdated] = addedBlocksAndSubscribe(exchangeTx)
+        checkingSubscribeFields(blockchainUpdated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+      }
+
+      def addedBlocksAndSubscribe(exchangeTx: ExchangeTransaction): Seq[BlockchainUpdated] = {
+        var blockchainUpdated: Seq[BlockchainUpdated] = Seq.empty
+        withGenerateSubscription(
+          settings = currentSettings,
+          balances = Seq(
+            AddrWithBalance(buyer.toAddress, buyerBalanceBefore),
+            AddrWithBalance(seller.toAddress, sellerBalanceBefore)
+          )
+        ) { d =>
+          d.appendBlock(priceAsset)
+          d.appendBlock(amountAsset)
+          d.appendMicroBlock(exchangeTx)
+        } { updates =>
+          blockchainUpdated = updates
+        }
+        blockchainUpdated
+      }
+
+      def checkingSubscribeFields(append: Append, exchangeTx: ExchangeTransaction, exchangedAssets: Long, orderAmount: Long): Unit = {
         checkExchange(append.transactionIds.head, append.transactionAt(0), exchangeTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
             (buyer.toAddress, Waves)              -> (buyerBalanceBeforeExchange, buyerBalanceBeforeExchange - fee + customFee),
             (seller.toAddress, priceAsset.asset)  -> (0, exchangedAssets),
-            (buyer.toAddress, amountAsset.asset)  -> (0, order1.amount.value),
+            (buyer.toAddress, amountAsset.asset)  -> (0, orderAmount),
             (seller.toAddress, Waves)             -> (sellerBalanceBeforeExchange, sellerBalanceBeforeExchange - customFee),
             (buyer.toAddress, priceAsset.asset)   -> (priceAssetQuantity, priceAssetQuantity - exchangedAssets),
-            (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - order1.amount.value)
+            (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount)
           )
         )
       }
@@ -460,8 +438,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkMassTransferBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (senderAddress, Waves)                     -> (senderBalanceBeforeTx, senderBalanceAfterTx),
-            (senderAddress, issue.asset)               -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
+            (senderAddress, Waves)       -> (senderBalanceBeforeTx, senderBalanceAfterTx),
+            (senderAddress, issue.asset) -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
             (Address.fromBytes(recipients.head.address.bytes).explicitGet(), issue.asset)     -> (0, transferAmount),
             (Address.fromBytes(recipients.apply(1).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
             (Address.fromBytes(recipients.apply(2).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
@@ -605,10 +583,10 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-121. Return correct data for UpdateAssetInfo" in {
-      val newName                           = "new_name"
-      val newDescription                    = "new_description"
-      val issue                             = TxHelpers.issue(sender, 99900000L)
-      val updateAssetInfo                   = TxHelpers.updateAssetInfo(issue.assetId, newName, newDescription, sender)
+      val newName         = "new_name"
+      val newDescription  = "new_description"
+      val issue           = TxHelpers.issue(sender, 99900000L)
+      val updateAssetInfo = TxHelpers.updateAssetInfo(issue.assetId, newName, newDescription, sender)
 
       withGenerateSubscription(
         settings = currentSettings.configure(_.copy(minAssetInfoUpdateInterval = 1)),
