@@ -434,23 +434,16 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
             }
           )
         )
-
         checkMassTransferBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (senderAddress, Waves)       -> (senderBalanceBeforeTx, senderBalanceAfterTx),
+            (senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx),
             (senderAddress, issue.asset) -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
-            (Address.fromBytes(recipients.head.address.bytes).explicitGet(), issue.asset)     -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(1).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(2).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(3).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(4).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(5).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(6).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(7).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(8).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount),
-            (Address.fromBytes(recipients.apply(9).address.bytes).explicitGet(), issue.asset) -> (0, transferAmount)
           )
+        )
+        checkMassTransferBalances(
+          append.transactionStateUpdates.head.balances,
+          recipients.map(r => (Address.fromBytes(r.address.bytes).explicitGet(), issue.asset) -> (0L, transferAmount)).toMap
         )
       }
     }
