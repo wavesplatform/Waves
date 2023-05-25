@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.WavesTxChecks.{checkExchange, *}
-import com.wavesplatform.events.protobuf.BlockchainUpdated
+import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
@@ -30,8 +30,6 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
   val sender: SeedKeyPair            = TxHelpers.signer(12)
   val senderAddress: Address         = sender.toAddress
   val senderBalanceBefore: Long      = 20.waves
-  var senderBalanceBeforeTx: Long    = 0L
-  var senderBalanceAfterTx: Long     = 0L
   val testScript: Script = TxHelpers.script(s"""{-# STDLIB_VERSION 6 #-}
                                                |{-# CONTENT_TYPE DAPP #-}
                                                |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -46,7 +44,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
   "BlockchainUpdates subscribe tests" - {
     "BU-1. Return correct data for alias" in {
-      val aliasTx = TxHelpers.createAlias("test", sender, fee = customFee)
+      val aliasTx                    = TxHelpers.createAlias("test", sender, fee = customFee)
+      val senderBalanceAfterTx: Long = senderBalanceBefore - aliasTx.fee.value
 
       withGenerateSubscription(
         settings = currentSettings,
@@ -56,7 +55,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
+          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceAfterTx))
         )
       }
     }
@@ -156,22 +155,20 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-19. Return correct data for reissue" in {
-      var senderBalanceBeforeReissue = 0L
-      var senderBalanceAfterReissue  = 0L
       val amount: Long               = current.nextInt(1, 9999999)
       val amountReissue: Long        = current.nextInt(1, 9999999)
       val issue                      = TxHelpers.issue(sender, amount)
       val reissueTx                  = TxHelpers.reissue(issue.asset, sender, amountReissue, reissuable = false, customAssetIssueFee)
       val quantityAfterReissue       = amount + amountReissue
+      val senderBalanceBeforeReissue = senderBalanceBefore - issue.fee.value
+      val senderBalanceAfterReissue  = senderBalanceBeforeReissue - reissueTx.fee.value
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        senderBalanceBeforeReissue = d.balance(senderAddress)
         d.appendMicroBlock(reissueTx)
-        senderBalanceAfterReissue = d.balance(senderAddress)
       } { updates =>
         val append       = updates(2).append
         val assetDetails = append.transactionStateUpdates.head.assets.head
@@ -190,22 +187,20 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-4. Return correct data for burn" in {
-      var senderBalanceBeforeReissue = 0L
-      var senderBalanceAfterReissue  = 0L
-      val amount: Long               = current.nextInt(5999999, 9999999)
-      val amountBurn: Long           = current.nextInt(4000000, 5999999)
-      val issue                      = TxHelpers.issue(sender, amount)
-      val burnTx                     = TxHelpers.burn(issue.asset, amountBurn, sender, customAssetIssueFee)
-      val amountAfterTx              = amount - amountBurn
+      val amount: Long            = current.nextInt(5999999, 9999999)
+      val amountBurn: Long        = current.nextInt(4000000, 5999999)
+      val issue                   = TxHelpers.issue(sender, amount)
+      val burnTx                  = TxHelpers.burn(issue.asset, amountBurn, sender, customAssetIssueFee)
+      val amountAfterTx           = amount - amountBurn
+      val senderBalanceBeforeBurn = senderBalanceBefore - issue.fee.value
+      val senderBalanceAfterBurn  = senderBalanceBeforeBurn - burnTx.fee.value
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        senderBalanceBeforeReissue = d.balance(senderAddress)
         d.appendMicroBlock(burnTx)
-        senderBalanceAfterReissue = d.balance(senderAddress)
       } { updates =>
         val append       = updates(2).append
         val assetDetails = append.transactionStateUpdates.head.assets.head
@@ -213,7 +208,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (senderAddress, Waves)        -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
+            (senderAddress, Waves)        -> (senderBalanceBeforeBurn, senderBalanceAfterBurn),
             (senderAddress, burnTx.asset) -> (amount, amountAfterTx)
           )
         )
@@ -261,8 +256,9 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         )
         val exchangedAssets                           = order1.price.value * order1.amount.value / 100000000
         val exchangeTx                                = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V2)
-        val blockchainUpdated: Seq[BlockchainUpdated] = addedBlocksAndSubscribe(exchangeTx)
-        checkingSubscribeFields(blockchainUpdated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+        addedBlocksAndSubscribe(exchangeTx) { updated =>
+          checkingSubscribeFields(updated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+        }
       }
 
       "BU-120. Return correct data for order V4, exchange V3" in {
@@ -291,13 +287,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           version = Order.V4
         )
         val exchangedAssets = order1.price.value / 2 / 10000000
-        val exchangeTx = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V3)
-        val blockchainUpdated: Seq[BlockchainUpdated] = addedBlocksAndSubscribe(exchangeTx)
-        checkingSubscribeFields(blockchainUpdated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+        val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V3)
+        addedBlocksAndSubscribe(exchangeTx) { updated =>
+          checkingSubscribeFields(updated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+        }
       }
 
-      def addedBlocksAndSubscribe(exchangeTx: ExchangeTransaction): Seq[BlockchainUpdated] = {
-        var blockchainUpdated: Seq[BlockchainUpdated] = Seq.empty
+      def addedBlocksAndSubscribe(exchangeTx: ExchangeTransaction)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
         withGenerateSubscription(
           settings = currentSettings,
           balances = Seq(
@@ -308,10 +304,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           d.appendBlock(priceAsset)
           d.appendBlock(amountAsset)
           d.appendMicroBlock(exchangeTx)
-        } { updates =>
-          blockchainUpdated = updates
-        }
-        blockchainUpdated
+        }(f)
       }
 
       def checkingSubscribeFields(append: Append, exchangeTx: ExchangeTransaction, exchangedAssets: Long, orderAmount: Long): Unit = {
@@ -366,21 +359,21 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-14. Return correct data for lease cancel" in {
-      val recipient        = TxHelpers.signer(123)
-      val recipientAddress = recipient.toAddress
-      val amount           = 5.waves
-      val lease            = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseCancel      = TxHelpers.leaseCancel(lease.id.value(), sender, customFee)
-      val leaseId          = leaseCancel.leaseId.arr
+      val recipient             = TxHelpers.signer(123)
+      val recipientAddress      = recipient.toAddress
+      val amount                = 5.waves
+      val lease                 = TxHelpers.lease(sender, recipientAddress, amount, customFee)
+      val leaseCancel           = TxHelpers.leaseCancel(lease.id.value(), sender, customFee)
+      val leaseId               = leaseCancel.leaseId.arr
+      val senderBalanceBeforeTx = senderBalanceBefore - lease.fee.value
+      val senderBalanceAfterTx  = senderBalanceBeforeTx - leaseCancel.fee.value
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(lease)
-        senderBalanceBeforeTx = d.balance(senderAddress)
         d.appendMicroBlock(leaseCancel)
-        senderBalanceAfterTx = d.balance(senderAddress)
       } { updates =>
         val append = updates(2).append
         checkLeaseCancel(append.transactionIds.head, append.transactionAt(0), leaseCancel)
@@ -407,21 +400,27 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-16. Return correct data for massTransfer" in {
-      val massTransferFee = fee * 6
-      val transferAmount  = 500000L
-      val recipients      = TxHelpers.accountSeqGenerator(10, transferAmount)
-      val issue           = TxHelpers.issue(sender, 1000000000L)
-      val massTransfer    = TxHelpers.massTransfer(sender, recipients, Asset.fromCompatId(issue.asset.compatId), massTransferFee)
+      val massTransferFee           = fee * 6
+      val transferAmount            = 500000L
+      val recipients                = TxHelpers.accountSeqGenerator(10, transferAmount)
+      val issue                     = TxHelpers.issue(sender, 1000000000L)
+      val issuedAsset: Asset        = Asset.fromCompatId(issue.asset.compatId)
+      val massTransfer              = TxHelpers.massTransfer(sender, recipients, issuedAsset, massTransferFee)
+      val senderBalanceBeforeTx     = senderBalanceBefore - issue.fee.value
+      val senderBalanceAfterTx      = senderBalanceBeforeTx - massTransfer.fee.value
+      val senderAssetBalanceAfterTx = issue.quantity.value - transferAmount * recipients.size
 
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        senderBalanceBeforeTx = d.balance(senderAddress)
         d.appendMicroBlock(massTransfer)
-        senderBalanceAfterTx = d.balance(senderAddress)
       } { updates =>
+        val balancesMap = Map(
+          (senderAddress, Waves)       -> (senderBalanceBeforeTx, senderBalanceAfterTx),
+          (senderAddress, issuedAsset) -> (issue.quantity.value, senderAssetBalanceAfterTx)
+        ) ++ recipients.map(r => (Address.fromBytes(r.address.bytes).explicitGet(), issuedAsset) -> (0L, transferAmount)).toMap
         val append = updates(2).append
         checkMassTransfer(
           append.transactionIds.head,
@@ -434,17 +433,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
             }
           )
         )
-        checkMassTransferBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx),
-            (senderAddress, issue.asset) -> (issue.quantity.value, issue.quantity.value - transferAmount * 10),
-          )
-        )
-        checkMassTransferBalances(
-          append.transactionStateUpdates.head.balances,
-          recipients.map(r => (Address.fromBytes(r.address.bytes).explicitGet(), issue.asset) -> (0L, transferAmount)).toMap
-        )
+        checkMassTransferBalances(append.transactionStateUpdates.head.balances, balancesMap)
       }
     }
 
@@ -491,19 +480,20 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "Return correct data for sponsorFee" - {
-      val sponsorshipFee   = Option.apply(current.nextLong(100000L, 9990000L))
-      val issue            = TxHelpers.issue(sender, 99900000L)
-      val sponsorFee       = TxHelpers.sponsor(issue.asset, sponsorshipFee, sender)
-      val sponsorFeeCancel = TxHelpers.sponsor(issue.asset, None, sender)
+      val sponsorshipFee                       = Option.apply(current.nextLong(100000L, 9990000L))
+      val issue                                = TxHelpers.issue(sender, 99900000L)
+      val sponsorFee                           = TxHelpers.sponsor(issue.asset, sponsorshipFee, sender)
+      val sponsorFeeCancel                     = TxHelpers.sponsor(issue.asset, None, sender)
+      val senderBalanceBeforeSponsorFeeTx      = senderBalanceBefore - issue.fee.value
+      val senderBalanceAfterSponsorFeeTx       = senderBalanceBeforeSponsorFeeTx - sponsorFee.fee.value
+      val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFeeCancel.fee.value
 
       "BU-25 sponsorFee" in withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        senderBalanceBeforeTx = d.balance(senderAddress)
         d.appendBlock(sponsorFee)
-        senderBalanceAfterTx = d.balance(senderAddress)
       } { updates =>
         val append       = updates(2).append
         val txUpdates    = append.transactionStateUpdates.head
@@ -512,7 +502,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkSponsorFeeTransaction(append.transactionIds.head, append.transactionAt(0), sponsorFee)
         checkBalances(
           txUpdates.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx))
+          Map((senderAddress, Waves) -> (senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx))
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
@@ -524,9 +514,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       ) { d =>
         d.appendBlock(issue)
         d.appendBlock(sponsorFee)
-        senderBalanceBeforeTx = d.balance(senderAddress)
         d.appendMicroBlock(sponsorFeeCancel)
-        senderBalanceAfterTx = d.balance(senderAddress)
       } { updates =>
         val append       = updates(3).append
         val txUpdates    = append.transactionStateUpdates.head
@@ -535,7 +523,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkSponsorFeeTransaction(append.transactionIds.head, append.transactionAt(0), sponsorFeeCancel)
         checkBalances(
           txUpdates.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx))
+          Map((senderAddress, Waves) -> (senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx))
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
@@ -543,20 +531,20 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-20. Return correct data for setAssetScript" in {
-      val complexScriptBefore = Option.apply(TxHelpers.script("true".stripMargin))
-      val complexScriptAfter  = TxHelpers.script("false".stripMargin)
-      val issue               = TxHelpers.issue(sender, 99900000L, script = complexScriptBefore)
-      val setAssetScript      = TxHelpers.setAssetScript(sender, issue.asset, complexScriptAfter, 1.waves)
-      val quantity            = issue.quantity.value
+      val complexScriptBefore                 = Option.apply(TxHelpers.script("true".stripMargin))
+      val complexScriptAfter                  = TxHelpers.script("false".stripMargin)
+      val issue                               = TxHelpers.issue(sender, 99900000L, script = complexScriptBefore)
+      val setAssetScript                      = TxHelpers.setAssetScript(sender, issue.asset, complexScriptAfter, 1.waves)
+      val quantity                            = issue.quantity.value
+      val senderBalanceBeforeSetAssetScriptTx = senderBalanceBefore - issue.fee.value
+      val senderBalanceAfterSetAssetScriptTx  = senderBalanceBeforeSetAssetScriptTx - setAssetScript.fee.value
 
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        senderBalanceBeforeTx = d.balance(senderAddress)
         d.appendMicroBlock(setAssetScript)
-        senderBalanceAfterTx = d.balance(senderAddress)
       } { updates =>
         val append       = updates(2).append
         val txUpdates    = append.transactionStateUpdates.head
@@ -565,7 +553,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           txUpdates.balances,
           Map(
-            (senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx)
+            (senderAddress, Waves) -> (senderBalanceBeforeSetAssetScriptTx, senderBalanceAfterSetAssetScriptTx)
           )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, quantity)
@@ -576,20 +564,20 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-121. Return correct data for UpdateAssetInfo" in {
-      val newName         = "new_name"
-      val newDescription  = "new_description"
-      val issue           = TxHelpers.issue(sender, 99900000L)
-      val updateAssetInfo = TxHelpers.updateAssetInfo(issue.assetId, newName, newDescription, sender)
+      val newName                              = "new_name"
+      val newDescription                       = "new_description"
+      val issue                                = TxHelpers.issue(sender, 99900000L)
+      val updateAssetInfo                      = TxHelpers.updateAssetInfo(issue.assetId, newName, newDescription, sender)
+      val senderBalanceBeforeUpdateAssetInfoTx = senderBalanceBefore - issue.fee.value
+      val senderBalanceAfterUpdateAssetInfoTx  = senderBalanceBeforeUpdateAssetInfoTx - updateAssetInfo.fee
 
       withGenerateSubscription(
         settings = currentSettings.configure(_.copy(minAssetInfoUpdateInterval = 1)),
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        senderBalanceBeforeTx = d.balance(senderAddress)
         d.appendBlock()
         d.appendMicroBlock(updateAssetInfo)
-        senderBalanceAfterTx = d.balance(senderAddress)
       } { updates =>
         val append       = updates(3).append
         val txUpdates    = append.transactionStateUpdates.head
@@ -598,7 +586,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           txUpdates.balances,
           Map(
-            (senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx)
+            (senderAddress, Waves) -> (senderBalanceBeforeUpdateAssetInfoTx, senderBalanceAfterUpdateAssetInfoTx)
           )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
