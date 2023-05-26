@@ -260,8 +260,7 @@ object WavesTxChecks extends Matchers with OptionValues {
       val actualValue = if (entry.value.isDefined) entry.value.value match {
         case byteStr: ByteString => byteStr.toByteArray
         case otherValue          => otherValue
-        case _ => fail("invalid value")
-
+        case _ =>
       }
       else None
 
