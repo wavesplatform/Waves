@@ -1,7 +1,5 @@
 package com.wavesplatform.events.fixtures
 
-import java.util.concurrent.ThreadLocalRandom.current
-
 object PrepareInvokeTestData {
   val scriptTransferIssueAssetNum: Long = 21000
   val scriptTransferUnitNum: Long       = 22000
@@ -18,15 +16,15 @@ object PrepareInvokeTestData {
   val issueData: Map[String, Any] = Map(
     "name"        -> "issuedAssetName",
     "description" -> "asset_ride_description",
-    "amount"      -> current.nextLong(416168074, 918171615),
-    "decimals"    -> current.nextLong(0, 8),
-    "nonce"       -> current.nextLong(0, 8)
+    "amount"      -> 416168000,
+    "decimals"    -> 8,
+    "nonce"       -> 1
   )
 
   val dataMap: Map[String, Any] = Map(
-    "intVal"                      -> current.nextInt(27001, 28000),
-    "stringVal"                   -> "test_string",
-    "booleanVal"                  -> "true"
+    "intVal"     -> 25400,
+    "stringVal"  -> "test_string",
+    "booleanVal" -> "true"
   )
 
   def invokeAssetScript(libVersion: Int): String =
