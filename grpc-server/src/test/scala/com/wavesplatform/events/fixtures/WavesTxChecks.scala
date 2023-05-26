@@ -180,6 +180,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     actual.transaction.wavesTransaction.value.data match {
       case Data.SetScript(value) =>
         value.script.toByteArray shouldBe expected.script.get.bytes.value().arr
+      case _ => fail("not a SetScript transaction")
     }
   }
 
@@ -191,6 +192,7 @@ object WavesTxChecks extends Matchers with OptionValues {
       case Data.SetAssetScript(value) =>
         value.assetId.toByteArray shouldBe expected.asset.id.arr
         value.script.toByteArray shouldBe expected.script.get.bytes.value().arr
+      case _ => fail("not a SetAssetScript transaction")
     }
   }
 
@@ -202,6 +204,7 @@ object WavesTxChecks extends Matchers with OptionValues {
       case Data.UpdateAssetInfo(value) =>
         value.assetId.toByteArray shouldBe expected.assetId.id.arr
         value.name shouldBe expected.name
+      case _ => fail("not a UpdateAssetInfo transaction")
     }
   }
 
@@ -212,6 +215,7 @@ object WavesTxChecks extends Matchers with OptionValues {
       case Data.SponsorFee(value) =>
         value.minFee.value.assetId.toByteArray shouldBe expected.asset.id.arr
         value.minFee.value.amount shouldBe expectedAmount
+      case _ => fail("not a SponsorFee transaction")
     }
   }
 
@@ -222,6 +226,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     actual.transaction.wavesTransaction.value.data match {
       case Data.InvokeScript(value) =>
         value.dApp.get.getPublicKeyHash.toByteArray shouldBe publicKeyHash
+      case _ => fail("not a InvokeScript transaction")
     }
   }
 
@@ -255,6 +260,8 @@ object WavesTxChecks extends Matchers with OptionValues {
       val actualValue = if (entry.value.isDefined) entry.value.value match {
         case byteStr: ByteString => byteStr.toByteArray
         case otherValue          => otherValue
+        case _ => fail("invalid value")
+
       }
       else None
 
