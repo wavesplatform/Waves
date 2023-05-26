@@ -171,7 +171,7 @@ object WavesTxChecks extends Matchers with OptionValues {
             actualValue shouldBe expectedValue
           }
         }
-      case _ => fail("not a create alias transaction")
+      case _ => fail("not a Data transaction")
     }
   }
 
