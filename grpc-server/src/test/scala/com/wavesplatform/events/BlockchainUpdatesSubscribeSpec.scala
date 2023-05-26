@@ -155,8 +155,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-19. Return correct data for reissue" in {
-      val amount: Long               = current.nextInt(1, 9999999)
-      val amountReissue: Long        = current.nextInt(1, 9999999)
+      val amount: Long               = 9000000
+      val amountReissue: Long        = 7500000
       val issue                      = TxHelpers.issue(sender, amount)
       val reissueTx                  = TxHelpers.reissue(issue.asset, sender, amountReissue, reissuable = false, customAssetIssueFee)
       val quantityAfterReissue       = amount + amountReissue

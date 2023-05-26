@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
 import FakeObserver.*
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateResponse, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
@@ -66,18 +66,15 @@ trait WithBUDomain extends WithDomain { _: Suite =>
   }
 
   def withGenerateGetBlockUpdate(
-      height: Int = 0,
+      height: Int = 1,
       settings: WavesSettings,
       balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
-  )(generateBlocks: Domain => Unit)(f: PBBlockchainUpdated => Unit): Unit = {
+  )(generateBlocks: Domain => Unit)(f: GetBlockUpdateResponse => Unit): Unit = {
     withDomainAndRepo(settings) { (d, repo) =>
       d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
-
-      val getBlockUpdate = repo.getBlockUpdate(height)
       generateBlocks(d)
-
-      val result = getBlockUpdate.getUpdate
-      f(result)
+      val getBlockUpdate = repo.getBlockUpdate(height)
+      f(getBlockUpdate)
     }
   }
 
