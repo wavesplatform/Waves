@@ -46,7 +46,7 @@ object TxHelpers {
 
   def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
     val accountsSeq = (0 until numberAccounts).map { _ =>
-      val recipient = signer(current.nextInt(1, 9999999)).toAddress
+      val recipient = signer(current.nextInt(10000, 9999999)).toAddress
       ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
     }
     accountsSeq

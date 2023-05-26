@@ -14,7 +14,6 @@ object PrepareInvokeTestData {
   val leaseNum: Long                    = 200000
   val baz                               = "baz"
   val bar                               = "bar"
-  val libVersion: Int                   = current.nextInt(5, 7)
 
   val issueData: Map[String, Any] = Map(
     "name"        -> "issuedAssetName",
@@ -30,7 +29,7 @@ object PrepareInvokeTestData {
     "booleanVal"                  -> "true"
   )
 
-  val invokeAssetScript: String =
+  def invokeAssetScript(libVersion: Int): String =
     s"""
        |{-# STDLIB_VERSION $libVersion #-}
        |{-# CONTENT_TYPE DAPP #-}
@@ -61,7 +60,7 @@ object PrepareInvokeTestData {
        |}
        |""".stripMargin
 
-  val mainDAppScript: String =
+  def mainDAppScript(libVersion: Int): String =
     s"""
        |{-# STDLIB_VERSION $libVersion #-}
        |{-# CONTENT_TYPE DAPP #-}
@@ -81,7 +80,7 @@ object PrepareInvokeTestData {
        |}
        |""".stripMargin
 
-  def nestedDAppScript(firstRecipient: String): String =
+  def nestedDAppScript(firstRecipient: String, libVersion: Int): String =
     s"""
        |{-# STDLIB_VERSION $libVersion #-}
        |{-# CONTENT_TYPE DAPP #-}
@@ -102,7 +101,7 @@ object PrepareInvokeTestData {
        |}
        |""".stripMargin
 
-  def doubleNestedDAppScript(secondRecipient: String): String =
+  def doubleNestedDAppScript(secondRecipient: String, libVersion: Int): String =
     s"""
        |{-# STDLIB_VERSION $libVersion #-}
        |{-# CONTENT_TYPE DAPP #-}

@@ -31,95 +31,97 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
   val senderWavesBalanceBefore: Long = 8.waves
 
   "BU-31. Invoke have to return correct data for subscribe" in {
-    val issue                           = TxHelpers.issue(dAppAccount)
-    val setScript                       = TxHelpers.setScript(dAppAccount, TxHelpers.script(invokeAssetScript))
-    val asset                           = issue.asset
-    val assetByteStr                    = CONST_BYTESTR(asset.id).explicitGet()
-    val addressByteStr                  = CONST_BYTESTR(ByteStr.apply(senderAddress.bytes)).explicitGet()
-    val args: Seq[EXPR]                 = Seq(assetByteStr, addressByteStr)
-    val invoke                          = TxHelpers.invoke(dAppAddress, Some("setData"), args, Seq.empty, sender, fee = 100500000L)
-    val dAppInvokeIssueBalance: Long    = issueData.apply("amount").toString.toLong - scriptTransferIssueAssetNum
-    val dAppBalanceBeforeInvoke: Long   = dAppBalanceBefore - issue.fee.value - setScript.fee.value
-    val dAppWavesBalanceAfterTx: Long   = dAppBalanceBeforeInvoke - scriptTransferUnitNum
-    val dAppAssetBalanceAfterTx: Long   = issue.quantity.value - burnNum - scriptTransferAssetNum + reissueNum
-    val senderWavesBalanceAfterTx: Long = senderWavesBalanceBefore - invoke.fee.value + scriptTransferUnitNum
-    val dataEntry: Seq[DataEntry[?]] = Seq[DataEntry[?]](
-      EmptyDataEntry("int"),
-      BinaryDataEntry("byte", asset.id),
-      BooleanDataEntry("bool", value = true),
-      StringDataEntry("str", "test_string")
-    )
-    val actualData = Seq(
-      ("int", dataMap.apply("intVal")),
-      ("byte", asset.id.arr),
-      ("bool", true),
-      ("str", dataMap.apply("stringVal")),
-      ("int", None)
-    )
+    for (libVersion <- 5 to 6) {
+      val issue                           = TxHelpers.issue(dAppAccount)
+      val setScript                       = TxHelpers.setScript(dAppAccount, TxHelpers.script(invokeAssetScript(libVersion)))
+      val asset                           = issue.asset
+      val assetByteStr                    = CONST_BYTESTR(asset.id).explicitGet()
+      val addressByteStr                  = CONST_BYTESTR(ByteStr.apply(senderAddress.bytes)).explicitGet()
+      val args: Seq[EXPR]                 = Seq(assetByteStr, addressByteStr)
+      val invoke                          = TxHelpers.invoke(dAppAddress, Some("setData"), args, Seq.empty, sender, fee = 100500000L)
+      val dAppInvokeIssueBalance: Long    = issueData.apply("amount").toString.toLong - scriptTransferIssueAssetNum
+      val dAppBalanceBeforeInvoke: Long   = dAppBalanceBefore - issue.fee.value - setScript.fee.value
+      val dAppWavesBalanceAfterTx: Long   = dAppBalanceBeforeInvoke - scriptTransferUnitNum
+      val dAppAssetBalanceAfterTx: Long   = issue.quantity.value - burnNum - scriptTransferAssetNum + reissueNum
+      val senderWavesBalanceAfterTx: Long = senderWavesBalanceBefore - invoke.fee.value + scriptTransferUnitNum
+      val dataEntry: Seq[DataEntry[?]] = Seq[DataEntry[?]](
+        EmptyDataEntry("int"),
+        BinaryDataEntry("byte", asset.id),
+        BooleanDataEntry("bool", value = true),
+        StringDataEntry("str", "test_string")
+      )
+      val actualData = Seq(
+        ("int", dataMap.apply("intVal")),
+        ("byte", asset.id.arr),
+        ("bool", true),
+        ("str", dataMap.apply("stringVal")),
+        ("int", None)
+      )
 
-    withGenerateSubscription(
-      settings = currentSettings,
-      balances = Seq(
-        AddrWithBalance(dAppAddress, dAppBalanceBefore),
-        AddrWithBalance(senderAddress, senderWavesBalanceBefore)
-      )
-    ) { d =>
-      d.appendBlock(setScript)
-      d.appendBlock(issue)
-      d.appendMicroBlock(invoke)
-    } { updates =>
-      val append              = updates(3).append
-      val transactionMetadata = append.transactionsMetadata
-      val invokeScript        = transactionMetadata.head.getInvokeScript
-      val arguments           = invokeScript.arguments
-      val result              = invokeScript.result.get
-      val dataEntries         = append.transactionStateUpdates.head.dataEntries
-      val invokeIssueAsset    = toVanillaAssetId(result.issues.head.assetId)
-      val invokeLeaseId       = result.leases.head.leaseId.toByteArray
-      val assetDetails        = append.transactionStateUpdates.head.assets
-      val expectedValues      = List(asset.id.arr, senderAddress.bytes)
-      val actualArguments = List(
-        arguments.head.value.binaryValue.get.toByteArray,
-        arguments.apply(1).value.binaryValue.get.toByteArray
-      )
-      checkInvokeTransaction(append.transactionIds.head, append.transactionAt(0), invoke, dAppAddress.publicKeyHash)
-      checkInvokeBaseTransactionMetadata(transactionMetadata, invoke)
-      checkArguments(expectedValues, actualArguments)
-      checkInvokeScriptResultData(result.data, actualData)
-      checkInvokeScriptResultIssues(result.issues.head, issueData)
-      checkInvokeScriptResultTransfers(result.transfers.head, senderAddress, scriptTransferAssetNum, asset)
-      checkInvokeScriptResultTransfers(result.transfers.apply(1), senderAddress, scriptTransferIssueAssetNum, invokeIssueAsset)
-      checkInvokeScriptResultTransfers(result.transfers.apply(2), senderAddress, scriptTransferUnitNum, Waves)
-      checkInvokeScriptResultReissue(result.reissues.head, asset, reissueNum, reissuable = true)
-      checkInvokeScriptResultBurn(result.burns.head, asset, burnNum)
-      checkInvokeScriptResultSponsorFee(result.sponsorFees.head, asset, sponsorFeeAssetNum)
-      checkInvokeScriptResultSponsorFee(result.sponsorFees.apply(1), invokeIssueAsset, sponsorFeeIssueAssetNum)
-      checkInvokeScriptResultLease(result.leases.head, senderAddress.publicKeyHash, leaseNum)
-      checkInvokeScriptResultLeaseCancel(result.leaseCancels.head, invokeLeaseId)
-      checkBalances(
-        append.transactionStateUpdates.head.balances,
-        Map(
-          (senderAddress, Waves)            -> (senderWavesBalanceBefore, senderWavesBalanceAfterTx),
-          (senderAddress, asset)            -> (0, scriptTransferAssetNum),
-          (senderAddress, invokeIssueAsset) -> (0, scriptTransferIssueAssetNum),
-          (dAppAddress, Waves)              -> (dAppBalanceBeforeInvoke, dAppWavesBalanceAfterTx),
-          (dAppAddress, invokeIssueAsset)   -> (0, dAppInvokeIssueBalance),
-          (dAppAddress, asset)              -> (issue.quantity.value, dAppAssetBalanceAfterTx)
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(
+          AddrWithBalance(dAppAddress, dAppBalanceBefore),
+          AddrWithBalance(senderAddress, senderWavesBalanceBefore)
         )
-      )
-      checkDataEntriesStateUpdate(dataEntries, dataEntry, dAppAddress.bytes)
-      checkAssetsStateUpdates(assetDetails.head.after, issueData, invokeIssueAsset, dAppAccount.publicKey.arr)
-      checkAssetsStateUpdates(assetDetails.apply(1).before, issue, isNft = false, issue.quantity.value)
-      checkAssetsStateUpdates(assetDetails.apply(1).after, issue, isNft = false, dAppAssetBalanceAfterTx + scriptTransferAssetNum)
-      checkIndividualLeases(
-        append.transactionStateUpdates.head.individualLeases,
-        Map(
-          (
-            LeaseStatus.Inactive,
-            leaseNum
-          ) -> (invokeLeaseId, dAppAccount.publicKey.arr, senderAddress.bytes, invoke.id.value().arr)
+      ) { d =>
+        d.appendBlock(setScript)
+        d.appendBlock(issue)
+        d.appendMicroBlock(invoke)
+      } { updates =>
+        val append              = updates(3).append
+        val transactionMetadata = append.transactionsMetadata
+        val invokeScript        = transactionMetadata.head.getInvokeScript
+        val arguments           = invokeScript.arguments
+        val result              = invokeScript.result.get
+        val dataEntries         = append.transactionStateUpdates.head.dataEntries
+        val invokeIssueAsset    = toVanillaAssetId(result.issues.head.assetId)
+        val invokeLeaseId       = result.leases.head.leaseId.toByteArray
+        val assetDetails        = append.transactionStateUpdates.head.assets
+        val expectedValues      = List(asset.id.arr, senderAddress.bytes)
+        val actualArguments = List(
+          arguments.head.value.binaryValue.get.toByteArray,
+          arguments.apply(1).value.binaryValue.get.toByteArray
         )
-      )
+        checkInvokeTransaction(append.transactionIds.head, append.transactionAt(0), invoke, dAppAddress.publicKeyHash)
+        checkInvokeBaseTransactionMetadata(transactionMetadata, invoke)
+        checkArguments(expectedValues, actualArguments)
+        checkInvokeScriptResultData(result.data, actualData)
+        checkInvokeScriptResultIssues(result.issues.head, issueData)
+        checkInvokeScriptResultTransfers(result.transfers.head, senderAddress, scriptTransferAssetNum, asset)
+        checkInvokeScriptResultTransfers(result.transfers.apply(1), senderAddress, scriptTransferIssueAssetNum, invokeIssueAsset)
+        checkInvokeScriptResultTransfers(result.transfers.apply(2), senderAddress, scriptTransferUnitNum, Waves)
+        checkInvokeScriptResultReissue(result.reissues.head, asset, reissueNum, reissuable = true)
+        checkInvokeScriptResultBurn(result.burns.head, asset, burnNum)
+        checkInvokeScriptResultSponsorFee(result.sponsorFees.head, asset, sponsorFeeAssetNum)
+        checkInvokeScriptResultSponsorFee(result.sponsorFees.apply(1), invokeIssueAsset, sponsorFeeIssueAssetNum)
+        checkInvokeScriptResultLease(result.leases.head, senderAddress.publicKeyHash, leaseNum)
+        checkInvokeScriptResultLeaseCancel(result.leaseCancels.head, invokeLeaseId)
+        checkBalances(
+          append.transactionStateUpdates.head.balances,
+          Map(
+            (senderAddress, Waves)            -> (senderWavesBalanceBefore, senderWavesBalanceAfterTx),
+            (senderAddress, asset)            -> (0, scriptTransferAssetNum),
+            (senderAddress, invokeIssueAsset) -> (0, scriptTransferIssueAssetNum),
+            (dAppAddress, Waves)              -> (dAppBalanceBeforeInvoke, dAppWavesBalanceAfterTx),
+            (dAppAddress, invokeIssueAsset)   -> (0, dAppInvokeIssueBalance),
+            (dAppAddress, asset)              -> (issue.quantity.value, dAppAssetBalanceAfterTx)
+          )
+        )
+        checkDataEntriesStateUpdate(dataEntries, dataEntry, dAppAddress.bytes)
+        checkAssetsStateUpdates(assetDetails.head.after, issueData, invokeIssueAsset, dAppAccount.publicKey.arr)
+        checkAssetsStateUpdates(assetDetails.apply(1).before, issue, isNft = false, issue.quantity.value)
+        checkAssetsStateUpdates(assetDetails.apply(1).after, issue, isNft = false, dAppAssetBalanceAfterTx + scriptTransferAssetNum)
+        checkIndividualLeases(
+          append.transactionStateUpdates.head.individualLeases,
+          Map(
+            (
+              LeaseStatus.Inactive,
+              leaseNum
+            ) -> (invokeLeaseId, dAppAccount.publicKey.arr, senderAddress.bytes, invoke.id.value().arr)
+          )
+        )
+      }
     }
   }
 
@@ -150,67 +152,72 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
         CONST_BYTESTR(asset.id).explicitGet()
       )
     val actualData                 = Seq(("bar", scriptTransferUnitNum * 2))
-    val mainDAppTx                 = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript))
     val invoke                     = TxHelpers.invoke(dAppAddress, Some("foo"), args, Seq.empty, invokerDappAccount, fee = 100500000L)
     val invokerDappBalance: Long   = 4.waves
     val secondAddressBalance: Long = 8.waves
     val assetDappBalance: Long     = 12.waves
 
     "BU-77 case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
-      val scriptTransferWavesSum               = scriptTransferUnitNum * 2
-      val nestedDAppTx                         = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller")))
-      val doubleNestedDAppTx                   = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller")))
-      val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](IntegerDataEntry(bar, scriptTransferWavesSum))
-      val secondAddressWavesBalanceBefore      = secondAddressBalance - nestedDAppTx.fee.value
-      val secondAddressWavesBalanceAfter       = secondAddressWavesBalanceBefore + scriptTransferUnitNum
-      val assetDappAddressWavesBalanceBefore   = assetDappBalance - issue.fee.value - massTx.fee.value - doubleNestedDAppTx.fee.value
-      val assetDappAddressWavesBalanceAfter    = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-      val invokerDappAddressWavesBalance       = invokerDappBalance - invoke.fee.value
-      val secondAddressAssetBalance            = assetTransferAmount - scriptTransferAssetNum + paymentNum
-      val dAppAddressAssetBalance              = assetTransferAmount + scriptTransferAssetNum - paymentNum
+      for (libVersion <- 5 to 6) {
+        val scriptTransferWavesSum = scriptTransferUnitNum * 2
+        val mainDAppTx             = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript(libVersion)))
+        val nestedDAppTx           = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
+        val doubleNestedDAppTx     = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller", libVersion)))
+        val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](IntegerDataEntry(bar, scriptTransferWavesSum))
+        val secondAddressWavesBalanceBefore      = secondAddressBalance - nestedDAppTx.fee.value
+        val secondAddressWavesBalanceAfter       = secondAddressWavesBalanceBefore + scriptTransferUnitNum
+        val assetDappAddressWavesBalanceBefore   = assetDappBalance - issue.fee.value - massTx.fee.value - doubleNestedDAppTx.fee.value
+        val assetDappAddressWavesBalanceAfter    = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
+        val invokerDappAddressWavesBalance       = invokerDappBalance - invoke.fee.value
+        val secondAddressAssetBalance            = assetTransferAmount - scriptTransferAssetNum + paymentNum
+        val dAppAddressAssetBalance              = assetTransferAmount + scriptTransferAssetNum - paymentNum
 
-      addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
-        val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
-        checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, dAppAddress, secondAddress)
-        checkBalances(
-          updates(2).getAppend.transactionStateUpdates.head.balances,
-          Map(
-            (secondAddress, Waves)      -> (secondAddressWavesBalanceBefore, secondAddressWavesBalanceAfter),
-            (secondAddress, asset)      -> (assetTransferAmount, secondAddressAssetBalance),
-            (dAppAddress, asset)        -> (assetTransferAmount, dAppAddressAssetBalance),
-            (assetDappAddress, Waves)   -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-            (invokerDappAddress, Waves) -> (invokerDappBalance, invokerDappAddressWavesBalance)
+        addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
+          val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
+          checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, dAppAddress, secondAddress)
+          checkBalances(
+            updates(2).getAppend.transactionStateUpdates.head.balances,
+            Map(
+              (secondAddress, Waves)      -> (secondAddressWavesBalanceBefore, secondAddressWavesBalanceAfter),
+              (secondAddress, asset)      -> (assetTransferAmount, secondAddressAssetBalance),
+              (dAppAddress, asset)        -> (assetTransferAmount, dAppAddressAssetBalance),
+              (assetDappAddress, Waves)   -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
+              (invokerDappAddress, Waves) -> (invokerDappBalance, invokerDappAddressWavesBalance)
+            )
           )
-        )
-        checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, dAppAddress.bytes)
+          checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, dAppAddress.bytes)
+        }
       }
     }
 
     "BU-39 case. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
-      val nestedDAppTx                         = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller")))
-      val doubleNestedDAppTx                   = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.originCaller")))
-      val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](IntegerDataEntry(bar, scriptTransferUnitNum * 2))
-      val assetDappAddressWavesBalanceBefore   = assetDappBalance - issue.fee.value - massTx.fee.value - doubleNestedDAppTx.fee.value
-      val assetDappAddressWavesBalanceAfter    = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-      val invokerDappAddressWavesBalance       = invokerDappBalance - invoke.fee.value + scriptTransferUnitNum
-      val invokerDappAddressAssetBalance       = assetTransferAmount + scriptTransferAssetNum
-      val secondAddressAssetBalance            = assetTransferAmount - scriptTransferAssetNum + paymentNum
-      val dAppAddressAssetBalance              = assetTransferAmount - paymentNum
+      for (libVersion <- 5 to 6) {
+        val mainDAppTx         = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript(libVersion)))
+        val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
+        val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.originCaller", libVersion)))
+        val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](IntegerDataEntry(bar, scriptTransferUnitNum * 2))
+        val assetDappAddressWavesBalanceBefore   = assetDappBalance - issue.fee.value - massTx.fee.value - doubleNestedDAppTx.fee.value
+        val assetDappAddressWavesBalanceAfter    = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
+        val invokerDappAddressWavesBalance       = invokerDappBalance - invoke.fee.value + scriptTransferUnitNum
+        val invokerDappAddressAssetBalance       = assetTransferAmount + scriptTransferAssetNum
+        val secondAddressAssetBalance            = assetTransferAmount - scriptTransferAssetNum + paymentNum
+        val dAppAddressAssetBalance              = assetTransferAmount - paymentNum
 
-      addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
-        val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
-        checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, invokerDappAddress, invokerDappAddress)
-        checkBalances(
-          updates(2).getAppend.transactionStateUpdates.head.balances,
-          Map(
-            (invokerDappAddress, asset) -> (assetTransferAmount, invokerDappAddressAssetBalance),
-            (secondAddress, asset)      -> (assetTransferAmount, secondAddressAssetBalance),
-            (dAppAddress, asset)        -> (assetTransferAmount, dAppAddressAssetBalance),
-            (assetDappAddress, Waves)   -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-            (invokerDappAddress, Waves) -> (invokerDappBalance, invokerDappAddressWavesBalance)
+        addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
+          val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
+          checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, invokerDappAddress, invokerDappAddress)
+          checkBalances(
+            updates(2).getAppend.transactionStateUpdates.head.balances,
+            Map(
+              (invokerDappAddress, asset) -> (assetTransferAmount, invokerDappAddressAssetBalance),
+              (secondAddress, asset)      -> (assetTransferAmount, secondAddressAssetBalance),
+              (dAppAddress, asset)        -> (assetTransferAmount, dAppAddressAssetBalance),
+              (assetDappAddress, Waves)   -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
+              (invokerDappAddress, Waves) -> (invokerDappBalance, invokerDappAddressWavesBalance)
+            )
           )
-        )
-        checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, dAppAddress.bytes)
+          checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, dAppAddress.bytes)
+        }
       }
     }
 
