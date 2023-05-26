@@ -3,15 +3,15 @@ package com.wavesplatform.events.fixtures
 import java.util.concurrent.ThreadLocalRandom.current
 
 object PrepareInvokeTestData {
-  val burnNum: Int                      = current.nextInt(1, 10000)
-  val leaseNum: Long                     = current.nextLong(10001, 20000)
-  val reissueNum: Int                   = current.nextInt(100000, 200000)
-  val scriptTransferAssetNum: Long      = current.nextInt(20001, 20600)
-  val scriptTransferUnitNum: Long       = current.nextInt(21001, 22001)
-  val scriptTransferIssueAssetNum: Long = current.nextInt(20601, 21000)
-  val sponsorFeeAssetNum: Long          = current.nextInt(23001, 24000)
-  val sponsorFeeIssueAssetNum: Long     = current.nextInt(25001, 26000)
-  val paymentNum: Long                  = current.nextLong(52300, 72487)
+  val scriptTransferIssueAssetNum: Long = 21000
+  val scriptTransferUnitNum: Long       = 22000
+  val scriptTransferAssetNum: Long      = 25000
+  val paymentNum: Long                  = 30000
+  val sponsorFeeAssetNum: Long          = 35000
+  val sponsorFeeIssueAssetNum: Long     = 40000
+  val reissueNum: Int                   = 50000
+  val burnNum: Int                      = 100000
+  val leaseNum: Long                    = 200000
   val baz                               = "baz"
   val bar                               = "bar"
   val libVersion: Int                   = current.nextInt(5, 7)
@@ -93,7 +93,7 @@ object PrepareInvokeTestData {
        |case r: Int =>
        |(
        |  [
-       |    ScriptTransfer($firstRecipient, $scriptTransferUnitNum, assetId)
+       |    ScriptTransfer($firstRecipient, $scriptTransferAssetNum, assetId)
        |  ],
        | a * 2
        |)
@@ -117,5 +117,4 @@ object PrepareInvokeTestData {
        |)
        |}
        |""".stripMargin
-
 }

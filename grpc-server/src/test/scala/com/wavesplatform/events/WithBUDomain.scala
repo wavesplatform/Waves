@@ -17,11 +17,8 @@ import org.iq80.leveldb.DB
 import org.scalatest.Suite
 
 trait WithBUDomain extends WithDomain { _: Suite =>
-  def withDomainAndRepo(
-      settings: WavesSettings,
-      balances: Seq[AddrWithBalance] = Seq.empty
-  )(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
-    withDomain(settings, balances) { d =>
+  def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
+    withDomain(settings) { d =>
       tempDb { db =>
         val repo = new Repo(wrapDB(db), d.blocksApi)
         d.triggers = Seq(repo)
