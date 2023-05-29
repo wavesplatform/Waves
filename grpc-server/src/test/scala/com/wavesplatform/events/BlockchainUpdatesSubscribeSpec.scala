@@ -21,12 +21,10 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
-import java.util.concurrent.ThreadLocalRandom.current
-
 class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = DomainPresets.RideV6
-  val customFee: Long                = 5234567L
-  val customAssetIssueFee            = 234567654L
+  val customFee: Long                = 5234000L
+  val customAssetIssueFee            = 234560000L
   val sender: SeedKeyPair            = TxHelpers.signer(12)
   val senderAddress: Address         = sender.toAddress
   val senderBalanceBefore: Long      = 20.waves
@@ -90,10 +88,10 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
     "BU-9. Return correct data for issue" in {
       val script              = Option(TxHelpers.script("true"))
-      val amount: Long        = current.nextInt(1, 9999999)
-      val decimals: Byte      = current.nextInt(0, 8).toByte
+      val amount: Long        = 599000
+      val decimals: Byte      = 8
       val name: String        = "Test_asset"
-      val description: String = name + "|_|_|_|_|_|" + current.nextInt(1111111, 9999999)
+      val description: String = name + "|_|_|_|_|_|" + 5380000
       val issue               = TxHelpers.issue(sender, amount, decimals, name, description, customAssetIssueFee, script)
       val issueScript         = issue.script.get.bytes.value().arr
 
@@ -119,7 +117,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
 
     "BU-11. Return correct data for issue NFT" in {
       val name: String        = "Nft_test_asset"
-      val description: String = name + "__" + current.nextInt(1111, 999999)
+      val description: String = name + "_OVER_9000"
       val issueNftTx = IssueTransaction
         .selfSigned(
           TxVersion.V3,
@@ -187,8 +185,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-4. Return correct data for burn" in {
-      val amount: Long            = current.nextInt(5999999, 9999999)
-      val amountBurn: Long        = current.nextInt(4000000, 5999999)
+      val amount: Long            = 6000000
+      val amountBurn: Long        = 5000000
       val issue                   = TxHelpers.issue(sender, amount)
       val burnTx                  = TxHelpers.burn(issue.asset, amountBurn, sender, customAssetIssueFee)
       val amountAfterTx           = amount - amountBurn
@@ -402,7 +400,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     "BU-16. Return correct data for massTransfer" in {
       val massTransferFee           = fee * 6
       val transferAmount            = 500000L
-      val recipients                = TxHelpers.accountSeqGenerator(10, transferAmount)
+      val recipients                = TxHelpers.accountSeqGenerator(100, transferAmount)
       val issue                     = TxHelpers.issue(sender, 1000000000L)
       val issuedAsset: Asset        = Asset.fromCompatId(issue.asset.compatId)
       val massTransfer              = TxHelpers.massTransfer(sender, recipients, issuedAsset, massTransferFee)
@@ -438,13 +436,12 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "BU-5. Return correct data for data" in {
-      val integerDataEntry = IntegerDataEntry.apply("Integer", current.nextLong(0, 9292929L))
+      val integerDataEntry = IntegerDataEntry.apply("Integer", 3550000L)
       val booleanDataEntry = BooleanDataEntry.apply("Boolean", value = true)
       val stringDataEntry  = StringDataEntry.apply("String", "test")
       val binaryDataEntry  = BinaryDataEntry.apply("Binary", ByteStr.apply(senderAddress.bytes))
       val entries          = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
-      val dataTxVersion    = current().nextInt(1, 2).toByte
-      val dataTx           = TxHelpers.data(sender, entries, customFee, dataTxVersion)
+      val dataTx           = TxHelpers.data(sender, entries, customFee, TxVersion.V2)
 
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
@@ -480,7 +477,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
     }
 
     "Return correct data for sponsorFee" - {
-      val sponsorshipFee                       = Option.apply(current.nextLong(100000L, 9990000L))
+      val sponsorshipFee                       = Option.apply(3950000L)
       val issue                                = TxHelpers.issue(sender, 99900000L)
       val sponsorFee                           = TxHelpers.sponsor(issue.asset, sponsorshipFee, sender)
       val sponsorFeeCancel                     = TxHelpers.sponsor(issue.asset, None, sender)
