@@ -55,7 +55,7 @@ class LeaseRouteSpec
       domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.compositeBlockchain, domain.rdb, domain.blockchain),
+      CommonAccountsApi(() => domain.blockchainUpdater.snapshotBlockchain, domain.rdb, domain.blockchain),
       new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     )
 

@@ -115,7 +115,7 @@ class EvaluatedPBSerializationTest
     d.transactionsApi,
     d.wallet,
     d.blockchain,
-    () => d.blockchain.compositeBlockchain,
+    () => d.blockchain.snapshotBlockchain,
     () => d.utxPool.size,
     (_, _) => Future.successful(TracedResult(Right(true))),
     ntpTime,

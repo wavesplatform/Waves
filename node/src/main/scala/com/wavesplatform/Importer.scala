@@ -150,7 +150,7 @@ object Importer extends ScorexLogging {
               Application.loadBlockInfoAt(rdb, blockchainUpdater)
             )
           override def accountsApi: CommonAccountsApi =
-            CommonAccountsApi(() => blockchainUpdater.compositeBlockchain, rdb, blockchainUpdater)
+            CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
             CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
         }

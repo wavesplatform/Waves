@@ -414,7 +414,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   )
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
-    () => blockchainUpdater.compositeBlockchain,
+    () => blockchainUpdater.snapshotBlockchain,
     rdb,
     blockchain
   )

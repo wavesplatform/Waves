@@ -649,40 +649,40 @@ class BlockchainUpdaterImpl(
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {
-    compositeBlockchain.transferById(id)
+    snapshotBlockchain.transferById(id)
   }
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readLock {
-    compositeBlockchain.transactionInfo(id)
+    snapshotBlockchain.transactionInfo(id)
   }
 
   override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = readLock {
-    compositeBlockchain.transactionInfos(ids)
+    snapshotBlockchain.transactionInfos(ids)
   }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {
-    compositeBlockchain.containsTransaction(tx)
+    snapshotBlockchain.containsTransaction(tx)
   }
 
   override def assetDescription(id: IssuedAsset): Option[AssetDescription] = readLock {
-    compositeBlockchain.assetDescription(id)
+    snapshotBlockchain.assetDescription(id)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readLock {
-    compositeBlockchain.resolveAlias(alias)
+    snapshotBlockchain.resolveAlias(alias)
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readLock {
-    compositeBlockchain.leaseDetails(leaseId)
+    snapshotBlockchain.leaseDetails(leaseId)
   }
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = readLock {
-    compositeBlockchain.filledVolumeAndFee(orderId)
+    snapshotBlockchain.filledVolumeAndFee(orderId)
   }
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
-    compositeBlockchain.balanceAtHeight(address, h, assetId)
+    snapshotBlockchain.balanceAtHeight(address, h, assetId)
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
@@ -692,47 +692,47 @@ class BlockchainUpdaterImpl(
   }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = readLock {
-    compositeBlockchain.accountScript(address)
+    snapshotBlockchain.accountScript(address)
   }
 
   override def hasAccountScript(address: Address): Boolean = readLock {
-    compositeBlockchain.hasAccountScript(address)
+    snapshotBlockchain.hasAccountScript(address)
   }
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readLock {
-    compositeBlockchain.assetScript(asset)
+    snapshotBlockchain.assetScript(asset)
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[?]] = readLock {
-    compositeBlockchain.accountData(acc, key)
+    snapshotBlockchain.accountData(acc, key)
   }
 
   override def hasData(acc: Address): Boolean = readLock {
-    compositeBlockchain.hasData(acc)
+    snapshotBlockchain.hasData(acc)
   }
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = readLock {
-    compositeBlockchain.transactionMeta(id)
+    snapshotBlockchain.transactionMeta(id)
   }
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = readLock {
-    compositeBlockchain.balance(address, mayBeAssetId)
+    snapshotBlockchain.balance(address, mayBeAssetId)
   }
 
   override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), TxTimestamp] = readLock {
-    compositeBlockchain.balances(req)
+    snapshotBlockchain.balances(req)
   }
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = readLock {
-    compositeBlockchain.wavesBalances(addresses)
+    snapshotBlockchain.wavesBalances(addresses)
   }
 
   override def leaseBalance(address: Address): LeaseBalance = readLock {
-    compositeBlockchain.leaseBalance(address)
+    snapshotBlockchain.leaseBalance(address)
   }
 
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = readLock {
-    compositeBlockchain.leaseBalances(addresses)
+    snapshotBlockchain.leaseBalances(addresses)
   }
 
   override def hitSource(height: Int): Option[ByteStr] = readLock {
@@ -743,10 +743,10 @@ class BlockchainUpdaterImpl(
   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = readLock {
-    compositeBlockchain.resolveERC20Address(address)
+    snapshotBlockchain.resolveERC20Address(address)
   }
 
-  def compositeBlockchain: SnapshotBlockchain =
+  def snapshotBlockchain: SnapshotBlockchain =
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.monoid.empty))(SnapshotBlockchain(rocksdb, _))
 
   // noinspection ScalaStyle,TypeAnnotation
