@@ -21,7 +21,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   private[this] case class PriorityData(diff: StateSnapshot, isValid: Boolean = true)
 
   @volatile private[this] var priorityDiffs         = Seq.empty[PriorityData]
-  @volatile private[this] var priorityDiffsCombined = StateSnapshot.monoid.empty
+  @volatile private[this] var priorityDiffsCombined = StateSnapshot.empty
 
   def validPriorityDiffs: Seq[StateSnapshot] = priorityDiffs.takeWhile(_.isValid).map(_.diff)
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)

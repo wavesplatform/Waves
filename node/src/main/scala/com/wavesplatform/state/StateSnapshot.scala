@@ -356,4 +356,6 @@ object StateSnapshot {
       )
     }
   }
+
+  val empty: StateSnapshot = monoid.empty
 }

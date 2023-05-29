@@ -82,7 +82,7 @@ case class NgState(
                 (prevDiff |+| currDiff, prevCarry + currCarry, prevTotalFee + currTotalFee)
 
               case None =>
-                (StateSnapshot.monoid.empty, 0L, 0L)
+                (StateSnapshot.empty, 0L, 0L)
             }
           }
         )

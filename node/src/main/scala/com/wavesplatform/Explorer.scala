@@ -41,7 +41,7 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.monoid.empty, _ => true).flatten.to(VectorMap))
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap))
     )
 
   def main(argsRaw: Array[String]): Unit = {
@@ -321,7 +321,7 @@ object Explorer extends ScorexLogging {
           val s = Scheduler.fixedPool("foo-bar", 8, executionModel = ExecutionModel.AlwaysAsyncExecution)
 
           def countEntries(): Future[Long] = {
-            CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.monoid.empty), rdb, reader)
+            CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.empty), rdb, reader)
               .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
               .countL
               .runToFuture(s)

@@ -747,7 +747,7 @@ class BlockchainUpdaterImpl(
   }
 
   def snapshotBlockchain: SnapshotBlockchain =
-    ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.monoid.empty))(SnapshotBlockchain(rocksdb, _))
+    ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
 
   // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
