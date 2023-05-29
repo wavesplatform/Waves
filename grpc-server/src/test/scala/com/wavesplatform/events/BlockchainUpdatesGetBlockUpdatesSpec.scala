@@ -24,15 +24,7 @@ import org.scalatest.concurrent.ScalaFutures
 
 import java.util.concurrent.ThreadLocalRandom.current
 
-class BlockchainUpdatesGetBlockUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures {
-  val currentSettings: WavesSettings = DomainPresets.RideV6
-  val customFee: Long                = 5234567L
-  val customAssetIssueFee            = 234567654L
-  val sender: SeedKeyPair            = TxHelpers.signer(12)
-  val senderAddress: Address         = sender.toAddress
-  val senderBalanceBefore: Long      = 20.waves
-  var senderBalanceBeforeTx: Long    = 0L
-  var senderBalanceAfterTx: Long     = 0L
+class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
 
   "BlockchainUpdates getBlockUpdate tests" - {
     "BU- . Return correct data for alias from getBlockUpdate" in {
@@ -43,11 +35,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends FreeSpec with WithBUDomain wi
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       )(_.appendBlock(aliasTx)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
-        )
+        checkAlias(append, aliasTx)
       }
     }
 

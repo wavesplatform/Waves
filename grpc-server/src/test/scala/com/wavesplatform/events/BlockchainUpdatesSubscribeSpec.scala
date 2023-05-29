@@ -21,40 +21,16 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
 import org.scalatest.concurrent.ScalaFutures
 
-class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
-  val currentSettings: WavesSettings = DomainPresets.RideV6
-  val customFee: Long                = 5234000L
-  val customAssetIssueFee            = 234560000L
-  val sender: SeedKeyPair            = TxHelpers.signer(12)
-  val senderAddress: Address         = sender.toAddress
-  val senderBalanceBefore: Long      = 20.waves
-  val testScript: Script = TxHelpers.script(s"""{-# STDLIB_VERSION 6 #-}
-                                               |{-# CONTENT_TYPE DAPP #-}
-                                               |{-# SCRIPT_TYPE ACCOUNT #-}
-                                               |
-                                               |@Verifier(tx)
-                                               |func verify () = match(tx) {
-                                               |    case _ =>
-                                               |      if (
-                                               |        ${(1 to 9).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || \n")}
-                                               |      ) then true else true
-                                               |}""".stripMargin)
-
+class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates subscribe tests" - {
     "BU-1. Return correct data for alias" in {
       val aliasTx                    = TxHelpers.createAlias("test", sender, fee = customFee)
-      val senderBalanceAfterTx: Long = senderBalanceBefore - aliasTx.fee.value
-
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       )(_.appendMicroBlock(aliasTx)) { updates =>
         val append = updates(1).append
-        checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceAfterTx))
-        )
+        checkAlias(append, aliasTx)
       }
     }
 
