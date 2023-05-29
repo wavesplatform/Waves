@@ -99,7 +99,7 @@ class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends A
 class BalanceIterator(
     address: Address,
     underlying: Iterator[Seq[(IssuedAsset, Long)]],
-    include: IssuedAsset => Boolean,
+    includeAsset: IssuedAsset => Boolean,
     private var pendingOverrides: Map[(Address, Asset), Long]
 ) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
 
@@ -107,7 +107,7 @@ class BalanceIterator(
     if (pendingOverrides.isEmpty) endOfData()
     else {
       val balances = pendingOverrides.collect {
-        case ((`address`, asset: IssuedAsset), balance) if include(asset) =>
+        case ((`address`, asset: IssuedAsset), balance) if includeAsset(asset) =>
           asset -> balance
       }.toSeq
       pendingOverrides = Map.empty

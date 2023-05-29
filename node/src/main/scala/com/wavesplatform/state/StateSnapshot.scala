@@ -328,10 +328,10 @@ object StateSnapshot {
         updatedS2 ++ s2.current.accountData.filterNot(e => updatedS2.exists(_.address == e.address))
       }
 
-      def displaceBy[A, B](f: TransactionStateSnapshot => Seq[A], k: A => B): Seq[A] = {
-        val values1 = f(s1.current)
-        val values2 = f(s2.current)
-        values1.filterNot(v1 => values2.exists(v2 => k(v2) == k(v1))) ++ values2
+      def displaceBy[A, B](field: TransactionStateSnapshot => Seq[A], fieldKey: A => B): Seq[A] = {
+        val values1 = field(s1.current)
+        val values2 = field(s2.current)
+        values1.filterNot(v1 => values2.exists(v2 => fieldKey(v2) == fieldKey(v1))) ++ values2
       }
 
       StateSnapshot(

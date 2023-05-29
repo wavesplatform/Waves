@@ -67,7 +67,7 @@ case class NgState(
 
   def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
-  def diffFor(totalResBlockRef: BlockId): (StateSnapshot, Long, Long) = {
+  def snapshotFor(totalResBlockRef: BlockId): (StateSnapshot, Long, Long) = {
     val (diff, carry, totalFee) =
       if (totalResBlockRef == base.id())
         (baseBlockSnapshot, baseBlockCarry, baseBlockTotalFee)
@@ -77,7 +77,7 @@ case class NgState(
           { () =>
             microBlocks.find(_.idEquals(totalResBlockRef)) match {
               case Some(MicroBlockInfo(blockId, current)) =>
-                val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
+                val (prevDiff, prevCarry, prevTotalFee)                   = this.snapshotFor(current.reference)
                 val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microSnapshots(blockId)
                 (prevDiff |+| currDiff, prevCarry + currCarry, prevTotalFee + currTotalFee)
 
@@ -114,11 +114,11 @@ case class NgState(
 
   def snapshotOf(id: BlockId): Option[(Block, StateSnapshot, Long, Long, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (block, discarded) =>
-      val (diff, carry, totalFee) = this.diffFor(id)
+      val (diff, carry, totalFee) = this.snapshotFor(id)
       (block, diff, carry, totalFee, discarded)
     }
 
-  def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
+  def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = snapshotFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
 
   def bestLiquidSnapshot: StateSnapshot = bestLiquidSnapshotAndFees._1
 

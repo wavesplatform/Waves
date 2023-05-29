@@ -93,8 +93,7 @@ object CommonAccountsApi {
         featureNotActivated || !compBlockchain.assetDescription(assetId).exists(_.nft)
 
       rdb.db.resourceObservable.flatMap { resource =>
-        Observable
-          .fromIterator(Task(assetBalanceIterator(resource, address, compositeBlockchain().snapshot, includeNft)))
+        Observable.fromIterator(Task(assetBalanceIterator(resource, address, compBlockchain.snapshot, includeNft)))
       }
     }
 

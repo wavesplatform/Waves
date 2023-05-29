@@ -205,7 +205,7 @@ abstract class Caches extends Blockchain with Storage {
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
-  protected def doAppendSnapshot(
+  protected def doAppend(
       blockMeta: PBBlockMeta,
       snapshot: TransactionStateSnapshot,
       carry: Long,
@@ -364,7 +364,7 @@ abstract class Caches extends Blockchain with Storage {
     for (sponsorship                <- snapshot.sponsorships) stateHash.addSponsorship(sponsorship.assetId.toIssuedAssetId, sponsorship.minFee)
     for (alias                      <- snapshot.aliases) stateHash.addAlias(alias.address.toAddress, alias.alias)
 
-    doAppendSnapshot(
+    doAppend(
       newMeta,
       snapshot,
       carryFee,

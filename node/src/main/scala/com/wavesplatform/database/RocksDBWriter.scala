@@ -383,7 +383,7 @@ class RocksDBWriter(
       writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
     }
 
-  override protected def doAppendSnapshot(
+  override protected def doAppend(
       blockMeta: PBBlockMeta,
       snapshot: TransactionStateSnapshot,
       carry: Long,
