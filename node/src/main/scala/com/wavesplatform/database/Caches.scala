@@ -240,7 +240,7 @@ abstract class Caches extends Blockchain with Storage {
       (snapshot.balances.map(_._1._1) ++ snapshot.leaseBalances.keys)
         .filter(addressIdCache.get(_).isEmpty)
 
-    for (address <- snapshot.transactions.flatMap(_.affected) if addressIdCache.get(address).isEmpty)
+    for (address <- snapshot.transactions.flatMap(_._2.affected) if addressIdCache.get(address).isEmpty)
       newAddresses += address
 
     val newAddressIds = (for {
@@ -263,7 +263,7 @@ abstract class Caches extends Blockchain with Storage {
 
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction, StateSnapshot)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for (nti <- snapshot.transactions) {
+    for ((_, nti) <- snapshot.transactions) {
       val entry = (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity), nti.transaction, nti.snapshot)
       transactionMeta += entry
       for (addr <- nti.affected) {

@@ -15,7 +15,7 @@ object SnapshotOps {
 
     def toDiff(blockchain: Blockchain): Diff =
       Diff.withTransactions(
-        s.transactions,
+        s.transactions.values.toVector,
         portfolios(blockchain),
         issuedAssets,
         updatedAssets,

@@ -48,7 +48,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   private[utx] def invalidateTxs(removed: Set[ByteStr]): Unit =
     updateDiffs(_.map { pd =>
       if (pd.diff.transactionIds.exists(removed)) {
-        val keep = pd.diff.transactions.filterNot(nti => removed(nti.transaction.id()))
+        val keep = pd.diff.transactions.filterNot(nti => removed(nti._2.transaction.id()))
         pd.copy(StateSnapshot.empty.copy(keep), isValid = false)
       } else pd
     })
@@ -84,7 +84,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   }
 
   def transactionById(txId: ByteStr): Option[Transaction] =
-    priorityDiffsCombined.transactions.find(_.transaction.id() == txId).map(_.transaction)
+    priorityDiffsCombined.transactions.get(txId).map(_.transaction)
 
   def contains(txId: ByteStr): Boolean = transactionById(txId).nonEmpty
 
@@ -145,8 +145,8 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
 
 private object UtxPriorityPool {
   implicit class DiffExt(private val snapshot: StateSnapshot) extends AnyVal {
-    def contains(txId: ByteStr): Boolean        = snapshot.transactions.exists(_.transaction.id() == txId)
-    def transactionsValues: Seq[Transaction]    = snapshot.transactions.map(_.transaction)
+    def contains(txId: ByteStr): Boolean        = snapshot.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction]    = snapshot.transactions.map(_._2.transaction).toSeq
     def transactionIds: collection.Set[ByteStr] = transactionsValues.map(_.id()).toSet
   }
 }

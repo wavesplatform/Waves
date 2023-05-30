@@ -81,7 +81,7 @@ class BlockchainUpdaterImpl(
       ngState
         .flatMap(_.snapshotOf(id))
         .map { case (_, snapshot, _, _, _) =>
-          snapshot.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+          snapshot.transactions.toSeq.map { case (_, info) => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction) }
         }
     )
 

@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import scala.collection.immutable.VectorMap
 
 case class StateSnapshot(
-    transactions: Vector[NewTransactionInfo],
+    transactions: VectorMap[ByteStr, NewTransactionInfo],
     balances: VectorMap[(Address, Asset), Long],
     leaseBalances: Map[Address, LeaseBalance],
     assetStatics: Map[IssuedAsset, AssetStatic],
@@ -138,7 +138,7 @@ object StateSnapshot {
 
   def fromDiff(diff: Diff, blockchain: Blockchain): StateSnapshot =
     StateSnapshot(
-      diff.transactions,
+      VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
       balances(diff, blockchain),
       leaseBalances(diff, blockchain),
       assetStatics(diff),
@@ -219,7 +219,7 @@ object StateSnapshot {
 
   implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
     override val empty: StateSnapshot =
-      StateSnapshot(Vector(), VectorMap(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), 0)
+      StateSnapshot(VectorMap(), VectorMap(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), 0)
 
     override def combine(s1: StateSnapshot, s2: StateSnapshot): StateSnapshot =
       StateSnapshot(

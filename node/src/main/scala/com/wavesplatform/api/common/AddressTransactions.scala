@@ -71,7 +71,7 @@ object AddressTransactions {
       subject,
       sender,
       types,
-      fromId.filter(id => maybeSnapshot.exists(s => !s._2.transactions.exists(_.transaction.id() == id)))
+      fromId.filter(id => maybeSnapshot.exists(s => !s._2.transactions.contains(id)))
     )
     Observable.fromIterable(diffTxs) ++ dbTxs.filterNot(diffTxs.contains)
   }
@@ -110,7 +110,7 @@ object AddressTransactions {
   ): Seq[(TxMeta, Transaction, Option[TxNum])] =
     (for {
       (height, snapshot) <- maybeSnapshot.toSeq
-      nti                <- snapshot.transactions.toSeq.reverse
+      nti                <- snapshot.transactions.values.toSeq.reverse
       if nti.affected(subject)
     } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }

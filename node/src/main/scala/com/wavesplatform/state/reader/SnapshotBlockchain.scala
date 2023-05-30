@@ -63,7 +63,7 @@ case class SnapshotBlockchain(
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     snapshot.transactions
-      .find(_.transaction.id() == id)
+      .get(id)
       .collect { case NewTransactionInfo(tx: TransferTransaction, _, _, true, _) =>
         (height, tx)
       }
@@ -71,14 +71,14 @@ case class SnapshotBlockchain(
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
     snapshot.transactions
-      .find(_.transaction.id() == id)
+      .get(id)
       .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = {
     inner.transactionInfos(ids).zip(ids).map { case (info, id) =>
       snapshot.transactions
-        .find(_.transaction.id() == id)
+        .get(id)
         .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
         .orElse(info)
     }
@@ -86,7 +86,7 @@ case class SnapshotBlockchain(
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     snapshot.transactions
-      .find(_.transaction.id() == id)
+      .get(id)
       .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
@@ -99,7 +99,7 @@ case class SnapshotBlockchain(
   }
 
   override def containsTransaction(tx: Transaction): Boolean =
-    snapshot.transactions.exists(_.transaction.id() == tx.id()) || inner.containsTransaction(tx)
+    snapshot.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     snapshot.orderFills.get(orderId).orEmpty
