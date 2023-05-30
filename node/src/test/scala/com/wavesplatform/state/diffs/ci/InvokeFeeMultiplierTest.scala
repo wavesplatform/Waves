@@ -68,7 +68,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     (balances, List(setDApp, issue, data1, initInvoke), invoke, data2)
   }
 
-  property(s"fee multiplier is always fixed after snapshot implementation") {
+  property(s"fee multiplier is always fixed after transaction snapshot implementation") {
     val (balances, preparingTxs, invoke, data) = paymentPreconditions(lambordini)
     withDomain(fsWithV5, balances) { d =>
       d.appendBlock(preparingTxs*)

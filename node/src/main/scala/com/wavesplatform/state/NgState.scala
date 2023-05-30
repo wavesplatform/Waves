@@ -6,7 +6,6 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.NgState.{CachedMicroDiff, MicroBlockInfo, NgStateCaches}
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
@@ -61,7 +60,7 @@ case class NgState(
 ) {
   def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
     leasesToCancel
-      .collect { case (id, ld) if snapshot.current.leaseStates.find(_.leaseId.toByteStr == id).forall(_.status.isActive) => ld }
+      .collect { case (id, ld) if snapshot.leaseStates.get(id).forall(_.isActive) => ld }
       .toList
       .foldLeft(snapshot)(_ |+| _)
 

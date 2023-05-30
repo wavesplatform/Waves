@@ -24,8 +24,7 @@ case class SnapshotBlockchain(
     reward: Option[Long] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
-
-  def snapshot: StateSnapshot = maybeSnapshot.orEmpty
+  lazy val snapshot: StateSnapshot          = maybeSnapshot.orEmpty
 
   override def balance(address: Address, assetId: Asset): Long =
     snapshot.balances.getOrElse((address, assetId), inner.balance(address, assetId))
@@ -129,14 +128,14 @@ case class SnapshotBlockchain(
     }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
-    snapshot.scripts.get(address) match {
+    snapshot.accountScripts.get(address) match {
       case None            => inner.accountScript(address)
       case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }
 
   override def hasAccountScript(address: Address): Boolean =
-    snapshot.scripts.get(address) match {
+    snapshot.accountScripts.get(address) match {
       case None          => inner.hasAccountScript(address)
       case Some(None)    => false
       case Some(Some(_)) => true
@@ -186,7 +185,7 @@ case class SnapshotBlockchain(
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     inner
       .resolveERC20Address(address)
-      .orElse(snapshot.issuedAssets.keys.find(id => ERC20Address(id) == address))
+      .orElse(snapshot.assetStatics.keys.find(id => ERC20Address(id) == address))
 }
 
 object SnapshotBlockchain {
@@ -228,7 +227,7 @@ object SnapshotBlockchain {
     lazy val info        = snapshot.assetNamesAndDescriptions.get(asset)
     lazy val sponsorship = snapshot.sponsorships.get(asset).map(_.minFee)
     lazy val script      = snapshot.assetScripts.get(asset)
-    snapshot.issuedAssets
+    snapshot.indexedAssetStatics
       .get(asset)
       .map { case (static, assetNum) =>
         AssetDescription(

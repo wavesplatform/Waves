@@ -5,7 +5,7 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
-import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
@@ -13,14 +13,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
@@ -385,9 +384,9 @@ class RocksDBWriter(
 
   override protected def doAppend(
       blockMeta: PBBlockMeta,
-      snapshot: TransactionStateSnapshot,
+      snapshot: StateSnapshot,
       carry: Long,
-      transactionMeta: Seq[(TxMeta, Transaction, TransactionStateSnapshot)],
+      transactionMeta: Seq[(TxMeta, Transaction, StateSnapshot)],
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -395,7 +394,6 @@ class RocksDBWriter(
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
@@ -426,9 +424,7 @@ class RocksDBWriter(
 
       val threshold = newSafeRollbackHeight
 
-      val assetStatics    = snapshot.assetStatics.map(static => (static.assetId.toIssuedAssetId, static))
-      val assetStaticsMap = assetStatics.toMap
-      appendBalances(balances, assetStaticsMap, rw)
+      appendBalances(balances, snapshot.assetStatics, rw)
       appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
@@ -445,68 +441,41 @@ class RocksDBWriter(
         rw.put(Keys.filledVolumeAndFeeAt(orderId, currentVolumeAndFee.height), volumeAndFeeNode)
       }
 
-      val lastAssetNum = {
-        var r = 0
-        rdb.db.iterateOver(KeyTags.AssetStaticInfo) { e =>
-          val info = StaticAssetInfo.parseFrom(e.getValue)
-          if (info.height == height && r < info.sequenceInBlock)
-            r = info.sequenceInBlock
-        }
-        r
-      }
-      for (((asset, assetStatic), assetNum) <- assetStatics.zipWithIndex) {
+      for ((asset, (assetStatic, assetNum)) <- snapshot.indexedAssetStatics) {
         val pbAssetStatic = StaticAssetInfo(
           assetStatic.sourceTransactionId,
           assetStatic.issuer,
           assetStatic.decimals,
           assetStatic.nft,
-          assetNum + lastAssetNum + 1,
+          assetNum,
           height
         )
         rw.put(Keys.assetStaticInfo(asset), Some(pbAssetStatic))
       }
 
-      val updatedAssetVolumes              = snapshot.assetVolumes.map(a => (a.assetId.toIssuedAssetId, a)).toMap
-      val updatedAssetNamesAndDescriptions = snapshot.assetNamesAndDescriptions.map(a => (a.assetId.toIssuedAssetId, a)).toMap
-      val updatedAssetSet                  = updatedAssetVolumes.keySet ++ updatedAssetNamesAndDescriptions.keySet
-
+      val updatedAssetSet = snapshot.assetVolumes.keySet ++ snapshot.assetNamesAndDescriptions.keySet
       for (asset <- updatedAssetSet) {
         lazy val dbInfo = rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
         val volume =
-          updatedAssetVolumes
+          snapshot.assetVolumes
             .get(asset)
-            .map(v => AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray)))
+            .map(v => AssetVolumeInfo(v.isReissuable, BigInt(v.volume.toByteArray)))
             .orElse(dbInfo.map(_._2))
         val nameAndDescription =
-          updatedAssetNamesAndDescriptions
+          snapshot.assetNamesAndDescriptions
             .get(asset)
-            .map(nd => AssetInfo(nd.name, nd.description, Height @@ nd.lastUpdated))
+            .map(nd => AssetInfo(nd.name, nd.description, nd.lastUpdatedAt))
             .orElse(dbInfo.map(_._1))
         (nameAndDescription, volume).bisequence
           .foreach(rw.put(Keys.assetDetails(asset)(height), _))
       }
 
-      for (asset <- assetStaticsMap.keySet ++ updatedAssetSet) {
+      for (asset <- snapshot.assetStatics.keySet ++ updatedAssetSet) {
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for (ls <- snapshot.leaseStates) {
-        val newDetails =
-          LeaseDetails(
-            PublicKey @@ ls.sender.toByteStr,
-            PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
-            ls.amount,
-            ls.status match {
-              case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>
-                LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
-              case _ =>
-                LeaseDetails.Status.Active
-            },
-            ls.originTransactionId.toByteStr,
-            ls.height
-          )
-        val id = ls.leaseId.toByteStr
-        rw.put(Keys.leaseDetails(id)(height), Some(Right(newDetails)))
+      for ((id, details) <- snapshot.leaseStates) {
+        rw.put(Keys.leaseDetails(id)(height), Some(Right(details)))
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
 
@@ -515,7 +484,7 @@ class RocksDBWriter(
         if (script.isDefined) rw.put(Keys.addressScript(addressId)(height), script)
       }
 
-      for ((asset, script) <- assetScripts) {
+      for ((asset, script) <- snapshot.assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
         if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
       }
@@ -530,14 +499,14 @@ class RocksDBWriter(
 
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
-      val transactions: Map[TransactionId, (TxMeta, Transaction, TransactionStateSnapshot, TxNum)] =
+      val transactions: Map[TransactionId, (TxMeta, Transaction, StateSnapshot, TxNum)] =
         transactionMeta.zipWithIndex.map { case ((tm, tx, txSnapshot), idx) =>
           TransactionId(tx.id()) -> ((tm, tx, txSnapshot, TxNum(idx.toShort)))
         }.toMap
 
       val txSizes = transactions.map { case (id, (txm, tx, txSnapshot, num)) =>
         val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
-        rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txSnapshot))
+        rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txSnapshot.toProtobuf(this)))
 
         targetBf.put(tx.id().arr)
 
@@ -563,16 +532,15 @@ class RocksDBWriter(
           }
       }
 
-      for (alias <- snapshot.aliases) {
-        val key   = Alias.create(alias.alias).explicitGet()
-        val value = addressIdWithFallback(alias.address.toAddress, newAddresses)
-        rw.put(Keys.addressIdOfAlias(key), Some(value))
+      for ((alias, address) <- snapshot.aliases) {
+        val key   = Keys.addressIdOfAlias(alias)
+        val value = addressIdWithFallback(address, newAddresses)
+        rw.put(key, Some(value))
       }
 
-      for (case sp <- snapshot.sponsorships) {
-        val asset = sp.assetId.toIssuedAssetId
-        rw.put(Keys.sponsorship(asset)(height), SponsorshipValue(sp.minFee))
-        expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
+      for ((assetId, sponsorship) <- snapshot.sponsorships) {
+        rw.put(Keys.sponsorship(assetId)(height), SponsorshipValue(sponsorship.minFee))
+        expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(assetId), threshold, Keys.sponsorship(assetId))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -596,20 +564,18 @@ class RocksDBWriter(
         }
       }
 
-      rw.put(Keys.issuedAssets(height), assetStaticsMap.keySet.toSeq)
+      rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
       rw.put(Keys.updatedAssets(height), updatedAssetSet.toSeq)
-      rw.put(Keys.sponsorshipAssets(height), snapshot.sponsorships.map(_.assetId.toIssuedAssetId))
+      rw.put(Keys.sponsorshipAssets(height), snapshot.sponsorships.keySet.toSeq)
 
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
-      if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { pbResult =>
-        val txId   = pbResult.transactionId.toTxId
-        val result = InvokeScriptResult.fromPB(pbResult.getResult)
+      if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactions
-          .get(txId)
+          .get(TransactionId @@ txId)
           .map { case (_, _, _, txNum) => (height, txNum) }
-          .orElse(rw.get(Keys.transactionMetaById(txId, rdb.txMetaHandle)).map { tm =>
+          .orElse(rw.get(Keys.transactionMetaById(TransactionId @@ txId, rdb.txMetaHandle)).map { tm =>
             (tm.height, TxNum(tm.num.toShort))
           })
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
@@ -621,20 +587,10 @@ class RocksDBWriter(
         }
       }
 
-      for (pbMeta <- snapshot.ethereumTransactionMeta) {
-        import TransactionStateSnapshot.EthereumTransactionMeta as M
-        val payload = pbMeta.payload match {
-          case M.Payload.Empty =>
-            Payload.Empty
-          case M.Payload.Invocation(M.Invocation(functionCall, payments, _)) =>
-            Payload.Invocation(EthereumTransactionMeta.Invocation(functionCall, payments))
-          case M.Payload.Transfer(M.Transfer(publicKeyHash, amount, _)) =>
-            Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
-        }
-        val meta  = EthereumTransactionMeta(payload)
-        val txNum = transactions(pbMeta.transactionId.toTxId)._4
+      for ((txId, pbMeta) <- snapshot.ethereumTransactionMeta) {
+        val txNum = transactions(TransactionId @@ txId)._4
         val key   = Keys.ethereumTransactionMeta(Height(height), txNum)
-        rw.put(key, Some(meta))
+        rw.put(key, Some(pbMeta))
       }
 
       expiredKeys.foreach(rw.delete)

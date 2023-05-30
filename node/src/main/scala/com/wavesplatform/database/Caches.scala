@@ -8,11 +8,8 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.BlockMeta as PBBlockMeta
-import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -207,9 +204,9 @@ abstract class Caches extends Blockchain with Storage {
 
   protected def doAppend(
       blockMeta: PBBlockMeta,
-      snapshot: TransactionStateSnapshot,
+      snapshot: StateSnapshot,
       carry: Long,
-      transactionMeta: Seq[(TxMeta, Transaction, TransactionStateSnapshot)],
+      transactionMeta: Seq[(TxMeta, Transaction, StateSnapshot)],
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -217,13 +214,10 @@ abstract class Caches extends Blockchain with Storage {
       data: Map[(Address, String), (CurrentData, DataNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       stateHash: StateHashBuilder.Result
   ): Unit
 
-  override def append(stateSnapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
-    val transactions = stateSnapshot.transactions
-    val snapshot     = stateSnapshot.current
+  override def append(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
     val newHeight    = current.height + 1
     val newAddresses = Set.newBuilder[Address]
     val newScore     = block.blockScore() + current.score
@@ -243,10 +237,10 @@ abstract class Caches extends Blockchain with Storage {
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
 
     newAddresses ++=
-      (snapshot.balances.map(_.address.toAddress) ++ snapshot.leaseBalances.map(_.address.toAddress))
+      (snapshot.balances.map(_._1._1) ++ snapshot.leaseBalances.keys)
         .filter(addressIdCache.get(_).isEmpty)
 
-    for (address <- transactions.flatMap(_.affected) if addressIdCache.get(address).isEmpty)
+    for (address <- snapshot.transactions.flatMap(_.affected) if addressIdCache.get(address).isEmpty)
       newAddresses += address
 
     val newAddressIds = (for {
@@ -255,22 +249,21 @@ abstract class Caches extends Blockchain with Storage {
 
     lastAddressId += newAddressIds.size
 
-    val leaseBalancesWithNodes = snapshot.leaseBalances.map { lb =>
-      val address                 = lb.address.toAddress
+    val leaseBalancesWithNodes = snapshot.leaseBalances.map { case (address, lease) =>
       val prevCurrentLeaseBalance = leaseBalanceCache.get(address)
       address ->
         (
-          CurrentLeaseBalance(lb.in, lb.out, Height(height), prevCurrentLeaseBalance.height),
-          LeaseBalanceNode(lb.in, lb.out, prevCurrentLeaseBalance.height)
+          CurrentLeaseBalance(lease.in, lease.out, Height(height), prevCurrentLeaseBalance.height),
+          LeaseBalanceNode(lease.in, lease.out, prevCurrentLeaseBalance.height)
         )
     }
     val leaseBalances = leaseBalancesWithNodes.map { case (address, (balance, _)) =>
       (address, balance)
-    }.toMap
+    }
 
-    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction, TransactionStateSnapshot)]
+    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction, StateSnapshot)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for (nti <- transactions) {
+    for (nti <- snapshot.transactions) {
       val entry = (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity), nti.transaction, nti.snapshot)
       transactionMeta += entry
       for (addr <- nti.affected) {
@@ -279,27 +272,20 @@ abstract class Caches extends Blockchain with Storage {
     }
 
     val updatedBalanceNodes = for {
-      balance <- snapshot.balances
-    } yield {
-      val address     = balance.address.toAddress
-      val asset       = balance.getAmount.assetId.toAssetId
-      val amount      = balance.getAmount.amount
-      val key         = (address, asset)
-      val prevBalance = balancesCache.get(key)
-      val prevHeight  = if (prevBalance.height == height) prevBalance.prevHeight else prevBalance.height
-      key -> (
-        CurrentBalance(amount, Height(height), prevHeight),
-        BalanceNode(amount, prevHeight)
-      )
-    }
+      ((address, asset), amount) <- snapshot.balances
+      key         = (address, asset)
+      prevBalance = balancesCache.get(key)
+      prevHeight  = if (prevBalance.height == height) prevBalance.prevHeight else prevBalance.height
+    } yield key -> (
+      CurrentBalance(amount, Height(height), prevHeight),
+      BalanceNode(amount, prevHeight)
+    )
 
     val updatedDataWithNodes = for {
-      data    <- snapshot.accountData
-      pbEntry <- data.entries
+      (address, entries) <- snapshot.accountData
+      (key, entry)       <- entries
     } yield {
-      val address    = data.address.toAddress
-      val entry      = PBTransactions.toVanillaDataEntry(pbEntry)
-      val entryKey   = (address, entry.key)
+      val entryKey   = (address, key)
       val prevData   = accountDataCache.get(entryKey)
       val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
       entryKey -> (
@@ -308,48 +294,19 @@ abstract class Caches extends Blockchain with Storage {
       )
     }
 
-    val newFills = for {
-      orderFill <- snapshot.orderFills
+    val orderFillsWithNodes = for {
+      (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills
     } yield {
-      val orderId    = orderFill.orderId.toByteStr
       val prevData   = volumeAndFeeCache.get(orderId)
       val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
-      val current    = CurrentVolumeAndFee(prevData.volume + orderFill.volume, prevData.fee + orderFill.fee, Height(height), prevHeight)
+      val current    = CurrentVolumeAndFee(prevData.volume + volume, prevData.fee + fee, Height(height), prevHeight)
       val node = VolumeAndFeeNode(
-        prevData.volume + orderFill.volume,
-        prevData.fee + orderFill.fee,
+        prevData.volume + volume,
+        prevData.fee + fee,
         prevHeight
       )
       orderId -> (current, node)
     }
-
-    val accountScripts =
-      snapshot.accountScripts.map { pbInfo =>
-        val info =
-          if (pbInfo.script.isEmpty)
-            None
-          else
-            Some(
-              AccountScriptInfo(
-                pbInfo.senderPublicKey.toPublicKey,
-                ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
-                pbInfo.verifierComplexity,
-                if (pbInfo.callableComplexities.nonEmpty) Map(3 -> pbInfo.callableComplexities)
-                else Map()
-              )
-            )
-        pbInfo.senderAddress.toAddress -> info
-      }.toMap
-
-    val assetScripts =
-      snapshot.assetScripts.map { pbInfo =>
-        val info =
-          if (pbInfo.script.isEmpty)
-            None
-          else
-            Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
-        pbInfo.assetId.toIssuedAssetId -> info
-      }.toMap
 
     val stateHash = new StateHashBuilder
     for (((address, asset), (amount, _)) <- updatedBalanceNodes) asset match {
@@ -358,11 +315,11 @@ abstract class Caches extends Blockchain with Storage {
     }
     for (((address, _), (entry, _)) <- updatedDataWithNodes) stateHash.addDataEntry(address, entry.entry)
     for ((address, lease)           <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
-    for ((address, script)          <- accountScripts) stateHash.addAccountScript(address, script.map(_.script))
-    for ((asset, script)            <- assetScripts) stateHash.addAssetScript(asset, script.map(_.script))
-    for (lease                      <- snapshot.leaseStates) stateHash.addLeaseStatus(lease.leaseId.toTxId, lease.status.isActive)
-    for (sponsorship                <- snapshot.sponsorships) stateHash.addSponsorship(sponsorship.assetId.toIssuedAssetId, sponsorship.minFee)
-    for (alias                      <- snapshot.aliases) stateHash.addAlias(alias.address.toAddress, alias.alias)
+    for ((address, script)          <- snapshot.accountScripts) stateHash.addAccountScript(address, script.map(_.script))
+    for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, script.map(_.script))
+    for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
+    for ((assetId, sponsorship)     <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
+    for ((alias, address)           <- snapshot.aliases) stateHash.addAlias(address, alias.name)
 
     doAppend(
       newMeta,
@@ -371,31 +328,30 @@ abstract class Caches extends Blockchain with Storage {
       transactionMeta.result(),
       newAddressIds,
       VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
-      leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance }.toMap,
-      newFills.toMap,
-      updatedDataWithNodes.toMap,
+      leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
+      orderFillsWithNodes,
+      updatedDataWithNodes,
       addressTransactions.asMap(),
-      accountScripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
-      assetScripts,
+      snapshot.accountScripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       stateHash.result()
     )
 
     val assetsToInvalidate =
-      snapshot.assetStatics.map(_.assetId.toIssuedAssetId).toSet ++
-        snapshot.assetScripts.map(_.assetId.toIssuedAssetId).toSet ++
-        snapshot.assetNamesAndDescriptions.map(_.assetId.toIssuedAssetId).toSet ++
-        snapshot.assetVolumes.map(_.assetId.toIssuedAssetId).toSet ++
-        snapshot.sponsorships.map(_.assetId.toIssuedAssetId).toSet
+      snapshot.assetStatics.keySet ++
+        snapshot.assetScripts.keySet ++
+        snapshot.assetNamesAndDescriptions.keySet ++
+        snapshot.assetVolumes.keySet ++
+        snapshot.sponsorships.keySet
 
     for ((address, id)                       <- newAddressIds) addressIdCache.put(address, Some(id))
-    for ((orderId, (volumeAndFee, _))        <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
+    for ((orderId, (volumeAndFee, _))        <- orderFillsWithNodes) volumeAndFeeCache.put(orderId, volumeAndFee)
     for (((address, asset), (newBalance, _)) <- updatedBalanceNodes) balancesCache.put((address, asset), newBalance)
     for (id                                  <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
-    for (alias <- snapshot.aliases) aliasCache.put(Alias.create(alias.alias).explicitGet(), Some(alias.address.toAddress))
+    for ((alias, address)                    <- snapshot.aliases) aliasCache.put(Alias.create(alias.name).explicitGet(), Some(address))
     leaseBalanceCache.putAll(leaseBalances.asJava)
-    scriptCache.putAll(accountScripts.asJava)
-    assetScriptCache.putAll(assetScripts.asJava)
-    accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.toMap.asJava)
+    scriptCache.putAll(snapshot.accountScripts.asJava)
+    assetScriptCache.putAll(snapshot.assetScripts.asJava)
+    accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]

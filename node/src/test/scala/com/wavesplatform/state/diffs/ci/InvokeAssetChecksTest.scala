@@ -8,9 +8,8 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
+import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, StateSnapshot}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
@@ -63,7 +62,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
         def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
           Vector(
-            NewTransactionInfo(invoke, TransactionStateSnapshot(), Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L)
+            NewTransactionInfo(invoke, StateSnapshot.empty, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L)
           )
 
         val expectedResult =
@@ -104,7 +103,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
           }
 
         def noSnapshot(d: Diff) =
-          d.copy(transactions = d.transactions.map(_.copy(snapshot = TransactionStateSnapshot())))
+          d.copy(transactions = d.transactions.map(_.copy(snapshot = StateSnapshot.empty)))
 
         withDomain(if (activated) RideV5 else RideV4, balances) { d =>
           d.appendBlock(setScriptTx)

@@ -438,7 +438,7 @@ class BlockchainUpdaterImpl(
         leaseState =
           Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
       )
-      val snapshot = StateSnapshot.create(diff, rocksdb)
+      val snapshot = StateSnapshot.fromDiff(diff, rocksdb)
       lt.id() -> snapshot
     }).toMap
 
@@ -686,7 +686,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
-    to.fold(ngState.map(_.bestLiquidSnapshot))(id => ngState.map(_.diffFor(id)._1))
+    to.fold(ngState.map(_.bestLiquidSnapshot))(id => ngState.map(_.snapshotFor(id)._1))
       .fold[Blockchain](rocksdb)(SnapshotBlockchain(rocksdb, _))
       .balanceSnapshots(address, from, to)
   }

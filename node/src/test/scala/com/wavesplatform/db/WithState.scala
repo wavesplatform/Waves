@@ -164,7 +164,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
         differ(state, block).map { diff =>
-          val snapshot = StateSnapshot.create(diff.diff, state)
+          val snapshot = StateSnapshot.fromDiff(diff.diff, state)
           state.append(snapshot, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
         }
       })

@@ -217,7 +217,7 @@ object BlockDiffer {
 
     txs
       .foldLeft(
-        TracedResult(Result(StateSnapshot.create(initDiff, blockchain), 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), prevStateHash)
+        TracedResult(Result(StateSnapshot.fromDiff(initDiff, blockchain), 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), prevStateHash)
             .asRight[ValidationError]
         ))
        {
@@ -251,9 +251,9 @@ object BlockDiffer {
               val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
               val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
 
-              val txSnapshot           = StateSnapshot.create(thisTxDiff, currBlockchain)
+              val txSnapshot           = StateSnapshot.fromDiff(thisTxDiff, currBlockchain)
               val txSnapshotBlockchain = SnapshotBlockchain(currBlockchain, txSnapshot)
-              val minerSnapshot        = StateSnapshot.create(minerDiff, txSnapshotBlockchain)
+              val minerSnapshot        = StateSnapshot.fromDiff(minerDiff, txSnapshotBlockchain)
               val snapshot             = currSnapshot |+| txSnapshot |+| minerSnapshot
               val result = for {
                 newParentDiff <- parentDiff.combineF(minerDiff)

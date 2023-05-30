@@ -13,7 +13,6 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -133,7 +132,7 @@ object Sponsorship {
 
 case class NewTransactionInfo(
     transaction: Transaction,
-    snapshot: TransactionStateSnapshot,
+    snapshot: StateSnapshot,
     affected: Set[Address],
     applied: Boolean,
     spentComplexity: Long
@@ -349,7 +348,7 @@ object Diff {
       val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
 
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, StateSnapshot.create(d, blockchain).current, affectedAddresses, applied, d.scriptsComplexity)),
+        transactions = Vector(NewTransactionInfo(tx, StateSnapshot.fromDiff(d, blockchain), affectedAddresses, applied, d.scriptsComplexity)),
         transactionFilter = mkFilterForTransactions(tx)
       )
     }

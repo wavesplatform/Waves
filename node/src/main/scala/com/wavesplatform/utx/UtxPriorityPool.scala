@@ -3,7 +3,6 @@ package com.wavesplatform.utx
 import cats.implicits.toFoldableOps
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.transaction.Transaction
@@ -50,7 +49,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     updateDiffs(_.map { pd =>
       if (pd.diff.transactionIds.exists(removed)) {
         val keep = pd.diff.transactions.filterNot(nti => removed(nti.transaction.id()))
-        pd.copy(StateSnapshot(keep, TransactionStateSnapshot()), isValid = false)
+        pd.copy(StateSnapshot.empty.copy(keep), isValid = false)
       } else pd
     })
 
