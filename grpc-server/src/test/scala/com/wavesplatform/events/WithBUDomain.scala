@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
 import FakeObserver.*
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateResponse, SubscribeRequest}
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdateResponse, GetBlockUpdatesRangeRequest, GetBlockUpdatesRangeResponse, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
@@ -15,6 +15,7 @@ import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
 import org.scalatest.Suite
+import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
 
 trait WithBUDomain extends WithDomain { _: Suite =>
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
@@ -75,6 +76,19 @@ trait WithBUDomain extends WithDomain { _: Suite =>
       generateBlocks(d)
       val getBlockUpdate = repo.getBlockUpdate(height)
       f(getBlockUpdate)
+    }
+  }
+
+  def withGenerateGetBlockUpdateRange(
+      request: GetBlockUpdatesRangeRequest = GetBlockUpdatesRangeRequest.of(1, 10),
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+  )(generateBlocks: Domain => Unit)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
+    withDomainAndRepo(settings) { (d, repo) =>
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
+      generateBlocks(d)
+      val getBlockUpdateRange = repo.getBlockUpdatesRange(request).futureValue.updates
+      f(getBlockUpdateRange)
     }
   }
 
