@@ -9,13 +9,15 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdate
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{TransactionBase, TxHelpers}
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
 import org.scalatest.Suite
 import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
+
+import scala.concurrent.Future
 
 trait WithBUDomain extends WithDomain { _: Suite =>
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
@@ -80,7 +82,7 @@ trait WithBUDomain extends WithDomain { _: Suite =>
   }
 
   def withGenerateGetBlockUpdateRange(
-      request: GetBlockUpdatesRangeRequest = GetBlockUpdatesRangeRequest.of(1, 10),
+      request: GetBlockUpdatesRangeRequest,
       settings: WavesSettings,
       balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
   )(generateBlocks: Domain => Unit)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {

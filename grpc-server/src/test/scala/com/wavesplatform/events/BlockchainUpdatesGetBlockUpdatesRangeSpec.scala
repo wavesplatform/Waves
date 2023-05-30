@@ -16,13 +16,13 @@ class BlockchainUpdatesGetBlockUpdatesRangeSpec extends BlockchainUpdatesTestBas
     "BU- . Return correct data for alias" in {
       val aliasTx = TxHelpers.createAlias("test", firstTxParticipant, fee = customFee)
       withGenerateGetBlockUpdateRange(
+        GetBlockUpdatesRangeRequest.of(1, 1),
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(aliasTx)) { getBlockUpdateRange =>
-        val append = getBlockUpdateRange(2).getAppend
+        val append = getBlockUpdateRange(0).getAppend
         checkingAlias(append, aliasTx)
       }
     }
-
   }
 }
