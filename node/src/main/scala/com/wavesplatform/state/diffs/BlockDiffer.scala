@@ -36,8 +36,6 @@ object BlockDiffer {
     def apply(l: Long): Long = l / divider * dividend
   }
 
-  case object InvalidStateHash extends ValidationError
-
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   def fromBlock(
@@ -213,6 +211,7 @@ object BlockDiffer {
 
     prepareCaches(blockGenerator, txs, loadCacheData)
 
+    // TODO: consider initDiff as separate txDiff in state hash computation
     txs
       .foldLeft(
         TracedResult(
@@ -320,7 +319,7 @@ object BlockDiffer {
       Either.cond(
         !blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) || computedStateHash.exists(blockStateHash.contains),
         (),
-        InvalidStateHash
+        InvalidStateHash(blockStateHash, computedStateHash)
       )
     )
 }

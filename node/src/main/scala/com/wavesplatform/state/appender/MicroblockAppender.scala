@@ -5,11 +5,12 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
+import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
-import com.wavesplatform.transaction.TxValidationError.InvalidSignature
+import com.wavesplatform.transaction.TxValidationError.{InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
@@ -47,6 +48,7 @@ object MicroblockAppender extends ScorexLogging {
       utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
+      blockChallenger: BlockChallenger,
       scheduler: Scheduler
   )(ch: Channel, md: MicroblockData): Task[Unit] = {
     import md.microBlock
@@ -64,6 +66,12 @@ object MicroblockAppender extends ScorexLogging {
       case Left(is: InvalidSignature) =>
         val idOpt = md.invOpt.map(_.totalBlockId)
         peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
+      case Left(ish: InvalidStateHash) =>
+        val idOpt = md.invOpt.map(_.totalBlockId)
+        peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish")
+        md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
+
+        blockChallenger.challengeMicroblock(md, ch, ish.computedStateHash)
       case Left(ve) =>
         md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
         val idOpt = md.invOpt.map(_.totalBlockId)

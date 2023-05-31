@@ -49,6 +49,16 @@ object TxValidationError {
     override def toString: String = s"InvalidSignature(${entity.toString + " reason: " + details})"
   }
 
+  case class InvalidStateHash(blockStateHash: Option[ByteStr], computedStateHash: Option[ByteStr]) extends ValidationError {
+    override def toString: String = {
+      val shStr = blockStateHash match {
+        case Some(sh) => sh.toString
+        case None     => "<undefined>"
+      }
+      s"InvalidStateHash($shStr)"
+    }
+  }
+
   sealed trait WithLog extends Product with Serializable {
     def log: Log[Id]
     def toStringWithLog(limit: Int): String

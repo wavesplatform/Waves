@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -56,6 +57,30 @@ package object appender {
       _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
     } yield Some(blockchainUpdater.height)
 
+  private[appender] def appendChallengeBlock(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      utx: UtxForAppender,
+      pos: PoSSelector,
+      time: Time,
+      verify: Boolean,
+      txSignParCheck: Boolean
+  )(block: Block): Either[ValidationError, Option[Int]] = {
+    val challengedBlock = block.toOriginal
+    for {
+      hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
+      newHeight <-
+        metrics.appendBlock
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
+          // TODO: maybe delete
+          .map { discardedDiffs =>
+            utx.setPriorityDiffs(discardedDiffs)
+            Some(blockchainUpdater.height)
+          }
+
+    } yield newHeight
+  }
+
+  // TODO: check challenged stateHash != challenging stateHash
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =
     for {
       _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
@@ -115,6 +140,11 @@ package object appender {
       GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
     )
   }
+
+  private def validateStateHash(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+    for {
+      _ <- Either.cond(block.header.stateHash.isEmpty)
+    } yield ()
 
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()

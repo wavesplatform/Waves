@@ -207,7 +207,7 @@ class BlockchainUpdaterImpl(
               rocksdb.lastBlockId match {
                 case Some(uniqueId) if uniqueId != block.header.reference =>
                   val logDetails = s"The referenced block(${block.header.reference})" +
-                    s" ${if (rocksdb.contains(block.header.reference)) "exits, it's not last persisted" else "doesn't exist"}"
+                    s" ${if (rocksdb.contains(block.header.reference)) "exists, it's not last persisted" else "doesn't exist"}"
                   Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(rocksdb.unsafeHeightOf)
@@ -373,7 +373,7 @@ class BlockchainUpdaterImpl(
                 }
           }).map {
             _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, _), discDiffs, reward, hitSource) =>
-              val newHeight   = rocksdb.height + 1
+              val newHeight = rocksdb.height + 1
 
               restTotalConstraint = updatedTotalConstraint
               ngState = Some(
@@ -439,11 +439,6 @@ class BlockchainUpdaterImpl(
       case Some(ng) if ng.contains(blockId) =>
         log.trace("Resetting liquid block, no rollback necessary")
         Right(Seq.empty)
-      case Some(ng) if ng.base.id() == blockId =>
-        log.trace("Discarding liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
-        ngState = None
-        Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>
         for {
           height <- rocksdb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
@@ -509,7 +504,15 @@ class BlockchainUpdaterImpl(
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
-                BlockDiffer.fromMicroBlock(this, rocksdb.lastBlockTimestamp, prevStateHash, microBlock, restTotalConstraint, rocksdb.loadCacheData, verify)
+                BlockDiffer.fromMicroBlock(
+                  this,
+                  rocksdb.lastBlockTimestamp,
+                  prevStateHash,
+                  microBlock,
+                  restTotalConstraint,
+                  rocksdb.loadCacheData,
+                  verify
+                )
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _) = blockDifferResult

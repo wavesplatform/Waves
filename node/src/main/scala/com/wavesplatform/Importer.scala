@@ -362,6 +362,7 @@ object Importer extends ScorexLogging {
               Nil,
               0,
               ByteStr.empty,
+              None,
               None
             ),
             ByteStr.empty,

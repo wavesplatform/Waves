@@ -194,7 +194,8 @@ class MinerImpl(
           account,
           blockFeatures(version),
           blockRewardVote(version),
-          stateHash
+          stateHash,
+          None
         )
         .leftMap(_.err)
     } yield (block, totalConstraint))
