@@ -377,6 +377,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
       d.appendBlock(firstToken)
       d.appendBlock(secondAsset)
       d.appendBlock(exchangeTx)
+      d.appendBlock()
     }(f)
   }
 }

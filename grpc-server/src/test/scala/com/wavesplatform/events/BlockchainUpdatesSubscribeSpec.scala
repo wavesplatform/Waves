@@ -1,24 +1,14 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
-import com.wavesplatform.account.Address
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.api.grpc.protobuf.GetBlockUpdateResponse
-import com.wavesplatform.events.fixtures.WavesTxChecks.{checkExchange, *}
-import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.protobuf.transaction.PBAmounts.toVanillaAssetId
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates subscribe tests" - {
