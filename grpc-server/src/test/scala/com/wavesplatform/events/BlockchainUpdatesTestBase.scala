@@ -52,7 +52,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, TxHelpers}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxHelpers}
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.language.existentials

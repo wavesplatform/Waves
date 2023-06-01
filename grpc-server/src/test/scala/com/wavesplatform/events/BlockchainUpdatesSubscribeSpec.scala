@@ -162,7 +162,7 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-5. Return correct data for data" in {
+    "BU-5. Return correct data for dataTx" in {
       val data = TxHelpers.data(firstTxParticipant, entries, customFee, TxVersion.V2)
       withGenerateSubscription(
         settings = currentSettings,

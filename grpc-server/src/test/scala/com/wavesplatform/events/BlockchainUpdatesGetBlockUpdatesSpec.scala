@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates getBlockUpdate tests" - {
-    "BU- . Return correct data for alias from getBlockUpdate" in {
+    "BU-192. Return correct data for alias from getBlockUpdate" in {
       val aliasTx = TxHelpers.createAlias("test", firstTxParticipant, fee = customFee)
       withGenerateGetBlockUpdate(
         height = 2,
@@ -24,7 +24,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for transfer" in {
+    "BU-207. Return correct data for transfer" in {
       val transferTx = TxHelpers.transfer(firstTxParticipant, secondTxParticipantAddress, amount, Waves, customFee)
       withGenerateGetBlockUpdate(
         height = 2,
@@ -39,7 +39,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for issue" in {
+    "BU-196. Return correct data for issue" in {
       val issue: IssueTransaction = TxHelpers.issue(
         firstTxParticipant,
         amount,
@@ -60,7 +60,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for issue NFT" in {
+    "BU-197. Return correct data for issue NFT" in {
       val issueNftTx =
         TxHelpers.issue(firstTxParticipant, name = "Nft_test_asset", description = "OVER_9000", amount = 1, reissuable = false, script = None)
       withGenerateGetBlockUpdate(
@@ -73,7 +73,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for reissue" in {
+    "BU-201. Return correct data for reissue" in {
       val issue   = TxHelpers.issue(firstTxParticipant, amount)
       val reissue = TxHelpers.reissue(issue.asset, firstTxParticipant, additionalAmount, reissuable = false, customAssetIssueFee)
       withGenerateGetBlockUpdate(
@@ -89,7 +89,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for burn" in {
+    "BU-193. Return correct data for burn" in {
       val issue = TxHelpers.issue(firstTxParticipant, amount)
       val burn  = TxHelpers.burn(issue.asset, additionalAmount, firstTxParticipant, customAssetIssueFee)
       withGenerateGetBlockUpdate(
@@ -106,7 +106,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
     }
 
     "Exchange transaction subscription tests" - {
-      "BU- . Return correct data for order V3, exchange V2" in {
+      "BU-195. Return correct data for order V3, exchange V2" in {
         val order1          = createOrders(OrderType.BUY, firstTxParticipant, Order.V3)
         val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V3)
         val exchangedAssets = order1.price.value * order1.amount.value / 100000000
@@ -117,7 +117,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         }
       }
 
-      "BU- . Return correct data for order V4, exchange V3" in {
+      "BU-223. Return correct data for order V4, exchange V3" in {
         val order1          = createOrders(OrderType.BUY, firstTxParticipant, Order.V4)
         val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V4)
         val normalizedPrice = order1.price.value / 2 / 10000000
@@ -129,7 +129,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for lease" in {
+    "BU-198. Return correct data for lease" in {
       val lease = TxHelpers.lease(firstTxParticipant, secondTxParticipantAddress, amount, customFee)
       withGenerateGetBlockUpdate(
         height = 2,
@@ -141,7 +141,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for lease cancel" in {
+    "BU-199. Return correct data for lease cancel" in {
       val lease       = TxHelpers.lease(firstTxParticipant, secondTxParticipantAddress, amount, customFee)
       val leaseCancel = TxHelpers.leaseCancel(lease.id.value(), firstTxParticipant, customFee)
       withGenerateGetBlockUpdate(
@@ -157,7 +157,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for massTransfer" in {
+    "BU-200. Return correct data for massTransfer" in {
       val massTransferFee = fee * 6
       val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients, firstToken.asset, massTransferFee)
 
@@ -174,7 +174,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for data" in {
+    "BU-194. Return correct data for dataTx" in {
       val data = TxHelpers.data(firstTxParticipant, entries, customFee, TxVersion.V2)
       withGenerateGetBlockUpdate(
         height = 2,
@@ -186,7 +186,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for setScript" in {
+    "BU-203. Return correct data for setScript" in {
       val setScript = TxHelpers.setScript(firstTxParticipant, testScript, customFee)
       withGenerateGetBlockUpdate(
         height = 2,
@@ -206,7 +206,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       val senderBalanceAfterSponsorFeeTx       = senderBalanceBeforeSponsorFeeTx - sponsorFee.fee.value
       val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFee.fee.value
 
-      "BU-  sponsorFee" in withGenerateGetBlockUpdate(
+      "BU-204 sponsorFee" in withGenerateGetBlockUpdate(
         height = 3,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
@@ -218,7 +218,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         checkingSponsorFee(append, sponsorFee, senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx)
       }
 
-      "BU-  sponsorFee cancel" in withGenerateGetBlockUpdate(
+      "BU-206 sponsorFee cancel" in withGenerateGetBlockUpdate(
         height = 4,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
@@ -232,7 +232,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for setAssetScript" in {
+    "BU-202. Return correct data for setAssetScript" in {
       val issue          = TxHelpers.issue(firstTxParticipant, amount, script = complexScriptBefore)
       val setAssetScript = TxHelpers.setAssetScript(firstTxParticipant, issue.asset, complexScriptAfter, 1.waves)
       withGenerateGetBlockUpdate(
@@ -248,7 +248,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . Return correct data for UpdateAssetInfo" in {
+    "BU-224. Return correct data for UpdateAssetInfo" in {
       val newName         = "new_name"
       val newDescription  = "new_description"
       val updateAssetInfo = TxHelpers.updateAssetInfo(firstTokenAsset.id, newName, newDescription, firstTxParticipant)
