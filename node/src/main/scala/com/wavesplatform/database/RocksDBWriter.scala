@@ -38,13 +38,11 @@ import org.slf4j.LoggerFactory
 
 import java.util
 import scala.annotation.tailrec
-import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
-object RocksDBWriter extends ScorexLogging {
-
+object RocksDBWriter extends ScorexLogging
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
