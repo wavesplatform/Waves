@@ -23,7 +23,8 @@ object BlockDiffer {
     def apply(l: Long): Long = l / divider * dividend
   }
 
-  val CurrentBlockFeePart: Fraction = Fraction(2, 5)
+  val CurrentBlockFeePart: Fraction    = Fraction(2, 5)
+  val CurrentBlockRewardPart: Fraction = Fraction(1, 3)
 
   def fromBlock(
       blockchain: Blockchain,
@@ -46,10 +47,30 @@ object BlockDiffer {
     val stateHeight = blockchain.height
 
     // height switch is next after activation
-    val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    val ngHeight                      = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
+    val sponsorshipHeight             = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    val blockRewardDistributionHeight = blockchain.featureActivationHeight(BlockchainFeatures.BlockRewardDistribution.id).getOrElse(Int.MaxValue)
 
-    val minerReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
+    val blockReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
+
+    val addressRewardsE = for {
+      daoAddress        <- blockchain.settings.functionalitySettings.daoAddressParsed
+      xtnBuybackAddress <- blockchain.settings.functionalitySettings.xtnBuybackAddressParsed
+    } yield {
+      if (stateHeight + 1 >= blockRewardDistributionHeight) {
+        val daoAddressReward = daoAddress.fold(Portfolio.empty) { _ =>
+          blockReward.multiply(CurrentBlockRewardPart)
+        }
+        val xtnBuybackReward = xtnBuybackAddress.fold(Portfolio.empty) { _ =>
+          blockReward.multiply(CurrentBlockRewardPart)
+        }
+        (
+          blockReward.minus(daoAddressReward).minus(xtnBuybackReward),
+          daoAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> daoAddressReward))),
+          xtnBuybackAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> xtnBuybackReward)))
+        )
+      } else (blockReward, Diff.empty, Diff.empty)
+    }
 
     val feeFromPreviousBlockE =
       if (stateHeight >= sponsorshipHeight) {
@@ -75,14 +96,17 @@ object BlockDiffer {
       } else
         Right(Portfolio.empty)
 
-    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, blockchain.lastBlockReward)
     val initDiffE =
       for {
-        feeFromPreviousBlock    <- feeFromPreviousBlockE
-        initialFeeFromThisBlock <- initialFeeFromThisBlockE
-        totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
-        patches                 <- patchesDiff(blockchainWithNewBlock)
-        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(patches)
+        feeFromPreviousBlock                                 <- feeFromPreviousBlockE
+        initialFeeFromThisBlock                              <- initialFeeFromThisBlockE
+        (minerReward, daoAddressDiff, xtnBuybackAddressDiff) <- addressRewardsE
+        totalReward                                          <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
+        patches                                              <- patchesDiff(blockchainWithNewBlock)
+        configAddressesDiff                                  <- daoAddressDiff.combineF(xtnBuybackAddressDiff)
+        totalRewardDiff <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(configAddressesDiff)
+        resultDiff      <- totalRewardDiff.combineF(patches)
       } yield resultDiff
 
     for {
