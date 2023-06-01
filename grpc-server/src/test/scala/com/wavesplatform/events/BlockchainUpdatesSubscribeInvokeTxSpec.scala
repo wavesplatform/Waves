@@ -207,7 +207,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
     val invokerDappAddressAssetBalanceForOriginCaller = amount + scriptTransferAssetNum
     val dAppAddressAssetBalanceForOriginCaller        = amount - paymentNum
 
-    "BU-77 case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
+    "BU-77. doubles nested i.caller. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
@@ -297,7 +297,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-39 case. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
+    "BU-39. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
