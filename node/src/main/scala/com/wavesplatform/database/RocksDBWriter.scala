@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory
 
 import java.util
 import scala.annotation.tailrec
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -386,7 +387,6 @@ class RocksDBWriter(
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
-      transactionMeta: Seq[(TxMeta, Transaction, StateSnapshot)],
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -496,23 +496,22 @@ class RocksDBWriter(
           bf1 = mkFilter()
         }
       }
-
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
-      val transactions: Map[TransactionId, (TxMeta, Transaction, StateSnapshot, TxNum)] =
-        transactionMeta.zipWithIndex.map { case ((tm, tx, txSnapshot), idx) =>
-          TransactionId(tx.id()) -> ((tm, tx, txSnapshot, TxNum(idx.toShort)))
+      val transactionsWithSize =
+        snapshot.transactions.zipWithIndex.map { case ((id, txInfo), i) =>
+          val tx   = txInfo.transaction
+          val num  = TxNum(i.toShort)
+          val meta = TxMeta(Height @@ blockMeta.height, txInfo.applied, txInfo.spentComplexity)
+          val txId = TransactionId(id)
+
+          val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((meta, tx)))
+          rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txInfo.snapshot.toProtobuf))
+          rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !meta.succeeded, 0, size)))
+          targetBf.put(id.arr)
+
+          txId -> (num, tx, size)
         }.toMap
-
-      val txSizes = transactions.map { case (id, (txm, tx, txSnapshot, num)) =>
-        val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
-        rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txSnapshot.toProtobuf(this)))
-
-        targetBf.put(tx.id().arr)
-
-        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
-        id -> size
-      }
 
       if (dbSettings.storeTransactionsByAddress) {
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
@@ -523,8 +522,7 @@ class RocksDBWriter(
           .foreach { case (prevSeqNr, (addressId, txIds, txSeqNrKey)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
             val txTypeNumSeq = txIds.asScala.map { txId =>
-              val (_, tx, _, num) = transactions(txId)
-              val size            = txSizes(txId)
+              val (num, tx, size) = transactionsWithSize(txId)
               (tx.tpe.id.toByte, num, size)
             }.toSeq
             rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
@@ -572,9 +570,9 @@ class RocksDBWriter(
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
       if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
-        val (txHeight, txNum) = transactions
+        val (txHeight, txNum) = transactionsWithSize
           .get(TransactionId @@ txId)
-          .map { case (_, _, _, txNum) => (height, txNum) }
+          .map { case (txNum, _, _) => (height, txNum) }
           .orElse(rw.get(Keys.transactionMetaById(TransactionId @@ txId, rdb.txMetaHandle)).map { tm =>
             (tm.height, TxNum(tm.num.toShort))
           })
@@ -588,7 +586,7 @@ class RocksDBWriter(
       }
 
       for ((txId, pbMeta) <- snapshot.ethereumTransactionMeta) {
-        val txNum = transactions(TransactionId @@ txId)._4
+        val txNum = transactionsWithSize(TransactionId @@ txId)._1
         val key   = Keys.ethereumTransactionMeta(Height(height), txNum)
         rw.put(key, Some(pbMeta))
       }

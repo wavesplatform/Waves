@@ -40,7 +40,7 @@ case class StateSnapshot(
 ) {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
-  def toProtobuf(blockchain: Blockchain): TransactionStateSnapshot =
+  def toProtobuf: TransactionStateSnapshot =
     TransactionStateSnapshot(
       balances.map { case ((address, asset), balance) =>
         S.Balance(address.toByteString, Some(Amount(asset.fold(ByteString.EMPTY)(_.id.toByteString), balance)))
@@ -71,16 +71,12 @@ case class StateSnapshot(
           case Status.Expired(expiredHeight) =>
             S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(expiredHeight))
         }
-        val resolvedRecipient = recipient match {
-          case address: Address => address
-          case alias: Alias     => aliases.getOrElse(alias, blockchain.resolveAlias(recipient).explicitGet())
-        }
         S.LeaseState(
           leaseId.toByteString,
           pbStatus,
           amount,
           sender.toByteString,
-          ByteString.copyFrom(resolvedRecipient.bytes),
+          ByteString.copyFrom(recipient.asInstanceOf[Address].bytes),
           sourceId.toByteString,
           height
         )
@@ -146,7 +142,7 @@ object StateSnapshot {
       assetNamesAndDescriptions(diff),
       diff.assetScripts,
       diff.sponsorship.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-      diff.leaseState,
+      resolvedLeaseStates(diff, blockchain),
       diff.aliases,
       orderFills(diff, blockchain),
       diff.scripts,
@@ -211,6 +207,16 @@ object StateSnapshot {
     issued ++ updated
   }
 
+  private def resolvedLeaseStates(diff: Diff, blockchain: Blockchain): Map[ByteStr, LeaseDetails] =
+    diff.leaseState.view
+      .mapValues(details =>
+        details.copy(recipient = details.recipient match {
+          case address: Address => address
+          case alias: Alias     => diff.aliases.getOrElse(alias, blockchain.resolveAlias(alias).explicitGet())
+        })
+      )
+      .toMap
+
   private def orderFills(diff: Diff, blockchain: Blockchain): Map[ByteStr, VolumeAndFee] =
     diff.orderFills.map { case (orderId, value) =>
       val newInfo = value |+| blockchain.filledVolumeAndFee(orderId)
@@ -242,9 +248,9 @@ object StateSnapshot {
       )
 
     private def combineDataEntries(
-        entries1: Map[Address, Map[String, DataEntry[_]]],
-        entries2: Map[Address, Map[String, DataEntry[_]]]
-    ): Map[Address, Map[String, DataEntry[_]]] =
+        entries1: Map[Address, Map[String, DataEntry[?]]],
+        entries2: Map[Address, Map[String, DataEntry[?]]]
+    ): Map[Address, Map[String, DataEntry[?]]] =
       entries2.foldLeft(entries1) { case (result, (address, addressEntries2)) =>
         val resultAddressEntries =
           result

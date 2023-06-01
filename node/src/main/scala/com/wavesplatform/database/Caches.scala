@@ -206,7 +206,6 @@ abstract class Caches extends Blockchain with Storage {
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
-      transactionMeta: Seq[(TxMeta, Transaction, StateSnapshot)],
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -261,15 +260,10 @@ abstract class Caches extends Blockchain with Storage {
       (address, balance)
     }
 
-    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction, StateSnapshot)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for ((_, nti) <- snapshot.transactions) {
-      val entry = (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity), nti.transaction, nti.snapshot)
-      transactionMeta += entry
-      for (addr <- nti.affected) {
+    for ((_, nti) <- snapshot.transactions)
+      for (addr <- nti.affected)
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
-      }
-    }
 
     val updatedBalanceNodes = for {
       ((address, asset), amount) <- snapshot.balances
@@ -325,7 +319,6 @@ abstract class Caches extends Blockchain with Storage {
       newMeta,
       snapshot,
       carryFee,
-      transactionMeta.result(),
       newAddressIds,
       VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },

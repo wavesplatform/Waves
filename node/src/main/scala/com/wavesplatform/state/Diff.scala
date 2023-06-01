@@ -140,7 +140,7 @@ case class NewTransactionInfo(
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
-case class Diff (
+case class Diff(
     transactions: Vector[NewTransactionInfo],
     portfolios: Map[Address, Portfolio],
     issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
