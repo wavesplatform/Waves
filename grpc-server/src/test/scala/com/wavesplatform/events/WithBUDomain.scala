@@ -4,20 +4,18 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
 import FakeObserver.*
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdateResponse, GetBlockUpdatesRangeRequest, GetBlockUpdatesRangeResponse, SubscribeRequest}
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateResponse, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.transaction.{TransactionBase, TxHelpers}
+import com.wavesplatform.transaction.TxHelpers
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
 import org.scalatest.Suite
 import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
-
-import scala.concurrent.Future
 
 trait WithBUDomain extends WithDomain { _: Suite =>
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
