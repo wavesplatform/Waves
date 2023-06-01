@@ -157,7 +157,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
     val secondAddressBalance: Long = 8.waves
     val assetDappBalance: Long     = 12.waves
 
-    "BU-77 case: doubles nested i.caller. Invoke have to return correct data for subscribe" in {
+    "BU-77. doubles nested i.caller. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val scriptTransferWavesSum = scriptTransferUnitNum * 2
         val mainDAppTx             = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript(libVersion)))
@@ -190,7 +190,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
       }
     }
 
-    "BU-39 case. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
+    "BU-39. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(dAppAccount, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
