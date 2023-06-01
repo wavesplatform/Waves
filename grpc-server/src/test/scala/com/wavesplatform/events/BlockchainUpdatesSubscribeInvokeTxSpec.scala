@@ -237,7 +237,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-210 case: doubles nested i.caller. Invoke have to return correct data for getBlockUpdate" in {
+    "BU-210. doubles nested i.caller. Invoke have to return correct data for getBlockUpdate" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
@@ -267,7 +267,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-175 case: doubles nested i.caller. Invoke have to return correct data for getBlockUpdateRange" in {
+    "BU-175. doubles nested i.caller. Invoke have to return correct data for getBlockUpdateRange" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
@@ -325,7 +325,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-209 case: doubles nested i.originCaller. Invoke have to return correct data for getBlockUpdate" in {
+    "BU-209. doubles nested i.originCaller. Invoke have to return correct data for getBlockUpdate" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
@@ -353,7 +353,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-174 case: doubles nested i.originCaller. Invoke have to return correct data for getBlockUpdateRange" in {
+    "BU-174. doubles nested i.originCaller. Invoke have to return correct data for getBlockUpdateRange" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))

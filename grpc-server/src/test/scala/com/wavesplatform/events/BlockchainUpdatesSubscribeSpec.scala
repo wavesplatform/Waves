@@ -252,8 +252,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           matcher = buyer,
           version = Order.V3
         )
-        val exchangedAssets                           = order1.price.value * order1.amount.value / 100000000
-        val exchangeTx                                = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V2)
+        val exchangedAssets = order1.price.value * order1.amount.value / 100000000
+        val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V2)
         addedBlocksAndSubscribe(exchangeTx) { updated =>
           checkingSubscribeFields(updated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
         }
@@ -485,7 +485,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       val senderBalanceAfterSponsorFeeTx       = senderBalanceBeforeSponsorFeeTx - sponsorFee.fee.value
       val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFeeCancel.fee.value
 
-      "BU-25 sponsorFee" in withGenerateSubscription(
+      "BU-25. subscribe sponsorFee" in withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>
@@ -505,7 +505,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
       }
 
-      "BU-27 sponsorFee cancel" in withGenerateSubscription(
+      "BU-27. subscribe sponsorFee cancel" in withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
       ) { d =>

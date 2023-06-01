@@ -230,7 +230,7 @@ class BlockchainUpdatesGetBlockUpdatesRangeSpec extends BlockchainUpdatesTestBas
       val senderBalanceAfterSponsorFeeTx       = senderBalanceBeforeSponsorFeeTx - sponsorFee.fee.value
       val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFee.fee.value
 
-      "BU-169 sponsorFee" in withGenerateGetBlockUpdateRange(
+      "BU-169. getBlockUpdateRange sponsorFee" in withGenerateGetBlockUpdateRange(
         GetBlockUpdatesRangeRequest.of(1, 3),
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
@@ -243,7 +243,7 @@ class BlockchainUpdatesGetBlockUpdatesRangeSpec extends BlockchainUpdatesTestBas
         checkingSponsorFee(append, sponsorFee, senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx)
       }
 
-      "BU-171 sponsorFee cancel" in withGenerateGetBlockUpdateRange(
+      "BU-171. getBlockUpdateRange sponsorFee cancel" in withGenerateGetBlockUpdateRange(
         GetBlockUpdatesRangeRequest.of(1, 4),
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
