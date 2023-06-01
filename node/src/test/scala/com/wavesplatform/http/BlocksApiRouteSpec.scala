@@ -244,7 +244,7 @@ class BlocksApiRouteSpec
 
     def metaAt(height: Int): Option[BlockMeta] =
       if (height >= 1 && height <= 3)
-        Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, None))
+        Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, Seq.empty, None))
       else None
 
     val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
@@ -282,7 +282,7 @@ class BlocksApiRouteSpec
           if (height < 1 || height > blocks.size) None
           else {
             val block = blocks(height - 1)
-            Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, None))
+            Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, Seq.empty, None))
           }
         }
       blocksApi

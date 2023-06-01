@@ -71,9 +71,9 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
        |  "currentReward" : ${d.blockchain.settings.rewardsSettings.initial},
        |  "minIncrement" : ${d.blockchain.settings.rewardsSettings.minIncrement},
        |  "term" : ${d.blockchain.settings.rewardsSettings.term},
-       |  "nextCheck" : ${d.blockchain.settings.rewardsSettings.nearestTermEnd(0, 1)},
+       |  "nextCheck" : ${d.blockchain.settings.rewardsSettings.nearestTermEnd(0, 1, modifyTerm = false)},
        |  "votingIntervalStart" : ${d.blockchain.settings.rewardsSettings
-      .nearestTermEnd(0, 1) - d.blockchain.settings.rewardsSettings.votingInterval + 1},
+      .nearestTermEnd(0, 1, modifyTerm = false) - d.blockchain.settings.rewardsSettings.votingInterval + 1},
        |  "votingInterval" : ${d.blockchain.settings.rewardsSettings.votingInterval},
        |  "votingThreshold" : ${d.blockchain.settings.rewardsSettings.votingInterval / 2 + 1},
        |  "votes" : {

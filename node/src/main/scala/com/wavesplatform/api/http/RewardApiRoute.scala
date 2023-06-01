@@ -31,10 +31,10 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
         .filter(_ <= height)
         .toRight(GenericError("Block reward feature is not activated yet"))
       reward <- blockchain.blockReward(height).toRight(GenericError(s"No information about rewards at height = $height"))
-      amount              = blockchain.wavesAmount(height)
-      rewardsSettings     = blockchain.settings.rewardsSettings
-      funcSettings        = blockchain.settings.functionalitySettings
-      nextCheck           = rewardsSettings.nearestTermEnd(activatedAt, height)
+      amount          = blockchain.wavesAmount(height)
+      rewardsSettings = blockchain.settings.rewardsSettings
+      funcSettings    = blockchain.settings.functionalitySettings
+      nextCheck       = rewardsSettings.nearestTermEnd(activatedAt, height, blockchain.isFeatureActivated(BlockchainFeatures.CappedReward, height))
       votingIntervalStart = nextCheck - rewardsSettings.votingInterval + 1
       votingThreshold     = rewardsSettings.votingInterval / 2 + 1
       votes               = blockchain.blockRewardVotes(height).filter(_ >= 0)

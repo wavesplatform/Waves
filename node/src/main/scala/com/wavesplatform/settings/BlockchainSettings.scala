@@ -13,6 +13,7 @@ import scala.concurrent.duration.*
 
 case class RewardsSettings(
     term: Int,
+    termAfterFeature20: Int,
     initial: Long,
     minIncrement: Long,
     votingInterval: Int
@@ -22,16 +23,18 @@ case class RewardsSettings(
   require(term > 0, "term must be greater than 0")
   require(votingInterval > 0, "votingInterval must be greater than 0")
   require(votingInterval <= term, s"votingInterval must be less than or equal to term($term)")
+  require(votingInterval <= termAfterFeature20, s"votingInterval must be less than or equal to termAfterFeature20($termAfterFeature20)")
 
-  def nearestTermEnd(activatedAt: Int, height: Int): Int = {
+  def nearestTermEnd(activatedAt: Int, height: Int, modifyTerm: Boolean): Int = {
     require(height >= activatedAt)
-    val diff = height - activatedAt + 1
-    val mul  = math.ceil(diff.toDouble / term).toInt
-    activatedAt + mul * term - 1
+    val diff         = height - activatedAt + 1
+    val modifiedTerm = if (modifyTerm) termAfterFeature20 else term
+    val mul          = math.ceil(diff.toDouble / modifiedTerm).toInt
+    activatedAt + mul * modifiedTerm - 1
   }
 
-  def votingWindow(activatedAt: Int, height: Int): Range = {
-    val end   = nearestTermEnd(activatedAt, height)
+  def votingWindow(activatedAt: Int, height: Int, modifyTerm: Boolean): Range = {
+    val end   = nearestTermEnd(activatedAt, height, modifyTerm)
     val start = end - votingInterval + 1
     if (height >= start) Range.inclusive(start, height)
     else Range(0, 0)
@@ -41,6 +44,7 @@ case class RewardsSettings(
 object RewardsSettings {
   val MAINNET, TESTNET, STAGENET = apply(
     100000,
+    50000,
     6 * Constants.UnitsInWave,
     50000000,
     10000
@@ -67,7 +71,8 @@ case class FunctionalitySettings(
     enforceTransferValidationAfter: Int = 0,
     ethInvokePaymentsCheckHeight: Int = 0,
     daoAddress: Option[String] = None,
-    xtnBuybackAddress: Option[String] = None
+    xtnBuybackAddress: Option[String] = None,
+    xtnBuybackRewardPeriod: Int = Int.MaxValue
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -119,7 +124,8 @@ object FunctionalitySettings {
     estimatorSumOverflowFixHeight = 2897510,
     enforceTransferValidationAfter = 2959447,
     daoAddress = Some("3PEgG7eZHLFhcfsTSaYxgRhZsh4AxMvA4Ms"),
-    xtnBuybackAddress = Some("3PFjHWuH6WXNJbwnfLHqNFBpwBS5dkYjTfv")
+    xtnBuybackAddress = Some("3PFjHWuH6WXNJbwnfLHqNFBpwBS5dkYjTfv"),
+    xtnBuybackRewardPeriod = 100000
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -133,7 +139,8 @@ object FunctionalitySettings {
     estimatorSumOverflowFixHeight = 1832520,
     enforceTransferValidationAfter = 1698800,
     daoAddress = Some("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS"),
-    xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT")
+    xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT"),
+    xtnBuybackRewardPeriod = 2000
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -146,7 +153,8 @@ object FunctionalitySettings {
     estimatorSumOverflowFixHeight = 1097419,
     ethInvokePaymentsCheckHeight = 1311110,
     daoAddress = Some("3MaFVH1vTv18FjBRugSRebx259D7xtRh9ic"),
-    xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM")
+    xtnBuybackAddress = Some("3MbhiRiLFLJ1EVKNP9npRszcLLQDjwnFfZM"),
+    xtnBuybackRewardPeriod = 1000
   )
 }
 

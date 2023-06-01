@@ -400,7 +400,13 @@ abstract class LevelDBWriter private[database] (
       rw.put(
         Keys.blockMetaAt(Height(height)),
         Some(
-          BlockMeta.fromBlock(block, height, totalFee, reward, if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None)
+          BlockMeta.fromBlock(
+            block,
+            height,
+            totalFee,
+            reward,
+            if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None
+          )
         )
       )
       rw.put(Keys.heightOf(block.id()), Some(height))
@@ -949,8 +955,9 @@ abstract class LevelDBWriter private[database] (
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
+        val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height + 1)
         settings.rewardsSettings
-          .votingWindow(activatedAt, height)
+          .votingWindow(activatedAt, height, modifyTerm)
           .flatMap { h =>
             db.get(Keys.blockMetaAt(Height(h)))
               .map(_.header.rewardVote)

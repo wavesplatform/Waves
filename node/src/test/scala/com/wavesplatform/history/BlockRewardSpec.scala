@@ -42,6 +42,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       ),
       rewardsSettings = RewardsSettings(
         10,
+        5,
         InitialReward,
         1 * Constants.UnitsInWave,
         4
@@ -106,7 +107,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     b16 = Range
       .inclusive(secondTermStart + 1, secondTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b15)) {
-        case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
+        case (prev, i)
+            if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i, modifyTerm = false).contains(i) =>
           prev :+ mkEmptyBlockDecReward(prev.last.id(), miner)
         case (prev, _) => prev :+ mkEmptyBlock(prev.last.id(), miner)
       }
@@ -115,7 +117,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     b17 = Range
       .inclusive(thirdTermStart + 1, thirdTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b16.last)) {
-        case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
+        case (prev, i)
+            if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i, modifyTerm = false).contains(i) =>
           prev :+ mkEmptyBlockReward(prev.last.id(), miner, -1L)
         case (prev, _) => prev :+ mkEmptyBlock(prev.last.id(), miner)
       }
@@ -124,7 +127,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     b18 = Range
       .inclusive(fourthTermStart + 1, fourthTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b17.last)) {
-        case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
+        case (prev, i)
+            if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i, modifyTerm = false).contains(i) =>
           prev :+ mkEmptyBlockReward(prev.last.id(), miner, 0)
         case (prev, _) => prev :+ mkEmptyBlock(prev.last.id(), miner)
       }
@@ -395,7 +399,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       b6s = Range
         .inclusive(BlockRewardActivationHeight + 1, BlockRewardActivationHeight + rewardSettings.blockchainSettings.rewardsSettings.term)
         .foldLeft(Seq(b5)) {
-          case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
+          case (prev, i)
+              if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i, modifyTerm = false).contains(i) =>
             prev :+ mkEmptyBlockIncReward(prev.last.id(), if (i % 2 == 0) miner2 else miner1)
           case (prev, i) => prev :+ mkEmptyBlock(prev.last.id(), if (i % 2 == 0) miner2 else miner1)
         }
@@ -447,7 +452,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         ),
         doubleFeaturesPeriodsAfterHeight = Int.MaxValue
       ),
-      rewardsSettings = RewardsSettings(12, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 6)
+      rewardsSettings = RewardsSettings(12, 6, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 6)
     )
   )
 
@@ -481,8 +486,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.blockchainUpdater.height shouldBe 15
 
       val calcSettings = calcRewardSettings.blockchainSettings.rewardsSettings
-      calcSettings.nearestTermEnd(4, 9) shouldBe 15
-      calcSettings.nearestTermEnd(4, 10) shouldBe 15
+      calcSettings.nearestTermEnd(4, 9, modifyTerm = false) shouldBe 15
+      calcSettings.nearestTermEnd(4, 10, modifyTerm = false) shouldBe 15
 
       val route = RewardApiRoute(d.blockchainUpdater)
 
@@ -510,7 +515,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         ),
         doubleFeaturesPeriodsAfterHeight = Int.MaxValue
       ),
-      rewardsSettings = RewardsSettings(3, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 2)
+      rewardsSettings = RewardsSettings(3, 1, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 2)
     )
   )
 
