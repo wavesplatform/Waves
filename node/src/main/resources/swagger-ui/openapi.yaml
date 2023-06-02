@@ -3961,12 +3961,11 @@ components:
         rewardShares:
           type: object
           additionalProperties:
-            type: integer
-            format: int64
+            type: string
           description: map of address <-> reward
           example:
-            3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: 200000000
-            3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: 100000000
+            3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
+            3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: '100000000'
         desiredReward:
           type: string
         VRF:
@@ -5440,8 +5439,8 @@ components:
         features: [0]
         reward: '30000'
         rewardShares:
-          3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: 200000000
-          3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: 100000000
+          3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
+          3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: '100000000'
         desiredReward: '30000'
         VRF: 'some_string_should_be_here'
         transactionsRoot: 'some_string_should_be_here'
@@ -5490,8 +5489,8 @@ components:
         features: [0]
         reward: '30000'
         rewardShares:
-          3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: 200000000
-          3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: 100000000
+          3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
+          3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: '100000000'
         desiredReward: '30000'
         VRF: 'some_string_should_be_here'
         transactionsRoot: 'some_string_should_be_here'
