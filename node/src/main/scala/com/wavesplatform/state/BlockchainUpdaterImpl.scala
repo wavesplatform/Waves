@@ -234,7 +234,7 @@ class BlockchainUpdaterImpl(
               }
             case Some(ng) =>
               if (ng.base.header.reference == block.header.reference) {
-                if (block.blockScore() > ng.base.blockScore()) {
+                if (block.header.timestamp < ng.base.header.timestamp) {
                   val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                   val miningConstraints = MiningConstraints(leveldb, height)
 
@@ -252,7 +252,7 @@ class BlockchainUpdaterImpl(
                     )
                     .map { r =>
                       log.trace(
-                        s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
+                        s"Better liquid block(timestamp=${block.header.timestamp}) received and applied instead of existing(timestamp=${ng.base.header.timestamp})"
                       )
                       val (mbs, diffs) = ng.allDiffs.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
