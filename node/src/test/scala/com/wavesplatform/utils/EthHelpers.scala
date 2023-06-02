@@ -3,9 +3,8 @@ package com.wavesplatform.utils
 import java.math.BigInteger
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.{EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.assets.exchange.OrderAuthentication
-import com.wavesplatform.transaction.utils.EthTxGenerator
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, SignedRawTransaction}
 import org.web3j.crypto.Sign.SignatureData
 
@@ -47,4 +46,3 @@ trait EthHelpers {
     def toSignedRawTransaction: SignedRawTransaction = new SignedRawTransaction(tx.underlying.getTransaction, tx.signatureData)
   }
 }
-

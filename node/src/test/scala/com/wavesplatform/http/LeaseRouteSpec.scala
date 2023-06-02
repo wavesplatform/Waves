@@ -27,9 +27,9 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, Authorized, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.EthTxGenerator.Arg
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}

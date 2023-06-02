@@ -2,11 +2,10 @@ package com.wavesplatform.generator
 
 import java.net.{InetSocketAddress, URL}
 import java.nio.charset.StandardCharsets
-
 import cats.Show
 import cats.implicits.showInterpolator
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 
 case class GeneratorSettings(
@@ -22,8 +21,8 @@ case class GeneratorSettings(
     oracle: OracleTransactionGenerator.Settings,
     swarm: SmartGenerator.Settings
 ) {
-  val addressScheme: Char              = chainId.head
-  val privateKeyAccounts: Seq[KeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
+  val addressScheme: Char                  = chainId.head
+  val privateKeyAccounts: Seq[SeedKeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
 }
 
 object GeneratorSettings {
@@ -53,7 +52,7 @@ object GeneratorSettings {
        |  ${modeSettings.split('\n').mkString("\n  ")}""".stripMargin
   }
 
-  def toKeyPair(seedText: String): KeyPair = {
+  def toKeyPair(seedText: String): SeedKeyPair = {
     KeyPair(com.wavesplatform.crypto.secureHash(Bytes.concat(Ints.toByteArray(0), seedText.getBytes(StandardCharsets.UTF_8))))
   }
 }

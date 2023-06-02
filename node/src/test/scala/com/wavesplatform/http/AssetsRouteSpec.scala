@@ -30,9 +30,8 @@ import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.EthTxGenerator.Arg
+import com.wavesplatform.transaction.{AssetIdLength, EthTxGenerator, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.*
