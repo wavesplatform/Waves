@@ -37,7 +37,13 @@ class BlocksApiRouteSpec
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
 
   private val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
-  private val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.id().toString)
+  private val testBlock2Json = testBlock2.json() ++ Json.obj(
+    "height"       -> 2,
+    "totalFee"     -> 0L,
+    "reward"       -> 5,
+    "rewardShares" -> Json.obj(testBlock2.header.generator.toAddress.toString -> 5),
+    "VRF"          -> testBlock2.id().toString
+  )
 
   private val testBlock1HeaderJson = BlockHeaderSerializer.toJson(testBlock1.header, testBlock1.bytes().length, 0, testBlock1.signature) ++ Json.obj(
     "height"   -> 1,
@@ -45,14 +51,16 @@ class BlocksApiRouteSpec
   )
 
   private val testBlock2HeaderJson = BlockHeaderSerializer.toJson(testBlock2.header, testBlock2.bytes().length, 0, testBlock2.signature) ++ Json.obj(
-    "height"   -> 2,
-    "totalFee" -> 0L,
-    "reward"   -> 5,
-    "VRF"      -> testBlock2.id().toString
+    "height"       -> 2,
+    "totalFee"     -> 0L,
+    "reward"       -> 5,
+    "rewardShares" -> Json.obj(testBlock2.header.generator.toAddress.toString -> 5),
+    "VRF"          -> testBlock2.id().toString
   )
 
   private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, 0L, None, None)
-  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id()))
+  private val testBlock2Meta =
+    BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id())).copy(rewardShares = Seq(testBlock2.header.generator.toAddress -> 5))
 
   private val invalidBlockId = ByteStr(new Array[Byte](32))
   (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()

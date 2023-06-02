@@ -23,7 +23,7 @@ object BlockchainFeatures {
   val RideV6                          = BlockchainFeature(17, "Ride V6, MetaMask support")
   val ConsensusImprovements           = BlockchainFeature(18, "Consensus and MetaMask updates")
   val BlockRewardDistribution         = BlockchainFeature(19, "Block Reward Distribution")
-  val CappedReward                    = BlockchainFeature(20, "Capped XTN buy-back & DAO amounts, fee burning")
+  val CappedReward                    = BlockchainFeature(20, "Capped XTN buy-back & DAO amounts")
   val CeaseXtnBuyback                 = BlockchainFeature(21, "Cease XTN buy-back")
 
   // Not exposed

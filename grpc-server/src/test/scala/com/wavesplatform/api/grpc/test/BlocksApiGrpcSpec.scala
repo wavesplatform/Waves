@@ -31,7 +31,12 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
     d.liquidAndSolidAssert { () =>
       val vrf = getBlockVrfPB(d, block)
       vrf.isEmpty shouldBe false
-      val expectedResult = BlockWithHeight.of(Some(PBBlocks.protobuf(block)), 2, vrf)
+      val expectedResult = BlockWithHeight.of(
+        Some(PBBlocks.protobuf(block)),
+        2,
+        vrf,
+        Seq(RewardShare(ByteString.copyFrom(block.sender.toAddress.bytes), d.blockchain.settings.rewardsSettings.initial))
+      )
 
       val resultById = Await.result(
         grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.BlockId(block.id().toByteString), includeTransactions = true)),
@@ -65,7 +70,12 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
       result.runSyncUnsafe() shouldBe blocks.zipWithIndex.map { case (block, idx) =>
         val vrf = getBlockVrfPB(d, block)
         vrf.isEmpty shouldBe false
-        BlockWithHeight.of(Some(PBBlocks.protobuf(block)), idx + 2, vrf)
+        BlockWithHeight.of(
+          Some(PBBlocks.protobuf(block)),
+          idx + 2,
+          vrf,
+          Seq(RewardShare(ByteString.copyFrom(block.sender.toAddress.bytes), d.blockchain.settings.rewardsSettings.initial))
+        )
       }
     }
   }

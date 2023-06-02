@@ -13,7 +13,7 @@ import scala.concurrent.duration.*
 
 case class RewardsSettings(
     term: Int,
-    termAfterFeature20: Int,
+    termAfterCappedRewardFeature: Int,
     initial: Long,
     minIncrement: Long,
     votingInterval: Int
@@ -23,12 +23,16 @@ case class RewardsSettings(
   require(term > 0, "term must be greater than 0")
   require(votingInterval > 0, "votingInterval must be greater than 0")
   require(votingInterval <= term, s"votingInterval must be less than or equal to term($term)")
-  require(votingInterval <= termAfterFeature20, s"votingInterval must be less than or equal to termAfterFeature20($termAfterFeature20)")
+  require(termAfterCappedRewardFeature > 0, "termAfterCappedRewardFeature must be greater than 0")
+  require(
+    votingInterval <= termAfterCappedRewardFeature,
+    s"votingInterval must be less than or equal to termAfterCappedRewardFeature($termAfterCappedRewardFeature)"
+  )
 
   def nearestTermEnd(activatedAt: Int, height: Int, modifyTerm: Boolean): Int = {
     require(height >= activatedAt)
     val diff         = height - activatedAt + 1
-    val modifiedTerm = if (modifyTerm) termAfterFeature20 else term
+    val modifiedTerm = if (modifyTerm) termAfterCappedRewardFeature else term
     val mul          = math.ceil(diff.toDouble / modifiedTerm).toInt
     activatedAt + mul * modifiedTerm - 1
   }

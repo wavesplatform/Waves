@@ -560,8 +560,6 @@ abstract class LevelDBWriter private[database] (
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
-      rw.put(Keys.blockTransactionsFee(height), totalFee)
-
       if (dbSettings.storeInvokeScriptResults) scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactions
           .get(TransactionId(txId))
@@ -743,7 +741,6 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.changedAddresses(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
           rw.delete(Keys.carryFee(currentHeight))
-          rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))

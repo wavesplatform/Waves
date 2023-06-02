@@ -54,11 +54,19 @@ object BlockDiffer {
       daoAddress        <- blockchain.settings.functionalitySettings.daoAddressParsed
       xtnBuybackAddress <- blockchain.settings.functionalitySettings.xtnBuybackAddressParsed
     } yield {
-      val blockReward = BlockRewardCalculator.getBlockReward(heightWithNewBlock, daoAddress, xtnBuybackAddress, blockchain)
+      val blockRewardShares = BlockRewardCalculator.getBlockRewardShares(
+        heightWithNewBlock,
+        blockchain.lastBlockReward.getOrElse(0L),
+        daoAddress,
+        xtnBuybackAddress,
+        blockchain
+      )
       (
-        Portfolio.waves(blockReward.miner),
-        daoAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> Portfolio.waves(blockReward.daoAddress)))),
-        xtnBuybackAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> Portfolio.waves(blockReward.xtnBuybackAddress))))
+        Portfolio.waves(blockRewardShares.miner),
+        daoAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> Portfolio.waves(blockRewardShares.daoAddress)).filter(_._2.balance > 0))),
+        xtnBuybackAddress.fold(Diff.empty)(addr =>
+          Diff(portfolios = Map(addr -> Portfolio.waves(blockRewardShares.xtnBuybackAddress)).filter(_._2.balance > 0))
+        )
       )
     }
 

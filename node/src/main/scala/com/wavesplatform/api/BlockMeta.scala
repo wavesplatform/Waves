@@ -1,5 +1,6 @@
 package com.wavesplatform.api
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.protoHeaderHash
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
@@ -16,7 +17,7 @@ case class BlockMeta(
     transactionCount: Int,
     totalFeeInWaves: Long,
     reward: Option[Long],
-    rewardShares: Seq[(String, Long)],
+    rewardShares: Seq[(Address, Long)],
     vrf: Option[ByteStr]
 ) {
   def toSignedHeader: SignedBlockHeader = SignedBlockHeader(header, signature)
@@ -25,8 +26,14 @@ case class BlockMeta(
   val json: Coeval[JsObject] = Coeval.evalOnce {
     BlockHeaderSerializer.toJson(header, size, transactionCount, signature) ++
       Json.obj("height" -> height, "totalFee" -> totalFeeInWaves) ++
-      reward.fold(Json.obj())(r => Json.obj("reward" -> r)) ++
-      Json.obj("rewardShares" -> Json.obj(rewardShares.map[(String, Json.JsValueWrapper)] { case (addrName, reward) => addrName -> reward }*)) ++
+      reward.fold(Json.obj())(r =>
+        Json.obj(
+          "reward" -> r,
+          "rewardShares" -> Json.obj(rewardShares.map[(String, Json.JsValueWrapper)] { case (addrName, reward) =>
+            addrName.toString -> reward
+          }*)
+        )
+      ) ++
       vrf.fold(Json.obj())(v => Json.obj("VRF" -> v.toString)) ++
       headerHash.fold(Json.obj())(h => Json.obj("id" -> h.toString))
   }

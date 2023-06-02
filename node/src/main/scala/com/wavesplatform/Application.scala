@@ -601,17 +601,9 @@ object Application extends ScorexLogging {
       .filter(_ => blockchainUpdater.height == height)
       .orElse(db.get(Keys.blockMetaAt(Height(height))))
       .map { blockMeta =>
-        val blockRewards = BlockRewardCalculator.getBlockReward(
-          height,
-          blockchainUpdater.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
-          blockchainUpdater.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten,
-          blockchainUpdater
-        )
+        val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, blockMeta.header.generator.toAddress, blockchainUpdater)
 
-        blockMeta.copy(rewardShares =
-          Seq("miner" -> blockRewards.miner, "daoAddress" -> blockRewards.daoAddress, "xtnBuybackAddress" -> blockRewards.xtnBuybackAddress)
-            .filter(_._2 > 0)
-        )
+        blockMeta.copy(rewardShares = rewardShares)
       }
   }
 

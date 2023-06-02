@@ -163,7 +163,7 @@ class BlockchainUpdaterImpl(
           val mayBeReward     = lastBlockReward
           val mayBeTimeToVote = nextHeight - activatedAt
           val modifiedTerm = if (leveldb.isFeatureActivated(BlockchainFeatures.CappedReward, nextHeight)) {
-            settings.termAfterFeature20
+            settings.termAfterCappedRewardFeature
           } else {
             settings.term
           }

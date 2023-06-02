@@ -1,13 +1,14 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 
 object BlockRewardCalculator {
 
-  case class BlockReward(miner: Long, daoAddress: Long, xtnBuybackAddress: Long)
+  case class BlockRewardShares(miner: Long, daoAddress: Long, xtnBuybackAddress: Long)
 
   val CurrentBlockRewardPart: Fraction   = Fraction(1, 3)
   val RemaindRewardAddressPart: Fraction = Fraction(1, 2)
@@ -16,8 +17,13 @@ object BlockRewardCalculator {
   val MaxAddressReward: Long      = 2 * Constants.UnitsInWave
   val GuaranteedMinerReward: Long = 2 * Constants.UnitsInWave
 
-  def getBlockReward(height: Int, daoAddress: Option[Address], xtnBuybackAddress: Option[Address], blockchain: Blockchain): BlockReward = {
-    val blockReward                   = blockchain.lastBlockReward.getOrElse(0L)
+  def getBlockRewardShares(
+      height: Int,
+      fullBlockReward: Long,
+      daoAddress: Option[Address],
+      xtnBuybackAddress: Option[Address],
+      blockchain: Blockchain
+  ): BlockRewardShares = {
     val blockRewardDistributionHeight = blockchain.featureActivationHeight(BlockchainFeatures.BlockRewardDistribution.id).getOrElse(Int.MaxValue)
     val cappedRewardHeight            = blockchain.featureActivationHeight(BlockchainFeatures.CappedReward.id).getOrElse(Int.MaxValue)
     val ceaseXtnBuybackHeight         = blockchain.featureActivationHeight(BlockchainFeatures.CeaseXtnBuyback.id).getOrElse(Int.MaxValue)
@@ -28,28 +34,46 @@ object BlockRewardCalculator {
         height < blockRewardDistributionHeight + blockchain.settings.functionalitySettings.xtnBuybackRewardPeriod
       }
       if (height >= cappedRewardHeight) {
-        if (blockReward < GuaranteedMinerReward) {
-          BlockReward(blockReward, 0, 0)
-        } else if (blockReward < FullRewardInit) {
+        if (fullBlockReward < GuaranteedMinerReward) {
+          BlockRewardShares(fullBlockReward, 0, 0)
+        } else if (fullBlockReward < FullRewardInit) {
           calculateRewards(
-            blockReward,
-            RemaindRewardAddressPart.apply(blockReward - GuaranteedMinerReward),
+            fullBlockReward,
+            RemaindRewardAddressPart.apply(fullBlockReward - GuaranteedMinerReward),
             daoAddress,
             modifiedXtnBuybackAddress
           )
         } else {
-          calculateRewards(blockReward, MaxAddressReward, daoAddress, modifiedXtnBuybackAddress)
+          calculateRewards(fullBlockReward, MaxAddressReward, daoAddress, modifiedXtnBuybackAddress)
         }
       } else {
-        calculateRewards(blockReward, CurrentBlockRewardPart.apply(blockReward), daoAddress, modifiedXtnBuybackAddress)
+        calculateRewards(fullBlockReward, CurrentBlockRewardPart.apply(fullBlockReward), daoAddress, modifiedXtnBuybackAddress)
       }
-    } else BlockReward(blockReward, 0, 0)
+    } else BlockRewardShares(fullBlockReward, 0, 0)
+  }
+
+  def getSortedBlockRewardShares(height: Int, fullBlockReward: Long, generator: Address, blockchain: Blockchain): Seq[(Address, Long)] = {
+    val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+    val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+
+    val rewardShares = getBlockRewardShares(height, fullBlockReward, daoAddress, xtnBuybackAddress, blockchain)
+
+    (Seq(generator     -> rewardShares.miner) ++
+      daoAddress.map(_ -> rewardShares.daoAddress) ++
+      xtnBuybackAddress.map(_ -> rewardShares.xtnBuybackAddress))
+      .filter(_._2 > 0)
+      .sortBy { case (addr, _) => ByteStr(addr.bytes) }
+  }
+
+  def getSortedBlockRewardShares(height: Int, generator: Address, blockchain: Blockchain): Seq[(Address, Long)] = {
+    val fullBlockReward = blockchain.blockReward(height).getOrElse(0L)
+    getSortedBlockRewardShares(height, fullBlockReward, generator, blockchain)
   }
 
   private def calculateRewards(blockReward: Long, addressReward: Long, daoAddress: Option[Address], xtnBuybackAddress: Option[Address]) = {
     val daoAddressReward = daoAddress.fold(0L) { _ => addressReward }
     val xtnBuybackReward = xtnBuybackAddress.fold(0L) { _ => addressReward }
-    BlockReward(
+    BlockRewardShares(
       blockReward - daoAddressReward - xtnBuybackReward,
       daoAddressReward,
       xtnBuybackReward

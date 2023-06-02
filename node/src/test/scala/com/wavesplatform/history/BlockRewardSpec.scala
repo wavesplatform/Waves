@@ -515,7 +515,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         ),
         doubleFeaturesPeriodsAfterHeight = Int.MaxValue
       ),
-      rewardsSettings = RewardsSettings(3, 1, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 2)
+      rewardsSettings = RewardsSettings(3, 2, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 2)
     )
   )
 
