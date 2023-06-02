@@ -109,11 +109,11 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       "BU-195. Return correct data for order V3, exchange V2" in {
         val order1          = createOrders(OrderType.BUY, firstTxParticipant, Order.V3)
         val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V3)
-        val exchangedAssets = order1.price.value * order1.amount.value / 100000000
+        val normalizedPrice = order1.price.value * order1.amount.value / 100000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V2)
         addedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
           val append = getBlockUpdate.getUpdate.getAppend
-          checkingExchangeTx(append, exchangeTx, exchangedAssets, order1.amount.value)
+          checkingExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
       }
 

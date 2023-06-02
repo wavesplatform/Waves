@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.api.grpc.protobuf.GetBlockUpdateResponse
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateResponse, GetBlockUpdatesRangeRequest}
 import com.wavesplatform.events.fixtures.WavesTxChecks.{
   checkAssetUpdatesStateUpdates,
   checkAssetsScriptStateUpdates,
@@ -186,7 +186,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkAssetsStateUpdates(assetDetails.after, burn, isNft = false, amountAfterTx)
   }
 
-  protected def checkingExchangeTx(append: Append, exchangeTx: ExchangeTransaction, exchangedAssets: Long, orderAmount: Long): Unit = {
+  protected def checkingExchangeTx(append: Append, exchangeTx: ExchangeTransaction, normalizedPrice: Long, orderAmount: Long): Unit = {
     val amountAssetQuantity                      = secondAsset.quantity.value
     val firstTxParticipantBalanceBeforeExchange  = firstTxParticipantBalanceBefore - firstTokenFee
     val firstTxParticipantBalanceAfterExchange   = firstTxParticipantBalanceBeforeExchange - exchangeTx.fee.value + customFee
@@ -198,10 +198,10 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
       append.transactionStateUpdates.head.balances,
       Map(
         (firstTxParticipantAddress, Waves)              -> (firstTxParticipantBalanceBeforeExchange, firstTxParticipantBalanceAfterExchange),
-        (secondTxParticipantAddress, firstToken.asset)  -> (0, exchangedAssets),
+        (secondTxParticipantAddress, firstToken.asset)  -> (0, normalizedPrice),
         (firstTxParticipantAddress, secondAsset.asset)  -> (0, orderAmount),
         (secondTxParticipantAddress, Waves)             -> (secondTxParticipantBalanceBeforeExchange, secondTxParticipantBalanceAfterExchange),
-        (firstTxParticipantAddress, firstToken.asset)   -> (firstTokenQuantity, firstTokenQuantity - exchangedAssets),
+        (firstTxParticipantAddress, firstToken.asset)   -> (firstTokenQuantity, firstTokenQuantity - normalizedPrice),
         (secondTxParticipantAddress, secondAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount)
       )
     )
@@ -365,6 +365,23 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
 
   protected def addedBlocksAndGetBlockUpdate(exchangeTx: ExchangeTransaction, height: Int)(f: GetBlockUpdateResponse => Unit): Unit = {
     withGenerateGetBlockUpdate(
+      height,
+      settings = currentSettings,
+      balances = Seq(
+        AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
+        AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+      )
+    ) { d =>
+      d.appendBlock(firstToken)
+      d.appendBlock(secondAsset)
+      d.appendBlock(exchangeTx)
+    }(f)
+  }
+
+  protected def addedBlocksAndGetBlockUpdateRange(exchangeTx: ExchangeTransaction, height: GetBlockUpdatesRangeRequest)(
+      f: Seq[PBBlockchainUpdated] => Unit
+  ): Unit = {
+    withGenerateGetBlockUpdateRange(
       height,
       settings = currentSettings,
       balances = Seq(
