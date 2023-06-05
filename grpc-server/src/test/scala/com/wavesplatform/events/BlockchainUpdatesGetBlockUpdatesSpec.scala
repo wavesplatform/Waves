@@ -8,7 +8,7 @@ import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
 
 class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates getBlockUpdate tests" - {
@@ -263,6 +263,29 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
         checkingUpdateAssetInfo(append, updateAssetInfo)
+      }
+    }
+
+    "BU-. Return correct data for EthereumTransfer" in {
+      val ethereumTransfer: EthereumTransaction =
+        EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
+      val ethAddress = ethereumTransfer.senderAddress.value()
+      val transfer = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
+
+      withGenerateGetBlockUpdate(
+        height = 4,
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(
+          AddrWithBalance(ethAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+        )
+      ) { d =>
+        d.appendKeyBlock()
+        d.appendBlock(secondToken, transfer)
+        d.appendBlock(ethereumTransfer)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
+        checkingEthereumTransfer(append, ethereumTransfer, ethAddress)
       }
     }
   }

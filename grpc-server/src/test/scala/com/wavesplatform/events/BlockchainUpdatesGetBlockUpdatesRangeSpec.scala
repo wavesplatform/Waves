@@ -9,7 +9,7 @@ import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
 
 class BlockchainUpdatesGetBlockUpdatesRangeSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates getBlockUpdateRange tests" - {
@@ -291,6 +291,30 @@ class BlockchainUpdatesGetBlockUpdatesRangeSpec extends BlockchainUpdatesTestBas
       } { getBlockUpdateRange =>
         val append = getBlockUpdateRange.apply(3).getAppend
         checkingUpdateAssetInfo(append, updateAssetInfo)
+      }
+    }
+
+    "BU-. Return correct data for EthereumTransfer" in {
+      val ethereumTransfer: EthereumTransaction =
+        EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
+      val ethAddress = ethereumTransfer.senderAddress.value()
+      val transfer = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
+
+      withGenerateGetBlockUpdateRange(
+        GetBlockUpdatesRangeRequest.of(1, 4),
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(
+          AddrWithBalance(ethAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+        )
+      ) { d =>
+        d.appendKeyBlock()
+        d.appendBlock(secondToken, transfer)
+        d.appendBlock(ethereumTransfer)
+        d.appendBlock()
+      } { getBlockUpdateRange =>
+        val append = getBlockUpdateRange.apply(3).getAppend
+        checkingEthereumTransfer(append, ethereumTransfer, ethAddress)
       }
     }
   }

@@ -2,13 +2,15 @@ package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.events.fixtures.WavesTxChecks.checkEthereumTransaction
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.settingsWithFeatures
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
 
 class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates subscribe tests" - {
@@ -220,7 +222,7 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
     }
 
     "BU-20. Return correct data for setAssetScript" in {
-      val issue = TxHelpers.issue(firstTxParticipant, amount, script = complexScriptBefore)
+      val issue          = TxHelpers.issue(firstTxParticipant, amount, script = complexScriptBefore)
       val setAssetScript = TxHelpers.setAssetScript(firstTxParticipant, issue.asset, complexScriptAfter, 1.waves)
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
@@ -229,14 +231,14 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(issue)
         d.appendMicroBlock(setAssetScript)
       } { updates =>
-        val append       = updates(2).append
+        val append = updates(2).append
         checkingSetAssetScript(append, setAssetScript, issue)
       }
     }
 
     "BU-121. Return correct data for UpdateAssetInfo" in {
-      val newName = "new_name"
-      val newDescription = "new_description"
+      val newName         = "new_name"
+      val newDescription  = "new_description"
       val updateAssetInfo = TxHelpers.updateAssetInfo(firstTokenAsset.id, newName, newDescription, firstTxParticipant)
 
       withGenerateSubscription(
@@ -247,8 +249,30 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
         d.appendBlock()
         d.appendMicroBlock(updateAssetInfo)
       } { updates =>
-        val append       = updates(3).append
+        val append = updates(3).append
         checkingUpdateAssetInfo(append, updateAssetInfo)
+      }
+    }
+
+    "BU-122. Return correct data for EthereumTransfer" in {
+      val ethereumTransfer: EthereumTransaction =
+        EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
+      val ethAddress = ethereumTransfer.senderAddress.value()
+      val transfer   = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
+
+      withGenerateSubscription(
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(
+          AddrWithBalance(ethAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+        )
+      ) { d =>
+        d.appendKeyBlock()
+        d.appendBlock(secondToken, transfer)
+        d.appendMicroBlock(ethereumTransfer)
+      } { updates =>
+        val append = updates(3).append
+        checkingEthereumTransfer(append, ethereumTransfer, ethAddress)
       }
     }
   }

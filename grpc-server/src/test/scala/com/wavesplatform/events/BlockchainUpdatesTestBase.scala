@@ -15,6 +15,7 @@ import com.wavesplatform.events.fixtures.WavesTxChecks.{
   checkCreateAlias,
   checkDataEntriesStateUpdate,
   checkDataTransaction,
+  checkEthereumTransaction,
   checkExchange,
   checkIndividualLeases,
   checkIssue,
@@ -52,36 +53,41 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxHelpers}
+import com.wavesplatform.transaction.utils.EthConverters.EthereumKeyPairExt
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, EthereumTransaction, TxHelpers}
 import org.scalatest.concurrent.ScalaFutures
+import org.web3j.crypto.Bip32ECKeyPair
 
 abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with ScalaFutures {
-  val currentSettings: WavesSettings         = DomainPresets.RideV6
-  val amount: Long                           = 9000000
-  val additionalAmount: Long                 = 5000000
-  val customFee: Long                        = 5234567L
-  val customAssetIssueFee                    = 234567654L
-  val firstTxParticipant: SeedKeyPair        = TxHelpers.signer(2)
-  val firstTxParticipantAddress: Address     = firstTxParticipant.toAddress
-  val firstTxParticipantBalanceBefore: Long  = 20.waves
-  val secondTxParticipant: SeedKeyPair       = TxHelpers.signer(3)
-  val secondTxParticipantAddress: Address    = secondTxParticipant.toAddress
-  val secondTxParticipantPKHash: Array[Byte] = secondTxParticipantAddress.publicKeyHash
-  val secondTxParticipantBalanceBefore: Long = 20.waves
-  val recipients: Seq[ParsedTransfer]        = TxHelpers.accountSeqGenerator(100, additionalAmount)
-  val firstToken: IssueTransaction           = TxHelpers.issue(firstTxParticipant, amount = 2000000000, 2)
-  val firstTokenAsset: IssuedAsset           = firstToken.asset
-  val firstTokenQuantity: Long               = firstToken.quantity.value
-  val firstTokenFee: Long                    = firstToken.fee.value
-  val secondAsset: IssueTransaction          = TxHelpers.issue(secondTxParticipant, amount = 1000000000, 6)
-  val integerDataEntry: IntegerDataEntry     = IntegerDataEntry.apply("Integer", 3550000L)
-  val booleanDataEntry: BooleanDataEntry     = BooleanDataEntry.apply("Boolean", value = true)
-  val stringDataEntry: StringDataEntry       = StringDataEntry.apply("String", "test")
-  val binaryDataEntry: BinaryDataEntry       = BinaryDataEntry.apply("Binary", ByteStr.apply(firstTxParticipantAddress.bytes))
-  val entries: Seq[DataEntry[?]]             = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
-  val defaultScript: Option[Script]          = Option(TxHelpers.script("true"))
-  val complexScriptBefore: Option[Script]    = Option.apply(TxHelpers.script("true".stripMargin))
-  val complexScriptAfter: Script             = TxHelpers.script("false".stripMargin)
+  val currentSettings: WavesSettings             = DomainPresets.RideV6
+  val amount: Long                               = 9000000
+  val additionalAmount: Long                     = 5000000
+  val customFee: Long                            = 5234567L
+  val customAssetIssueFee                        = 234567654L
+  val firstTxParticipant: SeedKeyPair            = TxHelpers.signer(2)
+  val firstTxParticipantAddress: Address         = firstTxParticipant.toAddress
+  val firstTxParticipantEthereum: Bip32ECKeyPair = firstTxParticipant.toEthKeyPair
+  val firstTxParticipantBalanceBefore: Long      = 20.waves
+  val secondTxParticipant: SeedKeyPair           = TxHelpers.signer(3)
+  val secondTxParticipantAddress: Address        = secondTxParticipant.toAddress
+  val secondTxParticipantPKHash: Array[Byte]     = secondTxParticipantAddress.publicKeyHash
+  val secondTxParticipantBalanceBefore: Long     = 20.waves
+  val recipients: Seq[ParsedTransfer]            = TxHelpers.accountSeqGenerator(100, additionalAmount)
+  val firstToken: IssueTransaction               = TxHelpers.issue(firstTxParticipant, amount = 2000000000L, 2)
+  val firstTokenAsset: IssuedAsset               = firstToken.asset
+  val firstTokenQuantity: Long                   = firstToken.quantity.value
+  val firstTokenFee: Long                        = firstToken.fee.value
+  val secondToken: IssueTransaction              = TxHelpers.issue(secondTxParticipant, amount = 6000000000L, 6)
+  val secondTokenAsset: IssuedAsset              = secondToken.asset
+  val secondTokenQuantity: Long                  = secondToken.quantity.value
+  val integerDataEntry: IntegerDataEntry         = IntegerDataEntry.apply("Integer", 3550000L)
+  val booleanDataEntry: BooleanDataEntry         = BooleanDataEntry.apply("Boolean", value = true)
+  val stringDataEntry: StringDataEntry           = StringDataEntry.apply("String", "test")
+  val binaryDataEntry: BinaryDataEntry           = BinaryDataEntry.apply("Binary", ByteStr.apply(firstTxParticipantAddress.bytes))
+  val entries: Seq[DataEntry[?]]                 = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
+  val defaultScript: Option[Script]              = Option(TxHelpers.script("true"))
+  val complexScriptBefore: Option[Script]        = Option.apply(TxHelpers.script("true".stripMargin))
+  val complexScriptAfter: Script                 = TxHelpers.script("false".stripMargin)
   val testScript: Script = TxHelpers.script(s"""{-# STDLIB_VERSION 6 #-}
                                                |{-# CONTENT_TYPE DAPP #-}
                                                |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -97,7 +103,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
   protected def createOrders(orderType: OrderType, orderSender: SeedKeyPair, orderVersion: Version): Order = {
     TxHelpers.order(
       orderType,
-      secondAsset.asset,
+      secondToken.asset,
       firstToken.asset,
       Waves,
       amount = 50000L,
@@ -187,10 +193,10 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
   }
 
   protected def checkingExchangeTx(append: Append, exchangeTx: ExchangeTransaction, normalizedPrice: Long, orderAmount: Long): Unit = {
-    val amountAssetQuantity                      = secondAsset.quantity.value
+    val amountAssetQuantity                      = secondToken.quantity.value
     val firstTxParticipantBalanceBeforeExchange  = firstTxParticipantBalanceBefore - firstTokenFee
     val firstTxParticipantBalanceAfterExchange   = firstTxParticipantBalanceBeforeExchange - exchangeTx.fee.value + customFee
-    val secondTxParticipantBalanceBeforeExchange = secondTxParticipantBalanceBefore - secondAsset.fee.value
+    val secondTxParticipantBalanceBeforeExchange = secondTxParticipantBalanceBefore - secondToken.fee.value
     val secondTxParticipantBalanceAfterExchange  = secondTxParticipantBalanceBeforeExchange - customFee
 
     checkExchange(append.transactionIds.head, append.transactionAt(0), exchangeTx)
@@ -199,10 +205,10 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
       Map(
         (firstTxParticipantAddress, Waves)              -> (firstTxParticipantBalanceBeforeExchange, firstTxParticipantBalanceAfterExchange),
         (secondTxParticipantAddress, firstToken.asset)  -> (0, normalizedPrice),
-        (firstTxParticipantAddress, secondAsset.asset)  -> (0, orderAmount),
+        (firstTxParticipantAddress, secondToken.asset)  -> (0, orderAmount),
         (secondTxParticipantAddress, Waves)             -> (secondTxParticipantBalanceBeforeExchange, secondTxParticipantBalanceAfterExchange),
         (firstTxParticipantAddress, firstToken.asset)   -> (firstTokenQuantity, firstTokenQuantity - normalizedPrice),
-        (secondTxParticipantAddress, secondAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount)
+        (secondTxParticipantAddress, secondToken.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount)
       )
     )
   }
@@ -346,7 +352,22 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
     checkAssetsStateUpdates(assetDetails.before, firstToken, isNft = false, firstTokenQuantity)
     checkAssetsStateUpdates(assetDetails.after, firstToken, isNft = false, firstTokenQuantity)
+  }
 
+  protected def checkingEthereumTransfer(append: Append, ethereumTransfer: EthereumTransaction, ethAddress: Address): Unit = {
+    val firstTxParticipantBalanceAfter = firstTxParticipantBalanceBefore - ethereumTransfer.fee
+    val recipientTokenBalanceAfter     = secondTokenQuantity - amount
+
+    val balances = append.transactionStateUpdates.head.balances
+    checkEthereumTransaction(append.transactionIds.head, append.transactionAt(0), ethereumTransfer)
+    checkBalances(
+      balances,
+      Map(
+        (ethAddress, Waves)                            -> (firstTxParticipantBalanceBefore, firstTxParticipantBalanceAfter),
+        (ethAddress, secondTokenAsset)                 -> (secondTokenQuantity, recipientTokenBalanceAfter),
+        (secondTxParticipantAddress, secondTokenAsset) -> (0, amount)
+      )
+    )
   }
 
   protected def addedBlocksAndSubscribe(exchangeTx: ExchangeTransaction)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
@@ -358,7 +379,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
       )
     ) { d =>
       d.appendBlock(firstToken)
-      d.appendBlock(secondAsset)
+      d.appendBlock(secondToken)
       d.appendMicroBlock(exchangeTx)
     }(f)
   }
@@ -373,7 +394,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
       )
     ) { d =>
       d.appendBlock(firstToken)
-      d.appendBlock(secondAsset)
+      d.appendBlock(secondToken)
       d.appendBlock(exchangeTx)
     }(f)
   }
@@ -390,7 +411,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
       )
     ) { d =>
       d.appendBlock(firstToken)
-      d.appendBlock(secondAsset)
+      d.appendBlock(secondToken)
       d.appendBlock(exchangeTx)
       d.appendBlock()
     }(f)
