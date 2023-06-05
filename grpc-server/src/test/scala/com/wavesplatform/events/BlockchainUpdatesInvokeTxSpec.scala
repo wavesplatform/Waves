@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
-class BlockchainUpdatesSubscribeInvokeTxSpec extends BlockchainUpdatesTestBase {
+class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
   "Simple invoke transaction" - {
     val issue           = TxHelpers.issue(firstTxParticipant)
     val asset           = issue.asset
