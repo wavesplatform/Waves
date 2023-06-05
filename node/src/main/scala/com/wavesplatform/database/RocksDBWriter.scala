@@ -734,6 +734,7 @@ class RocksDBWriter(
               rw.delete(Keys.transactionAt(currentHeight, num, rdb.txHandle))
               rw.delete(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle))
             }
+            rw.delete(Keys.transactionStateSnapshotAt(currentHeight, num, rdb.txSnapshotHandle))
           }
 
           rw.delete(Keys.blockMetaAt(currentHeight))
