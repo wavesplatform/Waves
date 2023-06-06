@@ -561,7 +561,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
   }
 
   property(
-    s"blockInfoByHeight(height) should return correct rewards after ${BlockchainFeatures.CappedReward} activation"
+    s"NODE-842, NODE-843. blockInfoByHeight(height) should return correct rewards after ${BlockchainFeatures.CappedReward} activation"
   ) {
     val invoker           = TxHelpers.signer(1)
     val dApp              = TxHelpers.signer(2)

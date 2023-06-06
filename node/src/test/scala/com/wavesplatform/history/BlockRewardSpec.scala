@@ -824,7 +824,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       cappedRewardFeatureTestCase(fullBlockReward, Some(_ => 0L), None, blockRewardDistributionActivated = false)
 
       // only xtnBuybackAddress defined
-      cappedRewardFeatureTestCase(fullBlockReward, Some(_ => 0L), None, blockRewardDistributionActivated = false)
+      cappedRewardFeatureTestCase(fullBlockReward, None, Some(_ => 0L), blockRewardDistributionActivated = false)
 
       // both addresses not defined
       cappedRewardFeatureTestCase(fullBlockReward, None, None, blockRewardDistributionActivated = false)
