@@ -952,7 +952,7 @@ abstract class LevelDBWriter private[database] (
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
-        val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height + 1)
+        val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
         settings.rewardsSettings
           .votingWindow(activatedAt, height, modifyTerm)
           .flatMap { h =>

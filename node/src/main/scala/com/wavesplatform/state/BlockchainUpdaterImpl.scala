@@ -162,7 +162,7 @@ class BlockchainUpdaterImpl(
         .flatMap { activatedAt =>
           val mayBeReward     = lastBlockReward
           val mayBeTimeToVote = nextHeight - activatedAt
-          val modifiedTerm = if (leveldb.isFeatureActivated(BlockchainFeatures.CappedReward, nextHeight)) {
+          val modifiedTerm = if (leveldb.isFeatureActivated(BlockchainFeatures.CappedReward, this.height)) {
             settings.termAfterCappedRewardFeature
           } else {
             settings.term
@@ -582,7 +582,7 @@ class BlockchainUpdaterImpl(
           case None => leveldb.blockRewardVotes(height)
           case Some(ng) =>
             val innerVotes = leveldb.blockRewardVotes(height)
-            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height + 1)
+            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
             if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height, modifyTerm).contains(height))
               innerVotes :+ ng.base.header.rewardVote
             else innerVotes

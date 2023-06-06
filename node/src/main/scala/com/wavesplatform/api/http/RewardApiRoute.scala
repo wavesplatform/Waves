@@ -38,12 +38,16 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
       votingIntervalStart = nextCheck - rewardsSettings.votingInterval + 1
       votingThreshold     = rewardsSettings.votingInterval / 2 + 1
       votes               = blockchain.blockRewardVotes(height).filter(_ >= 0)
+      term =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward, height))
+          rewardsSettings.termAfterCappedRewardFeature
+        else rewardsSettings.term
     } yield RewardStatus(
       height,
       amount,
       reward,
       rewardsSettings.minIncrement,
-      rewardsSettings.term,
+      term,
       nextCheck,
       votingIntervalStart,
       rewardsSettings.votingInterval,
