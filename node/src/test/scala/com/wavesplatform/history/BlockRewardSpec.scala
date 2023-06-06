@@ -753,7 +753,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
   }
 
-  s"NODE-815. Xtn buyback and dao addresses should get 2 WAVES when full block reward >= 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
+  s"NODE-815. XTN buyback and dao addresses should get 2 WAVES when full block reward >= 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
     Seq(6.waves, 7.waves).foreach { fullBlockReward =>
       cappedRewardFeatureTestCase(
         fullBlockReward,
@@ -763,7 +763,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
   }
 
-  s"NODE-816. Xtn buyback and dao addresses should get max((R - 2)/2, 0) WAVES when full block reward < 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
+  s"NODE-816. XTN buyback and dao addresses should get max((R - 2)/2, 0) WAVES when full block reward < 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
     Seq(1.waves, 2.waves, 3.waves).foreach { fullBlockReward =>
       cappedRewardFeatureTestCase(
         fullBlockReward,
@@ -773,7 +773,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
   }
 
-  s"NODE-817. Single xtn buyback or dao address should get 2 WAVES when full block reward >= 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
+  s"NODE-817. Single XTN buyback or dao address should get 2 WAVES when full block reward >= 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
     Seq(6.waves, 7.waves).foreach { fullBlockReward =>
       // only daoAddress defined
       cappedRewardFeatureTestCase(
@@ -791,7 +791,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
   }
 
-  s"NODE-818. Single xtn buyback or dao address should get max((R - 2)/2, 0) WAVES when full block reward < 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
+  s"NODE-818. Single XTN buyback or dao address should get max((R - 2)/2, 0) WAVES when full block reward < 6 WAVES after ${BlockchainFeatures.CappedReward} activation" in {
     Seq(1.waves, 2.waves, 3.waves).foreach { fullBlockReward =>
       // only daoAddress defined
       cappedRewardFeatureTestCase(
@@ -815,15 +815,212 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
   }
 
+  s"NODE-821. Miner should get full block reward after ${BlockchainFeatures.CappedReward} activation if ${BlockchainFeatures.BlockRewardDistribution} is not activated" in {
+    Seq(1.waves, 2.waves, 3.waves, 6.waves, 7.waves).foreach { fullBlockReward =>
+      // both addresses defined
+      cappedRewardFeatureTestCase(fullBlockReward, Some(_ => 0L), Some(_ => 0L), blockRewardDistributionActivated = false)
+
+      // only daoAddress defined
+      cappedRewardFeatureTestCase(fullBlockReward, Some(_ => 0L), None, blockRewardDistributionActivated = false)
+
+      // only xtnBuybackAddress defined
+      cappedRewardFeatureTestCase(fullBlockReward, Some(_ => 0L), None, blockRewardDistributionActivated = false)
+
+      // both addresses not defined
+      cappedRewardFeatureTestCase(fullBlockReward, None, None, blockRewardDistributionActivated = false)
+    }
+  }
+
+  s"NODE-822. termAfterCappedRewardFeature option should be used instead of term option after ${BlockchainFeatures.CappedReward} activation" in {
+    val votingInterval               = 1
+    val term                         = 10
+    val termAfterCappedRewardFeature = 5
+
+    Seq(6 -> true, 7 -> false, 11 -> true).foreach { case (cappedRewardActivationHeight, rewardChanged) =>
+      val settings = BlockRewardDistributionSettings
+        .copy(blockchainSettings =
+          BlockRewardDistributionSettings.blockchainSettings.copy(
+            functionalitySettings = BlockRewardDistributionSettings.blockchainSettings.functionalitySettings
+              .copy(daoAddress = None, xtnBuybackAddress = None),
+            rewardsSettings = BlockRewardDistributionSettings.blockchainSettings.rewardsSettings
+              .copy(votingInterval = votingInterval, term = term, termAfterCappedRewardFeature = termAfterCappedRewardFeature)
+          )
+        )
+        .setFeaturesHeight(BlockchainFeatures.CappedReward -> cappedRewardActivationHeight, BlockchainFeatures.BlockReward -> 1)
+
+      withDomain(settings) { d =>
+        val initReward  = d.settings.blockchainSettings.rewardsSettings.initial
+        val rewardDelta = d.settings.blockchainSettings.rewardsSettings.minIncrement
+        val miner       = d.appendBlock().sender.toAddress
+        (1 until cappedRewardActivationHeight - 1).foreach { _ =>
+          val prevMinerBalance = d.balance(miner)
+
+          d.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, rewardVote = initReward - 1))
+
+          d.balance(miner) shouldBe prevMinerBalance + initReward
+        }
+
+        val prevMinerBalance = d.balance(miner)
+        val newReward        = if (rewardChanged) initReward - rewardDelta else initReward
+
+        d.appendBlock()
+
+        d.balance(miner) shouldBe prevMinerBalance + newReward
+      }
+    }
+  }
+
+  s"NODE-825, NODE-828, NODE-841. XTN buyback reward should be cancelled when ${BlockchainFeatures.CeaseXtnBuyback} activated after xtnBuybackRewardPeriod blocks starting from ${BlockchainFeatures.BlockRewardDistribution} activation height (full reward >= 6 WAVES)" in {
+    Seq(6.waves, 7.waves).foreach { fullBlockReward =>
+      // daoAddress is defined
+      ceaseXtnBuybackFeatureTestCase(
+        fullBlockReward,
+        Some(_ => BlockRewardCalculator.MaxAddressReward),
+        Some(_ => BlockRewardCalculator.MaxAddressReward)
+      )
+
+      // daoAddress not defined
+      ceaseXtnBuybackFeatureTestCase(
+        fullBlockReward,
+        None,
+        Some(_ => BlockRewardCalculator.MaxAddressReward)
+      )
+    }
+  }
+
+  s"NODE-826, NODE-828, NODE-841. XTN buyback reward should be cancelled when ${BlockchainFeatures.CeaseXtnBuyback} activated after xtnBuybackRewardPeriod blocks starting from ${BlockchainFeatures.BlockRewardDistribution} activation height (full reward < 6 WAVES)" in {
+    Seq(1.waves, 2.waves, 3.waves).foreach { fullBlockReward =>
+      // daoAddress is defined
+      ceaseXtnBuybackFeatureTestCase(
+        fullBlockReward,
+        Some(r => Math.max((r - BlockRewardCalculator.GuaranteedMinerReward) / 2, 0)),
+        Some(r => Math.max((r - BlockRewardCalculator.GuaranteedMinerReward) / 2, 0))
+      )
+
+      // daoAddress not defined
+      ceaseXtnBuybackFeatureTestCase(
+        fullBlockReward,
+        None,
+        Some(r => Math.max((r - BlockRewardCalculator.GuaranteedMinerReward) / 2, 0))
+      )
+    }
+  }
+
+  s"NODE-829. Miner should get full block reward if daoAddress and xtnBuybackAddress are not defined after ${BlockchainFeatures.CeaseXtnBuyback} activation" in {
+    Seq(1.waves, 2.waves, 3.waves, 6.waves, 7.waves).foreach { fullBlockReward =>
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, None, None)
+    }
+  }
+
+  s"NODE-830. Block reward distribution should not change after ${BlockchainFeatures.CeaseXtnBuyback} activation if ${BlockchainFeatures.CappedReward}/${BlockchainFeatures.CappedReward} and ${BlockchainFeatures.BlockRewardDistribution} not activated" in {
+    Seq(1.waves, 2.waves, 3.waves, 6.waves, 7.waves).foreach { fullBlockReward =>
+      // both addresses defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, Some(r => r / 3), Some(r => r / 3), cappedRewardActivated = false)
+
+      // only xtnBuybackAddress defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, None, Some(r => r / 3), cappedRewardActivated = false)
+
+      // only daoAddress defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, Some(r => r / 3), None, cappedRewardActivated = false)
+
+      // both addresses not defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, None, None, cappedRewardActivated = false)
+
+      // both addresses defined
+      ceaseXtnBuybackFeatureTestCase(
+        fullBlockReward,
+        Some(_ => 0),
+        Some(_ => 0),
+        blockRewardDistributionActivated = false,
+        cappedRewardActivated = false
+      )
+
+      // only xtnBuybackAddress defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, None, Some(_ => 0), blockRewardDistributionActivated = false, cappedRewardActivated = false)
+
+      // only daoAddress defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, Some(_ => 0), None, blockRewardDistributionActivated = false, cappedRewardActivated = false)
+
+      // both addresses not defined
+      ceaseXtnBuybackFeatureTestCase(fullBlockReward, None, None, blockRewardDistributionActivated = false, cappedRewardActivated = false)
+    }
+  }
+
+  private def ceaseXtnBuybackFeatureTestCase(
+      fullBlockReward: Long,
+      daoAddressRewardF: Option[Long => Long],
+      xtnBuybackAddressRewardF: Option[Long => Long],
+      blockRewardDistributionActivated: Boolean = true,
+      cappedRewardActivated: Boolean = true
+  ): Unit = {
+    val daoAddress        = TxHelpers.address(1)
+    val xtnBuybackAddress = TxHelpers.address(2)
+
+    val settings                                = DomainPresets.ConsensusImprovements
+    val maybeBlockRewardDistributionHeight      = 1
+    val blockRewardDistributionActivationHeight = if (blockRewardDistributionActivated) maybeBlockRewardDistributionHeight else Int.MaxValue - 100
+    val cappedRewardActivationHeight            = if (cappedRewardActivated) maybeBlockRewardDistributionHeight else Int.MaxValue - 100
+    val xtnBuybackRewardPeriod                  = 5
+
+    // feature activation before, at and after last block with XTN buyback address reward
+    (xtnBuybackRewardPeriod - maybeBlockRewardDistributionHeight - 1 to xtnBuybackRewardPeriod - maybeBlockRewardDistributionHeight + 3)
+      .foreach { ceaseXtnBuybackActivationHeight =>
+        val modifiedRewardSettings = settings
+          .copy(blockchainSettings =
+            settings.blockchainSettings.copy(
+              rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = fullBlockReward),
+              functionalitySettings = settings.blockchainSettings.functionalitySettings
+                .copy(
+                  daoAddress = Some(daoAddress.toString).filter(_ => daoAddressRewardF.isDefined),
+                  xtnBuybackAddress = Some(xtnBuybackAddress.toString).filter(_ => xtnBuybackAddressRewardF.isDefined),
+                  xtnBuybackRewardPeriod = xtnBuybackRewardPeriod
+                )
+            )
+          )
+          .setFeaturesHeight(
+            BlockchainFeatures.BlockRewardDistribution -> blockRewardDistributionActivationHeight,
+            BlockchainFeatures.CappedReward            -> cappedRewardActivationHeight,
+            BlockchainFeatures.CeaseXtnBuyback         -> ceaseXtnBuybackActivationHeight
+          )
+
+        withDomain(modifiedRewardSettings) { d =>
+          val firstBlock = d.appendBlock()
+          val miner      = firstBlock.sender.toAddress
+
+          (1 to maybeBlockRewardDistributionHeight + xtnBuybackRewardPeriod + 1).foreach { idx =>
+            val prevMinerBalance             = d.balance(miner)
+            val prevDaoAddressBalance        = d.balance(daoAddress)
+            val prevXtnBuybackAddressBalance = d.balance(xtnBuybackAddress)
+
+            d.appendBlock()
+
+            val daoAddressReward        = d.balance(daoAddress) - prevDaoAddressBalance
+            val xtnBuybackAddressReward = d.balance(xtnBuybackAddress) - prevXtnBuybackAddressBalance
+
+            daoAddressReward shouldBe daoAddressRewardF.map(_.apply(fullBlockReward)).getOrElse(0L)
+            val expectedXtnBuybackAddressReward =
+              if (ceaseXtnBuybackActivationHeight <= idx + 1 && blockRewardDistributionActivationHeight + xtnBuybackRewardPeriod <= idx + 1) 0
+              else xtnBuybackAddressRewardF.map(_.apply(fullBlockReward)).getOrElse(0L)
+            xtnBuybackAddressReward shouldBe expectedXtnBuybackAddressReward
+            d.balance(
+              miner
+            ) - prevMinerBalance shouldBe d.settings.blockchainSettings.rewardsSettings.initial - daoAddressReward - xtnBuybackAddressReward
+          }
+        }
+      }
+  }
+
   private def cappedRewardFeatureTestCase(
       fullBlockReward: Long,
       daoAddressRewardF: Option[Long => Long],
-      xtnBuybackAddressRewardF: Option[Long => Long]
+      xtnBuybackAddressRewardF: Option[Long => Long],
+      blockRewardDistributionActivated: Boolean = true
   ) = {
     val daoAddress        = TxHelpers.address(1)
     val xtnBuybackAddress = TxHelpers.address(2)
 
-    val settings = DomainPresets.BlockRewardDistribution
+    val settings                      = DomainPresets.ConsensusImprovements
+    val blockRewardDistributionHeight = if (blockRewardDistributionActivated) 0 else Int.MaxValue
     val modifiedRewardSettings = settings
       .copy(blockchainSettings =
         settings.blockchainSettings.copy(
@@ -835,7 +1032,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
             )
         )
       )
-      .setFeaturesHeight(BlockchainFeatures.CappedReward -> 3)
+      .setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> blockRewardDistributionHeight, BlockchainFeatures.CappedReward -> 3)
 
     withDomain(modifiedRewardSettings) { d =>
       val firstBlock = d.appendBlock()
@@ -851,8 +1048,8 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       val prevXtnBuybackAddressBalance = d.balance(xtnBuybackAddress)
       val prevMinerBalance             = d.balance(miner)
 
-      prevDaoAddressBalance shouldBe (if (daoAddressRewardF.isDefined) fullBlockReward / 3 else 0L)
-      prevXtnBuybackAddressBalance shouldBe (if (xtnBuybackAddressRewardF.isDefined) fullBlockReward / 3 else 0L)
+      prevDaoAddressBalance shouldBe (if (daoAddressRewardF.isDefined && blockRewardDistributionActivated) fullBlockReward / 3 else 0L)
+      prevXtnBuybackAddressBalance shouldBe (if (xtnBuybackAddressRewardF.isDefined && blockRewardDistributionActivated) fullBlockReward / 3 else 0L)
       prevMinerBalance shouldBe fullBlockReward - prevDaoAddressBalance - prevXtnBuybackAddressBalance
 
       d.appendBlock()
