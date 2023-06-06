@@ -230,6 +230,17 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
+  def checkEthereumInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction, publicKeyHash: Array[Byte])(
+      implicit pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.InvokeScript(value) =>
+        value.dApp.get.getPublicKeyHash.toByteArray shouldBe publicKeyHash
+      case _ => fail("not a InvokeScript transaction")
+    }
+  }
+
   def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction)(implicit
       pos: Position
   ): Unit = {
@@ -238,6 +249,16 @@ object WavesTxChecks extends Matchers with OptionValues {
     actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
     invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
     invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
+  }
+
+  def checkEthereumInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: EthereumTransaction)(implicit
+                                                                                                              pos: Position
+  ): Unit = {
+    val invokeScript = actual.head.getInvokeScript
+
+    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress
+/*    invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
+    invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName*/
   }
 
   def checkArguments(expectedValues: List[Any], actualArguments: List[Any]): Unit = {

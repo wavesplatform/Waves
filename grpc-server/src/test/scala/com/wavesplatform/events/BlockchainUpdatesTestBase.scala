@@ -66,7 +66,10 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
   val customAssetIssueFee                        = 234567654L
   val firstTxParticipant: SeedKeyPair            = TxHelpers.signer(2)
   val firstTxParticipantAddress: Address         = firstTxParticipant.toAddress
-  val firstTxParticipantEthereum: Bip32ECKeyPair = firstTxParticipant.toEthKeyPair
+  val ethKeyPairExt: EthereumKeyPairExt          = EthereumKeyPairExt(firstTxParticipant)
+  val firstTxParticipantEthereum: Bip32ECKeyPair = ethKeyPairExt.toEthKeyPair
+  val firstTxParticipantEthereumAddress: Address = ethKeyPairExt.toEthWavesAddress
+  val ethKeyPair: SeedKeyPair                    = SeedKeyPair.apply(firstTxParticipantEthereum.getPrivateKeyBytes33)
   val firstTxParticipantBalanceBefore: Long      = 20.waves
   val secondTxParticipant: SeedKeyPair           = TxHelpers.signer(3)
   val secondTxParticipantAddress: Address        = secondTxParticipant.toAddress
