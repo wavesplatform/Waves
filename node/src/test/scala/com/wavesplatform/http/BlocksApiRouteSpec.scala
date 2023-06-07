@@ -1,12 +1,13 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.{BlocksApiRoute, RouteTimeout}
+import com.wavesplatform.api.http.{BlocksApiRoute, CustomJson, RouteTimeout}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -411,31 +412,60 @@ class BlocksApiRouteSpec
         5 -> Map(miner.toString -> minerReward5, daoAddress.toString -> configAddrReward5)
       )
 
-      heightToResult.foreach { case (h, expectedResult) =>
-        checkRewardSharesBlock(route, s"/at/$h", expectedResult)
-        checkRewardSharesBlock(route, s"/headers/at/$h", expectedResult)
-        checkRewardSharesBlock(route, s"/headers/${heightToBlock(h).id()}", expectedResult)
-        checkRewardSharesBlock(route, s"/${heightToBlock(h).id()}", expectedResult)
+      Seq(true, false).foreach { lsf =>
+        heightToResult.foreach { case (h, expectedResult) =>
+          checkRewardSharesBlock(route, s"/at/$h", expectedResult, lsf)
+          checkRewardSharesBlock(route, s"/headers/at/$h", expectedResult, lsf)
+          checkRewardSharesBlock(route, s"/headers/${heightToBlock(h).id()}", expectedResult, lsf)
+          checkRewardSharesBlock(route, s"/${heightToBlock(h).id()}", expectedResult, lsf)
+        }
+        checkRewardSharesBlockSeq(route, "/seq", 2, 5, heightToResult, lsf)
+        checkRewardSharesBlockSeq(route, "/headers/seq", 2, 5, heightToResult, lsf)
+        checkRewardSharesBlockSeq(route, s"/address/${miner.toString}", 2, 5, heightToResult, lsf)
       }
-      checkRewardSharesBlockSeq(route, "/seq", 2, 5, heightToResult)
-      checkRewardSharesBlockSeq(route, "/headers/seq", 2, 5, heightToResult)
-      checkRewardSharesBlockSeq(route, s"/address/${miner.toString}", 2, 5, heightToResult)
     }
   }
 
-  private def checkRewardSharesBlock(route: Route, path: String, expected: Map[String, Long]) = {
-    Get(routePath(path)) ~> route ~> check {
-      (responseAs[JsObject] \ "rewardShares").as[JsObject].value.view.mapValues(_.as[Long]).toMap shouldBe expected
+  private def checkRewardSharesBlock(route: Route, path: String, expected: Map[String, Long], largeSignificandFormat: Boolean) = {
+    val maybeWithLsf =
+      if (largeSignificandFormat)
+        Get(routePath(path)) ~> Accept(CustomJson.jsonWithNumbersAsStrings)
+      else Get(routePath(path))
+
+    maybeWithLsf ~> route ~> check {
+      (responseAs[JsObject] \ "rewardShares")
+        .as[JsObject]
+        .value
+        .view
+        .mapValues { rewardJson => if (largeSignificandFormat) rewardJson.as[String].toLong else rewardJson.as[Long] }
+        .toMap shouldBe expected
     }
   }
 
-  private def checkRewardSharesBlockSeq(route: Route, prefix: String, start: Int, end: Int, heightToResult: Map[Int, Map[String, Long]]) =
-    Get(routePath(s"$prefix/$start/$end")) ~> route ~> check {
+  private def checkRewardSharesBlockSeq(
+      route: Route,
+      prefix: String,
+      start: Int,
+      end: Int,
+      heightToResult: Map[Int, Map[String, Long]],
+      largeSignificandFormat: Boolean
+  ) = {
+    val maybeWithLsf =
+      if (largeSignificandFormat)
+        Get(routePath(s"$prefix/$start/$end")) ~> Accept(CustomJson.jsonWithNumbersAsStrings)
+      else Get(routePath(s"$prefix/$start/$end"))
+    maybeWithLsf ~> route ~> check {
       responseAs[Seq[JsObject]]
         .zip(start to end)
         .map { case (obj, h) =>
-          h -> (obj \ "rewardShares").as[JsObject].value.view.mapValues(_.as[Long]).toMap
+          h -> (obj \ "rewardShares")
+            .as[JsObject]
+            .value
+            .view
+            .mapValues { rewardJson => if (largeSignificandFormat) rewardJson.as[String].toLong else rewardJson.as[Long] }
+            .toMap
         }
         .toMap shouldBe heightToResult
     }
+  }
 }
