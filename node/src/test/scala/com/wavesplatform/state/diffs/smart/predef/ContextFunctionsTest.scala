@@ -573,7 +573,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
         ConsensusImprovements.blockchainSettings.copy(
           functionalitySettings = ConsensusImprovements.blockchainSettings.functionalitySettings
             .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString)),
-          rewardsSettings = ConsensusImprovements.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1)
+          rewardsSettings = ConsensusImprovements.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
         )
       )
       .setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 3, BlockchainFeatures.CappedReward -> 5)

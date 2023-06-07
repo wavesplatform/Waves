@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -10,8 +11,11 @@ import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
+import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import monix.reactive.Observable
@@ -358,4 +362,80 @@ class BlocksApiRouteSpec
       }
     }
   }
+
+  "Block meta response should contain correct rewardShares field" in {
+    val daoAddress        = TxHelpers.address(3)
+    val xtnBuybackAddress = TxHelpers.address(4)
+
+    val settings = DomainPresets.ConsensusImprovements
+    val settingsWithFeatures = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 1),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 3,
+        BlockchainFeatures.CappedReward            -> 4,
+        BlockchainFeatures.CeaseXtnBuyback         -> 5
+      )
+
+    withDomain(settingsWithFeatures) { d =>
+      val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler)).route
+
+      val miner                       = d.appendBlock().sender.toAddress
+      val blockBeforeBlockRewardDistr = d.appendBlock()
+      val heightToBlock = (3 to 5).map { h =>
+        h -> d.appendBlock()
+      }.toMap ++ Map(2 -> blockBeforeBlockRewardDistr)
+      d.appendBlock()
+
+      // BlockRewardDistribution activated
+      val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+      val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+      // CappedReward activated
+      val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+      val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+      // CeaseXTNBuyback activated with expired XTN buyback reward period
+      val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+      val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+      val heightToResult = Map(
+        2 -> Map(miner.toString -> d.blockchain.settings.rewardsSettings.initial),
+        3 -> Map(miner.toString -> minerReward3, daoAddress.toString -> configAddrReward3, xtnBuybackAddress.toString -> configAddrReward3),
+        4 -> Map(miner.toString -> minerReward4, daoAddress.toString -> configAddrReward4, xtnBuybackAddress.toString -> configAddrReward4),
+        5 -> Map(miner.toString -> minerReward5, daoAddress.toString -> configAddrReward5)
+      )
+
+      heightToResult.foreach { case (h, expectedResult) =>
+        checkRewardSharesBlock(route, s"/at/$h", expectedResult)
+        checkRewardSharesBlock(route, s"/headers/at/$h", expectedResult)
+        checkRewardSharesBlock(route, s"/headers/${heightToBlock(h).id()}", expectedResult)
+        checkRewardSharesBlock(route, s"/${heightToBlock(h).id()}", expectedResult)
+      }
+      checkRewardSharesBlockSeq(route, "/seq", 2, 5, heightToResult)
+      checkRewardSharesBlockSeq(route, "/headers/seq", 2, 5, heightToResult)
+      checkRewardSharesBlockSeq(route, s"/address/${miner.toString}", 2, 5, heightToResult)
+    }
+  }
+
+  private def checkRewardSharesBlock(route: Route, path: String, expected: Map[String, Long]) = {
+    Get(routePath(path)) ~> route ~> check {
+      (responseAs[JsObject] \ "rewardShares").as[JsObject].value.view.mapValues(_.as[Long]).toMap shouldBe expected
+    }
+  }
+
+  private def checkRewardSharesBlockSeq(route: Route, prefix: String, start: Int, end: Int, heightToResult: Map[Int, Map[String, Long]]) =
+    Get(routePath(s"$prefix/$start/$end")) ~> route ~> check {
+      responseAs[Seq[JsObject]]
+        .zip(start to end)
+        .map { case (obj, h) =>
+          h -> (obj \ "rewardShares").as[JsObject].value.view.mapValues(_.as[Long]).toMap
+        }
+        .toMap shouldBe heightToResult
+    }
 }

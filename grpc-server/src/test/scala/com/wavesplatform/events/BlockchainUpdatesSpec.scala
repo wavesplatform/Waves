@@ -1083,7 +1083,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         settings.blockchainSettings.copy(
           functionalitySettings = settings.blockchainSettings.functionalitySettings
             .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 1),
-          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1)
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
         )
       )
       .setFeaturesHeight(

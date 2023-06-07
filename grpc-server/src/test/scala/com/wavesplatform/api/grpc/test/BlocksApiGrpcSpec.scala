@@ -13,7 +13,7 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.BlockRewardCalculator
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
@@ -225,7 +225,7 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
         settings.blockchainSettings.copy(
           functionalitySettings = settings.blockchainSettings.functionalitySettings
             .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 1),
-          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1)
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
         )
       )
       .setFeaturesHeight(
