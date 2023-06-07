@@ -386,12 +386,7 @@ class BlocksApiRouteSpec
     withDomain(settingsWithFeatures) { d =>
       val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler)).route
 
-      val miner                       = d.appendBlock().sender.toAddress
-      val blockBeforeBlockRewardDistr = d.appendBlock()
-      val heightToBlock = (3 to 5).map { h =>
-        h -> d.appendBlock()
-      }.toMap ++ Map(2 -> blockBeforeBlockRewardDistr)
-      d.appendBlock()
+      val miner = d.appendBlock().sender.toAddress
 
       // BlockRewardDistribution activated
       val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
@@ -411,6 +406,18 @@ class BlocksApiRouteSpec
         4 -> Map(miner.toString -> minerReward4, daoAddress.toString -> configAddrReward4, xtnBuybackAddress.toString -> configAddrReward4),
         5 -> Map(miner.toString -> minerReward5, daoAddress.toString -> configAddrReward5)
       )
+
+      val heightToBlock = (2 to 5).map { h =>
+        val block = d.appendBlock()
+
+        Seq(true, false).foreach { lsf =>
+          checkRewardSharesBlock(route, "/last", heightToResult(h), lsf)
+          checkRewardSharesBlock(route, "/headers/last", heightToResult(h), lsf)
+        }
+
+        h -> block
+      }.toMap
+      d.appendBlock()
 
       Seq(true, false).foreach { lsf =>
         heightToResult.foreach { case (h, expectedResult) =>
