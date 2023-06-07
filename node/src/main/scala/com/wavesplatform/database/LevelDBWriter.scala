@@ -400,7 +400,13 @@ abstract class LevelDBWriter private[database] (
       rw.put(
         Keys.blockMetaAt(Height(height)),
         Some(
-          BlockMeta.fromBlock(block, height, totalFee, reward, if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None)
+          BlockMeta.fromBlock(
+            block,
+            height,
+            totalFee,
+            reward,
+            if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None
+          )
         )
       )
       rw.put(Keys.heightOf(block.id()), Some(height))
@@ -553,8 +559,6 @@ abstract class LevelDBWriter private[database] (
 
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
-
-      rw.put(Keys.blockTransactionsFee(height), totalFee)
 
       if (dbSettings.storeInvokeScriptResults) scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactions
@@ -737,7 +741,6 @@ abstract class LevelDBWriter private[database] (
           rw.delete(Keys.changedAddresses(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
           rw.delete(Keys.carryFee(currentHeight))
-          rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
@@ -949,8 +952,9 @@ abstract class LevelDBWriter private[database] (
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
+        val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
         settings.rewardsSettings
-          .votingWindow(activatedAt, height)
+          .votingWindow(activatedAt, height, modifyTerm)
           .flatMap { h =>
             db.get(Keys.blockMetaAt(Height(h)))
               .map(_.header.rewardVote)
