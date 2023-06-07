@@ -47,7 +47,7 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
     )
     .setFeaturesHeight(BlockchainFeatures.BlockReward -> blockRewardActivationHeight, BlockchainFeatures.CappedReward -> 3)
 
-  routePath("/rewards") in {
+  routePath("/rewards (NODE-855)") in {
     checkWithSettings(settingsWithoutAddresses)
     checkWithSettings(settingsWithOnlyDaoAddress)
     checkWithSettings(settingsWithOnlyXtnBuybackAddress)
@@ -82,7 +82,7 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
     }
   }
 
-  routePath("/rewards/{height}") in {
+  routePath("/rewards/{height} (NODE-856)") in {
     checkWithSettings(settingsWithoutAddresses, Some(1))
     checkWithSettings(settingsWithOnlyDaoAddress, Some(1))
     checkWithSettings(settingsWithOnlyXtnBuybackAddress, Some(1))

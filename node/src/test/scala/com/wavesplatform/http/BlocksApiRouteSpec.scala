@@ -364,7 +364,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  "Block meta response should contain correct rewardShares field" in {
+  "NODE-857. Block meta response should contain correct rewardShares field" in {
     val daoAddress        = TxHelpers.address(3)
     val xtnBuybackAddress = TxHelpers.address(4)
 
