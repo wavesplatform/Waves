@@ -951,6 +951,297 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     }
   }
 
+  s"NODE-858. Rollback on height before ${BlockchainFeatures.BlockRewardDistribution} activation should be correct" in {
+    val daoAddress        = TxHelpers.address(1)
+    val xtnBuybackAddress = TxHelpers.address(2)
+    val settings          = DomainPresets.ConsensusImprovements
+    val rewardSettings = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString)),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 4
+      )
+
+    withDomain(rewardSettings) { d =>
+      val fullReward = d.blockchain.settings.rewardsSettings.initial
+
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock() // rollback height
+      val prevDaoAddressBalance = d.balance(daoAddress)
+      val prevXtnBuybackAddress = d.balance(xtnBuybackAddress)
+      val prevMinerBalance      = d.balance(miner)
+
+      prevDaoAddressBalance shouldBe 0
+      prevXtnBuybackAddress shouldBe 0
+      prevMinerBalance shouldBe fullReward
+
+      d.appendBlock()
+      d.appendBlock() // block reward distribution activation height
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + 2 * (fullReward / 3)
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + 2 * (fullReward / 3)
+      d.balance(miner) shouldBe prevMinerBalance + fullReward + 2 * (fullReward - 2 * (fullReward / 3))
+
+      d.appendBlock()
+      d.rollbackTo(2)
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress
+      d.balance(miner) shouldBe prevMinerBalance
+
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress
+      d.balance(miner) shouldBe prevMinerBalance + fullReward
+
+      d.appendBlock() // block reward distribution activation height
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + fullReward / 3
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + fullReward / 3
+      d.balance(miner) shouldBe prevMinerBalance + fullReward + fullReward - 2 * (fullReward / 3)
+    }
+  }
+
+  s"NODE-859. Rollback on height after ${BlockchainFeatures.BlockRewardDistribution} activation should be correct" in {
+    val daoAddress        = TxHelpers.address(1)
+    val xtnBuybackAddress = TxHelpers.address(2)
+    val settings          = DomainPresets.ConsensusImprovements
+    val rewardSettings = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString)),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 2
+      )
+
+    withDomain(rewardSettings) { d =>
+      val fullReward = d.blockchain.settings.rewardsSettings.initial
+
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock() // block reward distribution activation height
+      d.appendBlock() // rollback height
+
+      val prevDaoAddressBalance = d.balance(daoAddress)
+      val prevXtnBuybackAddress = d.balance(xtnBuybackAddress)
+      val prevMinerBalance      = d.balance(miner)
+
+      prevDaoAddressBalance shouldBe 2 * fullReward / 3
+      prevXtnBuybackAddress shouldBe 2 * fullReward / 3
+      prevMinerBalance shouldBe 2 * (fullReward - (2 * fullReward / 3))
+
+      d.appendBlock()
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + 2 * (fullReward / 3)
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + 2 * (fullReward / 3)
+      d.balance(miner) shouldBe prevMinerBalance + 2 * (fullReward - 2 * (fullReward / 3))
+
+      d.appendBlock()
+      d.rollbackTo(3)
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress
+      d.balance(miner) shouldBe prevMinerBalance
+
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + fullReward / 3
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + fullReward / 3
+      d.balance(miner) shouldBe prevMinerBalance + fullReward - 2 * (fullReward / 3)
+    }
+  }
+
+  s"NODE-860. Rollback on height before ${BlockchainFeatures.CappedReward} activation should be correct" in {
+    val daoAddress        = TxHelpers.address(1)
+    val xtnBuybackAddress = TxHelpers.address(2)
+    val settings          = DomainPresets.ConsensusImprovements
+    val rewardSettings = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString)),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 2,
+        BlockchainFeatures.CappedReward            -> 5
+      )
+
+    withDomain(rewardSettings) { d =>
+      val fullReward = d.blockchain.settings.rewardsSettings.initial
+
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock() // block reward distribution activation height
+      d.appendBlock() // rollback height
+
+      val prevDaoAddressBalance = d.balance(daoAddress)
+      val prevXtnBuybackAddress = d.balance(xtnBuybackAddress)
+      val prevMinerBalance      = d.balance(miner)
+
+      prevDaoAddressBalance shouldBe 2 * fullReward / 3
+      prevXtnBuybackAddress shouldBe 2 * fullReward / 3
+      prevMinerBalance shouldBe 2 * (fullReward - (2 * fullReward / 3))
+
+      d.appendBlock()
+      d.appendBlock() // capped reward activation height
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + fullReward / 3 + 2 * BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + fullReward / 3 + 2 * BlockRewardCalculator.MaxAddressReward
+      d.balance(miner) shouldBe prevMinerBalance + fullReward - 2 * (fullReward / 3) + 2 * (fullReward - 2 * BlockRewardCalculator.MaxAddressReward)
+
+      d.appendBlock()
+      d.rollbackTo(3)
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress
+      d.balance(miner) shouldBe prevMinerBalance
+
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + fullReward / 3
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + fullReward / 3
+      d.balance(miner) shouldBe prevMinerBalance + fullReward - 2 * (fullReward / 3)
+
+      d.appendBlock() // capped reward activation height
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + fullReward / 3 + BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + fullReward / 3 + BlockRewardCalculator.MaxAddressReward
+      d.balance(miner) shouldBe prevMinerBalance + fullReward - 2 * (fullReward / 3) + fullReward - 2 * BlockRewardCalculator.MaxAddressReward
+    }
+  }
+
+  s"NODE-861. Rollback on height after ${BlockchainFeatures.CappedReward} activation should be correct" in {
+    val daoAddress        = TxHelpers.address(1)
+    val xtnBuybackAddress = TxHelpers.address(2)
+    val settings          = DomainPresets.ConsensusImprovements
+    val rewardSettings = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString)),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 2,
+        BlockchainFeatures.CappedReward            -> 2
+      )
+
+    withDomain(rewardSettings) { d =>
+      val fullReward = d.blockchain.settings.rewardsSettings.initial
+
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock() // block reward distribution and capped reward activation height
+      d.appendBlock() // rollback height
+
+      val prevDaoAddressBalance = d.balance(daoAddress)
+      val prevXtnBuybackAddress = d.balance(xtnBuybackAddress)
+      val prevMinerBalance      = d.balance(miner)
+
+      prevDaoAddressBalance shouldBe 2 * BlockRewardCalculator.MaxAddressReward
+      prevXtnBuybackAddress shouldBe 2 * BlockRewardCalculator.MaxAddressReward
+      prevMinerBalance shouldBe 2 * (fullReward - 2 * BlockRewardCalculator.MaxAddressReward)
+
+      d.appendBlock()
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + 2 * BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + 2 * BlockRewardCalculator.MaxAddressReward
+      d.balance(miner) shouldBe prevMinerBalance + 2 * (fullReward - 2 * BlockRewardCalculator.MaxAddressReward)
+
+      d.appendBlock()
+      d.rollbackTo(3)
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress
+      d.balance(miner) shouldBe prevMinerBalance
+
+      d.appendBlock()
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + BlockRewardCalculator.MaxAddressReward
+      d.balance(miner) shouldBe prevMinerBalance + fullReward - 2 * BlockRewardCalculator.MaxAddressReward
+    }
+  }
+
+  s"NODE-862. Rollback on height before ${BlockchainFeatures.CeaseXtnBuyback} activation should be correct" in {
+    val daoAddress        = TxHelpers.address(1)
+    val xtnBuybackAddress = TxHelpers.address(2)
+    val settings          = DomainPresets.ConsensusImprovements
+    val rewardSettings = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 3),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 2,
+        BlockchainFeatures.CappedReward            -> 2,
+        BlockchainFeatures.CeaseXtnBuyback         -> 5
+      )
+
+    withDomain(rewardSettings) { d =>
+      val fullReward = d.blockchain.settings.rewardsSettings.initial
+
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock() // block reward distribution and capped reward activation height
+      d.appendBlock() // rollback height
+
+      val prevDaoAddressBalance = d.balance(daoAddress)
+      val prevXtnBuybackAddress = d.balance(xtnBuybackAddress)
+      val prevMinerBalance      = d.balance(miner)
+
+      prevDaoAddressBalance shouldBe 2 * BlockRewardCalculator.MaxAddressReward
+      prevXtnBuybackAddress shouldBe 2 * BlockRewardCalculator.MaxAddressReward
+      prevMinerBalance shouldBe 2 * (fullReward - 2 * BlockRewardCalculator.MaxAddressReward)
+
+      d.appendBlock() // last block of XTN buyback reward period
+      d.appendBlock() // cease XTN buyback activation height
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + 2 * BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + BlockRewardCalculator.MaxAddressReward
+      d.balance(
+        miner
+      ) shouldBe prevMinerBalance + fullReward - 2 * BlockRewardCalculator.MaxAddressReward + fullReward - BlockRewardCalculator.MaxAddressReward
+
+      d.appendBlock()
+      d.rollbackTo(3)
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress
+      d.balance(miner) shouldBe prevMinerBalance
+
+      d.appendBlock() // last block of XTN buyback reward period
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + BlockRewardCalculator.MaxAddressReward
+      d.balance(miner) shouldBe prevMinerBalance + fullReward - 2 * BlockRewardCalculator.MaxAddressReward
+
+      d.appendBlock() // cease XTN buyback activation height
+
+      d.balance(daoAddress) shouldBe prevDaoAddressBalance + 2 * BlockRewardCalculator.MaxAddressReward
+      d.balance(xtnBuybackAddress) shouldBe prevXtnBuybackAddress + BlockRewardCalculator.MaxAddressReward
+      d.balance(
+        miner
+      ) shouldBe prevMinerBalance + fullReward - 2 * BlockRewardCalculator.MaxAddressReward + fullReward - BlockRewardCalculator.MaxAddressReward
+    }
+  }
+
   private def ceaseXtnBuybackFeatureTestCase(
       fullBlockReward: Long,
       daoAddressRewardF: Option[Long => Long],
