@@ -15,7 +15,13 @@ import com.wavesplatform.utils.*
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
+  import KeyTags.{
+    AddressId as AddressIdTag,
+    EthereumTransactionMeta as EthereumTransactionMetaTag,
+    InvokeScriptResult as InvokeScriptResultTag,
+    LeaseDetails as LeaseDetailsTag,
+    *
+  }
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -138,14 +144,6 @@ object Keys {
       txId.arr,
       TransactionMeta.parseFrom,
       _.toByteArray
-    )
-
-  def blockTransactionsFee(height: Int): Key[Long] =
-    Key(
-      BlockTransactionsFee,
-      h(height),
-      Longs.fromByteArray,
-      Longs.toByteArray
     )
 
   def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =

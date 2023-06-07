@@ -95,18 +95,18 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   override def onProcessBlock(
       block: Block,
       diff: BlockDiffer.DetailedDiff,
-      minerReward: Option[Long],
+      reward: Option[Long],
       hitSource: ByteStr,
-      blockchainBeforeWithMinerReward: Blockchain
-  ): Unit = repo.onProcessBlock(block, diff, minerReward, hitSource, blockchainBeforeWithMinerReward)
+      blockchainBeforeWithReward: Blockchain
+  ): Unit = repo.onProcessBlock(block, diff, reward, hitSource, blockchainBeforeWithReward)
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
       diff: BlockDiffer.DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
-  ): Unit = repo.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
+  ): Unit = repo.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
 
   override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
     repo.onRollback(blockchainBefore, toBlockId, toHeight)

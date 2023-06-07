@@ -23,8 +23,7 @@ object BlockDiffer {
     def apply(l: Long): Long = l / divider * dividend
   }
 
-  val CurrentBlockFeePart: Fraction    = Fraction(2, 5)
-  val CurrentBlockRewardPart: Fraction = Fraction(1, 3)
+  val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   def fromBlock(
       blockchain: Blockchain,
@@ -44,32 +43,31 @@ object BlockDiffer {
       hitSource: ByteStr,
       verify: Boolean
   ): TracedResult[ValidationError, Result] = {
-    val stateHeight = blockchain.height
+    val stateHeight        = blockchain.height
+    val heightWithNewBlock = stateHeight + 1
 
     // height switch is next after activation
-    val ngHeight                      = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
-    val sponsorshipHeight             = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-    val blockRewardDistributionHeight = blockchain.featureActivationHeight(BlockchainFeatures.BlockRewardDistribution.id).getOrElse(Int.MaxValue)
-
-    val blockReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
+    val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
+    val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     val addressRewardsE = for {
       daoAddress        <- blockchain.settings.functionalitySettings.daoAddressParsed
       xtnBuybackAddress <- blockchain.settings.functionalitySettings.xtnBuybackAddressParsed
     } yield {
-      if (stateHeight + 1 >= blockRewardDistributionHeight) {
-        val daoAddressReward = daoAddress.fold(Portfolio.empty) { _ =>
-          blockReward.multiply(CurrentBlockRewardPart)
-        }
-        val xtnBuybackReward = xtnBuybackAddress.fold(Portfolio.empty) { _ =>
-          blockReward.multiply(CurrentBlockRewardPart)
-        }
-        (
-          blockReward.minus(daoAddressReward).minus(xtnBuybackReward),
-          daoAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> daoAddressReward))),
-          xtnBuybackAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> xtnBuybackReward)))
+      val blockRewardShares = BlockRewardCalculator.getBlockRewardShares(
+        heightWithNewBlock,
+        blockchain.lastBlockReward.getOrElse(0L),
+        daoAddress,
+        xtnBuybackAddress,
+        blockchain
+      )
+      (
+        Portfolio.waves(blockRewardShares.miner),
+        daoAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> Portfolio.waves(blockRewardShares.daoAddress)).filter(_._2.balance > 0))),
+        xtnBuybackAddress.fold(Diff.empty)(addr =>
+          Diff(portfolios = Map(addr -> Portfolio.waves(blockRewardShares.xtnBuybackAddress)).filter(_._2.balance > 0))
         )
-      } else (blockReward, Diff.empty, Diff.empty)
+      )
     }
 
     val feeFromPreviousBlockE =
