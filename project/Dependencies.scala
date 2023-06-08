@@ -6,7 +6,7 @@ import sbt.{Def, _}
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.4.4" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.4.5-80-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.20"
 
@@ -152,6 +152,7 @@ object Dependencies {
 
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion,
+    "io.grpc"               % "grpc-services"        % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
     protoSchemasLib         % "protobuf"
   )

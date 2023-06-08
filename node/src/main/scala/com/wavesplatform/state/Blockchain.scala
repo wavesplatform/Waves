@@ -81,7 +81,7 @@ object Blockchain {
     def isEmpty: Boolean = blockchain.height == 0
 
     def isSponsorshipActive: Boolean = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-    def isNGActive: Boolean = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
+    def isNGActive: Boolean          = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
       blockchain

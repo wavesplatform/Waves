@@ -162,9 +162,14 @@ class BlockchainUpdaterImpl(
         .flatMap { activatedAt =>
           val mayBeReward     = lastBlockReward
           val mayBeTimeToVote = nextHeight - activatedAt
+          val modifiedTerm = if (leveldb.isFeatureActivated(BlockchainFeatures.CappedReward, this.height)) {
+            settings.termAfterCappedRewardFeature
+          } else {
+            settings.term
+          }
 
           mayBeReward match {
-            case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
+            case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % modifiedTerm == 0 =>
               Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
             case None if mayBeTimeToVote >= 0 =>
               Some((Seq(), settings.initial))
@@ -577,7 +582,8 @@ class BlockchainUpdaterImpl(
           case None => leveldb.blockRewardVotes(height)
           case Some(ng) =>
             val innerVotes = leveldb.blockRewardVotes(height)
-            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height).contains(height))
+            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
+            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height, modifyTerm).contains(height))
               innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }

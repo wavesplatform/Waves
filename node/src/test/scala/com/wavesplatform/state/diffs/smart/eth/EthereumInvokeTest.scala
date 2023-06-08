@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{EthABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
@@ -98,7 +98,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
     )
 
   private def hexData(script: Script, assets: Seq[IssuedAsset]) = {
-    val signature = ABIConverter(script).funcByMethodId.collectFirst { case (_, f) if f.name == "default" => f }.get
+    val signature = EthABIConverter(script).funcByMethodId.collectFirst { case (_, f) if f.name == "default" => f }.get
     val args      = Tuple.of(passingArg, Array[Tuple](assets.map(a => Tuple.of(a.id.arr, paymentAmount))*))
     val call      = new Function(signature.ethSignature).encodeCall(args).array()
     FastHex.encodeToString(call, 0, call.length)

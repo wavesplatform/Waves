@@ -3881,6 +3881,15 @@ components:
         reward:
           type: integer
           format: int64
+        rewardShares:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          description: map of address <-> reward
+          example:
+            3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: 200000000
+            3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: 100000000
         desiredReward:
           type: integer
           format: int64
@@ -3949,6 +3958,14 @@ components:
             format: int32
         reward:
           type: string
+        rewardShares:
+          type: object
+          additionalProperties:
+            type: string
+          description: map of address <-> reward
+          example:
+            3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
+            3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: '100000000'
         desiredReward:
           type: string
         VRF:
@@ -4302,6 +4319,10 @@ components:
             decrease:
               type: integer
               format: int32
+        daoAddress:
+          type: string
+        xtnBuybackAddress:
+          type: string
     RewardStatusLSF:
       required:
         - currentReward
@@ -4347,6 +4368,10 @@ components:
             decrease:
               type: integer
               format: int32
+        daoAddress:
+          type: string
+        xtnBuybackAddress:
+          type: string
     Signed:
       type: object
       properties:
@@ -5413,6 +5438,9 @@ components:
         transactionCount: 10
         features: [0]
         reward: '30000'
+        rewardShares:
+          3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
+          3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: '100000000'
         desiredReward: '30000'
         VRF: 'some_string_should_be_here'
         transactionsRoot: 'some_string_should_be_here'
@@ -5460,6 +5488,9 @@ components:
         transactionCount: 10
         features: [0]
         reward: '30000'
+        rewardShares:
+          3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
+          3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS: '100000000'
         desiredReward: '30000'
         VRF: 'some_string_should_be_here'
         transactionsRoot: 'some_string_should_be_here'
@@ -5477,6 +5508,8 @@ components:
         votes:
           increase: 0
           decrease: 0
+        daoAddress: '3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS'
+        xtnBuybackAddress: '3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT'
     largeSignificandTransaction:
       value:
         type: 7

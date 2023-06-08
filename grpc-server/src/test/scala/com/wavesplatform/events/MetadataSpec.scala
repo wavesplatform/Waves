@@ -1,7 +1,7 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.FakeObserver.*
+import FakeObserver.*
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.protobuf.*

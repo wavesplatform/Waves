@@ -19,7 +19,7 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.state.*
-import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockRewardPart
+import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.*
@@ -248,17 +248,26 @@ class WavesEnvironment(
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
 
-  private def getRewards(generator: PublicKey, height: Int): List[(Address, Long)] = {
-    blockchain.blockReward(height).fold(List.empty[(Address, Long)]) { reward =>
-      val configAddressesReward =
-        (blockchain.settings.functionalitySettings.daoAddressParsed.toList.flatten ++
-          blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toList.flatten).map { addr =>
-          Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(reward)
-        }
+  private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward)) {
+      val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, generator.toAddress, blockchain)
 
-      val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (reward - configAddressesReward.map(_._2).sum)
+      rewardShares.map { case (addr, reward) =>
+        Address(ByteStr(addr.bytes)) -> reward
+      }
+    } else {
+      val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+      val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
 
-      (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
+      blockchain.blockReward(height).fold(Seq.empty[(Address, Long)]) { fullBlockReward =>
+        val configAddressesReward =
+          (daoAddress.toSeq ++ xtnBuybackAddress).map { addr =>
+            Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(fullBlockReward)
+          }
+        val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (fullBlockReward - configAddressesReward.map(_._2).sum)
+
+        (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
+      }
     }
   }
 }

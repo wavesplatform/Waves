@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import cats.instances.either.*
+import cats.syntax.functor.*
 import cats.instances.vector.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -13,7 +14,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.Types.TypeExt
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.transaction.ABIConverter.WavesByteRepr
+import com.wavesplatform.transaction.EthABIConverter.WavesByteRepr
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.web3j.abi.TypeReference
@@ -22,7 +23,122 @@ import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.jdk.CollectionConverters.*
 
-object ABIConverter {
+final case class EthABIConverter(script: Script) {
+  case class FunctionArg(name: String, rideType: Types.FINAL) {
+    lazy val ethType: String = EthABIConverter.ethType(rideType)
+
+    def ethTypeRef: TypeReference[Type[?]] = TypeReference.makeTypeReference(ethType).asInstanceOf[TypeReference[Type[?]]]
+  }
+
+  case class FunctionRef(name: String, args: Seq[FunctionArg]) {
+
+    def decodeArgs(data: String, check: Boolean): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] = {
+      val arr   = FastHex.decode(data)
+      val func  = new Function(ethSignature)
+      val tuple = func.decodeCall(arr)
+
+      tuple.asScala.toList
+        .zip(args.map(_.rideType) :+ EthABIConverter.PaymentListType)
+        .traverse { case (ethArg, rideT) => EthABIConverter.toRideValue(ethArg, rideT) }
+        .flatMap(checkLen(func, tuple, arr.length, check).as(_))
+        .flatMap { alldecodedArgs =>
+          (alldecodedArgs.last match {
+            case Terms.ARR(xs) =>
+              xs.toVector.traverse {
+                case Terms.ARR(fields) =>
+                  fields match {
+                    case Seq(Terms.CONST_BYTESTR(assetId), Terms.CONST_LONG(amount)) =>
+                      Right(
+                        InvokeScriptTransaction.Payment(
+                          amount,
+                          assetId match {
+                            case WavesByteRepr => Asset.Waves
+                            case assetId       => Asset.IssuedAsset(assetId)
+                          }
+                        )
+                      )
+
+                    case other => Left(GenericError(s"decodeArgs: unexpected term in payment: $other"))
+                  }
+                case other => Left(GenericError(s"decodeArgs: unexpected term in payment: $other"))
+              }
+
+            case _ => Right(Nil)
+          }).map(ps => (alldecodedArgs.init, ps))
+        }
+    }
+
+    lazy val ethSignature: String = {
+      val argTypes = args.map(_.rideType).map(EthABIConverter.ethFuncSignatureTypeName) :+ EthABIConverter.PaymentArgSignature
+      s"$name(${argTypes.mkString(",")})"
+    }
+
+    lazy val ethMethodId: String = EthABIConverter.buildMethodId(ethSignature)
+
+    def checkLen(func: Function, tuple: Tuple, len: Int, check: Boolean) = {
+      val cls    = Class.forName("com.esaulpaugh.headlong.abi.TupleType")
+      val method = cls.getDeclaredMethod("byteLength", classOf[Tuple])
+      method.setAccessible(true)
+      Either.cond(
+        !check || method.invoke(func.getInputs, tuple).asInstanceOf[Int] == len - Function.SELECTOR_LEN,
+        (),
+        GenericError("unconsumed bytes remaining")
+      )
+    }
+  }
+
+  private[this] lazy val funcsWithTypes =
+    Global
+      .dAppFuncTypes(script)
+      .map { signatures =>
+        val filtered = signatures.argsWithFuncName.filter { case (_, args) =>
+          !args.exists { case (_, tpe) => tpe.containsUnion }
+        }
+        signatures.copy(argsWithFuncName = filtered)
+      }
+
+  private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
+    funcsWithTypes match {
+      case Right(signatures) => signatures.argsWithFuncName.toSeq
+      case Left(_)           => Nil
+    }
+  }
+
+  lazy val funcByMethodId: Map[String, FunctionRef] =
+    functionsWithArgs
+      .map { case (funcName, args) =>
+        FunctionRef(funcName, args.map { case (name, argType) => FunctionArg(name, argType) })
+      }
+      .map(func => func.ethMethodId -> func)
+      .toMap
+
+  def jsonABI: JsArray =
+    JsArray(functionsWithArgs.map { case (funcName, args) =>
+      val inputs = args.map { case (argName, argType) =>
+        Json.obj("name" -> argName) ++ EthABIConverter.ethTypeObj(argType)
+      } :+ EthABIConverter.PaymentArgJson
+
+      Json.obj(
+        "name"            -> funcName,
+        "type"            -> "function",
+        "constant"        -> false,
+        "payable"         -> false,
+        "stateMutability" -> "nonpayable",
+        "inputs"          -> inputs,
+        "outputs"         -> JsArray.empty
+      )
+    })
+
+  def decodeFunctionCall(data: String, check: Boolean): Either[ValidationError, (FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] = {
+    val methodId = data.substring(0, 8)
+    for {
+      function        <- funcByMethodId.get("0x" + methodId).toRight[ValidationError](GenericError(s"Function not defined: $methodId"))
+      argsAndPayments <- function.decodeArgs(data, check)
+    } yield (FUNCTION_CALL(FunctionHeader.User(function.name), argsAndPayments._1), argsAndPayments._2)
+  }
+}
+
+object EthABIConverter {
   val WavesByteRepr: ByteStr      = ByteStr(new Array[Byte](32))
   val PaymentListType: Types.LIST = Types.LIST(Types.TUPLE(List(Types.BYTESTR, Types.LONG)))
   val PaymentArgSignature: String = "(bytes32,int64)[]"
@@ -113,107 +229,5 @@ object ABIConverter {
         }
 
     case _ => throw new UnsupportedOperationException(s"Type not supported: $ethArg")
-  }
-}
-
-final case class ABIConverter(script: Script) {
-  case class FunctionArg(name: String, rideType: Types.FINAL) {
-    lazy val ethType: String = ABIConverter.ethType(rideType)
-
-    def ethTypeRef: TypeReference[Type[?]] = TypeReference.makeTypeReference(ethType).asInstanceOf[TypeReference[Type[?]]]
-  }
-
-  case class FunctionRef(name: String, args: Seq[FunctionArg]) {
-
-    def decodeArgs(data: String): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] =
-      new Function(ethSignature)
-        .decodeCall(FastHex.decode(data))
-        .asScala
-        .toList
-        .zip(args.map(_.rideType) :+ ABIConverter.PaymentListType)
-        .traverse { case (ethArg, rideT) => ABIConverter.toRideValue(ethArg, rideT) }
-        .flatMap { alldecodedArgs =>
-          (alldecodedArgs.last match {
-            case Terms.ARR(xs) =>
-              xs.toVector.traverse {
-                case Terms.ARR(fields) =>
-                  fields match {
-                    case Seq(Terms.CONST_BYTESTR(assetId), Terms.CONST_LONG(amount)) =>
-                      Right(
-                        InvokeScriptTransaction.Payment(
-                          amount,
-                          assetId match {
-                            case WavesByteRepr => Asset.Waves
-                            case assetId       => Asset.IssuedAsset(assetId)
-                          }
-                        )
-                      )
-
-                    case other => Left(GenericError(s"decodeArgs: unexpected term in payment: $other"))
-                  }
-                case other => Left(GenericError(s"decodeArgs: unexpected term in payment: $other"))
-              }
-
-            case _ => Right(Nil)
-          }).map(ps => (alldecodedArgs.init, ps))
-
-        }
-
-    lazy val ethSignature: String = {
-      val argTypes = args.map(_.rideType).map(ABIConverter.ethFuncSignatureTypeName) :+ ABIConverter.PaymentArgSignature
-      s"$name(${argTypes.mkString(",")})"
-    }
-
-    lazy val ethMethodId: String = ABIConverter.buildMethodId(ethSignature)
-  }
-
-  private[this] lazy val funcsWithTypes =
-    Global
-      .dAppFuncTypes(script)
-      .map { signatures =>
-        val filtered = signatures.argsWithFuncName.filter { case (_, args) =>
-          !args.exists { case (_, tpe) => tpe.containsUnion }
-        }
-        signatures.copy(argsWithFuncName = filtered)
-      }
-
-  private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
-    funcsWithTypes match {
-      case Right(signatures) => signatures.argsWithFuncName.toSeq
-      case Left(_)           => Nil
-    }
-  }
-
-  lazy val funcByMethodId: Map[String, FunctionRef] =
-    functionsWithArgs
-      .map { case (funcName, args) =>
-        FunctionRef(funcName, args.map { case (name, argType) => FunctionArg(name, argType) })
-      }
-      .map(func => func.ethMethodId -> func)
-      .toMap
-
-  def jsonABI: JsArray =
-    JsArray(functionsWithArgs.map { case (funcName, args) =>
-      val inputs = args.map { case (argName, argType) =>
-        Json.obj("name" -> argName) ++ ABIConverter.ethTypeObj(argType)
-      } :+ ABIConverter.PaymentArgJson
-
-      Json.obj(
-        "name"            -> funcName,
-        "type"            -> "function",
-        "constant"        -> false,
-        "payable"         -> false,
-        "stateMutability" -> "nonpayable",
-        "inputs"          -> inputs,
-        "outputs"         -> JsArray.empty
-      )
-    })
-
-  def decodeFunctionCall(data: String): Either[ValidationError, (FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] = {
-    val methodId = data.substring(0, 8)
-    for {
-      function        <- funcByMethodId.get("0x" + methodId).toRight[ValidationError](GenericError(s"Function not defined: $methodId"))
-      argsAndPayments <- function.decodeArgs(data)
-    } yield (FUNCTION_CALL(FunctionHeader.User(function.name), argsAndPayments._1), argsAndPayments._2)
   }
 }

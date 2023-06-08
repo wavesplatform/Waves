@@ -113,11 +113,11 @@ object EthTxGenerator {
       val tuples = payments.toVector.map { p =>
         val assetId = p.assetId match {
           case Asset.IssuedAsset(id) => id
-          case Asset.Waves           => ABIConverter.WavesByteRepr
+          case Asset.Waves           => EthABIConverter.WavesByteRepr
         }
         Arg.Struct(Arg.Bytes(assetId, "bytes32"), Arg.Integer(p.amount))
       }
-      Arg.List(Arg.Struct(Arg.Bytes(ABIConverter.WavesByteRepr, "bytes32"), Arg.Integer(0)), tuples)
+      Arg.List(Arg.Struct(Arg.Bytes(EthABIConverter.WavesByteRepr, "bytes32"), Arg.Integer(0)), tuples)
     }
 
     val fullArgs = args :+ paymentsArg

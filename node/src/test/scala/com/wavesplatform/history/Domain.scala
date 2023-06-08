@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{Application, TestValues, crypto, database}
+import com.wavesplatform.{Application, TestValues, crypto}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
 import org.scalatest.matchers.should.Matchers.*
@@ -340,16 +340,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   val blocksApi: CommonBlocksApi = {
     def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
-      blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
+      Application.loadBlockMetaAt(db, blockchainUpdater)(height)
 
     def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
         height: Int
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
-      loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
-        meta -> blockchainUpdater
-          .liquidTransactions(meta.id)
-          .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
-      }
+      Application.loadBlockInfoAt(db, blockchainUpdater)(height)
 
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
   }
