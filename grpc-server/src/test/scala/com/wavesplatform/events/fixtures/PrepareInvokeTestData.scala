@@ -10,6 +10,7 @@ object PrepareInvokeTestData {
   val reissueNum: Int                   = 50000
   val burnNum: Int                      = 100000
   val leaseNum: Long                    = 200000
+  val foo                               = "foo"
   val baz                               = "baz"
   val bar                               = "bar"
 
