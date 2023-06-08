@@ -1,42 +1,33 @@
 package com.wavesplatform.report
 
-import cats.syntax.functor.*
-import com.wavesplatform.report.QaseReporter.{QaseProjects, getProjectToRunIds}
+import com.wavesplatform.report.QaseReporter.{QaseProjects, TestResult}
 import io.qase.api.QaseClient
-import io.qase.api.exceptions.QaseException
-import io.qase.api.services.impl.ReportersResultOperationsImpl
 import io.qase.api.utils.IntegrationUtils
-import io.qase.client.ApiClient
-import io.qase.client.api.{ResultsApi, RunsApi}
 import io.qase.client.model.ResultCreate
 import org.scalatest.Reporter
 import org.scalatest.events.{Event, RunAborted, RunCompleted, RunStopped, TestFailed, TestSucceeded}
-import org.slf4j.{Logger, LoggerFactory}
+import play.api.libs.json.{Format, Json}
 
-import scala.util.Try
+import java.io.FileWriter
+import java.util.concurrent.ConcurrentHashMap
+import scala.jdk.CollectionConverters.*
 
 class QaseReporter extends Reporter {
 
-  val logger: Logger                       = LoggerFactory.getLogger(this.getClass)
-  val projectToRunIds: Map[String, String] = getProjectToRunIds
-  val apiClient: ApiClient                 = QaseClient.getApiClient
-  val runsApi                              = new RunsApi(apiClient)
-  val resultsApi                           = new ResultsApi(apiClient)
-  val resultOperations: Map[String, ReportersResultOperationsImpl] =
-    QaseProjects.map(projectCode => projectCode -> new ReportersResultOperationsImpl(resultsApi)).toMap
+  private val results = initResults()
 
   override def apply(event: Event): Unit = {
     event match {
       case ts: TestSucceeded =>
         extractCaseIds(ts.testName).foreach { case (projectCode, caseId) =>
-          finishTestCase(ResultCreate.StatusEnum.PASSED, ts.testName, projectCode, caseId, None, None, ts.duration)
+          saveTestCaseResults(ResultCreate.StatusEnum.PASSED, ts.testName, projectCode, caseId, None, None, ts.duration)
         }
       case tf: TestFailed =>
         extractCaseIds(tf.testName).foreach { case (projectCode, caseId) =>
-          finishTestCase(ResultCreate.StatusEnum.FAILED, tf.testName, projectCode, caseId, tf.throwable, Some(tf.message), tf.duration)
+          saveTestCaseResults(ResultCreate.StatusEnum.FAILED, tf.testName, projectCode, caseId, tf.throwable, Some(tf.message), tf.duration)
         }
       case _: RunAborted | _: RunStopped | _: RunCompleted =>
-        finishRun()
+        saveRunResults()
       case _ => ()
     }
   }
@@ -48,7 +39,7 @@ class QaseReporter extends Reporter {
     pattern.findAllMatchIn(testName).map(m => m.group(1) -> m.group(2).toLong).toSeq
   }
 
-  private def finishTestCase(
+  private def saveTestCaseResults(
       status: ResultCreate.StatusEnum,
       testName: String,
       projectCode: String,
@@ -58,50 +49,39 @@ class QaseReporter extends Reporter {
       duration: Option[Long]
   ): Unit =
     if (QaseClient.isEnabled) {
-      val resultCreate = new ResultCreate()
-      val errMsg       = msgOpt.map(msg => s"\n\n**Error**\n$msg").getOrElse("")
-      val comment      = s"$testName$errMsg"
-      val stacktrace   = throwable.map(IntegrationUtils.getStacktrace).orNull
-      val timeMs       = duration.getOrElse(0L)
-      resultCreate
-        .status(status)
-        .comment(comment)
-        .stacktrace(stacktrace)
-        .caseId(caseId)
-        .timeMs(timeMs)
+      val errMsg     = msgOpt.map(msg => s"\n\n**Error**\n$msg").getOrElse("")
+      val comment    = s"$testName$errMsg"
+      val stacktrace = throwable.map(IntegrationUtils.getStacktrace).orNull
+      val timeMs     = duration.getOrElse(0L)
 
-      if (QaseClient.getConfig.useBulk)
-        this.resultOperations.get(projectCode).foreach(_.addBulkResult(resultCreate))
-      else {
-        projectToRunIds.get(projectCode).foreach { runId =>
-          Try(resultsApi.createResult(projectCode, runId.toInt, resultCreate)).void.recover { case qe: QaseException =>
-            logger.warn("Error while sending test result occurred", qe)
-          }.get
-        }
-      }
+      results.computeIfPresent(projectCode, (_, results) => TestResult(status.toString, comment, Some(stacktrace), caseId, timeMs) +: results)
     }
 
-  private def finishRun(): Unit =
+  private def saveRunResults(): Unit =
     if (QaseClient.isEnabled) {
-      if (QaseClient.getConfig.useBulk) {
-        QaseProjects.foreach { projectCode =>
-          this.resultOperations.get(projectCode).foreach(_.sendBulkResult())
-        }
-      }
-      if (QaseClient.getConfig.runAutocomplete) {
-        projectToRunIds.foreach { case (projectCode, runId) =>
-          runsApi.completeRun(projectCode, runId.toInt)
+      results.asScala.foreach { case (projectCode, results) =>
+        if (results.nonEmpty) {
+          val writer = new FileWriter(s"./$projectCode-${System.currentTimeMillis()}")
+          writer.write(Json.toJson(results).toString)
+          writer.close()
         }
       }
     }
+
+  private def initResults() = {
+    val results = new ConcurrentHashMap[String, List[TestResult]]()
+    QaseProjects.foreach(projectCode => results.put(projectCode, List.empty))
+    results
+  }
 }
 
 object QaseReporter {
-  val RunIdKeyPrefix = "QASE_RUN_ID_"
-  val QaseProjects   = Seq("NODE", "RIDE", "BU", "SAPI")
+  val RunIdKeyPrefix  = "QASE_RUN_ID_"
+  val CheckPRRunIdKey = "CHECKPR_RUN_ID"
+  val QaseProjects    = Seq("NODE", "RIDE", "BU", "SAPI")
 
-  def getProjectToRunIds: Map[String, String] =
-    QaseProjects.flatMap { projectCode =>
-      Option(System.getProperty(s"$RunIdKeyPrefix$projectCode")).map(projectCode -> _)
-    }.toMap
+  case class TestResult(status: String, comment: String, stackTrace: Option[String], caseId: Long, timeMs: Long)
+  object TestResult {
+    implicit val format: Format[TestResult] = Json.format
+  }
 }

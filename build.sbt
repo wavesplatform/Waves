@@ -193,7 +193,6 @@ checkPRRaw := Def.taskDyn {
   val res = Def
     .sequential(
       `waves-node` / clean,
-      (`lang-testkit` / Compile / runMain).toTask(" com.wavesplatform.report.QaseRunCreator"),
       Def.task {
         (`lang-tests` / Test / test).value
         (`repl-jvm` / Test / test).value

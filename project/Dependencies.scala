@@ -68,7 +68,8 @@ object Dependencies {
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      web3jModule("crypto")
+      web3jModule("crypto"),
+      "com.typesafe.play" %% "play-json" % "2.9.3"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -119,8 +120,7 @@ object Dependencies {
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"       %% "play-json" % "2.9.3",
+      "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
