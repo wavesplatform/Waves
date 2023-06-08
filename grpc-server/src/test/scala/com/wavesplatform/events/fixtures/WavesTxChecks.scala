@@ -251,14 +251,22 @@ object WavesTxChecks extends Matchers with OptionValues {
     invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
   }
 
-  def checkEthereumInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: EthereumTransaction)(implicit
-                                                                                                              pos: Position
+  def checkEthereumInvokeBaseTransactionMetadata(
+      actual: Seq[TransactionMetadata],
+      expected: EthereumTransaction,
+      funcName: String,
+      dAppAddress: Address
+  )(implicit
+      pos: Position
   ): Unit = {
-    val invokeScript = actual.head.getInvokeScript
+    val ethereumMetadata = actual.head.getEthereum
 
-    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress
-/*    invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
-    invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName*/
+    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.value().bytes
+    ethereumMetadata.getInvoke.dAppAddress.toByteArray shouldBe dAppAddress.bytes
+    ethereumMetadata.getInvoke.functionName shouldBe funcName
+    ethereumMetadata.fee shouldBe expected.fee
+    ethereumMetadata.timestamp shouldBe expected.timestamp
+    ethereumMetadata.senderPublicKey.toByteArray shouldBe expected.sender.arr
   }
 
   def checkArguments(expectedValues: List[Any], actualArguments: List[Any]): Unit = {
