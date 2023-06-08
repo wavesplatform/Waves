@@ -102,7 +102,7 @@ case class SnapshotBlockchain(
     snapshot.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
-    snapshot.orderFills.get(orderId).orEmpty
+    snapshot.orderFills.getOrElse(orderId, inner.filledVolumeAndFee(orderId))
 
   override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] =
     if (maybeSnapshot.isEmpty || h < this.height) {
