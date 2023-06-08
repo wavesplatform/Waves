@@ -106,7 +106,7 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
         val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V3)
         val normalizedPrice = order1.price.value * order1.amount.value / 100000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V2)
-        addedBlocksAndSubscribe(exchangeTx) { updated =>
+        addedBlocksAndSubscribeExchangeTx(exchangeTx) { updated =>
           val append = updated.apply(3).getAppend
           checkingExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
@@ -117,7 +117,7 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
         val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V4)
         val normalizedPrice = order1.price.value / 2 / 10000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V3)
-        addedBlocksAndSubscribe(exchangeTx) { updated =>
+        addedBlocksAndSubscribeExchangeTx(exchangeTx) { updated =>
           val append = updated.apply(3).getAppend
           checkingExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
