@@ -293,12 +293,8 @@ abstract class Caches extends Blockchain with Storage {
     } yield {
       val prevData   = volumeAndFeeCache.get(orderId)
       val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
-      val current    = CurrentVolumeAndFee(prevData.volume + volume, prevData.fee + fee, Height(height), prevHeight)
-      val node = VolumeAndFeeNode(
-        prevData.volume + volume,
-        prevData.fee + fee,
-        prevHeight
-      )
+      val current    = CurrentVolumeAndFee(volume, fee, Height(height), prevHeight)
+      val node       = VolumeAndFeeNode(volume, fee, prevHeight)
       orderId -> (current, node)
     }
 
