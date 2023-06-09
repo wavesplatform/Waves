@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
