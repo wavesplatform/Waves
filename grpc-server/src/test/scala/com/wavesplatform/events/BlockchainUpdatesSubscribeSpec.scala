@@ -2,9 +2,7 @@ package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.fixtures.WavesTxChecks.checkEthereumTransaction
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.settingsWithFeatures
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
