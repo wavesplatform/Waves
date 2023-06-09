@@ -23,7 +23,7 @@ object GetString extends JsTestBase {
   private val invalidGetStringValue = s"getStringValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test("functions getString accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-16. Compile getString functions for address, alias, and 'this'") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -48,7 +48,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test("functions own data getString accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-17. Compile own data getString functions for address, alias, and 'this'") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (ownData <- Seq(ownDataGetString, ownDataGetStringArgBeforeFunc, ownDataGetStringValueArgBeforeFunc, ownDataGetStringValue)) {
@@ -58,7 +58,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test("negative tests for getString functions") {
+    test("RIDE-18. Test negative scenarios for getString functions") {
       val invalidFunction = s"getStringValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getStringValue()"
       for (version <- actualVersions) {
@@ -79,7 +79,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test("Can't find a own data functions overload String accountDataStorage for old Versions") {
+    test("RIDE-19. Ensure no overload of own data Integer accountDataStorage for old versions") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
