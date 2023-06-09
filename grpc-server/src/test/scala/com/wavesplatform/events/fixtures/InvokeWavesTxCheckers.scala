@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.TxHelpers.secondAddress
 import com.wavesplatform.transaction.assets.IssueTransaction
 
 object InvokeWavesTxCheckers extends BlockchainUpdatesTestBase {
-  def checkingSimpleInvoke(append: Append, issue: IssueTransaction, issuerAssetBalanceAfterTx: Long, invokeScript: InvokeScriptMetadata): Unit = {
+  def checkSimpleInvoke(append: Append, issue: IssueTransaction, issuerAssetBalanceAfterTx: Long, invokeScript: InvokeScriptMetadata): Unit = {
     val assetId = issue.assetId.arr
 
     val dataEntry: Seq[DataEntry[?]] = Seq[DataEntry[?]](
@@ -60,7 +60,7 @@ object InvokeWavesTxCheckers extends BlockchainUpdatesTestBase {
     checkAssetsStateUpdates(assetDetails.apply(1).after, issue, isNft = false, issuerAssetBalanceAfterTx + scriptTransferAssetNum)
   }
 
-  def checkingDoubleNestingInvoke(
+  def checkDoubleNestingInvoke(
       append: Append,
       invokeScript: InvokeScriptMetadata,
       issue: IssueTransaction,

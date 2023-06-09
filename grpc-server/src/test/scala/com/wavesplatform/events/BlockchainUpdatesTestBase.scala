@@ -3,52 +3,17 @@ package com.wavesplatform.events
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateResponse, GetBlockUpdatesRangeRequest}
-import com.wavesplatform.events.fixtures.WavesTxChecks.{
-  checkAssetUpdatesStateUpdates,
-  checkAssetsScriptStateUpdates,
-  checkAssetsStateUpdates,
-  checkBalances,
-  checkBurn,
-  checkCreateAlias,
-  checkDataEntriesStateUpdate,
-  checkDataTransaction,
-  checkEthereumTransaction,
-  checkExchange,
-  checkIndividualLeases,
-  checkIssue,
-  checkLease,
-  checkLeaseCancel,
-  checkLeasingForAddress,
-  checkMassTransfer,
-  checkMassTransferBalances,
-  checkReissue,
-  checkSetAssetScriptTransaction,
-  checkSetScriptStateUpdate,
-  checkSetScriptTransaction,
-  checkSponsorFeeTransaction,
-  checkTransfer,
-  checkUpdateAssetInfoTransaction
-}
+import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
-import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.*
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Order.Version
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.assets.{
-  BurnTransaction,
-  IssueTransaction,
-  ReissueTransaction,
-  SetAssetScriptTransaction,
-  SponsorFeeTransaction,
-  UpdateAssetInfoTransaction
-}
+import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -106,7 +71,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
                                                |      ) then true else true
                                                |}""".stripMargin)
 
-  protected def createOrders(orderType: OrderType, orderSender: SeedKeyPair, orderVersion: Version): Order = {
+  protected def createOrder(orderType: OrderType, orderSender: SeedKeyPair, orderVersion: Version): Order = {
     TxHelpers.order(
       orderType,
       secondToken.asset,
@@ -121,7 +86,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
   }
 
-  protected def checkingAlias(append: Append, aliasTx: CreateAliasTransaction): Unit = {
+  protected def checkAlias(append: Append, aliasTx: CreateAliasTransaction): Unit = {
     val firstTxParticipantBalanceAfter: Long = firstTxParticipantBalanceBefore - aliasTx.fee.value
     checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
     checkBalances(
@@ -130,7 +95,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
   }
 
-  protected def checkingTransferTx(append: Append, transferTx: TransferTransaction): Unit = {
+  protected def checkTransferTx(append: Append, transferTx: TransferTransaction): Unit = {
     val firstTxParticipantBalanceAfter  = firstTxParticipantBalanceBefore - customFee - amount
     val secondTxParticipantBalanceAfter = secondTxParticipantBalanceBefore + amount
     checkTransfer(append.transactionIds.head, append.transactionAt(0), transferTx, secondTxParticipantAddress.publicKeyHash)
@@ -143,7 +108,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
   }
 
-  protected def checkingIssueTx(append: Append, issue: IssueTransaction, isNft: Boolean): Unit = {
+  protected def checkIssueTx(append: Append, issue: IssueTransaction, isNft: Boolean): Unit = {
     val assetDetails                   = append.transactionStateUpdates.head.assets.head
     val issueQuantity                  = issue.quantity.value
     val firstTxParticipantBalanceAfter = firstTxParticipantBalanceBefore - issue.fee.value
@@ -162,7 +127,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     }
   }
 
-  protected def checkingReissueTx(append: Append, reissue: ReissueTransaction, issue: IssueTransaction): Unit = {
+  protected def checkReissueTx(append: Append, reissue: ReissueTransaction, issue: IssueTransaction): Unit = {
     val assetDetails                           = append.transactionStateUpdates.head.assets.head
     val quantityAfter                          = amount + additionalAmount
     val firstTxParticipantBalanceBeforeReissue = firstTxParticipantBalanceBefore - issue.fee.value
@@ -180,7 +145,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkAssetsStateUpdates(assetDetails.after, reissue, isNft = false, quantityAfter)
   }
 
-  protected def checkingBurnTx(append: Append, burn: BurnTransaction, issue: IssueTransaction): Unit = {
+  protected def checkBurnTx(append: Append, burn: BurnTransaction, issue: IssueTransaction): Unit = {
     val assetDetails                        = append.transactionStateUpdates.head.assets.head
     val amountAfterTx                       = amount - additionalAmount
     val firstTxParticipantBalanceBeforeBurn = firstTxParticipantBalanceBefore - issue.fee.value
@@ -198,7 +163,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkAssetsStateUpdates(assetDetails.after, burn, isNft = false, amountAfterTx)
   }
 
-  protected def checkingExchangeTx(append: Append, exchangeTx: ExchangeTransaction, normalizedPrice: Long, orderAmount: Long): Unit = {
+  protected def checkExchangeTx(append: Append, exchangeTx: ExchangeTransaction, normalizedPrice: Long, orderAmount: Long): Unit = {
     val amountAssetQuantity                      = secondToken.quantity.value
     val firstTxParticipantBalanceBeforeExchange  = firstTxParticipantBalanceBefore - firstTokenFee
     val firstTxParticipantBalanceAfterExchange   = firstTxParticipantBalanceBeforeExchange - exchangeTx.fee.value + customFee
@@ -219,7 +184,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
   }
 
-  protected def checkingLeaseTx(append: Append, lease: LeaseTransaction): Unit = {
+  protected def checkLeaseTx(append: Append, lease: LeaseTransaction): Unit = {
     val leaseId = lease.id.value().arr
     checkLease(append.transactionIds.head, append.transactionAt(0), lease, secondTxParticipantPKHash)
     checkBalances(
@@ -243,7 +208,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
   }
 
-  protected def checkingLeaseCancelTx(append: Append, leaseCancel: LeaseCancelTransaction, lease: LeaseTransaction): Unit = {
+  protected def checkLeaseCancelTx(append: Append, leaseCancel: LeaseCancelTransaction, lease: LeaseTransaction): Unit = {
     val leaseId                           = leaseCancel.leaseId.arr
     val firstTxParticipantBalanceBeforeTx = firstTxParticipantBalanceBefore - lease.fee.value
     val firstTxParticipantBalanceAfterTx  = firstTxParticipantBalanceBeforeTx - leaseCancel.fee.value
@@ -269,7 +234,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     )
   }
 
-  protected def checkingMassTransfer(append: Append, massTransfer: MassTransferTransaction): Unit = {
+  protected def checkForMassTransferTx(append: Append, massTransfer: MassTransferTransaction): Unit = {
     val firstTxParticipantBalanceBeforeTx     = firstTxParticipantBalanceBefore - firstTokenFee
     val firstTxParticipantBalanceAfterTx      = firstTxParticipantBalanceBeforeTx - massTransfer.fee.value
     val firstTxParticipantAssetBalanceAfterTx = firstTokenQuantity - additionalAmount * recipients.size
@@ -292,7 +257,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkMassTransferBalances(append.transactionStateUpdates.head.balances, balancesMap)
   }
 
-  protected def checkingDataTransfer(append: Append, data: DataTransaction): Unit = {
+  protected def checkDataTransfer(append: Append, data: DataTransaction): Unit = {
     val txUpdates = append.transactionStateUpdates.head
     checkDataTransaction(append.transactionIds.head, append.transactionAt(0), data)
     checkBalances(
@@ -302,7 +267,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkDataEntriesStateUpdate(txUpdates.dataEntries, data.data, firstTxParticipantAddress.bytes)
   }
 
-  protected def checkingSetScript(append: Append, setScript: SetScriptTransaction): Unit = {
+  protected def checkSetScript(append: Append, setScript: SetScriptTransaction): Unit = {
     val txUpdates = append.transactionStateUpdates.head
     checkSetScriptTransaction(append.transactionIds.head, append.transactionAt(0), setScript)
     checkBalances(
@@ -312,7 +277,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkSetScriptStateUpdate(txUpdates.scripts.head, setScript)
   }
 
-  protected def checkingSetAssetScript(append: Append, setAssetScript: SetAssetScriptTransaction, issue: IssueTransaction): Unit = {
+  protected def checkSetAssetScript(append: Append, setAssetScript: SetAssetScriptTransaction, issue: IssueTransaction): Unit = {
     val quantity                                        = issue.quantity.value
     val firstTxParticipantBalanceBeforeSetAssetScriptTx = firstTxParticipantBalanceBefore - issue.fee.value
     val firstTxParticipantBalanceAfterSetAssetScriptTx  = firstTxParticipantBalanceBeforeSetAssetScriptTx - setAssetScript.fee.value
@@ -331,7 +296,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkAssetsScriptStateUpdates(assetDetails.after.get.scriptInfo, complexScriptAfter.bytes.value().arr)
   }
 
-  protected def checkingUpdateAssetInfo(append: Append, updateAssetInfo: UpdateAssetInfoTransaction): Unit = {
+  protected def checkUpdateAssetInfo(append: Append, updateAssetInfo: UpdateAssetInfoTransaction): Unit = {
     val firstTxParticipantBalanceBeforeUpdateAssetInfoTx = firstTxParticipantBalanceBefore - firstTokenFee
     val firstTxParticipantBalanceAfterUpdateAssetInfoTx  = firstTxParticipantBalanceBeforeUpdateAssetInfoTx - updateAssetInfo.fee
     val txUpdates                                        = append.transactionStateUpdates.head
@@ -347,7 +312,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkAssetUpdatesStateUpdates(assetDetails.after, updateAssetInfo)
   }
 
-  protected def checkingSponsorFee(append: Append, sponsorFee: SponsorFeeTransaction, balanceBefore: Long, balanceAfter: Long): Unit = {
+  protected def checkSponsorFee(append: Append, sponsorFee: SponsorFeeTransaction, balanceBefore: Long, balanceAfter: Long): Unit = {
     val txUpdates    = append.transactionStateUpdates.head
     val assetDetails = txUpdates.assets.head
 
@@ -360,7 +325,7 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
     checkAssetsStateUpdates(assetDetails.after, firstToken, isNft = false, firstTokenQuantity)
   }
 
-  protected def checkingEthereumTransfer(append: Append, ethereumTransfer: EthereumTransaction, ethAddress: Address): Unit = {
+  protected def checkEthereumTransfer(append: Append, ethereumTransfer: EthereumTransaction, ethAddress: Address): Unit = {
     val firstTxParticipantBalanceAfter = firstTxParticipantBalanceBefore - ethereumTransfer.fee
     val recipientTokenBalanceAfter     = secondTokenQuantity - amount
 
@@ -374,52 +339,5 @@ abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with
         (secondTxParticipantAddress, secondTokenAsset) -> (0, amount)
       )
     )
-  }
-
-  protected def addedBlocksAndSubscribeExchangeTx(exchangeTx: ExchangeTransaction)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
-    withGenerateSubscription(
-      settings = currentSettings,
-      balances = Seq(
-        AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-        AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
-      )
-    ) { d =>
-      d.appendBlock(firstToken)
-      d.appendBlock(secondToken)
-      d.appendMicroBlock(exchangeTx)
-    }(f)
-  }
-
-  protected def addedBlocksAndGetBlockUpdate(exchangeTx: ExchangeTransaction, height: Int)(f: GetBlockUpdateResponse => Unit): Unit = {
-    withGenerateGetBlockUpdate(
-      height,
-      settings = currentSettings,
-      balances = Seq(
-        AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-        AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
-      )
-    ) { d =>
-      d.appendBlock(firstToken)
-      d.appendBlock(secondToken)
-      d.appendBlock(exchangeTx)
-    }(f)
-  }
-
-  protected def addedBlocksAndGetBlockUpdateRange(exchangeTx: ExchangeTransaction, height: GetBlockUpdatesRangeRequest)(
-      f: Seq[PBBlockchainUpdated] => Unit
-  ): Unit = {
-    withGenerateGetBlockUpdateRange(
-      height,
-      settings = currentSettings,
-      balances = Seq(
-        AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-        AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
-      )
-    ) { d =>
-      d.appendBlock(firstToken)
-      d.appendBlock(secondToken)
-      d.appendBlock(exchangeTx)
-      d.appendBlock()
-    }(f)
   }
 }

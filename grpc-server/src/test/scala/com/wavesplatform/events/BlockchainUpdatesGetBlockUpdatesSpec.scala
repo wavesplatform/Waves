@@ -2,12 +2,13 @@ package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.events.api.grpc.protobuf.GetBlockUpdateResponse
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
 
 class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
@@ -20,7 +21,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(aliasTx)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingAlias(append, aliasTx)
+        checkAlias(append, aliasTx)
       }
     }
 
@@ -35,7 +36,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         )
       )(_.appendBlock(transferTx)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingTransferTx(append, transferTx)
+        checkTransferTx(append, transferTx)
       }
     }
 
@@ -56,7 +57,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(issue)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingIssueTx(append, issue, isNft = false)
+        checkIssueTx(append, issue, isNft = false)
       }
     }
 
@@ -69,7 +70,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(issueNftTx)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingIssueTx(append, issueNftTx, isNft = true)
+        checkIssueTx(append, issueNftTx, isNft = true)
       }
     }
 
@@ -85,7 +86,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(reissue)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingReissueTx(append, reissue, issue)
+        checkReissueTx(append, reissue, issue)
       }
     }
 
@@ -101,30 +102,30 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(burn)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingBurnTx(append, burn, issue)
+        checkBurnTx(append, burn, issue)
       }
     }
 
     "Exchange transaction subscription tests" - {
       "BU-195. Return correct data for order V3, exchange V2" in {
-        val order1          = createOrders(OrderType.BUY, firstTxParticipant, Order.V3)
-        val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V3)
+        val order1          = createOrder(OrderType.BUY, firstTxParticipant, Order.V3)
+        val order2          = createOrder(OrderType.SELL, secondTxParticipant, Order.V3)
         val normalizedPrice = order1.price.value * order1.amount.value / 100000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V2)
-        addedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
+        withAddedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
           val append = getBlockUpdate.getUpdate.getAppend
-          checkingExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
+          checkExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
       }
 
       "BU-223. Return correct data for order V4, exchange V3" in {
-        val order1          = createOrders(OrderType.BUY, firstTxParticipant, Order.V4)
-        val order2          = createOrders(OrderType.SELL, secondTxParticipant, Order.V4)
+        val order1          = createOrder(OrderType.BUY, firstTxParticipant, Order.V4)
+        val order2          = createOrder(OrderType.SELL, secondTxParticipant, Order.V4)
         val normalizedPrice = order1.price.value / 2 / 10000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V3)
-        addedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
+        withAddedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
           val append = getBlockUpdate.getUpdate.getAppend
-          checkingExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
+          checkExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
       }
     }
@@ -137,7 +138,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(lease)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingLeaseTx(append, lease)
+        checkLeaseTx(append, lease)
       }
     }
 
@@ -153,7 +154,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(leaseCancel)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingLeaseCancelTx(append, leaseCancel, lease)
+        checkLeaseCancelTx(append, leaseCancel, lease)
       }
     }
 
@@ -170,7 +171,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(massTransfer)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingMassTransfer(append, massTransfer)
+        checkForMassTransferTx(append, massTransfer)
       }
     }
 
@@ -182,7 +183,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(data)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingDataTransfer(append, data)
+        checkDataTransfer(append, data)
       }
     }
 
@@ -194,7 +195,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendBlock(setScript)) { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingSetScript(append, setScript)
+        checkSetScript(append, setScript)
       }
     }
 
@@ -215,7 +216,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(sponsorFee)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingSponsorFee(append, sponsorFee, senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx)
+        checkSponsorFee(append, sponsorFee, senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx)
       }
 
       "BU-206. getBlockUpdate sponsorFee cancel" in withGenerateGetBlockUpdate(
@@ -228,7 +229,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(sponsorFeeCancel)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingSponsorFee(append, sponsorFeeCancel, senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx)
+        checkSponsorFee(append, sponsorFeeCancel, senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx)
       }
     }
 
@@ -244,7 +245,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(setAssetScript)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingSetAssetScript(append, setAssetScript, issue)
+        checkSetAssetScript(append, setAssetScript, issue)
       }
     }
 
@@ -262,7 +263,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(updateAssetInfo)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingUpdateAssetInfo(append, updateAssetInfo)
+        checkUpdateAssetInfo(append, updateAssetInfo)
       }
     }
 
@@ -285,8 +286,23 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
         d.appendBlock(ethereumTransfer)
       } { getBlockUpdate =>
         val append = getBlockUpdate.getUpdate.getAppend
-        checkingEthereumTransfer(append, ethereumTransfer, ethAddress)
+        checkEthereumTransfer(append, ethereumTransfer, ethAddress)
       }
+    }
+
+    def withAddedBlocksAndGetBlockUpdate(exchangeTx: ExchangeTransaction, height: Int)(f: GetBlockUpdateResponse => Unit): Unit = {
+      withGenerateGetBlockUpdate(
+        height,
+        settings = currentSettings,
+        balances = Seq(
+          AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+        )
+      ) { d =>
+        d.appendBlock(firstToken)
+        d.appendBlock(secondToken)
+        d.appendBlock(exchangeTx)
+      }(f)
     }
   }
 }
