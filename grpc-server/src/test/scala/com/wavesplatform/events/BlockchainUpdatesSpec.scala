@@ -18,7 +18,7 @@ import com.wavesplatform.events.StateUpdate.{
   LeasingBalanceUpdate,
   ScriptUpdate
 }
-import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeRequest}
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde.*
@@ -36,7 +36,7 @@ import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.state.{AssetDescription, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -852,6 +852,147 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
           )
       }
     }
+
+    "should return correct rewardShares for GetBlockUpdate (NODE-838)" in {
+      blockUpdatesRewardSharesTestCase { case (miner, daoAddress, xtnBuybackAddress, d, r) =>
+        // reward distribution features not activated
+        checkBlockUpdateRewards(
+          2,
+          Seq(RewardShare(ByteString.copyFrom(miner.bytes), d.blockchain.settings.rewardsSettings.initial))
+        )(r)
+
+        // BlockRewardDistribution activated
+        val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+        val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+        checkBlockUpdateRewards(
+          3,
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward3),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward3),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward3)
+          ).sortBy(_.address.toByteStr)
+        )(r)
+
+        // CappedReward activated
+        val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+        val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+        checkBlockUpdateRewards(
+          4,
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward4),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward4),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward4)
+          ).sortBy(_.address.toByteStr)
+        )(r)
+
+        // CeaseXTNBuyback activated with expired XTN buyback reward period
+        val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+        val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+        checkBlockUpdateRewards(
+          5,
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward5),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
+          ).sortBy(_.address.toByteStr)
+        )(r)
+      }
+    }
+
+    "should return correct rewardShares for GetBlockUpdatesRange (NODE-839)" in {
+      blockUpdatesRewardSharesTestCase { case (miner, daoAddress, xtnBuybackAddress, d, r) =>
+        val updates = r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(2, 5)).futureValue.updates
+
+        // reward distribution features not activated
+        checkBlockUpdateRewards(updates.head, Seq(RewardShare(ByteString.copyFrom(miner.bytes), d.blockchain.settings.rewardsSettings.initial)))
+
+        // BlockRewardDistribution activated
+        val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+        val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+        checkBlockUpdateRewards(
+          updates(1),
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward3),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward3),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward3)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CappedReward activated
+        val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+        val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+        checkBlockUpdateRewards(
+          updates(2),
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward4),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward4),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward4)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CeaseXTNBuyback activated with expired XTN buyback reward period
+        val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+        val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+        checkBlockUpdateRewards(
+          updates(3),
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward5),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
+          ).sortBy(_.address.toByteStr)
+        )
+      }
+    }
+
+    "should return correct rewardShares for Subscribe (NODE-840)" in {
+      blockUpdatesRewardSharesTestCase { case (miner, daoAddress, xtnBuybackAddress, d, r) =>
+        val subscription = r.createFakeObserver(SubscribeRequest.of(2, 0))
+
+        val rewardShares = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend.body.block.map(_.rewardShares))
+
+        // reward distribution features not activated
+        rewardShares.head shouldBe Some(Seq(RewardShare(ByteString.copyFrom(miner.bytes), d.blockchain.settings.rewardsSettings.initial)))
+
+        // BlockRewardDistribution activated
+        val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+        val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+        rewardShares(1) shouldBe Some(
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward3),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward3),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward3)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CappedReward activated
+        val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+        val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+        rewardShares(2) shouldBe Some(
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward4),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward4),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward4)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CeaseXTNBuyback activated with expired XTN buyback reward period
+        val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+        val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+        rewardShares(3) shouldBe Some(
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward5),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
+          ).sortBy(_.address.toByteStr)
+        )
+      }
+    }
   }
 
   private def assertCommon(rollback: RollbackResult): Assertion = {
@@ -931,4 +1072,47 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     case _ => throw new IllegalArgumentException("Not a microblock rollback")
   }
+
+  private def blockUpdatesRewardSharesTestCase(checks: (Address, Address, Address, Domain, Repo) => Unit): Unit = {
+    val daoAddress        = TxHelpers.address(3)
+    val xtnBuybackAddress = TxHelpers.address(4)
+
+    val settings = DomainPresets.ConsensusImprovements
+    val settingsWithFeatures = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 1),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 3,
+        BlockchainFeatures.CappedReward            -> 4,
+        BlockchainFeatures.CeaseXtnBuyback         -> 5
+      )
+
+    withDomainAndRepo(settingsWithFeatures) { case (d, r) =>
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock()
+      (3 to 5).foreach(_ => d.appendBlock())
+      d.appendBlock()
+
+      checks(miner, daoAddress, xtnBuybackAddress, d, r)
+    }
+  }
+
+  private def checkBlockUpdateRewards(height: Int, expected: Seq[RewardShare])(repo: Repo): Assertion =
+    Await
+      .result(
+        repo.getBlockUpdate(GetBlockUpdateRequest(height)),
+        Duration.Inf
+      )
+      .getUpdate
+      .update
+      .append
+      .flatMap(_.body.block.map(_.rewardShares)) shouldBe Some(expected)
+
+  private def checkBlockUpdateRewards(bu: protobuf.BlockchainUpdated, expected: Seq[RewardShare]): Assertion =
+    bu.getAppend.body.block.map(_.rewardShares) shouldBe Some(expected)
 }

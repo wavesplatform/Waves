@@ -76,10 +76,16 @@ object BlocksApiGrpcImpl {
     BlockWithHeight(
       Some(PBBlock(Some(blockMeta.header.toPBHeader), blockMeta.signature.toByteString, txs.map(_._2.toPB))),
       blockMeta.height,
-      blockMeta.vrf.fold(ByteString.EMPTY)(_.toByteString)
+      blockMeta.vrf.fold(ByteString.EMPTY)(_.toByteString),
+      blockMeta.rewardShares.map { case (addr, reward) => RewardShare(ByteString.copyFrom(addr.bytes), reward) }
     )
   }
 
   private def toBlockWithHeight(m: BlockMeta) =
-    BlockWithHeight(Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)), m.height, m.vrf.fold(ByteString.EMPTY)(_.toByteString))
+    BlockWithHeight(
+      Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)),
+      m.height,
+      m.vrf.fold(ByteString.EMPTY)(_.toByteString),
+      m.rewardShares.map { case (addr, reward) => RewardShare(ByteString.copyFrom(addr.bytes), reward) }
+    )
 }
