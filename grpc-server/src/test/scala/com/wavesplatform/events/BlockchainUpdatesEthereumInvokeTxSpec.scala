@@ -34,7 +34,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     val issuerAssetBalanceAfterTx: Long        = issue.quantity.value - burnNum - scriptTransferAssetNum + reissueNum
     val secondAddressWavesBalanceAfterTx: Long = secondTxParticipantBalanceBefore + scriptTransferUnitNum
 
-    "BU-. Invoke have to return correct data for subscribe" in {
+    "BU-226. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val setScript                       = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
         val issuerBalanceBeforeInvoke: Long = firstTxParticipantBalanceBefore - issue.fee.value - setScript.fee.value
@@ -56,7 +56,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-. Invoke have to return correct data for getBlockUpdate" in {
+    "BU-229. Invoke have to return correct data for getBlockUpdate" in {
       for (libVersion <- 5 to 6) {
         val setScript                       = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
         val issuerBalanceBeforeInvoke: Long = firstTxParticipantBalanceBefore - issue.fee.value - setScript.fee.value
@@ -79,7 +79,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-. Invoke have to return correct data for getBlockUpdateRange" in {
+    "BU-232. Invoke have to return correct data for getBlockUpdateRange" in {
       for (libVersion <- 5 to 6) {
         val setScript                       = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
         val issuerBalanceBeforeInvoke: Long = firstTxParticipantBalanceBefore - issue.fee.value - setScript.fee.value
@@ -170,7 +170,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     val dAppAddressAssetBalanceForOriginalCaller = amount - paymentNum
 
 
-    "BU- . doubles nested i.caller. Invoke have to return correct data for subscribe" in {
+    "BU-227. doubles nested i.caller. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx                      = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx                    = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
@@ -197,7 +197,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . doubles nested i.caller. Invoke have to return correct data for getBlockUpdate" in {
+    "BU-230. doubles nested i.caller. Invoke have to return correct data for getBlockUpdate" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx                      = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx                    = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
@@ -224,7 +224,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU- . doubles nested i.caller. Invoke have to return correct data for getBlockUpdateRange" in {
+    "BU-233. doubles nested i.caller. Invoke have to return correct data for getBlockUpdateRange" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx                      = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx                    = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
@@ -251,7 +251,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
+    "BU-228. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
@@ -282,7 +282,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-. double nested i.originCaller. Invoke have to return correct data for getBlockUpdate" in {
+    "BU-231. double nested i.originCaller. Invoke have to return correct data for getBlockUpdate" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
@@ -313,7 +313,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-. double nested i.originCaller. Invoke have to return correct data for getBlockUpdateRange" in {
+    "BU-234. double nested i.originCaller. Invoke have to return correct data for getBlockUpdateRange" in {
       for (libVersion <- 5 to 6) {
         val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
         val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
