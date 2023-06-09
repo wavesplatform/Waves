@@ -266,7 +266,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       }
     }
 
-    "BU-. Return correct data for EthereumTransfer" in {
+    "BU-225. Return correct data for EthereumTransfer" in {
       val ethereumTransfer: EthereumTransaction =
         EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
       val ethAddress = ethereumTransfer.senderAddress.value()
