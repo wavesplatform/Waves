@@ -121,20 +121,20 @@ object TestHelpers extends BlockchainUpdatesTestBase {
   }
 
   def checkGeneralInvoke(
-            append: Append,
-            issuerAssetBalanceAfterTx: Long,
-            invoke: Transaction,
-            issue: IssueTransaction,
-            invokeScript: InvokeScriptMetadata,
-            expectBalancesMap: Map[(Address, Asset), (Long, Long)]
+      append: Append,
+      issuerAssetBalanceAfterTx: Long,
+      invoke: Transaction,
+      issue: IssueTransaction,
+      invokeScript: InvokeScriptMetadata,
+      expectBalancesMap: Map[(Address, Asset), (Long, Long)]
   ): Unit = {
     val issuerInvokeIssueBalance: Long = issueData.apply("amount").toString.toLong - scriptTransferIssueAssetNum
     val result                         = invokeScript.result.get
     val invokeIssueAsset               = toVanillaAssetId(result.issues.head.assetId)
-    val expectMap = expectBalancesMap + (
+    val expectMap = Map(
       (firstTxParticipantAddress, invokeIssueAsset)  -> (0L, issuerInvokeIssueBalance),
       (secondTxParticipantAddress, invokeIssueAsset) -> (0L, scriptTransferIssueAssetNum)
-    )
+    ) ++ expectBalancesMap
     checkSimpleInvoke(append, issue, issuerAssetBalanceAfterTx, invokeScript, invoke.id.value().arr)
     checkBalances(
       append.transactionStateUpdates.head.balances,
