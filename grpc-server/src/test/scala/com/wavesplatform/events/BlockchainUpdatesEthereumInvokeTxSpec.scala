@@ -1,22 +1,20 @@
 package com.wavesplatform.events
 
+import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.api.grpc.protobuf.GetBlockUpdatesRangeRequest
-import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.{checkDoubleNestingInvoke, checkSimpleInvoke}
+import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.checkInvokeDoubleNestedBlockchainUpdates
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
+import com.wavesplatform.events.fixtures.TestHelpers.{checkGeneralInvoke, doubleNestedInvokeTest, testInvoke}
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
-import com.wavesplatform.protobuf.transaction.PBAmounts.toVanillaAssetId
-import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.EthTxGenerator.Arg
-import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxNonNegativeAmount}
-import com.wavesplatform.transaction.TxHelpers.{secondAddress, secondSigner}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, EthereumTransaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.TxHelpers.secondAddress
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
 class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
@@ -24,125 +22,69 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
 
   "Simple invoke transaction" - {
     val issue          = TxHelpers.issue(firstTxParticipant)
-    val asset          = issue.asset
-    val assetByteStr   = Arg.Bytes(asset.id)
+    val asset: Asset   = issue.asset
+    val assetByteStr   = Arg.Bytes(asset.compatId.get)
     val addressByteStr = Arg.Bytes(ByteStr.apply(secondTxParticipantAddress.bytes))
     val args: Seq[Arg] = Seq(assetByteStr, addressByteStr)
     val invoke: EthereumTransaction =
       EthTxGenerator.generateEthInvoke(firstTxParticipantEthereum, firstTxParticipantAddress, invokeFunctionName, args, Seq.empty, invokeFee)
-    val issuerInvokeIssueBalance: Long         = issueData.apply("amount").toString.toLong - scriptTransferIssueAssetNum
     val issuerAssetBalanceAfterTx: Long        = issue.quantity.value - burnNum - scriptTransferAssetNum + reissueNum
     val secondAddressWavesBalanceAfterTx: Long = secondTxParticipantBalanceBefore + scriptTransferUnitNum
+    val issuerBalanceBeforeInvoke: Long        = firstTxParticipantBalanceBefore - issue.fee.value - fee
+    val balances: Seq[AddrWithBalance] = Seq(
+      AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
+      AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
+      AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+    )
+    val expectBalanceMap = Map(
+      (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, ethAddressBalanceAfterTx),
+      (firstTxParticipantAddress, Waves)         -> (issuerBalanceBeforeInvoke, issuerBalanceBeforeInvoke - scriptTransferUnitNum),
+      (secondTxParticipantAddress, Waves)        -> (secondTxParticipantBalanceBefore, secondAddressWavesBalanceAfterTx),
+      (firstTxParticipantAddress, asset)         -> (issue.quantity.value, issuerAssetBalanceAfterTx),
+      (secondTxParticipantAddress, asset)        -> (0L, scriptTransferAssetNum)
+    )
 
     "BU-226. Invoke have to return correct data for subscribe" in {
-      for (libVersion <- 5 to 6) {
-        val setScript                       = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
-        val issuerBalanceBeforeInvoke: Long = firstTxParticipantBalanceBefore - issue.fee.value - setScript.fee.value
-        withGenerateSubscription(
-          settings = currentSettings,
-          balances = Seq(
-            AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-            AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
-            AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
-          )
-        ) { d =>
-          d.appendBlock(setScript)
-          d.appendBlock(issue)
-          d.appendMicroBlock(invoke)
-        } { updates =>
-          val append = updates(3).append
-          checkEthInvoke(append, issuerBalanceBeforeInvoke)
+      testInvoke(issue, invoke, balances)(
+        checkType = "subscribe",
+        checkFunction = append => {
+          val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+          checkEthereumBase(append, invoke, invokeFunctionName)
+          checkGeneralInvoke(append, issuerAssetBalanceAfterTx, invoke, issue, invokeScriptMetadata, expectBalanceMap)
         }
-      }
+      )
     }
 
     "BU-229. Invoke have to return correct data for getBlockUpdate" in {
-      for (libVersion <- 5 to 6) {
-        val setScript                       = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
-        val issuerBalanceBeforeInvoke: Long = firstTxParticipantBalanceBefore - issue.fee.value - setScript.fee.value
-        withGenerateGetBlockUpdate(
-          height = 4,
-          settings = currentSettings,
-          balances = Seq(
-            AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-            AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
-            AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
-          )
-        ) { d =>
-          d.appendBlock(setScript)
-          d.appendBlock(issue)
-          d.appendBlock(invoke)
-        } { getBlockUpdate =>
-          val append = getBlockUpdate.getUpdate.getAppend
-          checkEthInvoke(append, issuerBalanceBeforeInvoke)
+      testInvoke(issue, invoke, balances)(
+        checkType = "getBlockUpdate",
+        checkFunction = append => {
+          val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+          checkEthereumBase(append, invoke, invokeFunctionName)
+          checkGeneralInvoke(append, issuerAssetBalanceAfterTx, invoke, issue, invokeScriptMetadata, expectBalanceMap)
         }
-      }
+      )
     }
 
     "BU-232. Invoke have to return correct data for getBlockUpdateRange" in {
-      for (libVersion <- 5 to 6) {
-        val setScript                       = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
-        val issuerBalanceBeforeInvoke: Long = firstTxParticipantBalanceBefore - issue.fee.value - setScript.fee.value
-        withGenerateGetBlockUpdateRange(
-          GetBlockUpdatesRangeRequest.of(1, 4),
-          settings = currentSettings,
-          balances = Seq(
-            AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-            AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
-            AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
-          )
-        ) { d =>
-          d.appendBlock(setScript)
-          d.appendBlock(issue)
-          d.appendBlock(invoke)
-          d.appendBlock()
-        } { getBlockUpdateRange =>
-          val append = getBlockUpdateRange.apply(3).getAppend
-          checkEthInvoke(append, issuerBalanceBeforeInvoke)
+      testInvoke(issue, invoke, balances)(
+        checkType = "getBlockUpdateRange",
+        checkFunction = append => {
+          val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+          checkEthereumBase(append, invoke, invokeFunctionName)
+          checkGeneralInvoke(append, issuerAssetBalanceAfterTx, invoke, issue, invokeScriptMetadata, expectBalanceMap)
         }
-      }
-    }
-
-    def checkEthInvoke(append: Append, issuerBalanceBeforeInvoke: Long): Unit = {
-      val transactionMetadata = append.transactionsMetadata.head
-      val invokeScript        = transactionMetadata.getEthereum.getInvoke
-      val result              = invokeScript.result.get
-      val invokeIssueAsset    = toVanillaAssetId(result.issues.head.assetId)
-      val invokeLeaseId       = result.leases.head.leaseId.toByteArray
-      checkEthereumTransaction(append.transactionIds.head, append.transactionAt(0), invoke)
-      checkEthereumInvokeBaseTransactionMetadata(transactionMetadata, invoke, invokeFunctionName, firstTxParticipantAddress)
-      checkSimpleInvoke(append, issue, issuerAssetBalanceAfterTx, invokeScript)
-      checkBalances(
-        append.transactionStateUpdates.head.balances,
-        Map(
-          (firstTxParticipantEthereumAddress, Waves)     -> (firstTxParticipantBalanceBefore, ethAddressBalanceAfterTx),
-          (firstTxParticipantAddress, Waves)             -> (issuerBalanceBeforeInvoke, issuerBalanceBeforeInvoke - scriptTransferUnitNum),
-          (secondTxParticipantAddress, Waves)            -> (secondTxParticipantBalanceBefore, secondAddressWavesBalanceAfterTx),
-          (firstTxParticipantAddress, asset)             -> (issue.quantity.value, issuerAssetBalanceAfterTx),
-          (firstTxParticipantAddress, invokeIssueAsset)  -> (0, issuerInvokeIssueBalance),
-          (secondTxParticipantAddress, invokeIssueAsset) -> (0, scriptTransferIssueAssetNum),
-          (secondTxParticipantAddress, asset)            -> (0, scriptTransferAssetNum)
-        )
-      )
-      checkIndividualLeases(
-        append.transactionStateUpdates.head.individualLeases,
-        Map(
-          (
-            LeaseStatus.Inactive,
-            leaseNum
-          ) -> (invokeLeaseId, firstTxParticipant.publicKey.arr, secondTxParticipantAddress.bytes, invoke.id.value().arr)
-        )
       )
     }
   }
 
-  "Double nesting call tests" - {
+  "Double nesting call ethereum tests" - {
     val assetDappAccount: SeedKeyPair   = TxHelpers.signer(4)
     val assetDappAddress: Address       = assetDappAccount.toAddress
     val invokerDappAccount: SeedKeyPair = TxHelpers.signer(5)
     val invokerDappAddress: Address     = invokerDappAccount.toAddress
-    val issue                           = TxHelpers.issue(assetDappAccount)
-    val asset                           = issue.asset
+    val issue: IssueTransaction         = TxHelpers.issue(assetDappAccount)
+    val asset: Asset                    = issue.asset
     val issueAssetFee                   = issue.fee.value
     val massTx = TxHelpers.massTransfer(
       assetDappAccount,
@@ -160,270 +102,117 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
         Arg.Bytes(ByteStr.apply(assetDappAddress.bytes)),
         Arg.Integer(scriptTransferUnitNum),
         Arg.Str(bar),
-        Arg.Bytes(asset.id)
+        Arg.Bytes(asset.compatId.get)
       )
     val invoke = EthTxGenerator.generateEthInvoke(firstTxParticipantEthereum, firstTxParticipantAddress, "foo", args, Seq.empty, invokeFee)
-    val secondAddressBalance: Long       = 8.waves
-    val assetDappBalance: Long           = 12.waves
-    val secondAddressAssetBalanceForAll  = amount - scriptTransferAssetNum + paymentNum
-    val dAppAddressAssetBalanceForCaller = amount + scriptTransferAssetNum - paymentNum
+    val secondAddressBalance: Long               = 8.waves
+    val assetDappBalance: Long                   = 12.waves
+    val secondAddressAssetBalanceForAll          = amount - scriptTransferAssetNum + paymentNum
+    val dAppAddressAssetBalanceForCaller         = amount + scriptTransferAssetNum - paymentNum
     val dAppAddressAssetBalanceForOriginalCaller = amount - paymentNum
-
+    val balancesSeq = Seq(
+      AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
+      AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
+      AddrWithBalance(secondAddress, secondAddressBalance),
+      AddrWithBalance(invokerDappAddress, ethAddressBalanceAfterTx),
+      AddrWithBalance(assetDappAddress, assetDappBalance)
+    )
+    val secondAddressWavesBalanceBefore    = secondAddressBalance - fee
+    val secondAddressWavesBalanceAfter     = secondAddressWavesBalanceBefore + scriptTransferUnitNum
+    val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - fee
+    val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
+    val firstTxParticipantBalanceAfter     = ethAddressBalanceAfterTx + scriptTransferUnitNum
+    val callerBalancesMap = Map(
+      (secondAddress, Waves)                     -> (secondAddressWavesBalanceBefore, secondAddressWavesBalanceAfter),
+      (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
+      (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForCaller),
+      (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
+      (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, ethAddressBalanceAfterTx)
+    )
+    val originalCallerBalancesMap = Map(
+      (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
+      (firstTxParticipantEthereumAddress, asset) -> (0L, scriptTransferAssetNum),
+      (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForOriginalCaller),
+      (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
+      (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, firstTxParticipantBalanceAfter)
+    )
 
     "BU-227. doubles nested i.caller. Invoke have to return correct data for subscribe" in {
-      for (libVersion <- 5 to 6) {
-        val mainDAppTx                      = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
-        val nestedDAppTx                    = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
-        val doubleNestedDAppTx              = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller", libVersion)))
-        val secondAddressWavesBalanceBefore = secondAddressBalance - nestedDAppTx.fee.value
-        val secondAddressWavesBalanceAfter  = secondAddressWavesBalanceBefore + scriptTransferUnitNum
-        val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - doubleNestedDAppTx.fee.value
-        val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-
-        addedBlocksAndSubscribeDoubleNestingInvoke(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
-          val balances = updates(2).getAppend.transactionStateUpdates.head.balances
-          checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, assetDappAddress, firstTxParticipantAddress, secondAddress)
-          checkBalances(
-            balances,
-            Map(
-              (secondAddress, Waves)                     -> (secondAddressWavesBalanceBefore, secondAddressWavesBalanceAfter),
-              (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
-              (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForCaller),
-              (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-              (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, ethAddressBalanceAfterTx)
-            )
-          )
-        }
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, checkType = "subscribe") { append =>
+        val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+        checkEthereumBase(append, invoke, foo)
+        checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, firstTxParticipantAddress, secondAddress, issue, callerBalancesMap)
       }
     }
 
     "BU-230. doubles nested i.caller. Invoke have to return correct data for getBlockUpdate" in {
-      for (libVersion <- 5 to 6) {
-        val mainDAppTx                      = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
-        val nestedDAppTx                    = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
-        val doubleNestedDAppTx              = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller", libVersion)))
-        val secondAddressWavesBalanceBefore = secondAddressBalance - nestedDAppTx.fee.value
-        val secondAddressWavesBalanceAfter  = secondAddressWavesBalanceBefore + scriptTransferUnitNum
-        val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - doubleNestedDAppTx.fee.value
-        val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-
-        withAddedBlocksAndGetBlockUpdate(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { update =>
-          val balances = update.getAppend.transactionStateUpdates.head.balances
-          checkInvokeDoubleNestedBlockchainUpdates(update.getAppend, assetDappAddress, firstTxParticipantAddress, secondAddress)
-          checkBalances(
-            balances,
-            Map(
-              (secondAddress, Waves)                     -> (secondAddressWavesBalanceBefore, secondAddressWavesBalanceAfter),
-              (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
-              (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForCaller),
-              (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-              (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, ethAddressBalanceAfterTx)
-            )
-          )
-        }
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, checkType = "getBlockUpdate") { append =>
+        val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+        checkEthereumBase(append, invoke, foo)
+        checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, firstTxParticipantAddress, secondAddress, issue, callerBalancesMap)
       }
     }
 
     "BU-233. doubles nested i.caller. Invoke have to return correct data for getBlockUpdateRange" in {
-      for (libVersion <- 5 to 6) {
-        val mainDAppTx                      = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
-        val nestedDAppTx                    = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.caller", libVersion)))
-        val doubleNestedDAppTx              = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.caller", libVersion)))
-        val secondAddressWavesBalanceBefore = secondAddressBalance - nestedDAppTx.fee.value
-        val secondAddressWavesBalanceAfter  = secondAddressWavesBalanceBefore + scriptTransferUnitNum
-        val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - doubleNestedDAppTx.fee.value
-        val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-
-        withAddedBlocksAndGetBlockUpdateRange(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
-          val balances = updates(2).getAppend.transactionStateUpdates.head.balances
-          checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, assetDappAddress, firstTxParticipantAddress, secondAddress)
-          checkBalances(
-            balances,
-            Map(
-              (secondAddress, Waves)                     -> (secondAddressWavesBalanceBefore, secondAddressWavesBalanceAfter),
-              (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
-              (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForCaller),
-              (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-              (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, ethAddressBalanceAfterTx)
-            )
-          )
-        }
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, checkType = "getBlockUpdate") { append =>
+        val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+        checkEthereumBase(append, invoke, foo)
+        checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, firstTxParticipantAddress, secondAddress, issue, callerBalancesMap)
       }
     }
 
     "BU-228. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
-      for (libVersion <- 5 to 6) {
-        val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
-        val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
-        val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.originCaller", libVersion)))
-        val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - doubleNestedDAppTx.fee.value
-        val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-        val firstTxParticipantBalanceAfter     = ethAddressBalanceAfterTx + scriptTransferUnitNum
-
-        addedBlocksAndSubscribeDoubleNestingInvoke(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
-          val balances = updates(2).getAppend.transactionStateUpdates.head.balances
-          checkInvokeDoubleNestedBlockchainUpdates(
-            updates(2).getAppend,
-            assetDappAddress,
-            firstTxParticipantEthereumAddress,
-            firstTxParticipantEthereumAddress
-          )
-          checkBalances(
-            balances,
-            Map(
-              (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
-              (firstTxParticipantEthereumAddress, asset) -> (0, scriptTransferAssetNum),
-              (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForOriginalCaller),
-              (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-              (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, firstTxParticipantBalanceAfter)
-            )
-          )
-        }
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, checkType = "subscribe") { append =>
+        val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+        checkEthereumBase(append, invoke, foo)
+        checkInvokeDoubleNestedBlockchainUpdates(
+          append,
+          invokeScriptMetadata,
+          assetDappAddress,
+          firstTxParticipantEthereumAddress,
+          firstTxParticipantEthereumAddress,
+          issue,
+          originalCallerBalancesMap
+        )
       }
     }
 
     "BU-231. double nested i.originCaller. Invoke have to return correct data for getBlockUpdate" in {
-      for (libVersion <- 5 to 6) {
-        val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
-        val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
-        val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.originCaller", libVersion)))
-        val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - doubleNestedDAppTx.fee.value
-        val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-        val firstTxParticipantBalanceAfter     = ethAddressBalanceAfterTx + scriptTransferUnitNum
-
-        withAddedBlocksAndGetBlockUpdate(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { update =>
-          val balances = update.getAppend.transactionStateUpdates.head.balances
-          checkInvokeDoubleNestedBlockchainUpdates(
-            update.getAppend,
-            assetDappAddress,
-            firstTxParticipantEthereumAddress,
-            firstTxParticipantEthereumAddress
-          )
-          checkBalances(
-            balances,
-            Map(
-              (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
-              (firstTxParticipantEthereumAddress, asset) -> (0, scriptTransferAssetNum),
-              (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForOriginalCaller),
-              (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-              (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, firstTxParticipantBalanceAfter)
-            )
-          )
-        }
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, checkType = "getBlockUpdate") { append =>
+        val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+        checkEthereumBase(append, invoke, foo)
+        checkInvokeDoubleNestedBlockchainUpdates(
+          append,
+          invokeScriptMetadata,
+          assetDappAddress,
+          firstTxParticipantEthereumAddress,
+          firstTxParticipantEthereumAddress,
+          issue,
+          originalCallerBalancesMap
+        )
       }
     }
 
     "BU-234. double nested i.originCaller. Invoke have to return correct data for getBlockUpdateRange" in {
-      for (libVersion <- 5 to 6) {
-        val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
-        val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript("i.originCaller", libVersion)))
-        val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript("i.originCaller", libVersion)))
-        val assetDappAddressWavesBalanceBefore = assetDappBalance - issueAssetFee - massTx.fee.value - doubleNestedDAppTx.fee.value
-        val assetDappAddressWavesBalanceAfter  = assetDappAddressWavesBalanceBefore - scriptTransferUnitNum
-        val firstTxParticipantBalanceAfter     = ethAddressBalanceAfterTx + scriptTransferUnitNum
-
-        withAddedBlocksAndGetBlockUpdateRange(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
-          val balances = updates(2).getAppend.transactionStateUpdates.head.balances
-          checkInvokeDoubleNestedBlockchainUpdates(
-            updates(2).getAppend,
-            assetDappAddress,
-            firstTxParticipantEthereumAddress,
-            firstTxParticipantEthereumAddress
-          )
-          checkBalances(
-            balances,
-            Map(
-              (secondAddress, asset)                     -> (amount, secondAddressAssetBalanceForAll),
-              (firstTxParticipantEthereumAddress, asset) -> (0, scriptTransferAssetNum),
-              (firstTxParticipantAddress, asset)         -> (amount, dAppAddressAssetBalanceForOriginalCaller),
-              (assetDappAddress, Waves)                  -> (assetDappAddressWavesBalanceBefore, assetDappAddressWavesBalanceAfter),
-              (firstTxParticipantEthereumAddress, Waves) -> (firstTxParticipantBalanceBefore, firstTxParticipantBalanceAfter)
-            )
-          )
-        }
-      }
-    }
-
-    def checkInvokeDoubleNestedBlockchainUpdates(
-        append: Append,
-        transferAddress: Address,
-        nestedTransferAddress: Address,
-        doubleNestedTransferAddress: Address
-    ): Unit = {
-      val txMetadata = append.transactionsMetadata.head
-      val invokeScript = txMetadata.getEthereum.getInvoke
-      checkEthereumTransaction(append.transactionIds.head, append.transactionAt(0), invoke)
-      checkEthereumInvokeBaseTransactionMetadata(txMetadata, invoke, foo, firstTxParticipantAddress)
-      checkDoubleNestingInvoke(append, invokeScript, issue, transferAddress, nestedTransferAddress, doubleNestedTransferAddress)
-    }
-
-    def addedBlocksAndSubscribeDoubleNestingInvoke(
-        mainDAppTx: SetScriptTransaction,
-        nestedDAppTx: SetScriptTransaction,
-        doubleNestedDAppTx: SetScriptTransaction
-    )(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
-      withGenerateSubscription(
-        settings = currentSettings,
-        balances = Seq(
-          AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-          AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
-          AddrWithBalance(secondAddress, secondAddressBalance),
-          AddrWithBalance(invokerDappAddress, ethAddressBalanceAfterTx),
-          AddrWithBalance(assetDappAddress, assetDappBalance)
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, checkType = "getBlockUpdateRange") { append =>
+        val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
+        checkEthereumBase(append, invoke, foo)
+        checkInvokeDoubleNestedBlockchainUpdates(
+          append,
+          invokeScriptMetadata,
+          assetDappAddress,
+          firstTxParticipantEthereumAddress,
+          firstTxParticipantEthereumAddress,
+          issue,
+          originalCallerBalancesMap
         )
-      ) { d =>
-        d.appendBlock(issue, massTx, mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
-        d.appendMicroBlock(invoke)
-      } { updates =>
-        f(updates)
       }
     }
+  }
 
-    def withAddedBlocksAndGetBlockUpdate(
-        mainDAppTx: SetScriptTransaction,
-        nestedDAppTx: SetScriptTransaction,
-        doubleNestedDAppTx: SetScriptTransaction
-    )(f: PBBlockchainUpdated => Unit): Unit = {
-      withGenerateGetBlockUpdate(
-        height = 3,
-        settings = currentSettings,
-        balances = Seq(
-          AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-          AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
-          AddrWithBalance(secondAddress, secondAddressBalance),
-          AddrWithBalance(invokerDappAddress, ethAddressBalanceAfterTx),
-          AddrWithBalance(assetDappAddress, assetDappBalance)
-        )
-      ) { d =>
-        d.appendBlock(issue, massTx, mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
-        d.appendBlock(invoke)
-      } { getBlockUpdate =>
-        f(getBlockUpdate.getUpdate)
-      }
-    }
-
-    def withAddedBlocksAndGetBlockUpdateRange(
-        mainDAppTx: SetScriptTransaction,
-        nestedDAppTx: SetScriptTransaction,
-        doubleNestedDAppTx: SetScriptTransaction
-    )(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
-      withGenerateGetBlockUpdateRange(
-        GetBlockUpdatesRangeRequest.of(1, 3),
-        settings = currentSettings,
-        balances = Seq(
-          AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
-          AddrWithBalance(firstTxParticipantEthereumAddress, firstTxParticipantBalanceBefore),
-          AddrWithBalance(secondAddress, secondAddressBalance),
-          AddrWithBalance(invokerDappAddress, ethAddressBalanceAfterTx),
-          AddrWithBalance(assetDappAddress, assetDappBalance)
-        )
-      ) { d =>
-        d.appendBlock(issue, massTx, mainDAppTx, nestedDAppTx, doubleNestedDAppTx)
-        d.appendBlock(invoke)
-        d.appendBlock()
-      } { getBlockUpdateRange =>
-        f(getBlockUpdateRange)
-      }
-    }
+  def checkEthereumBase(append: Append, invoke: EthereumTransaction, functionName: String): Unit = {
+    val txMetadata = append.transactionsMetadata.head
+    checkEthereumTransaction(append.transactionIds.head, append.transactionAt(0), invoke)
+    checkEthereumInvokeBaseTransactionMetadata(txMetadata, invoke, functionName, firstTxParticipantAddress)
   }
 }

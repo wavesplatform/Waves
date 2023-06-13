@@ -219,7 +219,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: InvokeScriptTransaction, publicKeyHash: Array[Byte])(implicit
+  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: TransactionBase, publicKeyHash: Array[Byte])(implicit
       pos: Position
   ): Unit = {
     checkBaseTx(actualId, actual, expected)

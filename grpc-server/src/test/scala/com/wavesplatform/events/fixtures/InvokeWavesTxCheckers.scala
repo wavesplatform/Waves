@@ -2,18 +2,26 @@ package com.wavesplatform.events.fixtures
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.BlockchainUpdatesTestBase
+import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.events.protobuf.TransactionMetadata.InvokeScriptMetadata
 import com.wavesplatform.protobuf.transaction.PBAmounts.toVanillaAssetId
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.secondAddress
 import com.wavesplatform.transaction.assets.IssueTransaction
 
 object InvokeWavesTxCheckers extends BlockchainUpdatesTestBase {
-  def checkSimpleInvoke(append: Append, issue: IssueTransaction, issuerAssetBalanceAfterTx: Long, invokeScript: InvokeScriptMetadata): Unit = {
+  def checkSimpleInvoke(
+      append: Append,
+      issue: IssueTransaction,
+      issuerAssetBalanceAfterTx: Long,
+      invokeScript: InvokeScriptMetadata,
+      invokeId: Array[Byte]
+  ): Unit = {
     val assetId = issue.assetId.arr
 
     val dataEntry: Seq[DataEntry[?]] = Seq[DataEntry[?]](
@@ -58,6 +66,15 @@ object InvokeWavesTxCheckers extends BlockchainUpdatesTestBase {
     checkAssetsStateUpdates(assetDetails.head.after, issueData, invokeIssueAsset, firstTxParticipant.publicKey.arr)
     checkAssetsStateUpdates(assetDetails.apply(1).before, issue, isNft = false, issue.quantity.value)
     checkAssetsStateUpdates(assetDetails.apply(1).after, issue, isNft = false, issuerAssetBalanceAfterTx + scriptTransferAssetNum)
+    checkIndividualLeases(
+      append.transactionStateUpdates.head.individualLeases,
+      Map(
+        (
+          LeaseStatus.Inactive,
+          leaseNum
+        ) -> (invokeLeaseId, firstTxParticipant.publicKey.arr, secondTxParticipantAddress.bytes, invokeId)
+      )
+    )
   }
 
   def checkDoubleNestingInvoke(
@@ -68,16 +85,16 @@ object InvokeWavesTxCheckers extends BlockchainUpdatesTestBase {
       nestedTransferAddress: Address,
       doubleNestedTransferAddress: Address
   ): Unit = {
-    val scriptTransferWavesSum = scriptTransferUnitNum * 2
-    val asset                     = issue.asset
-    val actualData                = Seq(("bar", scriptTransferWavesSum))
-    val arguments                 = invokeScript.arguments
-    val result                    = invokeScript.result.get
-    val invokes                   = result.invokes.head
-    val invokesStateChangeInvoke  = invokes.stateChanges.get.invokes.head
-    val actualDataEntries = append.transactionStateUpdates.head.dataEntries
+    val scriptTransferWavesSum               = scriptTransferUnitNum * 2
+    val asset                                = issue.asset
+    val actualData                           = Seq(("bar", scriptTransferWavesSum))
+    val arguments                            = invokeScript.arguments
+    val result                               = invokeScript.result.get
+    val invokes                              = result.invokes.head
+    val invokesStateChangeInvoke             = invokes.stateChanges.get.invokes.head
+    val actualDataEntries                    = append.transactionStateUpdates.head.dataEntries
     val expectDataEntries: Seq[DataEntry[?]] = Seq[DataEntry[?]](IntegerDataEntry(bar, scriptTransferWavesSum))
-    val expectedValues: List[Any] = List(secondAddress.bytes, assetDappAddress.bytes, scriptTransferUnitNum, bar, issue.asset.id.arr)
+    val expectedValues: List[Any]            = List(secondAddress.bytes, assetDappAddress.bytes, scriptTransferUnitNum, bar, issue.asset.id.arr)
     val actualArguments: List[Any] = List(
       arguments.head.value.binaryValue.get.toByteArray,
       arguments(1).value.binaryValue.get.toByteArray,
@@ -103,5 +120,21 @@ object InvokeWavesTxCheckers extends BlockchainUpdatesTestBase {
       Waves
     )
     checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, firstTxParticipantAddress.bytes)
+  }
+
+  def checkInvokeDoubleNestedBlockchainUpdates(
+      append: Append,
+      invokeScript: InvokeScriptMetadata,
+      transferAddress: Address,
+      nestedTransferAddress: Address,
+      doubleNestedTransferAddress: Address,
+      issue: IssueTransaction,
+      expectBalancesMap: Map[(Address, Asset), (Long, Long)]
+  ): Unit = {
+    val actualDataEntries = append.transactionStateUpdates.head.dataEntries
+    val actualBalances    = append.transactionStateUpdates.head.balances
+    checkDoubleNestingInvoke(append, invokeScript, issue, transferAddress, nestedTransferAddress, doubleNestedTransferAddress)
+    checkDataEntriesStateUpdate(actualDataEntries, expectDataEntries, firstTxParticipantAddress.bytes)
+    checkBalances(actualBalances, expectBalancesMap)
   }
 }

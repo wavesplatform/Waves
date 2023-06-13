@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.events.fixtures.PrepareInvokeTestData.{bar, scriptTransferUnitNum}
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.lang.script.Script
@@ -24,41 +25,44 @@ import org.scalatest.concurrent.ScalaFutures
 import org.web3j.crypto.Bip32ECKeyPair
 
 abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with ScalaFutures {
-  val currentSettings: WavesSettings                    = DomainPresets.RideV6
-  val amount: Long                                      = 9000000
-  val additionalAmount: Long                            = 5000000
-  val customFee: Long                                   = 5234567L
-  val customAssetIssueFee                               = 234567654L
-  val invokeFee: Long                                   = 1.005.waves
-  val firstTxParticipant: SeedKeyPair                   = TxHelpers.signer(2)
-  val firstTxParticipantAddress: Address                = firstTxParticipant.toAddress
-  val ethKeyPairExt: EthereumKeyPairExt                 = EthereumKeyPairExt(firstTxParticipant)
-  val firstTxParticipantEthereum: Bip32ECKeyPair        = ethKeyPairExt.toEthKeyPair
-  val firstTxParticipantEthereumAddress: Address        = ethKeyPairExt.toEthWavesAddress
+  val currentSettings: WavesSettings                   = DomainPresets.RideV6
+  val amount: Long                                     = 9000000
+  val additionalAmount: Long                           = 5000000
+  val customFee: Long                                  = 5234567L
+  val customAssetIssueFee                              = 234567654L
+  val invokeFee: Long                                  = 1.005.waves
+  val firstTxParticipant: SeedKeyPair                  = TxHelpers.signer(2)
+  val firstTxParticipantAddress: Address               = firstTxParticipant.toAddress
+  val ethKeyPairExt: EthereumKeyPairExt                = EthereumKeyPairExt(firstTxParticipant)
+  val firstTxParticipantEthereum: Bip32ECKeyPair       = ethKeyPairExt.toEthKeyPair
+  val firstTxParticipantEthereumAddress: Address       = ethKeyPairExt.toEthWavesAddress
   val firstTxParticipantEthereumPublicKey: Array[Byte] = firstTxParticipantEthereum.getPublicKey.toByteArray
-  val ethKeyPair: SeedKeyPair                           = SeedKeyPair.apply(firstTxParticipantEthereum.getPrivateKeyBytes33)
-  val firstTxParticipantBalanceBefore: Long             = 20.waves
-  val secondTxParticipant: SeedKeyPair                  = TxHelpers.signer(3)
-  val secondTxParticipantAddress: Address               = secondTxParticipant.toAddress
-  val secondTxParticipantPKHash: Array[Byte]            = secondTxParticipantAddress.publicKeyHash
-  val secondTxParticipantBalanceBefore: Long            = 20.waves
-  val recipients: Seq[ParsedTransfer]                   = TxHelpers.accountSeqGenerator(100, additionalAmount)
-  val firstToken: IssueTransaction                      = TxHelpers.issue(firstTxParticipant, amount = 2000000000L, 2)
-  val firstTokenAsset: IssuedAsset                      = firstToken.asset
-  val firstTokenQuantity: Long                          = firstToken.quantity.value
-  val firstTokenFee: Long                               = firstToken.fee.value
-  val secondToken: IssueTransaction                     = TxHelpers.issue(secondTxParticipant, amount = 6000000000L, 6)
-  val secondTokenAsset: IssuedAsset                     = secondToken.asset
-  val secondTokenQuantity: Long                         = secondToken.quantity.value
-  val integerDataEntry: IntegerDataEntry                = IntegerDataEntry.apply("Integer", 3550000L)
-  val booleanDataEntry: BooleanDataEntry                = BooleanDataEntry.apply("Boolean", value = true)
-  val stringDataEntry: StringDataEntry                  = StringDataEntry.apply("String", "test")
-  val binaryDataEntry: BinaryDataEntry                  = BinaryDataEntry.apply("Binary", ByteStr.apply(firstTxParticipantAddress.bytes))
-  val entries: Seq[DataEntry[?]]                        = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
-  val defaultScript: Option[Script]                     = Option(TxHelpers.script("true"))
-  val complexScriptBefore: Option[Script]               = Option.apply(TxHelpers.script("true".stripMargin))
-  val complexScriptAfter: Script                        = TxHelpers.script("false".stripMargin)
-  val invokeFunctionName: String = "setData"
+  val ethKeyPair: SeedKeyPair                          = SeedKeyPair.apply(firstTxParticipantEthereum.getPrivateKeyBytes33)
+  val firstTxParticipantBalanceBefore: Long            = 20.waves
+  val secondTxParticipant: SeedKeyPair                 = TxHelpers.signer(3)
+  val secondTxParticipantAddress: Address              = secondTxParticipant.toAddress
+  val secondTxParticipantPKHash: Array[Byte]           = secondTxParticipantAddress.publicKeyHash
+  val secondTxParticipantBalanceBefore: Long           = 20.waves
+  val recipients: Seq[ParsedTransfer]                  = TxHelpers.accountSeqGenerator(100, additionalAmount)
+  val firstToken: IssueTransaction                     = TxHelpers.issue(firstTxParticipant, amount = 2000000000L, 2)
+  val firstTokenAsset: IssuedAsset                     = firstToken.asset
+  val firstTokenQuantity: Long                         = firstToken.quantity.value
+  val firstTokenFee: Long                              = firstToken.fee.value
+  val secondToken: IssueTransaction                    = TxHelpers.issue(secondTxParticipant, amount = 6000000000L, 6)
+  val secondTokenAsset: IssuedAsset                    = secondToken.asset
+  val secondTokenQuantity: Long                        = secondToken.quantity.value
+  val integerDataEntry: IntegerDataEntry               = IntegerDataEntry.apply("Integer", 3550000L)
+  val booleanDataEntry: BooleanDataEntry               = BooleanDataEntry.apply("Boolean", value = true)
+  val stringDataEntry: StringDataEntry                 = StringDataEntry.apply("String", "test")
+  val binaryDataEntry: BinaryDataEntry                 = BinaryDataEntry.apply("Binary", ByteStr.apply(firstTxParticipantAddress.bytes))
+  val expectDataEntries: Seq[DataEntry[?]]             = Seq[DataEntry[?]](IntegerDataEntry(bar, scriptTransferUnitNum * 2))
+  val entries: Seq[DataEntry[?]]                       = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
+  val defaultScript: Option[Script]                    = Option(TxHelpers.script("true"))
+  val complexScriptBefore: Option[Script]              = Option.apply(TxHelpers.script("true".stripMargin))
+  val complexScriptAfter: Script                       = TxHelpers.script("false".stripMargin)
+  val invokeFunctionName: String                       = "setData"
+  val caller: String                                   = "i.caller"
+  val originCaller: String                             = "i.originCaller"
   val testScript: Script = TxHelpers.script(s"""{-# STDLIB_VERSION 6 #-}
                                                |{-# CONTENT_TYPE DAPP #-}
                                                |{-# SCRIPT_TYPE ACCOUNT #-}
