@@ -16,10 +16,10 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBAmounts
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
@@ -446,7 +446,8 @@ class RocksDBWriter(
           assetStatic.decimals,
           assetStatic.nft,
           assetNum,
-          height
+          height,
+          asset.id.toByteString
         )
         rw.put(Keys.assetStaticInfo(asset), Some(pbAssetStatic))
       }
