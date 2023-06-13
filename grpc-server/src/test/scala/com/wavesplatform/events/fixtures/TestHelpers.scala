@@ -131,7 +131,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
     val issuerInvokeIssueBalance: Long = issueData.apply("amount").toString.toLong - scriptTransferIssueAssetNum
     val result                         = invokeScript.result.get
     val invokeIssueAsset               = toVanillaAssetId(result.issues.head.assetId)
-    val expectMap = expectBalancesMap ++ (
+    val expectMap = expectBalancesMap + (
       (firstTxParticipantAddress, invokeIssueAsset)  -> (0L, issuerInvokeIssueBalance),
       (secondTxParticipantAddress, invokeIssueAsset) -> (0L, scriptTransferIssueAssetNum)
     )
