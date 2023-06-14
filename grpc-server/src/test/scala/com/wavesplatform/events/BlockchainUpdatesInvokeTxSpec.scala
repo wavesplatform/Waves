@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.fixtures.BlockchainUpdateTrait.*
+import com.wavesplatform.events.fixtures.BlockchainUpdateGrpcMethod.*
 import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.checkInvokeDoubleNestedBlockchainUpdates
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
 import com.wavesplatform.events.fixtures.TestHelpers.{checkGeneralInvoke, doubleNestedInvokeTest, testInvoke}

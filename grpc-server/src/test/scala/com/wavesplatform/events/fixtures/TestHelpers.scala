@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdatesTestBase
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeRequest}
-import com.wavesplatform.events.fixtures.BlockchainUpdateTrait.*
+import com.wavesplatform.events.fixtures.BlockchainUpdateGrpcMethod.*
 import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.checkSimpleInvoke
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
 import com.wavesplatform.events.fixtures.WavesTxChecks.checkBalances
@@ -17,8 +17,8 @@ import com.wavesplatform.transaction.TxHelpers.secondSigner
 
 object TestHelpers extends BlockchainUpdatesTestBase {
   def testInvoke(issue: IssueTransaction, invoke: Transaction, balances: Seq[AddrWithBalance])(
-      checkType: BlockchainUpdateTrait,
-      checkFunction: Append => Unit
+    checkType: BlockchainUpdateGrpcMethod,
+    checkFunction: Append => Unit
   ): Unit = {
     for (libVersion <- 5 to 6) {
       val setScript = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
@@ -71,7 +71,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
       invoke: Transaction,
       massTx: Transaction,
       callerType: String,
-      checkType: BlockchainUpdateTrait
+      checkType: BlockchainUpdateGrpcMethod
   )(f: Append => Unit): Unit = {
     for (libVersion <- 5 to 6) {
       val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
