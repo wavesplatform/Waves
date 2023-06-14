@@ -17,8 +17,8 @@ import com.wavesplatform.transaction.TxHelpers.secondSigner
 
 object TestHelpers extends BlockchainUpdatesTestBase {
   def testInvoke(issue: IssueTransaction, invoke: Transaction, balances: Seq[AddrWithBalance])(
-    checkType: BlockchainUpdateGrpcMethod,
-    checkFunction: Append => Unit
+      checkType: BlockchainUpdateGrpcMethod,
+      checkFunction: Append => Unit
   ): Unit = {
     for (libVersion <- 5 to 6) {
       val setScript = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
@@ -59,7 +59,6 @@ object TestHelpers extends BlockchainUpdatesTestBase {
           } { getBlockUpdateRange =>
             checkFunction(getBlockUpdateRange.apply(3).getAppend)
           }
-        case _ => throw new Exception("handle unsupported checkType")
       }
     }
   }
@@ -77,7 +76,6 @@ object TestHelpers extends BlockchainUpdatesTestBase {
       val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
       val nestedDAppTx       = TxHelpers.setScript(secondSigner, TxHelpers.script(nestedDAppScript(callerType, libVersion)))
       val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript(callerType, libVersion)))
-
       checkType match {
         case Subscribe =>
           withGenerateSubscription(
