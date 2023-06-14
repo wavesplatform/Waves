@@ -1,6 +1,8 @@
 #!/bin/bash
 shopt -s nullglob
 
+# UnlockDiagnosticVMOptions is temporary
+# GCLockerRetryAllocationCount to prevent false OOM
 JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   --add-opens=java.base/java.lang=ALL-UNNAMED
   -XX:+ExitOnOutOfMemoryError
@@ -9,6 +11,8 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   -XX:+UseG1GC
   -XX:+ParallelRefProcEnabled
   -XX:+UseStringDeduplication
+  -XX:+UnlockDiagnosticVMOptions
+  -XX:GCLockerRetryAllocationCount=100
   -Xmx${RIDE_HEAP_SIZE}
   -XX:MaxMetaspaceSize=152m
   -Dfile.encoding=UTF-8

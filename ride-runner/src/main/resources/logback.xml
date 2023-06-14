@@ -32,7 +32,7 @@
     <logger name="com.wavesplatform.ride.runner.storage.persistent" level="WARN"/>
     <logger name="com.wavesplatform.blockchain" level="INFO"/>
     <logger name="com.wavesplatform.api" level="INFO"/>
-    <logger name="com.wavesplatform.api.http.CompositeHttpService" level="WARN"/>
+    <logger name="com.wavesplatform.api.http.CompositeHttpService" level="OFF"/>
     <logger name="com.wavesplatform.metrics" level="WARN"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
