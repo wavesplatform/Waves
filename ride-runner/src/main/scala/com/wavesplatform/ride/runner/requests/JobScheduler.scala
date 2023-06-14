@@ -42,7 +42,7 @@ class SynchronizedJobScheduler[T]()(implicit val scheduler: Scheduler) extends J
     if (prioritized) {
       prioritizedItems.add(item)
       prioritizedQueue.onNext(item)
-    } else {
+    } else if (!regularItems.contains(item)) {
       regularItems.add(item)
       regularQueue.onNext(item)
     }
