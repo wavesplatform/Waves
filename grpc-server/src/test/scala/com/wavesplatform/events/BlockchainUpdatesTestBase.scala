@@ -24,7 +24,8 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, E
 import org.scalatest.concurrent.ScalaFutures
 import org.web3j.crypto.Bip32ECKeyPair
 
-abstract class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with ScalaFutures {
+
+class BlockchainUpdatesTestBase extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings                   = DomainPresets.RideV6
   val amount: Long                                     = 9000000
   val additionalAmount: Long                           = 5000000

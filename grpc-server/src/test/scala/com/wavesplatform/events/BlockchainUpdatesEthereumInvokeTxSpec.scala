@@ -4,6 +4,7 @@ import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.events.fixtures.BlockchainUpdateTrait.*
 import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.checkInvokeDoubleNestedBlockchainUpdates
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
 import com.wavesplatform.events.fixtures.TestHelpers.{checkGeneralInvoke, doubleNestedInvokeTest, testInvoke}
@@ -46,7 +47,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
 
     "BU-226. Invoke have to return correct data for subscribe" in {
       testInvoke(issue, invoke, balances)(
-        checkType = "subscribe",
+        Subscribe,
         checkFunction = append => {
           val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
           checkEthereumBase(append, invoke, invokeFunctionName)
@@ -57,7 +58,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
 
     "BU-229. Invoke have to return correct data for getBlockUpdate" in {
       testInvoke(issue, invoke, balances)(
-        checkType = "getBlockUpdate",
+        GetBlockUpdate,
         checkFunction = append => {
           val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
           checkEthereumBase(append, invoke, invokeFunctionName)
@@ -68,7 +69,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
 
     "BU-232. Invoke have to return correct data for getBlockUpdateRange" in {
       testInvoke(issue, invoke, balances)(
-        checkType = "getBlockUpdateRange",
+        GetBlockUpdateRange,
         checkFunction = append => {
           val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
           checkEthereumBase(append, invoke, invokeFunctionName)
@@ -138,7 +139,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     )
 
     "BU-227. doubles nested i.caller. Invoke have to return correct data for subscribe" in {
-      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, checkType = "subscribe") { append =>
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, Subscribe) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
         checkEthereumBase(append, invoke, foo)
         checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, firstTxParticipantAddress, secondAddress, issue, callerBalancesMap)
@@ -146,7 +147,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     }
 
     "BU-230. doubles nested i.caller. Invoke have to return correct data for getBlockUpdate" in {
-      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, checkType = "getBlockUpdate") { append =>
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, GetBlockUpdate) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
         checkEthereumBase(append, invoke, foo)
         checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, firstTxParticipantAddress, secondAddress, issue, callerBalancesMap)
@@ -154,7 +155,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     }
 
     "BU-233. doubles nested i.caller. Invoke have to return correct data for getBlockUpdateRange" in {
-      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, checkType = "getBlockUpdate") { append =>
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, caller, GetBlockUpdateRange) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
         checkEthereumBase(append, invoke, foo)
         checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, firstTxParticipantAddress, secondAddress, issue, callerBalancesMap)
@@ -162,7 +163,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     }
 
     "BU-228. double nested i.originCaller. Invoke have to return correct data for subscribe" in {
-      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, checkType = "subscribe") { append =>
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, Subscribe) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
         checkEthereumBase(append, invoke, foo)
         checkInvokeDoubleNestedBlockchainUpdates(
@@ -178,7 +179,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     }
 
     "BU-231. double nested i.originCaller. Invoke have to return correct data for getBlockUpdate" in {
-      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, checkType = "getBlockUpdate") { append =>
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, GetBlockUpdate) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
         checkEthereumBase(append, invoke, foo)
         checkInvokeDoubleNestedBlockchainUpdates(
@@ -194,7 +195,7 @@ class BlockchainUpdatesEthereumInvokeTxSpec extends BlockchainUpdatesTestBase {
     }
 
     "BU-234. double nested i.originCaller. Invoke have to return correct data for getBlockUpdateRange" in {
-      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, checkType = "getBlockUpdateRange") { append =>
+      doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, GetBlockUpdateRange) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getEthereum.getInvoke
         checkEthereumBase(append, invoke, foo)
         checkInvokeDoubleNestedBlockchainUpdates(

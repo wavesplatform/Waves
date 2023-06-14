@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdatesTestBase
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeRequest}
+import com.wavesplatform.events.fixtures.BlockchainUpdateTrait.*
 import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.checkSimpleInvoke
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
 import com.wavesplatform.events.fixtures.WavesTxChecks.checkBalances
@@ -16,13 +17,13 @@ import com.wavesplatform.transaction.TxHelpers.secondSigner
 
 object TestHelpers extends BlockchainUpdatesTestBase {
   def testInvoke(issue: IssueTransaction, invoke: Transaction, balances: Seq[AddrWithBalance])(
-      checkType: String,
+      checkType: BlockchainUpdateTrait,
       checkFunction: Append => Unit
   ): Unit = {
     for (libVersion <- 5 to 6) {
       val setScript = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(invokeAssetScript(libVersion)))
       checkType match {
-        case "subscribe" =>
+        case Subscribe =>
           withGenerateSubscription(
             settings = currentSettings,
             balances = balances
@@ -33,7 +34,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
           } { updates =>
             checkFunction(updates(3).append)
           }
-        case "getBlockUpdate" =>
+        case GetBlockUpdate =>
           withGenerateGetBlockUpdate(
             height = 4,
             settings = currentSettings,
@@ -45,7 +46,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
           } { getBlockUpdate =>
             checkFunction(getBlockUpdate.getUpdate.getAppend)
           }
-        case "getBlockUpdateRange" =>
+        case GetBlockUpdateRange =>
           withGenerateGetBlockUpdateRange(
             GetBlockUpdatesRangeRequest.of(1, 4),
             settings = currentSettings,
@@ -70,7 +71,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
       invoke: Transaction,
       massTx: Transaction,
       callerType: String,
-      checkType: String
+      checkType: BlockchainUpdateTrait
   )(f: Append => Unit): Unit = {
     for (libVersion <- 5 to 6) {
       val mainDAppTx         = TxHelpers.setScript(firstTxParticipant, TxHelpers.script(mainDAppScript(libVersion)))
@@ -78,7 +79,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
       val doubleNestedDAppTx = TxHelpers.setScript(assetDappAccount, TxHelpers.script(doubleNestedDAppScript(callerType, libVersion)))
 
       checkType match {
-        case "subscribe" =>
+        case Subscribe =>
           withGenerateSubscription(
             SubscribeRequest.of(1, Int.MaxValue),
             settings = currentSettings,
@@ -90,7 +91,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
             f(updates(2).getAppend)
           }
 
-        case "getBlockUpdate" =>
+        case GetBlockUpdate =>
           withGenerateGetBlockUpdate(
             height = 3,
             settings = currentSettings,
@@ -102,7 +103,7 @@ object TestHelpers extends BlockchainUpdatesTestBase {
             f(getBlockUpdate.getUpdate.getAppend)
           }
 
-        case "getBlockUpdateRange" =>
+        case GetBlockUpdateRange =>
           withGenerateGetBlockUpdateRange(
             GetBlockUpdatesRangeRequest.of(1, 3),
             settings = currentSettings,
@@ -114,8 +115,6 @@ object TestHelpers extends BlockchainUpdatesTestBase {
           } { getBlockUpdateRange =>
             f(getBlockUpdateRange.apply(2).getAppend)
           }
-
-        case _ => throw new Exception("handle unsupported checkType")
       }
     }
   }
