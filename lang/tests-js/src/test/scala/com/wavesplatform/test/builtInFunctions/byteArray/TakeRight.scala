@@ -29,7 +29,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test("RIDE-59. Take function throws an error for invalid values") {
+    test("RIDE-59. TakeRight function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

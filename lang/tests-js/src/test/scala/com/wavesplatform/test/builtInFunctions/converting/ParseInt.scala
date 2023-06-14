@@ -20,7 +20,7 @@ object ParseInt extends JsTestBase {
   private val invalidParseIntValueArgBeforeFunc = "callerTestData.parseIntValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test(" Functions parseInt compiles") {
+    test("RIDE-68. ParseInt function should compile for valid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -35,7 +35,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test(" parseBigInt negative tests") {
+    test("RIDE-69. ParseInt function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -52,7 +52,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test(" Functions parseIntValue compiles") {
+    test("RIDE-70. parseIntValue function should compile for valid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -67,7 +67,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test(" parseIntValue negative tests") {
+    test("RIDE-71. parseIntValue function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
