@@ -26,7 +26,7 @@ class RideMulticastHttpApi(settings: Settings, httpBackend: SttpBackend[Identity
       .body
       .flatMap { rawJson =>
         Json.parse(rawJson) match {
-          case x: JsObject => (x - "stateChanges").asRight // TODO #140
+          case x: JsObject => x.asRight
           case x           => s"Expected a JsObject, but got:\n$x".asLeft
         }
       }

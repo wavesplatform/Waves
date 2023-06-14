@@ -13,7 +13,7 @@ import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
-import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService, RideScriptRunRequest, TestJobScheduler}
+import com.wavesplatform.ride.runner.requests.*
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.ride.runner.storage.{CommonCache, SharedBlockchainStorage}
@@ -38,9 +38,12 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     carlAddr  -> ScriptUtil.from(carlScriptSrc)
   )
 
+  private val defaultRequestServiceSettings =
+    DefaultRequestService.Settings(enableTraces = true, enableStateChanges = true, Int.MaxValue, 0, 3, 0.seconds, 100)
+
   "RequestsService" - {
     "trackAndRun" - {
-      "returns an actual value" in test { d =>
+      "returns an actual value" in test() { d =>
         def checkExpectedResults(aResult: Int, bResult: Int, cResult: Int): Unit = {
           withClue(s"a $aliceAddr:")(d.check(aRequest, aResult))
           withClue(s"b $bobAddr:")(d.check(bRequest, bResult))
@@ -68,7 +71,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         checkExpectedResults(1, 4, 1)
       }
 
-      "returns an error if the provided expr is wrong" in test { d =>
+      "returns an error if the provided expr is wrong" in test() { d =>
         val request = RideScriptRunRequest(
           address = aliceAddr,
           requestBody = Json.obj("expr" -> "buyNsbtREADONLY(10000000000000000000)")
@@ -86,6 +89,18 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
           StatusCodes.BadRequest
         )
       }
+
+      "no traces if disabled" in test(defaultRequestServiceSettings.copy(enableTraces = false)) { d =>
+        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
+        d.scheduler.tick()
+        (d.trackAndRun(aRequest).lastResult \ "vars").toOption shouldBe empty
+      }
+
+      "no state changes if disabled" in test(defaultRequestServiceSettings.copy(enableStateChanges = false)) { d =>
+        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
+        d.scheduler.tick()
+        (d.trackAndRun(aRequest).lastResult \ "stateChanges").toOption shouldBe empty
+      }
     }
   }
 
@@ -97,9 +112,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       scheduler: TestScheduler
   ) {
     def check(request: RideScriptRunRequest, expectedValue: Int): Unit = {
-      val task = requests.trackAndRun(request).runToFuture(scheduler)
-      scheduler.tick()
-      val r = Await.result(task, 5.seconds)
+      val r = trackAndRun(request)
       withClue(s"$r:") {
         r.lastStatus shouldBe StatusCodes.OK
         (r.lastResult \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
@@ -107,92 +120,96 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
     }
 
     def checkFull(request: RideScriptRunRequest, json: JsValue, status: StatusCode): Unit = {
-      val task = requests.trackAndRun(request).runToFuture(scheduler)
-      scheduler.tick()
-      val r = Await.result(task, 5.seconds)
+      val r = trackAndRun(request)
       withClue(s"$r:") {
         r.lastStatus shouldBe status
         r.lastResult shouldBe json
       }
     }
+
+    def trackAndRun(request: RideScriptRunRequest): RideScriptRunResult = {
+      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      scheduler.tick()
+      Await.result(task, 5.seconds)
+    }
   }
 
-  protected def test(f: TestDependencies => Unit): Unit = Using.Manager { use =>
-    implicit val testScheduler = TestScheduler()
+  protected def test(requestServiceSettings: DefaultRequestService.Settings = defaultRequestServiceSettings)(f: TestDependencies => Unit): Unit =
+    Using.Manager { use =>
+      implicit val testScheduler = TestScheduler()
 
-    val blockchainApi = new TestBlockchainApi() {
-      override def getCurrentBlockchainHeight(): Height = Height(2)
-      override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
-        toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
-      override def getActivatedFeatures(height: Height): Map[Short, Height] =
-        blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
-      override def getAccountScript(address: Address): Option[Script] = accountScripts.get(address)
-      override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
-        if (address == aliceAddr && key == "x") IntegerDataEntry("x", 0).some
-        else super.getAccountDataEntry(address, key)
+      val blockchainApi = new TestBlockchainApi() {
+        override def getCurrentBlockchainHeight(): Height = Height(2)
+        override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] =
+          toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
+        override def getActivatedFeatures(height: Height): Map[Short, Height] =
+          blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
+        override def getAccountScript(address: Address): Option[Script] = accountScripts.get(address)
+        override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
+          if (address == aliceAddr && key == "x") IntegerDataEntry("x", 0).some
+          else super.getAccountDataEntry(address, key)
 
-      override def getBalance(address: Address, asset: Asset): Long = Long.MaxValue / 3
-      override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances =
-        BalanceResponse.WavesBalances(getBalance(address, Asset.Waves))
-    }
-
-    val testDb = use(TestDb.mk())
-    val sharedBlockchain = testDb.storage.directReadWrite { implicit ctx =>
-      SharedBlockchainStorage[RideScriptRunRequest](
-        SharedBlockchainStorage.Settings(blockchainSettings, CommonCache.Settings(ConfigMemorySize.ofBytes(1024))),
-        testDb.storage,
-        DefaultPersistentCaches(testDb.storage),
-        blockchainApi
-      )
-    }
-
-    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds, 100)
-    val requestsService = use(
-      new DefaultRequestService(
-        settings = requestServiceSettings,
-        sharedBlockchain = sharedBlockchain,
-        use(new TestJobScheduler()),
-        runScriptScheduler = testScheduler
-      )
-    )
-    val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
-    val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
-
-    val workingHeight = Height(1)
-    val eventsStream = blockchainUpdatesStream.downstream
-      .doOnError(e =>
-        Task {
-          log.error("Error!", e)
-        }
-      )
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState.applyWithRestarts(BlockchainState.Settings(1.second), processor, blockchainUpdatesStream, _, _)
+        override def getBalance(address: Address, asset: Asset): Long = Long.MaxValue / 3
+        override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances =
+          BalanceResponse.WavesBalances(getBalance(address, Asset.Waves))
       }
-      .doOnError { e =>
-        Task {
-          log.error("Got an unhandled error, closing streams. Contact with developers", e)
-          blockchainUpdatesStream.close()
-        }
+
+      val testDb = use(TestDb.mk())
+      val sharedBlockchain = testDb.storage.directReadWrite { implicit ctx =>
+        SharedBlockchainStorage[RideScriptRunRequest](
+          SharedBlockchainStorage.Settings(blockchainSettings, CommonCache.Settings(ConfigMemorySize.ofBytes(1024))),
+          testDb.storage,
+          DefaultPersistentCaches(testDb.storage),
+          blockchainApi
+        )
       }
-      .lastL
-      .runToFuture
 
-    blockchainUpdatesStream.start(Height(1))
-
-    testScheduler.tick()
-    f(
-      TestDependencies(
-        requestServiceSettings,
-        requestsService,
-        new BlockchainProcessor(sharedBlockchain, requestsService),
-        blockchainApi,
-        testScheduler
+      val requestsService = use(
+        new DefaultRequestService(
+          settings = requestServiceSettings,
+          sharedBlockchain = sharedBlockchain,
+          use(new TestJobScheduler()),
+          runScriptScheduler = testScheduler
+        )
       )
-    )
-    blockchainApi.blockchainUpdatesUpstream.onComplete()
-    testScheduler.tick()
-    Await.result(eventsStream, 5.seconds)
-  }.get
+      val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
+      val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
+
+      val workingHeight = Height(1)
+      val eventsStream = blockchainUpdatesStream.downstream
+        .doOnError(e =>
+          Task {
+            log.error("Error!", e)
+          }
+        )
+        .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
+          BlockchainState.applyWithRestarts(BlockchainState.Settings(1.second), processor, blockchainUpdatesStream, _, _)
+        }
+        .doOnError { e =>
+          Task {
+            log.error("Got an unhandled error, closing streams. Contact with developers", e)
+            blockchainUpdatesStream.close()
+          }
+        }
+        .lastL
+        .runToFuture
+
+      blockchainUpdatesStream.start(Height(1))
+
+      testScheduler.tick()
+      f(
+        TestDependencies(
+          requestServiceSettings,
+          requestsService,
+          new BlockchainProcessor(sharedBlockchain, requestsService),
+          blockchainApi,
+          testScheduler
+        )
+      )
+      blockchainApi.blockchainUpdatesUpstream.onComplete()
+      testScheduler.tick()
+      Await.result(eventsStream, 5.seconds)
+    }.get
 
   private lazy val aliceScriptSrc = s"""
 {-#STDLIB_VERSION 6 #-}

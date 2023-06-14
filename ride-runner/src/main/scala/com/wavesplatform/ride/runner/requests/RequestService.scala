@@ -234,7 +234,7 @@ class DefaultRequestService(
               new DefaultDAppEnvironmentTracker(sharedBlockchain, prevResult.request)
             )
         )
-        (evaluation, jsResult - "stateChanges") // Not required for now
+        (evaluation, if (settings.enableStateChanges) jsResult else jsResult - "stateChanges")
     }
   }
 
@@ -250,6 +250,7 @@ class DefaultRequestService(
 object DefaultRequestService {
   case class Settings(
       enableTraces: Boolean,
+      enableStateChanges: Boolean,
       evaluateScriptComplexityLimit: Int,
       maxTxErrorLogSize: Int,
       parallelization: Int,
