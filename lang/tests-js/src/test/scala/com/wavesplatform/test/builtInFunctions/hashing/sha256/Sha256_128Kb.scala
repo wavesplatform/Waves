@@ -7,7 +7,6 @@ import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBinaryEntry, actu
 import utest.{Tests, test}
 
 object Sha256_128Kb extends JsTestBase {
-  // sha256_128Kb
   private val sha256_128Kb                     = "sha256_128Kb(callerTestData)"
   private val sha256_128KbArgBeforeFunc        = "callerTestData.sha256_128Kb()"
   private val invalidSha256_128Kb              = "sha256_128Kb()"
@@ -15,7 +14,7 @@ object Sha256_128Kb extends JsTestBase {
   private val invalidErrorSha256_128Kb         = testData.invalidFunctionError("sha256_128Kb", 1)
 
   val tests: Tests = Tests {
-    test("sha256_128Kb functions compiles with a ByteVector") {
+    test("RIDE-150. Function sha256_128Kb should compile for valid ByteVector") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -30,7 +29,7 @@ object Sha256_128Kb extends JsTestBase {
       }
     }
 
-    test("compilation errors sha256_128Kb") {
+    test("RIDE-151. Function sha256_128Kb should throw an error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
