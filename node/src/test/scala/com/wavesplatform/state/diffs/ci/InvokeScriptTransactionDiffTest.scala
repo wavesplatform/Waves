@@ -680,7 +680,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       Seq(TestBlock.create(genesis ++ Seq(transferringAsset, attachedAsset, setScript))),
       TestBlock.create(Seq(ci))
     ) { case (_, blockDiffEi) =>
-      blockDiffEi.resultE.explicitGet().scriptsRun shouldBe 3
       inside(blockDiffEi.trace) {
         case List(
               InvokeScriptTrace(_, _, _, Right(ScriptResultV3(_, transfers, _)), _, _),
@@ -1357,7 +1356,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         from = V4,
         to = V5
       ) { case (diff, state) =>
-        diff.scriptsRun shouldBe 0
         diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
         state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(_ =>
           sponsorIssue.quantity.value

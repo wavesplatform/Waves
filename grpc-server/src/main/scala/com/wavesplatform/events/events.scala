@@ -16,7 +16,6 @@ import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

@@ -85,34 +85,34 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     (master, List(genesisBlock, b1, b2))
   }
 
-  "blochain update events sending" - {
+  "blockchain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
         val triggersMock = mock[BlockchainUpdateTriggers]
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == 0 &&
-              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              snapshot.balances.head._2 == 0 &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
-              val txDiff = diff.transactionDiffs.head
-              val tx     = txDiff.transactions.head.transaction.asInstanceOf[TransferTransaction]
+            .expects(where { (block, snapshot, _, _, bc) =>
+              val txInfo = snapshot.transactions.head
+              val tx     = txInfo._2.transaction.asInstanceOf[TransferTransaction]
 
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 &&
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 5 &&
               // first Tx updated balances
-              txDiff.portfolios(tx.recipient.asInstanceOf[Address]).balance == (ENOUGH_AMT / 5) &&
-              txDiff.portfolios(tx.sender.toAddress).balance == (-ENOUGH_AMT / 5 - FEE_AMT)
+              snapshot.transactions.head._2.snapshot.balances((tx.recipient.asInstanceOf[Address], Waves)) == (ENOUGH_AMT / 5) &&
+              snapshot.transactions.head._2.snapshot.balances((tx.sender.toAddress, Waves)) == ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT
             })
             .once()
 
@@ -129,32 +129,33 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == 0 &&
-              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              snapshot.balances.head._2 == 0 &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 * 0.4
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 5 * 0.4
             })
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 2 &&
               block.transactionData.length == 4 &&
               // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == (
-                FEE_AMT * 5 * 0.6     // carry from prev block
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == (
+                FEE_AMT * 5 * 0.4     // from previous ↑ snapshot
+                  + FEE_AMT * 5 * 0.6 // carry from prev block
                   + FEE_AMT * 4 * 0.4 // current block reward
               )
             })
@@ -192,33 +193,35 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         inSequence {
           // genesis
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == 0 &&
-              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              snapshot.balances.head._2 == 0 &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           // microblock 1
           (triggersMock.onProcessMicroBlock _)
-            .expects(where { (microBlock, diff, bc, _, _) =>
+            .expects(where { (microBlock, snapshot, bc, _, _) =>
               bc.height == 1 &&
               microBlock.transactionData.length == 2 &&
               // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 2 * 0.4
             })
             .once()
 
           // microblock 2
           (triggersMock.onProcessMicroBlock _)
-            .expects(where { (microBlock, diff, bc, _, _) =>
+            .expects(where { (microBlock, snapshot, bc, _, _) =>
               bc.height == 1 &&
               microBlock.transactionData.length == 1 &&
               // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 ==
+                (FEE_AMT * 2 * 0.4 // from previous ↑ snapshot
+                  + FEE_AMT * 0.4)
             })
             .once()
 

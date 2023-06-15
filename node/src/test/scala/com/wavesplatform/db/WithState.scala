@@ -95,7 +95,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
-    assertion(totalDiff1.map(_.diff))
+    assertion(totalDiff1.map(_.snapshot.toDiff(state)))
   }
 
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled, enableExecutionLog: Boolean = false)(
@@ -119,7 +119,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
-    assertion(totalDiff1.map(_.diff))
+    assertion(totalDiff1.map(_.snapshot.toDiff(state)))
   }
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
@@ -163,9 +163,9 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val nextHeight = state.height + 1
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
-        differ(state, block).map { diff =>
-          val snapshot = StateSnapshot.fromDiff(diff.diff, state)
-          state.append(snapshot, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
+        differ(state, block).map { result =>
+          val snapshot = StateSnapshot.fromDiff(result.snapshot.toDiff(state), state)
+          state.append(snapshot, result.carry, result.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
         }
       })
     }

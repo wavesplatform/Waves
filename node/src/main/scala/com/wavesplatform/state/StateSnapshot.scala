@@ -1,4 +1,5 @@
 package com.wavesplatform.state
+import cats.Id
 import cats.data.Ior
 import cats.implicits.{catsKernelStdMonoidForMap, catsSyntaxSemigroup}
 import cats.kernel.Monoid
@@ -13,30 +14,30 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
 import com.wavesplatform.state.StateSnapshot.lastEstimator
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
+import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 import scala.collection.immutable.VectorMap
 
 case class StateSnapshot(
-    transactions: VectorMap[ByteStr, NewTransactionInfo],
-    balances: VectorMap[(Address, Asset), Long],
-    leaseBalances: Map[Address, LeaseBalance],
-    assetStatics: Map[IssuedAsset, AssetStatic],
-    assetVolumes: Map[IssuedAsset, AssetVolumeInfo],
-    assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo],
-    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-    sponsorships: Map[IssuedAsset, SponsorshipValue],
-    leaseStates: Map[ByteStr, LeaseDetails],
-    aliases: Map[Alias, Address],
-    orderFills: Map[ByteStr, VolumeAndFee],
-    accountScripts: Map[Address, Option[AccountScriptInfo]],
-    accountData: Map[Address, Map[String, DataEntry[?]]],
-    scriptResults: Map[ByteStr, InvokeScriptResult],
-    ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta],
-    scriptsComplexity: Long
+    transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
+    balances: VectorMap[(Address, Asset), Long] = VectorMap(),
+    leaseBalances: Map[Address, LeaseBalance] = Map(),
+    assetStatics: Map[IssuedAsset, AssetStatic] = Map(),
+    assetVolumes: Map[IssuedAsset, AssetVolumeInfo] = Map(),
+    assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
+    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map(),
+    sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
+    leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+    aliases: Map[Alias, Address] = Map(),
+    orderFills: Map[ByteStr, VolumeAndFee] = Map(),
+    accountScripts: Map[Address, Option[AccountScriptInfo]] = Map(),
+    accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
+    scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
+    ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
+    scriptsComplexity: Long = 0
 ) {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
@@ -122,6 +123,14 @@ case class StateSnapshot(
       }.toSeq
     )
 
+  def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): StateSnapshot = {
+    val appliedBalances = StateSnapshot.balances(portfolios, SnapshotBlockchain(blockchain, this))
+    copy(balances = balances ++ appliedBalances)
+  }
+
+  def withTransactions(diff: Diff): StateSnapshot =
+    copy(transactions ++ diff.transactions.map(info => info.transaction.id() -> info).toMap)
+
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
     assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap
 
@@ -135,7 +144,7 @@ object StateSnapshot {
   def fromDiff(diff: Diff, blockchain: Blockchain): StateSnapshot =
     StateSnapshot(
       VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
-      balances(diff, blockchain),
+      balances(diff.portfolios, blockchain),
       leaseBalances(diff, blockchain),
       assetStatics(diff),
       assetVolumes(diff, blockchain),
@@ -152,8 +161,8 @@ object StateSnapshot {
       diff.scriptsComplexity
     )
 
-  private def balances(diff: Diff, blockchain: Blockchain): VectorMap[(Address, Asset), Long] =
-    VectorMap() ++ diff.portfolios.flatMap { case (address, Portfolio(wavesAmount, _, assets)) =>
+  def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): VectorMap[(Address, Asset), Long] =
+    VectorMap() ++ portfolios.flatMap { case (address, Portfolio(wavesAmount, _, assets)) =>
       val assetBalances = assets.map { case (assetId, balance) =>
         val newBalance = blockchain.balance(address, assetId) + balance
         (address, assetId: Asset) -> newBalance
@@ -165,11 +174,8 @@ object StateSnapshot {
 
   private def leaseBalances(diff: Diff, blockchain: Blockchain): Map[Address, LeaseBalance] =
     diff.portfolios.flatMap { case (address, Portfolio(_, lease, _)) =>
-      if (lease != LeaseBalance.empty) {
-        val bLease = blockchain.leaseBalance(address)
-        Map(address -> LeaseBalance(bLease.in + lease.in, bLease.out + lease.out))
-      } else
-        Map()
+      val bLease = blockchain.leaseBalance(address)
+      Map(address -> LeaseBalance(bLease.in + lease.in, bLease.out + lease.out))
     }
 
   private def assetStatics(diff: Diff): Map[IssuedAsset, AssetStatic] =
@@ -223,9 +229,16 @@ object StateSnapshot {
       orderId -> newInfo
     }
 
+  def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): StateSnapshot =
+    StateSnapshot(
+      leaseBalances = balances.map { case (address, lb) =>
+        address -> lb.combineF[Id](blockchain.leaseBalance(address))
+      }
+    )
+
   implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
     override val empty: StateSnapshot =
-      StateSnapshot(VectorMap(), VectorMap(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), Map(), 0)
+      StateSnapshot()
 
     override def combine(s1: StateSnapshot, s2: StateSnapshot): StateSnapshot =
       StateSnapshot(
@@ -260,5 +273,5 @@ object StateSnapshot {
       }
   }
 
-  val empty: StateSnapshot = monoid.empty
+  val empty: StateSnapshot = StateSnapshot()
 }

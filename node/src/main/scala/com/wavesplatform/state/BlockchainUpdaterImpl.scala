@@ -229,7 +229,7 @@ class BlockchainUpdaterImpl(
                     .map { r =>
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward)
                       miner.scheduleMining(Some(updatedBlockchain))
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, hitSource, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.minerSnapshot, reward, hitSource, referencedBlockchain)
                       Option((r, Nil, reward, hitSource))
                     }
               }
@@ -259,7 +259,7 @@ class BlockchainUpdaterImpl(
                       )
                       val (mbs, diffs) = ng.allSnapshots.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.minerSnapshot, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
@@ -286,7 +286,7 @@ class BlockchainUpdaterImpl(
                         txSignParCheck = txSignParCheck
                       )
                       .map { r =>
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
+                        blockchainUpdateTriggers.onProcessBlock(block, r.minerSnapshot, ng.reward, hitSource, referencedBlockchain)
                         Some((r, Nil, ng.reward, hitSource))
                       }
                   }
@@ -353,7 +353,7 @@ class BlockchainUpdaterImpl(
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.minerSnapshot, reward, hitSource, this)
 
                         rocksdb.append(
                           liquidDiffWithCancelledLeases,

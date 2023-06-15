@@ -1,18 +1,17 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.{catsSyntaxSemigroup, toBifunctorOps, toFoldableOps}
+import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.state.patch.*
-import com.wavesplatform.state.reader.{CompositeBlockchain, SnapshotBlockchain}
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -24,16 +23,14 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, Transaction}
 
 object BlockDiffer {
-  final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(
       snapshot: StateSnapshot,
       carry: Long,
       totalFee: Long,
       constraint: MiningConstraint,
-      detailedDiff: DetailedDiff,
-      stateHash: Option[ByteStr]) {
-    def diff = detailedDiff.transactionDiffs.foldLeft(detailedDiff.parentDiff)(_.combineF(_).explicitGet())
-  }
+      minerSnapshot: StateSnapshot,
+      stateHash: Option[ByteStr]
+  )
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
@@ -99,26 +96,25 @@ object BlockDiffer {
       } else
         Right(Portfolio.empty)
 
-    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
-    val initDiffE =
+    val blockchainWithNewBlock = SnapshotBlockchain(blockchain, StateSnapshot.empty, block, hitSource, 0, None)
+    val initSnapshotE =
       for {
         feeFromPreviousBlock    <- feeFromPreviousBlockE
         initialFeeFromThisBlock <- initialFeeFromThisBlockE
         totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
-        patches                 <- patchesDiff(blockchainWithNewBlock)
-        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(patches)
-      } yield resultDiff
+        patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
+      } yield patchesSnapshot.addBalances(Map(block.sender.toAddress -> totalReward), blockchainWithNewBlock)
 
     for {
-      _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      resultDiff <- TracedResult(initDiffE.leftMap(GenericError(_)))
+      _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
+      initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
       r <- apply(
         blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
         // TODO: correctly obtain previous state hash on feature activation height
         if (blockchain.height == 0) Some(TxStateSnapshotHashBuilder.InitStateHash) else maybePrevBlock.flatMap(_.header.stateHash),
-        resultDiff,
+        initSnapshot,
         stateHeight >= ngHeight,
         block.transactionData,
         loadCacheData,
@@ -167,7 +163,7 @@ object BlockDiffer {
         constraint,
         prevBlockTimestamp,
         prevStateHash,
-        Diff.empty,
+        StateSnapshot.empty,
         hasNg = true,
         micro.transactionData,
         loadCacheData,
@@ -191,7 +187,7 @@ object BlockDiffer {
       initConstraint: MiningConstraint,
       prevBlockTimestamp: Option[Long],
       prevStateHash: Option[ByteStr],
-      initDiff: Diff,
+      initSnapshot: StateSnapshot,
       hasNg: Boolean,
       txs: Seq[Transaction],
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
@@ -199,9 +195,6 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
-    def updateConstraint(constraint: MiningConstraint, blockchain: Blockchain, tx: Transaction, diff: Diff): MiningConstraint =
-      constraint.put(blockchain, tx, diff)
-
     val currentBlockHeight = blockchain.height
     val timestamp          = blockchain.lastBlockTimestamp.get
     val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
@@ -216,15 +209,11 @@ object BlockDiffer {
     prepareCaches(blockGenerator, txs, loadCacheData)
 
     txs
-      .foldLeft(
-        TracedResult(Result(StateSnapshot.fromDiff(initDiff, blockchain), 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), prevStateHash)
-            .asRight[ValidationError]
-        ))
-       {
+      .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initSnapshot, prevStateHash).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (
               TracedResult(
-                Right(Result(currSnapshot, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHashOpt)),
+                Right(Result(currSnapshot, carryFee, currTotalFee, currConstraint, minerSnapshot, prevStateHashOpt)),
                 _,
                 _
               ),
@@ -232,7 +221,7 @@ object BlockDiffer {
             ) =>
           val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
-            val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
+            val updatedConstraint = currConstraint.put(currBlockchain, tx, thisTxDiff)
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {
@@ -248,38 +237,31 @@ object BlockDiffer {
               // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
-              val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-              val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
+              val txSnapshot       = StateSnapshot.fromDiff(thisTxDiff, currBlockchain)
+              val newSnapshot      = currSnapshot |+| txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+              val newMinerSnapshot = minerSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain).withTransactions(thisTxDiff)
+              val totalWavesFee    = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
 
-              val txSnapshot           = StateSnapshot.fromDiff(thisTxDiff, currBlockchain)
-              val txSnapshotBlockchain = SnapshotBlockchain(currBlockchain, txSnapshot)
-              val minerSnapshot        = StateSnapshot.fromDiff(minerDiff, txSnapshotBlockchain)
-              val snapshot             = currSnapshot |+| txSnapshot |+| minerSnapshot
-              val result = for {
-                newParentDiff <- parentDiff.combineF(minerDiff)
-              } yield Result(
-                snapshot,
+              val result = Result(
+                newSnapshot,
                 carryFee + carry,
                 totalWavesFee,
                 updatedConstraint,
-                DetailedDiff(newParentDiff, thisTxDiff :: txDiffs),
+                newMinerSnapshot,
                 prevStateHashOpt
                   .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxDiff(currBlockchain, thisTxDiff).createHash(prevStateHash))
               )
-              TracedResult(result.leftMap(GenericError(_)))
+              TracedResult(result.asRight)
             }
           }
       }
   }
 
-  private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
+  private def leasePatchesSnapshot(blockchain: Blockchain): StateSnapshot =
     Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
-      .foldM(Diff.empty) { case (prevDiff, patch) =>
-        patch
-          .lift(CompositeBlockchain(blockchain, prevDiff))
-          .fold(prevDiff.asRight[String])(prevDiff.combineF)
+      .foldLeft(StateSnapshot.empty) { case (prevSnapshot, patch) =>
+        prevSnapshot |+| patch.lift(SnapshotBlockchain(blockchain, prevSnapshot)).orEmpty
       }
-  }
 
   private def prepareCaches(blockGenerator: Address, txs: Seq[Transaction], loadCacheData: (Set[Address], Set[ByteStr]) => Unit): Unit = {
     val addresses = Set.newBuilder[Address].addOne(blockGenerator)

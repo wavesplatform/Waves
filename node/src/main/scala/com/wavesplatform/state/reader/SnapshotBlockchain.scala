@@ -203,7 +203,7 @@ object SnapshotBlockchain {
 
   def apply(inner: Blockchain, snapshot: StateSnapshot): SnapshotBlockchain =
     inner match {
-      case cb: SnapshotBlockchain => new SnapshotBlockchain(cb.inner, Some(cb.snapshot |+| snapshot))
+      case cb: SnapshotBlockchain => cb.copy(maybeSnapshot = Some(cb.snapshot |+| snapshot))
       case _                      => new SnapshotBlockchain(inner, Some(snapshot))
     }
 
