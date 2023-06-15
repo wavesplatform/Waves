@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.StatusCodes
-import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause}
+import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause, Scheduler as CaffeineScheduler}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.utils.UtilsEvaluator
@@ -75,6 +75,7 @@ class DefaultRequestService(
     .newBuilder()
     .maximumSize(800) // TODO #96 Weighed cache
     .expireAfter(requestsExpiry)
+    .scheduler(CaffeineScheduler.systemScheduler()) // Because we rely on eviction
     .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignore(key) }
     .recordStats(() => new KamonCaffeineStats("Requests"))
     .build[RideScriptRunRequest, RideScriptRunResult]()
@@ -135,7 +136,7 @@ class DefaultRequestService(
 
     log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
     requestScheduler.addMultiple(toRun)
-    RideRunnerStats.rideRequestActiveNumber.update((requests.estimatedSize() - ignoredRequests.size()).toDouble)
+    RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize())
   }
 
   override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {
