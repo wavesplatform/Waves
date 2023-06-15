@@ -1281,8 +1281,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1479,8 +1478,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2666,11 +2664,11 @@
               "custom": {
                 "axisGridShow": true,
                 "axisLabel": "",
-                "axisPlacement": "left",
+                "axisPlacement": "right",
                 "axisWidth": 60,
                 "barAlignment": 0,
-                "drawStyle": "points",
-                "fillOpacity": 0,
+                "drawStyle": "bars",
+                "fillOpacity": 100,
                 "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
@@ -2687,7 +2685,7 @@
                 "spanNulls": false,
                 "stacking": {
                   "group": "A",
-                  "mode": "none"
+                  "mode": "normal"
                 },
                 "thresholdsStyle": {
                   "mode": "off"
@@ -2706,7 +2704,53 @@
               },
               "unit": "none"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "not ignored"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "total b"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "super-light-blue",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "total mb"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "super-light-purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 5,
@@ -2722,7 +2766,7 @@
                 "max",
                 "mean"
               ],
-              "displayMode": "hidden",
+              "displayMode": "list",
               "placement": "bottom"
             },
             "tooltip": {
@@ -2741,12 +2785,27 @@
               "expr": "ride_affected_total{instance=~\"$instance\", job=\"$job\"} > 0",
               "hide": false,
               "interval": "30s",
-              "legendFormat": "affected {{tpe}}",
+              "legendFormat": "total {{tpe}}",
               "range": true,
               "refId": "E"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "exemplar": false,
+              "expr": "ride_affected_active{instance=~\"$instance\", job=\"$job\"} > 0",
+              "hide": false,
+              "interval": "30s",
+              "legendFormat": "not ignored",
+              "range": true,
+              "refId": "A"
             }
           ],
           "title": "Affected scripts",
+          "transformations": [],
           "type": "timeseries"
         },
         {
@@ -3740,8 +3799,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3845,8 +3903,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",

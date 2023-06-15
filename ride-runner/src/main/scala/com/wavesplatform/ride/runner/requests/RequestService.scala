@@ -49,6 +49,15 @@ class DefaultRequestService(
     r
   }
 
+  private def checkAndClearIgnored(): Boolean = {
+    val cleared = ignoredRequests.size() >= settings.ignoredCleanupThreshold
+    if (cleared) {
+      sharedBlockchain.removeTags(ignoredRequests.asScala)
+      ignoredRequests.clear()
+    }
+    cleared
+  }
+
   private val requestsExpiry = new Expiry[RideScriptRunRequest, RideScriptRunResult] {
     private val duration = settings.cacheTtl.toNanos
 
@@ -119,11 +128,7 @@ class DefaultRequestService(
   }
 
   override def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit = {
-    val toRun = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
-      sharedBlockchain.removeTags(ignoredRequests.asScala)
-      ignoredRequests.clear()
-      affected
-    } else affected.filterNot(isIgnored)
+    val toRun = if (checkAndClearIgnored()) affected else affected.filterNot(isIgnored)
 
     RideRunnerStats.requestServiceIgnoredNumber.update(ignoredRequests.size())
     RideRunnerStats.rideRequestActiveAffectedNumberByTypes.update(toRun.size.toDouble)
