@@ -49,13 +49,9 @@ class DefaultRequestService(
     r
   }
 
-  private def checkAndClearIgnored(): Boolean = {
-    val cleared = ignoredRequests.size() >= settings.ignoredCleanupThreshold
-    if (cleared) {
-      sharedBlockchain.removeTags(ignoredRequests.asScala)
-      ignoredRequests.clear()
-    }
-    cleared
+  private def clearIgnored(): Unit = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
+    sharedBlockchain.removeTags(ignoredRequests.asScala)
+    ignoredRequests.clear()
   }
 
   private val requestsExpiry = new Expiry[RideScriptRunRequest, RideScriptRunResult] {
@@ -87,6 +83,9 @@ class DefaultRequestService(
     queueTask = requestScheduler.jobs
       .takeWhile(_ => isWorking.get())
       .filterNot(isIgnored)
+      // This is the only place where we run scripts and thus add tags.
+      // Tags cleanup here too to eiliminate data races (tags.replaceAll in SharedBlockchainStorage).
+      .doOnNext(_ => Task(clearIgnored()))
       .mapParallelUnordered(settings.parallelization) { request =>
         log.debug(s"Processing ${request.shortLogPrefix}")
         if (createJob(request).inProgress) Task.unit
@@ -129,14 +128,14 @@ class DefaultRequestService(
   }
 
   override def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit = {
-    val toRun = if (checkAndClearIgnored()) affected else affected.filterNot(isIgnored)
+    val toRun = if (ignoredRequests.isEmpty) affected else affected.filterNot(isIgnored)
 
     RideRunnerStats.requestServiceIgnoredNumber.update(ignoredRequests.size())
     RideRunnerStats.rideRequestActiveAffectedNumberByTypes.update(toRun.size.toDouble)
 
     log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
     requestScheduler.addMultiple(toRun)
-    RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize())
+    RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize().toDouble)
   }
 
   override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {
