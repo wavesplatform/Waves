@@ -32,7 +32,7 @@ object Fraction extends JsTestBase {
   private val fractionError: String                = testData.invalidFunctionError("fraction", 3)
 
   val tests: Tests = Tests {
-    test("Fraction functions compiles with Int") {
+    test("RIDE-172. Fraction should compile with the Int type") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -47,7 +47,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test("Fraction functions compiles with Int and union") {
+    test("RIDE-173. Fraction should compile with the Int and Union types - Ride V5, V6") {
       for (version <- versionsSupportingTheNewFeatures) {
         for (
           (data, function, dataType) <- Seq(
@@ -66,7 +66,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test("Compilation error for Fraction with Int") {
+    test("RIDE-174. Fraction should throw an error for invalid data") {
       for (version <- actualVersions) {
         for (
           (data, function, dataType, error) <- Seq(
@@ -87,7 +87,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test("compilation error: invalid fraction data BigInt") {
+    test("RIDE-175. Fraction should raise a compilation error for BigInt - Ride V5, V6") {
       for (version <- versionsSupportingTheNewFeatures) {
         for (
           (data, function, dataType, error) <- Seq(
@@ -106,7 +106,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test("compilation error: Function 'fraction' requires 3 arguments, but 4 are provided for V3, V4") {
+    test("RIDE-176. Fraction should raise an error for versions V3 and V4 with incorrect argument count") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntAndUnion)
