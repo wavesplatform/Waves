@@ -51,7 +51,13 @@ object SnapshotOps {
 
     private def issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] =
       VectorMap[IssuedAsset, NewAssetInfo]() ++ s.assetStatics.map { case (asset, pbStatic) =>
-        val static = AssetStaticInfo(asset.id, pbStatic.sourceTransactionId.toTxId, pbStatic.issuer.toPublicKey, pbStatic.decimals, pbStatic.nft)
+        val static = AssetStaticInfo(
+          asset.id,
+          pbStatic.sourceTransactionId.toTxId,
+          pbStatic.issuerPublicKey.toPublicKey,
+          pbStatic.decimals,
+          pbStatic.nft
+        )
         asset -> NewAssetInfo(static, s.assetNamesAndDescriptions(asset), s.assetVolumes(asset))
       }
 

@@ -13,7 +13,6 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
-import com.wavesplatform.state.StateSnapshot.lastEstimator
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset
@@ -87,17 +86,13 @@ case class StateSnapshot(
           S.AccountScript(
             address.toByteString,
             ByteString.EMPTY,
-            ByteString.EMPTY,
-            0,
-            Map[String, Long]()
+            0
           )
         )(script =>
           S.AccountScript(
             address.toByteString,
             script.publicKey.toByteString,
-            script.script.bytes().toByteString,
-            script.verifierComplexity,
-            script.complexitiesByEstimator.getOrElse(lastEstimator, Map())
+            script.verifierComplexity
           )
         )
       }.toSeq,

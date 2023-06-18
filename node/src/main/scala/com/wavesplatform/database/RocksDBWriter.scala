@@ -442,7 +442,7 @@ class RocksDBWriter(
       for ((asset, (assetStatic, assetNum)) <- snapshot.indexedAssetStatics) {
         val pbAssetStatic = StaticAssetInfo(
           assetStatic.sourceTransactionId,
-          assetStatic.issuer,
+          assetStatic.issuerPublicKey,
           assetStatic.decimals,
           assetStatic.nft,
           assetNum,

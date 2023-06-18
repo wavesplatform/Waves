@@ -232,7 +232,7 @@ object SnapshotBlockchain {
       .map { case (static, assetNum) =>
         AssetDescription(
           static.sourceTransactionId.toByteStr,
-          static.issuer.toPublicKey,
+          static.issuerPublicKey.toPublicKey,
           info.get.name,
           info.get.description,
           static.decimals,
