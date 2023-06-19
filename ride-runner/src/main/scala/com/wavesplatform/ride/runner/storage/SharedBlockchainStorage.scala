@@ -44,9 +44,11 @@ class SharedBlockchainStorage[TagT] private (
   //   not exist - we don't known this key
   //   exist, but empty - we known this key, but doesn't remember why
   //   exist and non-empty - we know, why do we need this key (but there are probably more tags)
-  private val tags = new ConcurrentHashMap[CacheKey, Set[TagT]]()
+  private val allTags = new ConcurrentHashMap[CacheKey, Set[TagT]]()
 
-  def removeTags(xs: collection.Set[TagT]): Unit = tags.replaceAll { (_: CacheKey, orig: Set[TagT]) =>
+  def addDependent(key: CacheKey, tag: TagT): Unit = allTags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
+
+  def removeTags(xs: collection.Set[TagT]): Unit = allTags.replaceAll { (_: CacheKey, orig: Set[TagT]) =>
     if (orig.size >= xs.size) orig -- xs
     else orig.diff(xs)
   }
@@ -57,17 +59,15 @@ class SharedBlockchainStorage[TagT] private (
     // Guarantees, that Alias / Transaction don't change their address / height
     val firstSafeHeight = blockHeaders.latestHeight.fold(Height(0))(lastKnownHeight => Height(lastKnownHeight - SafeHeightOffset))
 
-    persistentCaches.accountDataEntries.getAllKeys().foreach(tags.put(_, Set.empty))
-    persistentCaches.accountScripts.getAllKeys().foreach(x => tags.put(CacheKey.AccountScript(x), Set.empty))
-    persistentCaches.assetDescriptions.getAllKeys().foreach(x => tags.put(CacheKey.Asset(x), Set.empty))
-    persistentCaches.aliases.getAllKeys(firstSafeHeight).foreach(tags.put(_, Set.empty))
-    persistentCaches.accountBalances.getAllKeys().foreach(x => tags.put(CacheKey.AccountBalance(x._1, x._2), Set.empty))
-    persistentCaches.accountLeaseBalances.getAllKeys().foreach(x => tags.put(CacheKey.AccountLeaseBalance(x), Set.empty))
-    persistentCaches.transactions.getAllKeys(firstSafeHeight).foreach(x => tags.put(CacheKey.Transaction(x), Set.empty))
-    log.info(s"Found ${tags.size()} keys")
+    persistentCaches.accountDataEntries.getAllKeys().foreach(allTags.put(_, Set.empty))
+    persistentCaches.accountScripts.getAllKeys().foreach(x => allTags.put(CacheKey.AccountScript(x), Set.empty))
+    persistentCaches.assetDescriptions.getAllKeys().foreach(x => allTags.put(CacheKey.Asset(x), Set.empty))
+    persistentCaches.aliases.getAllKeys(firstSafeHeight).foreach(allTags.put(_, Set.empty))
+    persistentCaches.accountBalances.getAllKeys().foreach(x => allTags.put(CacheKey.AccountBalance(x._1, x._2), Set.empty))
+    persistentCaches.accountLeaseBalances.getAllKeys().foreach(x => allTags.put(CacheKey.AccountLeaseBalance(x), Set.empty))
+    persistentCaches.transactions.getAllKeys(firstSafeHeight).foreach(x => allTags.put(CacheKey.Transaction(x), Set.empty))
+    log.info(s"Found ${allTags.size()} keys")
   }
-
-  def addDependent(key: CacheKey, tag: TagT): Unit = tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
 
   private val commonCache = new CommonCache(settings.commonCache)
 
@@ -277,14 +277,14 @@ class SharedBlockchainStorage[TagT] private (
       affected
     }
 
-  private def logIfTagPresent(key: CacheKey, hint: String): AffectedTags[TagT] = Option(tags.get(key)) match {
+  private def logIfTagPresent(key: CacheKey, hint: String): AffectedTags[TagT] = Option(allTags.get(key)) match {
     case None       => empty
     case Some(tags) =>
       // log.trace(s"dep $hint: ${self.xs.toList.map(_.toString).sorted.mkString("; ")}")
       AffectedTags(tags)
   }
 
-  private def runAndLogIfTagPresent(key: CacheKey, hint: String)(f: => Unit): AffectedTags[TagT] = Option(tags.get(key)) match {
+  private def runAndLogIfTagPresent(key: CacheKey, hint: String)(f: => Unit): AffectedTags[TagT] = Option(allTags.get(key)) match {
     case None => empty
     case Some(tags) =>
       f

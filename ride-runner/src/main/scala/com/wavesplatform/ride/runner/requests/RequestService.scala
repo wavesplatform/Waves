@@ -67,7 +67,7 @@ class DefaultRequestService(
       currentDuration
   }
 
-  private val requests = Caffeine
+  private val activeRequests = Caffeine
     .newBuilder()
     .maximumSize(800) // TODO #96 Weighed cache
     .expireAfter(requestsExpiry)
@@ -78,14 +78,15 @@ class DefaultRequestService(
 
   private val currJobs = new ConcurrentHashMap[RideScriptRunRequest, RequestJob]()
 
+  private def isActive(request: RideScriptRunRequest): Boolean =
+    currJobs.containsKey(request) || Option(activeRequests.policy().getIfPresentQuietly(request)).isDefined
+
   override def start(): Unit = if (isWorking.get()) {
     log.info("Starting queue...")
     queueTask = requestScheduler.jobs
       .takeWhile(_ => isWorking.get())
-      .filterNot(isIgnored)
-      // This is the only place where we run scripts and thus add tags.
-      // Tags cleanup here too to eiliminate data races (tags.replaceAll in SharedBlockchainStorage).
-      .doOnNext(_ => Task(clearIgnored()))
+      .doOnNext(_ => Task(clearIgnored())) // This is the only place where we run scripts and thus add tags.
+      .filter(isActive)
       .mapParallelUnordered(settings.parallelization) { request =>
         log.debug(s"Processing ${request.shortLogPrefix}")
         if (createJob(request).inProgress) Task.unit
@@ -94,14 +95,15 @@ class DefaultRequestService(
             case Some(updated) =>
               if (updated.isAvailable) {
                 // We don't need to cache an empty value, so we use getOrElse here
-                val origEnv = Option(requests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
-                runOne(origEnv).tapEval { r =>
-                  Task {
-                    requests.put(r.request, r)
-                    updated.result.trySuccess(r)
-                    Option(currJobs.remove(request)).foreach(_.timer.stop())
+                val origEnv = Option(activeRequests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
+                runOne(origEnv)
+                  .tapEval { r =>
+                    Task {
+                      activeRequests.put(r.request, r)
+                      updated.result.trySuccess(r)
+                    }
                   }
-                }
+                  .doOnFinish(_ => Task(Option(currJobs.remove(request)).foreach(_.timer.stop())))
               } else {
                 log.info(s"$request is already running")
                 requestScheduler.add(request) // A job is being processed now, but it can use stale data
@@ -128,17 +130,17 @@ class DefaultRequestService(
   }
 
   override def scheduleAffected(affected: Set[RideScriptRunRequest]): Unit = {
-    val toRun = if (ignoredRequests.isEmpty) affected else affected.filterNot(isIgnored)
+    val toRun = affected.filter(isActive)
 
     RideRunnerStats.requestServiceIgnoredNumber.update(ignoredRequests.size())
     RideRunnerStats.rideRequestActiveAffectedNumberByTypes.update(toRun.size.toDouble)
 
     log.info(f"Affected: total=${affected.size}, to run=${toRun.size} (${toRun.size * 100.0f / affected.size}%.1f%%)")
     requestScheduler.addMultiple(toRun)
-    RideRunnerStats.rideRequestActiveNumber.update(requests.estimatedSize().toDouble)
+    RideRunnerStats.rideRequestActiveNumber.update(activeRequests.estimatedSize().toDouble)
   }
 
-  override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(requests.getIfPresent(request)) match {
+  override def trackAndRun(request: RideScriptRunRequest): Task[RideScriptRunResult] = Option(activeRequests.getIfPresent(request)) match {
     case Some(cache) =>
       RideRunnerStats.rideRequestCacheHits.increment()
       Task.now(cache)
