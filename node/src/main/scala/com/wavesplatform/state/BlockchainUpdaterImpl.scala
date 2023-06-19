@@ -30,7 +30,7 @@ import monix.reactive.subjects.ReplaySubject
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
-    rocksdb: RocksDBWriter,
+    val rocksdb: RocksDBWriter,
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
@@ -301,7 +301,7 @@ class BlockchainUpdaterImpl(
               } else
                 metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                  case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
+                  case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, discarded)) =>
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
@@ -320,10 +320,10 @@ class BlockchainUpdaterImpl(
                       val reward     = nextReward()
 
                       val prevHitSource                 = ng.hitSource
-                      val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
+                      val liquidSnapshotWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidSnapshot)
                       val referencedBlockchain = SnapshotBlockchain(
                         rocksdb,
-                        liquidDiffWithCancelledLeases,
+                        liquidSnapshotWithCancelledLeases,
                         referencedForgedBlock,
                         ng.hitSource,
                         carry,
@@ -356,14 +356,14 @@ class BlockchainUpdaterImpl(
                         blockchainUpdateTriggers.onProcessBlock(block, differResult.minerSnapshot, reward, hitSource, this)
 
                         rocksdb.append(
-                          liquidDiffWithCancelledLeases,
+                          liquidSnapshotWithCancelledLeases,
                           carry,
                           totalFee,
                           prevReward,
                           prevHitSource,
                           referencedForgedBlock
                         )
-                        BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
+                        BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
                         val (discardedMbs, discardedSnapshots) = discarded.unzip
                         if (discardedMbs.nonEmpty) {
