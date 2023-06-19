@@ -32,7 +32,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
 
   def mkBlock(sender: KeyPair, reference: ByteStr, transactions: Seq[Transaction]): Block =
     Block
-      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L, None)
+      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L, None, None)
       .explicitGet()
 
   val setup: Seq[(KeyPair, KeyPair, KeyPair, Seq[Block])] = {

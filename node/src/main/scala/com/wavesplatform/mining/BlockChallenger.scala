@@ -1,6 +1,7 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
+import com.wavesplatform.account.SeedKeyPair
 import com.wavesplatform.block.{Block, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -25,13 +26,14 @@ class BlockChallenger(
     appendBlock: Block => Task[Either[ValidationError, Option[BigInt]]]
 ) extends ScorexLogging {
 
+  // TODO: NODE-2594 what if challenged block contains challengeHeader?
+
   def challengeBlock(block: Block, ch: Channel, correctStateHash: Option[ByteStr]): Task[Unit] = {
     log.debug(s"Challenging block $block")
-    // TODO: challenging account selection
-    wallet.privateKeyAccounts.headOption match {
+    getChallengingAccount match {
       case Some(acc) =>
         (for {
-          challengeBlock <- EitherT(
+          challengingBlock <- EitherT(
             Task(
               Block.buildAndSign(
                 block.header.version,
@@ -44,26 +46,34 @@ class BlockChallenger(
                 blockFeatures(blockchainUpdater, settings),
                 blockRewardVote(settings),
                 correctStateHash,
-                Some(ChallengedHeader(block.header.featureVotes, block.header.generator, block.header.rewardVote, block.signature))
+                Some(
+                  ChallengedHeader(
+                    block.header.featureVotes,
+                    block.header.generator,
+                    block.header.rewardVote,
+                    block.header.stateHash,
+                    block.signature
+                  )
+                )
               )
             )
           )
-          _ <- EitherT(appendBlock(challengeBlock))
+          _ <- EitherT(appendBlock(challengingBlock))
         } yield {
-          log.debug(s"Successfully challenged $block with $challengeBlock")
-          allChannels.broadcast(BlockForged(challengeBlock), Some(ch))
+          log.debug(s"Successfully challenged $block with $challengingBlock")
+          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
         }).fold(
           err => log.debug(s"Could not challenge $block: $err"),
           identity
         )
-      case None => Task.unit
+      case None => Task(log.debug(s"Could not challenge $block: no suitable account in wallet"))
     }
   }
 
   def challengeMicroblock(md: MicroblockData, ch: Channel, correctStateHash: Option[ByteStr]): Task[Unit] = {
     val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
     log.debug(s"Challenging microblock $idStr")
-    (blockchainUpdater.lastBlockHeader.map(_.header), wallet.privateKeyAccounts.headOption) match {
+    (blockchainUpdater.lastBlockHeader.map(_.header), getChallengingAccount) match {
       case (Some(blockHeader), Some(acc)) =>
         (for {
           discarded <- EitherT(Task(blockchainUpdater.removeAfter(blockHeader.reference)))
@@ -81,7 +91,15 @@ class BlockChallenger(
                 blockFeatures(blockchainUpdater, settings),
                 blockRewardVote(settings),
                 correctStateHash,
-                Some(ChallengedHeader(block.header.featureVotes, block.header.generator, block.header.rewardVote, md.microBlock.signature))
+                Some(
+                  ChallengedHeader(
+                    block.header.featureVotes,
+                    block.header.generator,
+                    block.header.rewardVote,
+                    md.microBlock.stateHash,
+                    md.microBlock.signature
+                  )
+                )
               )
             )
           )
@@ -93,7 +111,7 @@ class BlockChallenger(
           err => log.debug(s"Could not challenge microblock $idStr: $err"),
           identity
         )
-      case _ => Task.unit
+      case _ => Task(log.debug(s"Could not challenge microblock $idStr: no suitable account in wallet"))
     }
   }
 
@@ -108,4 +126,18 @@ class BlockChallenger(
 
   private def blockRewardVote(settings: WavesSettings): Long =
     settings.rewardsSettings.desired.getOrElse(-1L)
+
+  private def getChallengingAccount: Option[SeedKeyPair] = {
+    wallet.privateKeyAccounts
+      .map { pk =>
+        pk -> blockchainUpdater.generatingBalance(pk.toAddress)
+      }
+      .filter { case (_, balance) => blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance) }
+      .maxByOption(_._2)
+      .map(_._1)
+  }
+}
+
+object BlockChallenger {
+  val MaliciousMinerBanPeriod = 1000
 }

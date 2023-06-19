@@ -407,6 +407,7 @@ case class UtxPoolImpl(
                             r.validatedTransactions + tx.id(),
                             r.removedTransactions,
                             r.stateHash.map(prevStateHash =>
+                              // TODO: NODE-2594 use correct init diff (with miner rewards)
                               TxStateSnapshotHashBuilder.createHashFromTxDiff(updatedBlockchain, newDiff).createHash(prevStateHash)
                             )
                           )

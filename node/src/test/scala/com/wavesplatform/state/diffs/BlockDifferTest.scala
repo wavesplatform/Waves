@@ -9,11 +9,11 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
+import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 
 import scala.concurrent.duration.*

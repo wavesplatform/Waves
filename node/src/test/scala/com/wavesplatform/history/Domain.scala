@@ -259,7 +259,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         defaultSigner,
         lastBlock.header.featureVotes,
         lastBlock.header.rewardVote,
-        stateHash.orElse(lastBlock.header.stateHash)
+        stateHash.orElse(lastBlock.header.stateHash),
+        None
       )
       .explicitGet()
     MicroBlock
@@ -341,7 +342,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         featureVotes = Nil,
         rewardVote = -1L,
         signer = generator,
-        stateHash = None
+        stateHash = None,
+        challengedHeader = None
       )
       .explicitGet()
   }

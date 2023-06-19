@@ -211,7 +211,7 @@ object BlockDiffer {
 
     prepareCaches(blockGenerator, txs, loadCacheData)
 
-    // TODO: consider initDiff as separate txDiff in state hash computation
+    // TODO: NODE-2594 consider initDiff as separate txDiff in state hash computation
     txs
       .foldLeft(
         TracedResult(

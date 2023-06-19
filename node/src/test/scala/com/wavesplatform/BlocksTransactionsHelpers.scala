@@ -157,7 +157,8 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         featureVotes = Seq.empty,
         rewardVote = -1L,
         transactionData = txs,
-        stateHash = None
+        stateHash = None,
+        challengedHeader = None
       )
       val toSign =
         if (version < Block.ProtoBlockVersion) unsigned.bytes()

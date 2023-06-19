@@ -147,12 +147,13 @@ class WavesEnvironment(
     for {
       address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
-      effectiveBalance <- portfolio.effectiveBalance
+      isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
+      effectiveBalance <- portfolio.effectiveBalance.recover { case _ if isBanned => 0L }
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
       blockchain.generatingBalance(address),
-      effectiveBalance
+      if (isBanned) 0L else effectiveBalance
     )
   }
 
@@ -197,8 +198,8 @@ class WavesEnvironment(
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
-      generator = ByteStr(blockH.generator.toAddress.bytes),
-      generatorPublicKey = blockH.generator,
+      generator = ByteStr(blockH.challengedHeader.map(_.generator.toAddress.bytes).getOrElse(blockH.generator.toAddress.bytes)),
+      generatorPublicKey = blockH.challengedHeader.map(_.generator).getOrElse(blockH.generator),
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }

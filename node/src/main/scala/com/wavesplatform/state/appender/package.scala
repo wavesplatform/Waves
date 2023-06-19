@@ -71,7 +71,6 @@ package object appender {
       newHeight <-
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
-          // TODO: maybe delete
           .map { discardedDiffs =>
             utx.setPriorityDiffs(discardedDiffs)
             Some(blockchainUpdater.height)
@@ -80,7 +79,6 @@ package object appender {
     } yield newHeight
   }
 
-  // TODO: check challenged stateHash != challenging stateHash
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =
     for {
       _ <- Miner.isAllowedForMining(block.sender.toAddress, blockchainUpdater).leftMap(BlockAppendError(_, block))
@@ -92,6 +90,7 @@ package object appender {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
+      _ <- validateChallengedHeader(block, blockchainUpdater)
     } yield hitSource
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
@@ -141,9 +140,32 @@ package object appender {
     )
   }
 
-  private def validateStateHash(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+  private def validateChallengedHeader(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     for {
-      _ <- Either.cond(block.header.stateHash.isEmpty)
+      _ <- Either.cond(
+        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot),
+        (),
+        BlockAppendError("Challenged header is not supported yet", block)
+      )
+      _ <- Either.cond(
+        !block.header.challengedHeader.flatMap(_.stateHash).exists(block.header.stateHash.contains),
+        (),
+        BlockAppendError("Challenged state hash is equal to challenging", block)
+      )
+      _ <- Either.cond(
+        !block.header.challengedHeader.map(_.generator).contains(block.header.generator),
+        (),
+        BlockAppendError("Challenged block generator and challenging block generator should not be equal", block)
+      )
+      _ <- Either.cond(
+        block.header.challengedHeader.isEmpty || blockchain.isEffectiveBalanceValid(
+          blockchain.height,
+          block,
+          blockchain.generatingBalance(block.sender.toAddress)
+        ),
+        (),
+        BlockAppendError("Block sender doesn't have enough generating balance for challenging block generation", block)
+      )
     } yield ()
 
   private[this] object metrics {

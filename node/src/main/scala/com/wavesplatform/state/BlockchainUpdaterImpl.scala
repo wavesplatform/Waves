@@ -262,12 +262,17 @@ class BlockchainUpdaterImpl(
                       blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
-                } else if (areVersionsOfSameBlock(block, ng.base)) {
+                  // TODO: NODE-2594 empty block case?
+                } else if (areVersionsOfSameBlock(block, ng.base) || isChallengingBlock(block, ng.base)) {
                   if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
                     log.trace(s"Existing liquid block is better than new one, discarding $block")
                     Right(None)
                   } else {
-                    log.trace(s"New liquid block is better version of existing, swapping")
+                    if (isChallengingBlock(block, ng.base)) {
+                      log.trace("Challenging block received")
+                    } else {
+                      log.trace(s"New liquid block is better version of existing, swapping")
+                    }
                     val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(rocksdb, height)
 
@@ -718,6 +723,10 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.wavesBalances(addresses)
   }
 
+  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] = readLock {
+    compositeBlockchain.effectiveBalanceBanHeights(address)
+  }
+
   override def leaseBalance(address: Address): LeaseBalance = readLock {
     compositeBlockchain.leaseBalance(address)
   }
@@ -762,4 +771,10 @@ object BlockchainUpdaterImpl {
       b1.header.baseTarget == b2.header.baseTarget &&
       b1.header.reference == b2.header.reference &&
       b1.header.timestamp == b2.header.timestamp
+
+  def isChallengingBlock(newBlock: Block, existingBlock: Block): Boolean =
+    newBlock.header.challengedHeader.map(_.generator).contains(existingBlock.header.generator) &&
+      newBlock.header.baseTarget == existingBlock.header.baseTarget &&
+      newBlock.header.reference == existingBlock.header.reference &&
+      newBlock.header.timestamp == existingBlock.header.timestamp
 }

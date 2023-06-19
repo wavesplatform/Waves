@@ -91,6 +91,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           acc,
           Nil,
           0,
+          None,
           None
         )
         .explicitGet()

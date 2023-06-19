@@ -105,7 +105,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
         Right(Nil)
       }
       .once()
-    (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
+    (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0, false)))
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)

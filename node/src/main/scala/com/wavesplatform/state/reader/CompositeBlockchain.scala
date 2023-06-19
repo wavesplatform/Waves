@@ -51,6 +51,8 @@ final class CompositeBlockchain private (
       address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))
     }
 
+  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] = inner.effectiveBalanceBanHeights(address)
+
   override def leaseBalance(address: Address): LeaseBalance =
     inner.leaseBalance(address).combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
 
@@ -136,7 +138,7 @@ final class CompositeBlockchain private (
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
+      val bs         = BalanceSnapshot(height, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, height))
       val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
       if (inner.height > 0 && (from < this.height || height2Fix))
         bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain

@@ -64,6 +64,7 @@ object RollbackBenchmark extends ScorexLogging {
         issuer,
         Seq.empty,
         -1,
+        None,
         None
       )
       .explicitGet()
@@ -95,6 +96,7 @@ object RollbackBenchmark extends ScorexLogging {
           issuer,
           Seq.empty,
           -1,
+          None,
           None
         )
         .explicitGet()

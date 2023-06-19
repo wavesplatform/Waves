@@ -38,6 +38,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
         signer,
         Seq.empty,
         -1L,
+        None,
         None
       )
       .explicitGet()

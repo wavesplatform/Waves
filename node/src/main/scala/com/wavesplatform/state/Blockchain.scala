@@ -80,6 +80,8 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
+  def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)]
+
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 }
 
@@ -210,5 +212,8 @@ object Blockchain {
         })
 
     def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
+
+    def hasBannedEffectiveBalance(address: Address, height: Int = blockchain.height): Boolean =
+      blockchain.effectiveBalanceBanHeights(address).exists { case (start, end) => height >= start && height <= end }
   }
 }

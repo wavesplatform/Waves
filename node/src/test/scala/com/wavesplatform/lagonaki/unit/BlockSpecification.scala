@@ -50,6 +50,7 @@ class BlockSpecification extends PropSpec {
         recipient,
         Seq.empty,
         -1L,
+        None,
         None
       )
       .explicitGet()
@@ -68,6 +69,7 @@ class BlockSpecification extends PropSpec {
             recipient,
             Seq.empty,
             -1L,
+            None,
             None
           )
           .explicitGet()
@@ -94,6 +96,7 @@ class BlockSpecification extends PropSpec {
           recipient,
           Seq(1),
           -1L,
+          None,
           None
         ) should produce("could not contain feature votes")
       }
@@ -115,6 +118,7 @@ class BlockSpecification extends PropSpec {
         recipient,
         supportedFeatures,
         -1L,
+        None,
         None
       ) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature votes")
     }
@@ -136,6 +140,7 @@ class BlockSpecification extends PropSpec {
           recipient,
           featureVotes,
           -1L,
+          None,
           None
         )
         .explicitGet()
@@ -163,6 +168,7 @@ class BlockSpecification extends PropSpec {
           Seq.empty,
           -1L,
           transactionData,
+          None,
           None
         )
         .copy(signature = ByteStr(Array.fill(64)(0: Byte)))
@@ -175,7 +181,7 @@ class BlockSpecification extends PropSpec {
       case (txs, acc, ref, gs) =>
         val (block, _) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L, None).explicitGet()
+            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L, None, None).explicitGet()
           )
         val (bytes, _) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
         val (hash, _)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
