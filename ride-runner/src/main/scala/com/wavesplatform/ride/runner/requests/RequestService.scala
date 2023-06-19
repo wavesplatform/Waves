@@ -76,7 +76,8 @@ class DefaultRequestService(
     .recordStats(() => new KamonCaffeineStats("Requests"))
     .build[RideScriptRunRequest, RideScriptRunResult]()
 
-  private val currJobs = new ConcurrentHashMap[RideScriptRunRequest, RequestJob]()
+  private val currJobs                                     = new ConcurrentHashMap[RideScriptRunRequest, RequestJob]()
+  private def stopJob(request: RideScriptRunRequest): Unit = Option(currJobs.remove(request)).foreach(_.timer.stop())
 
   private def isActive(request: RideScriptRunRequest): Boolean =
     currJobs.containsKey(request) || Option(activeRequests.policy().getIfPresentQuietly(request)).isDefined
@@ -96,14 +97,17 @@ class DefaultRequestService(
               if (updated.isAvailable) {
                 // We don't need to cache an empty value, so we use getOrElse here
                 val origEnv = Option(activeRequests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
-                runOne(origEnv)
-                  .tapEval { r =>
-                    Task {
-                      activeRequests.put(r.request, r)
-                      updated.result.trySuccess(r)
-                    }
+                runOne(origEnv).redeem(
+                  e => {
+                    updated.result.tryFailure(e)
+                    stopJob(request)
+                  },
+                  x => {
+                    activeRequests.put(x.request, x)
+                    updated.result.trySuccess(x)
+                    stopJob(request)
                   }
-                  .doOnFinish(_ => Task(Option(currJobs.remove(request)).foreach(_.timer.stop())))
+                )
               } else {
                 log.info(s"$request is already running")
                 requestScheduler.add(request) // A job is being processed now, but it can use stale data
