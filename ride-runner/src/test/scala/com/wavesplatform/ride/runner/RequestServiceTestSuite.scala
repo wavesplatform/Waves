@@ -102,7 +102,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       "contains address and expr" in test(defaultRequestServiceSettings) { d =>
         d.emitSimpleEvent()
 
-        val r = d.trackAndRun(aRequest).lastResult
+        val r = d.trackAndRunLastResult(aRequest)
         withClue("address:") { (r \ "address").toOption shouldBe defined }
         withClue("expr:") { (r \ "expr").toOption shouldBe defined }
       }
@@ -111,7 +111,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         s"enable=$enableTraces, ask=$askTraces, has=$hasTraces" in test(defaultRequestServiceSettings.copy(enableTraces = enableTraces)) { d =>
           d.emitSimpleEvent()
 
-          val traces = (d.trackAndRun(aRequest.copy(trace = askTraces)).lastResult \ "vars").toOption
+          val traces = (d.trackAndRunLastResult(aRequest.copy(trace = askTraces)) \ "vars").toOption
           if (hasTraces) traces should not be empty
           else traces shouldBe empty
         }
@@ -126,19 +126,19 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       "state changes" - {
         "has if enabled" in test(defaultRequestServiceSettings.copy(enableStateChanges = true)) { d =>
           d.emitSimpleEvent()
-          (d.trackAndRun(aRequest).lastResult \ "stateChanges").toOption should not be empty
+          (d.trackAndRunLastResult(aRequest) \ "stateChanges").toOption should not be empty
         }
 
         "hasn't if disabled" in test(defaultRequestServiceSettings.copy(enableStateChanges = false)) { d =>
           d.emitSimpleEvent()
-          (d.trackAndRun(aRequest).lastResult \ "stateChanges").toOption shouldBe empty
+          (d.trackAndRunLastResult(aRequest) \ "stateChanges").toOption shouldBe empty
         }
       }
 
       "int as string" in test(defaultRequestServiceSettings) { d =>
         d.emitSimpleEvent()
 
-        def run(intAsString: Boolean) = (d.trackAndRun(aRequest.copy(intAsString = intAsString)).lastResult \ "result" \ "value" \ "_2" \ "value").get
+        def run(intAsString: Boolean) = (d.trackAndRunLastResult(aRequest.copy(intAsString = intAsString)) \ "result" \ "value" \ "_2" \ "value").get
 
         withClue("intAsString == true:") {
           run(intAsString = true) shouldBe a[JsString]
@@ -162,7 +162,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val r = trackAndRun(request)
       withClue(s"$r:") {
         r.lastStatus shouldBe StatusCodes.OK
-        (r.lastResult \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
+        (Json.parse(r.lastResult) \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt shouldBe expectedValue
       }
     }
 
@@ -170,7 +170,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val r = trackAndRun(request)
       withClue(s"$r:") {
         r.lastStatus shouldBe status
-        r.lastResult shouldBe json
+        Json.parse(r.lastResult) shouldBe json
       }
     }
 
@@ -178,6 +178,12 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val task = requests.trackAndRun(request).runToFuture(scheduler)
       scheduler.tick()
       Await.result(task, 5.seconds)
+    }
+
+    def trackAndRunLastResult(request: RideScriptRunRequest): JsValue = {
+      val task = requests.trackAndRun(request).runToFuture(scheduler)
+      scheduler.tick()
+      Json.parse(Await.result(task, 5.seconds).lastResult)
     }
 
     def emitSimpleEvent(): Unit = {

@@ -20,16 +20,18 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
           RideScriptRunResult(
             request = request,
             evaluation = None,
-            lastResult = Json.obj(
-              "result" -> Json.obj(
-                "type"  -> "Int",
-                "value" -> 2
-              ),
-              "complexity" -> 0,
-              "vars"       -> Json.arr(Json.obj("a" -> 1)),
-              "expr"       -> "1 + 1",
-              "address"    -> defaultAddr.toString
-            ),
+            lastResult = Json
+              .obj(
+                "result" -> Json.obj(
+                  "type"  -> "Int",
+                  "value" -> 2
+                ),
+                "complexity" -> 0,
+                "vars"       -> Json.arr(Json.obj("a" -> 1)),
+                "expr"       -> "1 + 1",
+                "address"    -> defaultAddr.toString
+              )
+              .toString(),
             lastStatus = StatusCodes.OK
           )
         )
@@ -49,7 +51,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
           RideScriptRunResult(
             request = request,
             evaluation = None,
-            lastResult = JsObject.empty,
+            lastResult = JsObject.empty.toString(),
             lastStatus = StatusCodes.BadRequest
           )
         )

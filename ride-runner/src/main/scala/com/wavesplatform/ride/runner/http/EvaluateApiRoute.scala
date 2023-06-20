@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.http
 
 import akka.http.scaladsl.model.headers.Accept
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
@@ -24,7 +25,10 @@ case class EvaluateApiRoute(evaluateExpr: RideScriptRunRequest => Future[RideScr
           )
 
           evaluateExpr(request).map { runResult =>
-            (runResult.lastStatus, runResult.lastResult)
+            HttpResponse(
+              status = runResult.lastStatus,
+              entity = HttpEntity(ContentTypes.`application/json`, runResult.lastResult)
+            )
           }
         }
       }

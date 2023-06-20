@@ -6,7 +6,6 @@ import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.utils.UtilsEvaluator
-import com.wavesplatform.api.http.utils.UtilsEvaluator.Evaluation
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
@@ -17,7 +16,6 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
-import org.openjdk.jol.info.GraphLayout
 import play.api.libs.json.{JsObject, Json}
 
 import java.util.concurrent.ConcurrentHashMap
@@ -187,31 +185,8 @@ class DefaultRequestService(
   private def runOne(prevResult: RideScriptRunResult): Task[RideScriptRunResult] =
     Task
       .evalAsync {
-        try {
-          val (evaluation, updatedResult) = RideRunnerStats.rideRequestRunTime.measure(evaluate(prevResult))
-
-          val origResult      = prevResult.lastResult
-          lazy val complexity = (updatedResult \ "complexity").as[Int]
-          if ((updatedResult \ "error").isDefined) {
-            log.trace(s"result=failed; ${prevResult.request.shortLogPrefix} errorCode=${(updatedResult \ "error").as[Int]}")
-            RideRunnerStats.rideScriptFailedCalls.increment()
-          } else if (
-            origResult == JsObject.empty ||
-            updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
-          ) {
-            RideRunnerStats.rideScriptOkCalls.increment()
-            log.trace(s"result=ok; ${prevResult.request.shortLogPrefix} complexity=$complexity")
-          } else {
-            RideRunnerStats.rideScriptUnnecessaryCalls.increment()
-            log.trace(s"result=unnecessary; ${prevResult.request.shortLogPrefix} complexity=$complexity")
-          }
-
-          prevResult.copy(
-            evaluation = evaluation,
-            lastResult = updatedResult,
-            lastStatus = StatusCodes.OK
-          )
-        } catch {
+        try RideRunnerStats.rideRequestRunTime.measure(evaluate(prevResult))
+        catch {
           case e: Throwable =>
             log.error(s"An error during running ${prevResult.request}: ${e.getMessage}")
             rideScriptFailedCalls.increment()
@@ -220,7 +195,7 @@ class DefaultRequestService(
       }
       .executeOn(runScriptScheduler)
 
-  private def evaluate(prevResult: RideScriptRunResult): (Option[Evaluation], JsObject) = {
+  private def evaluate(prevResult: RideScriptRunResult): RideScriptRunResult = {
     val (evaluation, failJson) =
       if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
       else // Note: the latest version here for simplicity
@@ -230,7 +205,7 @@ class DefaultRequestService(
         }
 
     evaluation match {
-      case None => (evaluation, failJson)
+      case None => RideScriptRunResult(prevResult.request, evaluation, failJson.toString(), StatusCodes.BadRequest)
       case Some(ev) =>
         val blockchain = new ProxyBlockchain(sharedBlockchain)
         val address    = prevResult.request.address
@@ -252,9 +227,28 @@ class DefaultRequestService(
         )
 
         val afterStateChanges = if (settings.enableStateChanges) initJsResult else initJsResult - "stateChanges"
-        val finalJsResult = afterStateChanges ++ prevResult.request.requestBody ++ Json.obj("address" -> address.toString)
+        val finalJsResult     = afterStateChanges ++ prevResult.request.requestBody ++ Json.obj("address" -> address.toString)
+        val finalStringResult = finalJsResult.toString()
 
-        (evaluation, finalJsResult)
+        lazy val complexity = (finalJsResult \ "complexity").as[Int]
+        val isError         = (finalJsResult \ "error").isDefined
+        if (isError) {
+          log.trace(s"result=failed; ${prevResult.request.shortLogPrefix} errorCode=${(finalJsResult \ "error").as[Int]}")
+          RideRunnerStats.rideScriptFailedCalls.increment()
+        } else if (prevResult.lastResult.isEmpty || finalStringResult != prevResult.lastResult) {
+          RideRunnerStats.rideScriptOkCalls.increment()
+          log.trace(s"result=ok; ${prevResult.request.shortLogPrefix} complexity=$complexity")
+        } else {
+          RideRunnerStats.rideScriptUnnecessaryCalls.increment()
+          log.trace(s"result=unnecessary; ${prevResult.request.shortLogPrefix} complexity=$complexity")
+        }
+
+        RideScriptRunResult(
+          prevResult.request,
+          evaluation,
+          finalStringResult,
+          if (isError) StatusCodes.BadRequest else StatusCodes.OK
+        )
     }
   }
 
@@ -262,7 +256,7 @@ class DefaultRequestService(
   private def fail(request: RideScriptRunRequest, reason: ApiError): RideScriptRunResult = RideScriptRunResult(
     request = request,
     evaluation = None,
-    lastResult = reason.json,
+    lastResult = reason.json.toString(),
     lastStatus = reason.code
   )
 }

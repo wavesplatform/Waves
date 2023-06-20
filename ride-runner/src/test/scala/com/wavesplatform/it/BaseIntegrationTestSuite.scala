@@ -103,7 +103,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     def getScriptResult: JsObject = {
       val r = requestService.trackAndRun(request).runToFuture
       testScheduler.tick()
-      Await.result(r, 5.seconds).lastResult
+      Json.parse(Await.result(r, 5.seconds).lastResult).as[JsObject]
     }
 
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
