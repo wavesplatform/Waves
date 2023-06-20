@@ -247,7 +247,7 @@ class DefaultRequestService(
         )
 
         val afterStateChanges = if (settings.enableStateChanges) initJsResult else initJsResult - "stateChanges"
-        val finalJsResult = afterStateChanges ++ Json.obj("address" -> address.toString)
+        val finalJsResult = afterStateChanges ++ prevResult.request.requestBody ++ Json.obj("address" -> address.toString)
 
         (evaluation, finalJsResult)
     }

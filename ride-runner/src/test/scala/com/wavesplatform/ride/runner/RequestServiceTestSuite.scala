@@ -90,6 +90,14 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         )
       }
 
+      "contains address and expr" in test(defaultRequestServiceSettings) { d =>
+        d.emitSimpleEvent()
+
+        val r = d.trackAndRun(aRequest).lastResult
+        withClue("address:") { (r \ "address").toOption shouldBe defined }
+        withClue("expr:") { (r \ "expr").toOption shouldBe defined }
+      }
+
       def runTracesTest(enableTraces: Boolean, askTraces: Boolean, hasTraces: Boolean): Unit =
         s"enable=$enableTraces, ask=$askTraces, has=$hasTraces" in test(defaultRequestServiceSettings.copy(enableTraces = enableTraces)) { d =>
           d.emitSimpleEvent()
