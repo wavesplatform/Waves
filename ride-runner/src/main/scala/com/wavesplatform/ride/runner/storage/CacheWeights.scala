@@ -3,9 +3,11 @@ package com.wavesplatform.ride.runner.storage
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{base58Length, base64Length}
+import org.openjdk.jol.info.GraphLayout
 
 // Close size of objects in bytes
 object CacheWeights {
@@ -30,6 +32,18 @@ object CacheWeights {
   val OfBigIntTotalVolume = 24 // = 12 (header) + 4 (ref, null _bigInteger) + 8 (_long)
 
   val OfLeaseBalance = 32 // = 12 (header) + 8 (in) + 8 (out) + 4 (align)
+
+  def ofRideScriptRunRequest(x: RideScriptRunRequest): Int = {
+    val longWeight = GraphLayout.parseInstance(x).totalSize()
+    if (longWeight.isValidInt) longWeight.toInt
+    else throw new ArithmeticException(s"Weight of RideScriptRunRequest overflow: $longWeight")
+  }
+
+  def ofRideScriptRunResult(x: RideScriptRunResult): Int = {
+    val longWeight = GraphLayout.parseInstance(x).totalSize()
+    if (longWeight.isValidInt) longWeight.toInt
+    else throw new ArithmeticException(s"Weight of RideScriptRunResult overflow: $longWeight")
+  }
 
   def ofWeighedAssetDescription(x: WeighedAssetDescription): Int = {
     24 + // 24 = 12 (header) + 4 (scriptWeight) + 4 (ref: assetDescription) + 4 (align)

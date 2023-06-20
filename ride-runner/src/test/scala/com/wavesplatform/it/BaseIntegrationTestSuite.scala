@@ -71,8 +71,18 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
     }
 
-    val request                = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "foo()"), trace = false, intAsString = true)
-    val requestServiceSettings = DefaultRequestService.Settings(enableTraces = true, enableStateChanges = false, Int.MaxValue, 0, 3, 0.seconds, 100)
+    val request = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "foo()"), trace = false, intAsString = true)
+    val requestServiceSettings = DefaultRequestService.Settings(
+      enableTraces = true,
+      enableStateChanges = false,
+      Int.MaxValue,
+      0,
+      3,
+      ConfigMemorySize.ofBytes(10000),
+      0.seconds,
+      100
+    )
+
     val requestService = use(
       new DefaultRequestService(
         settings = requestServiceSettings,

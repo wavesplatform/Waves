@@ -39,7 +39,16 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
   )
 
   private val defaultRequestServiceSettings =
-    DefaultRequestService.Settings(enableTraces = true, enableStateChanges = true, Int.MaxValue, 0, 3, 0.seconds, 100)
+    DefaultRequestService.Settings(
+      enableTraces = true,
+      enableStateChanges = true,
+      Int.MaxValue,
+      0,
+      3,
+      ConfigMemorySize.ofBytes(10000),
+      0.seconds,
+      100
+    )
 
   "RequestsService" - {
     "trackAndRun" - {

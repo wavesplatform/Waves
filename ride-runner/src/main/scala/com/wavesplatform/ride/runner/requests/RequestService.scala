@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.StatusCodes
 import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause, Scheduler as CaffeineScheduler}
+import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.utils.UtilsEvaluator
@@ -11,11 +12,12 @@ import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
-import com.wavesplatform.ride.runner.storage.{CacheKey, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKey, CacheWeights, SharedBlockchainStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
+import org.openjdk.jol.info.GraphLayout
 import play.api.libs.json.{JsObject, Json}
 
 import java.util.concurrent.ConcurrentHashMap
@@ -69,7 +71,10 @@ class DefaultRequestService(
 
   private val activeRequests = Caffeine
     .newBuilder()
-    .maximumSize(800) // TODO #96 Weighed cache
+    .maximumWeight(settings.cacheSize.toBytes)
+    .weigher { (key: RideScriptRunRequest, value: RideScriptRunResult) =>
+      CacheWeights.ofRideScriptRunRequest(key) + CacheWeights.ofRideScriptRunResult(value)
+    }
     .expireAfter(requestsExpiry)
     .scheduler(CaffeineScheduler.systemScheduler()) // Because we rely on eviction
     .evictionListener { (key: RideScriptRunRequest, _: RideScriptRunResult, _: RemovalCause) => ignore(key) }
@@ -269,6 +274,7 @@ object DefaultRequestService {
       evaluateScriptComplexityLimit: Int,
       maxTxErrorLogSize: Int,
       parallelization: Int,
+      cacheSize: ConfigMemorySize,
       cacheTtl: FiniteDuration,
       ignoredCleanupThreshold: Int
   )
