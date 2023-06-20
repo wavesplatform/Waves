@@ -16,7 +16,7 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, Json}
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -230,22 +230,26 @@ class DefaultRequestService(
         val blockchain = new ProxyBlockchain(sharedBlockchain)
         val address    = prevResult.request.address
         val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
-        val jsResult = UtilsEvaluator.evaluate(
+        val initJsResult = UtilsEvaluator.evaluate(
           settings.evaluateScriptComplexityLimit,
           blockchain,
           scriptInfo,
           ev,
           address,
-          settings.enableTraces,
-          settings.maxTxErrorLogSize,
-          intAsString = true, // TODO #110 Int as string in evaluate
+          trace = settings.enableTraces && prevResult.request.trace,
+          maxTxErrorLogSize = settings.maxTxErrorLogSize,
+          intAsString = prevResult.request.intAsString,
           wrapDAppEnv = underlying =>
             new TrackedDAppEnvironment(
               underlying,
               new DefaultDAppEnvironmentTracker(sharedBlockchain, prevResult.request)
             )
         )
-        (evaluation, if (settings.enableStateChanges) jsResult else jsResult - "stateChanges")
+
+        val afterStateChanges = if (settings.enableStateChanges) initJsResult else initJsResult - "stateChanges"
+        val finalJsResult = afterStateChanges ++ Json.obj("address" -> address.toString)
+
+        (evaluation, finalJsResult)
     }
   }
 

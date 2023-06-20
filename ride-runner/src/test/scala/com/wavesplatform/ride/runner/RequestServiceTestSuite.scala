@@ -21,16 +21,16 @@ import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
-import play.api.libs.json.{JsValue, Json}
+import play.api.libs.json.{JsNumber, JsString, JsValue, Json}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasDb {
-  private val aRequest = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "default()"))
-  private val bRequest = RideScriptRunRequest(bobAddr, Json.obj("expr" -> "default()"))
-  private val cRequest = RideScriptRunRequest(carlAddr, Json.obj("expr" -> "default()"))
+  private val aRequest = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
+  private val bRequest = RideScriptRunRequest(bobAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
+  private val cRequest = RideScriptRunRequest(carlAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
 
   private val accountScripts = Map(
     aliceAddr -> ScriptUtil.from(aliceScriptSrc),
@@ -74,12 +74,12 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       "returns an error if the provided expr is wrong" in test() { d =>
         val request = RideScriptRunRequest(
           address = aliceAddr,
-          requestBody = Json.obj("expr" -> "buyNsbtREADONLY(10000000000000000000)")
+          requestBody = Json.obj("expr" -> "buyNsbtREADONLY(10000000000000000000)"),
+          trace = false,
+          intAsString = true
         )
 
-        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
-        d.scheduler.tick()
-
+        d.emitSimpleEvent()
         d.checkFull(
           request,
           Json.obj(
@@ -90,16 +90,46 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         )
       }
 
-      "no traces if disabled" in test(defaultRequestServiceSettings.copy(enableTraces = false)) { d =>
-        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
-        d.scheduler.tick()
-        (d.trackAndRun(aRequest).lastResult \ "vars").toOption shouldBe empty
+      def runTracesTest(enableTraces: Boolean, askTraces: Boolean, hasTraces: Boolean): Unit =
+        s"enable=$enableTraces, ask=$askTraces, has=$hasTraces" in test(defaultRequestServiceSettings.copy(enableTraces = enableTraces)) { d =>
+          d.emitSimpleEvent()
+
+          val traces = (d.trackAndRun(aRequest.copy(trace = askTraces)).lastResult \ "vars").toOption
+          if (hasTraces) traces should not be empty
+          else traces shouldBe empty
+        }
+
+      "traces" - {
+        runTracesTest(enableTraces = true, askTraces = true, hasTraces = true)
+        runTracesTest(enableTraces = true, askTraces = false, hasTraces = false)
+        runTracesTest(enableTraces = false, askTraces = true, hasTraces = false)
+        runTracesTest(enableTraces = false, askTraces = false, hasTraces = false)
       }
 
-      "no state changes if disabled" in test(defaultRequestServiceSettings.copy(enableStateChanges = false)) { d =>
-        d.blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
-        d.scheduler.tick()
-        (d.trackAndRun(aRequest).lastResult \ "stateChanges").toOption shouldBe empty
+      "state changes" - {
+        "has if enabled" in test(defaultRequestServiceSettings.copy(enableStateChanges = true)) { d =>
+          d.emitSimpleEvent()
+          (d.trackAndRun(aRequest).lastResult \ "stateChanges").toOption should not be empty
+        }
+
+        "hasn't if disabled" in test(defaultRequestServiceSettings.copy(enableStateChanges = false)) { d =>
+          d.emitSimpleEvent()
+          (d.trackAndRun(aRequest).lastResult \ "stateChanges").toOption shouldBe empty
+        }
+      }
+
+      "int as string" in test(defaultRequestServiceSettings) { d =>
+        d.emitSimpleEvent()
+
+        def run(intAsString: Boolean) = (d.trackAndRun(aRequest.copy(intAsString = intAsString)).lastResult \ "result" \ "value" \ "_2" \ "value").get
+
+        withClue("intAsString == true:") {
+          run(intAsString = true) shouldBe a[JsString]
+        }
+
+        withClue("intAsString == false:") {
+          run(intAsString = false) shouldBe a[JsNumber]
+        }
       }
     }
   }
@@ -131,6 +161,11 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val task = requests.trackAndRun(request).runToFuture(scheduler)
       scheduler.tick()
       Await.result(task, 5.seconds)
+    }
+
+    def emitSimpleEvent(): Unit = {
+      blockchainApi.blockchainUpdatesUpstream.onNext(WrappedEvent.Next(mkBlockAppendEvent(1, 0)))
+      scheduler.tick()
     }
   }
 

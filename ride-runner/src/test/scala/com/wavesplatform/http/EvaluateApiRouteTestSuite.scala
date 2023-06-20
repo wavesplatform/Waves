@@ -15,7 +15,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
 
   "EvaluateApiRoute" - {
     "POST /utils/script/evaluate/{address}" - {
-      val okApi = EvaluateApiRoute({ request =>
+      val okApi = EvaluateApiRoute { request =>
         Future.successful(
           RideScriptRunResult(
             request = request,
@@ -26,30 +26,25 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
                 "value" -> 2
               ),
               "complexity" -> 0,
-              "vars"       -> Json.arr(),
+              "vars"       -> Json.arr(Json.obj("a" -> 1)),
               "expr"       -> "1 + 1",
               "address"    -> defaultAddr.toString
             ),
             lastStatus = StatusCodes.OK
           )
         )
-      })
+      }
       val okRoute = seal(okApi.route)
 
-      def evalScript(text: String, trace: Boolean): HttpRequest =
-        Post(s"/utils/script/evaluate/$defaultAddr${if (trace) "?trace=true" else ""}", Json.obj("expr" -> text))
+      def evalScript(text: String): HttpRequest =
+        Post(s"/utils/script/evaluate/$defaultAddr", Json.obj("expr" -> text))
 
-      "without traces" in evalScript("1 + 1", trace = false) ~> okRoute ~> check {
+      "happy path" in evalScript("1 + 1") ~> okRoute ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[JsObject] \\ "vars" shouldBe empty
+        responseAs[JsObject].value should not be empty
       }
 
-      "with traces" in evalScript("1 + 1", trace = true) ~> okRoute ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[JsObject] \\ "vars" should not be empty
-      }
-
-      val failApi = EvaluateApiRoute({ request =>
+      val failApi = EvaluateApiRoute { request =>
         Future.successful(
           RideScriptRunResult(
             request = request,
@@ -58,10 +53,10 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
             lastStatus = StatusCodes.BadRequest
           )
         )
-      })
+      }
 
       val failRoute = seal(failApi.route)
-      "user error" in evalScript("1 + 1", trace = true) ~> failRoute ~> check {
+      "an user error" in evalScript("1 + 1") ~> failRoute ~> check {
         status shouldBe StatusCodes.BadRequest
       }
     }
