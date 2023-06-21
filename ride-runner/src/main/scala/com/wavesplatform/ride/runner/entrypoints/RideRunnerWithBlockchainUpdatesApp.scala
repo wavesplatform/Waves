@@ -149,7 +149,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
 
     val processor = new BlockchainProcessor(sharedBlockchain, requestService)
 
-    val scriptsTask = Task.parTraverseUnordered(scripts)(requestService.trackAndRun)
+    val scriptsTask = Task.parTraverseUnordered(scripts)(request => requestService.trackAndRun(request).map((request, _)))
     val events = blockchainUpdatesStream.downstream
       .doOnError(e =>
         Task {
@@ -185,7 +185,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val task = scriptsTask.runToFuture(rideScheduler)
     val resultsStr = Await
       .result(task, Duration.Inf)
-      .map { r => s"${r.request.detailedLogPrefix}: status=${r.lastStatus}, result=${r.lastResult}" }
+      .map { case (request, result) => s"${request.detailedLogPrefix}: status=${result.lastStatus}, result=${result.lastResult}" }
       .mkString("\n")
     log.info(s"Results:\n$resultsStr")
 

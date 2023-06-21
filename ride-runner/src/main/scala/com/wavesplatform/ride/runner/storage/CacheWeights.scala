@@ -3,8 +3,9 @@ package com.wavesplatform.ride.runner.storage
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{AssetScriptInfo, BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{base58Length, base64Length}
 import org.openjdk.jol.info.GraphLayout
@@ -43,6 +44,18 @@ object CacheWeights {
     val longWeight = GraphLayout.parseInstance(x).totalSize()
     if (longWeight.isValidInt) longWeight.toInt
     else throw new ArithmeticException(s"Weight of RideScriptRunResult overflow: $longWeight")
+  }
+
+  def ofAssetScriptInfo(x: AssetScriptInfo): Int = {
+    val longWeight = GraphLayout.parseInstance(x).totalSize()
+    if (longWeight.isValidInt) longWeight.toInt
+    else throw new ArithmeticException(s"Weight of AssetScriptInfo overflow: $longWeight")
+  }
+
+  def ofScript(x: Script): Int = {
+    val longWeight = GraphLayout.parseInstance(x).totalSize()
+    if (longWeight.isValidInt) longWeight.toInt
+    else throw new ArithmeticException(s"Weight of Script overflow: $longWeight")
   }
 
   def ofWeighedAssetDescription(x: WeighedAssetDescription): Int = {

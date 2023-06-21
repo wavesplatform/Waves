@@ -26,7 +26,6 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{AssetDescription, DataEntry, Height, LeaseBalance}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
-import org.openjdk.jol.info.GraphLayout
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -544,24 +543,12 @@ class SharedBlockchainStorage[TagT] private (
   }
 
   private def toWeightedAssetDescription(x: AssetDescription): WeighedAssetDescription =
-    WeighedAssetDescription(
-      x.script.fold(0) { x =>
-        val r = GraphLayout.parseInstance(x).totalSize()
-        if (r.isValidInt) r.toInt
-        else throw new ArithmeticException(s"Weight of Script overflow: $r")
-      },
-      x
-    )
+    WeighedAssetDescription(x.script.fold(0)(CacheWeights.ofAssetScriptInfo), x)
 
   private def toWeightedAccountScriptInfo(x: Script): WeighedAccountScriptInfo = {
-    val longWeight = GraphLayout.parseInstance(x).totalSize()
-    val weight =
-      if (longWeight.isValidInt) longWeight.toInt
-      else throw new ArithmeticException(s"Weight of AccountScriptInfo overflow: $longWeight")
-
     val estimated = Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, x, isAsset = false))
     WeighedAccountScriptInfo(
-      scriptInfoWeight = weight,
+      scriptInfoWeight = CacheWeights.ofScript(x),
       script = x, // See WavesEnvironment.accountScript
       verifierComplexity = estimated.maxBy { case (version, _) => version }._2.verifierComplexity,
       complexitiesByEstimator = estimated.map { case (version, x) => version -> x.callableComplexities } // "Cannot find complexity storage" if empty

@@ -99,14 +99,14 @@ class DefaultRequestService(
             case Some(updated) =>
               if (updated.isAvailable) {
                 // We don't need to cache an empty value, so we use getOrElse here
-                val origEnv = Option(activeRequests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult(request))
-                runOne(origEnv).redeem(
+                val origEnv = Option(activeRequests.policy().getIfPresentQuietly(request)).getOrElse(RideScriptRunResult())
+                runOne(request, origEnv).redeem(
                   e => {
                     updated.result.tryFailure(e)
                     stopJob(request)
                   },
                   x => {
-                    activeRequests.put(x.request, x)
+                    activeRequests.put(request, x)
                     updated.result.trySuccess(x)
                     stopJob(request)
                   }
@@ -160,7 +160,7 @@ class DefaultRequestService(
           Task {
             sharedBlockchain.getOrFetch(CacheKey.AccountScript(request.address))
           }.flatMap {
-            case None => Task.now(fail(request, CustomValidationError(s"Address ${request.address} is not dApp")))
+            case None => Task.now(fail(CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
               if (removeFromIgnored(request)) {
                 RideRunnerStats.rideRequestTrackReAdded.increment()
@@ -175,40 +175,40 @@ class DefaultRequestService(
               Task.fromCancelablePromise(job.result)
           }.onErrorHandle { e =>
             log.warn("Can't run, got an error", e)
-            fail(request, ApiError.Unknown)
+            fail(ApiError.Unknown)
           }
       }
   }
 
   private def createJob(request: RideScriptRunRequest): RequestJob = currJobs.computeIfAbsent(request, _ => RequestJob())
 
-  private def runOne(prevResult: RideScriptRunResult): Task[RideScriptRunResult] =
+  private def runOne(request: RideScriptRunRequest, prevResult: RideScriptRunResult): Task[RideScriptRunResult] =
     Task
       .evalAsync {
-        try RideRunnerStats.rideRequestRunTime.measure(evaluate(prevResult))
+        try RideRunnerStats.rideRequestRunTime.measure(evaluate(request, prevResult))
         catch {
           case e: Throwable =>
-            log.error(s"An error during running ${prevResult.request}: ${e.getMessage}")
+            log.error(s"An error during running $request: ${e.getMessage}")
             rideScriptFailedCalls.increment()
-            fail(prevResult.request, CustomValidationError(e.getMessage))
+            fail(CustomValidationError(e.getMessage))
         }
       }
       .executeOn(runScriptScheduler)
 
-  private def evaluate(prevResult: RideScriptRunResult): RideScriptRunResult = {
+  private def evaluate(request: RideScriptRunRequest, prevResult: RideScriptRunResult): RideScriptRunResult = {
     val (evaluation, failJson) =
       if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
       else // Note: the latest version here for simplicity
-        RequestParser.parse(StdLibVersion.VersionDic.latest, prevResult.request.address, prevResult.request.requestBody) match {
+        RequestParser.parse(StdLibVersion.VersionDic.latest, request.address, request.requestBody) match {
           case Right(x) => (Some(x), JsObject.empty)
           case Left(e)  => (None, UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize))
         }
 
     evaluation match {
-      case None => RideScriptRunResult(prevResult.request, evaluation, failJson.toString(), StatusCodes.BadRequest)
+      case None => RideScriptRunResult(evaluation, failJson.toString(), StatusCodes.BadRequest)
       case Some(ev) =>
         val blockchain = new ProxyBlockchain(sharedBlockchain)
-        val address    = prevResult.request.address
+        val address    = request.address
         val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
         val initJsResult = UtilsEvaluator.evaluate(
           settings.evaluateScriptComplexityLimit,
@@ -216,35 +216,34 @@ class DefaultRequestService(
           scriptInfo,
           ev,
           address,
-          trace = settings.enableTraces && prevResult.request.trace,
+          trace = settings.enableTraces && request.trace,
           maxTxErrorLogSize = settings.maxTxErrorLogSize,
-          intAsString = prevResult.request.intAsString,
+          intAsString = request.intAsString,
           wrapDAppEnv = underlying =>
             new TrackedDAppEnvironment(
               underlying,
-              new DefaultDAppEnvironmentTracker(sharedBlockchain, prevResult.request)
+              new DefaultDAppEnvironmentTracker(sharedBlockchain, request)
             )
         )
 
         val afterStateChanges = if (settings.enableStateChanges) initJsResult else initJsResult - "stateChanges"
-        val finalJsResult     = afterStateChanges ++ prevResult.request.requestBody ++ Json.obj("address" -> address.toString)
+        val finalJsResult     = afterStateChanges ++ request.requestBody ++ Json.obj("address" -> address.toString)
         val finalStringResult = finalJsResult.toString()
 
         lazy val complexity = (finalJsResult \ "complexity").as[Int]
         val isError         = (finalJsResult \ "error").isDefined
         if (isError) {
-          log.trace(s"result=failed; ${prevResult.request.shortLogPrefix} errorCode=${(finalJsResult \ "error").as[Int]}")
+          log.trace(s"result=failed; ${request.shortLogPrefix} errorCode=${(finalJsResult \ "error").as[Int]}")
           RideRunnerStats.rideScriptFailedCalls.increment()
         } else if (prevResult.lastResult.isEmpty || finalStringResult != prevResult.lastResult) {
           RideRunnerStats.rideScriptOkCalls.increment()
-          log.trace(s"result=ok; ${prevResult.request.shortLogPrefix} complexity=$complexity")
+          log.trace(s"result=ok; ${request.shortLogPrefix} complexity=$complexity")
         } else {
           RideRunnerStats.rideScriptUnnecessaryCalls.increment()
-          log.trace(s"result=unnecessary; ${prevResult.request.shortLogPrefix} complexity=$complexity")
+          log.trace(s"result=unnecessary; ${request.shortLogPrefix} complexity=$complexity")
         }
 
         RideScriptRunResult(
-          prevResult.request,
           evaluation,
           finalStringResult,
           if (isError) StatusCodes.BadRequest else StatusCodes.OK
@@ -253,8 +252,7 @@ class DefaultRequestService(
   }
 
   // TODO #19 Change/move an error to an appropriate layer
-  private def fail(request: RideScriptRunRequest, reason: ApiError): RideScriptRunResult = RideScriptRunResult(
-    request = request,
+  private def fail(reason: ApiError): RideScriptRunResult = RideScriptRunResult(
     evaluation = None,
     lastResult = reason.json.toString(),
     lastStatus = reason.code

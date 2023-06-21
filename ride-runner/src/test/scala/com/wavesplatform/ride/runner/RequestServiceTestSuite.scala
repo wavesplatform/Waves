@@ -50,7 +50,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       100
     )
 
-  "RequestsService" - {
+  "RequestService" - {
     "trackAndRun" - {
       "returns an actual value" in test() { d =>
         def checkExpectedResults(aResult: Int, bResult: Int, cResult: Int): Unit = {

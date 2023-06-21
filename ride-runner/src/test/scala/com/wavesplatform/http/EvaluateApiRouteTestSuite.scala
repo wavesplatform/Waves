@@ -18,7 +18,6 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
       val okApi = EvaluateApiRoute { request =>
         Future.successful(
           RideScriptRunResult(
-            request = request,
             evaluation = None,
             lastResult = Json
               .obj(
@@ -49,7 +48,6 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
       val failApi = EvaluateApiRoute { request =>
         Future.successful(
           RideScriptRunResult(
-            request = request,
             evaluation = None,
             lastResult = JsObject.empty.toString(),
             lastStatus = StatusCodes.BadRequest
