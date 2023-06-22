@@ -158,19 +158,26 @@ object StateSnapshot {
 
   def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): VectorMap[(Address, Asset), Long] =
     VectorMap() ++ portfolios.flatMap { case (address, Portfolio(wavesAmount, _, assets)) =>
-      val assetBalances = assets.map { case (assetId, balance) =>
-        val newBalance = blockchain.balance(address, assetId) + balance
-        (address, assetId: Asset) -> newBalance
+      val assetBalances = assets.collect {
+        case (assetId, balance) if balance > 0 =>
+          val newBalance = blockchain.balance(address, assetId) + balance
+          (address, assetId: Asset) -> newBalance
       }
-      val newBalance   = blockchain.balance(address) + wavesAmount
-      val wavesBalance = (address, Waves) -> newBalance
-      assetBalances + wavesBalance
+      if (wavesAmount > 0) {
+        val newBalance   = blockchain.balance(address) + wavesAmount
+        val wavesBalance = (address, Waves) -> newBalance
+        assetBalances + wavesBalance
+      } else
+        assetBalances
     }
 
   private def leaseBalances(diff: Diff, blockchain: Blockchain): Map[Address, LeaseBalance] =
-    diff.portfolios.flatMap { case (address, Portfolio(_, lease, _)) =>
-      val bLease = blockchain.leaseBalance(address)
-      Map(address -> LeaseBalance(bLease.in + lease.in, bLease.out + lease.out))
+    diff.portfolios.flatMap {
+      case (address, Portfolio(_, lease, _)) if lease.out > 0 || lease.in > 0 =>
+        val bLease = blockchain.leaseBalance(address)
+        Map(address -> LeaseBalance(bLease.in + lease.in, bLease.out + lease.out))
+      case _ =>
+        Map()
     }
 
   private def assetStatics(diff: Diff): Map[IssuedAsset, AssetStatic] =

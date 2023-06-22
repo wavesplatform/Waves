@@ -300,15 +300,11 @@ abstract class Caches extends Blockchain with Storage {
 
     val stateHash = new StateHashBuilder
     for (((address, asset), (amount, _)) <- updatedBalanceNodes) asset match {
-      case Waves =>
-        if (amount.balance > 0)
-          stateHash.addWavesBalance(address, amount.balance)
-      case asset: IssuedAsset =>
-        if (amount.balance > 0)
-          stateHash.addAssetBalance(address, asset, amount.balance)
+      case Waves              => stateHash.addWavesBalance(address, amount.balance)
+      case asset: IssuedAsset => stateHash.addAssetBalance(address, asset, amount.balance)
     }
     for (((address, _), (entry, _)) <- updatedDataWithNodes) stateHash.addDataEntry(address, entry.entry)
-    for ((address, lease)           <- leaseBalances) if (lease.out > 0 || lease.in > 0) stateHash.addLeaseBalance(address, lease.in, lease.out)
+    for ((address, lease)           <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
     for ((address, script)          <- snapshot.accountScripts) stateHash.addAccountScript(address, script.map(_.script))
     for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, script.map(_.script))
     for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
