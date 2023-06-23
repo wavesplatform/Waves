@@ -72,9 +72,11 @@ object RideRunnerWithPreparedStateApp {
   }
 
   private final case class Args(
-      inputFile: File = new File(""),
+      private val rawInputFile: File = new File(""),
       verbose: Boolean = false
-  )
+  ) {
+    val inputFile = rawInputFile.getAbsoluteFile // Otherwise Lightbend Config doesn't resolve correctly relative paths
+  }
 
   private val commandParser = {
     import scopt.OParser
@@ -87,7 +89,7 @@ object RideRunnerWithPreparedStateApp {
       opt[File]('i', "input")
         .text("Path to JSON or HOCON (conf) file with prepared state and run arguments. It has highest priority than config.")
         .required()
-        .action((x, c) => c.copy(inputFile = x)),
+        .action((x, c) => c.copy(rawInputFile = x)),
       opt[Unit]('v', "verbose")
         .text("Print logs")
         .action((x, c) => c.copy(verbose = true)),
