@@ -318,7 +318,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
     (blockchain.accountScript _)
       .when(allAccounts(5).toAddress)
-      .onCall((_: Address) => Thread.sleep(100000).asInstanceOf[Nothing])
+      .onCall { (_: Address) =>
+        Thread.sleep(100000)
+        None
+      }
 
     implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
     implicit val timeout          = routeTestTimeout.duration

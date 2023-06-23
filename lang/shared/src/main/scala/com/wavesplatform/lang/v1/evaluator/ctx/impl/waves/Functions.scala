@@ -64,7 +64,7 @@ object Functions {
             case (_, (addressOrAlias: CaseObj) :: CONST_STRING(key) :: Nil) =>
               getData(env, addressOrAlias, key)
             case (_, xs) =>
-              notImplemented[F, EVALUATED](s"$name(s: String)", xs)
+              notImplemented[F, EVALUATED](s"${this.name}(s: String)", xs)
           }
         }
       }
@@ -104,7 +104,7 @@ object Functions {
                 .hasData(addressOrAlias)
                 .map(_.map(v => CONST_BOOLEAN(!v)))
 
-            case xs => notImplemented[F, EVALUATED](s"$name(s: AddressOrAlias)", xs)
+            case xs => notImplemented[F, EVALUATED](s"${this.name}(s: AddressOrAlias)", xs)
           }
       }
     }
