@@ -163,7 +163,7 @@ object Dependencies {
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",
       "net.logstash.logback"          % "logstash-logback-encoder" % "7.2" % Runtime,
-      "org.openjdk.jol"               % "jol-core"                 % "0.17", // Weighing scripts
+      "org.ehcache"                   % "sizeof"                   % "0.4.3", // Weighing caches
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       Dependencies.sttp3,

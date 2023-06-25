@@ -5,6 +5,8 @@ shopt -s nullglob
 # GCLockerRetryAllocationCount to prevent false OOM
 JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   --add-opens=java.base/java.lang=ALL-UNNAMED
+  --add-opens=java.base/java.math=ALL-UNNAMED
+  --add-opens=java.base/java.util=ALL-UNNAMED
   -XX:+ExitOnOutOfMemoryError
   -XX:+HeapDumpOnOutOfMemoryError
   -XX:HeapDumpPath=${RDATA}/heap-dumps

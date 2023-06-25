@@ -2,8 +2,6 @@ name        := "ride-runner"
 description := "Allows to execute RIDE code independently from Waves NODE"
 
 mainClass := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithPreparedStateApp")
-//discoveredMainClasses := (Compile / mainClass).value.toSeq
-run / fork := true // For working instrumentation
 
 enablePlugins(
   JavaServerAppPackaging,
@@ -25,7 +23,15 @@ inConfig(Compile)(
   )
 )
 
-Test / javaOptions += "-Djol.magicFieldOffset=true" // Cannot get the field offset
+val commonJavaOptions = Seq(
+  // JVM default charset for proper and deterministic getBytes behaviour
+  "-Dfile.encoding=UTF-8"
+) ++ Seq("lang", "math", "util").map(x => s"--add-opens=java.base/java.$x=ALL-UNNAMED") // For ehcache
+
+run / javaOptions ++= commonJavaOptions
+run / fork := true // For working instrumentation
+
+Test / javaOptions ++= commonJavaOptions
 Test / fork := true
 
 bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
@@ -46,10 +52,8 @@ inConfig(Universal)(
       "-J-XX:+ExitOnOutOfMemoryError",
       "-J-XX:+UseG1GC",
       "-J-XX:+ParallelRefProcEnabled",
-      "-J-XX:+UseStringDeduplication",
-      // JVM default charset for proper and deterministic getBytes behaviour
-      "-J-Dfile.encoding=UTF-8"
-    )
+      "-J-XX:+UseStringDeduplication"
+    ) ++ commonJavaOptions
   )
 )
 
