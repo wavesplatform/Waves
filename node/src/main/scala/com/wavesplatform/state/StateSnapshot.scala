@@ -159,11 +159,11 @@ object StateSnapshot {
   def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): VectorMap[(Address, Asset), Long] =
     VectorMap() ++ portfolios.flatMap { case (address, Portfolio(wavesAmount, _, assets)) =>
       val assetBalances = assets.collect {
-        case (assetId, balance) if balance > 0 =>
+        case (assetId, balance) if balance != 0 =>
           val newBalance = blockchain.balance(address, assetId) + balance
           (address, assetId: Asset) -> newBalance
       }
-      if (wavesAmount > 0) {
+      if (wavesAmount != 0) {
         val newBalance   = blockchain.balance(address) + wavesAmount
         val wavesBalance = (address, Waves) -> newBalance
         assetBalances + wavesBalance
@@ -173,7 +173,7 @@ object StateSnapshot {
 
   private def leaseBalances(diff: Diff, blockchain: Blockchain): Map[Address, LeaseBalance] =
     diff.portfolios.flatMap {
-      case (address, Portfolio(_, lease, _)) if lease.out > 0 || lease.in > 0 =>
+      case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
         val bLease = blockchain.leaseBalance(address)
         Map(address -> LeaseBalance(bLease.in + lease.in, bLease.out + lease.out))
       case _ =>
