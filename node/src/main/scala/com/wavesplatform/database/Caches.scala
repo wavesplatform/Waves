@@ -248,12 +248,17 @@ abstract class Caches extends Blockchain with Storage {
 
     lastAddressId += newAddressIds.size
 
-    val leaseBalancesWithNodes = snapshot.leaseBalances.map { case (address, lease) =>
+    val leaseBalancesWithNodes = snapshot.leaseBalances.flatMap { case (address, lease) =>
       val prevCurrentLeaseBalance = leaseBalanceCache.get(address)
-      address ->
-        (
-          CurrentLeaseBalance(lease.in, lease.out, Height(height), prevCurrentLeaseBalance.height),
-          LeaseBalanceNode(lease.in, lease.out, prevCurrentLeaseBalance.height)
+      if (prevCurrentLeaseBalance.in == lease.in && prevCurrentLeaseBalance.out == lease.out)
+        Map()
+      else
+        Map(
+          address ->
+            (
+              CurrentLeaseBalance(lease.in, lease.out, Height(height), prevCurrentLeaseBalance.height),
+              LeaseBalanceNode(lease.in, lease.out, prevCurrentLeaseBalance.height)
+            )
         )
     }
     val leaseBalances = leaseBalancesWithNodes.map { case (address, (balance, _)) =>
@@ -268,7 +273,7 @@ abstract class Caches extends Blockchain with Storage {
     val updatedBalanceNodes = for {
       ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
-      prevBalance = balancesCache.get(key)
+      prevBalance = balancesCache.get(key) if prevBalance.balance != amount
       prevHeight  = if (prevBalance.height == height) prevBalance.prevHeight else prevBalance.height
     } yield key -> (
       CurrentBalance(amount, Height(height), prevHeight),
