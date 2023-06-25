@@ -1,6 +1,5 @@
 package com.wavesplatform.state.reader
 
-import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
@@ -202,10 +201,7 @@ object SnapshotBlockchain {
     new SnapshotBlockchain(inner, carry = inner.carryFee, reward = reward)
 
   def apply(inner: Blockchain, snapshot: StateSnapshot): SnapshotBlockchain =
-    inner match {
-      case cb: SnapshotBlockchain => cb.copy(maybeSnapshot = Some(cb.snapshot |+| snapshot))
-      case _                      => new SnapshotBlockchain(inner, Some(snapshot))
-    }
+    new SnapshotBlockchain(inner, Some(snapshot))
 
   def apply(
       inner: Blockchain,
