@@ -67,7 +67,7 @@ object InvokeScriptDiff {
     val invoker     = tx.sender.toAddress
 
     val result = blockchain.accountScript(dAppAddress) match {
-      case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities)) =>
+      case Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, _)) =>
         for {
           _ <- traced {
             if (blockchain.checkSyncCallArgumentsTypes)
@@ -99,17 +99,6 @@ object InvokeScriptDiff {
             )
           )
           _ <- ensurePaymentsAreNotNegative(blockchain, tx, invoker, dAppAddress)
-          invocationComplexity <- traced {
-            InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
-          }
-
-          _ <- traced(
-            Either.cond(
-              invocationComplexity <= ContractLimits.MaxCallableComplexityByVersion(version),
-              (),
-              GenericError("Continuation is not allowed for Invoke by script")
-            )
-          )
 
           directives: DirectiveSet <- traced(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments <- traced(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
@@ -265,7 +254,7 @@ object InvokeScriptDiff {
             _ <- validateIntermediateBalances(blockchain, diff, spentComplexity, log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
-              val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
+              val storingComplexity = complexityAfterPayments - unusedComplexity
               CoevalR(
                 Coeval.now(
                   InvokeDiffsCommon.processActions(
@@ -273,7 +262,7 @@ object InvokeScriptDiff {
                     version,
                     dAppAddress,
                     pk,
-                    storingComplexity.toInt,
+                    storingComplexity,
                     tx,
                     CompositeBlockchain(blockchain, diff),
                     blockTime,
