@@ -4,6 +4,7 @@ import cats.implicits.{toBifunctorOps, toTraverseOps}
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.requests.InvokeScriptRequest
 import com.wavesplatform.api.http.requests.InvokeScriptRequest.FunctionCallPart
+import com.wavesplatform.api.http.utils.UtilsInvocationBlockchainState.AccountState
 import com.wavesplatform.api.http.utils.UtilsInvocationRequest.empty32Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -11,11 +12,12 @@ import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address as RideAddress
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.AttachedPaymentExtractor
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{TransactionType, smart}
-import play.api.libs.json.{Json, Reads}
+import com.wavesplatform.transaction.{Asset, TransactionType, smart}
+import play.api.libs.json.*
 
 case class UtilsInvocationRequest(
     call: FunctionCallPart = FunctionCallPart("default", Nil),
@@ -24,7 +26,8 @@ case class UtilsInvocationRequest(
     feeAssetId: Option[String] = None,
     sender: Option[String] = None,
     senderPublicKey: String = ByteStr(empty32Bytes).toString,
-    payment: Seq[Payment] = Nil
+    payment: Seq[Payment] = Nil,
+    state: Option[UtilsInvocationBlockchainState] = None
 ) {
   def toInvocation: Either[ValidationError, Invocation] =
     for {
@@ -52,4 +55,21 @@ object UtilsInvocationRequest {
   private val empty32Bytes = new Array[Byte](32)
 
   implicit val reads: Reads[UtilsInvocationRequest] = Json.using[Json.WithDefaultValues].reads[UtilsInvocationRequest]
+}
+
+case class UtilsInvocationBlockchainState(accounts: Map[Address, AccountState])
+object UtilsInvocationBlockchainState {
+  // TODO test errors, JsPath?
+  implicit val accountsMapReads: Reads[Map[Address, AccountState]] =
+    Reads.mapReads[Address, AccountState](x => Address.fromString(x).fold(e => JsError(s"Can't parse Address in accounts: $e"), JsSuccess(_)))
+
+  implicit val reads: Reads[UtilsInvocationBlockchainState] = Json.using[Json.WithDefaultValues].reads[UtilsInvocationBlockchainState]
+
+  case class AccountState(assetBalances: Map[IssuedAsset, BigInt] = Map.empty, regularBalance: BigInt = 0)
+  object AccountState {
+    implicit val assetBalancesMapReads: Reads[Map[IssuedAsset, BigInt]] =
+      Reads.mapReads[IssuedAsset, BigInt](x => Asset.assetReads.reads(JsString(x)))
+
+    implicit val reads: Reads[AccountState] = Json.using[Json.WithDefaultValues].reads[AccountState]
+  }
 }

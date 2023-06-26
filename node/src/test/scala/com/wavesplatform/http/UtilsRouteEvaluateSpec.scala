@@ -30,6 +30,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
 import scala.concurrent.duration.DurationInt
+import scala.util.chaining.scalaUtilChainingOps
 
 class UtilsRouteEvaluateSpec
     extends RouteSpec("/utils")
@@ -499,6 +500,97 @@ class UtilsRouteEvaluateSpec
           (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
           (json \ "vars").isEmpty shouldBe true
           json.as[UtilsInvocationRequest] shouldBe request.as[UtilsInvocationRequest]
+        }
+      }
+    }
+
+    "invocation with state" in {
+      val callerKeyPair          = signer(1)
+      val scriptTransferReceiver = signer(2)
+
+      val issueTx1, issueTx2 = issue(issuer = scriptTransferReceiver)
+      val asset1             = IssuedAsset(issueTx1.id())
+      val asset2             = IssuedAsset(issueTx2.id())
+
+      def toRide(asset: Asset) = asset.fold("unit")(id => s"base58'$id'")
+
+      def dAppWithTransfer(assets: Asset*) = {
+        def toScriptTransfer(asset: Asset, amount: Int): String = s"ScriptTransfer(receiver, $amount, ${toRide(asset)})"
+
+        TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   let receiver = Address(base58'${scriptTransferReceiver.toAddress}')
+             |   [ ${assets.zipWithIndex.map { case (asset, i) => toScriptTransfer(asset, i + 1) }.mkString(", ")} ]
+             | }
+       """.stripMargin
+        )
+      }
+
+      def invocationWithPayment(feeAsset: Asset, paymentAssets: Asset*) = {
+        def toPaymentJson(asset: Asset, amount: Int): String =
+          s""" {
+             |   "assetId": ${Json.toJson(asset)},
+             |   "amount": $amount
+             | }"""
+
+        Json
+          .parse(
+            s""" {
+               |  "call": {
+               |    "function": "default"
+               |  },
+               |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+               |  "fee": 1234567,
+               |  "feeAssetId": ${Json.toJson(feeAsset)},
+               |  "senderPublicKey": "${callerKeyPair.publicKey}",
+               |  "payment": [
+               |    ${paymentAssets.zipWithIndex.map { case (asset, i) => toPaymentJson(asset, i + 1) }.mkString(",\n")}
+               |  ],
+               |  "state": {
+               |    "accounts": {
+               |      "${callerKeyPair.toAddress}": {
+               |        "assetBalance": {
+               |          "$asset1": "10000000",
+               |          "$asset2": 10000000
+               |        },
+               |        "regularBalance": 10000000
+               |      }
+               |    }
+               |  }
+               | }""".stripMargin.tap(println)
+          )
+          .as[JsObject]
+      }
+
+      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, callerKeyPair, scriptTransferReceiver)) { d =>
+        val route              = utilsApi.copy(blockchain = d.blockchain).route
+        d.appendBlock(
+          issueTx1,
+          issueTx2,
+          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset1, amount = 10),
+          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset2, amount = 10)
+        )
+        d.appendBlock(setScript(defaultSigner, dAppWithTransfer(asset1, asset2)))
+
+        //
+        Post(routePath(s"/script/evaluate/$dAppAddress"), invocationWithPayment(Asset.Waves, asset1, asset2)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          println(s"== Response ==\n${Json.prettyPrint(json)}")
+          (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
+            Json.obj(
+              "address" -> scriptTransferReceiver.toAddress.toString,
+              "asset" -> asset1.toString,
+              "amount" -> 1
+            ),
+            Json.obj(
+              "address" -> scriptTransferReceiver.toAddress.toString,
+              "asset" -> asset2.toString,
+              "amount" -> 2
+            )
+          )
+//          json.as[UtilsInvocationRequest] shouldBe invocation(asset1).as[UtilsInvocationRequest]
         }
       }
     }
