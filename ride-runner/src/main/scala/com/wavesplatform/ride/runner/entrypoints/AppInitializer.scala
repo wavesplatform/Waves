@@ -4,7 +4,6 @@ import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.logs.RedirectLogs
 import com.wavesplatform.settings.{loadConfig as _, *}
 import com.wavesplatform.utils.{Misconfiguration, ScorexLogging, forceStopApplication}
 
