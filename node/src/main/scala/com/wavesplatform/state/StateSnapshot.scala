@@ -134,8 +134,6 @@ case class StateSnapshot(
 }
 
 object StateSnapshot {
-  val lastEstimator = 3
-
   def fromDiff(diff: Diff, blockchain: Blockchain): StateSnapshot =
     StateSnapshot(
       VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
