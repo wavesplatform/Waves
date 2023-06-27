@@ -148,7 +148,7 @@ object PureContext {
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
           .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Value too big for 512-bits big integer")
           .map(CONST_BIGINT.apply)
-          .leftMap(CommonError)
+          .leftMap(CommonError(_))
       case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
     }
 
@@ -214,7 +214,7 @@ object PureContext {
             s"$a ${op.func} $b is out of range."
           )
           .map(CONST_BIGINT)
-          .leftMap(CommonError)
+          .leftMap(CommonError(_))
       case args =>
         Left(s"Unexpected args $args for BigInt operator '${op.func}'")
     }
@@ -253,7 +253,7 @@ object PureContext {
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)))
     ) {
       IF(
-        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(eq, List(REF("@a"), REF(GlobalValNames.Unit))),
         FUNCTION_CALL(throwWithMessage, List(CONST_STRING("extract() called on unit value").explicitGet())),
         REF("@a")
       )
@@ -293,7 +293,7 @@ object PureContext {
             case _                                                    => base
           }
           IF(
-            FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF("unit"))),
+            FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF(GlobalValNames.Unit))),
             FUNCTION_CALL(throwWithMessage, List(CONST_STRING(errorMessage).explicitGet())),
             REF("@a")
           )
@@ -310,7 +310,7 @@ object PureContext {
       ("@alternative", TYPEPARAM('T'))
     ) {
       IF(
-        FUNCTION_CALL(eq, List(REF("@value"), REF("unit"))),
+        FUNCTION_CALL(eq, List(REF("@value"), REF(GlobalValNames.Unit))),
         REF("@alternative"),
         REF("@value")
       )
@@ -325,7 +325,7 @@ object PureContext {
       ("@msg", STRING)
     ) {
       IF(
-        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(eq, List(REF("@a"), REF(GlobalValNames.Unit))),
         FUNCTION_CALL(throwWithMessage, List(REF("@msg"))),
         REF("@a")
       )
@@ -338,7 +338,7 @@ object PureContext {
       BOOLEAN,
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)))
     ) {
-      FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
+      FUNCTION_CALL(ne, List(REF("@a"), REF(GlobalValNames.Unit)))
     }
 
   def fraction(fixLimitCheck: Boolean): BaseFunction[NoContext] =
@@ -363,7 +363,7 @@ object PureContext {
           _ <- Either.cond(checkMax(result), (), s"Long overflow: value `$result` greater than 2^63-1")
           _ <- Either.cond(checkMin(result), (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
-        r.leftMap(CommonError)
+        r.leftMap(CommonError(_))
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
 
@@ -406,7 +406,7 @@ object PureContext {
           division <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(round))
           _        <- Either.cond(division.isValidLong, (), s"Fraction result $division out of integers range")
         } yield CONST_LONG(division.longValue)
-        r.leftMap(CommonError)
+        r.leftMap(CommonError(_))
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: Int, numerator: Int, denominator: Int, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -431,7 +431,7 @@ object PureContext {
           _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
-        r.leftMap(CommonError)
+        r.leftMap(CommonError(_))
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
@@ -453,7 +453,7 @@ object PureContext {
           _ <- Either.cond(r <= BigIntMax, (), s"Long overflow: value `$r` greater than 2^511-1")
           _ <- Either.cond(r >= BigIntMin, (), s"Long overflow: value `$r` less than -2^511")
         } yield CONST_BIGINT(r)
-        r.leftMap(CommonError)
+        r.leftMap(CommonError(_))
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -1564,7 +1564,7 @@ object PureContext {
         ) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG).leftMap(CommonError)
+          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG).leftMap(CommonError(_))
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1598,7 +1598,7 @@ object PureContext {
         ) {
           Left(CommonError("log: scale out of range 0-8"))
         } else {
-          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG).leftMap(CommonError)
+          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG).leftMap(CommonError(_))
         }
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1731,14 +1731,15 @@ object PureContext {
     }
   }
 
-  val unitVarName = "unit"
-
   private val nil: (String, (LIST, ContextfulVal[NoContext])) =
-    ("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))
+    (
+      GlobalValNames.Nil,
+      (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet()))
+    )
 
   private val commonVars: Map[String, (FINAL, ContextfulVal[NoContext])] =
     Map(
-      (unitVarName, (UNIT, ContextfulVal.pure(unit)))
+      (GlobalValNames.Unit, (UNIT, ContextfulVal.pure(unit)))
     )
 
   private val v1V2Vars: Map[String, (FINAL, ContextfulVal[NoContext])] = commonVars ++ Rounding.all.map(_.definition)
@@ -2046,6 +2047,6 @@ object PureContext {
       case V3      => v3Ctx(useNewPowPrecision)
       case V4      => v4Ctx(useNewPowPrecision)
       case V5      => v5Ctx(useNewPowPrecision)
-      case V6      => v6Ctx
+      case _       => v6Ctx
     }
 }

@@ -1,33 +1,20 @@
 package com.wavesplatform
 
-import cats.{Id, Monad}
-import cats.implicits._
+import cats.Id
+import cats.implicits.*
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.Paged
-import play.api.libs.json._
+import play.api.libs.json.*
 import supertagged.TaggedType
 
-import scala.collection.immutable.Map
 import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long, source: String): Either[String, Long] =
     Try(Math.addExact(x, y)).toEither.leftMap(_ => s"$source sum overflow")
-
-  def sumMapF[F[_]: Monad, A, B](a: Map[A, B], b: Map[A, B], combine: (B, B) => F[B]): F[Map[A, B]] =
-    a.foldLeft(b.pure[F]) {
-      case (resultMapF, (key, next)) =>
-        resultMapF.flatMap(
-          resultMap =>
-            if (resultMap.contains(key))
-              combine(resultMap(key), next).map(r => resultMap + (key -> r))
-            else
-              (resultMap + (key -> next)).pure[F]
-        )
-    }
 
   implicit val safeSummarizer: Summarizer[Either[String, *]] = safeSum(_, _, _)
   implicit val unsafeSummarizer: Summarizer[Id]              = (x, y, _) => x + y
@@ -75,6 +62,9 @@ package object state {
 
   object TxNum extends TaggedType[Short]
   type TxNum = TxNum.Type
+
+  object AssetNum extends TaggedType[Int]
+  type AssetNum = AssetNum.Type
 
   object TransactionId extends TaggedType[ByteStr]
   type TransactionId = TransactionId.Type

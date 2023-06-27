@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.compiler
@@ -344,7 +344,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | match tx {
          |   case t : InvokeScriptTransaction =>
          |     let paymentAmount = ${Common.fold(size, "t.payments", "0", "assetsAmountSum")()} == ${tx.payments.map(_.amount).sum}
-         |     let paymentAssets = ${Common.fold(size, "t.payments", "nil", "extractAssets")()} == $paymentsStr
+         |     let paymentAssets = ${Common.fold(size, "t.payments", GlobalValNames.Nil, "extractAssets")()} == $paymentsStr
          |
          |     paymentAmount && paymentAssets
          |
@@ -442,7 +442,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | match tx {
          |   case t: InvokeExpressionTransaction  =>
          |     ${provenPart(tx)}
-         |     let checkFeeAssetId = t.feeAssetId == ${tx.feeAssetId.fold("unit")(a => s"base58'${a.id.toString}'")}
+         |     let checkFeeAssetId = t.feeAssetId == ${tx.feeAssetId.fold(GlobalValNames.Unit)(a => s"base58'${a.id.toString}'")}
          |     let checkExpression = t.expression == base58'${expression.bytes()}'
          |     ${assertProvenPart("t")} && checkFeeAssetId && checkExpression
          |   case _ => throw()
@@ -729,7 +729,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            |match tx {
            |  case o: Order =>
            |    let orderType = o.orderType
-           |    orderType == ${if (ord.orderType == OrderType.BUY) "Buy" else "Sell"}
+           |    orderType == ${if (ord.orderType == OrderType.BUY) GlobalValNames.Buy else GlobalValNames.Sell}
            |  case _ => throw()
            |}
        """.stripMargin
@@ -787,7 +787,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet(), fixBigScriptField = true)
 
     val environment = new WavesEnvironment(
       chainId,
@@ -818,7 +818,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-        WavesContext.build(Global, directives)
+        WavesContext.build(Global, directives, fixBigScriptField = true)
 
     val env = new WavesEnvironment(
       chainId,

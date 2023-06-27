@@ -11,7 +11,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -23,25 +23,28 @@ import scala.util.{Left, Right}
 object MicroblockAppender extends ScorexLogging {
   private val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
 
-  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPoolImpl, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
       microBlock: MicroBlock
   ): Task[Either[ValidationError, BlockId]] =
     Task(microblockProcessingTimeStats.measureSuccessful {
       blockchainUpdater
         .processMicroBlock(microBlock, verify)
         .map { totalBlockId =>
-          if (microBlock.transactionData.nonEmpty) log.trace {
-            s"Removing mined txs from ${microBlock.stringRepr(totalBlockId)}: ${microBlock.transactionData.map(_.id()).mkString(", ")}"
+          if (microBlock.transactionData.nonEmpty) {
+            utxStorage.removeAll(microBlock.transactionData)
+            log.trace(
+              s"Removing txs of ${microBlock.stringRepr(totalBlockId)} ${microBlock.transactionData.map(_.id()).mkString("(", ", ", ")")} from UTX pool"
+            )
           }
-          utxStorage.removeAll(microBlock.transactionData)
-          utxStorage.cleanUnconfirmed()
+
+          utxStorage.scheduleCleanup()
           totalBlockId
         }
     }).executeOn(scheduler)
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
       scheduler: Scheduler

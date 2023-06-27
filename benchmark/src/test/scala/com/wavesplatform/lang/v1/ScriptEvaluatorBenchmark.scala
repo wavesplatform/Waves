@@ -11,15 +11,15 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{V1, V4}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random
@@ -27,7 +27,7 @@ import scala.util.Random
 object ScriptEvaluatorBenchmark {
   val version = V1
   val pureEvalContext: EvaluationContext[NoContext, Id] =
-    PureContext.build(V1, useNewPowPrecision = true, useNewPowPrecision = true).evaluationContext
+    PureContext.build(V1, useNewPowPrecision = true).evaluationContext
   val evaluatorV1: EvaluatorV1[Id, NoContext] = new EvaluatorV1[Id, NoContext]()
 }
 
@@ -112,8 +112,8 @@ class Base58Perf {
 
   val encode: EXPR = {
     val base58Count = 120
-    val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) {
-      case (i, e) => FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
+    val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) { case (i, e) =>
+      FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
     }
     (1 to base58Count)
       .map { i =>
@@ -132,8 +132,8 @@ class Base58Perf {
 
   val decode: EXPR = {
     val base58Count = 60
-    val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) {
-      case (i, e) => FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
+    val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) { case (i, e) =>
+      FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
     }
     (1 to base58Count)
       .map { i =>
@@ -155,8 +155,8 @@ class Signatures {
 
   val expr: EXPR = {
     val sigCount = 20
-    val sum = (1 to sigCount).foldRight[EXPR](CONST_LONG(0)) {
-      case (i, e) => FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
+    val sum = (1 to sigCount).foldRight[EXPR](CONST_LONG(0)) { case (i, e) =>
+      FUNCTION_CALL(PureContext.sumLong, List(REF("v" + i), e))
     }
     (1 to sigCount)
       .map { i =>
@@ -183,8 +183,8 @@ class Signatures {
           )
         )
       }
-      .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(sigCount)))) {
-        case (let, e) => BLOCK(let, e)
+      .foldRight[EXPR](FUNCTION_CALL(PureContext.eq, List(sum, CONST_LONG(sigCount)))) { case (let, e) =>
+        BLOCK(let, e)
       }
   }
 }
@@ -196,8 +196,8 @@ class Concat {
   private val Steps = 180
 
   private def expr(init: EXPR, func: FunctionHeader, operand: EXPR, count: Int) =
-    (1 to count).foldLeft[EXPR](init) {
-      case (e, _) => FUNCTION_CALL(func, List(e, operand))
+    (1 to count).foldLeft[EXPR](init) { case (e, _) =>
+      FUNCTION_CALL(func, List(e, operand))
     }
 
   val strings: EXPR = expr(
@@ -218,7 +218,7 @@ class Concat {
 
 @State(Scope.Benchmark)
 class Median {
-  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4, useNewPowPrecision = true, useNewPowPrecision = true).evaluationContext
+  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4, useNewPowPrecision = true).evaluationContext
 
   val randomElements: Array[EXPR] =
     (1 to 10000).map { _ =>
@@ -261,9 +261,7 @@ class Median {
 @State(Scope.Benchmark)
 class SigVerify32Kb {
   val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(
-      PureContext.build(V4, useNewPowPrecision = true, useNewPowPrecision =true).evaluationContext,
-                   CryptoContext.build(Global, V4).evaluationContext)
+    Monoid.combine(PureContext.build(V4, useNewPowPrecision = true).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
 
   val expr: EXPR = {
     val (privateKey, publicKey) = curve25519.generateKeypair
@@ -285,7 +283,7 @@ class SigVerify32Kb {
 class ListRemoveByIndex {
   val context: EvaluationContext[NoContext, Id] =
     Monoid.combine(
-      PureContext.build(V4, useNewPowPrecision = true, useNewPowPrecision = true).evaluationContext,
+      PureContext.build(V4, useNewPowPrecision = true).evaluationContext,
       CryptoContext.build(Global, V4).evaluationContext
     )
 

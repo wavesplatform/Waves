@@ -1,8 +1,5 @@
 package com.wavesplatform.api
 
-import java.util.NoSuchElementException
-import java.util.concurrent.ExecutionException
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.*
@@ -23,6 +20,7 @@ import monix.execution.Scheduler
 import org.slf4j.LoggerFactory
 import play.api.libs.json.*
 
+import java.util.concurrent.ExecutionException
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -35,8 +33,8 @@ package object http {
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)
     val stringToByteReads = implicitly[Reads[String]]
       .map(s => Try(s.toByte))
-      .collect(JsonValidationError("Can't parse version")) {
-        case Success(v) => v
+      .collect(JsonValidationError("Can't parse version")) { case Success(v) =>
+        v
       }
 
     defaultByteReads orElse
@@ -44,7 +42,9 @@ package object http {
       stringToByteReads
   }
 
-  def createTransaction(senderPk: String, jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+  def createTransaction(senderPk: String, jsv: JsObject)(
+      txToResponse: Transaction => ToResponseMarshallable
+  ): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
     (jsv \ "version").validateOpt[Byte](versionReads) match {
@@ -80,7 +80,9 @@ package object http {
     }
   }
 
-  def parseOrCreateTransaction(jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+  def parseOrCreateTransaction(jsv: JsObject)(
+      txToResponse: Transaction => ToResponseMarshallable
+  ): ToResponseMarshallable = {
     val result = TransactionFactory.fromSignedRequest(jsv)
     if (result.isRight) {
       result.fold(ApiError.fromValidationError, txToResponse)
@@ -133,7 +135,6 @@ package object http {
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
-    case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
     case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
     case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
     case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
@@ -161,15 +162,15 @@ package object http {
     * This directive can't handle __fatal__ errors from:
     *
     *   - Monix [[monix.eval.Task tasks]] with async boundaries:
-    *     {{{
+    * {{{
     *       get(complete(Task(throw new StackOverflowError()).executeAsync.runToFuture))
     *       get(complete(Task.evalAsync(throw new StackOverflowError()).runToFuture))
     *       get(complete(Task.deferFuture(Future(throw new StackOverflowError())).runToFuture))
-    *     }}}
+    * }}}
     *   - Async futures (i.e. which are not available at the time of handling):
-    *     {{{
+    * {{{
     *       get(complete(Future(throw new StackOverflowException())))
-    *     }}}
+    * }}}
     */
   def handleAllExceptions: Directive0 =
     Directive { inner => ctx =>

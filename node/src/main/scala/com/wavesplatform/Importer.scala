@@ -1,12 +1,5 @@
 package com.wavesplatform
 
-import java.io._
-import java.net.{MalformedURLException, URL}
-
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
-
 import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
@@ -16,7 +9,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonB
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{openDB, DBExt, KeyTags}
+import com.wavesplatform.database.{DBExt, KeyTags, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
@@ -25,12 +18,12 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.utils.*
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
@@ -39,6 +32,12 @@ import monix.execution.Scheduler
 import monix.reactive.{Observable, Observer}
 import org.iq80.leveldb.DB
 import scopt.OParser
+
+import java.io.*
+import java.net.{MalformedURLException, URL}
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
@@ -59,7 +58,7 @@ object Importer extends ScorexLogging {
       import scopt.OParser
 
       val builder = OParser.builder[ImportOptions]
-      import builder._
+      import builder.*
 
       OParser.sequence(
         programName("waves import"),
@@ -136,7 +135,6 @@ object Importer extends ScorexLogging {
               db,
               blockchainUpdater,
               utxPool,
-              wallet,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
@@ -170,7 +168,7 @@ object Importer extends ScorexLogging {
   @volatile private var quit = false
   private val lock           = new Object
 
-  //noinspection UnstableApiUsage
+  // noinspection UnstableApiUsage
   def startImport(
       inputStream: BufferedInputStream,
       blockchain: Blockchain,
@@ -189,7 +187,7 @@ object Importer extends ScorexLogging {
     if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
 
     sys.addShutdownHook {
-      import scala.concurrent.duration._
+      import scala.concurrent.duration.*
       val millis = (System.nanoTime() - start).nanos.toMillis
       log.info(
         s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}"
@@ -279,7 +277,7 @@ object Importer extends ScorexLogging {
     val db          = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 

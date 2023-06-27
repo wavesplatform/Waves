@@ -81,7 +81,7 @@ object Blockchain {
     def isEmpty: Boolean = blockchain.height == 0
 
     def isSponsorshipActive: Boolean = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-    def isNGActive: Boolean = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
+    def isNGActive: Boolean          = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
       blockchain
@@ -190,8 +190,8 @@ object Blockchain {
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
 
-    def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
-      case BinaryDataEntry(_, value) => value
+    def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect { case BinaryDataEntry(_, value) =>
+      value
     }
 
     def hasDApp(address: Address): Boolean =

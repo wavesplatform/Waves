@@ -7,7 +7,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.events.protobuf.TransactionMetadata.EthereumMetadata
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Authorized, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, Authorized, CreateAliasTransaction, EthereumTransaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -34,16 +34,19 @@ final case class StateUpdate(
     leasingForAddress: Seq[LeasingBalanceUpdate],
     dataEntries: Seq[DataEntryUpdate],
     assets: Seq[AssetStateUpdate],
-    leases: Seq[LeaseUpdate]
+    leases: Seq[LeaseUpdate],
+    scripts: Seq[ScriptUpdate],
+    deletedAliases: Seq[String]
 ) {
-  def isEmpty: Boolean = balances.isEmpty && leases.isEmpty && dataEntries.isEmpty && assets.isEmpty
+  def isEmpty: Boolean = balances.isEmpty && leases.isEmpty && dataEntries.isEmpty && assets.isEmpty && scripts.isEmpty
 
   def reverse: StateUpdate = copy(
     balances.map(_.reverse).reverse,
     leasingForAddress.map(_.reverse).reverse,
     dataEntries.map(_.reverse).reverse,
     assets.map(_.reverse).reverse,
-    leases.map(_.reverse).reverse
+    leases.map(_.reverse).reverse,
+    scripts.map(_.reverse).reverse
   )
 }
 
@@ -204,7 +207,9 @@ object StateUpdate {
           Height @@ v.lastUpdated,
           v.scriptInfo.map(fromPBScriptInfo),
           v.sponsorship,
-          v.nft
+          v.nft,
+          v.sequenceInBlock,
+          Height @@ v.issueHeight
         )
       }
 
@@ -229,7 +234,9 @@ object StateUpdate {
           sponsorship = v.sponsorship,
           nft = v.nft,
           safeVolume = ByteString.copyFrom(v.totalVolume.toByteArray),
-          lastUpdated = v.lastUpdatedAt
+          lastUpdated = v.lastUpdatedAt,
+          sequenceInBlock = v.sequenceInBlock,
+          issueHeight = v.issueHeight
         )
       }
 
@@ -272,6 +279,24 @@ object StateUpdate {
       )
   }
 
+  final case class ScriptUpdate(dApp: ByteStr, before: Option[ByteStr], after: Option[ByteStr]) {
+    def reverse: ScriptUpdate = copy(before = after, after = before)
+  }
+
+  object ScriptUpdate {
+    import com.wavesplatform.events.protobuf.StateUpdate.ScriptUpdate as PBScriptUpdate
+
+    def toPB(su: ScriptUpdate): PBScriptUpdate =
+      PBScriptUpdate(su.dApp.toByteString, su.before.fold(ByteString.EMPTY)(_.toByteString), su.after.fold(ByteString.EMPTY)(_.toByteString))
+
+    def fromPB(su: PBScriptUpdate): ScriptUpdate =
+      ScriptUpdate(
+        su.address.toByteStr,
+        Option.unless(su.before.isEmpty)(su.before.toByteStr),
+        Option.unless(su.after.isEmpty)(su.after.toByteStr)
+      )
+  }
+
   import com.wavesplatform.events.protobuf.StateUpdate as PBStateUpdate
 
   def fromPB(v: PBStateUpdate): StateUpdate = {
@@ -280,7 +305,9 @@ object StateUpdate {
       v.leasingForAddress.map(LeasingBalanceUpdate.fromPB),
       v.dataEntries.map(DataEntryUpdate.fromPB),
       v.assets.map(AssetStateUpdate.fromPB),
-      v.individualLeases.map(LeaseUpdate.fromPB)
+      v.individualLeases.map(LeaseUpdate.fromPB),
+      v.scripts.map(ScriptUpdate.fromPB),
+      v.deletedAliases
     )
   }
 
@@ -290,12 +317,14 @@ object StateUpdate {
       v.leasingForAddress.map(LeasingBalanceUpdate.toPB),
       v.dataEntries.map(DataEntryUpdate.toPB),
       v.assets.map(AssetStateUpdate.toPB),
-      v.leases.map(LeaseUpdate.toPB)
+      v.leases.map(LeaseUpdate.toPB),
+      v.scripts.map(ScriptUpdate.toPB),
+      v.deletedAliases
     )
   }
 
   implicit val monoid: Monoid[StateUpdate] = new Monoid[StateUpdate] {
-    override def empty: StateUpdate = StateUpdate(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty)
+    override def empty: StateUpdate = StateUpdate(Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty)
 
     override def combine(x: StateUpdate, y: StateUpdate): StateUpdate = {
       // merge balance updates, preserving order
@@ -338,12 +367,22 @@ object StateUpdate {
         leasesMap(lease.originTransactionId) = lease
       }
 
+      val scriptsMap = mutable.LinkedHashMap.empty[ByteStr, ScriptUpdate]
+      (x.scripts ++ y.scripts).foreach { scriptUpdate =>
+        scriptsMap(scriptUpdate.dApp) = scriptsMap.get(scriptUpdate.dApp) match {
+          case Some(prevUpdate) => scriptUpdate.copy(before = prevUpdate.before)
+          case None             => scriptUpdate
+        }
+      }
+
       StateUpdate(
         balances = balancesMap.values.toList,
         leasingForAddress = addrLeasesMap.values.toList,
         dataEntries = dataEntriesMap.values.toList,
         assets = assetsMap.values.toList,
-        leases = leasesMap.values.toList
+        leases = leasesMap.values.toList,
+        scripts = scriptsMap.values.toList,
+        deletedAliases = x.deletedAliases ++ y.deletedAliases
       )
     }
   }
@@ -393,7 +432,11 @@ object StateUpdate {
       )
     }.toVector
 
-    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases)
+    val updatedScripts = diff.scripts.map { case (address, newScript) =>
+      ScriptUpdate(ByteStr(address.bytes), blockchain.accountScript(address).map(_.script.bytes()), newScript.map(_.script.bytes()))
+    }.toVector
+
+    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases, updatedScripts, Seq.empty)
   }
 
   private[this] def transactionsMetadata(blockchain: Blockchain, diff: Diff): Seq[TransactionMetadata] = {
@@ -417,11 +460,11 @@ object StateUpdate {
         ist.funcCall.function.funcName,
         ist.funcCall.args.map(x => PBInvokeScriptResult.Call.Argument(argumentToPB(x))),
         ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
-        diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB)
+        diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB(_, addressForTransfer = true))
       )
     }
 
-    diff.transactions.values.map { tx =>
+    diff.transactions.map { tx =>
       TransactionMetadata(
         tx.transaction match {
           case a: Authorized => a.sender.toAddress.toByteString
@@ -476,7 +519,7 @@ object StateUpdate {
             TransactionMetadata.Metadata.Empty
         }
       )
-    }.toVector
+    }
   }
 
   def referencedAssets(blockchain: Blockchain, txsStateUpdates: Seq[StateUpdate]): Seq[AssetInfo] =
@@ -486,32 +529,33 @@ object StateUpdate {
       .flatMap(id => blockchain.assetDescription(IssuedAsset(id)).map(ad => AssetInfo(id, ad.decimals, ad.name.toStringUtf8)))
 
   def container(
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       diff: DetailedDiff,
       minerAddress: Address
   ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata], Seq[AssetInfo]) = {
     val DetailedDiff(parentDiff, txsDiffs) = diff
-    val parentStateUpdate                  = atomic(blockchainBeforeWithMinerReward, parentDiff)
+    val parentStateUpdate                  = atomic(blockchainBeforeWithReward, parentDiff)
 
-    // miner reward is already in the blockchainBeforeWithMinerReward
+    // miner reward is already in the blockchainBeforeWithReward
     // if miner balance has been changed in parentDiff, it is already included in balance updates
     // if it has not, it needs to be manually requested from the blockchain and added to balance updates
+    // TODO: remove
     val parentStateUpdateWithMinerReward = parentStateUpdate.balances.find(_.address == minerAddress) match {
       case Some(_) => parentStateUpdate
       case None =>
-        val minerBalance = blockchainBeforeWithMinerReward.balance(minerAddress, Waves)
-        val reward       = blockchainBeforeWithMinerReward.blockReward(blockchainBeforeWithMinerReward.height).getOrElse(0L)
+        val minerBalance = blockchainBeforeWithReward.balance(minerAddress, Waves)
+        val reward       = blockchainBeforeWithReward.blockReward(blockchainBeforeWithReward.height).getOrElse(0L)
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
     val (txsStateUpdates, totalDiff) = txsDiffs.reverse
       .foldLeft((Seq.empty[StateUpdate], parentDiff)) { case ((updates, accDiff), txDiff) =>
         (
-          updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, accDiff), txDiff),
+          updates :+ atomic(CompositeBlockchain(blockchainBeforeWithReward, accDiff), txDiff),
           accDiff.combineF(txDiff).explicitGet()
         )
       }
-    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, totalDiff)
+    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithReward, totalDiff)
     val metadata        = transactionsMetadata(blockchainAfter, totalDiff)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
     (parentStateUpdateWithMinerReward, txsStateUpdates, metadata, refAssets)
@@ -548,32 +592,51 @@ final case class BlockAppended(
     height: Int,
     block: Block,
     updatedWavesAmount: Long,
+    vrf: Option[ByteStr],
+    activatedFeatures: Seq[Int],
+    rewardShares: Seq[(Address, Long)],
     blockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate],
     transactionMetadata: Seq[TransactionMetadata],
     referencedAssets: Seq[StateUpdate.AssetInfo]
 ) extends BlockchainUpdated {
-  def reverseStateUpdate: StateUpdate = Monoid.combineAll((blockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
+  def reverseStateUpdate: StateUpdate =
+    Monoid
+      .combineAll((blockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
+      .copy(deletedAliases = block.transactionData.collect { case cat: CreateAliasTransaction => cat.aliasName })
 }
 
 object BlockAppended {
-  def from(block: Block, diff: DetailedDiff, blockchainBeforeWithMinerReward: Blockchain): BlockAppended = {
+  def from(
+      block: Block,
+      diff: DetailedDiff,
+      blockchainBeforeWithReward: Blockchain,
+      reward: Option[Long],
+      hitSource: ByteStr
+  ): BlockAppended = {
+    val height = blockchainBeforeWithReward.height
     val (blockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
-      StateUpdate.container(blockchainBeforeWithMinerReward, diff, block.sender.toAddress)
+      StateUpdate.container(blockchainBeforeWithReward, diff, block.sender.toAddress)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
-    val updatedWavesAmount = blockchainBeforeWithMinerReward.height match {
-      // genesis case
-      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount.value }.sum
-      // miner reward case
-      case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
-    }
+    val wavesAmount        = blockchainBeforeWithReward.wavesAmount(height).toLong
+    val updatedWavesAmount = wavesAmount + reward.filter(_ => height > 0).getOrElse(0L)
+
+    val activatedFeatures = blockchainBeforeWithReward.activatedFeatures.collect {
+      case (id, activationHeight) if activationHeight == height + 1 => id.toInt
+    }.toSeq
+
+    val rewardShares =
+      BlockRewardCalculator.getSortedBlockRewardShares(height + 1, reward.getOrElse(0L), block.header.generator.toAddress, blockchainBeforeWithReward)
 
     BlockAppended(
       block.id(),
-      blockchainBeforeWithMinerReward.height + 1,
+      height + 1,
       block,
       updatedWavesAmount,
+      if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None,
+      activatedFeatures,
+      rewardShares,
       blockStateUpdate,
       txsStateUpdates,
       txsMetadata,
@@ -593,7 +656,9 @@ final case class MicroBlockAppended(
     totalTransactionsRoot: ByteStr,
     referencedAssets: Seq[StateUpdate.AssetInfo]
 ) extends BlockchainUpdated {
-  def reverseStateUpdate: StateUpdate = Monoid.combineAll((microBlockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
+  def reverseStateUpdate: StateUpdate = Monoid
+    .combineAll((microBlockStateUpdate +: transactionStateUpdates).map(_.reverse).reverse)
+    .copy(deletedAliases = microBlock.transactionData.collect { case cat: CreateAliasTransaction => cat.aliasName })
 }
 
 object MicroBlockAppended {
@@ -603,16 +668,16 @@ object MicroBlockAppended {
   def from(
       microBlock: MicroBlock,
       diff: DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): MicroBlockAppended = {
     val (microBlockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
-      StateUpdate.container(blockchainBeforeWithMinerReward, diff, microBlock.sender.toAddress)
+      StateUpdate.container(blockchainBeforeWithReward, diff, microBlock.sender.toAddress)
 
     MicroBlockAppended(
       totalBlockId,
-      blockchainBeforeWithMinerReward.height,
+      blockchainBeforeWithReward.height,
       microBlock,
       microBlockStateUpdate,
       txsStateUpdates,
@@ -623,20 +688,26 @@ object MicroBlockAppended {
   }
 }
 
-final case class RollbackResult(removedBlocks: Seq[Block], removedTransactionIds: Seq[ByteStr], stateUpdate: StateUpdate)
+final case class RollbackResult(
+    removedBlocks: Seq[Block],
+    removedTransactionIds: Seq[ByteStr],
+    stateUpdate: StateUpdate,
+    deactivatedFeatures: Seq[Int]
+)
 
 object RollbackResult {
   def micro(removedTransactionIds: Seq[ByteStr], stateUpdate: StateUpdate): RollbackResult =
-    RollbackResult(Nil, removedTransactionIds, stateUpdate)
+    RollbackResult(Nil, removedTransactionIds, stateUpdate, Nil)
 
   implicit val monoid: Monoid[RollbackResult] = new Monoid[RollbackResult] {
-    override def empty: RollbackResult = RollbackResult(Nil, Nil, Monoid.empty[StateUpdate])
+    override def empty: RollbackResult = RollbackResult(Nil, Nil, Monoid.empty[StateUpdate], Nil)
 
     override def combine(x: RollbackResult, y: RollbackResult): RollbackResult = {
       RollbackResult(
         x.removedBlocks ++ y.removedBlocks,
         x.removedTransactionIds ++ y.removedTransactionIds,
-        Monoid.combine(x.stateUpdate, y.stateUpdate)
+        Monoid.combine(x.stateUpdate, y.stateUpdate),
+        x.deactivatedFeatures ++ y.deactivatedFeatures
       )
     }
   }

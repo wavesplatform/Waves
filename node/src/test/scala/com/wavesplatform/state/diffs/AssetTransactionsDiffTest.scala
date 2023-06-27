@@ -15,8 +15,8 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -226,32 +226,27 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val genesis = TxHelpers.genesis(acc.toAddress)
     val issue   = TxHelpers.issue(acc, 100, script = Some(ExprScript(CONST_BOOLEAN(true)).explicitGet()))
 
-    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), smartEnabledFS) { case (blockDiff, newState) =>
-      newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
-        AssetDescription(
-          issue.assetId,
-          issue.sender,
-          issue.name,
-          issue.description,
-          issue.decimals.value,
-          issue.reissuable,
-          BigInt(issue.quantity.value),
-          Height @@ 2,
-          issue.script.map(s =>
-            AssetScriptInfo(
-              s,
-              Script
-                .estimate(s, ScriptEstimatorV1, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
-                .explicitGet()
-            )
-          ),
-          0L,
-          issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), RideV6.blockchainSettings.functionalitySettings) {
+      case (blockDiff, newState) =>
+        newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
+          AssetDescription(
+            issue.assetId,
+            issue.sender,
+            issue.name,
+            issue.description,
+            issue.decimals.value,
+            issue.reissuable,
+            BigInt(issue.quantity.value),
+            Height @@ 2,
+            issue.script.map(AssetScriptInfo(_, 0)),
+            0L,
+            issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
+            1,
+            Height @@ 2
+          )
         )
-      )
-      blockDiff.transactions.contains(issue.id()) shouldBe true
-      newState.transactionInfo(issue.id()).isDefined shouldBe true
-      newState.transactionInfo(issue.id()).isDefined shouldEqual true
+        blockDiff.transaction(issue.id()) shouldBe defined
+        newState.transactionInfo(issue.id()).isDefined shouldBe true
     }
   }
 
@@ -333,23 +328,14 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
   }
 
   property(s"Can update with CompositeBlockchain") {
-    val (gen, issues, signer, update1) = genesisIssueUpdateWithSecondAsset
+    val (gen, issues, _, update1) = genesisIssueUpdateWithSecondAsset
     withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
       val blockchain   = d.blockchainUpdater
       val genesisBlock = TestBlock.create(gen ++ issues)
       d.appendBlock(genesisBlock)
 
-      val (keyBlock, mbs) =
-        UnsafeBlocks.unsafeChainBaseAndMicro(
-          genesisBlock.id(),
-          Nil,
-          Seq(Seq(update1)),
-          signer,
-          Block.ProtoBlockVersion,
-          genesisBlock.header.timestamp + 100
-        )
-      d.appendBlock(keyBlock)
-      val microBlockId = d.appendMicroBlock(mbs.head)
+      d.appendBlock()
+      d.appendMicroBlock(update1)
 
       val issue  = issues(0)
       val issue1 = issues(1)
@@ -367,9 +353,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         desc1.lastUpdatedAt shouldBe blockchain.height
       }
 
-      val (keyBlock1, _) =
-        UnsafeBlocks.unsafeChainBaseAndMicro(microBlockId, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
-      d.appendBlock(keyBlock1)
+      d.appendKeyBlock()
 
       { // Check after new key block
         val desc = blockchain.assetDescription(issue.asset).get
@@ -575,7 +559,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
          |""".stripMargin
 
     ExpressionCompiler
-      .compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+      .compileBoolean(expr, NoLibraries, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
       .flatMap(ExprScript(V5, _))
       .explicitGet()
   }

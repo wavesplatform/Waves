@@ -16,8 +16,9 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, ScriptResultSource, 
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -34,7 +35,8 @@ class ContractCompilerTest extends PropSpec {
           CryptoContext.build(com.wavesplatform.lang.Global, version).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(version, Account, DAppType).explicitGet()
+            DirectiveSet(version, Account, DAppType).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )
@@ -107,7 +109,7 @@ class ContractCompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), REF("a"))),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -132,7 +134,7 @@ class ContractCompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet())),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -203,7 +205,7 @@ class ContractCompilerTest extends PropSpec {
                         FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("a").explicitGet(), CONST_STRING("b").explicitGet())),
                         FUNCTION_CALL(
                           Native(1100),
-                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF("nil"))
+                          List(FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), REF("sender0"))), REF(GlobalValNames.Nil))
                         )
                       )
                     )
@@ -369,7 +371,8 @@ class ContractCompilerTest extends PropSpec {
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet()
+            DirectiveSet(V3, Account, DAppType).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )
@@ -496,7 +499,8 @@ class ContractCompilerTest extends PropSpec {
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet()
+            DirectiveSet(V3, Account, DAppType).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )
@@ -811,7 +815,7 @@ class ContractCompilerTest extends PropSpec {
     }
     val ctx =
       PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
   }
@@ -824,7 +828,8 @@ class ContractCompilerTest extends PropSpec {
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V3, Account, DAppType).explicitGet()
+            DirectiveSet(V3, Account, DAppType).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )
@@ -875,6 +880,7 @@ class ContractCompilerTest extends PropSpec {
 
     Global.compileContract(
       dApp,
+      NoLibraries,
       dAppV4Ctx,
       V4,
       ScriptEstimatorV3(fixOverflow = true, overhead = true),
@@ -916,7 +922,7 @@ class ContractCompilerTest extends PropSpec {
     }
     val ctx =
       PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
   }
@@ -954,7 +960,7 @@ class ContractCompilerTest extends PropSpec {
     }
     val ctx =
       PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
   }
@@ -977,7 +983,7 @@ class ContractCompilerTest extends PropSpec {
     }
     val ctx =
       PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
     val result = compiler.ContractCompiler(ctx.compilerContext, expr, V4)
     result should produce("Undefined field `originCaller` of variable of type `Invocation`")
@@ -1033,6 +1039,7 @@ class ContractCompilerTest extends PropSpec {
         |  true
         |}
       """.stripMargin,
+      NoLibraries,
       getTestContext(V4).compilerContext,
       V4,
       ScriptEstimatorV3(fixOverflow = true, overhead = true),

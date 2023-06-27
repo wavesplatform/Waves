@@ -21,8 +21,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
+import com.wavesplatform.transaction.utils.Signed
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
@@ -684,7 +683,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       maxEntryCount: Int,
       useForScript: Boolean = false,
       withDeleteEntry: Boolean = false,
-      sender: Option[KeyPair] = None
+      sender: Option[SeedKeyPair] = None
   ): Gen[DataTransaction] =
     (for {
       timestamp <- timestampGen
@@ -720,15 +719,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   def invokeExpressionTransactionGen(sender: KeyPair, script: ExprScript, feeAmount: Long): Gen[InvokeExpressionTransaction] =
     InvokeExpressionTransaction.selfSigned(1, sender, script, feeAmount, Waves, ntpTime.getTimestamp()).explicitGet()
-
-  def ethereumInvokeTransactionGen(sender: ECKeyPair, dApp: KeyPair, funcName: String, args: Seq[Arg]): Gen[EthereumTransaction] =
-    EthTxGenerator.generateEthInvoke(
-      keyPair = sender,
-      address = dApp.toAddress,
-      funcName = funcName,
-      args = args,
-      payments = Seq.empty
-    )
 }
 
 trait TransactionGen extends TransactionGenBase { _: Suite => }

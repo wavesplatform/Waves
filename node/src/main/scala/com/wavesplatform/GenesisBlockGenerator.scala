@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -67,7 +67,7 @@ object GenesisBlockGenerator {
       accountPrivateKey: ByteStr,
       accountPublicKey: ByteStr,
       accountAddress: Address,
-      account: KeyPair,
+      account: SeedKeyPair,
       miner: Boolean
   )
 
@@ -223,7 +223,12 @@ object GenesisBlockGenerator {
       def inverseCalculateDelay(balance: Long, hitRate: Double): Int =
         posCalculator match {
           case FairPoSCalculator(minBlockTime, _) =>
-            val z = (1 - Math.exp((settings.averageBlockDelay.toMillis - minBlockTime) / 70000.0)) * balance
+            val averageBlockDelay = settings.averageBlockDelay.toMillis
+            require(
+              averageBlockDelay > minBlockTime,
+              s"average-block-delay: ${averageBlockDelay}ms should be > min-block-time: ${minBlockTime}ms"
+            )
+            val z = (1 - Math.exp((averageBlockDelay - minBlockTime) / 70000.0)) * balance
             (5e17 * (Math.log(hitRate) / z)).toInt
           case NxtPoSCalculator =>
             (FairPoSCalculator.MaxHit * hitRate / settings.averageBlockDelay.toSeconds / balance).toInt

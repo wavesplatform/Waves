@@ -72,7 +72,8 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.assetsBalance(bobAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L) shouldBe bobAssetBalance + 10 * token
       sender.assetsBalance(sponsorAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L) shouldBe sponsorAssetBalance + smallFee
 
-      val reward = (sender.height - minerBalanceHeight) * 600000000L
+      val height = nodes.head.waitForHeightArise()
+      val reward = (height - minerBalanceHeight) * 600000000L
       sender.wavesBalance(ByteString.copyFrom(Base58.decode(miner.address))).available shouldBe
         minerWavesBalance.available + reward + sponsorReducedFee + issueFee + minFee + FeeValidation.FeeUnit * smallFee / minSponsorFee
     }

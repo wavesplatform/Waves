@@ -1,13 +1,13 @@
 package com.wavesplatform.utils
 
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
-import java.util.concurrent.{Future => JavaFuture, _}
+import java.util.concurrent.{Future as JavaFuture, *}
 
 import io.netty.util.{Timeout, Timer}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 /** Helper methods to create schedulers with custom DiscardPolicy */
 object Schedulers {
@@ -41,7 +41,7 @@ object Schedulers {
     }
   }
 
-  private[this] def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = { r: Runnable =>
+  private[this] def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = { (r: Runnable) =>
     val thread = new Thread(r)
     thread.setName(name + "-" + thread.getId)
     thread.setDaemon(daemonic)

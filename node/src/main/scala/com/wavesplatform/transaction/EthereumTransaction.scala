@@ -1,13 +1,14 @@
 package com.wavesplatform.transaction
 
-import java.math.BigInteger
-
-import cats.syntax.either.*
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
+import com.wavesplatform.features.BlockchainFeatures.BlockRewardDistribution
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -16,6 +17,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, ValidatedV}
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
@@ -27,6 +29,7 @@ import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Convert
 import play.api.libs.json.*
 
+import java.math.BigInteger
 import scala.reflect.ClassTag
 
 final case class EthereumTransaction(
@@ -50,20 +53,23 @@ final case class EthereumTransaction(
 
   override val timestamp: TxTimestamp = underlying.getNonce.longValueExact()
 
-  val signerPublicKey: Coeval[PublicKey] = Coeval.evalOnce {
+  val signerKeyBigInt: Coeval[BigInteger] = Coeval.evalOnce {
     require(signatureData != null, "empty signature data")
     val v          = BigInt(1, signatureData.getV)
     val recoveryId = if (v > 28) v - chainId * 2 - 35 else v - 27
     val sig        = new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS))
 
-    PublicKey(
-      ByteStr(
-        Sign
-          .recoverFromSignature(recoveryId.intValue, sig, Hash.sha3(this.bodyBytes()))
-          .toByteArray
-          .takeRight(EthereumKeyLength)
+    Sign.recoverFromSignature(recoveryId.intValue, sig, Hash.sha3(this.bodyBytes()))
+  }
+
+  val signerPublicKey: Coeval[PublicKey] = Coeval.evalOnce {
+    val signerKey =
+      org.web3j.utils.Numeric.toBytesPadded(
+        signerKeyBigInt(),
+        EthereumKeyLength
       )
-    )
+
+    PublicKey(ByteStr(signerKey))
   }
 
   val senderAddress: Coeval[Address] = Coeval.evalOnce(signerPublicKey().toAddress(chainId))
@@ -99,6 +105,48 @@ final case class EthereumTransaction(
 object EthereumTransaction {
   sealed trait Payload
 
+  case class Invocation(dApp: Address, hexCallData: String) extends Payload {
+    def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] = {
+      for {
+        callAndPayments <- decodeFuncCall(blockchain, blockchain.isFeatureActivated(BlockRewardDistribution))
+        invocation = new InvokeScriptTransactionLike {
+          override def funcCall: Terms.FUNCTION_CALL                  = callAndPayments._1
+          override def payments: Seq[InvokeScriptTransaction.Payment] = callAndPayments._2
+          override def id: Coeval[ByteStr]                            = tx.id
+          override def dApp: AddressOrAlias                           = Invocation.this.dApp
+          override val sender: PublicKey                              = tx.signerPublicKey()
+          override def root: InvokeScriptTransactionLike              = this
+          override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+          override def timestamp: TxTimestamp                         = tx.timestamp
+          override def chainId: TxVersion                             = tx.chainId
+          override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+          override val tpe: TransactionType                           = TransactionType.InvokeScript
+        }
+        _ <- checkPaymentsAmount(blockchain, invocation)
+      } yield invocation
+    }
+
+    def decodeFuncCall(blockchain: Blockchain, check: Boolean): Either[ValidationError, (Terms.FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] =
+      for {
+        scriptInfo      <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
+        callAndPayments <- EthABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData, check)
+        _ <- Either.cond(
+          !check || PBTransactions
+            .toPBInvokeScriptData(dApp, Some(callAndPayments._1), callAndPayments._2)
+            .toByteArray
+            .length <= ContractLimits.MaxInvokeScriptSizeInBytes,
+          (),
+          GenericError(s"Ethereum Invoke bytes length exceeds limit = ${ContractLimits.MaxInvokeScriptSizeInBytes}")
+        )
+      } yield callAndPayments
+
+    private def checkPaymentsAmount(blockchain: Blockchain, invocation: InvokeScriptTransactionLike): Either[ValidationError, Unit] =
+      if (blockchain.height >= blockchain.settings.functionalitySettings.ethInvokePaymentsCheckHeight)
+        InvokeScriptTxValidator.checkAmounts(invocation.payments).toEither.leftMap(_.head)
+      else
+        Right(())
+  }
+
   case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload {
     def tryResolveAsset(blockchain: Blockchain): Either[ValidationError, Asset] =
       tokenAddress
@@ -111,30 +159,10 @@ object EthereumTransaction {
         asset  <- tryResolveAsset(blockchain)
         amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
       } yield tx.toTransferLike(amount, recipient, asset)
-  }
 
-  case class Invocation(dApp: Address, hexCallData: String) extends Payload {
-    def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
-      blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp")).flatMap { scriptInfo =>
-        ABIConverter(scriptInfo.script)
-          .decodeFunctionCall(hexCallData)
-          .leftMap(GenericError(_))
-          .map { case (extractedCall, extractedPayments) =>
-            new InvokeScriptTransactionLike {
-              override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
-              override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
-              override def id: Coeval[ByteStr]                            = tx.id
-              override def dApp: AddressOrAlias                           = Invocation.this.dApp
-              override val sender: PublicKey                              = tx.signerPublicKey()
-              override def root: InvokeScriptTransactionLike              = this
-              override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
-              override def timestamp: TxTimestamp                         = tx.timestamp
-              override def chainId: TxVersion                             = tx.chainId
-              override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
-              override val tpe: TransactionType                           = TransactionType.InvokeScript
-            }
-          }
-      }
+    def check(data: String) = {
+      Either.cond(tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == 136, (), GenericError("unconsumed bytes remaining"))
+    }
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {

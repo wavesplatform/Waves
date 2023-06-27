@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.evaluator
 
 import java.nio.ByteBuffer
-
 import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
@@ -19,6 +18,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
@@ -27,6 +27,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
@@ -51,7 +52,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         pureContext(version).withEnvironment[Environment],
         WavesContext.build(
           Global,
-          DirectiveSet(version, Account, Expression).explicitGet()
+          DirectiveSet(version, Account, Expression).explicitGet(),
+          fixBigScriptField = true
         )
       )
     )
@@ -65,7 +67,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     defaultEvaluator[T](context, expr)
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true, newMode = true)._3
+    EvaluatorV2
+      .applyCompleted(context, expr, LogExtraInfo(), implicitly[StdLibVersion], correctFunctionCallScope = true, newMode = true)
+      ._3
       .asInstanceOf[Either[ExecutionError, T]]
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
@@ -80,10 +84,19 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     eval[T](context.asInstanceOf[EvaluationContext[Environment, Id]], expr)
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
-    val evaluatorV1Result                      = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true, newMode = true)
+    val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
+    val (evaluatorV2Log, _, evaluatorV2Result) =
+      EvaluatorV2.applyCompleted(
+        context,
+        expr,
+        LogExtraInfo(),
+        implicitly[StdLibVersion],
+        correctFunctionCallScope = true,
+        newMode = true
+      )
 
-    evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
+    evaluatorV2Result shouldBe evaluatorV1Result.bimap(_._1, _._1)
+    evaluatorV2Log should contain allElementsOf evaluatorV1Result.fold(_._2, _._2)
     evaluatorV1Result
   }
 
@@ -206,7 +219,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("custom type field access") {
     val pointType     = CASETYPEREF("Point", List("X" -> LONG, "Y" -> LONG))
-    val pointInstance = CaseObj(pointType, Map("X"    -> 3L, "Y"   -> 4L))
+    val pointInstance = CaseObj(pointType, Map("X" -> 3L, "Y" -> 4L))
     evalPure[EVALUATED](
       context = Monoid.combine(
         pureEvalContext,
@@ -258,10 +271,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG))*) {
-        _ =>
-          functionEvaluated = functionEvaluated + 1
-          evaluated(1L)
+      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG))*) { _ =>
+        functionEvaluated = functionEvaluated + 1
+        evaluated(1L)
       }
 
       val context = Monoid
@@ -305,7 +317,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
     val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*)(_ =>
-      evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L))))
+      evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
+    )
 
     val context = EvaluationContext.build(
       typeDefs = Map.empty,
@@ -320,17 +333,16 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*) {
-      _ =>
-        evaluated(
-          CaseObj(
-            fooType,
-            Map(
-              "bar" -> "bAr",
-              "buz" -> 1L
-            )
+    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*) { _ =>
+      evaluated(
+        CaseObj(
+          fooType,
+          Map(
+            "bar" -> "bAr",
+            "buz" -> 1L
           )
         )
+      )
     }
     val fooTransform =
       NativeFunction[NoContext]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
@@ -424,7 +436,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     result shouldBe false
 
-    //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
+    // it false, because script fails on Alice's signature check, and bobSigned is not evaluated
     log.find(_._1 == "bobSigned") shouldBe None
     log.find(_._1 == "aliceSigned") shouldBe Some(("aliceSigned", evaluated(false)))
   }
@@ -444,54 +456,50 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   } yield (ByteStr(xs), number)
 
   property("drop(ByteStr, Long) works as the native one") {
-    forAll(genBytesAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
-        actual shouldBe evaluated(xs.drop(number))
+    forAll(genBytesAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
+      actual shouldBe evaluated(xs.drop(number))
     }
   }
 
   property("take(ByteStr, Long) works as the native one") {
-    forAll(genBytesAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
-        actual shouldBe evaluated(xs.take(number))
+    forAll(genBytesAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
+      actual shouldBe evaluated(xs.take(number))
     }
   }
 
   property("dropRightBytes(ByteStr, Long) works as the native one") {
-    forAll(genBytesAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
-        val limit  = 165947
-        actual shouldBe (
-          if (number < 0)
-            Left(s"Unexpected negative number = $number passed to dropRight()")
-          else if (number > limit)
-            Left(s"Number = $number passed to dropRight() exceeds ByteVector limit = $limit")
-          else
-            evaluated(xs.dropRight(number))
-        )
+    forAll(genBytesAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
+      val limit  = 165947
+      actual shouldBe (
+        if (number < 0)
+          Left(s"Unexpected negative number = $number passed to dropRight()")
+        else if (number > limit)
+          Left(s"Number = $number passed to dropRight() exceeds ByteVector limit = $limit")
+        else
+          evaluated(xs.dropRight(number))
+      )
     }
   }
 
   property("takeRightBytes(ByteStr, Long) works as the native one") {
-    forAll(genBytesAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
-        val limit  = 165947
-        actual shouldBe (
-          if (number < 0)
-            Left(s"Unexpected negative number = $number passed to takeRight()")
-          else if (number > limit)
-            Left(s"Number = $number passed to takeRight() exceeds ByteVector limit = $limit")
-          else
-            evaluated(xs.takeRight(number))
-        )
+    forAll(genBytesAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
+      val limit  = 165947
+      actual shouldBe (
+        if (number < 0)
+          Left(s"Unexpected negative number = $number passed to takeRight()")
+        else if (number > limit)
+          Left(s"Number = $number passed to takeRight() exceeds ByteVector limit = $limit")
+        else
+          evaluated(xs.takeRight(number))
+      )
     }
   }
 
@@ -501,38 +509,34 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   } yield (xs, number)
 
   property("drop(String, Long) works as the native one") {
-    forAll(genStringAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
-        actual shouldBe evaluated(xs.drop(number))
+    forAll(genStringAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(DROP_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
+      actual shouldBe evaluated(xs.drop(number))
     }
   }
 
   property("take(String, Long) works as the native one") {
-    forAll(genStringAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
-        actual shouldBe evaluated(xs.take(number))
+    forAll(genStringAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(FunctionHeader.Native(TAKE_STRING), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
+      actual shouldBe evaluated(xs.take(number))
     }
   }
 
   property("dropRight(String, Long) works as the native one") {
-    forAll(genStringAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(User("dropRight"), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
-        actual shouldBe evaluated(xs.dropRight(number))
+    forAll(genStringAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(User("dropRight"), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
+      actual shouldBe evaluated(xs.dropRight(number))
     }
   }
 
   property("takeRight(String, Long) works as the native one") {
-    forAll(genStringAndNumber) {
-      case (xs, number) =>
-        val expr   = FUNCTION_CALL(User("takeRight"), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureEvalContext, expr)
-        actual shouldBe evaluated(xs.takeRight(number))
+    forAll(genStringAndNumber) { case (xs, number) =>
+      val expr   = FUNCTION_CALL(User("takeRight"), List(CONST_STRING(xs).explicitGet(), CONST_LONG(number)))
+      val actual = evalPure[EVALUATED](pureEvalContext, expr)
+      actual shouldBe evaluated(xs.takeRight(number))
     }
   }
 
@@ -763,7 +767,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
 
     val expr = ExpressionCompiler
-      .compileUntyped(script, context.compilerContext)
+      .compileUntyped(script, NoLibraries, context.compilerContext)
       .explicitGet()
 
     evalPure[EVALUATED](
@@ -804,8 +808,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     }
   }
 
-  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: Array[Byte], signature: Array[Byte], lim_n: Option[Short] = None)(
-      implicit version: StdLibVersion
+  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: Array[Byte], signature: Array[Byte], lim_n: Option[Short] = None)(implicit
+      version: StdLibVersion
   ): Either[ExecutionError, Boolean] = {
     val txType = CASETYPEREF(
       "Transaction",
@@ -896,7 +900,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -909,7 +913,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     result shouldBe true
 
-    //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
+    // it false, because script fails on Alice's signature check, and bobSigned is not evaluated
     log.find(_._1 == "bobSigned") shouldBe None
     log.find(_._1 == "x0") shouldBe Some(("x0", evaluated("qqqq")))
   }
@@ -973,7 +977,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     eval[CONST_BOOLEAN](
       defaultFullContext.evaluationContext(environment),
-      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))
+      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF(GlobalValNames.Unit)))
     ) shouldBe evaluated(false)
   }
 
@@ -1032,7 +1036,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -1109,7 +1113,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteStr.fromBytes(1))
     evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteStr.fromBytes(0))
-    evalToBytes(toStringBoolean, REF("unit")) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
+    evalToBytes(toStringBoolean, REF(GlobalValNames.Unit)) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe evaluated(ByteStr(ByteBuffer.allocate(8).putLong(n).array))
@@ -1120,10 +1124,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction[NoContext]("F", 1, 258: Short, LONG, ("_", LONG)) {
-      case _ =>
-        functionEvaluated = functionEvaluated + 1
-        evaluated(1L)
+    val f = NativeFunction[NoContext]("F", 1, 258: Short, LONG, ("_", LONG)) { case _ =>
+      functionEvaluated = functionEvaluated + 1
+      evaluated(1L)
     }
 
     val doubleFst = UserFunction[NoContext]("ID", 0, LONG, ("x", LONG)) {
@@ -1142,8 +1145,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       .asInstanceOf[EvaluationContext[Environment, Id]]
 
     // g(...(g(f(1000)))))
-    val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) {
-      case (r, _) => FUNCTION_CALL(doubleFst.header, List(r))
+    val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) { case (r, _) =>
+      FUNCTION_CALL(doubleFst.header, List(r))
     }
 
     evalV1[EVALUATED](context, expr) shouldBe evaluated(64L)
@@ -1231,25 +1234,23 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("Rounding modes DOWN, HALFUP, HALFEVEN, CEILING, FLOOR are available for all versions") {
     DirectiveDictionary[StdLibVersion].all
-      .foreach(
-        version =>
-          Rounding.fromV5.foreach { rounding =>
-            evalPure(pureContext(version).evaluationContext, REF(rounding.`type`.name.toUpperCase)) shouldBe Right(rounding.value)
+      .foreach(version =>
+        Rounding.fromV5.foreach { rounding =>
+          evalPure(pureContext(version).evaluationContext, REF(rounding.`type`.name.toUpperCase)) shouldBe Right(rounding.value)
         }
       )
   }
 
   property("Rounding modes UP, HALFDOWN are not available from V5") {
     DirectiveDictionary[StdLibVersion].all
-      .foreach(
-        version =>
-          Rounding.all.filterNot(Rounding.fromV5.contains).foreach { rounding =>
-            val ref = rounding.`type`.name.toUpperCase
-            val r   = evalPure(pureContext(version).evaluationContext, REF(ref))
-            if (version < V5)
-              r shouldBe Right(rounding.value)
-            else
-              r should produce(s"A definition of '$ref' not found")
+      .foreach(version =>
+        Rounding.all.filterNot(Rounding.fromV5.contains).foreach { rounding =>
+          val ref = rounding.`type`.name.toUpperCase
+          val r   = evalPure(pureContext(version).evaluationContext, REF(ref))
+          if (version < V5)
+            r shouldBe Right(rounding.value)
+          else
+            r should produce(s"A definition of '$ref' not found")
         }
       )
   }

@@ -2,16 +2,16 @@ package com.wavesplatform
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
-
 import cats.data.NonEmptyList
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 package object settings {
@@ -46,6 +46,8 @@ package object settings {
     val uri = new URI(s"my://${config.getString(path)}")
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
+
+  implicit val privateKeyReader: ValueReader[PrivateKey] = byteStrReader.map(PrivateKey(_))
 
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")
@@ -86,7 +88,7 @@ package object settings {
     def osxDefaultDirectory: String =
       s"$${user.home}/Library/Application Support"
 
-    //noinspection SpellCheckingInspection
+    // noinspection SpellCheckingInspection
     def winDefaultDirectory: String =
       s"$${LOCALAPPDATA}"
 

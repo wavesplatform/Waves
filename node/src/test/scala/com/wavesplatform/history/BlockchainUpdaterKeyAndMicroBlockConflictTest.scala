@@ -208,7 +208,6 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     def duplicateDataKeys(): Gen[(Block, Seq[Block], Seq[MicroBlock], Address)] = {
       for {
         richAccount <- accountGen
-        tsAmount  = FeeAmount * 10
         blockTime = ntpNow
         data1 <- QuickTX.data(richAccount, "test", Gen.const(ntpNow))
         data2 <- QuickTX.data(richAccount, "test", Gen.const(ntpNow))

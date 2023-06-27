@@ -5,7 +5,7 @@ import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
@@ -51,6 +51,7 @@ import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
+import scala.collection.immutable.VectorMap
 import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -832,7 +833,7 @@ object AsyncHttpApi extends Assertions {
         })
     }
 
-    def createKeyPair(): Future[KeyPair] = Future.successful(n.generateKeyPair())
+    def createKeyPair(): Future[SeedKeyPair] = Future.successful(n.generateKeyPair())
 
     def createKeyPairServerSide(): Future[KeyPair] =
       for {
@@ -939,9 +940,9 @@ object AsyncHttpApi extends Assertions {
         .as[Seq[BalanceHistory]](amountsAsStrings)
     }
 
-    implicit val assetMapReads: Reads[Map[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map { case (k, v) =>
+    implicit val assetMapReads: Reads[VectorMap[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map { case (k, v) =>
       IssuedAsset(ByteStr.decodeBase58(k).get) -> v
-    })
+    }.to(VectorMap))
     implicit val leaseBalanceFormat: Reads[LeaseBalance] = Json.reads[LeaseBalance]
     implicit val portfolioFormat: Reads[Portfolio]       = Json.reads[Portfolio]
 

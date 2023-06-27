@@ -8,7 +8,7 @@ import scala.language.reflectiveCalls
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.{GenesisBlockGenerator, Version}
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
@@ -136,19 +136,19 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     val wallet: Wallet = new Wallet {
-      private[this] val map                                        = miners.map(kp => kp.toAddress -> kp).toMap
-      override def seed: Array[Byte]                               = Array.emptyByteArray
-      override def nonce: Int                                      = miners.length
-      override def privateKeyAccounts: Seq[KeyPair]                = miners
-      override def generateNewAccounts(howMany: Int): Seq[KeyPair] = ???
-      override def generateNewAccount(): Option[KeyPair]           = ???
-      override def generateNewAccount(nonce: Int): Option[KeyPair] = ???
-      override def deleteAccount(account: KeyPair): Boolean        = ???
-      override def privateKeyAccount(account: Address): Either[ValidationError, KeyPair] =
+      private[this] val map                                            = miners.map(kp => kp.toAddress -> kp).toMap
+      override def seed: Array[Byte]                                   = Array.emptyByteArray
+      override def nonce: Int                                          = miners.length
+      override def privateKeyAccounts: Seq[SeedKeyPair]                = miners
+      override def generateNewAccounts(howMany: Int): Seq[SeedKeyPair] = ???
+      override def generateNewAccount(): Option[SeedKeyPair]           = ???
+      override def generateNewAccount(nonce: Int): Option[SeedKeyPair] = ???
+      override def deleteAccount(account: SeedKeyPair): Boolean        = ???
+      override def privateKeyAccount(account: Address): Either[ValidationError, SeedKeyPair] =
         map.get(account).toRight(GenericError(s"No key for $account"))
     }
 
-    val utx         = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.minerSettings.enable)
+    val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
     val posSelector = PoSSelector(blockchain, None)
     val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)
     val miner = new MinerImpl(
@@ -161,9 +161,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       posSelector,
       scheduler,
       scheduler,
-      utxEvents.collect { case _: UtxEvent.TxAdded =>
-        ()
-      }
+      utxEvents.collect { case _: UtxEvent.TxAdded => () }
     )
     val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false) _
 

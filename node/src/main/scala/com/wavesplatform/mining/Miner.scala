@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.time.LocalTime
 import cats.syntax.either.*
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair, PKKeyPair}
 import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
@@ -90,8 +90,14 @@ class MinerImpl(
   def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
     Miner.blockMiningStarted.increment()
 
+    val accounts = if (settings.minerSettings.privateKeys.nonEmpty) {
+      settings.minerSettings.privateKeys.map(PKKeyPair(_))
+    } else {
+      wallet.privateKeyAccounts
+    }
+
     val hasAllowedForMiningScriptsAccounts =
-      wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
+      accounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
     scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block", err))

@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.directives.values.*
@@ -32,17 +32,27 @@ import com.wavesplatform.transaction.utils.Signed
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
-  def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
-  def address(i: Int): Address = signer(i).toAddress
+  def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
+  def address(i: Int): Address    = signer(i).toAddress
 
-  def defaultSigner: KeyPair  = signer(0)
-  def defaultAddress: Address = defaultSigner.toAddress
-  def secondSigner: KeyPair   = signer(1)
-  def secondAddress: Address  = secondSigner.toAddress
+  def defaultSigner: SeedKeyPair = signer(0)
+  def defaultAddress: Address    = defaultSigner.toAddress
+  def secondSigner: SeedKeyPair  = signer(1)
+  def secondAddress: Address     = secondSigner.toAddress
 
   def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
-  val matcher: KeyPair = defaultSigner
+  def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
+    val firstAccountNum = 100
+    val lastAccountNum = firstAccountNum + numberAccounts
+    val accountsSeq = (firstAccountNum until lastAccountNum).map { num =>
+      val recipient = signer(num).toAddress
+      ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
+    }
+    accountsSeq
+  }
+
+  val matcher: SeedKeyPair = defaultSigner
 
   private[this] var lastTimestamp = System.currentTimeMillis()
   def timestamp: Long = {
@@ -227,6 +237,16 @@ object TxHelpers {
       fee: Long = TestValues.fee,
       version: TxVersion = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
+  ): ExchangeTransaction = exchangeFromOrders(order1, order2, order1.price.value, matcher, fee, version, chainId)
+
+  def exchangeFromOrders(
+      order1: Order,
+      order2: Order,
+      price: Long,
+      matcher: KeyPair,
+      fee: Long,
+      version: TxVersion,
+      chainId: Byte
   ): ExchangeTransaction =
     ExchangeTransaction
       .signed(
@@ -235,7 +255,7 @@ object TxHelpers {
         order1,
         order2,
         order1.amount.value,
-        order1.price.value,
+        price,
         order1.matcherFee.value,
         order2.matcherFee.value,
         fee,
@@ -334,7 +354,8 @@ object TxHelpers {
       script: Script,
       fee: Long = FeeConstants(TransactionType.SetScript) * FeeUnit,
       version: TxVersion = TxVersion.V1,
-      chainId: Byte = AddressScheme.current.chainId
+      chainId: Byte = AddressScheme.current.chainId,
+      timestamp: TxTimestamp = timestamp
   ): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(version, acc, Some(script), fee, timestamp, chainId).explicitGet()
   }
@@ -359,7 +380,8 @@ object TxHelpers {
       invoker: KeyPair = defaultSigner,
       fee: Long = FeeConstants(TransactionType.InvokeScript) * FeeUnit,
       feeAssetId: Asset = Waves,
-      version: TxVersion = TxVersion.V2
+      version: TxVersion = TxVersion.V2,
+      timestamp: TxTimestamp = timestamp
   ): InvokeScriptTransaction = {
     val fc = func.map(name => functionCall(name, args*))
     Signed.invokeScript(version, invoker, dApp, fc, payments, fee, feeAssetId, timestamp)

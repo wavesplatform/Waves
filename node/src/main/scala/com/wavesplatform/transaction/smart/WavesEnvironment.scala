@@ -10,6 +10,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
@@ -18,17 +19,19 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
+import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
 import monix.eval.Coeval
 import shapeless.*
 
@@ -140,12 +143,12 @@ class WavesEnvironment(
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
-    (for {
-      aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
-      }
-      address <- blockchain.resolveAlias(aoa)
+    val addressE: Either[ValidationError, account.Address] = addressOrAlias match {
+      case Address(bytes) => account.Address.fromBytes(bytes.arr)
+      case Alias(name)    => account.Alias.create(name).flatMap(a => blockchain.resolveAlias(a))
+    }
+    for {
+      address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
       effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
@@ -153,7 +156,7 @@ class WavesEnvironment(
       portfolio.balance,
       blockchain.generatingBalance(address),
       effectiveBalance
-    )).left.map(_.toString)
+    )
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
@@ -199,7 +202,10 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
       generatorPublicKey = blockH.generator,
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
+        getRewards(blockH.generator, bHeight)
+      else List.empty
     )
   }
 
@@ -240,7 +246,30 @@ class WavesEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+
+  private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward)) {
+      val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, generator.toAddress, blockchain)
+
+      rewardShares.map { case (addr, reward) =>
+        Address(ByteStr(addr.bytes)) -> reward
+      }
+    } else {
+      val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+      val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+
+      blockchain.blockReward(height).fold(Seq.empty[(Address, Long)]) { fullBlockReward =>
+        val configAddressesReward =
+          (daoAddress.toSeq ++ xtnBuybackAddress).map { addr =>
+            Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(fullBlockReward)
+          }
+        val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (fullBlockReward - configAddressesReward.map(_._2).sum)
+
+        (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
+      }
+    }
+  }
 }
 
 object DAppEnvironment {
@@ -280,7 +309,13 @@ object DAppEnvironment {
       }
 
     def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] = {
-      def isNestedError(ve: ValidationError) = invocations.exists(_.result.left.map(_.toString) == Left(ve.toString))
+      def isNestedError(ve: ValidationError) = invocations.exists { inv =>
+        (inv.result, ve) match {
+          case (Left(fte1: FailedTransactionError), fte2: FailedTransactionError) => fte1.error == fte2.error
+          case (Left(ve1), ve2)                                                   => ve1 == ve2
+          case _                                                                  => false
+        }
+      }
 
       this.result.left.toOption.collect {
         case ve if !isNestedError(ve) =>
@@ -299,6 +334,23 @@ object DAppEnvironment {
       call: FUNCTION_CALL,
       payments: Seq[InvokeScriptTransaction.Payment]
   )
+
+  case class ActionLimits(
+      nonDataActions: Int,
+      balanceActions: Int,
+      assetActions: Int,
+      data: Int,
+      dataSize: Int
+  ) {
+    def decrease(nonDataActionsCount: Int, balanceActionsCount: Int, assetActionsCount: Int, dataCount: Int, dataSize: Int): ActionLimits =
+      ActionLimits(
+        nonDataActions - nonDataActionsCount,
+        balanceActions - balanceActionsCount,
+        assetActions - assetActionsCount,
+        data - dataCount,
+        this.dataSize - dataSize
+      )
+  }
 }
 
 // Not thread safe
@@ -309,6 +361,7 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
+    rootVersion: StdLibVersion,
     tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
@@ -316,12 +369,8 @@ class DAppEnvironment(
     limitedExecution: Boolean,
     totalComplexityLimit: Int,
     var remainingCalls: Int,
-    var availableActions: Int,
-    var availableBalanceActions: Int,
-    var availableAssetActions: Int,
+    var availableActions: ActionLimits,
     var availablePayments: Int,
-    var availableData: Int,
-    var availableDataSize: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
@@ -337,7 +386,7 @@ class DAppEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = {
 
     val r = for {
       address <- traced(
@@ -367,46 +416,43 @@ class DAppEnvironment(
         payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
         InvokeScriptResult.empty
       )
-      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingPayments, remainingData, remainingDataSize) <-
+      (
+        diff,
+        evaluated,
+        remainingActions,
+        remainingPayments
+      ) <-
         InvokeScriptDiff( // This is a recursive call
           mutableBlockchain,
           blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+          rootVersion,
           limitedExecution,
           totalComplexityLimit,
           availableComplexity,
           remainingCalls,
           availableActions,
-          availableBalanceActions,
-          availableAssetActions,
           availablePayments,
-          availableData,
-          availableDataSize,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
-      fixedDiff = diff.copy(
-        scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
-        scriptsRun = diff.scriptsRun + 1
-      )
+      fixedDiff = diff
+        .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))
+        .withScriptRuns(diff.scriptsRun + 1)
       newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
     } yield {
       currentDiff = newCurrentDiff
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
-      availableBalanceActions = remainingBalanceActions
-      availableAssetActions = remainingAssetActions
       availablePayments = remainingPayments
-      availableData = remainingData
-      availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt)
+      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
     }
 
     r.v.map {
       _.resultE match {
-        case Left(fte: FailedTransactionError) => (Left(fte), fte.spentComplexity.toInt)
-        case Left(e)                           => (Left(e), 0)
-        case Right((evaluated, complexity))    => (Right(evaluated), complexity)
+        case Left(fte: FailedTransactionError)       => (Left(fte), fte.spentComplexity.toInt)
+        case Left(e)                                 => (Left(e), 0)
+        case Right((evaluated, complexity, diffLog)) => (Right((evaluated, diffLog)), complexity)
       }
     }
   }

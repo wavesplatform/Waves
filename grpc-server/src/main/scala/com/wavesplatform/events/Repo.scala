@@ -1,18 +1,18 @@
 package com.wavesplatform.events
 
 import java.nio.{ByteBuffer, ByteOrder}
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.grpc._
+import com.wavesplatform.api.grpc.*
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.events.Repo.keyForHeight
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
-import com.wavesplatform.events.api.grpc.protobuf._
-import com.wavesplatform.events.protobuf.serde._
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events.api.grpc.protobuf.*
+import com.wavesplatform.events.protobuf.serde.*
+import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -61,8 +61,9 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
   override def onProcessBlock(
       block: Block,
       diff: BlockDiffer.DetailedDiff,
-      minerReward: Option[Long],
-      blockchainBeforeWithMinerReward: Blockchain
+      reward: Option[Long],
+      hitSource: ByteStr,
+      blockchainBeforeWithReward: Blockchain
   ): Unit = monitor.synchronized {
     require(
       liquidState.forall(_.totalBlockId == block.header.reference),
@@ -73,7 +74,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
-    val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
+    val ba = BlockAppended.from(block, diff, blockchainBeforeWithReward, reward, hitSource)
     liquidState = Some(LiquidState(ba, Seq.empty))
     handlers.forEach(_.handleUpdate(ba))
   }
@@ -81,7 +82,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
       diff: BlockDiffer.DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): Unit = monitor.synchronized {
@@ -91,7 +92,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       s"Microblock reference ${microBlock.reference} does not match last block id ${liquidState.get.totalBlockId}"
     )
 
-    val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
+    val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
     liquidState = Some(ls.copy(microBlocks = ls.microBlocks :+ mba))
 
     handlers.forEach(_.handleUpdate(mba))
@@ -141,7 +142,8 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       RollbackResult(
         Seq(ba.block),
         ba.block.transactionData.map(_.id()).reverse,
-        ba.reverseStateUpdate
+        ba.reverseStateUpdate,
+        blockchainBefore.activatedFeatures.collect { case (id, activationHeight) if activationHeight == ba.height => id.toInt }.toSeq
       ),
       StateUpdate.referencedAssets(blockchainBefore, ba.transactionStateUpdates)
     )

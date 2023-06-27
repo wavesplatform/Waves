@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 
 object Expressions {
 
@@ -12,7 +14,9 @@ object Expressions {
   }
 
   object Pos {
-    def apply(start: Int, end: Int): Pos = RealPos(start, end)
+    def apply(start: Int, end: Int)(implicit offset: LibrariesOffset): Pos = RealPos(offset.shiftStart(start), offset.shiftEnd(end))
+    def apply(pos: Pos): Pos                                               = RealPos(pos.start, pos.end)
+    def fromShifted(start: Int, end: Int): Pos                             = RealPos(start, end)
 
     override def equals(obj: scala.Any): Boolean = super.equals(obj)
 
@@ -108,7 +112,7 @@ object Expressions {
   }
   case class Tuple(types: Seq[Type]) extends Type
 
-  type CtxOpt = Option[Map[String, Pos]]
+  type CtxOpt = Option[CompilerContext]
 
   case class FUNC(position: Pos, expr: EXPR, name: PART[String], args: Seq[(PART[String], Type)]) extends Declaration {
     val allowShadowing = false
@@ -153,7 +157,14 @@ object Expressions {
   }
   case class FUNCTION_CALL(position: Pos, name: PART[String], args: List[EXPR], resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 
-  case class GENERIC_FUNCTION_CALL(position: Pos, expr: EXPR, name: PART[String], `type`: Type, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
+  case class GENERIC_FUNCTION_CALL(
+      position: Pos,
+      expr: EXPR,
+      name: PART[String],
+      `type`: Type,
+      resultType: Option[FINAL] = None,
+      ctxOpt: CtxOpt = None
+  ) extends EXPR
 
   case class FOLD(position: Pos, limit: Int, list: EXPR, acc: EXPR, func: REF, resultType: Option[FINAL] = None, ctxOpt: CtxOpt = None) extends EXPR
 

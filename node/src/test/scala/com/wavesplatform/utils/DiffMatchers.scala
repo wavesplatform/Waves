@@ -10,7 +10,7 @@ trait DiffMatchers {
 
   class DiffAppliedTxMatcher(transactionId: ByteStr, shouldBeApplied: Boolean) extends Matcher[Diff] {
     override def apply(diff: Diff): MatchResult = {
-      val isApplied = diff.transactions.get(transactionId) match {
+      val isApplied = diff.transaction(transactionId) match {
         case Some(nt) if nt.applied => true
         case _                      => false
       }

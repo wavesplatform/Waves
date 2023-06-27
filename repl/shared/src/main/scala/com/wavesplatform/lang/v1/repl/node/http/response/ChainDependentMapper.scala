@@ -77,7 +77,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       generationSignature = b.`nxt-consensus`.`generation-signature`.byteStr,
       generator = b.generator.byteStr,
       generatorPublicKey = b.generatorPublicKey.byteStr,
-      vrf = b.VRF.map(_.byteStr)
+      vrf = b.VRF.map(_.byteStr),
+      rewards = List.empty // TODO: fill with correct value
     )
 
   def pkToAddress(publicKey: ByteString): ByteStr = {

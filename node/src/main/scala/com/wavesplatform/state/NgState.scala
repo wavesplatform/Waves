@@ -63,7 +63,7 @@ case class NgState(
       .toList
       .foldLeft[Either[String, Diff]](Right(diff)) {
         case (Right(d1), d2) => d1.combineF(d2)
-        case (r, _) => r
+        case (r, _)          => r
       }
 
   def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
@@ -74,7 +74,8 @@ case class NgState(
         (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
       else
         internalCaches.blockDiffCache.get(
-          totalResBlockRef, { () =>
+          totalResBlockRef,
+          { () =>
             microBlocks.find(_.idEquals(totalResBlockRef)) match {
               case Some(MicroBlockInfo(blockId, current)) =>
                 val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
@@ -113,10 +114,9 @@ case class NgState(
       }
 
   def totalDiffOf(id: BlockId): Option[(Block, Diff, Long, Long, DiscardedMicroBlocks)] =
-    forgeBlock(id).map {
-      case (block, discarded) =>
-        val (diff, carry, totalFee) = this.diffFor(id)
-        (block, diff, carry, totalFee, discarded)
+    forgeBlock(id).map { case (block, discarded) =>
+      val (diff, carry, totalFee) = this.diffFor(id)
+      (block, diff, carry, totalFee, discarded)
     }
 
   def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
@@ -177,14 +177,20 @@ case class NgState(
 
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
     internalCaches.forgedBlockCache.get(
-      blockId, { () =>
+      blockId,
+      { () =>
         val microBlocksAsc = microBlocks.reverse
 
         if (base.id() == blockId) {
-          Some((base, microBlocksAsc.toVector.map { mb =>
-            val diff = microDiffs(mb.totalBlockId).diff
-            (mb.microBlock, diff)
-          }))
+          Some(
+            (
+              base,
+              microBlocksAsc.toVector.map { mb =>
+                val diff = microDiffs(mb.totalBlockId).diff
+                (mb.microBlock, diff)
+              }
+            )
+          )
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {
           val (accumulatedTxs, maybeFound) = microBlocksAsc.foldLeft((Vector.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) {
@@ -200,9 +206,8 @@ case class NgState(
               (accumulated ++ mb.transactionData, None)
           }
 
-          maybeFound.map {
-            case (sig, discarded) =>
-              (Block.create(base, base.transactionData ++ accumulatedTxs, sig), discarded)
+          maybeFound.map { case (sig, discarded) =>
+            (Block.create(base, base.transactionData ++ accumulatedTxs, sig), discarded)
           }
         }
       }

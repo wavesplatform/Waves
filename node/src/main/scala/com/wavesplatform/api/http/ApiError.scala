@@ -58,8 +58,10 @@ object ApiError {
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
-          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
-          case e: TxValidationError.FailedTransactionError if e.isExecutionError => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError if e.isAssetExecution => ScriptExecutionError(tx, e.message, isTokenScript = true)
+          case e: TxValidationError.FailedTransactionError if e.isDAppExecution  => InvokeExecutionError(tx, e.message)
+          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.message)
           case _: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
           case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
@@ -256,6 +258,13 @@ object ApiError {
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 
+  final case class InvokeExecutionError(tx: Transaction, error: String) extends ApiError {
+    override val id: Int             = ScriptExecutionError.Id
+    override val code: StatusCode    = StatusCodes.BadRequest
+    override val message: String     = s"Error while executing dApp: $error"
+    override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
+  }
+
   case object ScriptExecutionError {
     val Id = 306
   }
@@ -301,6 +310,13 @@ object ApiError {
     val id: Int          = 313
     val message: String  = s"Asset does not exist: $assetId"
     val code: StatusCode = StatusCodes.NotFound
+  }
+
+  case class AssetsDoesNotExist(ids: Seq[IssuedAsset]) extends ApiError {
+    val id: Int                      = 314
+    val message: String              = s"Asset does not exist. ${ids.map(_.id.toString).mkString(", ")}"
+    val code: StatusCode             = StatusCodes.BadRequest
+    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
   }
 
   final case class NegativeAmount(msg: String) extends ApiError {
@@ -412,6 +428,30 @@ object ApiError {
   case object InvalidAssetId extends ApiError {
     override val id      = 4007
     override val message = "Invalid asset id"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object ServerRequestTimeout extends ApiError {
+    override val id: Int         = 5031
+    override val code            = StatusCodes.ServiceUnavailable
+    override val message: String = "The server was not able to produce a timely response to request"
+  }
+
+  case object DataKeysNotSpecified extends ApiError {
+    override val id      = 4008
+    override val message = "Key was not specified"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object AssetIdNotSpecified extends ApiError {
+    override val id      = 4009
+    override val message = "Asset ID was not specified"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object ConflictingRequestStructure extends ApiError {
+    override val id      = 198
+    override val message = "Conflicting request structure. Both expression and invocation structure were sent"
     override val code    = StatusCodes.BadRequest
   }
 }

@@ -1,0 +1,116 @@
+{
+  funcs: [
+    {
+      name: "cons"
+      params: [ "A", "List[B]" ]
+      doc: "Prepends a new element to the list."
+      paramsDoc: [ "The element.", "The list." ]
+      complexity: 1
+    }
+    {
+      name: "size"
+      params: [ "List[T]" ]
+      doc: "Returns the size of a list."
+      paramsDoc: [ "The list." ]
+      complexity: 2
+    }
+	{
+      name: "getElement"
+      params: [ "List[T]", "Int" ]
+      doc: "Gets an element from a list by index."
+      paramsDoc: [ "The list.", "The index of the element." ]
+      complexity: 2
+    }
+    {
+      name: "median"
+      params: [ "List[Int]" ]
+      doc: "Returns the median of the list."
+      paramsDoc: [ "The list of integers." ]
+      complexity: 20
+    }
+    {
+      name: "median"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the median of the list."
+      paramsDoc: [ "The list of BigInt." ]
+      complexity: 160
+    }
+    {
+      name: "min"
+      params: [ "List[Int]" ]
+      doc: "Returns the minimum of the list."
+      paramsDoc: [ "The list of integers." ]
+      complexity: 3
+    }
+    {
+      name: "max"
+      params: [ "List[Int]" ]
+      doc: "Returns the maximum of the list."
+      paramsDoc: [ "The list of integers." ]
+      complexity: 3
+    }
+    {
+      name: "min"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the minimum of the list."
+      paramsDoc: [ "The list of big integers." ]
+      complexity: 192
+    }
+    {
+      name: "max"
+      params: [ "List[BigInt]" ]
+      doc: "Returns the maximum of the list."
+      paramsDoc: [ "The list of big integers." ]
+      complexity: 192
+    }
+    {
+      name: "indexOf"
+      params: [ "List[T]", "T" ]
+      doc: "Returns the index of the first occurrence of given value"
+      paramsDoc: [ "The list.", "The element." ]
+      complexity: 5
+    }
+    {
+      name: "lastIndexOf"
+      params: [ "List[T]", "T" ]
+      doc: "Returns the index of the last occurrence of given value"
+      paramsDoc: [ "The list.", "The element." ]
+      complexity: 5
+    }
+    {
+      name: "containsElement"
+      params: [ "List[T]", "T" ]
+      doc: "Tests whether the list contains a given value as an element"
+      paramsDoc: [ "The list.", "The element." ]
+      complexity: 5
+    }
+	{
+      name: "makeString"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 70. Output string size limit = 500 bytes"
+      paramsDoc: [ "The list of strings.", "The separator" ]
+      complexity: 1
+    }
+	{
+      name: "makeString_2C"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 100. Output string size limit = 6000 bytes"
+      paramsDoc: [ "The list of strings.", "The separator" ]
+      complexity: 2
+    }
+	{
+      name: "makeString_11C"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 1000. Output string size limit = 32767 bytes"
+      paramsDoc: [ "The list of strings.", "The separator" ]
+      complexity: 11
+    }
+	{
+      name: "removeByIndex"
+      params: [ "List[T]", "Int" ]
+      doc: "Removes the element at given index from the list and returns new list."
+      paramsDoc: [ "The list.", "The element." ]
+      complexity: 7
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetInfo, ordType, orderObject, transactionObject}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.traits.Environment
@@ -18,9 +19,10 @@ object Vals {
   def tx(
       isTokenContext: Boolean,
       version: StdLibVersion,
-      proofsEnabled: Boolean
+      proofsEnabled: Boolean,
+      fixBigScriptField: Boolean
   ): (String, (UNION, ContextfulVal[Environment])) =
-    ("tx", (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled)))
+    (Tx, (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled, fixBigScriptField)))
 
   private def scriptInputType(isTokenContext: Boolean, version: StdLibVersion, proofsEnabled: Boolean) =
     if (isTokenContext)
@@ -28,13 +30,13 @@ object Vals {
     else
       UNION(buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version))
 
-  private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean): ContextfulVal[Environment] =
+  private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean, fixBigScriptField: Boolean): ContextfulVal[Environment] =
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later(
           env.inputEntity
             .eliminate(
-              tx => transactionObject(tx, proofsEnabled, version).asRight[ExecutionError],
+              tx => transactionObject(tx, proofsEnabled, version, fixBigScriptField).asRight[ExecutionError],
               _.eliminate(
                 o => orderObject(o, proofsEnabled, version).asRight[ExecutionError],
                 _.eliminate(
@@ -105,18 +107,18 @@ object Vals {
         }
     }
 
-  def lastBlock(version: StdLibVersion) = ("lastBlock", (blockInfo(version), lastBlockVal(version)))
+  def lastBlock(version: StdLibVersion) = (LastBlock, (blockInfo(version), lastBlockVal(version)))
 
   val sellOrdTypeVal: ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
   val buyOrdTypeVal: ContextfulVal[Environment]  = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
 
-  val sell = ("Sell", (ordTypeType, sellOrdTypeVal))
-  val buy  = ("Buy", (ordTypeType, buyOrdTypeVal))
+  val sell = (Sell, (ordTypeType, sellOrdTypeVal))
+  val buy  = (Buy, (ordTypeType, buyOrdTypeVal))
 
-  val height: (String, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
+  val height: (String, (LONG.type, ContextfulVal[Environment])) = (Height, (LONG, heightVal))
 
-  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
+  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = (This, (addressType, accountThisVal))
   def assetThis(version: StdLibVersion): (String, (CASETYPEREF, ContextfulVal[Environment])) =
-    ("this", (assetType(version), assetThisVal(version)))
+    (This, (assetType(version), assetThisVal(version)))
 
 }

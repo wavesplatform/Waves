@@ -201,7 +201,7 @@ object UtilApp {
     )
   }
 
-  //noinspection TypeAnnotation
+  // noinspection TypeAnnotation
   private[this] final class NodeState(c: Command) {
     lazy val settings = Application.loadApplicationConfig(c.configFile.map(new File(_)))
     lazy val wallet   = Wallet(settings.walletSettings)
@@ -211,7 +211,7 @@ object UtilApp {
   private[this] object Actions {
     type ActionResult = Either[String, Array[Byte]]
 
-    //noinspection ScalaDeprecation
+    // noinspection ScalaDeprecation
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
       ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator)
         .map(_._1.bytes().arr)
@@ -231,7 +231,11 @@ object UtilApp {
       Right(com.wavesplatform.crypto.sign(c.signOptions.privateKey, data).arr)
 
     def doVerify(c: Command, data: Array[Byte]): ActionResult =
-      Either.cond(com.wavesplatform.crypto.verify(c.verifyOptions.signature, data, c.verifyOptions.publicKey, c.verifyOptions.checkWeakPk), data, "Invalid signature")
+      Either.cond(
+        com.wavesplatform.crypto.verify(c.verifyOptions.signature, data, c.verifyOptions.publicKey, c.verifyOptions.checkWeakPk),
+        data,
+        "Invalid signature"
+      )
 
     def doCreateKeyPair(c: Command, data: Array[Byte]): ActionResult =
       KeyPair

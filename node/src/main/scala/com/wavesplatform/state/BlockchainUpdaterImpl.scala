@@ -1,7 +1,5 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
-
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -12,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
@@ -27,6 +26,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain & Storage,
@@ -81,7 +82,7 @@ class BlockchainUpdaterImpl(
       ngState
         .flatMap(_.totalDiffOf(id))
         .map { case (_, diff, _, _, _) =>
-          diff.transactions.values.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 
@@ -152,34 +153,42 @@ class BlockchainUpdaterImpl(
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
-    leveldb
-      .featureActivationHeight(BlockchainFeatures.BlockReward.id)
-      .filter(_ <= nextHeight)
-      .flatMap { activatedAt =>
-        val mayBeReward     = lastBlockReward
-        val mayBeTimeToVote = nextHeight - activatedAt
+    if (height == 0 && leveldb.featureActivationHeight(ConsensusImprovements.id).exists(_ <= 1))
+      None
+    else
+      leveldb
+        .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+        .filter(_ <= nextHeight)
+        .flatMap { activatedAt =>
+          val mayBeReward     = lastBlockReward
+          val mayBeTimeToVote = nextHeight - activatedAt
+          val modifiedTerm = if (leveldb.isFeatureActivated(BlockchainFeatures.CappedReward, this.height)) {
+            settings.termAfterCappedRewardFeature
+          } else {
+            settings.term
+          }
 
-        mayBeReward match {
-          case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
-            Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
-          case None if mayBeTimeToVote >= 0 =>
-            Some((Seq(), settings.initial))
-          case _ => None
+          mayBeReward match {
+            case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % modifiedTerm == 0 =>
+              Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
+            case None if mayBeTimeToVote >= 0 =>
+              Some((Seq(), settings.initial))
+            case _ => None
+          }
         }
-      }
-      .flatMap { case (votes, currentReward) =>
-        val lt        = votes.count(_ < currentReward)
-        val gt        = votes.count(_ > currentReward)
-        val threshold = settings.votingInterval / 2 + 1
+        .flatMap { case (votes, currentReward) =>
+          val lt        = votes.count(_ < currentReward)
+          val gt        = votes.count(_ > currentReward)
+          val threshold = settings.votingInterval / 2 + 1
 
-        if (lt >= threshold)
-          Some(math.max(currentReward - settings.minIncrement, 0))
-        else if (gt >= threshold)
-          Some(currentReward + settings.minIncrement)
-        else
-          Some(currentReward)
-      }
-      .orElse(lastBlockReward)
+          if (lt >= threshold)
+            Some(math.max(currentReward - settings.minIncrement, 0))
+          else if (gt >= threshold)
+            Some(currentReward + settings.minIncrement)
+          else
+            Some(currentReward)
+        }
+        .orElse(lastBlockReward)
   }
 
   override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Seq[Diff]] =
@@ -219,7 +228,7 @@ class BlockchainUpdaterImpl(
                     .map { r =>
                       val updatedBlockchain = CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
                       miner.scheduleMining(Some(updatedBlockchain))
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, hitSource, referencedBlockchain)
                       Option((r, Nil, reward, hitSource))
                     }
               }
@@ -247,7 +256,7 @@ class BlockchainUpdaterImpl(
                       )
                       val (mbs, diffs) = ng.allDiffs.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
@@ -272,7 +281,7 @@ class BlockchainUpdaterImpl(
                         verify
                       )
                       .map { r =>
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
                         Some((r, Nil, ng.reward, hitSource))
                       }
                   }
@@ -333,11 +342,11 @@ class BlockchainUpdaterImpl(
                           block,
                           hitSource,
                           differResult.carry,
-                          reward
+                          None
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
 
                         leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
@@ -573,7 +582,8 @@ class BlockchainUpdaterImpl(
           case None => leveldb.blockRewardVotes(height)
           case Some(ng) =>
             val innerVotes = leveldb.blockRewardVotes(height)
-            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height).contains(height))
+            val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
+            if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height, modifyTerm).contains(height))
               innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }

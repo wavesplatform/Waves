@@ -3,7 +3,7 @@ package com.wavesplatform.serialization
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.{ApiMarshallers, TransactionsApiRoute}
+import com.wavesplatform.api.http.{ApiMarshallers, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
@@ -15,10 +15,11 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils.JsonMatchers
+import com.wavesplatform.utils.{JsonMatchers, SharedSchedulerMixin}
 import play.api.libs.json.*
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class EvaluatedPBSerializationTest
     extends PropSpec
@@ -26,7 +27,8 @@ class EvaluatedPBSerializationTest
     with RestAPISettingsHelper
     with ScalatestRouteTest
     with JsonMatchers
-    with ApiMarshallers {
+    with ApiMarshallers
+    with SharedSchedulerMixin {
 
   property("correctly serialize/deserialize EVALUATED args for callable functions") {
     val masterDApp  = TxHelpers.signer(1)
@@ -56,23 +58,22 @@ class EvaluatedPBSerializationTest
         "ByteVector",
         "Int"
       )
-    ).foreach {
-      case (argValue, argType) =>
-        withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(masterDApp, serviceDApp, invoker)) { d =>
-          val setMasterScript  = TxHelpers.setScript(masterDApp, masterScript(argValue, serviceDApp.toAddress))
-          val setServiceScript = TxHelpers.setScript(serviceDApp, serviceScript)
-          val invoke           = TxHelpers.invoke(masterDApp.toAddress, Some("test"), Seq.empty, invoker = invoker)
+    ).foreach { case (argValue, argType) =>
+      withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(masterDApp, serviceDApp, invoker)) { d =>
+        val setMasterScript  = TxHelpers.setScript(masterDApp, masterScript(argValue, serviceDApp.toAddress))
+        val setServiceScript = TxHelpers.setScript(serviceDApp, serviceScript)
+        val invoke           = TxHelpers.invoke(masterDApp.toAddress, Some("test"), Seq.empty, invoker = invoker)
 
-          val route = transactionsApiRoute(d).route
+        val route = transactionsApiRoute(d).route
 
-          d.appendBlock(setMasterScript, setServiceScript)
+        d.appendBlock(setMasterScript, setServiceScript)
 
-          d.appendBlock(invoke)
-          checkTxInfoResult(invoke, argType)(route)
+        d.appendBlock(invoke)
+        checkTxInfoResult(invoke, argType)(route)
 
-          d.appendKeyBlock()
-          checkTxInfoResult(invoke, argType)(route)
-        }
+        d.appendKeyBlock()
+        checkTxInfoResult(invoke, argType)(route)
+      }
     }
   }
 
@@ -117,6 +118,7 @@ class EvaluatedPBSerializationTest
     d.blockchain,
     () => d.utxPool.size,
     (_, _) => Future.successful(TracedResult(Right(true))),
-    ntpTime
+    ntpTime,
+    new RouteTimeout(60.seconds)(sharedScheduler)
   )
 }

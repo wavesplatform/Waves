@@ -1,22 +1,22 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state._
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test._
+import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.*
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import org.scalacheck.Gen
 
 class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenarioDrivenPropertyCheck {
+  private val time = new TestTime
+  private def ts   = time.getTimestamp()
 
   private val amtTx = 100000
 
@@ -26,7 +26,6 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
   val sponsorPreconditions: Gen[Setup] = for {
 
     master                      <- accountGen
-    ts                          <- timestampGen
     transferAssetWavesFee       <- smallFeeGen
     _                           <- accountGen
     alice                       <- accountGen
@@ -90,33 +89,29 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
+      .copy(
+        featureCheckBlocksPeriod = 1,
+        blocksForFeatureActivation = 1,
+        preActivatedFeatures = Map(
           BlockchainFeatures.FeeSponsorship.id -> 0,
           BlockchainFeatures.NG.id             -> 0,
           BlockchainFeatures.BlockV5.id        -> 0
-        ))
+        )
+      )
   )
 
   val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)
 
   property("not enough waves to sponsor sponsored tx") {
     scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {
-      case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
-        val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
-        val block1 =
-          customBuildBlockOfTxs(microBlocks.last.totalResBlockSig, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
-        val block2 = customBuildBlockOfTxs(block1.id(), Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
-        val block3 = buildBlockOfTxs(block2.id(), Seq(aliceToBob, bobToMaster))
-        val block4 = buildBlockOfTxs(block3.id(), Seq(bobToMaster2))
-
-        domain.blockchainUpdater.processBlock(block0) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should beRight
-        domain.blockchainUpdater.processBlock(block1) should beRight
-        domain.blockchainUpdater.processBlock(block2) should beRight
-        domain.blockchainUpdater.processBlock(block3) should beRight
-        domain.blockchainUpdater.processBlock(block4) should produce("negative waves balance" /*"unavailable funds"*/ )
+      case (d, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
+        d.appendBlock(genesis)
+        d.appendBlock()
+        d.appendMicroBlock(masterToAlice)
+        d.appendMicroBlock(feeAsset)
+        d.appendMicroBlock(sponsor)
+        d.appendBlock(aliceToBob, bobToMaster)
+        d.appendBlockE(bobToMaster2) should produce("negative waves balance" /*"unavailable funds"*/ )
     }
   }
 

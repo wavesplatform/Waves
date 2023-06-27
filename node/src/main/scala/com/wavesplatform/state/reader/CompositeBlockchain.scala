@@ -32,6 +32,11 @@ final class CompositeBlockchain private (
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
+  private lazy val indexedIssuedAssets: Map[IssuedAsset, (NewAssetInfo, Int)] =
+    Map.empty ++
+      diff.issuedAssets.zipWithIndex
+        .map { case ((asset, info), i) => asset -> (info, i + 1) }
+
   override def balance(address: Address, assetId: Asset): Long =
     inner.balance(address, assetId) + diff.portfolios.get(address).fold(0L)(_.balanceOf(assetId))
 
@@ -44,7 +49,13 @@ final class CompositeBlockchain private (
       .getOrElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
-    CompositeBlockchain.assetDescription(asset, maybeDiff.getOrElse(Diff.empty), inner.assetDescription(asset))
+    CompositeBlockchain.assetDescription(
+      asset,
+      maybeDiff.getOrElse(Diff.empty),
+      height,
+      indexedIssuedAssets,
+      inner.assetDescription(asset)
+    )
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
     inner
@@ -53,22 +64,22 @@ final class CompositeBlockchain private (
       .orElse(diff.leaseState.get(leaseId))
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    diff.transactions
-      .get(id)
+    diff
+      .transaction(id)
       .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
-    diff.transactions
-      .get(id)
+    diff
+      .transaction(id)
       .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
-    diff.transactions
-      .get(id)
+    diff
+      .transaction(id)
       .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
@@ -80,7 +91,7 @@ final class CompositeBlockchain private (
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
+  override def containsTransaction(tx: Transaction): Boolean = diff.transaction(tx.id()).isDefined || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
@@ -198,11 +209,13 @@ object CompositeBlockchain {
   private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
+      height: Int,
+      indexedIssuedAssets: Map[IssuedAsset, (NewAssetInfo, Int)],
       innerAssetDescription: => Option[AssetDescription]
   ): Option[AssetDescription] = {
-    diff.issuedAssets
+    indexedIssuedAssets
       .get(asset)
-      .map { case NewAssetInfo(static, info, volume) =>
+      .map { case (NewAssetInfo(static, info, volume), assetNum) =>
         AssetDescription(
           static.source,
           static.issuer,
@@ -214,7 +227,9 @@ object CompositeBlockchain {
           info.lastUpdatedAt,
           None,
           0L,
-          static.nft
+          static.nft,
+          assetNum,
+          Height @@ height
         )
       }
       .orElse(innerAssetDescription)

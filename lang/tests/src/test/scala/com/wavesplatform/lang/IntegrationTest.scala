@@ -15,12 +15,13 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
@@ -50,8 +51,6 @@ class IntegrationTest extends PropSpec with Inside {
       version: StdLibVersion,
       env: C[Id]
   ): Either[String, T] = {
-    val untyped = Parser.parseExpr(code).get.value
-
     val f: BaseFunction[C] =
       NativeFunction(
         "fn1",
@@ -90,14 +89,17 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val compiled = ExpressionCompiler(ctx.compilerContext, untyped)
+    val compiled = ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext)
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
-      EvaluatorV2.applyCompleted(evalCtx, v._1, version, correctFunctionCallScope = true, newMode = true)._3.bimap(_.message, _.asInstanceOf[T])
+      EvaluatorV2
+        .applyCompleted(evalCtx, v._1, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true)
+        ._3
+        .bimap(_.message, _.asInstanceOf[T])
     )
   }
 
-  private val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet())
+  private val v5Ctx = WavesContext.build(Global, DirectiveSet(V5, Account, DApp).explicitGet(), fixBigScriptField = true)
 
   property("simple let") {
     val src =
@@ -117,7 +119,7 @@ class IntegrationTest extends PropSpec with Inside {
         |  case _ => throw()
         |}
       """.stripMargin
-    eval[EVALUATED](src) should produce("can't parse the expression")
+    eval[EVALUATED](src) should produce("Parse error: expected expression in 40-62")
   }
 
   property("Exception handling") {
@@ -285,7 +287,7 @@ class IntegrationTest extends PropSpec with Inside {
   }
 
   def compile(script: String): Either[String, Terms.EXPR] =
-    ExpressionCompiler.compileBoolean(script, CTX.empty.compilerContext)
+    ExpressionCompiler.compileBoolean(script, NoLibraries, CTX.empty.compilerContext)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")
@@ -951,7 +953,7 @@ class IntegrationTest extends PropSpec with Inside {
          |    }
          |    WriteSet(result)
          | }
-         |
+         | true
       """.stripMargin
 
     eval[EVALUATED](script, None) should produce("expected: List[T], actual: List[DataEntry]|String")
@@ -1077,6 +1079,7 @@ class IntegrationTest extends PropSpec with Inside {
          |   ScriptTransfer(Address(base58'bbbb'), 2,   base58'xxx')
          | ]
          | let ts = TransferSet(tsArr)
+         | true
        """.stripMargin
 
     val scriptResultScript =
@@ -1086,7 +1089,7 @@ class IntegrationTest extends PropSpec with Inside {
          |
        """.stripMargin
 
-    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
 
     genericEval[Environment, EVALUATED](
       writeSetScript,
@@ -1384,7 +1387,7 @@ class IntegrationTest extends PropSpec with Inside {
          | calculateAssetId(issue)
       """.stripMargin
 
-    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
@@ -1397,7 +1400,7 @@ class IntegrationTest extends PropSpec with Inside {
         | Issue("name", "description", 1234567, 100, true, unit, 0)
      """.stripMargin
 
-    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       Right(CONST_BOOLEAN(true))
@@ -1601,7 +1604,7 @@ class IntegrationTest extends PropSpec with Inside {
         ("true", "Boolean"),
         ("123", "Int"),
         ("base58'aaaa'", "ByteVector"),
-        ("unit", "Unit")
+        (GlobalValNames.Unit, "Unit")
       ) #::: getElement
 
     /*  Example for size = 2
@@ -1975,7 +1978,7 @@ class IntegrationTest extends PropSpec with Inside {
         | entries[0] == deleteEntry
       """.stripMargin
 
-    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+    val ctx = WavesContext.build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), fixBigScriptField = true)
     genericEval(script, ctxt = ctx, version = V4, env = utils.environment) shouldBe Right(CONST_BOOLEAN(true))
   }
 

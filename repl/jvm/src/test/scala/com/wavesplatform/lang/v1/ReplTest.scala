@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1
 
 import cats.Functor
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient.ResponseWrapper
@@ -44,8 +45,8 @@ class ReplTest extends AnyPropSpec with Matchers {
 
   property("syntax errors") {
     val repl = Repl()
-    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: [expected a value's expression in 9-9]")
-    await(repl.execute(""" 1 %% 2 """)) shouldBe Left("Compilation failed: [expected a second operator in 4-4]")
+    await(repl.execute("""let a = {{1}""")) shouldBe Left("Can't parse 'let a = {{1}'")
+    await(repl.execute("""1 %% 2""")) shouldBe Left("Compilation failed: [expected a second operator in 3-3]")
   }
 
   property("logic errors") {
@@ -153,7 +154,7 @@ class ReplTest extends AnyPropSpec with Matchers {
     val repl = Repl()
     await(repl.execute("let a = 5"))
     repl.info("a") shouldBe "let a: Int"
-    repl.info("unit") shouldBe "let unit: Unit"
+    repl.info(GlobalValNames.Unit) shouldBe "let unit: Unit"
   }
 
   property("state reassign") {
