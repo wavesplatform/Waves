@@ -25,7 +25,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
   val BlockV5Settings: FunctionalitySettings = NgAndSponsorshipSettings.copy(preActivatedFeatures = NgAndSponsorshipSettings.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
   property("SponsorFee serialization roundtrip") {
-    forAll(sponsorFeeGen) { tx: SponsorFeeTransaction =>
+    forAll(sponsorFeeGen) { (tx: SponsorFeeTransaction) =>
       val recovered = SponsorFeeTransaction.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
@@ -57,7 +57,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
   }
 
   property("SponsorFee serialization from TypedTransaction") {
-    forAll(sponsorFeeGen) { transaction: SponsorFeeTransaction =>
+    forAll(sponsorFeeGen) { (transaction: SponsorFeeTransaction) =>
       val recovered = TransactionParsers.parseBytes(transaction.bytes()).get
       recovered.bytes() shouldEqual transaction.bytes()
     }
@@ -146,7 +146,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     )
 
   property("sponsorship negative fee") {
-    forAll(invalidFee) { fee: Long =>
+    forAll(invalidFee) { (fee: Long) =>
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
@@ -173,7 +173,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
   }
 
   property("cancel sponsorship negative fee") {
-    forAll(invalidFee) { fee: Long =>
+    forAll(invalidFee) { (fee: Long) =>
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen

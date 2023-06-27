@@ -6,8 +6,8 @@ import java.util.concurrent.{ConcurrentMap, TimeUnit}
 import com.wavesplatform.network.Handshake.InvalidHandshakeException
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
+import io.netty.channel.*
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.AttributeKey
@@ -32,7 +32,7 @@ class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void
 case object HandshakeTimeoutExpired
 
 class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  private var timeout: Option[ScheduledFuture[_]] = None
+  private var timeout: Option[ScheduledFuture[?]] = None
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
 
@@ -78,7 +78,7 @@ abstract class HandshakeHandler(
 ) extends ChannelInboundHandlerAdapter
     with ScorexLogging {
 
-  import HandshakeHandler._
+  import HandshakeHandler.*
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case remoteHandshake: Handshake =>
@@ -108,7 +108,7 @@ abstract class HandshakeHandler(
               Option(ctx.channel().attr(ConnectionStartAttributeKey).get()).foreach { start =>
                 log.trace(s"Time taken to accept handshake = ${System.currentTimeMillis() - start} ms")
               }
-              ctx.channel().closeFuture().addListener { f: ChannelFuture =>
+              ctx.channel().closeFuture().addListener { (f: ChannelFuture) =>
                 peerConnections.remove(key, f.channel())
                 establishedConnections.remove(f.channel())
                 log.trace(s"${id(f.channel())} was closed")
@@ -139,9 +139,9 @@ abstract class HandshakeHandler(
 
 object HandshakeHandler {
 
-  val NodeNameAttributeKey        = AttributeKey.newInstance[String]("name")
-  val NodeVersionAttributeKey     = AttributeKey.newInstance[(Int, Int, Int)]("version")
-  val ConnectionStartAttributeKey = AttributeKey.newInstance[Long]("connectionStart")
+  val NodeNameAttributeKey: AttributeKey[String]             = AttributeKey.newInstance[String]("name")
+  val NodeVersionAttributeKey: AttributeKey[(Int, Int, Int)] = AttributeKey.newInstance[(Int, Int, Int)]("version")
+  private val ConnectionStartAttributeKey                    = AttributeKey.newInstance[Long]("connectionStart")
 
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
     (remoteVersion._1 == 0 && remoteVersion._2 >= 13) || (remoteVersion._1 == 1 && remoteVersion._2 >= 0)

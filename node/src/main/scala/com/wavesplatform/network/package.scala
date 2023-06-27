@@ -81,7 +81,7 @@ package object network {
         .writeAndFlush(message, { (channel: Channel) =>
           !except.contains(channel)
         })
-        .addListener { _: ChannelGroupFuture =>
+        .addListener { (_: ChannelGroupFuture) =>
           st.stop()
         }
     }
