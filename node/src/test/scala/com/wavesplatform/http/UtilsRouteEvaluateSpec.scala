@@ -9,6 +9,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -504,17 +505,23 @@ class UtilsRouteEvaluateSpec
       }
     }
 
-    "invocation with state" in {
-      val callerKeyPair          = signer(1)
-      val scriptTransferReceiver = signer(2)
+    "invocation with state" - {
+      val callerKeyPair = signer(1)
 
-      val issueTx1, issueTx2 = issue(issuer = scriptTransferReceiver)
-      val asset1             = IssuedAsset(issueTx1.id())
-      val asset2             = IssuedAsset(issueTx2.id())
+      val scriptTransferReceiver        = signer(2)
+      val scriptTransferReceiverAddress = scriptTransferReceiver.toAddress
+
+      val assetIssuer        = signer(3)
+      val assetIssuerAddress = assetIssuer.toAddress
+
+      val issueTx = issue(issuer = assetIssuer)
+      val asset   = IssuedAsset(issueTx.id())
+
+      val defaultInvocationFee = 1234567
 
       def toRide(asset: Asset) = asset.fold("unit")(id => s"base58'$id'")
 
-      def dAppWithTransfer(assets: Asset*) = {
+      def dAppWithTransfer(assetAndAmounts: (Asset, Int)*): Script = {
         def toScriptTransfer(asset: Asset, amount: Int): String = s"ScriptTransfer(receiver, $amount, ${toRide(asset)})"
 
         TestCompiler(V6).compileContract(
@@ -522,13 +529,12 @@ class UtilsRouteEvaluateSpec
              | @Callable(i)
              | func default() = {
              |   let receiver = Address(base58'${scriptTransferReceiver.toAddress}')
-             |   [ ${assets.zipWithIndex.map { case (asset, i) => toScriptTransfer(asset, i + 1) }.mkString(", ")} ]
-             | }
-       """.stripMargin
+             |   [ ${assetAndAmounts.map { case (asset, amount) => toScriptTransfer(asset, amount) }.mkString(", ")} ]
+             | }""".stripMargin
         )
       }
 
-      def invocationWithPayment(feeAsset: Asset, paymentAssets: Asset*) = {
+      def invocationWithPayment(feeAsset: Asset, state: JsObject, paymentAssets: (Asset, Int)*) = {
         def toPaymentJson(asset: Asset, amount: Int): String =
           s""" {
              |   "assetId": ${Json.toJson(asset)},
@@ -542,54 +548,187 @@ class UtilsRouteEvaluateSpec
                |    "function": "default"
                |  },
                |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
-               |  "fee": 1234567,
+               |  "fee": $defaultInvocationFee,
                |  "feeAssetId": ${Json.toJson(feeAsset)},
                |  "sender": "${callerKeyPair.toAddress}",
                |  "senderPublicKey": "${callerKeyPair.publicKey}",
                |  "payment": [
-               |    ${paymentAssets.zipWithIndex.map { case (asset, i) => toPaymentJson(asset, i + 1) }.mkString(",\n")}
+               |    ${paymentAssets.map(Function.tupled(toPaymentJson)).mkString(",\n")}
                |  ],
-               |  "state": {
-               |    "accounts": {
-               |      "${callerKeyPair.toAddress}": {
-               |        "assetBalances": {
-               |          "$asset1": "11",
-               |          "$asset2": 12
-               |        },
-               |        "regularBalance": 10000000
-               |      }
-               |    }
-               |  }
+               |  "state": ${Json.prettyPrint(state)} 
                | }""".stripMargin.tap(println)
           )
           .as[JsObject]
       }
 
-      // TODO test: override with a smaller
-      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, callerKeyPair, scriptTransferReceiver)) { d =>
-        val route = utilsApi.copy(blockchain = d.blockchain).route
-        d.appendBlock(
-          issueTx1,
-          issueTx2
-//          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset1, amount = 10),
-//          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset2, amount = 10)
-        )
-        d.appendBlock(setScript(defaultSigner, dAppWithTransfer(asset1, asset2)))
+      val sponsorshipTx = sponsor(asset, Some(100000), assetIssuer)
 
-        //
-        Post(routePath(s"/script/evaluate/$dAppAddress"), invocationWithPayment(Asset.Waves, asset1, asset2)) ~> route ~> check {
+      def mkSetScriptTx(transferAssetAmounts: (Asset, Int)*) = setScript(dAppAccount, dAppWithTransfer(transferAssetAmounts*))
+      val defaultSetScriptTx                                 = mkSetScriptTx(asset -> 1)
+
+      def mkBlockchainOverrides(callerWavesBalance: Int, callerAssetBalance: Option[Int] = None) = Json.obj(
+        "accounts" -> Json.obj(
+          callerKeyPair.toAddress.toString -> Json
+            .obj("regularBalance" -> callerWavesBalance)
+            .deepMerge(callerAssetBalance.fold(Json.obj()) { callerAssetBalance =>
+              Json.obj(
+                "assetBalances" -> Json.obj(
+                  asset.toString -> callerAssetBalance
+                )
+              )
+            })
+        )
+      )
+
+      println(s"""== Accounts ==
+                 |dApp:                   $dAppAddress
+                 |caller:                 ${callerKeyPair.toAddress}
+                 |scriptTransferReceiver: $scriptTransferReceiverAddress
+                 |assetIssuer:            $assetIssuerAddress
+                 |
+                 |== Assets ==
+                 |asset1: $asset
+                 |""".stripMargin)
+
+      val defaultState = mkBlockchainOverrides(defaultInvocationFee, Some(11))
+
+      // TODO test: override with a smaller
+      // TODO test: default address?
+      // TODO test: generating balance
+
+      val setScriptTransferWavesTx = mkSetScriptTx(Asset.Waves -> 1)
+      "Basic transfers: fee=Waves, payment=Waves" in withDomain(
+        RideV6,
+        Seq(AddrWithBalance(dAppAddress, setScriptTransferWavesTx.fee.value))
+      ) { d =>
+        val route = utilsApi.copy(blockchain = d.blockchain).route
+        d.appendBlock(setScriptTransferWavesTx)
+        Post(
+          routePath(s"/script/evaluate/$dAppAddress"),
+          invocationWithPayment(
+            feeAsset = Asset.Waves,
+            state = mkBlockchainOverrides(callerWavesBalance = defaultInvocationFee + 1), // 1 for payment
+            paymentAssets = Asset.Waves -> 1
+          )
+        ) ~> route ~> check {
           val json = responseAs[JsValue]
-          println(s"== Response ==\n${Json.prettyPrint(json)}")
+          withClue(Json.prettyPrint(json)) {
+            (json \ "error").toOption shouldBe empty
+          }
           (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
             Json.obj(
               "address" -> scriptTransferReceiver.toAddress.toString,
-              "asset"   -> asset1.toString,
+              "asset"   -> None,
               "amount"  -> 1
-            ),
+            )
+          )
+        }
+      }
+
+      val setScriptTransferAssetTx = mkSetScriptTx(asset -> 1)
+      "Basic transfers: fee=Waves, payment=asset" in withDomain(
+        RideV6,
+        Seq(
+          AddrWithBalance(dAppAddress, setScriptTransferAssetTx.fee.value),
+          AddrWithBalance(assetIssuerAddress, issueTx.fee.value)
+        )
+      ) { d =>
+        val route = utilsApi.copy(blockchain = d.blockchain).route
+        d.appendBlock(issueTx, setScriptTransferAssetTx)
+
+        Post(
+          routePath(s"/script/evaluate/$dAppAddress"),
+          invocationWithPayment(
+            feeAsset = Asset.Waves,
+            state = mkBlockchainOverrides(callerWavesBalance = defaultInvocationFee, callerAssetBalance = Some(1)),
+            paymentAssets = asset -> 1
+          )
+        ) ~> route ~> check {
+          val json = responseAs[JsValue]
+          withClue(Json.prettyPrint(json)) {
+            (json \ "error").toOption shouldBe empty
+          }
+          (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
             Json.obj(
               "address" -> scriptTransferReceiver.toAddress.toString,
-              "asset"   -> asset2.toString,
-              "amount"  -> 2
+              "asset"   -> asset.toString,
+              "amount"  -> 1
+            )
+          )
+        }
+      }
+
+      "Basic transfers: fee=asset, payment=Waves" in withDomain(
+        RideV6,
+        Seq(
+          AddrWithBalance(dAppAddress, setScriptTransferWavesTx.fee.value),
+          AddrWithBalance(assetIssuerAddress, issueTx.fee.value + sponsorshipTx.fee.value + defaultInvocationFee)
+        )
+      ) { d =>
+        val route = utilsApi.copy(blockchain = d.blockchain).route
+        d.appendBlock(issueTx, sponsorshipTx, setScriptTransferWavesTx)
+
+        Post(
+          routePath(s"/script/evaluate/$dAppAddress"),
+          invocationWithPayment(
+            feeAsset = asset,
+            state = mkBlockchainOverrides(callerWavesBalance = 1, callerAssetBalance = Some(defaultInvocationFee)),
+            paymentAssets = Asset.Waves -> 1
+          )
+        ) ~> route ~> check {
+          val json = responseAs[JsValue]
+          withClue(Json.prettyPrint(json)) {
+            (json \ "error").toOption shouldBe empty
+          }
+          (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
+            Json.obj(
+              "address" -> scriptTransferReceiver.toAddress.toString,
+              "asset"   -> None,
+              "amount"  -> 1
+            )
+          )
+        }
+      }
+
+      "rest" in withDomain(
+        RideV6,
+        Seq(
+          AddrWithBalance(dAppAddress, defaultSetScriptTx.fee.value), // set script
+          AddrWithBalance(scriptTransferReceiverAddress, issueTx.fee.value + sponsorshipTx.fee.value)
+        )
+      ) { d =>
+        val route = utilsApi.copy(blockchain = d.blockchain).route
+        d.appendBlock(issueTx, sponsorshipTx, defaultSetScriptTx)
+
+        markup("Basic transfers: fee=asset1, payment=asset1")
+        Post(routePath(s"/script/evaluate/$dAppAddress"), invocationWithPayment(asset, defaultState, asset -> 1)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          withClue(Json.prettyPrint(json)) {
+            (json \ "error").toOption shouldBe empty
+          }
+          (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
+            Json.obj(
+              "address" -> scriptTransferReceiver.toAddress.toString,
+              "asset"   -> asset.toString,
+              "amount"  -> 1
+            )
+          )
+        }
+
+        markup("Basic transfers: fee=Waves, payments=Waves, asset1")
+        Post(
+          routePath(s"/script/evaluate/$dAppAddress"),
+          invocationWithPayment(Asset.Waves, defaultState, Asset.Waves -> 1, asset -> 2)
+        ) ~> route ~> check {
+          val json = responseAs[JsValue]
+          withClue(Json.prettyPrint(json)) {
+            (json \ "error").toOption shouldBe empty
+          }
+          (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
+            Json.obj(
+              "address" -> scriptTransferReceiver.toAddress.toString,
+              "asset"   -> asset.toString,
+              "amount"  -> 1
             )
           )
         }
