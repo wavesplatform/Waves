@@ -544,6 +544,7 @@ class UtilsRouteEvaluateSpec
                |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
                |  "fee": 1234567,
                |  "feeAssetId": ${Json.toJson(feeAsset)},
+               |  "sender": "${callerKeyPair.toAddress}",
                |  "senderPublicKey": "${callerKeyPair.publicKey}",
                |  "payment": [
                |    ${paymentAssets.zipWithIndex.map { case (asset, i) => toPaymentJson(asset, i + 1) }.mkString(",\n")}
@@ -551,9 +552,9 @@ class UtilsRouteEvaluateSpec
                |  "state": {
                |    "accounts": {
                |      "${callerKeyPair.toAddress}": {
-               |        "assetBalance": {
-               |          "$asset1": "10000000",
-               |          "$asset2": 10000000
+               |        "assetBalances": {
+               |          "$asset1": "11",
+               |          "$asset2": 12
                |        },
                |        "regularBalance": 10000000
                |      }
@@ -564,13 +565,14 @@ class UtilsRouteEvaluateSpec
           .as[JsObject]
       }
 
+      // TODO test: override with a smaller
       withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, callerKeyPair, scriptTransferReceiver)) { d =>
-        val route              = utilsApi.copy(blockchain = d.blockchain).route
+        val route = utilsApi.copy(blockchain = d.blockchain).route
         d.appendBlock(
           issueTx1,
-          issueTx2,
-          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset1, amount = 10),
-          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset2, amount = 10)
+          issueTx2
+//          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset1, amount = 10),
+//          transfer(from = scriptTransferReceiver, to = callerKeyPair.toAddress, asset = asset2, amount = 10)
         )
         d.appendBlock(setScript(defaultSigner, dAppWithTransfer(asset1, asset2)))
 
@@ -581,16 +583,15 @@ class UtilsRouteEvaluateSpec
           (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe Json.arr(
             Json.obj(
               "address" -> scriptTransferReceiver.toAddress.toString,
-              "asset" -> asset1.toString,
-              "amount" -> 1
+              "asset"   -> asset1.toString,
+              "amount"  -> 1
             ),
             Json.obj(
               "address" -> scriptTransferReceiver.toAddress.toString,
-              "asset" -> asset2.toString,
-              "amount" -> 2
+              "asset"   -> asset2.toString,
+              "amount"  -> 2
             )
           )
-//          json.as[UtilsInvocationRequest] shouldBe invocation(asset1).as[UtilsInvocationRequest]
         }
       }
     }

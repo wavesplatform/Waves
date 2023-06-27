@@ -271,19 +271,20 @@ case class UtilsApiRoute(
         case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictingRequestStructure)
         case (None, None)                                  => Left(WrongJson)
         case (Some(exprRequest), _) =>
-          parseCall(exprRequest, script.stdLibVersion).flatMap(expr =>
+          parseCall(exprRequest, script.stdLibVersion).flatMap { expr =>
             UtilsEvaluator.executeExpression(blockchain, script, address, pk, limit)(
               UtilsEvaluator.emptyInvokeScriptLike(address),
               dApp => Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey))
             )
-          )
+          }
         case (None, Some(invocationRequest)) =>
-          invocationRequest.toInvocation.flatMap(invocation =>
-            UtilsEvaluator.executeExpression(blockchain, script, address, pk, limit)(
+          invocationRequest.toInvocation.flatMap { invocation =>
+            val enrichedBlockchain = new OverriddenBlockchain(blockchain, invocationRequest.state)
+            UtilsEvaluator.executeExpression(enrichedBlockchain, script, address, pk, limit)(
               UtilsEvaluator.toInvokeScriptLike(invocation, address),
               ContractEvaluator.buildExprFromInvocation(_, invocation, script.stdLibVersion).bimap(e => GenericError(e.message), _.expr)
             )
-          )
+          }
       }
 
       val apiResult = evaluated
@@ -296,7 +297,7 @@ case class UtilsApiRoute(
           },
           { case (result, complexity, log, scriptResult) =>
             val intAsString = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
-            val traceObj = if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj()
+            val traceObj    = if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj()
             traceObj ++ Json.obj(
               "result"       -> ScriptValuesJson.serializeValue(result, intAsString),
               "complexity"   -> complexity,
