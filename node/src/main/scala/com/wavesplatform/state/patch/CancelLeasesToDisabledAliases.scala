@@ -1,6 +1,6 @@
 package com.wavesplatform.state.patch
 
-import cats.kernel.Monoid
+import cats.implicits.{catsSyntaxAlternativeSeparate, catsSyntaxSemigroup, toFoldableOps}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -38,32 +38,23 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
     }.toMap
   }
 
-  import cats.implicits.*
-
   override def apply(blockchain: Blockchain): StateSnapshot = {
-    val snapshots = patchData
-      .map { case (id, (ld, recipientAddress)) =>
-        val leaseBalances =
+    val (leaseBalances, leaseStates) =
+      patchData.toSeq.map { case (id, (ld, recipientAddress)) =>
+        (
           Diff
             .combine(
               Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))),
               Map(recipientAddress    -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
             )
-            .getOrElse(Map.empty)
-            .view
-            .mapValues(_.lease)
-            .toMap
-        val balancesSnapshot = StateSnapshot.ofLeaseBalances(leaseBalances, blockchain)
-        balancesSnapshot |+| StateSnapshot(
-          aliases = ld.recipient match {
-            case alias: Alias => Map(alias -> recipientAddress)
-            case _            => Map()
-          },
-          leaseStates = Map(
-            id -> ld.copy(status = LeaseDetails.Status.Expired(blockchain.height))
+            .explicitGet(),
+          StateSnapshot(
+            leaseStates = Map(id -> ld.copy(status = LeaseDetails.Status.Expired(blockchain.height)))
           )
         )
-      }
-    Monoid.combineAll(snapshots)
+      }.separate
+    val combinedLeaseBalances = leaseBalances.reduce(Diff.combine(_, _).explicitGet())
+    val leaseBalancesSnapshot = StateSnapshot.ofLeaseBalances(combinedLeaseBalances.view.mapValues(_.lease).toMap, blockchain)
+    leaseBalancesSnapshot |+| leaseStates.combineAll
   }
 }
