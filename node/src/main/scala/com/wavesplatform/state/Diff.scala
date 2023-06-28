@@ -138,6 +138,38 @@ case class NewTransactionInfo(
     spentComplexity: Long
 )
 
+object NewTransactionInfo {
+  def create(
+      tx: Transaction,
+      applied: Boolean,
+      snapshot: StateSnapshot,
+      blockchain: Blockchain
+  ): NewTransactionInfo = {
+    val calledScripts = snapshot.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
+    val maybeDApp = tx match {
+      case i: InvokeTransaction =>
+        i.dApp match {
+          case alias: Alias     => snapshot.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
+          case address: Address => Some(address)
+        }
+      case et: EthereumTransaction =>
+        et.payload match {
+          case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
+          case _                                       => None
+        }
+      case _ =>
+        None
+    }
+    val affectedAddresses =
+      snapshot.balances.keySet.map(_._1) ++
+        snapshot.leaseBalances.keySet ++
+        snapshot.accountData.keySet ++
+        calledScripts ++
+        maybeDApp
+    NewTransactionInfo(tx, snapshot, affectedAddresses, applied, snapshot.scriptsComplexity)
+  }
+}
+
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
 case class Diff(
@@ -330,25 +362,10 @@ object Diff {
       Integer.toHexString(d.hashCode())
 
     def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
-      val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
-      val maybeDApp = tx match {
-        case i: InvokeTransaction =>
-          i.dApp match {
-            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
-            case address: Address => Some(address)
-          }
-        case et: EthereumTransaction =>
-          et.payload match {
-            case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
-            case _                                       => None
-          }
-        case _ =>
-          None
-      }
-      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
-
+      val snapshot = StateSnapshot.fromDiff(d, blockchain)
+      val txInfo   = NewTransactionInfo.create(tx, applied, snapshot, blockchain)
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, StateSnapshot.fromDiff(d, blockchain), affectedAddresses, applied, d.scriptsComplexity)),
+        transactions = Vector(txInfo),
         transactionFilter = mkFilterForTransactions(tx)
       )
     }
