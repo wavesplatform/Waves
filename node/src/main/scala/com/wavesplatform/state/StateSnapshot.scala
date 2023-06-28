@@ -4,15 +4,16 @@ import cats.data.Ior
 import cats.implicits.{catsKernelStdMonoidForMap, catsSyntaxSemigroup}
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
+import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
-import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset
@@ -134,6 +135,139 @@ case class StateSnapshot(
 }
 
 object StateSnapshot {
+  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): StateSnapshot = {
+    val balances: VectorMap[(Address, Asset), Long] =
+      VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
+
+    val leaseBalances: Map[Address, LeaseBalance] =
+      pbSnapshot.leaseBalances
+        .map(b => b.address.toAddress -> LeaseBalance(b.in, b.out))
+        .toMap
+
+    val assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] =
+      pbSnapshot.assetScripts.map { s =>
+        val info =
+          if (s.script.isEmpty)
+            None
+          else
+            Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), s.complexity))
+        s.assetId.toIssuedAssetId -> info
+      }.toMap
+
+    val assetStatics: Map[IssuedAsset, AssetStatic] =
+      pbSnapshot.assetStatics.map(info => info.assetId.toIssuedAssetId -> info).toMap
+
+    val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =
+      pbSnapshot.assetVolumes
+        .map(v => v.assetId.toIssuedAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray)))
+        .toMap
+
+    val assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] =
+      pbSnapshot.assetNamesAndDescriptions
+        .map(i => i.assetId.toIssuedAssetId -> AssetInfo(i.name, i.description, Height @@ i.lastUpdated))
+        .toMap
+
+    val sponsorships: Map[IssuedAsset, SponsorshipValue] =
+      pbSnapshot.sponsorships
+        .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
+        .toMap
+
+    val leaseStates: Map[ByteStr, LeaseDetails] =
+      pbSnapshot.leaseStates
+        .map(ls =>
+          ls.leaseId.toByteStr -> LeaseDetails(
+            ls.sender.toPublicKey,
+            PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
+            ls.amount,
+            ls.status match {
+              case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>
+                LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
+              case _ =>
+                LeaseDetails.Status.Active
+            },
+            ls.originTransactionId.toByteStr,
+            ls.height
+          )
+        )
+        .toMap
+
+    val aliases: Map[Alias, Address] =
+      pbSnapshot.aliases
+        .map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress)
+        .toMap
+
+    val orderFills: Map[ByteStr, VolumeAndFee] =
+      pbSnapshot.orderFills
+        .map(of => of.orderId.toByteStr -> VolumeAndFee(of.volume, of.fee))
+        .toMap
+
+    val accountScripts: Map[Address, Option[AccountScriptInfo]] =
+      pbSnapshot.accountScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(
+              AccountScriptInfo(
+                pbInfo.senderPublicKey.toPublicKey,
+                ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
+                pbInfo.verifierComplexity
+              )
+            )
+        pbInfo.senderPublicKey.toAddress -> info
+      }.toMap
+
+    val accountData: Map[Address, Map[String, DataEntry[?]]] =
+      pbSnapshot.accountData.map { data =>
+        val entries =
+          data.entries.map { pbEntry =>
+            val entry = PBTransactions.toVanillaDataEntry(pbEntry)
+            entry.key -> entry
+          }.toMap
+        data.address.toAddress -> entries
+      }.toMap
+
+    val scriptResults: Map[ByteStr, InvokeScriptResult] =
+      pbSnapshot.scriptResults.map { pbResult =>
+        val txId   = pbResult.transactionId.toByteStr
+        val result = InvokeScriptResult.fromPB(pbResult.getResult)
+        txId -> result
+      }.toMap
+
+    val ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] =
+      pbSnapshot.ethereumTransactionMeta.map { pbMeta =>
+        import TransactionStateSnapshot.EthereumTransactionMeta as M
+        val payload = pbMeta.payload match {
+          case M.Payload.Empty =>
+            Payload.Empty
+          case M.Payload.Invocation(M.Invocation(functionCall, payments, _)) =>
+            Payload.Invocation(EthereumTransactionMeta.Invocation(functionCall, payments))
+          case M.Payload.Transfer(M.Transfer(publicKeyHash, amount, _)) =>
+            Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
+        }
+        pbMeta.transactionId.toByteStr -> EthereumTransactionMeta(payload)
+      }.toMap
+
+    StateSnapshot(
+      VectorMap(),
+      balances,
+      leaseBalances,
+      assetStatics,
+      assetVolumes,
+      assetNamesAndDescriptions,
+      assetScripts,
+      sponsorships,
+      leaseStates,
+      aliases,
+      orderFills,
+      accountScripts,
+      accountData,
+      scriptResults,
+      ethereumTransactionMeta,
+      pbSnapshot.totalComplexity
+    )
+  }
+
   def fromDiff(diff: Diff, blockchain: Blockchain): StateSnapshot =
     StateSnapshot(
       VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
@@ -231,8 +365,8 @@ object StateSnapshot {
 
   def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): StateSnapshot =
     StateSnapshot(
-      leaseBalances = balances.map { case (address, lb) =>
-        address -> lb.combineF[Id](blockchain.leaseBalance(address))
+      leaseBalances = balances.map { case (address, leaseBalance) =>
+        address -> leaseBalance.combineF[Id](blockchain.leaseBalance(address))
       }
     )
 
