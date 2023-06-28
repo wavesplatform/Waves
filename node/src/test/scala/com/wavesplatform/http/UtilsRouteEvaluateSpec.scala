@@ -564,7 +564,7 @@ class UtilsRouteEvaluateSpec
 
       def mkSetScriptTx(transferAssetAmounts: (Asset, Int)*) = setScript(dAppAccount, dAppWithTransfer(transferAssetAmounts*))
 
-      def mkBlockchainOverrides(callerWavesBalance: Int, callerAssetBalance: Option[Int] = None) = Json.obj(
+      def mkBlockchainOverrides(callerWavesBalance: Int, callerAssetBalance: Option[Int]) = Json.obj(
         "accounts" -> Json.obj(
           callerKeyPair.toAddress.toString -> Json
             .obj("regularBalance" -> callerWavesBalance)
