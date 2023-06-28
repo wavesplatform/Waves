@@ -59,7 +59,7 @@ class WavesEnvironment(
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._1.succeeded)
+      .filter(_._1.status == TxMeta.Status.Succeeded)
       .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
@@ -159,7 +159,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.succeeded => tm.height.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -198,8 +198,8 @@ class WavesEnvironment(
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
-      generator = ByteStr(blockH.challengedHeader.map(_.generator.toAddress.bytes).getOrElse(blockH.generator.toAddress.bytes)),
-      generatorPublicKey = blockH.challengedHeader.map(_.generator).getOrElse(blockH.generator),
+      generator = ByteStr(blockH.generator.toAddress.bytes),
+      generatorPublicKey = blockH.generator,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }

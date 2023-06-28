@@ -1,7 +1,6 @@
 package com.wavesplatform.api.common
 
 import java.util.regex.Pattern
-
 import cats.syntax.either.*
 import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
@@ -17,7 +16,7 @@ import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -143,7 +142,7 @@ object CommonAccountsApi {
         Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),
         None
       ).flatMapIterable {
-        case TransactionMeta(leaseHeight, lt: LeaseTransaction, true) if leaseIsActive(lt.id()) =>
+        case TransactionMeta(leaseHeight, lt: LeaseTransaction, TxMeta.Status.Succeeded) if leaseIsActive(lt.id()) =>
           Seq(
             LeaseInfo(
               lt.id(),
@@ -155,9 +154,9 @@ object CommonAccountsApi {
               LeaseInfo.Status.Active
             )
           )
-        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
+        case TransactionMeta.Invoke(invokeHeight, originTransaction, TxMeta.Status.Succeeded, _, Some(scriptResult)) =>
           extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
-        case Ethereum(height, tx @ EthereumTransaction(_: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
+        case Ethereum(height, tx @ EthereumTransaction(_: Invocation, _, _, _), TxMeta.Status.Succeeded, _, _, Some(scriptResult)) =>
           extractLeases(address, scriptResult, tx.id(), height)
         case _ => Seq()
       }

@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.THROW
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -1694,7 +1695,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             state.balance(exchange.sender.toAddress, asset) shouldBe balance
           }
 
-          state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
+          state.transactionInfo(exchange.id()).map(r => r._2 -> (r._1.status == Status.Succeeded)) shouldBe Some((exchange, false))
       }
     }
   }

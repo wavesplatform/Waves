@@ -228,6 +228,6 @@ object Keys {
   def ethereumTransactionMeta(height: Height, txNum: TxNum): Key[Option[EthereumTransactionMeta]] =
     Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray)
 
-  def maliciousMinerToEndBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
+  def maliciousMinerEndBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerEndBanHeights, addressBytes)
 }

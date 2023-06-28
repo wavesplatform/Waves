@@ -11,6 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.mining.BlockChallenger.MaliciousMinerBanPeriod
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -51,7 +52,13 @@ final class CompositeBlockchain private (
       address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))
     }
 
-  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] = inner.effectiveBalanceBanHeights(address)
+  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] = {
+    val maybeLastBlockBan = blockMeta.flatMap(_._1.header.challengedHeader).map(_.generator.toAddress) match {
+      case Some(generator) if address == generator => Seq((height, height + MaliciousMinerBanPeriod - 1))
+      case _                                       => Seq.empty
+    }
+    maybeLastBlockBan ++ inner.effectiveBalanceBanHeights(address)
+  }
 
   override def leaseBalance(address: Address): LeaseBalance =
     inner.leaseBalance(address).combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
@@ -84,7 +91,7 @@ final class CompositeBlockchain private (
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     diff
       .transaction(id)
-      .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
+      .collect { case NewTransactionInfo(tx: TransferTransaction, _, TxMeta.Status.Succeeded, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
@@ -92,14 +99,14 @@ final class CompositeBlockchain private (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
     diff
       .transaction(id)
-      .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+      .map(t => (TxMeta(Height(this.height), t.status, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = {
     inner.transactionInfos(ids).zip(ids).map { case (info, id) =>
       diff.transactions
         .find(_.transaction.id() == id)
-        .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+        .map(t => (TxMeta(Height(this.height), t.status, t.spentComplexity), t.transaction))
         .orElse(info)
     }
   }
@@ -107,7 +114,7 @@ final class CompositeBlockchain private (
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     diff
       .transaction(id)
-      .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
+      .map(t => TxMeta(Height(this.height), t.status, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)

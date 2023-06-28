@@ -67,7 +67,8 @@ package object appender {
   )(block: Block): Either[ValidationError, Option[Int]] = {
     val challengedBlock = block.toOriginal
     for {
-      hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
+      _         <- if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
+      hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <-
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
@@ -86,7 +87,7 @@ package object appender {
         val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
-          balance,
+          balance + block.header.challengedHeader.map(ch => blockchainUpdater.generatingBalance(ch.generator.toAddress, Some(parent))).getOrElse(0L),
           s"generator's effective balance $balance is less that required for generation"
         )
       }
@@ -148,23 +149,9 @@ package object appender {
         BlockAppendError("Challenged header is not supported yet", block)
       )
       _ <- Either.cond(
-        !block.header.challengedHeader.flatMap(_.stateHash).exists(block.header.stateHash.contains),
-        (),
-        BlockAppendError("Challenged state hash is equal to challenging", block)
-      )
-      _ <- Either.cond(
         !block.header.challengedHeader.map(_.generator).contains(block.header.generator),
         (),
         BlockAppendError("Challenged block generator and challenging block generator should not be equal", block)
-      )
-      _ <- Either.cond(
-        block.header.challengedHeader.isEmpty || blockchain.isEffectiveBalanceValid(
-          blockchain.height,
-          block,
-          blockchain.generatingBalance(block.sender.toAddress)
-        ),
-        (),
-        BlockAppendError("Block sender doesn't have enough generating balance for challenging block generation", block)
       )
     } yield ()
 

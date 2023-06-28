@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.{Height, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
@@ -114,7 +115,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1 shouldBe Some(Seq(tx))
     d.appendBlock(tx)
 
-    d.blockchain.transactionMeta(tx.id()) shouldBe Some(TxMeta(Height(3), false, 1212))
+    d.blockchain.transactionMeta(tx.id()) shouldBe Some(TxMeta(Height(3), Status.Failed, 1212))
   })
 
   it should s"drop failed Invoke with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>

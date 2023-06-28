@@ -250,6 +250,7 @@ object TransactionsApiRoute {
   object ApplicationStatus {
     val Succeeded             = "succeeded"
     val ScriptExecutionFailed = "script_execution_failed"
+    val Elided                = "elided"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

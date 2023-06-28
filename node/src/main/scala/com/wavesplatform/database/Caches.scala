@@ -284,7 +284,7 @@ abstract class Caches extends Blockchain with Storage {
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     for (nti <- diff.transactions) {
-      transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
+      transactionMeta += (TxMeta(Height(newHeight), nti.status, nti.spentComplexity) -> nti.transaction)
       for (addr <- nti.affected) {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
       }

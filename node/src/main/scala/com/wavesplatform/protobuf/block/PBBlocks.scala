@@ -27,6 +27,9 @@ object PBBlocks {
       Option.unless(header.stateHash.isEmpty)(header.stateHash.toByteStr),
       header.challengedHeader.map { ch =>
         ChallengedHeader(
+          ch.timestamp,
+          ch.baseTarget,
+          ch.generationSignature.toByteStr,
           ch.featureVotes.map(_.toShort),
           ch.generator.toPublicKey,
           ch.rewardVote,
@@ -55,7 +58,10 @@ object PBBlocks {
     header.stateHash.getOrElse(ByteStr.empty).toByteString,
     header.challengedHeader.map { ch =>
       PBBlock.Header.ChallengedHeader(
+        ch.baseTarget,
+        ch.generationSignature.toByteString,
         ch.featureVotes.map(_.toInt),
+        ch.timestamp,
         ch.generator.toByteString,
         ch.rewardVote,
         ch.stateHash.getOrElse(ByteStr.empty).toByteString,

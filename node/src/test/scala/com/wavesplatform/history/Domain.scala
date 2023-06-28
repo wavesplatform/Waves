@@ -235,8 +235,21 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def appendBlock(txs: Transaction*): Block =
     appendBlock(Block.PlainBlockVersion, txs*)
 
-  def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+  def appendKeyBlock(signer: KeyPair = defaultSigner, ref: Option[ByteStr] = None): Block = {
+    val block = createBlock(
+      Block.NgBlockVersion,
+      Nil,
+      ref.orElse(Some(lastBlockId)),
+      generator = signer,
+      stateHash = this.lastBlock.header.stateHash.map(prev =>
+        TxStateSnapshotHashBuilder
+          .createHashFromDiff(
+            this.blockchain,
+            Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(this.settings.blockchainSettings.rewardsSettings.initial)))
+          )
+          .createHash(prev)
+      )
+    )
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
     utxPool.cleanUnconfirmed()
@@ -293,7 +306,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       txs: Seq[Transaction],
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
-      generator: KeyPair = defaultSigner
+      generator: KeyPair = defaultSigner,
+      stateHash: Option[ByteStr] = None
   ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
@@ -342,7 +356,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         featureVotes = Nil,
         rewardVote = -1L,
         signer = generator,
-        stateHash = None,
+        stateHash = stateHash,
         challengedHeader = None
       )
       .explicitGet()

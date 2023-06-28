@@ -393,25 +393,26 @@ case class UtxPoolImpl(
                           log.trace(s"Packing transaction ${tx.id()}")
                       }
 
-                      r.totalDiff
-                        .combineF(newDiff)
-                        .flatMap(_.combineF(minerFeePortfolio(updatedBlockchain, tx)))
-                        .fold(
-                          error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
-                          PackResult(
-                            Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                            _,
-                            updatedConstraint,
-                            r.iterations + 1,
-                            newCheckedAddresses,
-                            r.validatedTransactions + tx.id(),
-                            r.removedTransactions,
-                            r.stateHash.map(prevStateHash =>
-                              // TODO: NODE-2594 use correct init diff (with miner rewards)
-                              TxStateSnapshotHashBuilder.createHashFromTxDiff(updatedBlockchain, newDiff).createHash(prevStateHash)
-                            )
-                          )
+                      val minerFeeDiff = minerFeePortfolio(updatedBlockchain, tx)
+
+                      (for {
+                        totalDiff  <- r.totalDiff.combineF(newDiff).flatMap(_.combineF(minerFeeDiff))
+                        fullTxDiff <- newDiff.combineF(minerFeeDiff)
+                      } yield {
+                        PackResult(
+                          Some(r.transactions.fold(Seq(tx))(tx +: _)),
+                          totalDiff,
+                          updatedConstraint,
+                          r.iterations + 1,
+                          newCheckedAddresses,
+                          r.validatedTransactions + tx.id(),
+                          r.removedTransactions,
+                          r.stateHash.map(TxStateSnapshotHashBuilder.createHashFromDiff(updatedBlockchain, fullTxDiff).createHash(_))
                         )
+                      }).fold(
+                        error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                        identity
+                      )
                     }
 
                   case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
@@ -466,7 +467,12 @@ case class UtxPoolImpl(
           Set.empty,
           Set.empty,
           Set.empty,
-          prevStateHash
+          prevStateHash.flatMap { prevHash =>
+            BlockDiffer
+              .createInitialBlockDiff(blockchain, blockchain.lastBlockHeader.get.header.generator.toAddress)
+              .toOption
+              .map(initDiff => TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(prevHash))
+          }
         )
       )
     }

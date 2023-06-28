@@ -13,6 +13,7 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -130,7 +131,7 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean, spentComplexity: Long)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], status: Status, spentComplexity: Long)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
@@ -325,7 +326,7 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
+    def bindTransaction(blockchain: Blockchain, tx: Transaction): Diff = {
       val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
       val maybeDApp = tx match {
         case i: InvokeTransaction =>
@@ -344,7 +345,7 @@ object Diff {
       val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
 
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
+        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, TxMeta.Status.Succeeded, d.scriptsComplexity)),
         transactionFilter = mkFilterForTransactions(tx)
       )
     }

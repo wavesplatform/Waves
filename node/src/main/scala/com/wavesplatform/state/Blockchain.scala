@@ -211,7 +211,7 @@ object Blockchain {
           case _                                    => false
         })
 
-    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
+    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.status == TxMeta.Status.Succeeded)
 
     def hasBannedEffectiveBalance(address: Address, height: Int = blockchain.height): Boolean =
       blockchain.effectiveBalanceBanHeights(address).exists { case (start, end) => height >= start && height <= end }

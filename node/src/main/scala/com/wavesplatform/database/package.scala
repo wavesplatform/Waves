@@ -633,7 +633,7 @@ package object database {
 
   def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
-    TxMeta(height, !data.failed, data.spentComplexity) -> (data.transaction match {
+    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> (data.transaction match {
       case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
       case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
       case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
@@ -650,7 +650,7 @@ package object database {
       case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
       case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
+    pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }
 
   def loadTransactions(height: Height, rdb: RDB): Seq[(TxMeta, Transaction)] = {
@@ -702,7 +702,7 @@ package object database {
       tm <- r.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
       tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
     } yield tx).collect {
-      case (ltm, lt: LeaseTransaction) if ltm.succeeded => lt
+      case (ltm, lt: LeaseTransaction) if ltm.status == TxMeta.Status.Succeeded => lt
     }.toSeq
   }
 

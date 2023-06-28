@@ -30,12 +30,13 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{SystemTime, Time}
 import io.netty.channel.Channel
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.state.TxMeta.Status
 import org.scalamock.MockFactoryBase
 import org.scalamock.matchers.MockParameter
 
 trait BlockchainStubHelpers { self: MockFactoryBase =>
-  def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain with NG = {
+  def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain & NG = {
     trait Blockchain1 extends Blockchain with NG
     val blockchain = stub[Blockchain1]
     f(blockchain) // Overrides
@@ -119,7 +120,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         .returns(
           Some(
             (
-              TxMeta(Height(1), true, 0), // height
+              TxMeta(Height(1), Status.Succeeded, 0), // height
               IssueTransaction
                 .selfSigned(2.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
                 .explicitGet()

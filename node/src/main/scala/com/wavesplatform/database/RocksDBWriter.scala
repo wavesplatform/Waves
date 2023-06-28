@@ -15,7 +15,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, Status as PBStatus, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.BlockChallenger.MaliciousMinerBanPeriod
@@ -428,10 +428,11 @@ class RocksDBWriter(
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
       blockHeightCache.put(blockMeta.id, Some(height))
 
-      blockMeta.header.flatMap(_.challengedHeader.map(_.generator)) match {
+      blockMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
         case Some(addr) =>
-          val savedHeights = rw.get(Keys.maliciousMinerToEndBanHeights(addr.toByteArray))
-          rw.put(Keys.maliciousMinerToEndBanHeights(addr.toByteArray), (height + MaliciousMinerBanPeriod - 1) +: savedHeights)
+          val key          = Keys.maliciousMinerEndBanHeights(addr.bytes)
+          val savedHeights = rw.get(key)
+          rw.put(key, (height + MaliciousMinerBanPeriod - 1) +: savedHeights)
         case _ => ()
       }
 
@@ -525,7 +526,7 @@ class RocksDBWriter(
 
         targetBf.put(tx.id().arr)
 
-        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
+        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, txm.status.protobuf, 0, size)))
         id -> size
       }
 
@@ -755,6 +756,14 @@ class RocksDBWriter(
             }
           }
 
+          discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
+            case Some(addr) =>
+              val key        = Keys.maliciousMinerEndBanHeights(addr.bytes)
+              val banHeights = rw.get(key)
+              rw.put(key, banHeights.tail)
+            case _ => ()
+          }
+
           rw.delete(Keys.blockMetaAt(currentHeight))
           rw.delete(Keys.changedAddresses(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
@@ -875,8 +884,8 @@ class RocksDBWriter(
       tx <- db
         .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
-          case (tm, t: TransferTransaction) if tm.succeeded => t
-          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
+          case (tm, t: TransferTransaction) if tm.status == TxMeta.Status.Succeeded => t
+          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if tm.status == PBStatus.SUCCEEDED =>
             val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
             val transfer = meta.payload.transfer.get
             val tAmount  = transfer.amount.get
@@ -906,7 +915,7 @@ class RocksDBWriter(
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = {
     writableDB.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)).map { tm =>
-      TxMeta(Height(tm.height), !tm.failed, tm.spentComplexity)
+      TxMeta(Height(tm.height), TxMeta.Status.fromProtobuf(tm.status), tm.spentComplexity)
     }
   }
 
@@ -1070,7 +1079,7 @@ class RocksDBWriter(
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] =
-    readOnly(_.get(Keys.maliciousMinerToEndBanHeights(address.bytes)).map(endBanHeight => (endBanHeight - MaliciousMinerBanPeriod + 1, endBanHeight)))
+    readOnly(_.get(Keys.maliciousMinerEndBanHeights(address.bytes)).map(endBanHeight => (endBanHeight - MaliciousMinerBanPeriod + 1, endBanHeight)))
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

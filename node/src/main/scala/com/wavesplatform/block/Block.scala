@@ -35,6 +35,9 @@ case class BlockHeader(
 }
 
 case class ChallengedHeader(
+    timestamp: Long,
+    baseTarget: Long,
+    generationSignature: ByteStr,
     featureVotes: Seq[Short],
     generator: PublicKey,
     rewardVote: Long,
@@ -72,6 +75,9 @@ case class Block(
       header.challengedHeader
         .map { ch =>
           header.copy(
+            baseTarget = ch.baseTarget,
+            timestamp = ch.timestamp,
+            generationSignature = ch.generationSignature,
             generator = ch.generator,
             featureVotes = ch.featureVotes,
             rewardVote = ch.rewardVote,

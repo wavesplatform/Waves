@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{Portfolio, StringDataEntry}
 import com.wavesplatform.test.*
@@ -164,7 +165,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
       d.appendBlock(leaseTx, dataTx)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invokeTx)
-      d.blockchain.transactionInfo(invokeTx.id()).get._1.succeeded shouldBe false
+      d.blockchain.transactionInfo(invokeTx.id()).get._1.status == Status.Succeeded shouldBe false
       d.liquidDiff.sponsorship shouldBe Map()
       d.liquidDiff.leaseState shouldBe Map()
       d.liquidDiff.issuedAssets shouldBe Map()

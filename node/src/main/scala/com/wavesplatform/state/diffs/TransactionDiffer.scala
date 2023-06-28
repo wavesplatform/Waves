@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship, TxMeta}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -220,7 +220,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(diff => initDiff.combineE(diff.bindTransaction(blockchain, tx, applied = true)))
+      .flatMap(diff => initDiff.combineE(diff.bindTransaction(blockchain, tx)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -316,7 +316,7 @@ object TransactionDiffer {
       }
       Diff
         .withTransactions(
-          Vector(NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity)),
+          Vector(NewTransactionInfo(tx, affectedAddresses, TxMeta.Status.Failed, spentComplexity)),
           portfolios = portfolios,
           scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
           scriptsComplexity = spentComplexity

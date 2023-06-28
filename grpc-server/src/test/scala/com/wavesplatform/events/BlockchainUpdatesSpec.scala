@@ -166,7 +166,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       d.appendMicroBlock(TxHelpers.transfer())
 
       val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-      d.appendKeyBlock(Some(keyBlockId))
+      d.appendKeyBlock(ref = Some(keyBlockId))
 
       subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should (
         matchPattern {
@@ -367,7 +367,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
           repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
 
           // micro rollback
-          d.appendKeyBlock(Some(block.id()))
+          d.appendKeyBlock(ref = Some(block.id()))
           d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
           repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
 
@@ -564,7 +564,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         d.appendMicroBlock(transfer, lease, issue, reissue, data, createAlias, setScript1)
         sendUpdate()
 
-        d.appendKeyBlock(Some(firstMicroId))
+        d.appendKeyBlock(ref = Some(firstMicroId))
         sendUpdate()
         sendUpdate()
 
@@ -601,7 +601,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(keyBlockId))
+        d.appendKeyBlock(ref = Some(keyBlockId))
 
         sendUpdate()
         sendUpdate()
@@ -623,7 +623,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         val microBlockId = d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(microBlockId))
+        d.appendKeyBlock(ref = Some(microBlockId))
 
         (1 to 3).foreach(_ => sendUpdate())
 
@@ -646,7 +646,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(keyBlockId))
+        d.appendKeyBlock(ref = Some(keyBlockId))
         sendUpdate()
 
         subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
@@ -669,7 +669,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         sendUpdate()
 
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(keyBlockId))
+        d.appendKeyBlock(ref = Some(keyBlockId))
 
         (1 to 3).foreach(_ => sendUpdate())
 

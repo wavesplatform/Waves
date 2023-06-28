@@ -2,6 +2,7 @@ package com.wavesplatform.state.appender
 
 import java.time.Instant
 import cats.data.EitherT
+import cats.syntax.traverse.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
@@ -90,7 +91,13 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        blockChallenger.challengeBlock(newBlock, ch, ish.computedStateHash)
+        (for {
+          prevStateHash <- ish.prevStateHash
+          diffHashes    <- ish.diffHashes
+        } yield {
+          blockChallenger.challengeBlock(newBlock, ch, prevStateHash, diffHashes)
+        }).sequence.void
+
       case Left(ve) =>
         Task {
           log.debug(s"${id(ch)} Could not append $newBlock: $ve")
