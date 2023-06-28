@@ -124,8 +124,8 @@ case class StateSnapshot(
     copy(balances = balances ++ appliedBalances)
   }
 
-  def withTransactions(diff: Diff): StateSnapshot =
-    copy(transactions ++ diff.transactions.map(info => info.transaction.id() -> info).toMap)
+  def withTransaction(tx: NewTransactionInfo): StateSnapshot =
+    copy(transactions + (tx.transaction.id() -> tx))
 
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
     assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap
