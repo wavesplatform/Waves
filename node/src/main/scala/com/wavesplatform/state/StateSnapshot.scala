@@ -84,15 +84,11 @@ case class StateSnapshot(
       }.toSeq,
       accountScripts.map { case (address, scriptOpt) =>
         scriptOpt.fold(
-          S.AccountScript(
-            address.toByteString,
-            ByteString.EMPTY,
-            0
-          )
+          S.AccountScript()
         )(script =>
           S.AccountScript(
-            address.toByteString,
             script.publicKey.toByteString,
+            script.script.bytes().toByteString,
             script.verifierComplexity
           )
         )
