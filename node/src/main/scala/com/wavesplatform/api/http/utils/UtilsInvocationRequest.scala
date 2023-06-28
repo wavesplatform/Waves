@@ -74,12 +74,12 @@ object BlockchainOverrides {
         if (s.length > LongStringMaxLength) JsError("error.expected.numberdigitlimit")
         else
           s.toLongOption match {
-            case Some(r) => JsSuccess(apply(r))
+            case Some(r) => JsSuccess(Balance(r))
             case None    => JsError(JsonValidationError("error.expected.numberformatexception"))
           }
 
       case JsNumber(d) =>
-        if (d.isValidLong) JsSuccess(apply(d.toLongExact))
+        if (d.isValidLong) JsSuccess(Balance(d.toLongExact))
         else JsError(JsonValidationError("error.invalid.long"))
 
       case _ => JsError(JsonValidationError("error.expected.jsnumberorjsstring"))
