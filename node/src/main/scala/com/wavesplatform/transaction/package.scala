@@ -55,8 +55,10 @@ package object transaction {
           }
 
       case JsNumber(d) =>
-        if (d.isValidLong) JsSuccess(TxNonNegativeAmount.unsafeFrom(d.toLongExact))
-        else JsError(JsonValidationError("error.invalid.long"))
+        if (d.isValidLong) {
+          if (d >= 0) JsSuccess(TxNonNegativeAmount.unsafeFrom(d.toLongExact))
+          else JsError(JsonValidationError("error.expected.txnonnegativeamount"))
+        } else JsError(JsonValidationError("error.invalid.long"))
 
       case _ => JsError(JsonValidationError("error.expected.jsnumberorjsstring"))
     }
