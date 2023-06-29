@@ -545,9 +545,6 @@ class UtilsRouteEvaluateSpec
                  |asset1: $asset
                  |""".stripMargin)
 
-      // TODO test: override with a smaller
-      // TODO test: default address?
-
       "expr" in {
         def mkExprJson(state: JsObject): JsObject =
           Json

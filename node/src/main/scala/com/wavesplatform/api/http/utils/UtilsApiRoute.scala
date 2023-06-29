@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.lang.{API, CompileResult, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, OverriddenBlockchain}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

@@ -1,4 +1,4 @@
-package com.wavesplatform.api.http.utils
+package com.wavesplatform.state
 
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -8,23 +8,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  LeaseBalance,
-  TxMeta,
-  VolumeAndFee
-}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
-import scala.util.chaining.scalaUtilChainingOps
-
-// TODO move to another place?
 class OverriddenBlockchain(underlying: Blockchain, overrides: BlockchainOverrides) extends Blockchain {
   override def settings: BlockchainSettings = underlying.settings
 
@@ -55,32 +41,23 @@ class OverriddenBlockchain(underlying: Blockchain, overrides: BlockchainOverride
   override def balance(address: Address, mayBeAssetId: Asset): Long =
     overrides.balance(address, mayBeAssetId).getOrElse(underlying.balance(address, mayBeAssetId))
 
-  // TODO generating balance tests?
-  // TODO order?
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
-    val orig = underlying.balanceSnapshots(address, from, to)
-//    println(s"balanceSnapshots: orig=${orig.mkString(", ")}")
+    val orig     = underlying.balanceSnapshots(address, from, to)
     val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
-//    println(s"balanceSnapshots: this.height=${this.height}, toHeight=$toHeight")
     if (toHeight < this.height) orig
     else
       overrides
         .balance(address, Asset.Waves)
         .fold(orig) { regularBalance =>
-//          println(s"balanceSnapshots: overrides.balance($address, Asset.Waves)=$regularBalance")
           orig.headOption match {
             case None => Seq(BalanceSnapshot(toHeight, regularBalance, 0, 0))
             case Some(latest) =>
-//              println(s"balanceSnapshots: latest.height=${latest.height} < toHeight=$toHeight")
               val updatedLatest = latest.copy(height = toHeight, regularBalance = regularBalance)
               if (latest.height < toHeight) updatedLatest +: orig
               else updatedLatest +: orig.tail
           }
-        }
-        .tap { xs =>
-//          println(s"balanceSnapshots: result=${xs.mkString(", ")}")
         }
   }
 

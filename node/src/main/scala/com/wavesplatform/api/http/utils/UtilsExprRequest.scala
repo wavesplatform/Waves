@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.state.BlockchainOverrides
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import play.api.libs.json.*
 
