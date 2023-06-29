@@ -1,5 +1,6 @@
 package com.wavesplatform.api.http.utils
 
+import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
@@ -21,6 +22,9 @@ import com.wavesplatform.state.{
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
+import scala.util.chaining.scalaUtilChainingOps
+
+// TODO move to another place?
 class OverriddenBlockchain(underlying: Blockchain, overrides: BlockchainOverrides) extends Blockchain {
   override def settings: BlockchainSettings = underlying.settings
 
@@ -52,22 +56,38 @@ class OverriddenBlockchain(underlying: Blockchain, overrides: BlockchainOverride
     overrides.balance(address, mayBeAssetId).getOrElse(underlying.balance(address, mayBeAssetId))
 
   // TODO generating balance tests?
+  // TODO order?
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
-    val orig     = underlying.balanceSnapshots(address, from, to)
+    val orig = underlying.balanceSnapshots(address, from, to)
+//    println(s"balanceSnapshots: orig=${orig.mkString(", ")}")
     val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
+//    println(s"balanceSnapshots: this.height=${this.height}, toHeight=$toHeight")
     if (toHeight < this.height) orig
     else
-      overrides.balance(address, Asset.Waves).fold(orig) { regularBalance =>
-        orig.lastOption match {
-          case None => Seq(BalanceSnapshot(toHeight, regularBalance, 0, 0))
-          case Some(last) =>
-            val updatedLast = last.copy(height = toHeight, regularBalance = regularBalance)
-            if (last.height < toHeight) orig :+ updatedLast
-            else orig.init :+ updatedLast
+      overrides
+        .balance(address, Asset.Waves)
+        .fold(orig) { regularBalance =>
+//          println(s"balanceSnapshots: overrides.balance($address, Asset.Waves)=$regularBalance")
+          orig.headOption match {
+            case None => Seq(BalanceSnapshot(toHeight, regularBalance, 0, 0))
+            case Some(latest) =>
+//              println(s"balanceSnapshots: latest.height=${latest.height} < toHeight=$toHeight")
+              val updatedLatest = latest.copy(height = toHeight, regularBalance = regularBalance)
+              if (latest.height < toHeight) updatedLatest +: orig
+              else updatedLatest +: orig.tail
+          }
         }
-      }
+        .tap { xs =>
+//          println(s"balanceSnapshots: result=${xs.mkString(", ")}")
+        }
+  }
+
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = {
+    lazy val orig = underlying.balanceAtHeight(address, height, assetId)
+    if (height < this.height) orig
+    else overrides.balance(address, assetId).fold(orig)(b => (height, b).some)
   }
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = underlying.transactionMeta(id)
@@ -97,9 +117,6 @@ class OverriddenBlockchain(underlying: Blockchain, overrides: BlockchainOverride
   override def blockRewardVotes(height: Int): Seq[Long] = underlying.blockRewardVotes(height)
 
   override def wavesAmount(height: Int): BigInt = underlying.wavesAmount(height)
-
-  override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] =
-    underlying.balanceAtHeight(address, height, assetId)
 
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = underlying.resolveERC20Address(address)
 }

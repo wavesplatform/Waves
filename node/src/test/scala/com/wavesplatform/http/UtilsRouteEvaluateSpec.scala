@@ -547,7 +547,6 @@ class UtilsRouteEvaluateSpec
 
       // TODO test: override with a smaller
       // TODO test: default address?
-      // TODO test: generating balance
 
       "expr" in {
         def mkExprJson(state: JsObject): JsObject =
@@ -706,6 +705,94 @@ class UtilsRouteEvaluateSpec
                       )
                     }
                   )
+                }
+              }
+            }
+          }
+        }
+      }
+
+      "waves balances" in {
+        val miner        = scriptTransferReceiver
+        val minerAddress = miner.toAddress
+
+        val script = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = ([], wavesBalance(Address(base58'$minerAddress')))
+             | """.stripMargin
+        )
+        val setScriptTx = setScript(dAppAccount, script)
+
+        def invocation(state: JsObject) =
+          Json
+            .parse(
+              s""" {
+                 |  "expr": "default()",
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
+            )
+            .as[JsObject]
+
+        val minerInitialWavesBalance = 10001
+        val leasingTx                = lease(miner, dAppAddress, 333)
+
+        withDomain(
+          RideV6,
+          Seq(
+            AddrWithBalance(dAppAddress, setScriptTx.fee.value),
+            AddrWithBalance(minerAddress, minerInitialWavesBalance + leasingTx.fee.value)
+          )
+        ) { d =>
+          d.appendBlock(setScriptTx, leasingTx)
+          val route = utilsApi.copy(blockchain = d.blockchain).route
+
+          markup("without overrides")
+          Post(
+            routePath(s"/script/evaluate/$dAppAddress"),
+            invocation(Json.obj())
+          ) ~> route ~> check {
+            val json = responseAs[JsValue]
+            withClue(s"${Json.prettyPrint(json)}: ") {
+              (json \ "error").toOption shouldBe empty
+              withClue("result: ") {
+                def check(tpe: String, expected: Long): Unit = withClue(s"$tpe: ") {
+                  (json \ "result" \ "value" \ "_2" \ "value" \ tpe \ "value").asOpt[Long] shouldBe Some(expected)
+                }
+
+                check("available", minerInitialWavesBalance - leasingTx.amount.value)
+                check("regular", minerInitialWavesBalance)
+                check("generating", minerInitialWavesBalance - leasingTx.amount.value)
+                check("effective", minerInitialWavesBalance - leasingTx.amount.value)
+              }
+            }
+          }
+
+          markup("with overrides")
+          forAll(Table[Int]("regularBalanceDiff", -1000, 0, 1000)) { regularBalanceDiff =>
+            val minerOverriddenWavesBalance = minerInitialWavesBalance + regularBalanceDiff
+            Post(
+              routePath(s"/script/evaluate/$dAppAddress"),
+              invocation(
+                Json.obj(
+                  "accounts" -> Json.obj(
+                    minerAddress.toString -> Json.obj("regularBalance" -> minerOverriddenWavesBalance)
+                  )
+                )
+              )
+            ) ~> route ~> check {
+              val json = responseAs[JsValue]
+              withClue(s"${Json.prettyPrint(json)}: ") {
+                (json \ "error").toOption shouldBe empty
+                withClue("result: ") {
+                  def check(tpe: String, expected: Long): Unit = withClue(s"$tpe: ") {
+                    (json \ "result" \ "value" \ "_2" \ "value" \ tpe \ "value").asOpt[Long] shouldBe Some(expected)
+                  }
+
+                  check("available", minerOverriddenWavesBalance - leasingTx.amount.value)
+                  check("regular", minerOverriddenWavesBalance)
+                  check("generating", math.min(minerInitialWavesBalance, minerOverriddenWavesBalance) - leasingTx.amount.value)
+                  check("effective", minerOverriddenWavesBalance - leasingTx.amount.value)
                 }
               }
             }
