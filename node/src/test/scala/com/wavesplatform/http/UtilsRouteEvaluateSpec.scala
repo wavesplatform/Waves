@@ -527,23 +527,13 @@ class UtilsRouteEvaluateSpec
           s"""
              | @Callable(i)
              | func default() = {
-             |   let receiver = Address(base58'${scriptTransferReceiver.toAddress}')
+             |   let receiver = Address(base58'$scriptTransferReceiverAddress')
              |   [ ${assetAndAmounts.map { case (asset, amount) => toScriptTransfer(asset, amount) }.mkString(", ")} ]
              | }""".stripMargin
         )
       }
 
       def mkSetScriptTx(transferAssetAmounts: (Asset, Int)*) = setScript(dAppAccount, dAppWithTransfer(transferAssetAmounts*))
-
-      println(s"""== Accounts ==
-                 |dApp:                   $dAppAddress
-                 |caller:                 $callerAddress
-                 |scriptTransferReceiver: $scriptTransferReceiverAddress
-                 |assetIssuer:            $assetIssuerAddress
-                 |
-                 |== Assets ==
-                 |asset1: $asset
-                 |""".stripMargin)
 
       "expr" in {
         def mkExprJson(state: JsObject): JsObject =
@@ -600,7 +590,7 @@ class UtilsRouteEvaluateSpec
                   (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
                     paymentAssetWithAmounts.map { case (asset, amount) =>
                       Json.obj(
-                        "address" -> scriptTransferReceiver.toAddress.toString,
+                        "address" -> scriptTransferReceiverAddress.toString,
                         "asset"   -> Json.toJson(asset),
                         "amount"  -> amount
                       )
@@ -669,8 +659,9 @@ class UtilsRouteEvaluateSpec
 
             val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
 
-            val callerWavesBalance = invocationFeeInWaves + paymentAssetWithAmounts.collect { case (a, x) if a == Asset.Waves => x }.sum
-            val callerAssetBalance = invocationFeeInAsset + paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+            def collectBalance(asset: Asset): Int = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+            val callerWavesBalance                = invocationFeeInWaves + collectBalance(Asset.Waves)
+            val callerAssetBalance                = invocationFeeInAsset + collectBalance(asset)
             val blockchainOverrides = Json.obj(
               "accounts" -> Json.obj(
                 callerAddress.toString -> Json
@@ -696,7 +687,7 @@ class UtilsRouteEvaluateSpec
                   (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
                     paymentAssetWithAmounts.map { case (asset, amount) =>
                       Json.obj(
-                        "address" -> scriptTransferReceiver.toAddress.toString,
+                        "address" -> scriptTransferReceiverAddress.toString,
                         "asset"   -> Json.toJson(asset),
                         "amount"  -> amount
                       )
@@ -766,7 +757,7 @@ class UtilsRouteEvaluateSpec
           }
 
           markup("with overrides")
-          forAll(Table[Int]("regularBalanceDiff", -1000, 0, 1000)) { regularBalanceDiff =>
+          forAll(Table("regularBalanceDiff", -1000, 0, 1000)) { regularBalanceDiff =>
             val minerOverriddenWavesBalance = minerInitialWavesBalance + regularBalanceDiff
             Post(
               routePath(s"/script/evaluate/$dAppAddress"),

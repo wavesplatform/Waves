@@ -20,8 +20,8 @@ import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.lang.{API, CompileResult, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, OverriddenBlockchain}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{Blockchain, OverriddenBlockchain}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
@@ -272,16 +272,16 @@ case class UtilsApiRoute(
         case (None, None)                                              => Left(WrongJson)
         case (Some(exprRequest), _) =>
           exprRequest.parseCall(script.stdLibVersion).flatMap { expr =>
-            val enrichedBlockchain = new OverriddenBlockchain(blockchain, exprRequest.state)
-            UtilsEvaluator.executeExpression(enrichedBlockchain, script, address, pk, limit)(
+            val overridden = new OverriddenBlockchain(blockchain, exprRequest.state)
+            UtilsEvaluator.executeExpression(overridden, script, address, pk, limit)(
               UtilsEvaluator.emptyInvokeScriptLike(address),
               dApp => Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey))
             )
           }
         case (None, Some(invocationRequest)) =>
           invocationRequest.toInvocation.flatMap { invocation =>
-            val enrichedBlockchain = new OverriddenBlockchain(blockchain, invocationRequest.state)
-            UtilsEvaluator.executeExpression(enrichedBlockchain, script, address, pk, limit)(
+            val overridden = new OverriddenBlockchain(blockchain, invocationRequest.state)
+            UtilsEvaluator.executeExpression(overridden, script, address, pk, limit)(
               UtilsEvaluator.toInvokeScriptLike(invocation, address),
               ContractEvaluator.buildExprFromInvocation(_, invocation, script.stdLibVersion).bimap(e => GenericError(e.message), _.expr)
             )

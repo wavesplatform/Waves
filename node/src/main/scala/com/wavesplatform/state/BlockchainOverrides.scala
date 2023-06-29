@@ -15,7 +15,6 @@ case class BlockchainOverrides(accounts: Map[Address, AccountOverrides] = Map.em
 object BlockchainOverrides {
   import TxNonNegativeAmount.reads
 
-  // TODO test errors, JsPath?
   implicit val accountsMapReads: Reads[Map[Address, AccountOverrides]] =
     Reads.mapReads[Address, AccountOverrides](x => Address.fromString(x).fold(e => JsError(s"Can't parse Address in accounts: $e"), JsSuccess(_)))
 

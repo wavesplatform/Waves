@@ -20,7 +20,7 @@ case class UtilsExprRequest(
 }
 
 object UtilsExprRequest {
-  implicit val byteStrFormat: Format[ByteStr]            = com.wavesplatform.utils.byteStrFormat
-  implicit val exprReads: Reads[Either[ByteStr, String]] = com.wavesplatform.api.http.eitherReads[ByteStr, String]
-  implicit val reads: Reads[UtilsExprRequest]            = Json.using[Json.WithDefaultValues].reads[UtilsExprRequest]
+  implicit val byteStrReads: Reads[ByteStr]                   = com.wavesplatform.utils.byteStrFormat
+  implicit val exprReads: Reads[Either[ByteStr, String]]      = com.wavesplatform.api.http.eitherReads[ByteStr, String]
+  implicit val utilsExprRequestReads: Reads[UtilsExprRequest] = Json.using[Json.WithDefaultValues].reads[UtilsExprRequest]
 }
