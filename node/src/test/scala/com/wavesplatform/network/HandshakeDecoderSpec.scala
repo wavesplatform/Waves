@@ -74,7 +74,7 @@ class HandshakeDecoderSpec extends FreeSpec with MockFactory {
     }
   }
 
-  "should blacklist a node sends an invalid handshake" in forAll(invalidHandshakeBytes) { bytes: Array[Byte] =>
+  "should blacklist a node sends an invalid handshake" in forAll(invalidHandshakeBytes) { (bytes: Array[Byte]) =>
     val decoder = new SpiedHandshakeDecoder
     val channel = new EmbeddedChannel(decoder)
 
