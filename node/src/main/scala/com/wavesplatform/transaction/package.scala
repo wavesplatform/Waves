@@ -43,24 +43,27 @@ package object transaction {
   object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long] {
     private val LongStringMaxLength = 20 // Long.MaxValue.toString.length
 
-    implicit val reads: Reads[TxNonNegativeAmount] = Reads {
-      case JsString(s) =>
-        if (s.length > LongStringMaxLength) JsError("error.expected.numberdigitlimit")
-        else
-          s.toLongOption match {
-            case None => JsError(JsonValidationError("error.expected.numberformatexception"))
-            case Some(r) =>
-              if (r >= 0) JsSuccess(TxNonNegativeAmount.unsafeFrom(r))
-              else JsError(JsonValidationError("error.expected.txnonnegativeamount"))
-          }
+    implicit val reads: Reads[TxNonNegativeAmount] = Reads { json =>
+      val r = json match {
+        case JsString(s) =>
+          if (s.length > LongStringMaxLength) JsError("error.expected.numberdigitlimit")
+          else
+            s.toLongOption match {
+              case None    => JsError(JsonValidationError("error.expected.numberformatexception"))
+              case Some(r) => JsSuccess(r)
+            }
 
-      case JsNumber(d) =>
-        if (d.isValidLong) {
-          if (d >= 0) JsSuccess(TxNonNegativeAmount.unsafeFrom(d.toLongExact))
-          else JsError(JsonValidationError("error.expected.txnonnegativeamount"))
-        } else JsError(JsonValidationError("error.invalid.long"))
+        case JsNumber(r) =>
+          if (r.isValidLong) JsSuccess(r.toLongExact)
+          else JsError(JsonValidationError("error.invalid.long"))
 
-      case _ => JsError(JsonValidationError("error.expected.jsnumberorjsstring"))
+        case _ => JsError(JsonValidationError("error.expected.jsnumberorjsstring"))
+      }
+
+      r.flatMap { r =>
+        if (r >= 0) JsSuccess(TxNonNegativeAmount.unsafeFrom(r))
+        else JsError(JsonValidationError("error.expected.txnonnegativeamount"))
+      }
     }
   }
 
