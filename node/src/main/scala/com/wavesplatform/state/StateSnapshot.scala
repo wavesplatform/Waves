@@ -259,8 +259,7 @@ object StateSnapshot {
       accountScripts,
       accountData,
       scriptResults,
-      ethereumTransactionMeta,
-      pbSnapshot.totalComplexity
+      ethereumTransactionMeta
     )
   }
 
