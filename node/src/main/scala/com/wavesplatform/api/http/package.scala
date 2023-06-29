@@ -4,6 +4,7 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.*
 import akka.http.scaladsl.server.Directives.*
+import cats.syntax.either.*
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBlockId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
@@ -13,6 +14,7 @@ import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
+import com.wavesplatform.meta.getSimpleClassName
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -22,11 +24,23 @@ import play.api.libs.json.*
 
 import java.util.concurrent.ExecutionException
 import scala.concurrent.Future
+import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 package object http {
   import ApiMarshallers.*
+
+  implicit def eitherReads[L, R](implicit leftReads: Reads[L], rightReads: Reads[R], leftCT: ClassTag[L], rightCT: ClassTag[R]): Reads[Either[L, R]] =
+    Reads { js =>
+      leftReads
+        .reads(js)
+        .map(_.asLeft[R])
+        .orElse {
+          rightReads.reads(js).map(_.asRight[L])
+        }
+        .orElse(JsError(s"Can't read JSON neither as ${getSimpleClassName(leftCT.runtimeClass)}, nor ${getSimpleClassName(rightCT.runtimeClass)}"))
+    }
 
   val versionReads: Reads[Byte] = {
     val defaultByteReads = implicitly[Reads[Byte]]
