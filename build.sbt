@@ -46,12 +46,12 @@ lazy val `lang-testkit` = project
   .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
   .settings(
-    libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile")))
+    libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps
   )
 
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
-  .dependsOn(`lang-testkit`)
+  .dependsOn(`lang-testkit` % "test;test->test")
 
 lazy val `lang-tests-js` = project
   .in(file("lang/tests-js"))
@@ -62,7 +62,7 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
+lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
@@ -92,7 +92,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   )
 
 lazy val `repl-jvm` = repl.jvm
-  .dependsOn(`lang-jvm`, `lang-testkit` % "test")
+  .dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
@@ -210,7 +210,7 @@ checkPRRaw := Def.taskDyn {
     .value
 
   Def.task {
-    (`lang-testkit` / Compile / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
+    (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
     res match {
       case Inc(inc: Incomplete) => throw inc
       case Value(v)             => v

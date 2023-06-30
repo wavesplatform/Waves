@@ -38,7 +38,8 @@ object Dependencies {
   val catsCore  = catsModule("core", "2.9.0")
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.14" % Test
+  val playJson    = "com.typesafe.play" %% "play-json" % "2.9.4"
+  val scalaTest   = "org.scalatest"     %% "scalatest" % "3.2.14" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
@@ -68,8 +69,7 @@ object Dependencies {
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      web3jModule("crypto"),
-      "com.typesafe.play" %% "play-json" % "2.9.3"
+      web3jModule("crypto")
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -85,8 +85,12 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.17.0",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "5.2.0",
-    ("io.qase"           % "qase-api"        % "3.0.4").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+    "org.scalamock"     %% "scalamock"       % "5.2.0"
+  ).map(_ % Test)
+
+  lazy val qaseReportDeps = Seq(
+    playJson,
+    ("io.qase" % "qase-api" % "3.0.4").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -120,6 +124,7 @@ object Dependencies {
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
+      playJson,
       "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
       akkaModule("actor"),
       akkaModule("stream"),

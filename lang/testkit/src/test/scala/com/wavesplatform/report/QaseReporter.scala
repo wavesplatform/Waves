@@ -5,7 +5,7 @@ import io.qase.api.QaseClient
 import io.qase.api.utils.IntegrationUtils
 import io.qase.client.model.ResultCreate
 import org.scalatest.Reporter
-import org.scalatest.events.{Event, RunAborted, RunCompleted, RunStopped, TestFailed, TestSucceeded}
+import org.scalatest.events.*
 import play.api.libs.json.{Format, Json}
 
 import java.io.FileWriter
