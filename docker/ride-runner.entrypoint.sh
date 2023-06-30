@@ -5,6 +5,8 @@ shopt -s nullglob
 #   -XX:+HeapDumpOnOutOfMemoryError
 #   -XX:HeapDumpPath=${RDATA}/heap-dumps
 #
+# -Djdk.attach.allowAttachSelf=true for ehcache/sizeoOf
+#
 # GCLockerRetryAllocationCount to prevent false OOM
 #
 # UnlockDiagnosticVMOptions is required for GCLockerRetryAllocationCount, otherwise we get:
@@ -23,6 +25,7 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   -XX:GCLockerRetryAllocationCount=100
   -Xmx${RIDE_HEAP_SIZE}
   -XX:MaxMetaspaceSize=152m
+  -Djdk.attach.allowAttachSelf=true
   -Dfile.encoding=UTF-8
   -Dlogback.configurationFile=${RIDE_LOGBACK_CONFIG}
   -Dlogback.stdout.level=${RIDE_LOG_LEVEL}

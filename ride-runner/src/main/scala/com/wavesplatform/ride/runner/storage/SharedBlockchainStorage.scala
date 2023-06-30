@@ -562,7 +562,7 @@ object SharedBlockchainStorage {
       db: RideDbAccess,
       persistentCaches: PersistentCaches,
       blockchainApi: BlockchainApi
-  )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] =
+  )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] =
     new SharedBlockchainStorage[TagT](settings, db, persistentCaches, blockchainApi).tap(_.load())
 
   case class Settings(blockchain: BlockchainSettings, commonCache: CommonCache.Settings)

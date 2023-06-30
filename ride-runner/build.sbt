@@ -24,6 +24,7 @@ inConfig(Compile)(
 )
 
 val commonJavaOptions = Seq(
+  "-Djdk.attach.allowAttachSelf=true",
   // JVM default charset for proper and deterministic getBytes behaviour
   "-Dfile.encoding=UTF-8"
 ) ++ Seq("lang", "math", "util").map(x => s"--add-opens=java.base/java.$x=ALL-UNNAMED") // For ehcache
