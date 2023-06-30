@@ -11,7 +11,7 @@ import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, transfer}
@@ -130,9 +130,9 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr]) = {
           val (txs, constraint, stateHash) = inner.packUnconfirmed(rest, None, strategy, cancelled)
           val waitingConstraint = new MiningConstraint {
-            def isFull                                          = { eventHasBeenSent.await(); constraint.isFull }
-            def isOverfilled                                    = constraint.isOverfilled
-            def put(b: Blockchain, tx: Transaction, diff: Diff) = constraint.put(b, tx, diff)
+            def isFull                                                = { eventHasBeenSent.await(); constraint.isFull }
+            def isOverfilled                                          = constraint.isOverfilled
+            def put(b: Blockchain, tx: Transaction, s: StateSnapshot) = constraint.put(b, tx, s)
           }
           (txs, waitingConstraint, stateHash)
         }

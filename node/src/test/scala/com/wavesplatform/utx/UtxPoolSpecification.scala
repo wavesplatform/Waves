@@ -42,8 +42,8 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.Eventually
+import org.scalatest.{Assertion, EitherValues}
 
 import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
@@ -656,7 +656,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(
-            OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber, "scriptRunNumber"),
+            OneDimensionalMiningConstraint(3, TxEstimators.scriptsComplexity, "KeyBlock"),
             OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one, "KeyBlock")
           )
         )
@@ -924,9 +924,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invokeTx)
         val event = events.head.asInstanceOf[UtxEvent.TxAdded]
         event.tx.id() shouldBe invokeTx.id()
-        event.diff.scriptsComplexity shouldBe 1011
-        event.diff.portfolios(secondAddress) shouldBe Portfolio.waves(-1)
-        event.diff.portfolios(recipient) shouldBe Portfolio.waves(1)
+        event.snapshot.scriptsComplexity shouldBe 1011
+        event.snapshot.balances((secondAddress, Waves)) shouldBe d.blockchainUpdater.balance(secondAddress, Waves) - 1
+        event.snapshot.balances((recipient, Waves)) shouldBe d.blockchainUpdater.balance(recipient, Waves) + 1
       }
 
       "sync calls are fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
@@ -1122,7 +1122,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               d.blockchainUpdater,
               _: Transaction
             ).resultE.explicitGet()
-            val validTransferDiff = differ(validTransfer)
+            val validTransferDiff = StateSnapshot.fromDiff(differ(validTransfer), d.blockchainUpdater)
             addUnverified(validTransfer)
             addUnverified(invalidTransfer)
             assertEvents { case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass

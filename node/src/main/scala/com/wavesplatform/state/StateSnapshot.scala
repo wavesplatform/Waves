@@ -123,6 +123,9 @@ case class StateSnapshot(
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
 
+  def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
+    scriptResults.get(txId).flatMap(_.error)
+
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
     assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap
 

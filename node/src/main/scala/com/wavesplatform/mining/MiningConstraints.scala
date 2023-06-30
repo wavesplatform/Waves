@@ -22,7 +22,6 @@ object MiningConstraints {
     val activatedFeatures     = blockchain.activatedFeaturesAt(height)
     val isNgEnabled           = activatedFeatures.contains(BlockchainFeatures.NG.id)
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
-    val isScriptEnabled       = activatedFeatures.contains(BlockchainFeatures.SmartAccounts.id)
     val isDAppsEnabled        = activatedFeatures.contains(BlockchainFeatures.Ride4DApps.id)
 
     val total: MiningConstraint =
@@ -42,11 +41,8 @@ object MiningConstraints {
             NonEmptyList
               .of(OneDimensionalMiningConstraint(complexityLimit, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total)
           )
-        } else if (isScriptEnabled)
-          MultiDimensionalMiningConstraint(
-            NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total)
-          )
-        else total,
+        } else
+          total,
       keyBlock =
         if (isNgEnabled) OneDimensionalMiningConstraint(0, TxEstimators.one, "MaxTxsInKeyBlock")
         else OneDimensionalMiningConstraint(ClassicAmountOfTxsInBlock, TxEstimators.one, "MaxTxsInKeyBlock"),
