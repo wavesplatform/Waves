@@ -36,7 +36,7 @@ class ClientSpec extends FreeSpec with MockFactory {
   "should add a server's channel to all channels after the handshake only" in {
     var channelWasAdded = false
     val allChannels     = mock[ChannelGroup]
-    (allChannels.add _).expects(*).onCall { _: Channel =>
+    (allChannels.add _).expects(*).onCall { (_: Channel) =>
       channelWasAdded = true
       true
     }
