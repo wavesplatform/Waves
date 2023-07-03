@@ -14,7 +14,6 @@ import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
-import com.wavesplatform.meta.getSimpleClassName
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -39,7 +38,7 @@ package object http {
         .orElse {
           rightReads.reads(js).map(_.asRight[L])
         }
-        .orElse(JsError(s"Can't read JSON neither as ${getSimpleClassName(leftCT.runtimeClass)}, nor ${getSimpleClassName(rightCT.runtimeClass)}"))
+        .orElse(JsError(s"Can't read JSON neither as ${leftCT.runtimeClass.getSimpleName}, nor ${rightCT.runtimeClass.getSimpleName}"))
     }
 
   val versionReads: Reads[Byte] = {
