@@ -11,7 +11,7 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
@@ -135,7 +135,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             .foldLeft(genesis.header.stateHash.get -> Diff.empty) { case ((prevStateHash, accDiff), tx) =>
               val blockchain = CompositeBlockchain(d.blockchain, accDiff)
               val txDiff     = txDiffer(blockchain, tx).resultE.explicitGet()
-              val stateHash  = TxStateSnapshotHashBuilder.createHashFromTxDiff(blockchain, txDiff).createHash(prevStateHash)
+              val txSnapshot = StateSnapshot.fromDiff(txDiff, blockchain)
+              val stateHash  = TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, succeeded = true).createHash(prevStateHash)
               (stateHash, accDiff.combineF(txDiff).explicitGet())
             }
             ._1

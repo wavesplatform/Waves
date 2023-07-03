@@ -221,7 +221,9 @@ object BlockDiffer {
             ) =>
           val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
-            val txSnapshot        = StateSnapshot.fromDiff(thisTxDiff, currBlockchain).withTransaction(thisTxDiff.transactions.head)
+            val txInfo     = thisTxDiff.transactions.head
+            val txSnapshot = StateSnapshot.fromDiff(thisTxDiff, currBlockchain).withTransaction(txInfo)
+
             val updatedConstraint = currConstraint.put(currBlockchain, tx, txSnapshot)
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
@@ -241,7 +243,7 @@ object BlockDiffer {
               val newSnapshot = currSnapshot |+| txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
               val newMinerSnapshot =
                 minerSnapshot
-                  .withTransaction(thisTxDiff.transactions.head)
+                  .withTransaction(txInfo)
                   .addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
 
               val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
@@ -253,7 +255,7 @@ object BlockDiffer {
                 updatedConstraint,
                 newMinerSnapshot,
                 prevStateHashOpt
-                  .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxDiff(currBlockchain, thisTxDiff).createHash(prevStateHash))
+                  .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, txInfo.applied).createHash(prevStateHash))
               )
               TracedResult(result.asRight)
             }
