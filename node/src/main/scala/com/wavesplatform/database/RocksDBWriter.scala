@@ -505,7 +505,7 @@ class RocksDBWriter(
           val txId = TransactionId(id)
 
           val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((meta, tx)))
-          rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txInfo.snapshot.toProtobuf))
+          rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txInfo.snapshot.toProtobuf(txInfo.applied)))
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !meta.succeeded, 0, size)))
           targetBf.put(id.arr)
 

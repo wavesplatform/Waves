@@ -8,10 +8,9 @@ import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.{AssetStatic, TransactionStatus}
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
@@ -41,7 +40,7 @@ case class StateSnapshot(
 ) {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
-  def toProtobuf: TransactionStateSnapshot =
+  def toProtobuf(txSucceeded: Boolean): TransactionStateSnapshot =
     TransactionStateSnapshot(
       balances.map { case ((address, asset), balance) =>
         S.Balance(address.toByteString, Some(Amount(asset.fold(ByteString.EMPTY)(_.id.toByteString), balance)))
@@ -82,7 +81,7 @@ case class StateSnapshot(
           height
         )
       }.toSeq,
-      accountScripts.map { case (address, scriptOpt) =>
+      accountScripts.map { case (_, scriptOpt) =>
         scriptOpt.fold(
           S.AccountScript()
         )(script =>
@@ -99,20 +98,7 @@ case class StateSnapshot(
       sponsorships.collect { case (asset, SponsorshipValue(minFee)) =>
         S.Sponsorship(asset.id.toByteString, minFee)
       }.toSeq,
-      scriptResults.map { case (txId, script) =>
-        S.ScriptResult(txId.toByteString, Some(InvokeScriptResult.toPB(script, addressForTransfer = true)))
-      }.toSeq,
-      ethereumTransactionMeta.map { case (txId, meta) =>
-        val payload = meta.payload match {
-          case Payload.Empty =>
-            S.EthereumTransactionMeta.Payload.Empty
-          case Payload.Invocation(value) =>
-            S.EthereumTransactionMeta.Payload.Invocation(S.EthereumTransactionMeta.Invocation(value.functionCall, value.payments))
-          case Payload.Transfer(value) =>
-            S.EthereumTransactionMeta.Payload.Transfer(S.EthereumTransactionMeta.Transfer(value.publicKeyHash, value.amount))
-        }
-        S.EthereumTransactionMeta(txId.toByteString, payload)
-      }.toSeq
+      transactionStatus = if (txSucceeded) TransactionStatus.SUCCEEDED else TransactionStatus.FAILED
     )
 
   def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): StateSnapshot = {
@@ -134,7 +120,7 @@ case class StateSnapshot(
 }
 
 object StateSnapshot {
-  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): StateSnapshot = {
+  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, Boolean) = {
     val balances: VectorMap[(Address, Asset), Long] =
       VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
@@ -226,43 +212,23 @@ object StateSnapshot {
         data.address.toAddress -> entries
       }.toMap
 
-    val scriptResults: Map[ByteStr, InvokeScriptResult] =
-      pbSnapshot.scriptResults.map { pbResult =>
-        val txId   = pbResult.transactionId.toByteStr
-        val result = InvokeScriptResult.fromPB(pbResult.getResult)
-        txId -> result
-      }.toMap
-
-    val ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] =
-      pbSnapshot.ethereumTransactionMeta.map { pbMeta =>
-        import TransactionStateSnapshot.EthereumTransactionMeta as M
-        val payload = pbMeta.payload match {
-          case M.Payload.Empty =>
-            Payload.Empty
-          case M.Payload.Invocation(M.Invocation(functionCall, payments, _)) =>
-            Payload.Invocation(EthereumTransactionMeta.Invocation(functionCall, payments))
-          case M.Payload.Transfer(M.Transfer(publicKeyHash, amount, _)) =>
-            Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
-        }
-        pbMeta.transactionId.toByteStr -> EthereumTransactionMeta(payload)
-      }.toMap
-
-    StateSnapshot(
-      VectorMap(),
-      balances,
-      leaseBalances,
-      assetStatics,
-      assetVolumes,
-      assetNamesAndDescriptions,
-      assetScripts,
-      sponsorships,
-      leaseStates,
-      aliases,
-      orderFills,
-      accountScripts,
-      accountData,
-      scriptResults,
-      ethereumTransactionMeta
+    (
+      StateSnapshot(
+        VectorMap(),
+        balances,
+        leaseBalances,
+        assetStatics,
+        assetVolumes,
+        assetNamesAndDescriptions,
+        assetScripts,
+        sponsorships,
+        leaseStates,
+        aliases,
+        orderFills,
+        accountScripts,
+        accountData
+      ),
+      pbSnapshot.transactionStatus.isSucceeded
     )
   }
 
