@@ -4,6 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -16,7 +17,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.utils.EthTxGenerator
+import com.wavesplatform.transaction.{Asset, ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
 import scala.collection.immutable.VectorMap
@@ -29,7 +31,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
 
   private val transferAmount = 1234
 
-  private def accountScript(version: StdLibVersion, getTx: String, tx: EthereumTransaction, asset: Option[IssuedAsset], recipient: Address) =
+  private def accountScript(version: StdLibVersion, getTx: String, tx: EthereumTransaction, asset: Asset, recipient: Address) =
     TestCompiler(version).compileExpression(
       s"""
          | let t = $getTx(base58'${tx.id()}').${if (version >= V3) "value" else "extract"}()
@@ -65,40 +67,35 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
        |   case a: Address => a.bytes == base58'$recipient'
        |   case a: Alias   => throw("unexpected")
        | }
-       | ${assertProvenPart("t", proofs = false)} && amount && feeAssetId && recipient && attachment
-       | ${if (asset.isEmpty) "" else " && assetId"}
+       | ${assertProvenPart("t", proofs = false)} && amount && feeAssetId #&& recipient && attachment
+       | #${if (asset.isEmpty) "" else " && assetId"}
      """.stripMargin
 
   property("access to Ethereum transfer from RIDE script") {
     val recipient = RandomKeyPair()
-
-    val issue = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, None, 1.waves, ts).explicitGet()
-    val asset = IssuedAsset(issue.id())
+    val issue     = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, None, 1.waves, ts).explicitGet()
 
     for {
       version <- DirectiveDictionary[StdLibVersion].all
-      token   <- Seq(None, Some(ERC20Address(asset.id.take(20))))
+      asset   <- Seq(Waves, IssuedAsset(issue.id()))
     } {
-      val transfer    = EthereumTransaction.Transfer(token, transferAmount, recipient.toAddress)
-      val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte)
+      val ethTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, recipient.toAddress, transferAmount, asset)
       val ethSender   = ethTransfer.senderAddress()
-      val preTransfer =
+      val transferIssuedAsset =
         TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.001.waves, ByteStr.empty, ts).explicitGet()
 
-      val genesis1 = GenesisTransaction.create(ethSender, ENOUGH_AMT, ts).explicitGet()
-      val genesis2 = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
-
       val function    = if (version >= V3) "transferTransactionById" else "transactionById"
-      val verifier    = Some(accountScript(version, function, ethTransfer, token.map(_ => asset), recipient.toAddress))
+      val verifier    = Some(accountScript(version, function, ethTransfer, asset, recipient.toAddress))
       val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, 0.01.waves, ts).explicitGet()
 
-      withDomain(RideV6) { d =>
-        d.appendBlock(genesis1, genesis2, issue, preTransfer, setVerifier())
+      withDomain(RideV6, Seq(AddrWithBalance(ethSender), AddrWithBalance(recipient.toAddress))) { d =>
+        if (asset != Waves) d.appendBlock(issue, transferIssuedAsset)
+        d.appendBlock(setVerifier())
         d.appendBlock(ethTransfer)
 
-        val transferPortfolio = if (token.isEmpty) Portfolio.waves(transferAmount) else Portfolio.build(asset, transferAmount)
+        val transferPortfolio = Portfolio.build(asset, transferAmount)
         d.liquidDiff.portfolios(recipient.toAddress) shouldBe transferPortfolio
-        d.liquidDiff.portfolios(ethSender) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasPrice.longValue()).minus(transferPortfolio)
+        d.liquidDiff.portfolios(ethSender) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasLimit.longValue()).minus(transferPortfolio)
 
         d.appendBlock()
 

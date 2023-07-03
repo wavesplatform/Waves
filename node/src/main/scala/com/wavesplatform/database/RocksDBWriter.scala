@@ -18,7 +18,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
@@ -859,12 +858,9 @@ class RocksDBWriter(
         .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
           case (tm, t: TransferTransaction) if tm.succeeded => t
-          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
-            val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
-            val transfer = meta.payload.transfer.get
-            val tAmount  = transfer.amount.get
-            val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
-            e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
+          case (m, e @ EthereumTransaction(transfer: Transfer, _, _, _)) if m.succeeded =>
+            val asset = transfer.tokenAddress.fold[Asset](Waves)(resolveERC20Address(_).get)
+            e.toTransferLike(TxPositiveAmount.unsafeFrom(transfer.amount), transfer.recipient, asset)
         }
     } yield (height, tx)
   }
