@@ -80,7 +80,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = Map.empty
 
-  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] = Seq.empty
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 

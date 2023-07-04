@@ -182,7 +182,3 @@ class BlockChallenger(
       } else Task.unit
     }
 }
-
-object BlockChallenger {
-  val MaliciousMinerBanPeriod = 1000
-}

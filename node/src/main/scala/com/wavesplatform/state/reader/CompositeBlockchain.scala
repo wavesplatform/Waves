@@ -11,7 +11,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.BlockChallenger.MaliciousMinerBanPeriod
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -52,9 +51,9 @@ final class CompositeBlockchain private (
       address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))
     }
 
-  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] = {
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
     val maybeLastBlockBan = blockMeta.flatMap(_._1.header.challengedHeader).map(_.generator.toAddress) match {
-      case Some(generator) if address == generator => Seq((height, height + MaliciousMinerBanPeriod - 1))
+      case Some(generator) if address == generator => Seq(height)
       case _                                       => Seq.empty
     }
     maybeLastBlockBan ++ inner.effectiveBalanceBanHeights(address)

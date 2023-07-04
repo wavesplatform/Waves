@@ -157,6 +157,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b).explicitGet()
 
+  def appendMicroBlockE(b: MicroBlock): Either[ValidationError, BlockId] = blockchainUpdater.processMicroBlock(b)
+
   def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.getOrElse(randomSig)
 
   def carryFee: Long = blockchainUpdater.carryFee
@@ -265,7 +267,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
     Try(appendMicroBlock(txs*)).toEither
 
-  def createMicroBlock(stateHash: Option[ByteStr], txs: Transaction*): MicroBlock = {
+  def createMicroBlock(stateHash: Option[ByteStr], signer: Option[KeyPair], txs: Transaction*): MicroBlock = {
     val lastBlock = this.lastBlock
     val block = Block
       .buildAndSign(
@@ -275,7 +277,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         lastBlock.header.baseTarget,
         lastBlock.header.generationSignature,
         lastBlock.transactionData ++ txs,
-        defaultSigner,
+        signer.getOrElse(defaultSigner),
         lastBlock.header.featureVotes,
         lastBlock.header.rewardVote,
         stateHash.orElse(lastBlock.header.stateHash),
@@ -283,12 +285,19 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       )
       .explicitGet()
     MicroBlock
-      .buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature, block.header.stateHash)
+      .buildAndSign(
+        lastBlock.header.version,
+        signer.getOrElse(defaultSigner),
+        txs,
+        blockchainUpdater.lastBlockId.get,
+        block.signature,
+        block.header.stateHash
+      )
       .explicitGet()
   }
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
-    val mb = createMicroBlock(None, txs*)
+    val mb = createMicroBlock(None, None, txs*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 
@@ -366,7 +375,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           if (initDiff == Diff.empty) prevStateHash
           else TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(prevStateHash)
 
-        Some(computeStateHash(txs, initStateHash, initDiff, generator, timestamp, blockchain))
+        Some(computeStateHash(txs, initStateHash, initDiff, generator, timestamp, challengedHeader.nonEmpty, blockchain))
       } else None
     }
 
@@ -476,6 +485,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       initDiff: Diff,
       signer: KeyPair,
       timestamp: Long,
+      isChallenging: Boolean,
       blockchain: Blockchain
   ): ByteStr = {
     val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, timestamp) _
@@ -484,10 +494,16 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       .foldLeft(initStateHash -> initDiff) { case ((prevStateHash, accDiff), tx) =>
         val compBlockchain = CompositeBlockchain(blockchain, accDiff)
         val minerDiff      = Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart)))
-        val txDiff         = txDiffer(compBlockchain, tx).resultE.explicitGet()
-        val stateHash =
-          TxStateSnapshotHashBuilder.createHashFromDiff(compBlockchain, txDiff.combineF(minerDiff).explicitGet()).createHash(prevStateHash)
-        (stateHash, accDiff.combineF(txDiff).flatMap(_.combineF(minerDiff)).explicitGet())
+        txDiffer(compBlockchain, tx).resultE match {
+          case Right(txDiff) =>
+            val stateHash =
+              TxStateSnapshotHashBuilder.createHashFromDiff(compBlockchain, txDiff.combineF(minerDiff).explicitGet()).createHash(prevStateHash)
+            (stateHash, accDiff.combineF(txDiff).flatMap(_.combineF(minerDiff)).explicitGet())
+          case Left(_) if isChallenging =>
+            (prevStateHash, accDiff)
+          case Left(err) => throw new RuntimeException(err.toString)
+        }
+
       }
       ._1
   }

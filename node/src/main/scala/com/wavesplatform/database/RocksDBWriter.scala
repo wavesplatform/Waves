@@ -18,7 +18,6 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, Status as PBStatus, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.BlockChallenger.MaliciousMinerBanPeriod
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBAmounts
@@ -430,9 +429,9 @@ class RocksDBWriter(
 
       blockMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
         case Some(addr) =>
-          val key          = Keys.maliciousMinerEndBanHeights(addr.bytes)
+          val key          = Keys.maliciousMinerBanHeights(addr.bytes)
           val savedHeights = rw.get(key)
-          rw.put(key, (height + MaliciousMinerBanPeriod - 1) +: savedHeights)
+          rw.put(key, height +: savedHeights)
         case _ => ()
       }
 
@@ -758,7 +757,7 @@ class RocksDBWriter(
 
           discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
             case Some(addr) =>
-              val key        = Keys.maliciousMinerEndBanHeights(addr.bytes)
+              val key        = Keys.maliciousMinerBanHeights(addr.bytes)
               val banHeights = rw.get(key)
               rw.put(key, banHeights.tail)
             case _ => ()
@@ -997,7 +996,7 @@ class RocksDBWriter(
     addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, isBanned = false))) { addressId =>
       val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
 
-      val banHeights = effectiveBalanceBanHeights(address)
+      val banHeights = effectiveBalanceBanHeights(address).toSet
 
       val lastBalance      = balancesCache.get((address, Asset.Waves))
       val lastLeaseBalance = leaseBalanceCache.get(address)
@@ -1030,7 +1029,7 @@ class RocksDBWriter(
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
       } yield {
         val height   = wh.max(lh)
-        val isBanned = banHeights.exists { case (start, end) => height >= start && height <= end }
+        val isBanned = banHeights.contains(height)
         BalanceSnapshot(height, wb.balance, lb.in, lb.out, isBanned)
       }
     }
@@ -1078,8 +1077,8 @@ class RocksDBWriter(
     }
   }
 
-  override def effectiveBalanceBanHeights(address: Address): Seq[(Int, Int)] =
-    readOnly(_.get(Keys.maliciousMinerEndBanHeights(address.bytes)).map(endBanHeight => (endBanHeight - MaliciousMinerBanPeriod + 1, endBanHeight)))
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] =
+    readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

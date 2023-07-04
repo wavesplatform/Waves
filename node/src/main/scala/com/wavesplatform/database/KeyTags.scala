@@ -59,7 +59,7 @@ object KeyTags extends Enumeration {
   SponsoredAssets,
   StateHash,
   EthereumTransactionMeta,
-  MaliciousMinerEndBanHeights = Value
+  MaliciousMinerBanHeights = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)
