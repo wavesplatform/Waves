@@ -6,12 +6,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
@@ -134,8 +135,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           val blockStateHash = txs
             .foldLeft(genesis.header.stateHash.get -> Diff.empty) { case ((prevStateHash, accDiff), tx) =>
               val blockchain = CompositeBlockchain(d.blockchain, accDiff)
-              val txDiff     = txDiffer(blockchain, tx).resultE.explicitGet()
-              val txSnapshot = StateSnapshot.fromDiff(txDiff, blockchain)
+              val txSnapshot = txDiffer(blockchain, tx).resultE.explicitGet()
+              val txDiff     = txSnapshot.toDiff(blockchain)
               val stateHash  = TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, succeeded = true).createHash(prevStateHash)
               (stateHash, accDiff.combineF(txDiff).explicitGet())
             }

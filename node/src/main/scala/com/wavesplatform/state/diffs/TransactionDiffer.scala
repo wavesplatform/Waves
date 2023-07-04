@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.{toFoldableOps, toTraverseOps}
+import cats.implicits.{catsSyntaxSemigroup, toFoldableOps, toTraverseOps}
 import cats.instances.either.*
 import cats.syntax.either.*
 import cats.syntax.functor.*
@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship, StateSnapshot}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -30,7 +30,7 @@ object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true, enableExecutionLog: Boolean = false)(
       blockchain: Blockchain,
       tx: Transaction
-  ): TracedResult[ValidationError, Diff] =
+  ): TracedResult[ValidationError, StateSnapshot] =
     validate(prevBlockTs, currentBlockTs, verify, limitedExecution = false, enableExecutionLog = enableExecutionLog)(blockchain, tx) match {
       case isFailedTransaction((complexity, scriptResult, trace, attributes)) if acceptFailed(blockchain) =>
         TracedResult(failedTransactionDiff(blockchain, tx, complexity, scriptResult), trace, attributes)
@@ -41,7 +41,7 @@ object TransactionDiffer {
   def forceValidate(prevBlockTs: Option[Long], currentBlockTs: Long, enableExecutionLog: Boolean = false)(
       blockchain: Blockchain,
       tx: Transaction
-  ): TracedResult[ValidationError, Diff] =
+  ): TracedResult[ValidationError, StateSnapshot] =
     validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false, enableExecutionLog = enableExecutionLog)(blockchain, tx)
 
   def limitedExecution(
@@ -53,7 +53,7 @@ object TransactionDiffer {
   )(
       blockchain: Blockchain,
       tx: Transaction
-  ): TracedResult[ValidationError, Diff] = {
+  ): TracedResult[ValidationError, StateSnapshot] = {
     val limitedExecution = if (unlimited) false else transactionMayFail(tx) && acceptFailed(blockchain)
     validate(
       prevBlockTimestamp,
@@ -79,24 +79,25 @@ object TransactionDiffer {
   )(
       blockchain: Blockchain,
       tx: Transaction
-  ): TracedResult[ValidationError, Diff] = {
+  ): TracedResult[ValidationError, StateSnapshot] = {
     val runVerifiers = verify || (transactionMayFail(tx) && acceptFailed(blockchain))
     val result = for {
-      _               <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify).traced
-      _               <- validateFunds(blockchain, tx).traced
-      verifierDiff    <- if (runVerifiers) verifierDiff(blockchain, tx, enableExecutionLog) else Right(Diff.empty).traced
-      transactionDiff <- transactionDiff(blockchain, tx, verifierDiff, currentBlockTimestamp, limitedExecution, enableExecutionLog)
-      remainingComplexity = if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionDiff.scriptsComplexity.toInt else Int.MaxValue
-      _ <- validateBalance(blockchain, tx.tpe, transactionDiff).traced.leftMap { err =>
+      _                   <- validateCommon(blockchain, tx, prevBlockTimestamp, currentBlockTimestamp, verify).traced
+      _                   <- validateFunds(blockchain, tx).traced
+      verifierSnapshot    <- if (runVerifiers) verifierDiff(blockchain, tx, enableExecutionLog) else TracedResult.wrapValue(StateSnapshot.empty)
+      transactionSnapshot <- transactionSnapshot(blockchain, tx, verifierSnapshot, currentBlockTimestamp, limitedExecution, enableExecutionLog)
+      remainingComplexity =
+        if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - transactionSnapshot.scriptsComplexity.toInt else Int.MaxValue
+      _ <- validateBalance(blockchain, tx.tpe, transactionSnapshot).traced.leftMap { err =>
         def acceptFailedByBalance(): Boolean =
           acceptFailed(blockchain) && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
 
-        if (transactionDiff.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
-          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionDiff.scriptsComplexity, Nil, Some(err.toString))
+        if (transactionSnapshot.scriptsComplexity > ContractLimits.FailFreeInvokeComplexity && transactionMayFail(tx) && acceptFailedByBalance())
+          FailedTransactionError(FailedTransactionError.Cause.DAppExecution, transactionSnapshot.scriptsComplexity, Nil, Some(err.toString))
         else
           err
       }
-      diff <- assetsVerifierDiff(blockchain, tx, runVerifiers, transactionDiff, remainingComplexity, enableExecutionLog)
+      diff <- assetsVerifierDiff(blockchain, tx, runVerifiers, transactionSnapshot, remainingComplexity, enableExecutionLog)
     } yield diff
 
     result
@@ -150,7 +151,7 @@ object TransactionDiffer {
                 if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight) {
                   ExchangeTransactionDiff
                     .getPortfolios(blockchain, etx)
-                    .flatMap(pfs => validateBalance(blockchain, etx.tpe, Diff(portfolios = pfs)))
+                    .flatMap(pfs => validateBalance(blockchain, etx.tpe, StateSnapshot.fromDiff(Diff(portfolios = pfs), blockchain)))
                 } else Right(())
             } yield ()
           case itx: InvokeScriptTransaction => validatePayments(blockchain, itx)
@@ -158,17 +159,18 @@ object TransactionDiffer {
         }
       } yield ()
 
-  private[this] def verifierDiff(blockchain: Blockchain, tx: Transaction, enableExecutionLog: Boolean): TracedResult[ValidationError, Diff] =
-    Verifier(blockchain, enableExecutionLog = enableExecutionLog)(tx).map(complexity => Diff(scriptsComplexity = complexity))
+  private[this] def verifierDiff(blockchain: Blockchain, tx: Transaction, enableExecutionLog: Boolean): TracedResult[ValidationError, StateSnapshot] =
+    Verifier(blockchain, enableExecutionLog = enableExecutionLog)(tx)
+      .map(complexity => StateSnapshot(scriptsComplexity = complexity))
 
   def assetsVerifierDiff(
       blockchain: Blockchain,
       tx: TransactionBase,
       verify: Boolean,
-      initDiff: Diff,
+      initSnapshot: StateSnapshot,
       remainingComplexity: Int,
       enableExecutionLog: Boolean
-  ): TracedResult[ValidationError, Diff] = {
+  ): TracedResult[ValidationError, StateSnapshot] = {
     val diff = if (verify) {
       Verifier.assets(blockchain, remainingComplexity, enableExecutionLog)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if transactionMayFail(tx) && acceptFailed(blockchain) =>
@@ -179,23 +181,25 @@ object TransactionDiffer {
       }
     } else Diff.empty.asRight[ValidationError].traced
 
-    diff.flatMap(d => initDiff.combineE(d)).leftMap {
-      case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
-      case ve                          => ve
-    }
+    diff
+      .map(d => initSnapshot |+| StateSnapshot.fromDiff(d, blockchain))
+      .leftMap {
+        case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
+        case ve                          => ve
+      }
   }
 
-  def validateBalance(blockchain: Blockchain, txType: Transaction.Type, diff: Diff): Either[ValidationError, Unit] =
-    stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
+  def validateBalance(blockchain: Blockchain, txType: Transaction.Type, s: StateSnapshot): Either[ValidationError, Unit] =
+    stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(s).as(()))
 
-  private def transactionDiff(
+  private def transactionSnapshot(
       blockchain: Blockchain,
       tx: Transaction,
-      initDiff: Diff,
+      initSnapshot: StateSnapshot,
       currentBlockTs: TxTimestamp,
       limitedExecution: Boolean,
       enableExecutionLog: Boolean
-  ): TracedResult[ValidationError, Diff] =
+  ): TracedResult[ValidationError, StateSnapshot] =
     stats.transactionDiffValidation
       .measureForType(tx.tpe) {
         tx match {
@@ -220,9 +224,12 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(diff => initDiff.combineE(diff.bindTransaction(blockchain, tx, applied = true)))
+      .map { diff =>
+        val txSnapshot = StateSnapshot.fromDiff(diff, blockchain)
+        initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, applied = true, txSnapshot, blockchain))
+      }
       .leftMap {
-        case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
+        case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
       }
 
@@ -237,7 +244,7 @@ object TransactionDiffer {
   private def validateFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] =
     for {
       fee <- feePortfolios(blockchain, tx)
-      _   <- validateBalance(blockchain, tx.tpe, Diff(portfolios = fee))
+      _   <- validateBalance(blockchain, tx.tpe, StateSnapshot.fromDiff(Diff(portfolios = fee), blockchain))
     } yield ()
 
   private def validateOrder(blockchain: Blockchain, order: Order, matcherFee: Long): Either[ValidationError, Unit] =
@@ -250,7 +257,7 @@ object TransactionDiffer {
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
       orderDiff = Diff(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
-      _ <- validateBalance(blockchain, TransactionType.Exchange, orderDiff)
+      _ <- validateBalance(blockchain, TransactionType.Exchange, StateSnapshot.fromDiff(orderDiff, blockchain))
     } yield ()
 
   private def validatePayments(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[ValidationError, Unit] =
@@ -282,7 +289,7 @@ object TransactionDiffer {
         }
         .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
       paymentsDiff = Diff(portfolios = portfolios)
-      _ <- BalanceDiffValidation(blockchain)(paymentsDiff)
+      _ <- BalanceDiffValidation(blockchain)(StateSnapshot.fromDiff(paymentsDiff, blockchain))
     } yield ()
 
   // failed transactions related
@@ -298,7 +305,7 @@ object TransactionDiffer {
       tx: Transaction,
       spentComplexity: Long,
       scriptResult: Option[InvokeScriptResult]
-  ): Either[ValidationError, Diff] =
+  ): Either[ValidationError, StateSnapshot] =
     for {
       portfolios <- feePortfolios(blockchain, tx)
     } yield {
@@ -306,18 +313,20 @@ object TransactionDiffer {
         case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
         case _                      => Diff.empty
       }
-      Diff(
-          portfolios = portfolios,
-          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-          scriptsComplexity = spentComplexity
-        )
-        .combineF(ethereumMetaDiff)
+      val diff = Diff(
+        portfolios = portfolios,
+        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+        scriptsComplexity = spentComplexity
+      ).combineF(ethereumMetaDiff)
         .getOrElse(Diff.empty)
         .bindTransaction(blockchain, tx, applied = false)
+      StateSnapshot.fromDiff(diff, blockchain)
     }
 
   private object isFailedTransaction {
-    def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep], TracedResult.Attributes)] =
+    def unapply(
+        result: TracedResult[ValidationError, StateSnapshot]
+    ): Option[(Long, Option[InvokeScriptResult], List[TraceStep], TracedResult.Attributes)] =
       result match {
         case TracedResult(Left(TransactionValidationError(e: FailedTransactionError, _)), trace, attributes) =>
           Some((e.spentComplexity, scriptResult(e), trace, attributes))

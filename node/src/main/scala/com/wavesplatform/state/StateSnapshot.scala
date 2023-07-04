@@ -267,6 +267,13 @@ object StateSnapshot {
         assetBalances
     }
 
+  def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): StateSnapshot =
+    StateSnapshot(
+      leaseBalances = balances.map { case (address, leaseBalance) =>
+        address -> leaseBalance.combineF[Id](blockchain.leaseBalance(address))
+      }
+    )
+
   private def leaseBalances(diff: Diff, blockchain: Blockchain): Map[Address, LeaseBalance] =
     diff.portfolios.flatMap {
       case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
@@ -326,13 +333,6 @@ object StateSnapshot {
       val newInfo = value |+| blockchain.filledVolumeAndFee(orderId)
       orderId -> newInfo
     }
-
-  def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): StateSnapshot =
-    StateSnapshot(
-      leaseBalances = balances.map { case (address, leaseBalance) =>
-        address -> leaseBalance.combineF[Id](blockchain.leaseBalance(address))
-      }
-    )
 
   implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
     override val empty: StateSnapshot =

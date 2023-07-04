@@ -8,7 +8,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot}
 import com.wavesplatform.transaction.EthereumTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -56,12 +56,20 @@ object EthereumTransactionDiff {
     val baseDiff = e.payload match {
       case et: EthereumTransaction.Transfer =>
         for {
-          _         <- checkLeadingZeros(e, blockchain)
-          asset     <- TracedResult(et.tryResolveAsset(blockchain))
-          transfer  <- TracedResult(et.toTransferLike(e, blockchain))
-          assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue, enableExecutionLog)
-          diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
-          result    <- assetDiff.combineE(diff)
+          _        <- checkLeadingZeros(e, blockchain)
+          asset    <- TracedResult(et.tryResolveAsset(blockchain))
+          transfer <- TracedResult(et.toTransferLike(e, blockchain))
+          assetSnapshot <- TransactionDiffer.assetsVerifierDiff(
+            blockchain,
+            transfer,
+            verify = true,
+            StateSnapshot(),
+            Int.MaxValue,
+            enableExecutionLog
+          )
+          assetDiff = Diff(scriptsComplexity = assetSnapshot.scriptsComplexity)
+          diff   <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
+          result <- assetDiff.combineE(diff)
         } yield result
 
       case ei: EthereumTransaction.Invocation =>
@@ -69,8 +77,15 @@ object EthereumTransactionDiff {
           _          <- checkLeadingZeros(e, blockchain)
           invocation <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
           diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(invocation)
-          result     <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, diff, Int.MaxValue, enableExecutionLog)
-        } yield result
+          resultSnapshot <- TransactionDiffer.assetsVerifierDiff(
+            blockchain,
+            invocation,
+            verify = true,
+            StateSnapshot.fromDiff(diff, blockchain),
+            Int.MaxValue,
+            enableExecutionLog
+          )
+        } yield Diff(scriptsComplexity = resultSnapshot.scriptsComplexity)
     }
 
     baseDiff.flatMap(bd => TracedResult(bd.combineE(this.meta(blockchain)(e))))

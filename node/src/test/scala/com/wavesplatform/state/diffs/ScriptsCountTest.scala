@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -92,7 +93,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
     assertDiffAndState(Nil, TestBlock.create(Seq(genesis)), fs) { case (_, state) =>
       txs.foldLeft(Diff.empty) { (diff, tx) =>
         val newState = CompositeBlockchain(state, diff)
-        val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
+        val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet().toDiff(newState)
         val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
         if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
         diff.combineF(newDiff).explicitGet()

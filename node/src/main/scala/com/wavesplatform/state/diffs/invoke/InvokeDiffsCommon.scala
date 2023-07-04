@@ -508,7 +508,7 @@ object InvokeDiffsCommon {
                       tx.txId
                     )
                     val assetValidationDiff = for {
-                      _ <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(assetVerifierDiff)
+                      _ <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(StateSnapshot.fromDiff(assetVerifierDiff, blockchain))
                       assetValidationDiff <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
                         pseudoTx,
                         a.id,
@@ -658,7 +658,8 @@ object InvokeDiffsCommon {
         .flatMap(baseDiff =>
           TracedResult(
             BalanceDiffValidation
-              .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(baseDiff)
+              .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(StateSnapshot.fromDiff(baseDiff, blockchain))
+              .map(_ => baseDiff)
               .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
           )
         )

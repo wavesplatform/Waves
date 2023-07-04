@@ -220,9 +220,8 @@ object BlockDiffer {
               tx
             ) =>
           val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
-          txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
-            val txInfo     = thisTxDiff.transactions.head
-            val txSnapshot = StateSnapshot.fromDiff(thisTxDiff, currBlockchain).withTransaction(txInfo)
+          txDiffer(currBlockchain, tx).flatMap { txSnapshot =>
+            val txInfo = txSnapshot.transactions.head._2
 
             val updatedConstraint = currConstraint.put(currBlockchain, tx, txSnapshot)
             if (updatedConstraint.isOverfilled)

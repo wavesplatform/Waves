@@ -49,10 +49,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   val posSelector: PoSSelector = PoSSelector(blockchainUpdater, None)
 
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
-    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
+    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _).map(_.toDiff(blockchain))
 
   val transactionDifferWithLog: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis(), enableExecutionLog = true)(blockchain, _)
+      .map(_.toDiff(blockchain))
 
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()

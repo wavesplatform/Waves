@@ -1122,7 +1122,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               d.blockchainUpdater,
               _: Transaction
             ).resultE.explicitGet()
-            val validTransferDiff = StateSnapshot.fromDiff(differ(validTransfer), d.blockchainUpdater)
+            val validTransferDiff = differ(validTransfer)
             addUnverified(validTransfer)
             addUnverified(invalidTransfer)
             assertEvents { case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass

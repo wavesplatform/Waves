@@ -6,6 +6,7 @@ import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
@@ -139,7 +140,7 @@ class EthOrderSpec
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(100))
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
@@ -174,7 +175,7 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
+    val diff        = differ(transaction).resultE.explicitGet().toDiff(blockchain)
     diff should containAppliedTx(transaction.id())
   }
 
@@ -353,7 +354,7 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
+    val diff        = differ(transaction).resultE.explicitGet().toDiff(blockchain)
     diff should containAppliedTx(transaction.id())
   }
 
@@ -390,7 +391,7 @@ class EthOrderSpec
       sh.setScript(TxHelpers.matcher.toAddress, script)
     }
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(100))
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
     val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())

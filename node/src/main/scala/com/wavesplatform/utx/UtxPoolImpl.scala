@@ -15,7 +15,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -199,13 +199,12 @@ case class UtxPoolImpl(
   ): TracedResult[ValidationError, Boolean] = {
     val diffEi = {
       def calculateSnapshot(): TracedResult[ValidationError, StateSnapshot] = {
-        val diff =
           if (forceValidate)
             TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
               priorityPool.compositeBlockchain,
               tx
             )
-          else {
+          else
             TransactionDiffer.limitedExecution(
               blockchain.lastBlockTimestamp,
               time.correctedTime(),
@@ -216,8 +215,6 @@ case class UtxPoolImpl(
               priorityPool.compositeBlockchain,
               tx
             )
-          }
-        diff.map(StateSnapshot.fromDiff(_, blockchain))
       }
 
       if (canLock) priorityPool.optimisticRead(calculateSnapshot())(_.resultE.isLeft)
@@ -326,7 +323,7 @@ case class UtxPoolImpl(
     )
   }
 
-  private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
+  private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, StateSnapshot])(
       initialConstraint: MultiDimensionalMiningConstraint,
       strategy: PackStrategy,
       prevStateHash: Option[ByteStr],
@@ -373,7 +370,7 @@ case class UtxPoolImpl(
               else {
                 val updatedBlockchain   = SnapshotBlockchain(blockchain, r.totalSnapshot)
                 val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
-                val e                   = differ(updatedBlockchain, tx).resultE.map(StateSnapshot.fromDiff(_, updatedBlockchain))
+                val e                   = differ(updatedBlockchain, tx).resultE
                 e match {
                   case Right(newSnapshot) =>
                     val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newSnapshot)
