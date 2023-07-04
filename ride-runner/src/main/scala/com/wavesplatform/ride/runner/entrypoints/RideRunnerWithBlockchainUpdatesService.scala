@@ -107,7 +107,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     }
 
     log.info("Loading data from caches...")
-    val sharedBlockchain = rideDb.access.directReadWrite { implicit rw =>
+    val sharedBlockchain = rideDb.access.batchedReadOnly { implicit ro =>
       val dbCaches = DefaultPersistentCaches(rideDb.access)
       SharedBlockchainStorage[RideScriptRunRequest](settings.rideRunner.sharedBlockchain, rideDb.access, dbCaches, blockchainApi)
     }
