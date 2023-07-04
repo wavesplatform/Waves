@@ -23,11 +23,13 @@ import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Transaction, TxHelpers}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
+
+import scala.concurrent.duration.*
 
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
@@ -209,7 +211,7 @@ trait WithDomain extends WithState { _: Suite =>
           TxHelpers.genesis(address, amount)
         }
         if (genesis.nonEmpty) {
-          domain.appendBlock(genesis*)
+          domain.appendBlock(createGenesisWithStateHash(genesis, bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, 1)))
         }
         test(domain)
       } finally bcu.shutdown()
@@ -226,6 +228,23 @@ trait WithDomain extends WithState { _: Suite =>
     allVersions
       .filter(v => v >= from && v <= to)
       .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
+
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean): Block = {
+    val timestamp = txs.map(_.timestamp).max
+    val genesisSettings = GenesisSettings(
+      timestamp,
+      timestamp,
+      txs.map(_.amount.value).sum,
+      None,
+      txs.map { tx =>
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
+      },
+      2L,
+      60.seconds
+    )
+
+    Block.genesis(genesisSettings, rideV6Activated = true, txStateSnapshotActivated).explicitGet()
+  }
 }
 
 object WithState {

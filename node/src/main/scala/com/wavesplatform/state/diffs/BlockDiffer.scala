@@ -104,7 +104,7 @@ object BlockDiffer {
         totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
         patches                 <- patchesDiff(blockchainWithNewBlock)
         resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(patches)
-      } yield resultDiff
+      } yield resultDiff.withPortfolios(resultDiff.portfolios.filter(!_._2.isEmpty))
 
     for {
       _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
@@ -211,7 +211,7 @@ object BlockDiffer {
     minerReward
       .combine(feeFromPreviousBlock)
       .map { totalReward =>
-        Diff(portfolios = Map(miner -> totalReward))
+        Diff(portfolios = Map(miner -> totalReward).filter(!_._2.isEmpty))
       }
   }
 
@@ -246,7 +246,8 @@ object BlockDiffer {
 
     val initStateHashes =
       if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
-        if (initDiff == Diff.empty || blockchain.height == 1) Some(Seq.empty)
+        if (initDiff == Diff.empty || blockchain.height == 1)
+          Some(Seq.empty)
         else
           Some(Seq(TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).txStateSnapshotHash))
       } else None

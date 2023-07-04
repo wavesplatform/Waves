@@ -8,14 +8,14 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, Result}
+import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state.diffs.BlockDiffer.Result
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 
 import scala.concurrent.duration.*
 
@@ -136,8 +136,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             .createInitialBlockDiff(blockchain, signer.toAddress)
             .explicitGet()
           val initStateHash  = TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(genesis.header.stateHash.get)
-          val blockStateHash = computeStateHash(txs, initStateHash, initDiff, signer, blockchain)
           val blockTs        = txs.map(_.timestamp).max
+          val blockStateHash = d.computeStateHash(txs, initStateHash, initDiff, signer, blockTs, blockchain)
 
           val correctBlock =
             TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
@@ -155,7 +155,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           ) shouldBe an[Left[InvalidStateHash, Result]]
 
           d.appendKeyBlock(signer)
-          val correctMicroblock = d.createMicroBlock(Some(computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer, blockchain)), txs*)
+          val correctMicroblock =
+            d.createMicroBlock(Some(d.computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer, blockTs, blockchain)), txs*)
           BlockDiffer.fromMicroBlock(
             blockchain,
             blockchain.lastBlockTimestamp,
@@ -176,22 +177,6 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           ) shouldBe an[Left[InvalidStateHash, Result]]
         }
     }
-  }
-
-  private def computeStateHash(txs: Seq[Transaction], initStateHash: ByteStr, initDiff: Diff, signer: KeyPair, blockchain: Blockchain): ByteStr = {
-    val blockTs  = txs.map(_.timestamp).max
-    val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, blockTs) _
-
-    txs
-      .foldLeft(initStateHash -> initDiff) { case ((prevStateHash, accDiff), tx) =>
-        val compBlockchain = CompositeBlockchain(blockchain, accDiff)
-        val minerDiff      = Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart)))
-        val txDiff         = txDiffer(compBlockchain, tx).resultE.explicitGet()
-        val stateHash =
-          TxStateSnapshotHashBuilder.createHashFromDiff(compBlockchain, txDiff.combineF(minerDiff).explicitGet()).createHash(prevStateHash)
-        (stateHash, accDiff.combineF(txDiff).flatMap(_.combineF(minerDiff)).explicitGet())
-      }
-      ._1
   }
 
   private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
@@ -216,22 +201,5 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       val signer = if (i % 2 == 0) signerA else signerB
       TestBlock.create(signer, Seq(x), features)
     }
-  }
-
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean): Block = {
-    val timestamp = txs.map(_.timestamp).max
-    val genesisSettings = GenesisSettings(
-      timestamp,
-      timestamp,
-      txs.map(_.amount.value).sum,
-      None,
-      txs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
-      },
-      2L,
-      60.seconds
-    )
-
-    Block.genesis(genesisSettings, rideV6Activated = true, txStateSnapshotActivated).explicitGet()
   }
 }

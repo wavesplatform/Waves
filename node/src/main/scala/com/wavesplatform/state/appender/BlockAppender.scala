@@ -78,8 +78,9 @@ object BlockAppender extends ScorexLogging {
           span.markNtp("block.applied")
           span.finishNtp()
           BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-          if (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)
+          if (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined) {
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
+          }
         }
       case Left(is: InvalidSignature) =>
         Task(peerDatabase.blacklistAndClose(ch, s"Could not append $newBlock: $is"))

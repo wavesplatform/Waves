@@ -4,20 +4,24 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, ChallengedHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, TransactionStateSnapshot}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, WavesSettings}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.InitStateHash
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
+import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
@@ -241,13 +245,15 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       Nil,
       ref.orElse(Some(lastBlockId)),
       generator = signer,
-      stateHash = this.lastBlock.header.stateHash.map(prev =>
-        TxStateSnapshotHashBuilder
-          .createHashFromDiff(
-            this.blockchain,
-            Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(this.settings.blockchainSettings.rewardsSettings.initial)))
-          )
-          .createHash(prev)
+      stateHash = Some(
+        this.lastBlock.header.stateHash.map(prev =>
+          TxStateSnapshotHashBuilder
+            .createHashFromDiff(
+              this.blockchain,
+              Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(this.settings.blockchainSettings.rewardsSettings.initial)))
+            )
+            .createHash(prev)
+        )
       )
     )
     val discardedDiffs = appendBlock(block)
@@ -307,7 +313,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
       generator: KeyPair = defaultSigner,
-      stateHash: Option[ByteStr] = None
+      stateHash: Option[Option[ByteStr]] = None,
+      challengedHeader: Option[ChallengedHeader] = None
   ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
@@ -345,19 +352,43 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           .explicitGet()
       else NxtLikeConsensusBlockData(60, generationSignature)
 
+    val resultStateHash = stateHash.getOrElse {
+      if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
+        val blockchain =
+          if (this.blockchain.height == 0) this.blockchain
+          else CompositeBlockchain(this.blockchain, Some(this.settings.blockchainSettings.rewardsSettings.initial))
+        val prevStateHash = blockchain.lastBlockHeader.flatMap(_.header.stateHash).getOrElse(InitStateHash)
+
+        val initDiff = BlockDiffer
+          .createInitialBlockDiff(blockchain, generator.toAddress)
+          .explicitGet()
+        val initStateHash =
+          if (initDiff == Diff.empty) prevStateHash
+          else TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(prevStateHash)
+
+        Some(computeStateHash(txs, initStateHash, initDiff, generator, timestamp, blockchain))
+      } else None
+    }
+
+    val resultBt =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, blockchain.height + 1)) {
+        consensus.baseTarget
+      } else if (blockchain.height % 2 != 0) parent.baseTarget
+      else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
+
     Block
       .buildAndSign(
         version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
         timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
         reference = reference,
-        baseTarget = consensus.baseTarget.max(PoSCalculator.MinBaseTarget),
+        baseTarget = resultBt,
         generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
         rewardVote = -1L,
         signer = generator,
-        stateHash = stateHash,
-        challengedHeader = None
+        stateHash = resultStateHash,
+        challengedHeader = challengedHeader
       )
       .explicitGet()
   }
@@ -438,6 +469,28 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     rdb.db,
     blockchain
   )
+
+  def computeStateHash(
+      txs: Seq[Transaction],
+      initStateHash: ByteStr,
+      initDiff: Diff,
+      signer: KeyPair,
+      timestamp: Long,
+      blockchain: Blockchain
+  ): ByteStr = {
+    val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, timestamp) _
+
+    txs
+      .foldLeft(initStateHash -> initDiff) { case ((prevStateHash, accDiff), tx) =>
+        val compBlockchain = CompositeBlockchain(blockchain, accDiff)
+        val minerDiff      = Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart)))
+        val txDiff         = txDiffer(compBlockchain, tx).resultE.explicitGet()
+        val stateHash =
+          TxStateSnapshotHashBuilder.createHashFromDiff(compBlockchain, txDiff.combineF(minerDiff).explicitGet()).createHash(prevStateHash)
+        (stateHash, accDiff.combineF(txDiff).flatMap(_.combineF(minerDiff)).explicitGet())
+      }
+      ._1
+  }
 }
 
 object Domain {
