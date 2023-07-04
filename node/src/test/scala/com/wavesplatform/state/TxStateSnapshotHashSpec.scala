@@ -124,25 +124,25 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
           Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),
           Array(KeyType.Alias.id.toByte) ++ address2.bytes ++ addr2Alias.name.getBytes(StandardCharsets.UTF_8),
           Array(KeyType.VolumeAndFee.id.toByte) ++ orderId.arr ++ Longs.toByteArray(volumeAndFee.volume) ++ Longs.toByteArray(volumeAndFee.fee),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId1.id.arr ++ assetInfo1.static.issuer.toAddress.bytes ++
+          Array(KeyType.AssetStatic.id.toByte) ++ assetId1.id.arr ++ assetInfo1.static.issuer.arr ++
             Array(assetInfo1.static.decimals.toByte) ++ (if (assetInfo1.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId2.id.arr ++ assetInfo2.static.issuer.toAddress.bytes ++
+          Array(KeyType.AssetStatic.id.toByte) ++ assetId2.id.arr ++ assetInfo2.static.issuer.arr ++
             Array(assetInfo2.static.decimals.toByte) ++ (if (assetInfo2.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId3.id.arr ++ assetInfo3.static.issuer.toAddress.bytes ++
+          Array(KeyType.AssetStatic.id.toByte) ++ assetId3.id.arr ++ assetInfo3.static.issuer.arr ++
             Array(assetInfo3.static.decimals.toByte) ++ (if (assetInfo3.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.toAddress.bytes ++
+          Array(KeyType.AssetStatic.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.arr ++
             Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetVolume.id.toByte) ++ assetId1.id.arr ++
-            updatedAssetVolumeInfo1.volume.toByteArray ++
+            snapshot.assetVolumes(assetId1).volume.toByteArray ++
             (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetVolume.id.toByte) ++ assetId2.id.arr ++
-            assetInfo2.volume.volume.toByteArray ++
+            snapshot.assetVolumes(assetId2).volume.toByteArray ++
             (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetVolume.id.toByte) ++ assetId3.id.arr ++
-            updatedAssetVolumeInfo3.volume.toByteArray ++
+            snapshot.assetVolumes(assetId3).volume.toByteArray ++
             (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetVolume.id.toByte) ++ assetId4.id.arr ++
-            assetInfo4.volume.volume.toByteArray ++
+            snapshot.assetVolumes(assetId4).volume.toByteArray ++
             (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)),
           Array(
             KeyType.AssetNameDescription.id.toByte
