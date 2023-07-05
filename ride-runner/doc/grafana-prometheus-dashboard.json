@@ -60,8 +60,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "rgb(224, 180, 0)",
-                "value": null
+                "color": "rgb(224, 180, 0)"
               },
               {
                 "color": "rgb(55, 135, 45)",
@@ -176,8 +175,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(31, 96, 196, 1)",
-                "value": null
+                "color": "rgba(31, 96, 196, 1)"
               },
               {
                 "color": "rgba(140, 44, 186, 1)",
@@ -249,8 +247,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(31, 96, 196, 1)",
-                "value": null
+                "color": "rgba(31, 96, 196, 1)"
               },
               {
                 "color": "rgba(140, 44, 186, 1)",
@@ -322,8 +319,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(31, 96, 196, 1)",
-                "value": null
+                "color": "rgba(31, 96, 196, 1)"
               },
               {
                 "color": "rgba(140, 44, 186, 1)",
@@ -394,8 +390,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -418,8 +413,7 @@
                   "mode": "percentage",
                   "steps": [
                     {
-                      "color": "rgb(55, 135, 45)",
-                      "value": null
+                      "color": "rgb(55, 135, 45)"
                     }
                   ]
                 }
@@ -438,8 +432,7 @@
                   "mode": "percentage",
                   "steps": [
                     {
-                      "color": "rgb(196, 22, 42)",
-                      "value": null
+                      "color": "rgb(196, 22, 42)"
                     }
                   ]
                 }
@@ -514,8 +507,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -538,8 +530,7 @@
                   "mode": "percentage",
                   "steps": [
                     {
-                      "color": "rgb(55, 135, 45)",
-                      "value": null
+                      "color": "rgb(55, 135, 45)"
                     }
                   ]
                 }
@@ -558,8 +549,7 @@
                   "mode": "percentage",
                   "steps": [
                     {
-                      "color": "rgb(196, 22, 42)",
-                      "value": null
+                      "color": "rgb(196, 22, 42)"
                     }
                   ]
                 }
@@ -635,8 +625,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -695,8 +684,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgb(50, 116, 217)",
-                "value": null
+                "color": "rgb(50, 116, 217)"
               }
             ]
           },
@@ -780,8 +768,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(31, 96, 196, 1)",
-                "value": null
+                "color": "rgba(31, 96, 196, 1)"
               },
               {
                 "color": "rgba(140, 44, 186, 1)",
@@ -853,8 +840,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(31, 96, 196, 1)",
-                "value": null
+                "color": "rgba(31, 96, 196, 1)"
               },
               {
                 "color": "rgba(140, 44, 186, 1)",
@@ -926,8 +912,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "rgba(31, 96, 196, 1)",
-                "value": null
+                "color": "rgba(31, 96, 196, 1)"
               },
               {
                 "color": "rgba(140, 44, 186, 1)",
@@ -998,8 +983,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1022,8 +1006,7 @@
                   "mode": "percentage",
                   "steps": [
                     {
-                      "color": "rgb(55, 135, 45)",
-                      "value": null
+                      "color": "rgb(55, 135, 45)"
                     }
                   ]
                 }
@@ -1042,8 +1025,7 @@
                   "mode": "percentage",
                   "steps": [
                     {
-                      "color": "rgb(196, 22, 42)",
-                      "value": null
+                      "color": "rgb(196, 22, 42)"
                     }
                   ]
                 }
@@ -1116,8 +1098,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "dark-blue",
-                "value": null
+                "color": "dark-blue"
               }
             ]
           },
@@ -1180,8 +1161,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2587,8 +2567,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2697,8 +2676,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   }
                 ]
               },
@@ -2764,7 +2742,7 @@
               "calcs": [
                 "min",
                 "max",
-                "mean"
+                "lastNotNull"
               ],
               "displayMode": "list",
               "placement": "bottom"
@@ -2855,8 +2833,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2956,8 +2933,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3057,8 +3033,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3154,8 +3129,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3267,8 +3241,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3392,8 +3365,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3528,8 +3500,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3618,8 +3589,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3708,8 +3678,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4260,8 +4229,259 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "Zf4mEOr7z"
+            "uid": "${datasource}"
           },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 8,
+            "x": 0,
+            "y": 11
+          },
+          "id": 392,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"NUMBER_KEYS_READ\"}[1m])",
+              "hide": false,
+              "legendFormat": "reads",
+              "range": true,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"NUMBER_KEYS_WRITTEN\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "writes",
+              "range": true,
+              "refId": "E"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"NUMBER_FILTERED_DELETES\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "deletes (not existed)",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"rocksdb.num-deletes-imm-mem-tables\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "deletes (imm mem tables)",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"rocksdb.num-deletes-active-mem-table\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "deletes (active mem table)",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Gets/Puts/Deletes",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 8,
+            "x": 8,
+            "y": 11
+          },
+          "id": 391,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BYTES_READ\"}[1m])",
+              "hide": false,
+              "legendFormat": "read",
+              "range": true,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BYTES_WRITTEN\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "written",
+              "range": true,
+              "refId": "E"
+            }
+          ],
+          "title": "Bytes read/written",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4307,29 +4527,123 @@
                     "value": 80
                   }
                 ]
-              }
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 16,
+            "y": 11
+          },
+          "id": 390,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rocksdb_props{job=\"$job\", name=\"rocksdb.block-cache-usage\"}) + sum(rocksdb_props{job=\"$job\", name=\"rocksdb.cur-size-all-mem-tables\"}) + sum(rocksdb_props{job=\"$job\", name=\"rocksdb.estimate-table-readers-mem\"})",
+              "legendFormat": "total",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "RAM - Total usage (approx)",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "pinned = can't be evicted",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "bytes"
             },
             "overrides": [
               {
-                "__systemRef": "hideSeriesFrom",
                 "matcher": {
-                  "id": "byNames",
-                  "options": {
-                    "mode": "exclude",
-                    "names": [
-                      "rocksdb.total-sst-files-size"
-                    ],
-                    "prefix": "All except:",
-                    "readOnly": true
-                  }
+                  "id": "byName",
+                  "options": "rocksdb.block-cache-pinned-usage"
                 },
                 "properties": [
                   {
-                    "id": "custom.hideFrom",
+                    "id": "color",
                     "value": {
-                      "legend": false,
-                      "tooltip": false,
-                      "viz": true
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "rocksdb.block-cache-usage"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
                     }
                   }
                 ]
@@ -4337,43 +4651,48 @@
             ]
           },
           "gridPos": {
-            "h": 18,
-            "w": 13,
-            "x": 0,
-            "y": 1
+            "h": 9,
+            "w": 8,
+            "x": 16,
+            "y": 16
           },
-          "id": 291,
+          "id": 361,
           "options": {
             "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "right"
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
             },
             "tooltip": {
-              "mode": "single",
-              "sort": "none"
+              "mode": "multi",
+              "sort": "desc"
             }
           },
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "Zf4mEOr7z"
+                "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "rocksdb_stats{job=\"$job\", instance=~\"$instance\"}",
+              "expr": "rocksdb_props{job=\"$job\", name=~\"rocksdb.block-cache-usage|rocksdb.block-cache-pinned-usage\"}",
+              "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
-              "refId": "A"
+              "refId": "C"
             }
           ],
-          "title": "Panel Title",
+          "title": "RAM - Block Cache Usage",
           "type": "timeseries"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "Zf4mEOr7z"
+            "uid": "${datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -4425,37 +4744,1036 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 17,
-            "w": 9,
-            "x": 13,
-            "y": 1
+            "h": 7,
+            "w": 8,
+            "x": 8,
+            "y": 22
           },
-          "id": 292,
+          "id": 362,
           "options": {
             "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "right"
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
             },
             "tooltip": {
-              "mode": "single",
-              "sort": "none"
+              "mode": "multi",
+              "sort": "desc"
             }
           },
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "Zf4mEOr7z"
+                "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "rocksdb_props{job=\"$job\", instance=~\"$instance\", cf=\"default\"}",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"WRITE_WITH_WAL\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"WAL_FILE_SYNCED\"}[$__rate_interval])",
+              "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Panel Title",
+          "title": "WAL",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 0,
+            "y": 23
+          },
+          "id": 291,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "rocksdb_stats{job=\"$job\", name=~\"rocksdb.compaction-pending|rocksdb.num-running-flushes|rocksdb.mem-table-flush-pending|rocksdb.num-running-compactions\"}",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Compaction",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Size of in-memory data structures where RocksDB writes new data first before flushing them to SST files on disk.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 16,
+            "y": 25
+          },
+          "id": 389,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "hidden",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "rocksdb_props{job=\"$job\", name=\"rocksdb.cur-size-all-mem-tables\"}",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "RAM - MemTables",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "FLUSH_WRITE_BYTES - how much bytes moved from WAL to SST during a flush",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 8,
+            "y": 29
+          },
+          "id": 383,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"WAL_FILE_BYTES\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"FLUSH_WRITE_BYTES\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "WAL Written",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "A new version is created for each successful commit of a write batch (or transaction). High numbers for this metric may indicate that your database has many pending writes, which could be due to a slow disk or high write volumes.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "min": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 0,
+            "y": 30
+          },
+          "id": 384,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "rocksdb_stats{job=\"$job\", name=\"rocksdb.num-live-versions\"}",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Live versions",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Estimated amount of memory (RAM) used by table readers, excluding the block cache",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 16,
+            "y": 30
+          },
+          "id": 385,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "hidden",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "rocksdb_props{job=\"$job\", name=\"rocksdb.estimate-table-readers-mem\"}",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "RAM - Table Readers / Index and Bloom Filters",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The observed false positive rate",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 3,
+              "mappings": [],
+              "max": 1,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 0,
+            "y": 35
+          },
+          "id": 388,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "(sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_FULL_POSITIVE\"}[1m])) - sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_FULL_TRUE_POSITIVE\"}[1m]))) /\n(sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_FULL_POSITIVE\"}[1m])) - sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_FULL_TRUE_POSITIVE\"}[1m])) + sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_USEFUL\"}[1m])))\n",
+              "hide": false,
+              "legendFormat": "false positive rate",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "Bloom filters - false positive rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "The number of ... data block reads from cache.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BLOCK_CACHE_DATA_ADD"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BLOCK_CACHE_DATA_HIT"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BLOCK_CACHE_DATA_MISS"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 14,
+            "w": 8,
+            "x": 16,
+            "y": 35
+          },
+          "id": 360,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_ADD\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_HIT\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_MISS\"}[$__rate_interval])",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Block Cache Data",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "log": 2,
+                  "type": "log"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "rocksdb.block-cache-pinned-usage"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "rocksdb.block-cache-usage"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "green",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 13,
+            "w": 8,
+            "x": 8,
+            "y": 36
+          },
+          "id": 386,
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "rocksdb_props{job=\"$job\", name=~\"rocksdb.live-sst-files-size|rocksdb.total-sst-files-size\"}",
+              "hide": false,
+              "legendFormat": "{{name}}",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "SST Files Size",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 0,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 8,
+            "x": 0,
+            "y": 40
+          },
+          "id": 387,
+          "options": {
+            "legend": {
+              "calcs": [
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_FULL_POSITIVE\"}[1m]))",
+              "hide": false,
+              "legendFormat": "(all) positives",
+              "range": true,
+              "refId": "D"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_FULL_TRUE_POSITIVE\"}[1m]))",
+              "hide": false,
+              "legendFormat": "true positives",
+              "range": true,
+              "refId": "E"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(increase(rocksdb_stats{job=\"$job\", name=\"BLOOM_FILTER_USEFUL\"}[1m]))",
+              "hide": false,
+              "legendFormat": "true negatives",
+              "range": true,
+              "refId": "F"
+            }
+          ],
+          "title": "Bloom filters - overview",
           "type": "timeseries"
         }
       ],
@@ -4568,7 +5886,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 11
+            "y": 48
           },
           "id": 11,
           "links": [],
@@ -4774,7 +6092,7 @@
             "h": 13,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 54
           },
           "id": 12,
           "links": [],
@@ -4953,7 +6271,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 17
+            "y": 49
           },
           "id": 79,
           "links": [],
@@ -5031,7 +6349,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 23
+            "y": 55
           },
           "heatmap": {},
           "hideZeroBuckets": false,
@@ -5148,7 +6466,7 @@
             "h": 12,
             "w": 18,
             "x": 0,
-            "y": 15
+            "y": 50
           },
           "id": 141,
           "links": [],
@@ -5321,7 +6639,7 @@
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 15
+            "y": 50
           },
           "id": 204,
           "links": [],
@@ -5473,7 +6791,7 @@
             "h": 12,
             "w": 18,
             "x": 0,
-            "y": 27
+            "y": 62
           },
           "id": 139,
           "links": [],
@@ -5616,7 +6934,7 @@
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 27
+            "y": 62
           },
           "id": 225,
           "links": [],
@@ -5731,7 +7049,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 39
+            "y": 74
           },
           "id": 137,
           "links": [],
@@ -5844,7 +7162,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 15
+            "y": 51
           },
           "id": 159,
           "links": [],
@@ -5987,7 +7305,7 @@
             "h": 12,
             "w": 8,
             "x": 0,
-            "y": 56
+            "y": 52
           },
           "id": 155,
           "links": [],
@@ -6084,7 +7402,7 @@
             "h": 12,
             "w": 8,
             "x": 8,
-            "y": 56
+            "y": 52
           },
           "id": 153,
           "links": [],
@@ -6181,7 +7499,7 @@
             "h": 12,
             "w": 8,
             "x": 16,
-            "y": 56
+            "y": 52
           },
           "id": 151,
           "links": [],
@@ -6279,7 +7597,7 @@
             "h": 12,
             "w": 8,
             "x": 0,
-            "y": 68
+            "y": 64
           },
           "id": 149,
           "links": [],
@@ -6376,7 +7694,7 @@
             "h": 12,
             "w": 8,
             "x": 8,
-            "y": 68
+            "y": 64
           },
           "id": 147,
           "links": [],
@@ -6473,7 +7791,7 @@
             "h": 12,
             "w": 8,
             "x": 16,
-            "y": 68
+            "y": 64
           },
           "id": 145,
           "links": [],
@@ -6571,7 +7889,7 @@
             "h": 12,
             "w": 8,
             "x": 0,
-            "y": 80
+            "y": 76
           },
           "id": 246,
           "links": [],
@@ -6684,7 +8002,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 58
+            "y": 53
           },
           "id": 133,
           "links": [],
@@ -6812,7 +8130,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 65
+            "y": 60
           },
           "id": 131,
           "links": [],
@@ -6953,7 +8271,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 71
+            "y": 66
           },
           "id": 129,
           "links": [],
@@ -7108,7 +8426,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 1
+            "y": 54
           },
           "id": 123,
           "links": [],
@@ -7249,7 +8567,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 7
+            "y": 60
           },
           "id": 125,
           "links": [],
@@ -7373,7 +8691,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 1
+            "y": 55
           },
           "id": 113,
           "links": [],
@@ -7507,7 +8825,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 7
+            "y": 61
           },
           "id": 115,
           "links": [],
@@ -7631,7 +8949,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 61
+            "y": 56
           },
           "id": 119,
           "links": [],
@@ -7739,7 +9057,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 67
+            "y": 62
           },
           "id": 121,
           "links": [],
