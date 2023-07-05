@@ -551,11 +551,11 @@ object StateUpdate {
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
-    val (txsStateUpdates, totalSnapshot) = snapshot.transactions.values
-      .foldRight((Seq.empty[StateUpdate], snapshot)) { case (txSnapshot, (updates, accSnapshot)) =>
+    val (totalSnapshot, txsStateUpdates) = snapshot.transactions.values
+      .foldLeft((snapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), txInfo) =>
         (
-          updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithMinerReward, accSnapshot), txSnapshot.snapshot),
-          accSnapshot |+| txSnapshot.snapshot
+          accSnapshot |+| txInfo.snapshot,
+          updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithMinerReward, accSnapshot), txInfo.snapshot),
         )
       }
     val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithMinerReward, totalSnapshot)
