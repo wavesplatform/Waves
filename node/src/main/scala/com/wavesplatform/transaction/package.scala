@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.{EthEncoding, base58Length}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
-import play.api.libs.json.{Format, Reads, Writes}
+import play.api.libs.json.*
 import supertagged.*
 import supertagged.postfix.*
 
@@ -40,7 +40,32 @@ package object transaction {
   object TxPositiveAmount extends RefinedTypeOps[TxPositiveAmount, Long]
 
   type TxNonNegativeAmount = Long Refined NonNegative
-  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long]
+  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long] {
+    private val LongStringMaxLength = 20 // Long.MaxValue.toString.length
+
+    implicit val reads: Reads[TxNonNegativeAmount] = Reads { json =>
+      val r = json match {
+        case JsString(s) =>
+          if (s.length > LongStringMaxLength) JsError("error.expected.numberdigitlimit")
+          else
+            s.toLongOption match {
+              case None    => JsError(JsonValidationError("error.expected.numberformatexception"))
+              case Some(r) => JsSuccess(r)
+            }
+
+        case JsNumber(r) =>
+          if (r.isValidLong) JsSuccess(r.toLongExact)
+          else JsError(JsonValidationError("error.invalid.long"))
+
+        case _ => JsError(JsonValidationError("error.expected.jsnumberorjsstring"))
+      }
+
+      r.flatMap { r =>
+        if (r >= 0) JsSuccess(TxNonNegativeAmount.unsafeFrom(r))
+        else JsError(JsonValidationError("error.expected.txnonnegativeamount"))
+      }
+    }
+  }
 
   type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type]
   object TxDecimals extends RefinedTypeOps[TxDecimals, Byte] {
