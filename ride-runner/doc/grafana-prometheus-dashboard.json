@@ -4265,8 +4265,9 @@
                   "mode": "off"
                 }
               },
-              "decimals": 0,
+              "decimals": 2,
               "mappings": [],
+              "min": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -4311,7 +4312,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"NUMBER_KEYS_READ\"}[1m])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"NUMBER_KEYS_READ\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "reads",
               "range": true,
@@ -4323,7 +4324,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"NUMBER_KEYS_WRITTEN\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"NUMBER_KEYS_WRITTEN\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "writes",
               "range": true,
@@ -4335,7 +4336,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"NUMBER_FILTERED_DELETES\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"NUMBER_FILTERED_DELETES\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "deletes (not existed)",
               "range": true,
@@ -4347,7 +4348,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"rocksdb.num-deletes-imm-mem-tables\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"rocksdb.num-deletes-imm-mem-tables\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "deletes (imm mem tables)",
               "range": true,
@@ -4359,7 +4360,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"rocksdb.num-deletes-active-mem-table\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"rocksdb.num-deletes-active-mem-table\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "deletes (active mem table)",
               "range": true,
@@ -4454,7 +4455,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BYTES_READ\"}[1m])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"BYTES_READ\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "read",
               "range": true,
@@ -4466,7 +4467,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BYTES_WRITTEN\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"BYTES_WRITTEN\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "written",
               "range": true,
@@ -4727,7 +4728,9 @@
                   "mode": "off"
                 }
               },
+              "decimals": 2,
               "mappings": [],
+              "min": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -4772,7 +4775,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"WRITE_WITH_WAL\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"WRITE_WITH_WAL\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -4784,7 +4787,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"WAL_FILE_SYNCED\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"WAL_FILE_SYNCED\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -5065,7 +5068,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"WAL_FILE_BYTES\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"WAL_FILE_BYTES\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -5077,7 +5080,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"FLUSH_WRITE_BYTES\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"FLUSH_WRITE_BYTES\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -5412,7 +5415,9 @@
                   "mode": "off"
                 }
               },
+              "decimals": 2,
               "mappings": [],
+              "min": 0,
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -5500,7 +5505,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_ADD\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_ADD\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -5512,7 +5517,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_HIT\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_HIT\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -5524,7 +5529,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "builder",
-              "expr": "increase(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_MISS\"}[$__rate_interval])",
+              "expr": "rate(rocksdb_stats{job=\"$job\", name=\"BLOCK_CACHE_DATA_MISS\"}[$__rate_interval])",
               "hide": false,
               "legendFormat": "{{name}}",
               "range": true,
@@ -6207,7 +6212,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 13
       },
       "id": 77,
       "panels": [
@@ -6401,7 +6406,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 14
       },
       "id": 143,
       "panels": [
@@ -6466,7 +6471,7 @@
             "h": 12,
             "w": 18,
             "x": 0,
-            "y": 50
+            "y": 15
           },
           "id": 141,
           "links": [],
@@ -6639,7 +6644,7 @@
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 50
+            "y": 15
           },
           "id": 204,
           "links": [],
@@ -6791,7 +6796,7 @@
             "h": 12,
             "w": 18,
             "x": 0,
-            "y": 62
+            "y": 27
           },
           "id": 139,
           "links": [],
@@ -6934,7 +6939,7 @@
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 62
+            "y": 27
           },
           "id": 225,
           "links": [],
@@ -7049,7 +7054,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 74
+            "y": 39
           },
           "id": 137,
           "links": [],
@@ -7097,7 +7102,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 15
       },
       "id": 161,
       "panels": [
@@ -7241,7 +7246,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 23
       },
       "id": 157,
       "panels": [
@@ -7938,7 +7943,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 24
       },
       "id": 135,
       "panels": [
@@ -8331,7 +8336,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 25
       },
       "id": 127,
       "panels": [
@@ -8627,7 +8632,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "id": 111,
       "panels": [
@@ -8885,7 +8890,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 27
       },
       "id": 117,
       "panels": [
