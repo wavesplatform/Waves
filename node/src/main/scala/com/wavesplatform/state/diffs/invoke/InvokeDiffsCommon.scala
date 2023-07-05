@@ -140,22 +140,6 @@ object InvokeDiffsCommon {
     TracedResult(resultE).withAttributes(Attribute.MinFee -> minFee)
   }
 
-  def getInvocationComplexity(
-      blockchain: Blockchain,
-      call: FUNCTION_CALL,
-      callableComplexities: Map[Int, Map[String, Long]],
-      dAppAddress: Address
-  ): Either[ValidationError, Long] = {
-    for { // TODO adaptation for snapshot
-      complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).orElse(callableComplexities.get(3)).toRight {
-        GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
-      }
-      complexity <- complexitiesByCallable.get(call.function.funcName).toRight {
-        GenericError(s"Cannot find callable function `${call.function.funcName}`, address = $dAppAddress`")
-      }
-    } yield complexity
-  }
-
   def processActions(
       actions: StructuredCallableActions,
       version: StdLibVersion,
