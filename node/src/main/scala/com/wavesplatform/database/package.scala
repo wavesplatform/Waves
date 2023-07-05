@@ -395,7 +395,7 @@ package object database {
       val readOptions  = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
       val batch        = new WriteBatch()
       val rw           = new RW(db, readOptions, batch)
-      val writeOptions = new WriteOptions().setSync(false).setDisableWAL(true)
+      val writeOptions = new WriteOptions()
       try {
         val r = f(rw)
         db.write(writeOptions, batch)
