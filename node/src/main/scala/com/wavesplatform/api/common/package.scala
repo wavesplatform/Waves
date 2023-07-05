@@ -87,11 +87,11 @@ package object common {
       meta.spentComplexity,
       ist =>
         maybeSnapshot
-          .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
+          .flatMap { case (_, s) => s.scriptResults.get(ist.id()) }
           .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, ist.id())),
       et =>
         maybeSnapshot
-          .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(et.id()) }
+          .flatMap { case (_, s) => s.ethereumTransactionMeta.get(et.id()) }
           .orElse(loadEthereumMetadata(rdb.db, rdb.txMetaHandle, et.id()))
     )
   }
