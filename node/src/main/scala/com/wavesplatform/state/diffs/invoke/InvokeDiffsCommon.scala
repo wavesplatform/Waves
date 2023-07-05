@@ -146,7 +146,7 @@ object InvokeDiffsCommon {
       callableComplexities: Map[Int, Map[String, Long]],
       dAppAddress: Address
   ): Either[ValidationError, Long] = {
-    for {                                                                             //TODO adaptation for snapshot
+    for { // TODO adaptation for snapshot
       complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version).orElse(callableComplexities.get(3)).toRight {
         GenericError(s"Cannot find complexity storage, address = $dAppAddress, estimator version = ${blockchain.estimator.version}")
       }
@@ -203,7 +203,11 @@ object InvokeDiffsCommon {
       complexityLimit =
         if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
         else Int.MaxValue
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(actions.list, paymentsAndFeeDiff, complexityLimit)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(
+        actions.list,
+        paymentsAndFeeDiff,
+        complexityLimit
+      )
         .leftMap {
           case failed: FailedTransactionError => failed.addComplexity(storingComplexity).withLog(log)
           case other                          => other
@@ -508,7 +512,8 @@ object InvokeDiffsCommon {
                       tx.txId
                     )
                     val assetValidationDiff = for {
-                      _ <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(StateSnapshot.fromDiff(assetVerifierDiff, blockchain))
+                      snapshot <- StateSnapshot.fromDiff(assetVerifierDiff, blockchain)
+                      _        <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(snapshot)
                       assetValidationDiff <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
                         pseudoTx,
                         a.id,
@@ -657,10 +662,14 @@ object InvokeDiffsCommon {
       nextDiff
         .flatMap(baseDiff =>
           TracedResult(
-            BalanceDiffValidation
-              .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(StateSnapshot.fromDiff(baseDiff, blockchain))
-              .map(_ => baseDiff)
-              .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
+            StateSnapshot
+              .fromDiff(baseDiff, blockchain)
+              .flatMap(snapshot =>
+                BalanceDiffValidation
+                  .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(snapshot)
+                  .map(_ => baseDiff)
+                  .leftMap(FailedTransactionError.asFailedScriptError(_).addComplexity(baseDiff.scriptsComplexity))
+              )
           )
         )
         .leftMap {

@@ -150,7 +150,7 @@ object UtilsEvaluator {
         )
         .merge
       totalDiff <- diff.combineE(paymentsDiff)
-      totalSnapshot = StateSnapshot.fromDiff(addWavesToDefaultInvoker(totalDiff), blockchain)
+      totalSnapshot <- StateSnapshot.fromDiff(addWavesToDefaultInvoker(totalDiff), blockchain)
       _         <- TransactionDiffer.validateBalance(blockchain, InvokeScript, totalSnapshot)
       _         <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalSnapshot, Int.MaxValue, enableExecutionLog = true).resultE
       rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)

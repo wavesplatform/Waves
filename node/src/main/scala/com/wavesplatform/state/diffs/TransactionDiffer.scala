@@ -148,11 +148,14 @@ object TransactionDiffer {
 
               // Balance overflow check
               _ <-
-                if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight) {
-                  ExchangeTransactionDiff
-                    .getPortfolios(blockchain, etx)
-                    .flatMap(pfs => validateBalance(blockchain, etx.tpe, StateSnapshot.fromDiff(Diff(portfolios = pfs), blockchain)))
-                } else Right(())
+                if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight)
+                  for {
+                    portfolios <- ExchangeTransactionDiff.getPortfolios(blockchain, etx)
+                    snapshot   <- StateSnapshot.fromDiff(Diff(portfolios = portfolios), blockchain)
+                    _          <- validateBalance(blockchain, etx.tpe, snapshot)
+                  } yield portfolios
+                else
+                  Right(())
             } yield ()
           case itx: InvokeScriptTransaction => validatePayments(blockchain, itx)
           case _                            => Right(())
@@ -182,7 +185,7 @@ object TransactionDiffer {
     } else Diff.empty.asRight[ValidationError].traced
 
     diff
-      .map(d => initSnapshot |+| StateSnapshot.fromDiff(d, blockchain))
+      .flatMap(d => StateSnapshot.fromDiff(d, blockchain).map(initSnapshot |+| _))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
@@ -224,8 +227,8 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .map { diff =>
-        val txSnapshot = StateSnapshot.fromDiff(diff, blockchain)
+      .flatMap(StateSnapshot.fromDiff(_, blockchain))
+      .map { txSnapshot =>
         initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, applied = true, txSnapshot, blockchain))
       }
       .leftMap {
@@ -243,8 +246,9 @@ object TransactionDiffer {
 
   private def validateFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] =
     for {
-      fee <- feePortfolios(blockchain, tx)
-      _   <- validateBalance(blockchain, tx.tpe, StateSnapshot.fromDiff(Diff(portfolios = fee), blockchain))
+      fee      <- feePortfolios(blockchain, tx)
+      snapshot <- StateSnapshot.fromDiff(Diff(portfolios = fee), blockchain)
+      _        <- validateBalance(blockchain, tx.tpe, snapshot)
     } yield ()
 
   private def validateOrder(blockchain: Blockchain, order: Order, matcherFee: Long): Either[ValidationError, Unit] =
@@ -257,7 +261,8 @@ object TransactionDiffer {
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
       orderDiff = Diff(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
-      _ <- validateBalance(blockchain, TransactionType.Exchange, StateSnapshot.fromDiff(orderDiff, blockchain))
+      snapshot <- StateSnapshot.fromDiff(orderDiff, blockchain)
+      _        <- validateBalance(blockchain, TransactionType.Exchange, snapshot)
     } yield ()
 
   private def validatePayments(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[ValidationError, Unit] =
@@ -289,7 +294,8 @@ object TransactionDiffer {
         }
         .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
       paymentsDiff = Diff(portfolios = portfolios)
-      _ <- BalanceDiffValidation(blockchain)(StateSnapshot.fromDiff(paymentsDiff, blockchain))
+      snapshot <- StateSnapshot.fromDiff(paymentsDiff, blockchain)
+      _        <- BalanceDiffValidation(blockchain)(snapshot)
     } yield ()
 
   // failed transactions related
@@ -308,20 +314,18 @@ object TransactionDiffer {
   ): Either[ValidationError, StateSnapshot] =
     for {
       portfolios <- feePortfolios(blockchain, tx)
-    } yield {
-      val ethereumMetaDiff = tx match {
+      ethereumMetaDiff = tx match {
         case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
         case _                      => Diff.empty
       }
-      val diff = Diff(
+      diff <- Diff(
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      ).combineF(ethereumMetaDiff)
-        .getOrElse(Diff.empty)
-        .bindTransaction(blockchain, tx, applied = false)
-      StateSnapshot.fromDiff(diff, blockchain)
-    }
+      ).combineF(ethereumMetaDiff).leftMap(GenericError(_))
+      bound    <- diff.bindTransaction(blockchain, tx, applied = false)
+      snapshot <- StateSnapshot.fromDiff(bound, blockchain)
+    } yield snapshot
 
   private object isFailedTransaction {
     def unapply(

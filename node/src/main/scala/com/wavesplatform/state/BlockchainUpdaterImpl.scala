@@ -7,6 +7,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -319,7 +320,7 @@ class BlockchainUpdaterImpl(
                       val prevReward = ng.reward
                       val reward     = nextReward()
 
-                      val prevHitSource                 = ng.hitSource
+                      val prevHitSource                     = ng.hitSource
                       val liquidSnapshotWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidSnapshot)
                       val referencedBlockchain = SnapshotBlockchain(
                         rocksdb,
@@ -380,7 +381,7 @@ class BlockchainUpdaterImpl(
                 }
           }).map {
             _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, _), discDiffs, reward, hitSource) =>
-              val newHeight   = rocksdb.height + 1
+              val newHeight = rocksdb.height + 1
 
               restTotalConstraint = updatedTotalConstraint
               ngState = Some(
@@ -438,7 +439,7 @@ class BlockchainUpdaterImpl(
         leaseState =
           Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
       )
-      val snapshot = StateSnapshot.fromDiff(diff, rocksdb)
+      val snapshot = StateSnapshot.fromDiff(diff, rocksdb).explicitGet()
       lt.id() -> snapshot
     }).toMap
 
@@ -521,7 +522,15 @@ class BlockchainUpdaterImpl(
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
-                BlockDiffer.fromMicroBlock(this, rocksdb.lastBlockTimestamp, prevStateHash, microBlock, restTotalConstraint, rocksdb.loadCacheData, verify)
+                BlockDiffer.fromMicroBlock(
+                  this,
+                  rocksdb.lastBlockTimestamp,
+                  prevStateHash,
+                  microBlock,
+                  restTotalConstraint,
+                  rocksdb.loadCacheData,
+                  verify
+                )
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _) = blockDifferResult

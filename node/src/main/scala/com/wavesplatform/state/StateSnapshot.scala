@@ -1,13 +1,13 @@
 package com.wavesplatform.state
-import cats.Id
 import cats.data.Ior
-import cats.implicits.{catsKernelStdMonoidForMap, catsSyntaxSemigroup}
+import cats.implicits.{catsSyntaxEitherId, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.{AssetStatic, TransactionStatus}
@@ -17,6 +17,7 @@ import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 import scala.collection.immutable.VectorMap
 
@@ -101,10 +102,11 @@ case class StateSnapshot(
       transactionStatus = if (txSucceeded) TransactionStatus.SUCCEEDED else TransactionStatus.FAILED
     )
 
-  def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): StateSnapshot = {
-    val appliedBalances = StateSnapshot.balances(portfolios, SnapshotBlockchain(blockchain, this))
-    copy(balances = balances ++ appliedBalances)
-  }
+  def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
+    StateSnapshot
+      .balances(portfolios, SnapshotBlockchain(blockchain, this))
+      .leftMap(GenericError(_))
+      .map(b => copy(balances = balances ++ b))
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
@@ -232,11 +234,14 @@ object StateSnapshot {
     )
   }
 
-  def fromDiff(diff: Diff, blockchain: Blockchain): StateSnapshot =
-    StateSnapshot(
+  def fromDiff(diff: Diff, blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
+    for {
+      b <- balances(diff.portfolios, blockchain).leftMap(GenericError(_))
+      lb <- leaseBalances(diff, blockchain).leftMap(GenericError(_))
+    } yield StateSnapshot(
       VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
-      balances(diff.portfolios, blockchain),
-      leaseBalances(diff, blockchain),
+      b,
+      lb,
       assetStatics(diff),
       assetVolumes(diff, blockchain),
       assetNamesAndDescriptions(diff),
@@ -252,36 +257,55 @@ object StateSnapshot {
       diff.scriptsComplexity
     )
 
-  def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): VectorMap[(Address, Asset), Long] =
-    VectorMap() ++ portfolios.flatMap { case (address, Portfolio(wavesAmount, _, assets)) =>
-      val assetBalances = assets.collect {
-        case (assetId, balance) if balance != 0 =>
-          val newBalance = blockchain.balance(address, assetId) + balance
-          (address, assetId: Asset) -> newBalance
+  private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
+    flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets)) =>
+      val assetBalancesE = flatTraverse(assets) {
+        case (_, 0) =>
+          Right(VectorMap[(Address, Asset), Long]())
+        case (assetId, balance) =>
+          Portfolio
+            .sum(blockchain.balance(address, assetId), balance, "Asset balance sum overflow")
+            .map(newBalance => VectorMap((address, assetId: Asset) -> newBalance))
       }
-      if (wavesAmount != 0) {
-        val newBalance   = blockchain.balance(address) + wavesAmount
-        val wavesBalance = (address, Waves) -> newBalance
-        assetBalances + wavesBalance
-      } else
-        assetBalances
+      if (wavesAmount != 0)
+        for {
+          assetBalances   <- assetBalancesE
+          newWavesBalance <- Portfolio.sum(blockchain.balance(address), wavesAmount, "Waves balance sum overflow")
+        } yield assetBalances + ((address, Waves) -> newWavesBalance)
+      else
+        assetBalancesE
     }
 
-  def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): StateSnapshot =
-    StateSnapshot(
-      leaseBalances = balances.map { case (address, leaseBalance) =>
-        address -> leaseBalance.combineF[Id](blockchain.leaseBalance(address))
-      }
-    )
-
-  private def leaseBalances(diff: Diff, blockchain: Blockchain): Map[Address, LeaseBalance] =
-    diff.portfolios.flatMap {
-      case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
-        val bLease = blockchain.leaseBalance(address)
-        Map(address -> LeaseBalance(bLease.in + lease.in, bLease.out + lease.out))
-      case _ =>
-        Map()
+  private def flatTraverse[E, K1, V1, K2, V2](m: Map[K1, V1])(f: (K1, V1) => Either[E, VectorMap[K2, V2]]): Either[E, VectorMap[K2, V2]] =
+    m.foldLeft(VectorMap[K2, V2]().asRight[E]) {
+      case (e @ Left(_), _) =>
+        e
+      case (Right(acc), (k, v)) =>
+        f(k, v).map(acc ++ _)
     }
+
+  def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): Either[String, StateSnapshot] =
+    balances.toSeq
+      .traverse { case (address, leaseBalance) =>
+        leaseBalance.combineF[Either[String, *]](blockchain.leaseBalance(address)).map(address -> _)
+      }
+      .map(newBalances => StateSnapshot(leaseBalances = newBalances.toMap))
+
+  import cats.implicits.*
+
+  private def leaseBalances(diff: Diff, blockchain: Blockchain): Either[String, Map[Address, LeaseBalance]] =
+    diff.portfolios.toSeq
+      .flatTraverse {
+        case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
+          val bLease = blockchain.leaseBalance(address)
+          for {
+            newIn  <- Portfolio.sum(bLease.in, lease.in, "Lease in overflow")
+            newOut <- Portfolio.sum(bLease.out, lease.out, "Lease out overflow")
+          } yield Seq(address -> LeaseBalance(newIn, newOut))
+        case _ =>
+          Seq().asRight[String]
+      }
+      .map(_.toMap)
 
   private def assetStatics(diff: Diff): Map[IssuedAsset, AssetStatic] =
     diff.issuedAssets.map { case (asset, info) =>

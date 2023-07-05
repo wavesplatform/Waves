@@ -447,7 +447,8 @@ object InvokeScriptDiff {
 
   private def validateIntermediateBalances(blockchain: Blockchain, diff: Diff, spentComplexity: Long, log: Log[Id]) = traced(
     if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
-      BalanceDiffValidation(blockchain)(StateSnapshot.fromDiff(diff, blockchain))
+      StateSnapshot.fromDiff(diff, blockchain)
+        .flatMap(BalanceDiffValidation(blockchain))
         .leftMap { be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log) }
     } else if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
       // reject transaction if any balance is negative

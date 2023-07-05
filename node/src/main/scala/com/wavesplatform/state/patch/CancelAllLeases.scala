@@ -28,6 +28,6 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
 
   def apply(blockchain: Blockchain): StateSnapshot = {
     val patch = readPatchData[CancelledLeases]()
-    StateSnapshot.ofLeaseBalances(patch.balances, blockchain) |+| StateSnapshot(leaseStates = patch.leaseStates)
+    StateSnapshot.ofLeaseBalances(patch.balances, blockchain).explicitGet() |+| StateSnapshot(leaseStates = patch.leaseStates)
   }
 }

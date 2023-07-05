@@ -4,6 +4,7 @@ import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
@@ -400,7 +401,7 @@ case class UtxPoolImpl(
 
                       PackResult(
                         Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                        resultSnapshot,
+                        resultSnapshot.explicitGet(),
                         updatedConstraint,
                         r.iterations + 1,
                         newCheckedAddresses,

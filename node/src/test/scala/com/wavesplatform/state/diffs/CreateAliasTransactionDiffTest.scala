@@ -70,7 +70,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
         addressTransactions(
           rdb,
-          Some(Height(newState.height + 1) -> StateSnapshot.fromDiff(blockDiff, newState)),
+          Some(Height(newState.height + 1) -> StateSnapshot.fromDiff(blockDiff, newState).explicitGet()),
           senderAcc,
           Set(TransactionType.CreateAlias),
           None

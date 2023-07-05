@@ -107,7 +107,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
 
   property("correctly create transaction state snapshot hash from diff") {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
-      val snapshot = StateSnapshot.fromDiff(diff, d.blockchain)
+      val snapshot = StateSnapshot.fromDiff(diff, d.blockchain).explicitGet()
       TxStateSnapshotHashBuilder.createHashFromTxSnapshot(snapshot, succeeded = true).txStateSnapshotHash shouldBe hash(
         Seq(
           Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),

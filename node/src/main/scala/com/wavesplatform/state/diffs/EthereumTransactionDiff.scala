@@ -77,11 +77,12 @@ object EthereumTransactionDiff {
           _          <- checkLeadingZeros(e, blockchain)
           invocation <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
           diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(invocation)
+          snapshot   <- TracedResult(StateSnapshot.fromDiff(diff, blockchain))
           resultSnapshot <- TransactionDiffer.assetsVerifierDiff(
             blockchain,
             invocation,
             verify = true,
-            StateSnapshot.fromDiff(diff, blockchain),
+            snapshot,
             Int.MaxValue,
             enableExecutionLog
           )

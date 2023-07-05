@@ -361,13 +361,15 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
-      val snapshot = StateSnapshot.fromDiff(d, blockchain)
-      val txInfo   = NewTransactionInfo.create(tx, applied, snapshot, blockchain)
-      d.copy(
-        transactions = Vector(txInfo),
-        transactionFilter = mkFilterForTransactions(tx)
-      )
-    }
+    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Either[ValidationError, Diff] =
+      StateSnapshot
+        .fromDiff(d, blockchain)
+        .map { s =>
+          val txInfo = NewTransactionInfo.create(tx, applied, s, blockchain)
+          d.copy(
+            transactions = Vector(txInfo),
+            transactionFilter = mkFilterForTransactions(tx)
+          )
+        }
   }
 }

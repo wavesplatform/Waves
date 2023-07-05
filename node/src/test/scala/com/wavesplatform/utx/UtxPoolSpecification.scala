@@ -1011,7 +1011,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val transfer1 = TxHelpers.transfer(amount = 10.waves)
         val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
 
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(StateSnapshot.fromDiff(d.createDiff(transfer1), d.blockchain)))
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(StateSnapshot.fromDiff(d.createDiff(transfer1), d.blockchain).explicitGet()))
         d.utxPool.addTransaction(transfer2, verify = false)
 
         d.utxPool.cleanUnconfirmed()

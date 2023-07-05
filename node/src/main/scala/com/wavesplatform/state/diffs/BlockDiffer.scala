@@ -107,7 +107,7 @@ object BlockDiffer {
 
     for {
       _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
+      initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_): ValidationError).flatten)
       r <- apply(
         blockchainWithNewBlock,
         constraint,
@@ -239,24 +239,24 @@ object BlockDiffer {
               // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
-              val newSnapshot = currSnapshot |+| txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
-              val newMinerSnapshot =
-                minerSnapshot
-                  .withTransaction(txInfo)
-                  .addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+              for {
+                resultTxSnapshot <- txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+                newMinerSnapshot <- minerSnapshot.withTransaction(txInfo).addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+              } yield {
+                val newSnapshot   = currSnapshot |+| resultTxSnapshot
+                val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
 
-              val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-
-              val result = Result(
-                newSnapshot,
-                carryFee + carry,
-                totalWavesFee,
-                updatedConstraint,
-                newMinerSnapshot,
-                prevStateHashOpt
-                  .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, txInfo.applied).createHash(prevStateHash))
-              )
-              TracedResult(result.asRight)
+                val result = Result(
+                  newSnapshot,
+                  carryFee + carry,
+                  totalWavesFee,
+                  updatedConstraint,
+                  newMinerSnapshot,
+                  prevStateHashOpt
+                    .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, txInfo.applied).createHash(prevStateHash))
+                )
+                result
+              }
             }
           }
       }
