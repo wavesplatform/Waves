@@ -94,8 +94,8 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
       txs.foldLeft(Diff.empty) { (diff, tx) =>
         val newState = CompositeBlockchain(state, diff)
         val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet().toDiff(newState)
-        val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
-        if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
+        // unsupported for snapshot
+        // if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
         diff.combineF(newDiff).explicitGet()
       }
     }

@@ -1012,7 +1012,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val (genesis, setScript, ci) = preconditionsAndSetContract(contract, isCIDefaultFunc = true)
 
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
-      _ should produceRejectOrFailedDiff("Cannot find callable function `default`, address = ")
+      _ should produceRejectOrFailedDiff("@Callable function 'default' doesn't exist in the script")
 
     }
   }

@@ -221,8 +221,6 @@ object BlockDiffer {
             ) =>
           val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
           txDiffer(currBlockchain, tx).flatMap { txSnapshot =>
-            val txInfo = txSnapshot.transactions.head._2
-
             val updatedConstraint = currConstraint.put(currBlockchain, tx, txSnapshot)
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
@@ -239,6 +237,7 @@ object BlockDiffer {
               // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
+              val txInfo = txSnapshot.transactions.head._2
               for {
                 resultTxSnapshot <- txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
                 newMinerSnapshot <- minerSnapshot.withTransaction(txInfo).addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)

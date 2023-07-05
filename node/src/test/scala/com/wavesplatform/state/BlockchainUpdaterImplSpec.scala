@@ -95,7 +95,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              snapshot.balances.head._2 == 0 &&
+              snapshot.balances.isEmpty &&
               snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
@@ -132,7 +132,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              snapshot.balances.head._2 == 0 &&
+              snapshot.balances.isEmpty &&
               snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
@@ -196,7 +196,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              snapshot.balances.head._2 == 0 &&
+              snapshot.balances.isEmpty &&
               snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()

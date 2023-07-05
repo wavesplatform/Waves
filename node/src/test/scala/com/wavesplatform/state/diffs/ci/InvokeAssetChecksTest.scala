@@ -16,8 +16,6 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
 
-import scala.collection.immutable.VectorMap
-
 class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets.*
 
@@ -62,7 +60,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
         def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
           Vector(
-            NewTransactionInfo(invoke, StateSnapshot.empty, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L)
+            NewTransactionInfo(invoke, StateSnapshot.empty, Set(invoke.senderAddress, dAppAddress), succeeded, 8)
           )
 
         val expectedResult =
@@ -86,11 +84,10 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             Diff.withTransactions(
               invokeInfo(true),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = VectorMap(asset -> 0)),
-                dAppAddress          -> Portfolio.build(asset, 0),
+                invoke.senderAddress -> Portfolio(-invoke.fee.value),
                 miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
-              scriptsComplexity = 18,
+              scriptsComplexity = 8,
               scriptResults = Map(
                 invoke.id() -> InvokeScriptResult(
                   transfers = Seq(

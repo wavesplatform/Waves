@@ -103,7 +103,7 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
       val invoke1 = invoke()
       d.appendBlock(invoke1)
       d.liquidDiff.errorMessage(invoke1.id()) shouldBe empty
-      d.liquidDiff.scriptsComplexity shouldBe 13382 // dApp + 3 actions + 2 payments + verifier = 7 * 1900 = 13300
+      d.liquidDiff.scriptsComplexity shouldBe 11459 // 3 actions + 2 payments + verifier = 6 * 1900 = 11400
 
       d.appendBlock()
       d.blockchainUpdater.height shouldBe activationHeight

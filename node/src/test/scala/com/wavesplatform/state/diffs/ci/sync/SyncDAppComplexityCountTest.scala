@@ -210,7 +210,10 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
         val totalPortfolios = if (exceeding || raiseError) basePortfolios else basePortfolios |+| additionalPortfolios
 
-        diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
+        diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe
+          totalPortfolios
+            .filter(_._2 != overlappedPortfolio)
+            .map(p => p.copy(_2 = p._2.copy(assets = p._2.assets.filterNot(_._2 == 0))))
       }
     }
   }

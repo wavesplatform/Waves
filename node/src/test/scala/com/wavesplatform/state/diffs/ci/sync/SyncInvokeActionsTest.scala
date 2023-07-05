@@ -68,8 +68,8 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
       d.appendAndAssertSucceed(invoke(dApp1Address, fee = invokeFee(issues = 1)))
-      d.liquidDiff.portfolios(dApp1Address).assets.head._2 shouldBe 0
-      d.liquidDiff.portfolios(dApp2Address).assets.head._2 shouldBe 0
+      d.liquidDiff.portfolios.get(dApp1Address) shouldBe empty
+      d.liquidDiff.portfolios.get(dApp2Address) shouldBe empty
       d.liquidDiff.portfolios(defaultAddress).assets.head._2 shouldBe 1000
     }
   }

@@ -16,7 +16,7 @@ import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNCTION_CALL, *}
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.*
@@ -648,6 +648,7 @@ object InvokeDiffsCommon {
           TracedResult(
             StateSnapshot
               .fromDiff(baseDiff, blockchain)
+              .leftMap(FailedTransactionError.asFailedScriptError)
               .flatMap(snapshot =>
                 BalanceDiffValidation
                   .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(snapshot)

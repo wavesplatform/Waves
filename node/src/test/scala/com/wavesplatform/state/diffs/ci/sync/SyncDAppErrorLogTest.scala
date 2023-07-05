@@ -39,7 +39,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
       "testCase",
       Seq(CONST_BOOLEAN(true))
     )((tx, leaseId, assetId) =>
-      s"""FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+      s"""FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |	@invokedDApp = Address(
          |		bytes = base58'3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy'
          |	)
@@ -241,7 +241,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
          |	]
          |	invoke.@complexity = 75
          |	@complexityLimit = 51102
-         |	inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+         |	inv = FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |		@invokedDApp = Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |		)
@@ -364,7 +364,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
          |		]
          |		invoke.@complexity = 75
          |		@complexityLimit = 50901
-         |		inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+         |		inv = FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |			@invokedDApp = Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
          |			)
@@ -473,7 +473,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
       "testCase",
       Seq(CONST_BOOLEAN(false))
     )((tx, leaseId, assetId) =>
-      s"""InvokeRejectError(error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+      s"""InvokeRejectError(error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |	@invokedDApp = Address(
          |		bytes = base58'3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy'
          |	)
@@ -637,7 +637,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
          |	]
          |	invoke.@complexity = 75
          |	@complexityLimit = 51736
-         |	inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+         |	inv = FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |		@invokedDApp = Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |		)
@@ -749,7 +749,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
          |		]
          |		invoke.@complexity = 75
          |		@complexityLimit = 51578
-         |		inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
+         |		inv = FailedTransactionError(code = 1, error = AccountBalanceError(VectorMap(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |			@invokedDApp = Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
          |			)
