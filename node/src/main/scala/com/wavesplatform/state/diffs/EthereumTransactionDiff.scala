@@ -86,7 +86,7 @@ object EthereumTransactionDiff {
             Int.MaxValue,
             enableExecutionLog
           )
-        } yield Diff(scriptsComplexity = resultSnapshot.scriptsComplexity)
+        } yield diff.copy(scriptsComplexity = resultSnapshot.scriptsComplexity)
     }
 
     baseDiff.flatMap(bd => TracedResult(bd.combineE(this.meta(blockchain)(e))))
