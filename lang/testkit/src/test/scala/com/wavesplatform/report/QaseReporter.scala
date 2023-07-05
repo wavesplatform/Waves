@@ -1,6 +1,6 @@
 package com.wavesplatform.report
 
-import com.wavesplatform.report.QaseReporter.{QaseProjects, TestResult}
+import com.wavesplatform.report.QaseReporter.{CaseIdPattern, QaseProjects, TestResult}
 import io.qase.api.QaseClient
 import io.qase.api.utils.IntegrationUtils
 import io.qase.client.model.ResultCreate
@@ -11,6 +11,7 @@ import play.api.libs.json.{Format, Json}
 import java.io.FileWriter
 import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters.*
+import scala.util.matching.Regex
 
 class QaseReporter extends Reporter {
 
@@ -32,12 +33,8 @@ class QaseReporter extends Reporter {
     }
   }
 
-  private def extractCaseIds(testName: String): Seq[(String, Long)] = {
-    val patternStr = s"""(${QaseProjects.mkString("|")})-([0-9]+)"""
-    val pattern    = patternStr.r
-
-    pattern.findAllMatchIn(testName).map(m => m.group(1) -> m.group(2).toLong).toSeq
-  }
+  private def extractCaseIds(testName: String): Seq[(String, Long)] =
+    CaseIdPattern.findAllMatchIn(testName).map(m => m.group(1) -> m.group(2).toLong).toSeq
 
   private def saveTestCaseResults(
       status: ResultCreate.StatusEnum,
@@ -51,10 +48,10 @@ class QaseReporter extends Reporter {
     if (QaseClient.isEnabled) {
       val errMsg     = msgOpt.map(msg => s"\n\n**Error**\n$msg").getOrElse("")
       val comment    = s"$testName$errMsg"
-      val stacktrace = throwable.map(IntegrationUtils.getStacktrace).orNull
+      val stacktrace = throwable.map(IntegrationUtils.getStacktrace)
       val timeMs     = duration.getOrElse(0L)
 
-      results.computeIfPresent(projectCode, (_, results) => TestResult(status.toString, comment, Some(stacktrace), caseId, timeMs) +: results)
+      results.computeIfPresent(projectCode, (_, results) => TestResult(status.toString, comment, stacktrace, caseId, timeMs) +: results)
     }
 
   private def saveRunResults(): Unit =
@@ -79,6 +76,9 @@ object QaseReporter {
   val RunIdKeyPrefix  = "QASE_RUN_ID_"
   val CheckPRRunIdKey = "CHECKPR_RUN_ID"
   val QaseProjects    = Seq("NODE", "RIDE", "BU", "SAPI")
+
+  private val patternStr   = s"""(${QaseProjects.mkString("|")})-([0-9]+)"""
+  val CaseIdPattern: Regex = patternStr.r
 
   case class TestResult(status: String, comment: String, stackTrace: Option[String], caseId: Long, timeMs: Long)
   object TestResult {
