@@ -1,8 +1,8 @@
 package com.wavesplatform.ride.runner.db
 
 object RocksDbProperties {
-  // List:https://github.com/facebook/rocksdb/blob/main/include/rocksdb/db.h#L1217-L1249
-  // Description:https://github.com/facebook/rocksdb/blob/main/include/rocksdb/db.h#L921
+  // List: https://github.com/facebook/rocksdb/blob/main/include/rocksdb/db.h#L1217-L1249
+  // Description: https://github.com/facebook/rocksdb/blob/main/include/rocksdb/db.h#L921
   val All = List(
     // number of immutable memtables that have not yet been flushed.
     "rocksdb.num-immutable-mem-table",

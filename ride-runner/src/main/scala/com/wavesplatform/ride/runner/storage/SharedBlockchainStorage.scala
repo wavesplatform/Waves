@@ -291,7 +291,7 @@ class SharedBlockchainStorage[TagT] private (
       AffectedTags(tags)
   }
 
-  def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
+  private def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (initialAffectedTags, txs, timer) = evt.body match {
       case Body.Block(block) =>
         (logIfTagPresent(CacheKey.Height, "append.height"), block.getBlock.transactions, RideRunnerStats.blockProcessingTime.some)
