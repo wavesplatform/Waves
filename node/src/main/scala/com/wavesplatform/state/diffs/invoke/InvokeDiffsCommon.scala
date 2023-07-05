@@ -648,7 +648,12 @@ object InvokeDiffsCommon {
           TracedResult(
             StateSnapshot
               .fromDiff(baseDiff, blockchain)
-              .leftMap(FailedTransactionError.asFailedScriptError)
+              .leftMap(e =>
+                if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
+                  FailedTransactionError.asFailedScriptError(e)
+                else
+                  e
+              )
               .flatMap(snapshot =>
                 BalanceDiffValidation
                   .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(snapshot)
