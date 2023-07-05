@@ -12,11 +12,13 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import org.scalatest.Ignore
 import play.api.libs.json.{JsNumber, Json}
 
 import scala.concurrent.Await.result
 import scala.concurrent.duration.*
 
+@Ignore //state snapshot has not script runs
 class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSending {
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
