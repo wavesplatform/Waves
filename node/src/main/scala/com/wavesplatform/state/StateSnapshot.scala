@@ -102,6 +102,7 @@ case class StateSnapshot(
       transactionStatus = if (txSucceeded) TransactionStatus.SUCCEEDED else TransactionStatus.FAILED
     )
 
+  //ignores lease balances from portfolios
   def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
     StateSnapshot
       .balances(portfolios, SnapshotBlockchain(blockchain, this))
@@ -257,6 +258,7 @@ object StateSnapshot {
       diff.scriptsComplexity
     )
 
+  //ignores lease balances from portfolios
   private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
     flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets)) =>
       val assetBalancesE = flatTraverse(assets) {

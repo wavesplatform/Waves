@@ -345,6 +345,7 @@ object Diff {
 
   private def mkFilter() =
     BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
+
   private def mkFilterForTransactions(tx: Transaction*) =
     Some(
       mkFilter().tap(bf =>
