@@ -2,6 +2,7 @@ package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.events.api.grpc.protobuf.GetBlockUpdateResponse
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
@@ -9,36 +10,37 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
-import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 
-class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
-  "BlockchainUpdates subscribe tests" - {
-    "BU-1. Return correct data for alias" in {
+class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
+  "BlockchainUpdates getBlockUpdate tests" - {
+    "BU-192. Return correct data for alias from getBlockUpdate" in {
       val aliasTx = TxHelpers.createAlias("test", firstTxParticipant, fee = customFee)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 2,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
-      )(_.appendMicroBlock(aliasTx)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(aliasTx)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkAlias(append, aliasTx)
       }
     }
 
-    "BU-28. Return correct data for transfer" in {
+    "BU-207. Return correct data for transfer" in {
       val transferTx = TxHelpers.transfer(firstTxParticipant, secondTxParticipantAddress, amount, Waves, customFee)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 2,
         settings = currentSettings,
         balances = Seq(
           AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
           AddrWithBalance(secondTxParticipant.toAddress, secondTxParticipantBalanceBefore)
         )
-      )(_.appendMicroBlock(transferTx)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(transferTx)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkTransferTx(append, transferTx)
       }
     }
 
-    "BU-9. Return correct data for issue" in {
+    "BU-196. Return correct data for issue" in {
       val issue: IssueTransaction = TxHelpers.issue(
         firstTxParticipant,
         amount,
@@ -48,142 +50,151 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
         customAssetIssueFee,
         defaultScript
       )
-      withGenerateSubscription(
+
+      withGenerateGetBlockUpdate(
+        height = 2,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
-      )(_.appendMicroBlock(issue)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(issue)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkIssueTx(append, issue, isNft = false)
       }
     }
 
-    "BU-11. Return correct data for issue NFT" in {
+    "BU-197. Return correct data for issue NFT" in {
       val issueNftTx =
         TxHelpers.issue(firstTxParticipant, name = "Nft_test_asset", description = "OVER_9000", amount = 1, reissuable = false, script = None)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 2,
         settings = currentSettings.addFeatures(BlockchainFeatures.ReduceNFTFee),
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
-      )(_.appendMicroBlock(issueNftTx)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(issueNftTx)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkIssueTx(append, issueNftTx, isNft = true)
       }
     }
 
-    "BU-19. Return correct data for reissue" in {
+    "BU-201. Return correct data for reissue" in {
       val issue   = TxHelpers.issue(firstTxParticipant, amount)
       val reissue = TxHelpers.reissue(issue.asset, firstTxParticipant, additionalAmount, reissuable = false, customAssetIssueFee)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 3,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
         d.appendBlock(reissue)
-      } { updates =>
-        val append = updates(2).append
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkReissueTx(append, reissue, issue)
       }
     }
 
-    "BU-4. Return correct data for burn" in {
+    "BU-193. Return correct data for burn" in {
       val issue = TxHelpers.issue(firstTxParticipant, amount)
       val burn  = TxHelpers.burn(issue.asset, additionalAmount, firstTxParticipant, customAssetIssueFee)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 3,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
         d.appendBlock(burn)
-      } { updates =>
-        val append = updates(2).append
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkBurnTx(append, burn, issue)
       }
     }
 
     "Exchange transaction subscription tests" - {
-      "BU-6. Return correct data for order V3, exchange V2" in {
+      "BU-195. Return correct data for order V3, exchange V2" in {
         val order1          = createOrder(OrderType.BUY, firstTxParticipant, Order.V3)
         val order2          = createOrder(OrderType.SELL, secondTxParticipant, Order.V3)
         val normalizedPrice = order1.price.value * order1.amount.value / 100000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V2)
-        withAddedBlocksAndSubscribeExchangeTx(exchangeTx) { updated =>
-          val append = updated.apply(3).getAppend
+        withAddedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
+          val append = getBlockUpdate.getUpdate.getAppend
           checkExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
       }
 
-      "BU-120. Return correct data for order V4, exchange V3" in {
+      "BU-223. Return correct data for order V4, exchange V3" in {
         val order1          = createOrder(OrderType.BUY, firstTxParticipant, Order.V4)
         val order2          = createOrder(OrderType.SELL, secondTxParticipant, Order.V4)
         val normalizedPrice = order1.price.value / 2 / 10000000
         val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V3)
-        withAddedBlocksAndSubscribeExchangeTx(exchangeTx) { updated =>
-          val append = updated.apply(3).getAppend
+        withAddedBlocksAndGetBlockUpdate(exchangeTx, height = 4) { getBlockUpdate =>
+          val append = getBlockUpdate.getUpdate.getAppend
           checkExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
       }
     }
 
-    "BU-12. Return correct data for lease" in {
+    "BU-198. Return correct data for lease" in {
       val lease = TxHelpers.lease(firstTxParticipant, secondTxParticipantAddress, amount, customFee)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 2,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
-      )(_.appendMicroBlock(lease)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(lease)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkLeaseTx(append, lease)
       }
     }
 
-    "BU-14. Return correct data for lease cancel" in {
+    "BU-199. Return correct data for lease cancel" in {
       val lease       = TxHelpers.lease(firstTxParticipant, secondTxParticipantAddress, amount, customFee)
       val leaseCancel = TxHelpers.leaseCancel(lease.id.value(), firstTxParticipant, customFee)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 3,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(lease)
-        d.appendMicroBlock(leaseCancel)
-      } { updates =>
-        val append = updates(2).append
+        d.appendBlock(leaseCancel)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkLeaseCancelTx(append, leaseCancel, lease)
       }
     }
 
-    "BU-16. Return correct data for massTransfer" in {
+    "BU-200. Return correct data for massTransfer" in {
       val massTransferFee = fee * 6
       val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients, firstToken.asset, massTransferFee)
 
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 3,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(firstToken)
-        d.appendMicroBlock(massTransfer)
-      } { updates =>
-        val append = updates(2).append
+        d.appendBlock(massTransfer)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkForMassTransferTx(append, massTransfer)
       }
     }
 
-    "BU-5. Return correct data for dataTx" in {
+    "BU-194. Return correct data for dataTx" in {
       val data = TxHelpers.data(firstTxParticipant, entries, customFee, TxVersion.V2)
-      withGenerateSubscription(
-        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+      withGenerateGetBlockUpdate(
+        height = 2,
+        settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
-      )(_.appendMicroBlock(data)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(data)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkDataTransfer(append, data)
       }
     }
 
-    "BU-21. Return correct data for setScript" in {
+    "BU-203. Return correct data for setScript" in {
       val setScript = TxHelpers.setScript(firstTxParticipant, testScript, customFee)
-
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 2,
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
-      )(_.appendMicroBlock(setScript)) { updates =>
-        val append = updates(1).append
+      )(_.appendBlock(setScript)) { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkSetScript(append, setScript)
       }
     }
@@ -196,70 +207,74 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
       val senderBalanceAfterSponsorFeeTx       = senderBalanceBeforeSponsorFeeTx - sponsorFee.fee.value
       val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFee.fee.value
 
-      "BU-25. subscribe sponsorFee" in withGenerateSubscription(
+      "BU-204. getBlockUpdate sponsorFee" in withGenerateGetBlockUpdate(
+        height = 3,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(firstToken)
         d.appendBlock(sponsorFee)
-      } { updates =>
-        val append = updates(2).append
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkSponsorFee(append, sponsorFee, senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx)
       }
 
-      "BU-27. subscribe sponsorFee cancel" in withGenerateSubscription(
+      "BU-206. getBlockUpdate sponsorFee cancel" in withGenerateGetBlockUpdate(
+        height = 4,
         settings = currentSettings,
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(firstToken)
         d.appendBlock(sponsorFee)
-        d.appendMicroBlock(sponsorFeeCancel)
-      } { updates =>
-        val append = updates(3).append
+        d.appendBlock(sponsorFeeCancel)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkSponsorFee(append, sponsorFeeCancel, senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx)
       }
     }
 
-    "BU-20. Return correct data for setAssetScript" in {
+    "BU-202. Return correct data for setAssetScript" in {
       val issue          = TxHelpers.issue(firstTxParticipant, amount, script = complexScriptBefore)
       val setAssetScript = TxHelpers.setAssetScript(firstTxParticipant, issue.asset, complexScriptAfter, 1.waves)
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 3,
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        d.appendMicroBlock(setAssetScript)
-      } { updates =>
-        val append = updates(2).append
+        d.appendBlock(setAssetScript)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkSetAssetScript(append, setAssetScript, issue)
       }
     }
 
-    "BU-121. Return correct data for UpdateAssetInfo" in {
+    "BU-224. Return correct data for UpdateAssetInfo" in {
       val newName         = "new_name"
       val newDescription  = "new_description"
       val updateAssetInfo = TxHelpers.updateAssetInfo(firstTokenAsset.id, newName, newDescription, firstTxParticipant)
-
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 4,
         settings = currentSettings.configure(_.copy(minAssetInfoUpdateInterval = 1)),
         balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(firstToken)
         d.appendBlock()
-        d.appendMicroBlock(updateAssetInfo)
-      } { updates =>
-        val append = updates(3).append
+        d.appendBlock(updateAssetInfo)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkUpdateAssetInfo(append, updateAssetInfo)
       }
     }
 
-    "BU-122. Return correct data for EthereumTransfer" in {
+    "BU-225. Return correct data for EthereumTransfer" in {
       val ethereumTransfer: EthereumTransaction =
         EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
       val ethAddress = ethereumTransfer.senderAddress.value()
-      val transfer   = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
+      val transfer = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
 
-      withGenerateSubscription(
+      withGenerateGetBlockUpdate(
+        height = 4,
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
         balances = Seq(
           AddrWithBalance(ethAddress, firstTxParticipantBalanceBefore),
@@ -268,15 +283,16 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
       ) { d =>
         d.appendKeyBlock()
         d.appendBlock(secondToken, transfer)
-        d.appendMicroBlock(ethereumTransfer)
-      } { updates =>
-        val append = updates(3).append
+        d.appendBlock(ethereumTransfer)
+      } { getBlockUpdate =>
+        val append = getBlockUpdate.getUpdate.getAppend
         checkEthereumTransfer(append, ethereumTransfer, ethAddress)
       }
     }
 
-    def withAddedBlocksAndSubscribeExchangeTx(exchangeTx: ExchangeTransaction)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
-      withGenerateSubscription(
+    def withAddedBlocksAndGetBlockUpdate(exchangeTx: ExchangeTransaction, height: Int)(f: GetBlockUpdateResponse => Unit): Unit = {
+      withGenerateGetBlockUpdate(
+        height,
         settings = currentSettings,
         balances = Seq(
           AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
@@ -285,7 +301,7 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
       ) { d =>
         d.appendBlock(firstToken)
         d.appendBlock(secondToken)
-        d.appendMicroBlock(exchangeTx)
+        d.appendBlock(exchangeTx)
       }(f)
     }
   }
