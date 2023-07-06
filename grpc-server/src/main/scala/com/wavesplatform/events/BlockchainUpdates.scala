@@ -6,7 +6,8 @@ import com.wavesplatform.database.RDB
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
@@ -93,7 +94,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   override def onProcessBlock(
       block: Block,
-      snapshot: StateSnapshot,
+      snapshot: DetailedSnapshot,
       minerReward: Option[Long],
       hitSource: ByteStr,
       blockchainBeforeWithMinerReward: Blockchain
@@ -101,7 +102,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
-      snapshot: StateSnapshot,
+      snapshot: DetailedSnapshot,
       blockchainBeforeWithMinerReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr

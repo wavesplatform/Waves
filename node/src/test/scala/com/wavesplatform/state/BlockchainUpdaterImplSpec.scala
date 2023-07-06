@@ -95,24 +95,24 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              snapshot.balances.isEmpty &&
-              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
+              snapshot.parentSnapshot.balances.isEmpty &&
+              snapshot.parentSnapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
             .expects(where { (block, snapshot, _, _, bc) =>
-              val txInfo = snapshot.transactions.head
+              val txInfo = snapshot.parentSnapshot.transactions.head
               val tx     = txInfo._2.transaction.asInstanceOf[TransferTransaction]
 
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
-              snapshot.balances.size == 1 &&
-              snapshot.balances.head._2 == FEE_AMT * 5 &&
+              snapshot.parentSnapshot.balances.size == 1 &&
+              snapshot.parentSnapshot.balances.head._2 == FEE_AMT * 5 &&
               // first Tx updated balances
-              snapshot.transactions.head._2.snapshot.balances((tx.recipient.asInstanceOf[Address], Waves)) == (ENOUGH_AMT / 5) &&
-              snapshot.transactions.head._2.snapshot.balances((tx.sender.toAddress, Waves)) == ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT
+              snapshot.parentSnapshot.transactions.head._2.snapshot.balances((tx.recipient.asInstanceOf[Address], Waves)) == (ENOUGH_AMT / 5) &&
+              snapshot.parentSnapshot.transactions.head._2.snapshot.balances((tx.sender.toAddress, Waves)) == ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT
             })
             .once()
 
@@ -132,8 +132,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              snapshot.balances.isEmpty &&
-              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
+              snapshot.parentSnapshot.balances.isEmpty &&
+              snapshot.parentSnapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
@@ -142,8 +142,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
-              snapshot.balances.size == 1 &&
-              snapshot.balances.head._2 == FEE_AMT * 5 * 0.4
+              snapshot.parentSnapshot.balances.size == 1 &&
+              snapshot.parentSnapshot.balances.head._2 == FEE_AMT * 5 * 0.4
             })
             .once()
 
@@ -152,8 +152,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
               bc.height == 2 &&
               block.transactionData.length == 4 &&
               // miner reward, no NG — all txs fees
-              snapshot.balances.size == 1 &&
-              snapshot.balances.head._2 == (
+              snapshot.parentSnapshot.balances.size == 1 &&
+              snapshot.parentSnapshot.balances.head._2 == (
                 FEE_AMT * 5 * 0.4     // from previous ↑ snapshot
                   + FEE_AMT * 5 * 0.6 // carry from prev block
                   + FEE_AMT * 4 * 0.4 // current block reward
@@ -196,8 +196,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
             .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              snapshot.balances.isEmpty &&
-              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
+              snapshot.parentSnapshot.balances.isEmpty &&
+              snapshot.parentSnapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
@@ -207,8 +207,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
               bc.height == 1 &&
               microBlock.transactionData.length == 2 &&
               // miner reward, no NG — all txs fees
-              snapshot.balances.size == 1 &&
-              snapshot.balances.head._2 == FEE_AMT * 2 * 0.4
+              snapshot.parentSnapshot.balances.size == 1 &&
+              snapshot.parentSnapshot.balances.head._2 == FEE_AMT * 2 * 0.4
             })
             .once()
 
@@ -218,8 +218,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
               bc.height == 1 &&
               microBlock.transactionData.length == 1 &&
               // miner reward, no NG — all txs fees
-              snapshot.balances.size == 1 &&
-              snapshot.balances.head._2 ==
+              snapshot.parentSnapshot.balances.size == 1 &&
+              snapshot.parentSnapshot.balances.head._2 ==
                 (FEE_AMT * 2 * 0.4 // from previous ↑ snapshot
                   + FEE_AMT * 0.4)
             })

@@ -16,6 +16,7 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -535,10 +536,10 @@ object StateUpdate {
 
   def container(
       blockchainBeforeWithMinerReward: Blockchain,
-      snapshot: StateSnapshot,
+      snapshot: DetailedSnapshot,
       minerAddress: Address
   ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata], Seq[AssetInfo]) = {
-    val parentStateUpdate = atomic(blockchainBeforeWithMinerReward, snapshot)
+    val parentStateUpdate = atomic(blockchainBeforeWithMinerReward, snapshot.parentSnapshot)
 
     // miner reward is already in the blockchainBeforeWithMinerReward
     // if miner balance has been changed in parentSnapshot, it is already included in balance updates
@@ -551,13 +552,15 @@ object StateUpdate {
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
-    val (totalSnapshot, txsStateUpdates) = snapshot.transactions.values
-      .foldLeft((snapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), txInfo) =>
-        (
-          accSnapshot |+| txInfo.snapshot,
-          updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithMinerReward, accSnapshot), txInfo.snapshot),
-        )
-      }
+    val (totalSnapshot, txsStateUpdates) =
+      snapshot.parentSnapshot.transactions
+        .foldLeft((snapshot.parentSnapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), (_, txInfo)) =>
+          val txSnapshot = txInfo.snapshot.addBalances(snapshot.feePortfolios, blockchainBeforeWithMinerReward).explicitGet()
+          (
+            accSnapshot |+| txSnapshot,
+            updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithMinerReward, accSnapshot), txSnapshot)
+          )
+        }
     val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithMinerReward, totalSnapshot)
     val metadata        = transactionsMetadata(blockchainAfter, totalSnapshot)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
@@ -611,7 +614,7 @@ final case class BlockAppended(
 object BlockAppended {
   def from(
       block: Block,
-      snapshot: StateSnapshot,
+      snapshot: DetailedSnapshot,
       blockchainBeforeWithMinerReward: Blockchain,
       minerReward: Option[Long],
       hitSource: ByteStr
@@ -660,12 +663,9 @@ final case class MicroBlockAppended(
 }
 
 object MicroBlockAppended {
-  def revertMicroBlocks(mbs: Seq[MicroBlockAppended]): StateUpdate =
-    Monoid.combineAll(mbs.reverse.map(_.reverseStateUpdate))
-
   def from(
       microBlock: MicroBlock,
-      snapshot: StateSnapshot,
+      snapshot: DetailedSnapshot,
       blockchainBeforeWithMinerReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
