@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http.eth
 
-import java.math.BigInteger
-
 import akka.http.scaladsl.server.*
 import cats.data.Validated
 import cats.instances.vector.*
@@ -13,21 +11,24 @@ import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{ABIConverter, ERC20Address, EthereumTransaction}
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{EthABIConverter, ERC20Address, EthereumTransaction}
 import com.wavesplatform.utils.EthEncoding.*
 import com.wavesplatform.utils.{EthEncoding, Time}
 import org.web3j.abi.*
+import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto.*
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
+import java.math.BigInteger
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
@@ -53,149 +54,198 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           complete(jsons.sequence.leftMap(CustomValidationError(_)).map(JsArray(_))) // TODO: Only first error is displayed
       }
     } ~ (get & path("abi" / AddrSegment)) { addr =>
-      complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
+      complete(blockchain.accountScript(addr).map(as => EthABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
-      val id             = (jso \ "id").get
-      val params         = (jso \ "params").asOpt[IndexedSeq[JsValue]].getOrElse(Nil)
-      lazy val param1    = params.head
-      lazy val param1Str = param1.as[String]
-
-      (jso \ "method").as[String] match {
-        case "eth_chainId" | "net_version" =>
+      val id = (jso \ "id").getOrElse(JsNull)
+      (jso \ "method").asOpt[String] match {
+        case Some("eth_chainId" | "net_version") =>
           resp(id, quantity(blockchain.settings.addressSchemeCharacter.toInt))
-        case "eth_blockNumber" =>
+        case Some("eth_blockNumber") =>
           resp(id, quantity(blockchain.height))
-        case "eth_getTransactionCount" =>
+        case Some("eth_getTransactionCount") =>
           resp(id, quantity(time.getTimestamp()))
-        case "eth_getBlockByNumber" =>
-          resp(
-            id,
-            Json.obj(
-              "number" -> quantity(Integer.parseInt(param1Str.drop(2), 16))
-            )
-          )
-
-        case "eth_getBlockByHash" =>
-          val blockId = ByteStr(toBytes(param1Str))
-
-          resp(
-            id,
-            blockchain.heightOf(blockId).flatMap(blockchain.blockHeader).fold[JsValue](JsNull) { _ =>
-              Json.obj(
-                "baseFeePerGas" -> "0x0"
-              )
+        case Some("eth_getBlockByNumber") =>
+          extractParam1[String](jso) { str =>
+            val blockNumberOpt = str match {
+              case "earliest" => Some(1).asRight
+              case "latest"   => Some(blockchain.height).asRight
+              case "pending"  => None.asRight
+              case _ =>
+                Try(Some(Integer.parseInt(str.drop(2), 16))).toEither
+                  .leftMap(_ => GenericError("Request parameter is not number nor supported tag"))
             }
-          )
-        case "eth_getBalance" =>
-          val address = Address.fromHexString(param1Str)
-          resp(
-            id,
-            toHexString(
-              BigInt(blockchain.balance(address)) * EthereumTransaction.AmountMultiplier
-            )
-          )
-        case "eth_sendRawTransaction" =>
-          extractTransaction(param1Str) match {
-            case Left(value) => resp(id, ApiError.fromValidationError(value).json)
-            case Right(et) =>
-              resp(
-                id,
-                transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
-                  result.resultE match {
-                    case Left(error) => ApiError.fromValidationError(error).json
-                    case Right(_)    => toHexString(et.id().arr)
-                  }
-                }
-              )
-          }
-
-        case "eth_getTransactionReceipt" =>
-          val transactionHex = param1Str
-          val txId           = ByteStr(toBytes(transactionHex))
-          log.info(s"Get receipt for $transactionHex/$txId") // TODO remove logging
-
-          resp(
-            id,
-            transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
-              tm.transaction match {
-                case tx: EthereumTransaction =>
-                  Json.obj(
-                    "transactionHash"   -> toHexString(tm.transaction.id().arr),
-                    "transactionIndex"  -> "0x1",
-                    "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
-                    "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
-                    "from"              -> toHexString(tx.senderAddress().publicKeyHash),
-                    "to"                -> tx.underlying.getTo,
-                    "cumulativeGasUsed" -> toHexString(tx.fee),
-                    "gasUsed"           -> toHexString(tx.fee),
-                    "contractAddress"   -> JsNull,
-                    "logs"              -> Json.arr(),
-                    "logsBloom"         -> toHexString(new Array[Byte](32)),
-                    "status"            -> (if (tm.succeeded) "0x1" else "0x0")
-                  )
-                case _ => JsNull
+            blockNumberOpt.fold(
+              error => complete(error),
+              { numberOpt =>
+                val result = numberOpt.map(n => JsString(quantity(n)))
+                resp(id, Json.obj("number" -> result))
               }
-
+            )
+          }
+        case Some("eth_getBlockByHash") =>
+          extractParam1[String](jso) { str =>
+            val blockId = ByteStr(toBytes(str))
+            resp(
+              id,
+              blockchain.heightOf(blockId).flatMap(blockchain.blockHeader).fold[JsValue](JsNull) { _ =>
+                Json.obj(
+                  "baseFeePerGas" -> "0x0"
+                )
+              }
+            )
+          }
+        case Some("eth_getBalance") =>
+          extractParam1[String](jso) { str =>
+            val address = Address.fromHexString(str)
+            resp(
+              id,
+              toHexString(
+                BigInt(blockchain.balance(address)) * EthereumTransaction.AmountMultiplier
+              )
+            )
+          }
+        case Some("eth_sendRawTransaction") =>
+          extractParam1[String](jso) { str =>
+            extractTransaction(str) match {
+              case Left(value) => resp(id, ApiError.fromValidationError(value).json)
+              case Right(et) =>
+                resp(
+                  id,
+                  transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
+                    result.resultE match {
+                      case Left(error) => ApiError.fromValidationError(error).json
+                      case Right(_)    => toHexString(et.id().arr)
+                    }
+                  }
+                )
             }
-          )
-        case "eth_call" =>
-          val call            = param1.as[JsObject]
-          val dataString      = (call \ "data").as[String]
-          val contractAddress = (call \ "to").as[String]
+          }
+        case Some("eth_getTransactionReceipt") =>
+          extractParam1[String](jso) { transactionHex =>
+            val txId = ByteStr(toBytes(transactionHex))
+            resp(
+              id,
+              transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
+                tm.transaction match {
+                  case tx: EthereumTransaction =>
+                    Json.obj(
+                      "transactionHash"   -> toHexString(tm.transaction.id().arr),
+                      "transactionIndex"  -> "0x1",
+                      "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
+                      "from"              -> toHexString(tx.senderAddress().publicKeyHash),
+                      "to"                -> tx.underlying.getTo,
+                      "cumulativeGasUsed" -> toHexString(tx.fee),
+                      "gasUsed"           -> toHexString(tx.fee),
+                      "contractAddress"   -> JsNull,
+                      "logs"              -> Json.arr(),
+                      "logsBloom"         -> toHexString(new Array[Byte](32)),
+                      "status"            -> (if (tm.succeeded) "0x1" else "0x0")
+                    )
+                  case _ => JsNull
+                }
+              }
+            )
+          }
+        case Some("eth_getTransactionByHash") =>
+          extractParam1[String](jso) { transactionHex =>
+            val txId = ByteStr(toBytes(transactionHex))
+            resp(
+              id,
+              transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
+                tm.transaction match {
+                  case tx: EthereumTransaction =>
+                    Json.obj(
+                      "hash"             -> toHexString(tm.transaction.id().arr),
+                      "nonce"            -> "0x1",
+                      "blockHash"        -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockNumber"      -> toHexString(BigInteger.valueOf(tm.height)),
+                      "transactionIndex" -> "0x1",
+                      "from"             -> toHexString(tx.senderAddress().publicKeyHash),
+                      "to"               -> tx.underlying.getTo,
+                      "value"            -> "0x10",
+                      "gasPrice"         -> toHexString(tx.fee),
+                      "gas"              -> toHexString(tx.fee),
+                      "input"            -> "0x20",
+                      "v"                -> "0x30",
+                      "standardV"        -> "0x40",
+                      "r"                -> "0x50",
+                      "raw"              -> "0x60",
+                      "publickey"        -> toHexString(tx.signerPublicKey().arr)
+                    )
+                  case _ => JsNull
+                }
+              }
+            )
+          }
+        case Some("eth_call") =>
+          extractParam1[JsObject](jso) { call =>
+            val dataString      = (call \ "data").as[String]
+            val contractAddress = (call \ "to").as[String]
 
-          log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}") // TODO remove logging
-
-          cleanHexPrefix(dataString).take(8) match {
-            case "95d89b41" =>
-              resp(id, encodeResponse(assetDescription(contractAddress).get.name.toStringUtf8))
-            case "313ce567" =>
-              resp(id, encodeResponse(new Uint8(assetDescription(contractAddress).get.decimals)))
-            case "70a08231" =>
-              resp(
-                id,
-                encodeResponse(
-                  new Uint256(
-                    blockchain.balance(Address.fromHexString(dataString.takeRight(40)), assetId(contractAddress).get)
+            cleanHexPrefix(dataString).take(8) match {
+              case "95d89b41" => // symbol()
+                resp(id, encodeResponse(assetDescription(contractAddress).fold("")(_.name.toStringUtf8)))
+              case "313ce567" => // decimals()
+                resp(id, encodeResponse(new Uint8(assetDescription(contractAddress).fold(0)(_.decimals))))
+              case "70a08231" => // balanceOf(address)
+                resp(
+                  id,
+                  encodeResponse(
+                    new Uint256(
+                      assetId(contractAddress).fold(0L)(ia => blockchain.balance(Address.fromHexString(dataString.takeRight(40)), ia))
+                    )
                   )
                 )
-              )
-            case _ =>
-              log.info(s"Unexpected call $dataString at $contractAddress")
-              resp(id, "")
+              case "01ffc9a7" => // supportsInterface() https://eips.ethereum.org/EIPS/eip-165
+                resp(id, encodeResponse(new Bool(false)))
+              case _ =>
+                resp(id, "0x")
+            }
           }
-        case "eth_estimateGas" =>
-          val txParams = param1.as[JsObject]
-          val tx = RawTransaction.createTransaction(
-            BigInteger.valueOf(System.currentTimeMillis()),
-            EthereumTransaction.GasPrice,
-            BigInteger.ONE,
-            (txParams \ "to").as[String],
-            (txParams \ "value").asOpt[String].fold(BigInteger.ZERO)(s => new BigInteger(cleanHexPrefix(s), 16)),
-            (txParams \ "data").asOpt[String].getOrElse("0x")
-          )
+        case Some("eth_estimateGas") =>
+          extractParam1[JsObject](jso) { txParams =>
+            val tx = RawTransaction.createTransaction(
+              BigInteger.valueOf(System.currentTimeMillis()),
+              EthereumTransaction.GasPrice,
+              BigInteger.ONE,
+              // "to" may be missing when estimating base currency transfer
+              (txParams \ "to").asOpt[String].getOrElse("0x0000000000000000000000000000000000000000"),
+              (txParams \ "value").asOpt[String].fold(BigInteger.ZERO)(s => new BigInteger(cleanHexPrefix(s), 16)),
+              (txParams \ "data").asOpt[String].getOrElse("0x")
+            )
 
-          val errorOrLong = for {
-            et            <- EthereumTransaction(tx)
-            (_, txFee, _) <- transactionsApi.calculateFee(et)
-          } yield txFee
+            val errorOrLong = for {
+              et            <- EthereumTransaction(tx)
+              (_, txFee, _) <- transactionsApi.calculateFee(et)
+            } yield txFee
 
-          resp(
-            id,
-            errorOrLong
-              .fold[JsValueWrapper](e => ApiError.fromValidationError(e).json, fee => toHexString(BigInteger.valueOf(fee)))
-          )
+            resp(
+              id,
+              errorOrLong
+                .fold[JsValueWrapper](e => ApiError.fromValidationError(e).json, fee => toHexString(BigInteger.valueOf(fee)))
+            )
+          }
 
-        case "eth_gasPrice" =>
+        case Some("eth_gasPrice") =>
           resp(id, toHexString(EthereumTransaction.GasPrice))
-        case "eth_getCode" =>
-          val address = Address.fromHexString(param1Str)
-          resp(id, if (blockchain.hasDApp(address)) "0xff" else "0x")
+        case Some("eth_getCode") =>
+          extractParam1[String](jso) { str =>
+            val address = Address.fromHexString(str)
+            resp(id, if (blockchain.hasDApp(address) || assetDescription(str).isDefined) "0xff" else "0x")
+          }
         case _ =>
           log.trace(s"Unexpected call: ${Json.stringify(jso)}")
           complete(Json.obj())
       }
     }
   }
+
+  private def extractParam1[A: Reads](jso: JsObject)(f: A => StandardRoute) =
+    (jso \ "params" \ 0).asOpt[A] match {
+      case Some(v) => f(v)
+      case None    => complete(GenericError("Error extracting required parameter"))
+    }
 
   @inline
   private[this] def quantity(v: Long) = "0x" + java.lang.Long.toString(v, 16)
@@ -210,7 +260,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
   private[this] def assetId(contractAddress: String): Option[IssuedAsset] =
     blockchain.resolveERC20Address(ERC20Address(ByteStr(toBytes(contractAddress))))
 
-  private[this] def encodeResponse(values: Type*): String = FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
+  private[this] def encodeResponse(values: Type*): String = "0x" + FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
 
   private[this] def extractTransaction(transactionHex: String) = TransactionDecoder.decode(transactionHex) match {
     case srt: SignedRawTransaction => EthereumTransaction(srt)

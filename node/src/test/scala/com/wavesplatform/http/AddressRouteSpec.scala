@@ -1,24 +1,24 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, MediaTypes, TransferEncodings}
 import akka.http.scaladsl.model.headers.{Accept, `Content-Type`, `Transfer-Encoding`}
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import akka.stream.scaladsl.Source
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
-import com.wavesplatform.crypto
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.http.AddressApiRoute
-import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
+import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -30,16 +30,18 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.{Schedulers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
+import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
+import play.api.libs.json.Json.JsValueWrapper
 
 import scala.concurrent.duration.*
 
-class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain with SharedSchedulerMixin {
 
   private val wallet = Wallet(WalletSettings(None, Some("123"), Some(ByteStr(Longs.toByteArray(System.nanoTime())))))
   wallet.generateNewAccounts(10)
@@ -52,18 +54,25 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
+  private val timeLimited: SchedulerService = Schedulers.timeBoundedFixedPool(
+    new HashedWheelTimer(),
+    5.seconds,
+    1,
+    "rest-time-limited"
+  )
+
+  override def afterAll(): Unit = {
+    timeLimited.shutdown()
+    super.afterAll()
+  }
   private val addressApiRoute: AddressApiRoute = AddressApiRoute(
     restAPISettings,
     wallet,
     blockchain,
     utxPoolSynchronizer,
     new TestTime,
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ),
+    timeLimited,
+    new RouteTimeout(60.seconds)(sharedScheduler),
     commonAccountApi,
     5
   )
@@ -143,19 +152,18 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   }
 
   private def testSign(path: String, encode: Boolean): Unit =
-    forAll(generatedMessages) {
-      case (account, message) =>
-        val uri = routePath(s"/$path/${account.toAddress}")
-        Post(uri, message) ~> route should produce(ApiKeyNotValid)
-        Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
-          val resp      = responseAs[JsObject]
-          val signature = ByteStr.decodeBase58((resp \ "signature").as[String]).get
+    forAll(generatedMessages) { case (account, message) =>
+      val uri = routePath(s"/$path/${account.toAddress}")
+      Post(uri, message) ~> route should produce(ApiKeyNotValid)
+      Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
+        val resp      = responseAs[JsObject]
+        val signature = ByteStr.decodeBase58((resp \ "signature").as[String]).get
 
-          (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
-          (resp \ "publicKey").as[String] shouldEqual account.publicKey.toString
+        (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
+        (resp \ "publicKey").as[String] shouldEqual account.publicKey.toString
 
-          crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
-        }
+        crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
+      }
     }
 
   routePath("/sign/{address}") in testSign("sign", true)
@@ -163,27 +171,26 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private def testVerify(path: String, encode: Boolean): Unit = {
 
-    forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) {
-      case ((account, message), b58) =>
-        val uri          = routePath(s"/$path/${account.toAddress}")
-        val messageBytes = message.getBytes("UTF-8")
-        val signature    = crypto.sign(account.privateKey, messageBytes)
-        val validBody = Json.obj(
-          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
-          "publickey" -> JsString(Base58.encode(account.publicKey.arr)),
-          "signature" -> JsString(signature.toString)
-        )
+    forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) { case ((account, message), b58) =>
+      val uri          = routePath(s"/$path/${account.toAddress}")
+      val messageBytes = message.getBytes("UTF-8")
+      val signature    = crypto.sign(account.privateKey, messageBytes)
+      val validBody = Json.obj(
+        "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
+        "publickey" -> JsString(Base58.encode(account.publicKey.arr)),
+        "signature" -> JsString(signature.toString)
+      )
 
-        val emptySignature =
-          Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey.arr)), "signature" -> JsString(""))
+      val emptySignature =
+        Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey.arr)), "signature" -> JsString(""))
 
-        Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
-        Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
-          (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
-        }
-        Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
-          (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
-        }
+      Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
+      Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
+        (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
+      }
+      Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
+        (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
+      }
     }
   }
   routePath("/verifyText/{address}") in testVerify("verifyText", false)
@@ -287,7 +294,6 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3).toString
       (response \ "meta" \ "version").as[String] shouldBe "1"
-      (response \ "meta" \ "isArrayArguments").as[Boolean] shouldBe true
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ 0 \ "name").as[String] shouldBe "a"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ 0 \ "type").as[String] shouldBe "Int"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ 1 \ "name").as[String] shouldBe "b"
@@ -312,7 +318,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
     (blockchain.accountScript _)
       .when(allAccounts(5).toAddress)
-      .onCall((_: Address) => Thread.sleep(100000).asInstanceOf[Nothing])
+      .onCall { (_: Address) =>
+        Thread.sleep(100000)
+        None
+      }
 
     implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
     implicit val timeout          = routeTestTimeout.duration
@@ -325,16 +334,15 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     val contractWithoutVerifierComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
     (blockchain.accountScript _)
       .when(allAccounts(6).toAddress)
-      .onCall(
-        (_: Address) =>
-          Some(
-            AccountScriptInfo(
-              allAccounts(6).publicKey,
-              ContractScript(V3, contractWithoutVerifier).explicitGet(),
-              0L,
-              complexitiesByEstimator = Map(1 -> contractWithoutVerifierComplexities)
-            )
+      .onCall((_: Address) =>
+        Some(
+          AccountScriptInfo(
+            allAccounts(6).publicKey,
+            ContractScript(V3, contractWithoutVerifier).explicitGet(),
+            0L,
+            complexitiesByEstimator = Map(1 -> contractWithoutVerifierComplexities)
           )
+        )
       )
     (blockchain.hasAccountScript _).when(allAccounts(6).toAddress).returns(true).once()
 
@@ -422,4 +430,81 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
+  routePath(s"/data/{address} - handles keys limit") in {
+    def checkErrorResponse(): Unit = {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(addressApiRoute.settings.dataKeysRequestLimit).message
+    }
+
+    def checkResponse(key: String, value: String, idsCount: Int): Unit = {
+      response.status shouldBe StatusCodes.OK
+
+      val result = responseAs[JsArray].value
+      result.size shouldBe idsCount
+      (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
+        json should matchJson(s"""
+                                 |{
+                                 |  "key" : "$key",
+                                 |  "type" : "string",
+                                 |  "value" : "$value"
+                                 |}
+                                 |""".stripMargin)
+      }
+    }
+
+    val account = TxHelpers.signer(1)
+    val key     = "testKey"
+    val value   = "testValue"
+
+    withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
+      d.appendBlock(TxHelpers.dataSingle(account, key = key, value = value))
+
+      val route =
+        addressApiRoute
+          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .route
+
+      val maxLimitKeys      = Seq.fill(addressApiRoute.settings.dataKeysRequestLimit)(key)
+      val moreThanLimitKeys = key +: maxLimitKeys
+
+      Get(routePath(s"/data/${account.toAddress}?${maxLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
+        checkResponse(key, value, maxLimitKeys.size)
+      )
+      Get(routePath(s"/data/${account.toAddress}?${moreThanLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
+        checkErrorResponse()
+      )
+
+      Post(routePath(s"/data/${account.toAddress}"), FormData(maxLimitKeys.map("key" -> _)*)) ~> route ~> check(
+        checkResponse(key, value, maxLimitKeys.size)
+      )
+      Post(routePath(s"/data/${account.toAddress}"), FormData(moreThanLimitKeys.map("key" -> _)*)) ~> route ~> check(
+        checkErrorResponse()
+      )
+
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> Json.arr(maxLimitKeys.map(key => key: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkResponse(key, value, maxLimitKeys.size))
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> Json.arr(moreThanLimitKeys.map(key => key: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkErrorResponse())
+    }
+  }
+
+  routePath(s"/data/{address} - handles empty keys input in POST") in {
+    def checkErrorResponse(): Unit = {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe DataKeysNotSpecified.message
+    }
+
+    val account = TxHelpers.signer(1)
+
+    Post(routePath(s"/data/${account.toAddress}"), FormData()) ~> route ~> check(checkErrorResponse())
+
+    Post(
+      routePath(s"/data/${account.toAddress}"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> JsArray.empty).toString())
+    ) ~> route ~> check(checkErrorResponse())
+  }
 }

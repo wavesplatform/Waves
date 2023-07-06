@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -19,15 +20,17 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
-import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, signer}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
@@ -35,6 +38,7 @@ import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -43,7 +47,8 @@ class LeaseRouteSpec
     with NTPTime
     with WithDomain
     with TestWallet
-    with PathMockFactory {
+    with PathMockFactory
+    with SharedSchedulerMixin {
   private def route(domain: Domain) =
     LeaseApiRoute(
       restAPISettings,
@@ -51,7 +56,8 @@ class LeaseRouteSpec
       domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
+      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain),
+      new RouteTimeout(60.seconds)(sharedScheduler)
     )
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
@@ -309,48 +315,41 @@ class LeaseRouteSpec
       }
     }
 
-    val genesisWithEthereumInvoke = for {
-      sender    <- ethAccountGen
-      dApp      <- accountGen
-      recipient <- accountGen
-      invokeEth <- ethereumInvokeTransactionGen(
-        sender,
-        dApp,
-        "leaseTo",
-        Seq(Arg.Bytes(ByteStr(recipient.toAddress.bytes)), Arg.Integer(10000.waves))
-      )
-    } yield (
-      dApp,
-      setScriptTransaction(dApp),
-      invokeEth,
-      recipient.toAddress
-    )
-
-    "created by EthereumTransaction and canceled by CancelLeaseTransaction" in forAll(genesisWithEthereumInvoke) {
-      case (dApp, setScript, invoke, recipient) =>
-        withRoute(Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoke.sender.toAddress))) { (d, r) =>
-          d.appendBlock(setScript)
-          d.appendBlock(invoke)
-          val leaseId = d.blockchain
-            .accountData(dApp.toAddress, "leaseId")
-            .collect { case i: BinaryDataEntry =>
-              i.value
-            }
-            .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(recipient, r, expectedDetails)
+    "created by EthereumTransaction and canceled by CancelLeaseTransaction" in {
+      val sender    = signer(2).toEthKeyPair
+      val dApp      = defaultSigner
+      val recipient = secondSigner.toAddress
+      val invoke =
+        EthTxGenerator.generateEthInvoke(
+          keyPair = sender,
+          address = dApp.toAddress,
+          funcName = "leaseTo",
+          args = Seq(Arg.Bytes(ByteStr(recipient.bytes)), Arg.Integer(10000.waves)),
+          payments = Seq.empty
+        )
+      withRoute(Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoke.sender.toAddress))) { (d, r) =>
+        d.appendBlock(setScriptTransaction(dApp))
+        d.appendBlock(invoke)
+        val leaseId = d.blockchain
+          .accountData(dApp.toAddress, "leaseId")
+          .collect { case i: BinaryDataEntry =>
+            i.value
           }
+          .get
+        val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
 
-          d.appendMicroBlock(leaseCancelTransaction(dApp, leaseId))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(dApp.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(recipient, r, Seq.empty)
-          }
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(recipient, r, expectedDetails)
         }
+
+        d.appendMicroBlock(leaseCancelTransaction(dApp, leaseId))
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(dApp.toAddress, r, Seq.empty)
+          checkActiveLeasesFor(recipient, r, Seq.empty)
+        }
+      }
     }
 
     val nestedInvocation = {
@@ -428,11 +427,105 @@ class LeaseRouteSpec
     }
   }
 
+  "returns leases created by invoke only for lease sender or recipient" in {
+    val invoker         = TxHelpers.signer(1)
+    val dApp1           = TxHelpers.signer(2)
+    val dApp2           = TxHelpers.signer(3)
+    val leaseRecipient1 = TxHelpers.signer(4)
+    val leaseRecipient2 = TxHelpers.signer(5)
+
+    val leaseAmount1 = 1
+    val leaseAmount2 = 2
+
+    val dAppScript1 = TestCompiler(V5)
+      .compileContract(s"""
+                          |{-# STDLIB_VERSION 5 #-}
+                          |{-# CONTENT_TYPE DAPP #-}
+                          |{-# SCRIPT_TYPE ACCOUNT #-}
+                          |
+                          |@Callable(i)
+                          |func foo() = {
+                          |  strict inv = invoke(Address(base58'${dApp2.toAddress}'), "bar", [], [])
+                          |  let lease = Lease(Address(base58'${leaseRecipient1.toAddress}'), 1)
+                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+                          |}
+                          |""".stripMargin)
+
+    val dAppScript2 = TestCompiler(V5)
+      .compileContract(s"""
+                          |{-# STDLIB_VERSION 5 #-}
+                          |{-# CONTENT_TYPE DAPP #-}
+                          |{-# SCRIPT_TYPE ACCOUNT #-}
+                          |
+                          |@Callable(i)
+                          |func bar() = {
+                          |  let lease = Lease(Address(base58'${leaseRecipient2.toAddress}'), 2)
+                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+                          |}
+                          |""".stripMargin)
+
+    def checkForInvoke(invokeTx: Transaction & Authorized): Unit =
+      withRoute(AddrWithBalance.enoughBalances(dApp1, dApp2) :+ AddrWithBalance(invokeTx.sender.toAddress)) { case (d, r) =>
+        def getLeaseId(address: Address) =
+          d.blockchain
+            .accountData(address, "leaseId")
+            .collect { case i: BinaryDataEntry =>
+              i.value
+            }
+            .get
+
+        d.appendBlock(
+          TxHelpers.setScript(dApp1, dAppScript1),
+          TxHelpers.setScript(dApp2, dAppScript2)
+        )
+
+        d.appendBlock(invokeTx)
+
+        val leaseDetails1 = Seq(
+          getLeaseId(dApp1.toAddress) -> LeaseDetails(
+            dApp1.publicKey,
+            leaseRecipient1.toAddress,
+            leaseAmount1,
+            LeaseDetails.Status.Active,
+            invokeTx.id(),
+            3
+          )
+        )
+        val leaseDetails2 = Seq(
+          getLeaseId(dApp2.toAddress) -> LeaseDetails(
+            dApp2.publicKey,
+            leaseRecipient2.toAddress,
+            leaseAmount2,
+            LeaseDetails.Status.Active,
+            invokeTx.id(),
+            3
+          )
+        )
+
+        checkActiveLeasesFor(invokeTx.sender.toAddress, r, Seq.empty)
+        checkActiveLeasesFor(dApp1.toAddress, r, leaseDetails1)
+        checkActiveLeasesFor(dApp2.toAddress, r, leaseDetails2)
+        checkActiveLeasesFor(leaseRecipient1.toAddress, r, leaseDetails1)
+        checkActiveLeasesFor(leaseRecipient2.toAddress, r, leaseDetails2)
+      }
+
+    checkForInvoke(TxHelpers.invoke(dApp1.toAddress, Some("foo"), invoker = invoker))
+    checkForInvoke(EthTxGenerator.generateEthInvoke(invoker.toEthKeyPair, dApp1.toAddress, "foo", Seq.empty, Seq.empty))
+  }
+
   routePath("/info") in {
     val blockchain = stub[Blockchain]
     val commonApi  = stub[CommonAccountsApi]
 
-    val route = LeaseApiRoute(restAPISettings, stub[Wallet], blockchain, stub[TransactionPublisher], SystemTime, commonApi).route
+    val route = LeaseApiRoute(
+      restAPISettings,
+      stub[Wallet],
+      blockchain,
+      stub[TransactionPublisher],
+      SystemTime,
+      commonApi,
+      new RouteTimeout(60.seconds)(sharedScheduler)
+    ).route
 
     val lease       = TxHelpers.lease()
     val leaseCancel = TxHelpers.leaseCancel(lease.id())

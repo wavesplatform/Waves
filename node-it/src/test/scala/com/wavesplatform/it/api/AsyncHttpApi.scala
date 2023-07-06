@@ -5,7 +5,7 @@ import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
@@ -51,6 +51,7 @@ import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
+import scala.collection.immutable.VectorMap
 import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -60,7 +61,7 @@ import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with matchers.should.Matchers {
 
     def get(
@@ -190,8 +191,8 @@ object AsyncHttpApi extends Assertions {
           .toCompletableFuture
           .toScala
           .map(Option(_))
-          .recoverWith {
-            case _: IOException | _: TimeoutException => Future(None)
+          .recoverWith { case _: IOException | _: TimeoutException =>
+            Future(None)
           }
 
       def cond(ropt: Option[Response]) = ropt.exists { r =>
@@ -270,7 +271,7 @@ object AsyncHttpApi extends Assertions {
           "/addresses/balance",
           Json.obj("addresses" -> addresses) ++
             height.fold(Json.obj())(h => Json.obj("height" -> h)) ++
-            asset.fold(Json.obj())(a => Json.obj("asset"   -> a))
+            asset.fold(Json.obj())(a => Json.obj("asset" -> a))
         )
       } yield Json.parse(json.getResponseBody).as[Seq[JsObject]].map(r => Balance((r \ "id").as[String], 0, (r \ "balance").as[Long]))
     }
@@ -599,11 +600,11 @@ object AsyncHttpApi extends Assertions {
         ).signWith(sender.privateKey).json()
       )
 
-    def debugStateChanges(invokeScriptTransactionId: String, amountsAsStrings: Boolean): Future[DebugStateChanges] =
-      get(s"/debug/stateChanges/info/$invokeScriptTransactionId", amountsAsStrings).as[DebugStateChanges](amountsAsStrings)
+    def stateChanges(invokeScriptTransactionId: String, amountsAsStrings: Boolean): Future[StateChanges] =
+      transactionInfo[StateChanges](invokeScriptTransactionId, amountsAsStrings)
 
-    def debugStateChangesByAddress(address: String, limit: Int = 10000, after: Option[String] = None): Future[Seq[DebugStateChanges]] =
-      get(s"/debug/stateChanges/address/$address/limit/$limit${after.fold("")(a => s"?after=$a")}").as[Seq[DebugStateChanges]]
+    def debugStateChangesByAddress(address: String, limit: Int = 10000, after: Option[String] = None): Future[Seq[StateChanges]] =
+      get(s"/debug/stateChanges/address/$address/limit/$limit${after.fold("")(a => s"?after=$a")}").as[Seq[StateChanges]]
 
     def assetBalance(address: String, asset: String, amountsAsStrings: Boolean = false): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset", amountsAsStrings).as[AssetBalance](amountsAsStrings)
@@ -731,7 +732,7 @@ object AsyncHttpApi extends Assertions {
       post("/transactions/broadcast", stringify(json)).transform {
         case Failure(UnexpectedStatusCodeException(_, _, 400, body)) => Success((Json.parse(body) \ "error").as[Int])
         case Failure(cause)                                          => Failure(cause)
-        case Success(resp)                                           => Failure(UnexpectedStatusCodeException("POST", "/transactions/broadcast", resp.getStatusCode, resp.getResponseBody))
+        case Success(resp) => Failure(UnexpectedStatusCodeException("POST", "/transactions/broadcast", resp.getStatusCode, resp.getResponseBody))
       }
     }
 
@@ -832,7 +833,7 @@ object AsyncHttpApi extends Assertions {
         })
     }
 
-    def createKeyPair(): Future[KeyPair] = Future.successful(n.generateKeyPair())
+    def createKeyPair(): Future[SeedKeyPair] = Future.successful(n.generateKeyPair())
 
     def createKeyPairServerSide(): Future[KeyPair] =
       for {
@@ -939,9 +940,9 @@ object AsyncHttpApi extends Assertions {
         .as[Seq[BalanceHistory]](amountsAsStrings)
     }
 
-    implicit val assetMapReads: Reads[Map[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map {
-      case (k, v) => IssuedAsset(ByteStr.decodeBase58(k).get) -> v
-    })
+    implicit val assetMapReads: Reads[VectorMap[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map { case (k, v) =>
+      IssuedAsset(ByteStr.decodeBase58(k).get) -> v
+    }.to(VectorMap))
     implicit val leaseBalanceFormat: Reads[LeaseBalance] = Json.reads[LeaseBalance]
     implicit val portfolioFormat: Reads[Portfolio]       = Json.reads[Portfolio]
 
@@ -1028,10 +1029,13 @@ object AsyncHttpApi extends Assertions {
       def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 
       def waitSameBlockHeaders =
-        waitFor[BlockHeader](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
-          val id = blocks.map(_.id)
-          id.forall(_ == id.head)
-        })
+        waitFor[BlockHeader](s"same blocks at height = $height")(retryInterval)(
+          _.blockHeadersAt(height),
+          { blocks =>
+            val id = blocks.map(_.id)
+            id.forall(_ == id.head)
+          }
+        )
 
       for {
         _ <- waitHeight

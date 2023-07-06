@@ -6,7 +6,9 @@ import com.wavesplatform.consensus.PoSCalculator.HitSize
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.FunctionalitySettings
 
-trait PoSCalculator {
+import scala.util.Try
+
+sealed trait PoSCalculator {
   def calculateBaseTarget(
       targetBlockDelaySeconds: Long,
       prevHeight: Int,
@@ -51,7 +53,7 @@ object NxtPoSCalculator extends PoSCalculator {
   protected val BaseTargetGamma      = 64
   protected val MeanCalculationDepth = 3
 
-  import PoSCalculator._
+  import PoSCalculator.*
 
   def calculateBaseTarget(
       targetBlockDelaySeconds: Long,
@@ -92,14 +94,14 @@ object FairPoSCalculator {
     if (fs.minBlockTime.toSeconds == 15 && fs.delayDelta == 8) V2
     else FairPoSCalculator(fs.minBlockTime.toMillis.toInt, fs.delayDelta)
 
-  private val MaxHit = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
-  private val C1     = 70000
-  private val C2     = 5e17
+  val MaxHit: BigDecimal = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
+  private val C1         = 70000
+  private val C2         = 5e17
 }
 
 case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalculator {
-  import FairPoSCalculator._
-  import PoSCalculator._
+  import FairPoSCalculator.*
+  import PoSCalculator.*
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = {
     val h = (BigDecimal(hit) / MaxHit).toDouble
@@ -121,10 +123,12 @@ case class FairPoSCalculator(minBlockTime: Int, delayDelta: Int) extends PoSCalc
     maybeGreatGrandParentTimestamp match {
       case None =>
         prevBaseTarget
+
       case Some(ts) =>
-        val avg = (timestamp - ts) / 3 / 1000
-        if (avg > maxDelay) prevBaseTarget + math.max(1, prevBaseTarget / 100)
-        else if (avg < minDelay) prevBaseTarget - math.max(1, prevBaseTarget / 100)
+        val avg                = (timestamp - ts) / 3 / 1000
+        val prevBaseTarget1pct = (prevBaseTarget / 100) max 1
+        if (avg > maxDelay) Try(math.addExact(prevBaseTarget, prevBaseTarget1pct)).getOrElse(Long.MaxValue)
+        else if (avg < minDelay) math.subtractExact(prevBaseTarget, prevBaseTarget1pct) max 1
         else prevBaseTarget
     }
   }

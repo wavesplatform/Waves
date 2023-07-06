@@ -1,20 +1,19 @@
 package com.wavesplatform.generator.utils
 
 import java.util.concurrent.ThreadLocalRandom
-
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.Curve25519.KeyLength
-import com.wavesplatform.generator.utils.Implicits._
+import com.wavesplatform.generator.utils.Implicits.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Transaction, TxNonNegativeAmount}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.LoggerFacade
 import org.slf4j.LoggerFactory
 
@@ -26,14 +25,14 @@ object Gen {
   def script(complexity: Boolean = true, estimator: ScriptEstimator): Script = {
     val s = if (complexity) s"""
                                |${(for (b <- 1 to 10) yield {
-                                 s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
-                               }).mkString("\n")}
+      s"let a$b = blake2b256(base58'') != base58'' && keccak256(base58'') != base58'' && sha256(base58'') != base58'' && sigVerify(base58'333', base58'123', base58'567')"
+    }).mkString("\n")}
                                |
                                |${(for (b <- 1 to 10) yield { s"a$b" }).mkString("&&")} || true
        """.stripMargin
     else
       s"""
-        |${recString(10)} || true
+         |${recString(10)} || true
       """.stripMargin
 
     val script = ScriptCompiler(s, isAssetScript = false, estimator).explicitGet()
@@ -46,7 +45,7 @@ object Gen {
     else
       s"if (${recString(n - 1)}) then true else false"
 
-  def oracleScript(oracle: KeyPair, data: Set[DataEntry[_]], estimator: ScriptEstimator): Script = {
+  def oracleScript(oracle: KeyPair, data: Set[DataEntry[?]], estimator: ScriptEstimator): Script = {
     val conditions =
       data.map {
         case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
@@ -54,7 +53,7 @@ object Gen {
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
         case EmptyDataEntry(_)            => ???
-      } reduce [String] { case (l, r) => s"$l && $r " }
+      }.reduce[String] { case (l, r) => s"$l && $r " }
 
     val src =
       s"""
@@ -74,21 +73,18 @@ object Gen {
   def multiSigScript(owners: Seq[KeyPair], requiredProofsCount: Int, estimator: ScriptEstimator): Script = {
     val accountsWithIndexes = owners.zipWithIndex
     val keyLets =
-      accountsWithIndexes map {
-        case (acc, i) =>
-          s"let accountPK$i = base58'${acc.publicKey}'"
+      accountsWithIndexes map { case (acc, i) =>
+        s"let accountPK$i = base58'${acc.publicKey}'"
       } mkString "\n"
 
     val signedLets =
-      accountsWithIndexes map {
-        case (_, i) =>
-          s"let accountSigned$i = if(sigVerify(tx.bodyBytes, tx.proofs[$i], accountPK$i)) then 1 else 0"
+      accountsWithIndexes map { case (_, i) =>
+        s"let accountSigned$i = if(sigVerify(tx.bodyBytes, tx.proofs[$i], accountPK$i)) then 1 else 0"
       } mkString "\n"
 
     val proofSum = accountsWithIndexes
-      .map {
-        case (_, ind) =>
-          s"accountSigned$ind"
+      .map { case (_, ind) =>
+        s"accountSigned$ind"
       }
       .mkString("let proofSum = ", " + ", "")
 
@@ -96,13 +92,13 @@ object Gen {
 
     val src =
       s"""
-       |$keyLets
-       |
-       |$signedLets
-       |
-       |$proofSum
-       |
-       |$finalStatement
+         |$keyLets
+         |
+         |$signedLets
+         |
+         |$proofSum
+         |
+         |$finalStatement
       """.stripMargin
 
     val (script, _) = ScriptCompiler(src, isAssetScript = false, estimator)
@@ -124,9 +120,8 @@ object Gen {
       .zip(recipientGen)
       .zip(feeGen)
       .zipWithIndex
-      .map {
-        case (((src, dst), fee), i) =>
-          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i)
+      .map { case (((src, dst), fee), i) =>
+        TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i)
       }
       .collect { case Right(x) => x }
   }
@@ -137,11 +132,10 @@ object Gen {
     senderGen
       .zip(transferCountGen)
       .zipWithIndex
-      .map {
-        case ((sender, count), i) =>
-          val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
-          val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, ByteStr.empty)
+      .map { case ((sender, count), i) =>
+        val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), TxNonNegativeAmount.unsafeFrom(amountGen.next())))
+        val fee       = 100000 + count * 50000
+        MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, ByteStr.empty)
       }
       .collect { case Right(tx) => tx }
   }

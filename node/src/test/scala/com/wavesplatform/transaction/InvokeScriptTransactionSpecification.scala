@@ -119,7 +119,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction") {
     val dApp = KeyPair("test5".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "6z3CsQBFzV8Wfp1DDiXw5c75LrrwxktPPJTcXYBfTetN",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
@@ -167,7 +167,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     val dApp = KeyPair("test6".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "4sxYQWNDmWvaLwVcmfX1Znj8RfAy7JAWnSQUFgAFFixC",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
@@ -223,7 +223,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     req.toTx.explicitGet()
   }
 
-  property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
+  property(s"NODE-237, NODE-238. can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(22)(CONST_LONG(0))).funcCallOpt.get.args.length shouldBe 22
     (the[Exception] thrownBy TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(23)(CONST_LONG(0)))).getMessage should include(
       "InvokeScript can't have more than 22 arguments"
@@ -274,7 +274,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ) should produce("is unsupported")
   }
 
-  property(s"can't call a func with non native(simple) args - BigInt") {
+  property(s"NODE-97. can't call a func with non native(simple) args - BigInt") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,

@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.*
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
@@ -15,13 +16,20 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
-import com.wavesplatform.utils.{Time, *}
+import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen as G
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
-class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
+import scala.concurrent.duration.*
+
+class AssetsBroadcastRouteSpec
+    extends RouteSpec("/assets/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with SharedSchedulerMixin {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,
@@ -31,7 +39,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     stub[Time],
     stub[CommonAccountsApi],
     stub[CommonAssetsApi],
-    1000
+    1000,
+    new RouteTimeout(60.seconds)(sharedScheduler)
   ).route
 
   private[this] val fixedIssueGen = for {
@@ -70,7 +79,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
-        forAll(gen) { t: Transaction =>
+        forAll(gen) { (t: Transaction) =>
           posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
         }
       }
@@ -159,11 +168,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
             WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Expected base58-encoded assetId"))))
           )
         }
-        forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"Length ${a.length} exceeds maximum length of 192"))))
-          )
-        }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee)
         }
@@ -180,7 +184,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       stub[Time],
       stub[CommonAccountsApi],
       stub[CommonAssetsApi],
-      1000
+      1000,
+      new RouteTimeout(60.seconds)(sharedScheduler)
     ).route
 
     val seed               = "seed".getBytes("UTF-8")

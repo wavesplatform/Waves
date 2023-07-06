@@ -3,41 +3,44 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.Common.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler, Types}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec {
+  implicit val offset: LibrariesOffset = NoLibraries
 
   property("should infer generic function return type") {
-    import com.wavesplatform.lang.v1.parser.Expressions._
+    import com.wavesplatform.lang.v1.parser.Expressions.*
     val v = ExpressionCompiler(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1)))).explicitGet()
     v._2 shouldBe LONG
   }
 
   property("should infer inner types") {
-    import com.wavesplatform.lang.v1.parser.Expressions._
+    import com.wavesplatform.lang.v1.parser.Expressions.*
     val v =
       ExpressionCompiler(
         compilerContext,
@@ -243,7 +246,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |   case t1: (Int, String)              => t1._2
         |   case t2: (Boolean, Int, ByteVector) => t2._1
         | }
-        |
+        | true
       """.stripMargin
     val expr2 = Parser.parseExpr(script2).get.value
     ExpressionCompiler(compilerContextV4, expr2) should produce(
@@ -312,14 +315,15 @@ class ExpressionCompilerV1Test extends PropSpec {
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V4, Account, Expression).explicitGet()
+            DirectiveSet(V4, Account, Expression).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )
       .compilerContext
 
     val e = ScriptEstimatorV3(fixOverflow = true, overhead = true)
-    Global.compileExpression(expr, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    Global.compileExpression(expr, NoLibraries, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
@@ -398,13 +402,13 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | let a = Lease(Address(base58''), 1)
-          | let b = Lease(Address(base58''), 1, 0)
-          | let c = calculateLeaseId(b)
-          | true
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | let a = Lease(Address(base58''), 1)
+           | let b = Lease(Address(base58''), 1, 0)
+           | let c = calculateLeaseId(b)
+           | true
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -429,13 +433,13 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | match tx {
-          |   case m: MassTransferTransaction => m.feeAssetId == unit
-          |   case _                          => throw()
-          | }
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | match tx {
+           |   case m: MassTransferTransaction => m.feeAssetId == unit
+           |   case _                          => throw()
+           | }
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -456,24 +460,24 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | let r = 
-          |  if (true) then
-          |   DOWN 
-          |  else if (true) then
-          |   HALFUP 
-          |  else if (true) then
-          |   HALFEVEN 
-          |  else if (true) then
-          |   CEILING 
-          |  else
-          |   FLOOR
-          |   
-          | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
-          | f(r)
-          |
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | let r = 
+           |  if (true) then
+           |   DOWN 
+           |  else if (true) then
+           |   HALFUP 
+           |  else if (true) then
+           |   HALFEVEN 
+           |  else if (true) then
+           |   CEILING 
+           |  else
+           |   FLOOR
+           |   
+           | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
+           | f(r)
+           |
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -488,20 +492,20 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | let r =
-          |  if (true) then
-          |   UP
-          |  else
-          |   HALFDOWN
-          |
-          | func f(r: HalfDown) = true
-          | func g(r: Up) = true
-          |
-          | true
-          |
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | let r =
+           |  if (true) then
+           |   UP
+           |  else
+           |   HALFDOWN
+           |
+           | func f(r: HalfDown) = true
+           | func g(r: Up) = true
+           |
+           | true
+           |
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -525,12 +529,12 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          |  let r1 = invoke(Address(base58''), "default", [], [])
-          |  let r2 = reentrantInvoke(Address(base58''), "default", [], [])
-          |  r1 == r2
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           |  let r1 = invoke(Address(base58''), "default", [], [])
+           |  let r2 = reentrantInvoke(Address(base58''), "default", [], [])
+           |  r1 == r2
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -565,7 +569,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | func f(a: Any) = a._1 == a._2
         | true
       """.stripMargin
-    ExpressionCompiler.compile(script, compilerContext) should produce(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContext) should produce(
       "Compilation failed: [" +
         "Undefined field `_1` of variable of type `Any` in 19-23; " +
         "Undefined field `_2` of variable of type `Any` in 27-31" +
@@ -581,10 +585,26 @@ class ExpressionCompilerV1Test extends PropSpec {
         |t._2[ind] == 3
         |""".stripMargin
 
-    ExpressionCompiler.compile(script, compilerContextV4) shouldBe Right(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4) shouldBe Right(
       (
         LET_BLOCK(
-          LET("t", FUNCTION_CALL(Native(1301), List(CONST_LONG(1), FUNCTION_CALL(Native(1100), List(CONST_LONG(2), FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF("nil"))))))), CONST_LONG(5)))),
+          LET(
+            "t",
+            FUNCTION_CALL(
+              Native(1301),
+              List(
+                CONST_LONG(1),
+                FUNCTION_CALL(
+                  Native(1100),
+                  List(
+                    CONST_LONG(2),
+                    FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF(GlobalValNames.Nil)))))
+                  )
+                ),
+                CONST_LONG(5)
+              )
+            )
+          ),
           LET_BLOCK(
             LET("ind", CONST_LONG(1)),
             FUNCTION_CALL(Native(0), List(FUNCTION_CALL(Native(401), List(GETTER(REF("t"), "_2"), REF("ind"))), CONST_LONG(3)))
@@ -603,15 +623,37 @@ class ExpressionCompilerV1Test extends PropSpec {
         |t.some[ind] == 3
         |""".stripMargin
 
-    ExpressionCompiler.compile(script, compilerContextV4) should produce(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4) should produce(
       "Compilation failed: [Non-matching types: expected: List[T], actual: Nothing in 39-50; Undefined field `some` of variable of type `(Int, List[Int], Int)` in 39-45]"
     )
+  }
+
+  property("match result of function with composite types instantiated in signature") {
+    Seq(
+      ("transferTransactionFromProto(base58'')", "TransferTransaction"),
+      ("transferTransactionById(base58'')", "TransferTransaction"),
+      ("assetInfo(base58'')", "Asset"),
+      ("blockInfoByHeight(1)", "BlockInfo")
+    ).foreach { case (function, resultType) =>
+      DirectiveDictionary[StdLibVersion].all
+        .filter(_ >= V4)
+        .foreach(
+          TestCompiler(_).compileExpression(
+            s"""
+               |match $function {
+               |  case r: $resultType => r
+               |  case _: Unit        => throw()
+               |}
+          """.stripMargin
+          ) shouldBe an[ExprScript]
+        )
+    }
   }
 
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
-      varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
+      varDefs = Map("p" -> VariableInfo(AnyPos, pointType)),
       functionDefs = Map.empty,
       provideRuntimeTypeOnCastError = false
     ),
@@ -620,7 +662,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       ref = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
       field = Expressions.PART.VALID(AnyPos, "x")
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((GETTER(expr = REF("p"), field = "x"), LONG))
     }
   )
@@ -628,12 +670,12 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("REF(OBJECT)")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
-      varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
+      varDefs = Map("p" -> VariableInfo(AnyPos, pointType)),
       functionDefs = Map.empty,
       provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((REF("p"), pointType))
     }
   )
@@ -641,12 +683,12 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("REF x = y")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
-      varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
+      varDefs = Map("p" -> VariableInfo(AnyPos, pointType)),
       functionDefs = Map.empty,
       provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((REF("p"), pointType))
     }
   )
@@ -658,7 +700,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, multiplierFunction.name),
       List(Expressions.CONST_LONG(AnyPos, 1), Expressions.CONST_LONG(AnyPos, 2))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(1), CONST_LONG(2))), LONG))
     }
   )
@@ -670,7 +712,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, getElement.name),
       List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "l")), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((FUNCTION_CALL(getElement.header, List(REF("l"), CONST_LONG(1))), LONG))
     }
   )
@@ -682,7 +724,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, getElement.name),
       List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "lpa")), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((FUNCTION_CALL(getElement.header, List(REF("lpa"), CONST_LONG(1))), Common.pointTypeA))
     }
   )
@@ -694,7 +736,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, getElement.name),
       List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "lpabc")), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right((FUNCTION_CALL(getElement.header, List(REF("lpabc"), CONST_LONG(1))), Common.AorBorC))
     }
   )
@@ -722,7 +764,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "a")), Expressions.CONST_LONG(AnyPos, 3))
       )
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           LET_BLOCK(
@@ -740,10 +782,10 @@ class ExpressionCompilerV1Test extends PropSpec {
     expr = Expressions.FUNCTION_CALL(
       AnyPos,
       Expressions.PART.VALID(AnyPos, idOptionLong.name),
-      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "unit")))
+      List(Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, GlobalValNames.Unit)))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
-      res shouldBe Right((FUNCTION_CALL(idOptionLong.header, List(REF("unit"))), UNIT))
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
+      res shouldBe Right((FUNCTION_CALL(idOptionLong.header, List(REF(GlobalValNames.Unit))), UNIT))
     }
   )
 
@@ -774,7 +816,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         )
       )
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           LET_BLOCK(
@@ -825,7 +867,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       """.stripMargin
       Parser.parseExpr(script).get.value
     },
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           LET_BLOCK(
@@ -873,7 +915,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         )
       )
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("Value 'foo' already defined in the scope in -1--1")
     }
   )
@@ -909,7 +951,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         )
       )
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("Value 'p' already defined in the scope in -1--1")
     }
   )
@@ -938,7 +980,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         )
       )
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("Undefined type: `Point0`, expected: PointA, PointB")
     }
   )
@@ -950,7 +992,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.LET(AnyPos, Expressions.PART.INVALID(Pos(0, 1), "can't parse"), Expressions.TRUE(AnyPos)),
       Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x"))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("can't parse in 0-1")
     }
   )
@@ -959,7 +1001,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = compilerContext,
     expr =
       Expressions.GETTER(AnyPos, Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "x")), Expressions.PART.INVALID(Pos(2, 3), "can't parse")),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("can't parse in 2-3")
     }
   )
@@ -967,7 +1009,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("Invalid BYTESTR")(
     ctx = compilerContext,
     expr = Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("can't parse in -1--1")
     }
   )
@@ -975,7 +1017,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("Invalid STRING")(
     ctx = compilerContext,
     expr = Expressions.CONST_STRING(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("can't parse in -1--1")
     }
   )
@@ -983,7 +1025,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("Invalid REF")(
     ctx = compilerContext,
     expr = Expressions.REF(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse")),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("can't parse in -1--1")
     }
   )
@@ -991,7 +1033,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("Invalid FUNCTION_CALL")(
     ctx = compilerContext,
     expr = Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.INVALID(AnyPos, "can't parse"), List.empty),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("can't parse in -1--1")
     }
   )
@@ -999,7 +1041,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("INVALID")(
     ctx = compilerContext,
     expr = Expressions.INVALID(AnyPos, "###"),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("### in -1--1")
     }
   )
@@ -1011,7 +1053,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.CONST_BYTESTR(AnyPos, Expressions.PART.VALID(AnyPos, ByteStr.empty)), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           FUNCTION_CALL(User("dropRightBytes"), List(CONST_BYTESTR(ByteStr.empty).explicitGet(), CONST_LONG(1))),
@@ -1028,7 +1070,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.CONST_STRING(AnyPos, Expressions.PART.VALID(AnyPos, "")), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           FUNCTION_CALL(User("dropRight"), List(CONST_STRING("").explicitGet(), CONST_LONG(1))),
@@ -1045,7 +1087,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       Expressions.PART.VALID(AnyPos, "dropRight"),
       List(Expressions.TRUE(AnyPos), Expressions.CONST_LONG(AnyPos, 1))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res should produce("Can't find a function overload 'dropRight'(Boolean, Int) in -1--1")
     }
   )
@@ -1062,7 +1104,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       ),
       Expressions.FUNCTION_CALL(AnyPos, Expressions.PART.VALID(AnyPos, "id"), List(Expressions.CONST_LONG(AnyPos, 1L)))
     ),
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           BLOCK(
@@ -1081,7 +1123,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       val script = """[1,""]"""
       Parser.parseExpr(script).get.value
     },
-    expectedResult = { res: Either[String, (EXPR, TYPE)] =>
+    expectedResult = { (res: Either[String, (EXPR, TYPE)]) =>
       res shouldBe Right(
         (
           FUNCTION_CALL(
@@ -1092,7 +1134,7 @@ class ExpressionCompilerV1Test extends PropSpec {
                 FunctionHeader.Native(1100),
                 List(
                   CONST_STRING("").explicitGet(),
-                  REF("nil")
+                  REF(GlobalValNames.Nil)
                 )
               )
             )

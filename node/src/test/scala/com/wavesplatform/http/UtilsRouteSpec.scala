@@ -1,38 +1,33 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
+import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.{V2, V3, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{Global, contract}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.settings.TestSettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
+import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
@@ -42,11 +37,14 @@ import play.api.libs.json.*
 import scala.concurrent.duration.*
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside with WithDomain {
-  implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(10.seconds)
-  implicit val timeout: FiniteDuration            = routeTestTimeout.duration
-
   private val estimator = ScriptEstimatorV2
 
+  private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
+    new HashedWheelTimer(),
+    5.seconds,
+    1,
+    "rest-time-limited"
+  )
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
@@ -54,15 +52,16 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       def getTimestamp(): Long = System.currentTimeMillis()
     },
     restAPISettings,
+    Int.MaxValue,
     () => estimator,
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ),
+    timeBounded,
     stub[Blockchain]("globalBlockchain")
   )
+
+  override def afterAll(): Unit = {
+    timeBounded.shutdown()
+    super.afterAll()
+  }
 
   (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
   private val route = seal(utilsApi.route)
@@ -431,7 +430,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/meta"), dappBase64) ~> route ~> check {
       val json = responseAs[JsObject]
       json("version").as[String] shouldBe "1"
-      json("isArrayArguments").as[Boolean] shouldBe true
       json("callableFuncTypes") shouldBe JsObject(
         Seq(
           "func1" -> JsArray(
@@ -461,7 +459,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/meta"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
       json("version").as[String] shouldBe "1"
-      json("isArrayArguments").as[Boolean] shouldBe true
       json("callableFuncTypes") shouldBe JsObject(
         Seq(
           "init" -> JsArray(
@@ -824,216 +821,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])
         seed.get.length shouldEqual l
       }
-    }
-  }
-
-  routePath("/script/evaluate/{address}") in withDomain(DomainPresets.RideV5) { d =>
-    val blockchain = d.blockchain
-    val api        = utilsApi.copy(blockchain = blockchain)
-    val route      = seal(api.route)
-
-    val letFromContract = 1000
-    val testScript = TxHelpers.scriptV5(s"""
-                                           |let letFromContract = $letFromContract
-                                           |
-                                           |func test(i: Int) = i * 10
-                                           |func testB() = true
-                                           |func testBS() = base58'MATCHER'
-                                           |func testS() = "Test"
-                                           |func testF() = throw("Test")
-                                           |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 200} true
-                                           |func testThis() = this
-                                           |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
-                                           |
-                                           |@Callable(i)
-                                           |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
-                                           |
-                                           |@Callable(i)
-                                           |func testSyncinvoke() = {
-                                           |  strict r = invoke(this, "testCallable", [], [])
-                                           |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
-                                           |}
-                                           |
-                                           |@Callable(i)
-                                           |func testSyncCallComplexityExcess() = {
-                                           |  strict r = invoke(this, "testSyncCallComplexityExcess", [], [])
-                                           |  []
-                                           |}
-                                           |
-                                           |@Callable(i)
-                                           |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ] """.stripMargin)
-
-    val dAppAccount = TxHelpers.defaultSigner
-    val dAppAddress = TxHelpers.defaultSigner.toAddress
-
-    def evalScript(text: String, address: Address = dAppAddress) =
-      Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
-
-    def evalBin(expr: EXPR) = {
-      val serialized = ByteStr(SerdeV1.serialize(expr))
-      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
-    }
-
-    def responseJson: JsObject = {
-      val fullJson = responseAs[JsObject]
-      (fullJson \ "address").as[String] shouldBe dAppAddress.toString
-      (fullJson \ "expr").as[String] should not be empty
-      (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
-    }
-
-    evalScript("testNone()") ~> route ~> check {
-      responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
-    }
-
-    d.helpers.creditWavesToDefaultSigner()
-    d.helpers.setScript(dAppAccount, testScript)
-
-    evalScript("testListArg([\"test\", 111, base64'dGVzdA==', false], \"test\", base58'aaa')") ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
-    }
-
-    evalScript("testCallable()") ~> route ~> check {
-      responseAs[JsValue] should matchJson(
-        """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":5,"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-      )
-    }
-
-    evalScript("testThis()") ~> route ~> check {
-      responseJson shouldBe Json.obj(
-        "type"  -> "Address",
-        "value" -> Json.obj("bytes" -> Json.obj("type" -> "ByteVector", "value" -> "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"))
-      )
-    }
-
-    evalScript("testNone()") ~> route ~> check {
-      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
-    }
-
-    evalScript("testCompl()") ~> route ~> check {
-      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Calculation complexity limit exceeded")
-    }
-
-    evalScript("testF()") ~> route ~> check {
-      responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
-    }
-
-    evalScript("test(123)") ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
-    }
-
-    evalBin(FUNCTION_CALL(FunctionHeader.User("test"), List(CONST_LONG(123)))) ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
-    }
-
-    evalScript("testS()") ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "String", "value" -> "Test")
-    }
-
-    evalScript("testB()") ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
-    }
-
-    evalScript("testBS()") ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "ByteVector", "value" -> "MATCHER")
-    }
-
-    evalScript("""match test(123) {
-                 |  case i: Int => i * 123
-                 |  case _ => throw("")
-                 |}""".stripMargin) ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
-    }
-
-    val expectingKey   = "some"
-    val expectingValue = 1234
-
-    d.helpers.setData(dAppAccount, IntegerDataEntry(expectingKey, expectingValue))
-    evalScript(
-      s"""
-         | this.getInteger("$expectingKey") == $expectingValue &&
-         | height == height
-       """.stripMargin
-    ) ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
-    }
-
-    evalScript("letFromContract - 1") ~> route ~> check {
-      responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
-    }
-
-    (() => utilsApi.blockchain.settings)
-      .when()
-      .returning(DefaultBlockchainSettings)
-      .anyNumberOfTimes()
-    (utilsApi.blockchain.leaseBalance _)
-      .when(*)
-      .returning(LeaseBalance.empty)
-      .anyNumberOfTimes()
-
-    evalScript(""" testSyncinvoke() """) ~> route ~> check {
-      responseAs[JsValue] should matchJson("""{
-                                             |  "result" : {
-                                             |    "type" : "Array",
-                                             |    "value" : [ {
-                                             |      "type" : "BinaryEntry",
-                                             |      "value" : {
-                                             |        "key" : {
-                                             |          "type" : "String",
-                                             |          "value" : "testSyncInvoke"
-                                             |        },
-                                             |        "value" : {
-                                             |          "type" : "ByteVector",
-                                             |          "value" : "11111111111111111111111111"
-                                             |        }
-                                             |      }
-                                             |    } ]
-                                             |  },
-                                             |  "complexity" : 92,
-                                             |  "expr" : " testSyncinvoke() ",
-                                             |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-                                             |}""".stripMargin)
-    }
-
-    val complexityLimit = 1234
-    val customApi       = api.copy(settings = restAPISettings.copy(evaluateScriptComplexityLimit = complexityLimit))
-    evalScript(""" testSyncCallComplexityExcess() """) ~> customApi.route ~> check {
-      responseAs[JsValue] should matchJson(
-        s"""{"error":306,"message":"FailedTransactionError(code = 1, error = Invoke complexity limit = $complexityLimit is exceeded, log =)","expr":" testSyncCallComplexityExcess() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-      )
-    }
-
-    evalScript(""" testWriteEntryType("abc") """) ~> route ~> check {
-      responseAs[JsValue] should matchJson(
-        """{"error":306,"message":"Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-      )
-    }
-    evalScript(""" testWriteEntryType(base58'aaaa') """) ~> route ~> check {
-      responseAs[JsValue] should matchJson(
-        """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-      )
-    }
-
-    evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> route ~> check {
-      responseAs[JsValue] should matchJson(
-        s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-      )
-    }
-
-    val dAppAccount2 = TxHelpers.secondSigner
-    val dAppAddress2 = TxHelpers.secondAddress
-    d.helpers.creditWavesFromDefaultSigner(dAppAddress2)
-    val testScript2 = TxHelpers.scriptV5(s"""@Callable(i)
-                                            | func callable() = {
-                                            |   strict a = sigVerify(base58'', base58'', base58'')
-                                            |   strict r = Address(base58'$dAppAddress').invoke("testCallable", [], [AttachedPayment(unit, 100)])
-                                            |   [BinaryEntry("testSyncInvoke", i.caller.bytes)]
-                                            | }""".stripMargin)
-    d.helpers.setScript(dAppAccount2, testScript2)
-
-    evalScript(""" callable() """, dAppAddress2) ~> route ~> check {
-      responseAs[JsValue] should matchJson(
-        """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
-      )
     }
   }
 

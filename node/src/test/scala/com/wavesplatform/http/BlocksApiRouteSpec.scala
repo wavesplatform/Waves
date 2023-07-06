@@ -1,34 +1,54 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.Accept
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.BlocksApiRoute
+import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.{BlocksApiRoute, CustomJson, RouteTimeout}
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
+import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
+import scala.concurrent.duration.*
 import scala.util.Random
 
-class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
-  private val blocksApi                      = mock[CommonBlocksApi]
-  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
-  private val route                          = blocksApiRoute.route
+class BlocksApiRouteSpec
+    extends RouteSpec("/blocks")
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with TestWallet
+    with WithDomain
+    with SharedSchedulerMixin {
+  private val blocksApi = mock[CommonBlocksApi]
+  private val blocksApiRoute: BlocksApiRoute =
+    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler))
+  private val route = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
 
   private val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
-  private val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.id().toString)
+  private val testBlock2Json = testBlock2.json() ++ Json.obj(
+    "height"       -> 2,
+    "totalFee"     -> 0L,
+    "reward"       -> 5,
+    "rewardShares" -> Json.obj(testBlock2.header.generator.toAddress.toString -> 5),
+    "VRF"          -> testBlock2.id().toString
+  )
 
   private val testBlock1HeaderJson = BlockHeaderSerializer.toJson(testBlock1.header, testBlock1.bytes().length, 0, testBlock1.signature) ++ Json.obj(
     "height"   -> 1,
@@ -36,14 +56,16 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
   )
 
   private val testBlock2HeaderJson = BlockHeaderSerializer.toJson(testBlock2.header, testBlock2.bytes().length, 0, testBlock2.signature) ++ Json.obj(
-    "height"   -> 2,
-    "totalFee" -> 0L,
-    "reward"   -> 5,
-    "VRF"      -> testBlock2.id().toString
+    "height"       -> 2,
+    "totalFee"     -> 0L,
+    "reward"       -> 5,
+    "rewardShares" -> Json.obj(testBlock2.header.generator.toAddress.toString -> 5),
+    "VRF"          -> testBlock2.id().toString
   )
 
   private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, 0L, None, None)
-  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id()))
+  private val testBlock2Meta =
+    BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id())).copy(rewardShares = Seq(testBlock2.header.generator.toAddress -> 5))
 
   private val invalidBlockId = ByteStr(new Array[Byte](32))
   (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
@@ -235,7 +257,7 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
 
     def metaAt(height: Int): Option[BlockMeta] =
       if (height >= 1 && height <= 3)
-        Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, None))
+        Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, Seq.empty, None))
       else None
 
     val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
@@ -248,6 +270,17 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     Get(routePath(s"/delay/${blocks.last.id()}/1")) ~> route ~> check {
       val delay = (responseAs[JsObject] \ "delay").as[Int]
       delay shouldBe 1000
+    }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/${BlocksApiRoute.MaxBlocksForDelay}")) ~> route ~> check {
+      response.status shouldBe StatusCodes.OK
+      val delay = (responseAs[JsObject] \ "delay").as[Int]
+      delay shouldBe 1000
+    }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/${BlocksApiRoute.MaxBlocksForDelay + 1}")) ~> route ~> check {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(BlocksApiRoute.MaxBlocksForDelay).message
     }
   }
 
@@ -262,7 +295,7 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
           if (height < 1 || height > blocks.size) None
           else {
             val block = blocks(height - 1)
-            Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, None))
+            Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, Seq.empty, None))
           }
         }
       blocksApi
@@ -315,21 +348,131 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     }
 
     "random blocks" in {
-      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) {
-        case ((ts, blocks), _) =>
-          val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
-          (newBlock.header.timestamp, blocks :+ newBlock)
+      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) { case ((ts, blocks), _) =>
+        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
+        (newBlock.header.timestamp, blocks :+ newBlock)
       }
 
       val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
-      blocks.zipWithIndex.foreach {
-        case (block, index) =>
-          Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
-            val result = (responseAs[JsObject] \ "height").as[Int]
-            result shouldBe (index + 1)
-          }
+      blocks.zipWithIndex.foreach { case (block, index) =>
+        Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
+          val result = (responseAs[JsObject] \ "height").as[Int]
+          result shouldBe (index + 1)
+        }
       }
+    }
+  }
+
+  "NODE-857. Block meta response should contain correct rewardShares field" in {
+    val daoAddress        = TxHelpers.address(3)
+    val xtnBuybackAddress = TxHelpers.address(4)
+
+    val settings = DomainPresets.ConsensusImprovements
+    val settingsWithFeatures = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 1),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 3,
+        BlockchainFeatures.CappedReward            -> 4,
+        BlockchainFeatures.CeaseXtnBuyback         -> 5
+      )
+
+    withDomain(settingsWithFeatures) { d =>
+      val route = new BlocksApiRoute(d.settings.restAPISettings, d.blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler)).route
+
+      val miner = d.appendBlock().sender.toAddress
+
+      // BlockRewardDistribution activated
+      val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+      val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+      // CappedReward activated
+      val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+      val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+      // CeaseXTNBuyback activated with expired XTN buyback reward period
+      val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+      val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+      val heightToResult = Map(
+        2 -> Map(miner.toString -> d.blockchain.settings.rewardsSettings.initial),
+        3 -> Map(miner.toString -> minerReward3, daoAddress.toString -> configAddrReward3, xtnBuybackAddress.toString -> configAddrReward3),
+        4 -> Map(miner.toString -> minerReward4, daoAddress.toString -> configAddrReward4, xtnBuybackAddress.toString -> configAddrReward4),
+        5 -> Map(miner.toString -> minerReward5, daoAddress.toString -> configAddrReward5)
+      )
+
+      val heightToBlock = (2 to 5).map { h =>
+        val block = d.appendBlock()
+
+        Seq(true, false).foreach { lsf =>
+          checkRewardSharesBlock(route, "/last", heightToResult(h), lsf)
+          checkRewardSharesBlock(route, "/headers/last", heightToResult(h), lsf)
+        }
+
+        h -> block
+      }.toMap
+      d.appendBlock()
+
+      Seq(true, false).foreach { lsf =>
+        heightToResult.foreach { case (h, expectedResult) =>
+          checkRewardSharesBlock(route, s"/at/$h", expectedResult, lsf)
+          checkRewardSharesBlock(route, s"/headers/at/$h", expectedResult, lsf)
+          checkRewardSharesBlock(route, s"/headers/${heightToBlock(h).id()}", expectedResult, lsf)
+          checkRewardSharesBlock(route, s"/${heightToBlock(h).id()}", expectedResult, lsf)
+        }
+        checkRewardSharesBlockSeq(route, "/seq", 2, 5, heightToResult, lsf)
+        checkRewardSharesBlockSeq(route, "/headers/seq", 2, 5, heightToResult, lsf)
+        checkRewardSharesBlockSeq(route, s"/address/${miner.toString}", 2, 5, heightToResult, lsf)
+      }
+    }
+  }
+
+  private def checkRewardSharesBlock(route: Route, path: String, expected: Map[String, Long], largeSignificandFormat: Boolean) = {
+    val maybeWithLsf =
+      if (largeSignificandFormat)
+        Get(routePath(path)) ~> Accept(CustomJson.jsonWithNumbersAsStrings)
+      else Get(routePath(path))
+
+    maybeWithLsf ~> route ~> check {
+      (responseAs[JsObject] \ "rewardShares")
+        .as[JsObject]
+        .value
+        .view
+        .mapValues { rewardJson => if (largeSignificandFormat) rewardJson.as[String].toLong else rewardJson.as[Long] }
+        .toMap shouldBe expected
+    }
+  }
+
+  private def checkRewardSharesBlockSeq(
+      route: Route,
+      prefix: String,
+      start: Int,
+      end: Int,
+      heightToResult: Map[Int, Map[String, Long]],
+      largeSignificandFormat: Boolean
+  ) = {
+    val maybeWithLsf =
+      if (largeSignificandFormat)
+        Get(routePath(s"$prefix/$start/$end")) ~> Accept(CustomJson.jsonWithNumbersAsStrings)
+      else Get(routePath(s"$prefix/$start/$end"))
+    maybeWithLsf ~> route ~> check {
+      responseAs[Seq[JsObject]]
+        .zip(start to end)
+        .map { case (obj, h) =>
+          h -> (obj \ "rewardShares")
+            .as[JsObject]
+            .value
+            .view
+            .mapValues { rewardJson => if (largeSignificandFormat) rewardJson.as[String].toLong else rewardJson.as[Long] }
+            .toMap
+        }
+        .toMap shouldBe heightToResult
     }
   }
 }

@@ -5,8 +5,9 @@ Waves is a decentralized platform that allows any user to issue, transfer, swap 
 
 
 ## About the image
-This Docker image contains scripts and configs to run Waves Node for `mainnet`, 'testnet' or 'stagenet' networks.
-The image is focused on fast and convenient deployment of Waves Node.
+This Docker image is focused on fast and convenient deployment of Waves Node.
+The image contains scripts and configs to run Waves Node for `mainnet`, `testnet` or `stagenet` networks.
+If you need to run node in private network, see [Waves private node](https://github.com/wavesplatform/Waves/tree/master/docker#waves-private-node) section.
 
 GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
 
@@ -19,27 +20,30 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 **You can specify following arguments when building the image:**
 
 
-|Argument              | Default value |Description   |
-|----------------------|-------------------|--------------|
-|`WAVES_NETWORK`       | `mainnet`         | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`. Can be overridden in a runtime using environment variable with the same name.|
-|`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration). Can be overridden in a runtime using environment variable with the same name. |
-|`WAVES_HEAP_SIZE`     | `2g`              | Default Waves Node JVM Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). Can be overridden in a runtime using environment variable with the same name. |
+| Argument          | Default value | Description                                                                                                                                                                                                                                                                                   |
+|-------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `INCLUDE_GRPC`    | `true`        | Whether to include gRPC server files in the image.                                                                                                                                                                                                                                            |
 
-**Note: All build arguments are optional.**  
+**Note: All build arguments are optional.**
 
 ## Running Docker image
 
 ### Configuration options
 
-1. The image supports Waves Node config customization. To change a config field use corrresponding JVM options. JVM options can be sent to JVM using `JAVA_OPTS` environment variable. Please refer to ([complete configuration file](https://raw.githubusercontent.com/wavesplatform/Waves/2634f71899e3100808c44c5ed70b8efdbb600b05/Node/src/main/resources/application.conf)) to get the full path of the configuration item you want to change.
+1. The image supports Waves Node config customization. To change a config field use corresponding JVM options. JVM options can be sent to JVM using `JAVA_OPTS` environment variable. Please refer to ([complete configuration file](https://github.com/wavesplatform/Waves/blob/master/node/src/main/resources/application.conf)) to get the full path of the configuration item you want to change.
 
 ```
-docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6869:6869 -p 6862:6862 -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.wallet.password=myWalletSuperPassword" -e WAVES_NETWORK=stagenet -ti wavesplatform/wavesnode
+docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6869:6869 -p 6862:6862 -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.wallet.password=myWalletSuperPassword" -ti wavesplatform/wavesnode
 ```
 
-2. Waves Node is looking for a config in the directory `/etc/waves/waves.conf` which can be mounted using Docker volumes. If this directory does not exist, a default configuration will be copied to this directory. Default configuration is chosen depending on `WAVES_NETWORK` environment variable. If the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default configuration won't be applied. This is a scenario of using `CUSTOM` network - correct configuration must be provided. If you use `CUSTOM` network and `/etc/waves/waves.conf` is NOT found Waves Node container will exit.
+2. Waves Node is looking for a config in the directory `/etc/waves/waves.conf` which can be mounted using Docker volumes. During image build, a default configuration will be copied to this directory. While running container if the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default configuration won't be enough for correct node working. This is a scenario of using `CUSTOM` network - correct configuration must be provided when running container. If you use `CUSTOM` network and `/etc/waves/waves.conf` is NOT found Waves Node container will exit.
 
 3. By default, `/etc/waves/waves.conf` config includes `/etc/waves/local.conf`. Custom `/etc/waves/local.conf` can be used to override default config entries. Custom `/etc/waves/waves.conf` can be used to override or the whole configuration. For additional information about Docker volumes mapping please refer to `Managing data` item.
+
+4. You can override the default executable by using the following syntax:
+```
+docker run -it wavesplatform/wavesnode [command] [args]
+```
 
 ### Environment variables
 
@@ -57,7 +61,6 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 **Note: All variables are optional.**  
 
 **Note: Environment variables override values in the configuration file.** 
-
 
 ### Managing data
 We recommend to store the blockchain state as well as Waves configuration on the host side. As such, consider using Docker volumes mapping to map host directories inside the container:
@@ -137,8 +140,53 @@ http://localhost:6870/api-docs/index.html
 ### Extensions
 You can run custom extensions in this way:
 1. Copy all lib/*.jar files from extension to any directory, lets say `plugins`
-2. Add extension class to configuration file, lets say `local.conf`:
+2. Add extension class to configuration file, lets say `local.conf`, located in `config` directory containing also `waves.conf`:
 ```hocon
 waves.extensions += com.johndoe.WavesExtension
 ```
-3. Run `docker run -v "$(pwd)/plugins:/usr/share/waves/lib/plugins" -v "$(pwd)/local.conf:/etc/waves/local.conf" -i wavesplatform/wavesnode`
+3. Run `docker run -v "$(pwd)/plugins:/usr/share/waves/lib/plugins" -v "$(pwd)/config:/etc/waves" -i wavesplatform/wavesnode`
+
+## Waves private node
+
+The image is useful for developing dApps and other smart contracts on Waves blockchain.
+
+### Getting started
+
+To run the node,\
+`docker run -d --name waves-private-node -p 6869:6869 wavesplatform/waves-private-node`
+
+To view node API documentation, open http://localhost:6869/
+
+### Preserve blockchain state
+
+If you want to keep the blockchain state, then just stop the container instead of killing it, and start it again when needed:\
+`docker stop waves-private-node`
+`docker start waves-private-node`
+
+### Configuration details
+
+The node is configured with:
+
+- faster generation of blocks (**10 sec** interval)
+- all features pre-activated
+- custom chain id - **R**
+- api_key `waves-private-node`
+- default miner account with all Waves tokens (you can distribute these tokens to other accounts as you wish):
+  ```
+  rich account:
+      Seed text:           waves private node seed with waves tokens
+      Seed:                TBXHUUcVx2n3Rgszpu5MCybRaR86JGmqCWp7XKh7czU57ox5dgjdX4K4
+      Account seed:        HewBh5uTNEGLVpmDPkJoHEi5vbZ6uk7fjKdP5ghiXKBs
+      Private account key: 83M4HnCQxrDMzUQqwmxfTVJPTE9WdE7zjAooZZm2jCyV
+      Public account key:  AXbaBkJNocyrVpwqTzD4TpUY8fQ6eeRto9k1m2bNCzXV
+      Account address:     3M4qwDomRabJKLZxuXhwfqLApQkU592nWxF
+  ```
+
+Full node configuration is available on Github in `waves.custom.conf`: https://github.com/wavesplatform/Waves/blob/master/docker/private/waves.custom.conf
+
+### Image tags
+
+You can use the following tags:
+
+- `latest` - currrent version of Mainnet
+- `vX.X.X` - specific version of Waves Node

@@ -28,7 +28,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
-        DirectiveSet(V3, Account, DApp).explicitGet()
+        DirectiveSet(V3, Account, DApp).explicitGet(),
+        fixBigScriptField = true
       )
 
   private val environment: Environment[Id] =
@@ -122,14 +123,13 @@ class ContractIntegrationTest extends PropSpec with Inside {
       "foo",
       args = Nil
     )
-    inside(evalResult) {
-      case Left((CommonError(error), log)) =>
-        error shouldBe "exception message"
-        log should contain.allOf(
-          ("a", Right(CONST_LONG(1))),
-          ("b", Right(CONST_LONG(2))),
-          ("isError", Right(TRUE))
-        )
+    inside(evalResult) { case Left((err @ CommonError(_, _), log)) =>
+      err.message shouldBe "exception message"
+      log should contain.allOf(
+        ("a", Right(CONST_LONG(1))),
+        ("b", Right(CONST_LONG(2))),
+        ("isError", Right(TRUE))
+      )
     }
   }
 
@@ -159,6 +159,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
       .applyV2Coeval(
         ctx.evaluationContext(environment),
         compiled,
+        ByteStr.fill(32)(1),
         Invocation(
           Terms.FUNCTION_CALL(FunctionHeader.User(func), args),
           Recipient.Address(callerAddress),
@@ -182,12 +183,12 @@ class ContractIntegrationTest extends PropSpec with Inside {
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
-    val txObject = Bindings.transactionObject(tx, proofsEnabled = true, V3)
+    val txObject = Bindings.transactionObject(tx, proofsEnabled = true, V3, fixBigScriptField = true)
     ContractEvaluator
       .verify(
         compiled.decs,
         compiled.verifierFuncOpt.get,
-        EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, V3, correctFunctionCallScope = true, newMode = false),
+        EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, _, V3, correctFunctionCallScope = true, newMode = false),
         txObject
       )
       ._3

@@ -1,17 +1,23 @@
 package com.wavesplatform.http
 
+import java.util.concurrent.TimeUnit
+
+import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
-import com.wavesplatform.account.Alias
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.account.{Alias, KeyPair}
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.api.http.DebugApiRoute
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.api.http.DebugApiRoute.AccountMiningInfo
+import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout, handleAllExceptions}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -19,26 +25,31 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
+import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.PeerDatabase
-import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash, TxMeta}
 import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
+import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.utils.SharedSchedulerMixin
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.*
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
+import scala.concurrent.duration.*
 import scala.util.Random
 
 //noinspection ScalaStyle
@@ -49,13 +60,28 @@ class DebugApiRouteSpec
     with NTPTime
     with PathMockFactory
     with BlockchainStubHelpers
-    with WithDomain {
+    with WithDomain
+    with OptionValues
+    with SharedSchedulerMixin {
   import DomainPresets.*
 
-  val wavesSettings: WavesSettings = WavesSettings.default()
-  val configObject: ConfigObject = wavesSettings.config.root()
+  val wavesSettings: WavesSettings = WavesSettings.default().copy(restAPISettings = restAPISettings)
+  val configObject: ConfigObject   = wavesSettings.config.root()
+
   trait Blockchain1 extends Blockchain with NG
   val blockchain: Blockchain1 = stub[Blockchain1]
+  (blockchain.hasAccountScript _).when(*).returns(false)
+  (() => blockchain.microblockIds).when().returns(Seq.empty)
+  (blockchain.heightOf _).when(*).returns(None)
+  (() => blockchain.height).when().returns(0)
+  (blockchain.balanceSnapshots _).when(*, *, *).returns(Seq.empty)
+
+  val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
+    override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
+    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Right(FiniteDuration(0, TimeUnit.SECONDS))
+    override def state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
+  }
+
   val block: Block = TestBlock.create(Nil)
   val testStateHash: StateHash = {
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
@@ -63,12 +89,13 @@ class DebugApiRouteSpec
     StateHash(randomHash, hashes)
   }
 
+  val wallet: Wallet = Wallet(WalletSettings(None, Some("password"), Some(ByteStr(TxHelpers.defaultSigner.seed))))
   val debugApiRoute: DebugApiRoute =
     DebugApiRoute(
       wavesSettings,
       ntpTime,
       blockchain,
-      null,
+      wallet,
       null,
       stub[CommonTransactionsApi],
       null,
@@ -76,17 +103,20 @@ class DebugApiRouteSpec
       null,
       (_, _) => Task.raiseError(new NotImplementedError("")),
       null,
-      null,
+      miner,
       null,
       null,
       null,
       null,
       configObject,
-      _ => Seq.empty, {
+      _ => Seq.empty,
+      {
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain
+      () => blockchain,
+      new RouteTimeout(60.seconds)(sharedScheduler),
+      sharedScheduler
     )
   import debugApiRoute.*
 
@@ -98,24 +128,44 @@ class DebugApiRouteSpec
   }
 
   routePath("/stateHash") - {
-    "works" in {
-      (blockchain.blockHeader(_: Int)).when(*).returning(Some(SignedBlockHeader(block.header, block.signature)))
-      Get(routePath("/stateHash/2")) ~> route ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj("blockId" -> block.id().toString))
+    "works" - {
+      val settingsWithStateHashes = DomainPresets.SettingsFromDefaultConfig.copy(
+        dbSettings = DomainPresets.SettingsFromDefaultConfig.dbSettings.copy(storeStateHashes = true)
+      )
+
+      "at nonexistent height" in withDomain(settingsWithStateHashes) { d =>
+        d.appendBlock(TestBlock.create(Nil))
+        Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d) ~> check {
+          status shouldBe StatusCodes.NotFound
+        }
       }
 
-      Get(routePath("/stateHash/3")) ~> route ~> check {
-        status shouldBe StatusCodes.NotFound
+      "at existing height" in expectStateHashAt2("2")
+      "last" in expectStateHashAt2("last")
+
+      def expectStateHashAt2(suffix: String): Assertion = withDomain(settingsWithStateHashes) { d =>
+        val genesisBlock = TestBlock.create(Nil)
+        d.appendBlock(genesisBlock)
+
+        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil)
+        d.appendBlock(blockAt2)
+        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
+
+        val stateHashAt2 = d.levelDBWriter.loadStateHash(2).value
+        Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
+          status shouldBe StatusCodes.OK
+          responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
+            "blockId" -> blockAt2.id().toString,
+            "height"  -> 2,
+            "version" -> Version.VersionString
+          ))
+        }
       }
     }
   }
 
   routePath("/validate") - {
-    def routeWithBlockchain(blockchain: Blockchain & NG) =
-      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
-
-    def validatePost(tx: TransferTransaction) =
+    def validatePost(tx: Transaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
     "takes the priority pool into account" in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
@@ -159,11 +209,23 @@ class DebugApiRouteSpec
       }
     }
 
+    "NoSuchElementException" in {
+      val blockchain = createBlockchainStub { b =>
+        (b.accountScript _).when(*).throws(new NoSuchElementException())
+      }
+      val route = handleAllExceptions(routeWithBlockchain(blockchain))
+      validatePost(TxHelpers.invoke()) ~> route ~> check {
+        responseAs[String] shouldBe """{"error":0,"message":"Error is unknown"}"""
+        response.status shouldBe StatusCodes.InternalServerError
+      }
+    }
+
     "exchange tx with fail script" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
 
-        val (assetScript, comp) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+        val (assetScript, comp) =
+          ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, comp)))
         (blockchain.assetDescription _)
           .when(TestValues.asset)
@@ -180,21 +242,24 @@ class DebugApiRouteSpec
                 Height(1),
                 Some(AssetScriptInfo(assetScript, comp)),
                 0,
-                nft = false
+                nft = false,
+                0,
+                Height(1)
               )
             )
           )
+        blockchain.stub.activateAllFeatures()
       }
 
       val route = routeWithBlockchain(blockchain)
-      val tx    = TxHelpers.exchangeFromOrders(TxHelpers.orderV3(OrderType.BUY, TestValues.asset), TxHelpers.orderV3(OrderType.SELL, TestValues.asset))
+      val tx = TxHelpers.exchangeFromOrders(TxHelpers.orderV3(OrderType.BUY, TestValues.asset), TxHelpers.orderV3(OrderType.SELL, TestValues.asset))
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
         (json \ "trace").as[JsArray] shouldBe Json.parse(
-          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[],\"error\":\"error\"}]"
+          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[{\"name\":\"throw.@args\",\"type\":\"Array\",\"value\":[{\"type\":\"String\",\"value\":\"error\"}]},{\"name\":\"throw.@complexity\",\"type\":\"Int\",\"value\":1},{\"name\":\"@complexityLimit\",\"type\":\"Int\",\"value\":2147483646}],\"error\":\"error\"}]"
         )
       }
     }
@@ -228,7 +293,9 @@ class DebugApiRouteSpec
                 Height(1),
                 Some(AssetScriptInfo(assetScript, assetScriptComplexity)),
                 0,
-                nft = false
+                nft = false,
+                0,
+                Height(1)
               )
             )
           )
@@ -286,6 +353,7 @@ class DebugApiRouteSpec
           )
 
         (blockchain.hasAccountScript _).when(*).returns(true)
+        blockchain.stub.activateAllFeatures()
       }
 
       val route = routeWithBlockchain(blockchain)
@@ -304,7 +372,7 @@ class DebugApiRouteSpec
         }
       }
 
-      def testPayment(result: String) = withClue("payment") {
+      def testPayment(result: InvokeScriptTransaction => String) = withClue("payment") {
         val tx = TxHelpers.invoke(TxHelpers.secondAddress, fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
@@ -315,237 +383,1188 @@ class DebugApiRouteSpec
           else
             (json \ "transaction").as[JsObject] should matchJson(tx.json())
 
-          (json \ "trace").as[JsArray] should matchJson(Json.parse(result))
+          (json \ "trace").as[JsArray] should matchJson(Json.parse(result(tx)))
         }
       }
 
-      testPayment("""[ {
-                    |  "type" : "verifier",
-                    |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                    |  "result" : "success",
-                    |  "error" : null
-                    |}, {
-                    |  "type" : "dApp",
-                    |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                    |  "function" : "default",
-                    |  "args" : [ ],
-                    |  "invocations" : [ ],
-                    |  "result" : {
-                    |    "data" : [ ],
-                    |    "transfers" : [ ],
-                    |    "issues" : [ ],
-                    |    "reissues" : [ ],
-                    |    "burns" : [ ],
-                    |    "sponsorFees" : [ ],
-                    |    "leases" : [ ],
-                    |    "leaseCancels" : [ ],
-                    |    "invokes" : [ ]
-                    |  },
-                    |  "error" : null,
-                    |  "vars" : [ ]
-                    |}, {
-                    |  "type" : "asset",
-                    |  "context" : "payment",
-                    |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-                    |  "result" : "failure",
-                    |  "vars" : [ {
-                    |    "name" : "test",
-                    |    "type" : "Boolean",
-                    |    "value" : true
-                    |  } ],
-                    |  "error" : "error"
-                    |} ]""".stripMargin)
+      testPayment(tx => s"""[ {
+                           |  "type" : "verifier",
+                           |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                           |  "result" : "success",
+                           |  "error" : null
+                           |}, {
+                           |  "type" : "dApp",
+                           |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                           |  "function" : "default",
+                           |  "args" : [ ],
+                           |  "invocations" : [ ],
+                           |  "result" : {
+                           |    "data" : [ ],
+                           |    "transfers" : [ ],
+                           |    "issues" : [ ],
+                           |    "reissues" : [ ],
+                           |    "burns" : [ ],
+                           |    "sponsorFees" : [ ],
+                           |    "leases" : [ ],
+                           |    "leaseCancels" : [ ],
+                           |    "invokes" : [ ]
+                           |  },
+                           |  "error" : null,
+                           |  "vars" : [ {
+                           |    "name" : "i",
+                           |    "type" : "Invocation",
+                           |    "value" : {
+                           |      "payments" : {
+                           |        "type" : "Array",
+                           |        "value" : [ {
+                           |          "type" : "AttachedPayment",
+                           |          "value" : {
+                           |            "amount" : {
+                           |              "type" : "Int",
+                           |              "value" : 1
+                           |            },
+                           |            "assetId" : {
+                           |              "type" : "ByteVector",
+                           |              "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                           |            }
+                           |          }
+                           |        } ]
+                           |      },
+                           |      "callerPublicKey" : {
+                           |        "type" : "ByteVector",
+                           |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                           |      },
+                           |      "feeAssetId" : {
+                           |        "type" : "Unit",
+                           |        "value" : { }
+                           |      },
+                           |      "transactionId" : {
+                           |        "type" : "ByteVector",
+                           |        "value" : "${tx.id()}"
+                           |      },
+                           |      "caller" : {
+                           |        "type" : "Address",
+                           |        "value" : {
+                           |          "bytes" : {
+                           |            "type" : "ByteVector",
+                           |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                           |          }
+                           |        }
+                           |      },
+                           |      "fee" : {
+                           |        "type" : "Int",
+                           |        "value" : 1300000
+                           |      }
+                           |    }
+                           |  }, {
+                           |    "name" : "default.@args",
+                           |    "type" : "Array",
+                           |    "value" : [ ]
+                           |  }, {
+                           |    "name" : "default.@complexity",
+                           |    "type" : "Int",
+                           |    "value" : 1
+                           |  }, {
+                           |    "name" : "@complexityLimit",
+                           |    "type" : "Int",
+                           |    "value" : 51994
+                           |  } ]
+                           |}, {
+                           |  "type" : "asset",
+                           |  "context" : "payment",
+                           |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                           |  "result" : "failure",
+                           |  "vars" : [ {
+                           |    "name" : "test",
+                           |    "type" : "Boolean",
+                           |    "value" : true
+                           |  }, {
+                           |    "name" : "throw.@args",
+                           |    "type" : "Array",
+                           |    "value" : [ {
+                           |      "type" : "String",
+                           |      "value" : "error"
+                           |    } ]
+                           |  }, {
+                           |    "name" : "throw.@complexity",
+                           |    "type" : "Int",
+                           |    "value" : 1
+                           |  }, {
+                           |    "name" : "@complexityLimit",
+                           |    "type" : "Int",
+                           |    "value" : 2147483646
+                           |  } ],
+                           |  "error" : "error"
+                           |} ]""".stripMargin)
 
       testFunction(
         "dataAndTransfer",
-        _ => """[ {
-               |  "type" : "verifier",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "success",
-               |  "error" : null
-               |}, {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "dataAndTransfer",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ {
-               |      "key" : "key",
-               |      "type" : "integer",
-               |      "value" : 1
-               |    }, {
-               |      "key" : "key",
-               |      "type" : "boolean",
-               |      "value" : true
-               |    }, {
-               |      "key" : "key",
-               |      "type" : "string",
-               |      "value" : "str"
-               |    }, {
-               |      "key" : "key",
-               |      "type" : "binary",
-               |      "value" : "base64:"
-               |    }, {
-               |      "key" : "key",
-               |      "value" : null
-               |    } ],
-               |    "transfers" : [ {
-               |      "address" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-               |      "asset" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "amount" : 1
-               |    } ],
-               |    "issues" : [ ],
-               |    "reissues" : [ ],
-               |    "burns" : [ ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ ]
-               |}, {
-               |  "type" : "asset",
-               |  "context" : "transfer",
-               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "result" : "failure",
-               |  "vars" : [ {
-               |    "name" : "test",
-               |    "type" : "Boolean",
-               |    "value" : true
-               |  } ],
-               |  "error" : "error"
-               |} ]""".stripMargin
+        tx => s"""[ {
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "dataAndTransfer",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ {
+                 |      "key" : "key",
+                 |      "type" : "integer",
+                 |      "value" : 1
+                 |    }, {
+                 |      "key" : "key",
+                 |      "type" : "boolean",
+                 |      "value" : true
+                 |    }, {
+                 |      "key" : "key",
+                 |      "type" : "string",
+                 |      "value" : "str"
+                 |    }, {
+                 |      "key" : "key",
+                 |      "type" : "binary",
+                 |      "value" : "base64:"
+                 |    }, {
+                 |      "key" : "key",
+                 |      "value" : null
+                 |    } ],
+                 |    "transfers" : [ {
+                 |      "address" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                 |      "asset" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "amount" : 1
+                 |    } ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ ],
+                 |    "burns" : [ ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "dataAndTransfer.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "IntegerEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    } ]
+                 |  }, {
+                 |    "name" : "IntegerEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "BooleanEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : true
+                 |    } ]
+                 |  }, {
+                 |    "name" : "BooleanEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  }, {
+                 |    "name" : "StringEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "String",
+                 |      "value" : "str"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "StringEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51997
+                 |  }, {
+                 |    "name" : "BinaryEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "ByteVector",
+                 |      "value" : ""
+                 |    } ]
+                 |  }, {
+                 |    "name" : "BinaryEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51996
+                 |  }, {
+                 |    "name" : "DeleteEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "DeleteEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51995
+                 |  }, {
+                 |    "name" : "Address.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Address.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51994
+                 |  }, {
+                 |    "name" : "ScriptTransfer.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Address",
+                 |      "value" : {
+                 |        "bytes" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    }, {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "ScriptTransfer.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51993
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ScriptTransfer",
+                 |      "value" : {
+                 |        "recipient" : {
+                 |          "type" : "Address",
+                 |          "value" : {
+                 |            "bytes" : {
+                 |              "type" : "ByteVector",
+                 |              "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |            }
+                 |          }
+                 |        },
+                 |        "amount" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        },
+                 |        "asset" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51992
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "DeleteEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51991
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "BinaryEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : ""
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51990
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "StringEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "String",
+                 |          "value" : "str"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "BinaryEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : ""
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51989
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "BooleanEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "Boolean",
+                 |          "value" : true
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "StringEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "String",
+                 |            "value" : "str"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "BinaryEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : ""
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51988
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "IntegerEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "BooleanEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "Boolean",
+                 |            "value" : true
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "StringEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "String",
+                 |            "value" : "str"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "BinaryEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : ""
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51987
+                 |  } ]
+                 |}, {
+                 |  "type" : "asset",
+                 |  "context" : "transfer",
+                 |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |  "result" : "failure",
+                 |  "vars" : [ {
+                 |    "name" : "test",
+                 |    "type" : "Boolean",
+                 |    "value" : true
+                 |  }, {
+                 |    "name" : "throw.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "error"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
+                 |  } ],
+                 |  "error" : "error"
+                 |} ]""".stripMargin
       )
 
       testFunction(
         "issue",
         tx => s"""[ {
-          |  "type" : "verifier",
-          |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "result" : "success",
-          |  "error" : null
-          |}, {
-          |  "type" : "dApp",
-          |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-          |  "function" : "issue",
-          |  "args" : [ ],
-          |  "invocations" : [ ],
-          |  "result" : {
-          |    "data" : [ ],
-          |    "transfers" : [ ],
-          |    "issues" : [ {
-          |      "assetId" : "${Issue.calculateId(4, "description", isReissuable = true, "name", 1000, 0, tx.id())}",
-          |      "name" : "name",
-          |      "description" : "description",
-          |      "quantity" : 1000,
-          |      "decimals" : 4,
-          |      "isReissuable" : true,
-          |      "compiledScript" : null,
-          |      "nonce" : 0
-          |    } ],
-          |    "reissues" : [ ],
-          |    "burns" : [ ],
-          |    "sponsorFees" : [ ],
-          |    "leases" : [ ],
-          |    "leaseCancels" : [ ],
-          |    "invokes" : [ ]
-          |  },
-          |  "error" : null,
-          |  "vars" : [ {
-          |    "name" : "decimals",
-          |    "type" : "Int",
-          |    "value" : 4
-          |  } ]
-          |} ]""".stripMargin
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "issue",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ ],
+                 |    "transfers" : [ ],
+                 |    "issues" : [ {
+                 |      "assetId" : "${Issue.calculateId(4, "description", isReissuable = true, "name", 1000, 0, tx.id())}",
+                 |      "name" : "name",
+                 |      "description" : "description",
+                 |      "quantity" : 1000,
+                 |      "decimals" : 4,
+                 |      "isReissuable" : true,
+                 |      "compiledScript" : null,
+                 |      "nonce" : 0
+                 |    } ],
+                 |    "reissues" : [ ],
+                 |    "burns" : [ ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "issue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "decimals",
+                 |    "type" : "Int",
+                 |    "value" : 4
+                 |  }, {
+                 |    "name" : "Issue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "name"
+                 |    }, {
+                 |      "type" : "String",
+                 |      "value" : "description"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1000
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 4
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : true
+                 |    }, {
+                 |      "type" : "Unit",
+                 |      "value" : { }
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 0
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Issue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Issue",
+                 |      "value" : {
+                 |        "isReissuable" : {
+                 |          "type" : "Boolean",
+                 |          "value" : true
+                 |        },
+                 |        "nonce" : {
+                 |          "type" : "Int",
+                 |          "value" : 0
+                 |        },
+                 |        "description" : {
+                 |          "type" : "String",
+                 |          "value" : "description"
+                 |        },
+                 |        "decimals" : {
+                 |          "type" : "Int",
+                 |          "value" : 4
+                 |        },
+                 |        "compiledScript" : {
+                 |          "type" : "Unit",
+                 |          "value" : { }
+                 |        },
+                 |        "name" : {
+                 |          "type" : "String",
+                 |          "value" : "name"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1000
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  } ]
+                 |} ]""".stripMargin
       )
 
       testFunction(
         "reissue",
-        _ => """[ {
-               |  "type" : "verifier",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "success",
-               |  "error" : null
-               |}, {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "reissue",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ ],
-               |    "transfers" : [ ],
-               |    "issues" : [ ],
-               |    "reissues" : [ {
-               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "isReissuable" : false,
-               |      "quantity" : 1
-               |    } ],
-               |    "burns" : [ ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ ]
-               |}, {
-               |  "type" : "asset",
-               |  "context" : "reissue",
-               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "result" : "failure",
-               |  "vars" : [ {
-               |    "name" : "test",
-               |    "type" : "Boolean",
-               |    "value" : true
-               |  } ],
-               |  "error" : "error"
-               |} ]""".stripMargin
+        tx => s"""[ {
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "reissue",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ ],
+                 |    "transfers" : [ ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ {
+                 |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "isReissuable" : false,
+                 |      "quantity" : 1
+                 |    } ],
+                 |    "burns" : [ ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "reissue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "Reissue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : false
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Reissue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Reissue",
+                 |      "value" : {
+                 |        "assetId" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        },
+                 |        "isReissuable" : {
+                 |          "type" : "Boolean",
+                 |          "value" : false
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  } ]
+                 |}, {
+                 |  "type" : "asset",
+                 |  "context" : "reissue",
+                 |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |  "result" : "failure",
+                 |  "vars" : [ {
+                 |    "name" : "test",
+                 |    "type" : "Boolean",
+                 |    "value" : true
+                 |  }, {
+                 |    "name" : "throw.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "error"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
+                 |  } ],
+                 |  "error" : "error"
+                 |} ]""".stripMargin
       )
 
       testFunction(
         "burn",
-        _ => """[ {
-               |  "type" : "verifier",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "success",
-               |  "error" : null
-               |}, {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "burn",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ ],
-               |    "transfers" : [ ],
-               |    "issues" : [ ],
-               |    "reissues" : [ ],
-               |    "burns" : [ {
-               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "quantity" : 1
-               |    } ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ ]
-               |}, {
-               |  "type" : "asset",
-               |  "context" : "burn",
-               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "result" : "failure",
-               |  "vars" : [ {
-               |    "name" : "test",
-               |    "type" : "Boolean",
-               |    "value" : true
-               |  } ],
-               |  "error" : "error"
-               |} ]""".stripMargin
+        tx => s"""[ {
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "burn",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ ],
+                 |    "transfers" : [ ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ ],
+                 |    "burns" : [ {
+                 |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "quantity" : 1
+                 |    } ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "burn.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "Burn.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Burn.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Burn",
+                 |      "value" : {
+                 |        "assetId" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  } ]
+                 |}, {
+                 |  "type" : "asset",
+                 |  "context" : "burn",
+                 |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |  "result" : "failure",
+                 |  "vars" : [ {
+                 |    "name" : "test",
+                 |    "type" : "Boolean",
+                 |    "value" : true
+                 |  }, {
+                 |    "name" : "throw.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "error"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
+                 |  } ],
+                 |  "error" : "error"
+                 |} ]""".stripMargin
       )
 
     }
@@ -566,10 +1585,14 @@ class DebugApiRouteSpec
       val nonce2     = 2
       val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id())
 
+      val leaseCancelAmount = 786
+
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
 
         (blockchain.resolveAlias _).when(Alias.create(recipient2.name).explicitGet()).returning(Right(TxHelpers.secondAddress))
+
+        blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -618,7 +1641,7 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, 100, LeaseDetails.Status.Active, leaseCancelId, 1)))
+          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, leaseCancelAmount, LeaseDetails.Status.Active, leaseCancelId, 1)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -642,46 +1665,46 @@ class DebugApiRouteSpec
         val json = responseAs[JsValue]
         (json \ "valid").as[Boolean] shouldBe true
         (json \ "stateChanges").as[JsObject] should matchJson(s"""{
-                                                                |  "data" : [ ],
-                                                                |  "transfers" : [ ],
-                                                                |  "issues" : [ ],
-                                                                |  "reissues" : [ ],
-                                                                |  "burns" : [ ],
-                                                                |  "sponsorFees" : [ ],
-                                                                |  "leases" : [ {
-                                                                |    "id" : "$leaseId1",
-                                                                |    "originTransactionId" : "${invoke.id()}",
-                                                                |    "sender" : "$dAppAddress",
-                                                                |    "recipient" : "${recipient1.bytes}",
-                                                                |    "amount" : 100,
-                                                                |    "height" : 1,
-                                                                |    "status" : "active",
-                                                                |    "cancelHeight" : null,
-                                                                |    "cancelTransactionId" : null
-                                                                |  }, {
-                                                                |    "id" : "$leaseId2",
-                                                                |    "originTransactionId" : "${invoke.id()}",
-                                                                |    "sender" : "$dAppAddress",
-                                                                |    "recipient" : "${TxHelpers.secondAddress}",
-                                                                |    "amount" : 20,
-                                                                |    "height" : 1,
-                                                                |    "status" : "active",
-                                                                |    "cancelHeight" : null,
-                                                                |    "cancelTransactionId" : null
-                                                                |  } ],
-                                                                |  "leaseCancels" : [ {
-                                                                |    "id" : "$leaseCancelId",
-                                                                |    "originTransactionId" : "$leaseCancelId",
-                                                                |    "sender" : "$dAppAddress",
-                                                                |    "recipient" : "${TxHelpers.defaultAddress}",
-                                                                |    "amount" : 100,
-                                                                |    "height" : 1,
-                                                                |    "status" : "canceled",
-                                                                |    "cancelHeight" : 1,
-                                                                |    "cancelTransactionId" : "${invoke.id()}"
-                                                                |  } ],
-                                                                |  "invokes" : [ ]
-                                                                |}""".stripMargin)
+                                                                 |  "data" : [ ],
+                                                                 |  "transfers" : [ ],
+                                                                 |  "issues" : [ ],
+                                                                 |  "reissues" : [ ],
+                                                                 |  "burns" : [ ],
+                                                                 |  "sponsorFees" : [ ],
+                                                                 |  "leases" : [ {
+                                                                 |    "id" : "$leaseId1",
+                                                                 |    "originTransactionId" : "${invoke.id()}",
+                                                                 |    "sender" : "$dAppAddress",
+                                                                 |    "recipient" : "${recipient1.bytes}",
+                                                                 |    "amount" : 100,
+                                                                 |    "height" : 1,
+                                                                 |    "status" : "active",
+                                                                 |    "cancelHeight" : null,
+                                                                 |    "cancelTransactionId" : null
+                                                                 |  }, {
+                                                                 |    "id" : "$leaseId2",
+                                                                 |    "originTransactionId" : "${invoke.id()}",
+                                                                 |    "sender" : "$dAppAddress",
+                                                                 |    "recipient" : "${TxHelpers.secondAddress}",
+                                                                 |    "amount" : 20,
+                                                                 |    "height" : 1,
+                                                                 |    "status" : "active",
+                                                                 |    "cancelHeight" : null,
+                                                                 |    "cancelTransactionId" : null
+                                                                 |  } ],
+                                                                 |  "leaseCancels" : [ {
+                                                                 |    "id" : "$leaseCancelId",
+                                                                 |    "originTransactionId" : "$leaseCancelId",
+                                                                 |    "sender" : "$dAppAddress",
+                                                                 |    "recipient" : "${TxHelpers.defaultAddress}",
+                                                                 |    "amount" : $leaseCancelAmount,
+                                                                 |    "height" : 1,
+                                                                 |    "status" : "canceled",
+                                                                 |    "cancelHeight" : 1,
+                                                                 |    "cancelTransactionId" : "${invoke.id()}"
+                                                                 |  } ],
+                                                                 |  "invokes" : [ ]
+                                                                 |}""".stripMargin)
         (json \ "trace").as[JsArray] should matchJson(
           s"""
              |[ {
@@ -728,7 +1751,7 @@ class DebugApiRouteSpec
              |      "originTransactionId" : "$leaseCancelId",
              |      "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |      "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-             |      "amount" : 100,
+             |      "amount" : $leaseCancelAmount,
              |      "height" : 1,
              |      "status" : "canceled",
              |      "cancelHeight" : 1,
@@ -738,19 +1761,972 @@ class DebugApiRouteSpec
              |  },
              |  "error" : null,
              |  "vars" : [ {
+             |    "name" : "i",
+             |    "type" : "Invocation",
+             |    "value" : {
+             |      "originCaller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "payments" : {
+             |        "type" : "Array",
+             |        "value" : [ ]
+             |      },
+             |      "callerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "feeAssetId" : {
+             |        "type" : "Unit",
+             |        "value" : { }
+             |      },
+             |      "originCallerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "transactionId" : {
+             |        "type" : "ByteVector",
+             |        "value" : "${invoke.id()}"
+             |      },
+             |      "caller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "fee" : {
+             |        "type" : "Int",
+             |        "value" : 500000
+             |      }
+             |    }
+             |  }, {
+             |    "name" : "default.@args",
+             |    "type" : "Array",
+             |    "value" : [ ]
+             |  }, {
+             |    "name" : "parseBigIntValue.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "String",
+             |      "value" : "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047"
+             |    } ]
+             |  }, {
+             |    "name" : "parseBigIntValue.@complexity",
+             |    "type" : "Int",
+             |    "value" : 65
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25935
+             |  }, {
              |    "name" : "a",
              |    "type" : "BigInt",
              |    "value" : 6.703903964971298549787012499102923E+153
              |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "BigInt",
+             |      "value" : 6.703903964971298549787012499102923E+153
+             |    }, {
+             |      "type" : "BigInt",
+             |      "value" : 6.703903964971298549787012499102923E+153
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25934
+             |  }, {
              |    "name" : "test",
              |    "type" : "Int",
              |    "value" : 1
+             |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 1
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25933
+             |  }, {
+             |    "name" : "Address.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "ByteVector",
+             |      "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
+             |    } ]
+             |  }, {
+             |    "name" : "Address.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25932
+             |  }, {
+             |    "name" : "Lease.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Address",
+             |      "value" : {
+             |        "bytes" : {
+             |          "type" : "ByteVector",
+             |          "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 100
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 0
+             |    } ]
+             |  }, {
+             |    "name" : "Lease.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25931
+             |  }, {
+             |    "name" : "Alias.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "String",
+             |      "value" : "some_alias"
+             |    } ]
+             |  }, {
+             |    "name" : "Alias.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25930
+             |  }, {
+             |    "name" : "Lease.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Alias",
+             |      "value" : {
+             |        "alias" : {
+             |          "type" : "String",
+             |          "value" : "some_alias"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 20
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 2
+             |    } ]
+             |  }, {
+             |    "name" : "Lease.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25929
+             |  }, {
+             |    "name" : "LeaseCancel.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "ByteVector",
+             |      "value" : "$leaseCancelId"
+             |    } ]
+             |  }, {
+             |    "name" : "LeaseCancel.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25928
+             |  }, {
+             |    "name" : "cons.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "LeaseCancel",
+             |      "value" : {
+             |        "leaseId" : {
+             |          "type" : "ByteVector",
+             |          "value" : "$leaseCancelId"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25927
+             |  }, {
+             |    "name" : "cons.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Lease",
+             |      "value" : {
+             |        "recipient" : {
+             |          "type" : "Alias",
+             |          "value" : {
+             |            "alias" : {
+             |              "type" : "String",
+             |              "value" : "some_alias"
+             |            }
+             |          }
+             |        },
+             |        "amount" : {
+             |          "type" : "Int",
+             |          "value" : 20
+             |        },
+             |        "nonce" : {
+             |          "type" : "Int",
+             |          "value" : 2
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "LeaseCancel",
+             |        "value" : {
+             |          "leaseId" : {
+             |            "type" : "ByteVector",
+             |            "value" : "$leaseCancelId"
+             |          }
+             |        }
+             |      } ]
+             |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25926
+             |  }, {
+             |    "name" : "cons.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Lease",
+             |      "value" : {
+             |        "recipient" : {
+             |          "type" : "Address",
+             |          "value" : {
+             |            "bytes" : {
+             |              "type" : "ByteVector",
+             |              "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
+             |            }
+             |          }
+             |        },
+             |        "amount" : {
+             |          "type" : "Int",
+             |          "value" : 100
+             |        },
+             |        "nonce" : {
+             |          "type" : "Int",
+             |          "value" : 0
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "Lease",
+             |        "value" : {
+             |          "recipient" : {
+             |            "type" : "Alias",
+             |            "value" : {
+             |              "alias" : {
+             |                "type" : "String",
+             |                "value" : "some_alias"
+             |              }
+             |            }
+             |          },
+             |          "amount" : {
+             |            "type" : "Int",
+             |            "value" : 20
+             |          },
+             |          "nonce" : {
+             |            "type" : "Int",
+             |            "value" : 2
+             |          }
+             |        }
+             |      }, {
+             |        "type" : "LeaseCancel",
+             |        "value" : {
+             |          "leaseId" : {
+             |            "type" : "ByteVector",
+             |            "value" : "$leaseCancelId"
+             |          }
+             |        }
+             |      } ]
+             |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25925
              |  } ]
              |} ]
              |
           """.stripMargin
         )
         (json \ "height").as[Int] shouldBe 1
+      }
+    }
+
+    "invoke tx returning leases with error" in {
+      val dApp1Kp      = signer(1)
+      val dApp2Kp      = signer(2)
+      val leaseAddress = signer(3).toAddress
+      val amount       = 123
+
+      withDomain(RideV6, AddrWithBalance.enoughBalances(dApp1Kp, dApp2Kp)) { d =>
+        val dApp1 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict r = Address(base58'${dApp2Kp.toAddress}').invoke("default", [], [])
+             |   if (true) then throw() else []
+             | }
+           """.stripMargin
+        )
+        val leaseTx = lease(dApp2Kp, leaseAddress)
+        val dApp2 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   let lease   = Lease(Address(base58'$leaseAddress'), $amount)
+             |   let cancel1 = LeaseCancel(calculateLeaseId(lease))
+             |   let cancel2 = LeaseCancel(base58'${leaseTx.id()}')
+             |   [lease, cancel1, cancel2]
+             | }
+           """.stripMargin
+        )
+        d.appendBlock(leaseTx)
+        d.appendBlock(setScript(dApp1Kp, dApp1), setScript(dApp2Kp, dApp2))
+
+        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => d.blockchain).route
+        val invoke  = TxHelpers.invoke(dApp1Kp.toAddress)
+        val leaseId = Lease.calculateId(Lease(Address(ByteStr(leaseAddress.bytes)), amount, 0), invoke.id())
+
+        Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, invoke.json().toString())) ~> route ~> check {
+          val json = responseAs[JsValue]
+          json should matchJson(
+            s"""
+               |{
+               |  "valid": false,
+               |  "validationTime": ${(json \ "validationTime").as[Int]},
+               |  "trace": [
+               |    {
+               |      "type": "dApp",
+               |      "id": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+               |      "function": "default",
+               |      "args": [],
+               |      "invocations": [
+               |        {
+               |          "type": "dApp",
+               |          "id": "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy",
+               |          "function": "default",
+               |          "args": [],
+               |          "invocations": [],
+               |          "result": {
+               |            "data": [],
+               |            "transfers": [],
+               |            "issues": [],
+               |            "reissues": [],
+               |            "burns": [],
+               |            "sponsorFees": [],
+               |            "leases": [
+               |              {
+               |                "id": "$leaseId",
+               |                "originTransactionId": null,
+               |                "sender": null,
+               |                "recipient": "$leaseAddress",
+               |                "amount": $amount,
+               |                "height": null,
+               |                "status": "canceled",
+               |                "cancelHeight": null,
+               |                "cancelTransactionId": null
+               |              }
+               |            ],
+               |            "leaseCancels": [
+               |              {
+               |                "id": "$leaseId",
+               |                "originTransactionId": null,
+               |                "sender": null,
+               |                "recipient": null,
+               |                "amount": null,
+               |                "height": null,
+               |                "status": "canceled",
+               |                "cancelHeight": null,
+               |                "cancelTransactionId": null
+               |              }, {
+               |                "id" : "${leaseTx.id()}",
+               |                "originTransactionId" : "${leaseTx.id()}",
+               |                "sender" : "${dApp2Kp.toAddress}",
+               |                "recipient" : "$leaseAddress",
+               |                "amount" : ${leaseTx.amount},
+               |                "height" : 2,
+               |                "status" : "active",
+               |                "cancelHeight" : null,
+               |                "cancelTransactionId" : null
+               |              }
+               |
+               |            ],
+               |            "invokes": []
+               |          },
+               |          "error": null,
+               |          "vars": [
+               |            {
+               |              "name": "i",
+               |              "type": "Invocation",
+               |              "value": {
+               |                "originCaller": {
+               |                  "type": "Address",
+               |                  "value": {
+               |                    "bytes": {
+               |                      "type": "ByteVector",
+               |                      "value": "$defaultAddress"
+               |                    }
+               |                  }
+               |                },
+               |                "payments": {
+               |                  "type": "Array",
+               |                  "value": []
+               |                },
+               |                "callerPublicKey": {
+               |                  "type": "ByteVector",
+               |                  "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+               |                },
+               |                "feeAssetId": {
+               |                  "type": "Unit",
+               |                  "value": {}
+               |                },
+               |                "originCallerPublicKey": {
+               |                  "type": "ByteVector",
+               |                  "value": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+               |                },
+               |                "transactionId": {
+               |                  "type": "ByteVector",
+               |                  "value": "${invoke.id()}"
+               |                },
+               |                "caller": {
+               |                  "type": "Address",
+               |                  "value": {
+               |                    "bytes": {
+               |                      "type": "ByteVector",
+               |                      "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |                    }
+               |                  }
+               |                },
+               |                "fee": {
+               |                  "type": "Int",
+               |                  "value": 500000
+               |                }
+               |              }
+               |            },
+               |            {
+               |              "name": "default.@args",
+               |              "type": "Array",
+               |              "value": []
+               |            },
+               |            {
+               |              "name": "Address.@args",
+               |              "type": "Array",
+               |              "value": [
+               |                {
+               |                  "type": "ByteVector",
+               |                  "value": "$leaseAddress"
+               |                }
+               |              ]
+               |            },
+               |            {
+               |              "name": "Address.@complexity",
+               |              "type": "Int",
+               |              "value": 1
+               |            },
+               |            {
+               |              "name": "@complexityLimit",
+               |              "type": "Int",
+               |              "value": 51923
+               |            },
+               |            {
+               |              "name": "Lease.@args",
+               |              "type": "Array",
+               |              "value": [
+               |                {
+               |                  "type": "Address",
+               |                  "value": {
+               |                    "bytes": {
+               |                      "type": "ByteVector",
+               |                      "value": "$leaseAddress"
+               |                    }
+               |                  }
+               |                },
+               |                {
+               |                  "type": "Int",
+               |                  "value": $amount
+               |                }
+               |              ]
+               |            },
+               |            {
+               |              "name": "Lease.@complexity",
+               |              "type": "Int",
+               |              "value": 1
+               |            },
+               |            {
+               |              "name": "@complexityLimit",
+               |              "type": "Int",
+               |              "value": 51922
+               |            },
+               |            {
+               |              "name": "lease",
+               |              "type": "Lease",
+               |              "value": {
+               |                "recipient": {
+               |                  "type": "Address",
+               |                  "value": {
+               |                    "bytes": {
+               |                      "type": "ByteVector",
+               |                      "value": "$leaseAddress"
+               |                    }
+               |                  }
+               |                },
+               |                "amount": {
+               |                  "type": "Int",
+               |                  "value": $amount
+               |                },
+               |                "nonce": {
+               |                  "type": "Int",
+               |                  "value": 0
+               |                }
+               |              }
+               |            },
+               |            {
+               |              "name": "calculateLeaseId.@args",
+               |              "type": "Array",
+               |              "value": [
+               |                {
+               |                  "type": "Lease",
+               |                  "value": {
+               |                    "recipient": {
+               |                      "type": "Address",
+               |                      "value": {
+               |                        "bytes": {
+               |                          "type": "ByteVector",
+               |                          "value": "$leaseAddress"
+               |                        }
+               |                      }
+               |                    },
+               |                    "amount": {
+               |                      "type": "Int",
+               |                      "value": $amount
+               |                    },
+               |                    "nonce": {
+               |                      "type": "Int",
+               |                      "value": 0
+               |                    }
+               |                  }
+               |                }
+               |              ]
+               |            },
+               |            {
+               |              "name": "calculateLeaseId.@complexity",
+               |              "type": "Int",
+               |              "value": 1
+               |            },
+               |            {
+               |              "name": "@complexityLimit",
+               |              "type": "Int",
+               |              "value": 51921
+               |            },
+               |            {
+               |              "name": "LeaseCancel.@args",
+               |              "type": "Array",
+               |              "value": [
+               |                {
+               |                  "type": "ByteVector",
+               |                  "value": "$leaseId"
+               |                }
+               |              ]
+               |            },
+               |            {
+               |              "name": "cancel1",
+               |              "type": "LeaseCancel",
+               |              "value": {
+               |                "leaseId": {
+               |                  "type": "ByteVector",
+               |                  "value": "$leaseId"
+               |                }
+               |              }
+               |            },
+               |            {
+               |              "name": "LeaseCancel.@complexity",
+               |              "type": "Int",
+               |              "value": 1
+               |            },
+               |            {
+               |              "name": "@complexityLimit",
+               |              "type": "Int",
+               |              "value": 51920
+               |            },
+               |            {
+               |              "name" : "LeaseCancel.@args",
+               |              "type" : "Array",
+               |              "value" : [ {
+               |                "type" : "ByteVector",
+               |                "value" : "${leaseTx.id()}"
+               |              } ]
+               |            }, {
+               |              "name" : "cancel2",
+               |              "type" : "LeaseCancel",
+               |              "value" : {
+               |                "leaseId" : {
+               |                  "type" : "ByteVector",
+               |                  "value" : "${leaseTx.id()}"
+               |                }
+               |              }
+               |            }, {
+               |              "name" : "LeaseCancel.@complexity",
+               |              "type" : "Int",
+               |              "value" : 1
+               |            }, {
+               |              "name" : "@complexityLimit",
+               |              "type" : "Int",
+               |              "value" : 51919
+               |            },
+               |            {
+               |              "name": "cons.@args",
+               |              "type": "Array",
+               |              "value": [
+               |                {
+               |                  "type": "LeaseCancel",
+               |                  "value": {
+               |                    "leaseId": {
+               |                      "type": "ByteVector",
+               |                      "value": "${leaseTx.id()}"
+               |                    }
+               |                  }
+               |                },
+               |                {
+               |                  "type": "Array",
+               |                  "value": []
+               |                }
+               |              ]
+               |            },
+               |            {
+               |              "name": "cons.@complexity",
+               |              "type": "Int",
+               |              "value": 1
+               |            },
+               |            {
+               |              "name": "@complexityLimit",
+               |              "type": "Int",
+               |              "value": 51918
+               |            }, {
+               |              "name" : "cons.@args",
+               |              "type" : "Array",
+               |              "value" : [ {
+               |                "type" : "LeaseCancel",
+               |                "value" : {
+               |                  "leaseId" : {
+               |                    "type" : "ByteVector",
+               |                    "value" : "$leaseId"
+               |                  }
+               |                }
+               |              }, {
+               |                "type" : "Array",
+               |                "value" : [ {
+               |                  "type" : "LeaseCancel",
+               |                  "value" : {
+               |                    "leaseId" : {
+               |                      "type" : "ByteVector",
+               |                      "value" : "${leaseTx.id()}"
+               |                    }
+               |                  }
+               |                } ]
+               |              } ]
+               |            }, {
+               |              "name" : "cons.@complexity",
+               |              "type" : "Int",
+               |              "value" : 1
+               |            }, {
+               |              "name" : "@complexityLimit",
+               |              "type" : "Int",
+               |              "value" : 51917
+               |            }, {
+               |              "name": "cons.@args",
+               |              "type": "Array",
+               |              "value": [
+               |                {
+               |                  "type": "Lease",
+               |                  "value": {
+               |                    "recipient": {
+               |                      "type": "Address",
+               |                      "value": {
+               |                        "bytes": {
+               |                          "type": "ByteVector",
+               |                          "value": "$leaseAddress"
+               |                        }
+               |                      }
+               |                    },
+               |                    "amount": {
+               |                      "type": "Int",
+               |                      "value": $amount
+               |                    },
+               |                    "nonce": {
+               |                      "type": "Int",
+               |                      "value": 0
+               |                    }
+               |                  }
+               |           }, {
+               |             "type" : "Array",
+               |             "value" : [ {
+               |               "type" : "LeaseCancel",
+               |               "value" : {
+               |                 "leaseId" : {
+               |                   "type" : "ByteVector",
+               |                   "value" : "$leaseId"
+               |                 }
+               |               }
+               |             }, {
+               |               "type" : "LeaseCancel",
+               |               "value" : {
+               |                 "leaseId" : {
+               |                   "type" : "ByteVector",
+               |                   "value" : "${leaseTx.id()}"
+               |                 }
+               |               }
+               |             } ]
+               |           } ]
+               |         }, {
+               |              "name": "cons.@complexity",
+               |              "type": "Int",
+               |              "value": 1
+               |            },
+               |            {
+               |              "name": "@complexityLimit",
+               |              "type": "Int",
+               |              "value": 51916
+               |            }
+               |          ]
+               |        }
+               |      ],
+               |      "result": "failure",
+               |      "error": "InvokeRejectError(error = Explicit script termination)",
+               |      "vars" : [ {
+               |        "name" : "i",
+               |        "type" : "Invocation",
+               |        "value" : {
+               |          "originCaller" : {
+               |            "type" : "Address",
+               |            "value" : {
+               |              "bytes" : {
+               |                "type" : "ByteVector",
+               |                "value" : "$defaultAddress"
+               |              }
+               |            }
+               |          },
+               |          "payments" : {
+               |            "type" : "Array",
+               |            "value" : [ ]
+               |          },
+               |          "callerPublicKey" : {
+               |            "type" : "ByteVector",
+               |            "value" : "${defaultSigner.publicKey}"
+               |          },
+               |          "feeAssetId" : {
+               |            "type" : "Unit",
+               |            "value" : { }
+               |          },
+               |          "originCallerPublicKey" : {
+               |            "type" : "ByteVector",
+               |            "value" : "${defaultSigner.publicKey}"
+               |          },
+               |          "transactionId" : {
+               |            "type" : "ByteVector",
+               |            "value" : "${invoke.id()}"
+               |          },
+               |          "caller" : {
+               |            "type" : "Address",
+               |            "value" : {
+               |              "bytes" : {
+               |                "type" : "ByteVector",
+               |                "value" : "$defaultAddress"
+               |              }
+               |            }
+               |          },
+               |          "fee" : {
+               |            "type" : "Int",
+               |            "value" : 500000
+               |          }
+               |        }
+               |      }, {
+               |        "name" : "default.@args",
+               |        "type" : "Array",
+               |        "value" : [ ]
+               |      }, {
+               |        "name" : "Address.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "ByteVector",
+               |          "value" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy"
+               |        } ]
+               |      }, {
+               |        "name" : "Address.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51999
+               |      }, {
+               |        "name" : "invoke.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "Address",
+               |          "value" : {
+               |            "bytes" : {
+               |              "type" : "ByteVector",
+               |              "value" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy"
+               |            }
+               |          }
+               |        }, {
+               |          "type" : "String",
+               |          "value" : "default"
+               |        }, {
+               |          "type" : "Array",
+               |          "value" : [ ]
+               |        }, {
+               |          "type" : "Array",
+               |          "value" : [ ]
+               |        } ]
+               |      }, {
+               |        "name" : "invoke.@complexity",
+               |        "type" : "Int",
+               |        "value" : 75
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51924
+               |      }, {
+               |        "name" : "default.@complexity",
+               |        "type" : "Int",
+               |        "value" : 8
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51916
+               |      }, {
+               |        "name" : "r",
+               |        "type" : "Unit",
+               |        "value" : { }
+               |      }, {
+               |        "name" : "==.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "Unit",
+               |          "value" : { }
+               |        }, {
+               |          "type" : "Unit",
+               |          "value" : { }
+               |        } ]
+               |      }, {
+               |        "name" : "==.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51915
+               |      }, {
+               |        "name" : "throw.@args",
+               |        "type" : "Array",
+               |        "value" : [ ]
+               |      }, {
+               |        "name" : "throw.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51914
+               |      }, {
+               |        "name" : "throw.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "String",
+               |          "value" : "Explicit script termination"
+               |        } ]
+               |      }, {
+               |        "name" : "throw.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51913
+               |      } ]
+               |    }
+               |  ],
+               |  "height": 3,
+               |  "error": "Error while executing dApp: Explicit script termination",
+               |  "transaction": {
+               |    "type": 16,
+               |    "id": "${invoke.id()}",
+               |    "fee": 500000,
+               |    "feeAssetId": null,
+               |    "timestamp": ${(json \ "transaction" \ "timestamp").as[Long]},
+               |    "version": 2,
+               |    "chainId": 84,
+               |    "sender": "$defaultAddress",
+               |    "senderPublicKey": "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+               |    "proofs": [ "${(json \ "transaction" \ "proofs" \ 0).as[String]}" ],
+               |    "dApp": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+               |    "payment": [],
+               |    "call": {
+               |      "function": "default",
+               |      "args": []
+               |    }
+               |  }
+               |}
+             """.stripMargin
+          )
+        }
       }
     }
 
@@ -761,6 +2737,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -882,13 +2859,160 @@ class DebugApiRouteSpec
              |    },
              |    "error" : null,
              |    "vars" : [ {
+             |      "name" : "i",
+             |      "type" : "Invocation",
+             |      "value" : {
+             |        "originCaller" : {
+             |          "type" : "Address",
+             |          "value" : {
+             |            "bytes" : {
+             |              "type" : "ByteVector",
+             |              "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |            }
+             |          }
+             |        },
+             |        "payments" : {
+             |          "type" : "Array",
+             |          "value" : [ ]
+             |        },
+             |        "callerPublicKey" : {
+             |          "type" : "ByteVector",
+             |          "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |        },
+             |        "feeAssetId" : {
+             |          "type" : "Unit",
+             |          "value" : { }
+             |        },
+             |        "originCallerPublicKey" : {
+             |          "type" : "ByteVector",
+             |          "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |        },
+             |        "transactionId" : {
+             |          "type" : "ByteVector",
+             |          "value" : "${invoke.id()}"
+             |        },
+             |        "caller" : {
+             |          "type" : "Address",
+             |          "value" : {
+             |            "bytes" : {
+             |              "type" : "ByteVector",
+             |              "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |            }
+             |          }
+             |        },
+             |        "fee" : {
+             |          "type" : "Int",
+             |          "value" : 500000
+             |        }
+             |      }
+             |    }, {
+             |      "name" : "test.@args",
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    }, {
+             |      "name" : "parseBigIntValue.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "String",
+             |        "value" : "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047"
+             |      } ]
+             |    }, {
+             |      "name" : "parseBigIntValue.@complexity",
+             |      "type" : "Int",
+             |      "value" : 65
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25860
+             |    }, {
              |      "name" : "a",
              |      "type" : "BigInt",
              |      "value" : 6.703903964971298549787012499102923E+153
              |    }, {
+             |      "name" : "==.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "BigInt",
+             |        "value" : 6.703903964971298549787012499102923E+153
+             |      }, {
+             |        "type" : "BigInt",
+             |        "value" : 6.703903964971298549787012499102923E+153
+             |      } ]
+             |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25859
+             |    }, {
              |      "name" : "test",
              |      "type" : "Int",
              |      "value" : 1
+             |    }, {
+             |      "name" : "==.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "Int",
+             |        "value" : 1
+             |      }, {
+             |        "type" : "Int",
+             |        "value" : 1
+             |      } ]
+             |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25858
+             |    }, {
+             |      "name" : "IntegerEntry.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "String",
+             |        "value" : "key"
+             |      }, {
+             |        "type" : "Int",
+             |        "value" : 1
+             |      } ]
+             |    }, {
+             |      "name" : "IntegerEntry.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25857
+             |    }, {
+             |      "name" : "cons.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "IntegerEntry",
+             |        "value" : {
+             |          "key" : {
+             |            "type" : "String",
+             |            "value" : "key"
+             |          },
+             |          "value" : {
+             |            "type" : "Int",
+             |            "value" : 1
+             |          }
+             |        }
+             |      }, {
+             |        "type" : "Array",
+             |        "value" : [ ]
+             |      } ]
+             |    }, {
+             |      "name" : "cons.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25856
              |    } ]
              |  } ],
              |  "result" : {
@@ -904,9 +3028,133 @@ class DebugApiRouteSpec
              |  },
              |  "error" : null,
              |  "vars" : [ {
+             |    "name" : "i",
+             |    "type" : "Invocation",
+             |    "value" : {
+             |      "originCaller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "payments" : {
+             |        "type" : "Array",
+             |        "value" : [ ]
+             |      },
+             |      "callerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "feeAssetId" : {
+             |        "type" : "Unit",
+             |        "value" : { }
+             |      },
+             |      "originCallerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "transactionId" : {
+             |        "type" : "ByteVector",
+             |        "value" : "${invoke.id()}"
+             |      },
+             |      "caller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "fee" : {
+             |        "type" : "Int",
+             |        "value" : 500000
+             |      }
+             |    }
+             |  }, {
+             |    "name" : "test1.@args",
+             |    "type" : "Array",
+             |    "value" : [ ]
+             |  }, {
+             |    "name" : "reentrantInvoke.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Address",
+             |      "value" : {
+             |        "bytes" : {
+             |          "type" : "ByteVector",
+             |          "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "String",
+             |      "value" : "test"
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    } ]
+             |  }, {
+             |    "name" : "reentrantInvoke.@complexity",
+             |    "type" : "Int",
+             |    "value" : 75
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25925
+             |  }, {
+             |    "name" : "test.@complexity",
+             |    "type" : "Int",
+             |    "value" : 69
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25856
+             |  }, {
              |    "name" : "result",
              |    "type" : "Unit",
              |    "value" : { }
+             |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    }, {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25855
+             |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    }, {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25854
              |  } ]
              |} ]
           """.stripMargin
@@ -919,7 +3167,8 @@ class DebugApiRouteSpec
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
 
-        val (assetScript, assetScriptComplexity) = ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+        val (assetScript, assetScriptComplexity) =
+          ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, assetScriptComplexity)))
         (blockchain.assetDescription _)
           .when(TestValues.asset)
@@ -936,7 +3185,9 @@ class DebugApiRouteSpec
                 Height(1),
                 Some(AssetScriptInfo(assetScript, assetScriptComplexity)),
                 0,
-                nft = false
+                nft = false,
+                0,
+                Height(1)
               )
             )
           )
@@ -947,13 +3198,13 @@ class DebugApiRouteSpec
       jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
         val json = responseAs[JsObject]
         (json \ "trace").as[JsArray] should matchJson("""[ {
-                                                           |    "type" : "asset",
-                                                           |    "context" : "transfer",
-                                                           |    "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-                                                           |    "result" : "failure",
-                                                           |    "vars" : [ ],
-                                                           |    "error" : null
-                                                           |  } ]""".stripMargin)
+                                                        |    "type" : "asset",
+                                                        |    "context" : "transfer",
+                                                        |    "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                                                        |    "result" : "failure",
+                                                        |    "vars" : [ ],
+                                                        |    "error" : null
+                                                        |  } ]""".stripMargin)
 
         (json \ "valid").as[Boolean] shouldBe false
         (json \ "transaction").as[JsObject] shouldBe tx.json()
@@ -962,7 +3213,10 @@ class DebugApiRouteSpec
 
     "txs with empty and small verifier" in {
       val blockchain = createBlockchainStub { blockchain =>
-        val settings = TestFunctionalitySettings.Enabled.copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
+        val settings = TestFunctionalitySettings.Enabled.copy(
+          featureCheckBlocksPeriod = 1,
+          blocksForFeatureActivation = 1,
+          preActivatedFeatures = Map(
             BlockchainFeatures.SmartAccounts.id    -> 0,
             BlockchainFeatures.SmartAssets.id      -> 0,
             BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -971,7 +3225,8 @@ class DebugApiRouteSpec
             BlockchainFeatures.BlockReward.id      -> 0,
             BlockchainFeatures.BlockV5.id          -> 0,
             BlockchainFeatures.SynchronousCalls.id -> 0
-          ))
+          )
+        )
         (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
         (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
         (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
@@ -1021,8 +3276,8 @@ class DebugApiRouteSpec
 
         val expression = TestCompiler(V6).compileFreeCall(
           s"""
-           | let assetId = base58'${TestValues.asset}'
-           | [ Reissue(assetId, 1, true) ]
+             | let assetId = base58'${TestValues.asset}'
+             | [ Reissue(assetId, 1, true) ]
          """.stripMargin
         )
         val invokeExpression = TxHelpers.invokeExpression(expression)
@@ -1031,130 +3286,193 @@ class DebugApiRouteSpec
           (json \ "expression").as[String] shouldBe expression.bytes.value().base64
           (json \ "valid").as[Boolean] shouldBe true
           (json \ "trace").as[JsArray] should matchJson(
-            """
-            |  [
-            |    {
-            |      "type": "dApp",
-            |      "id": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-            |      "function": "default",
-            |      "args": [],
-            |      "invocations": [],
-            |      "result": {
-            |        "data": [],
-            |        "transfers": [],
-            |        "issues": [],
-            |        "reissues": [
-            |          {
-            |            "assetId": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-            |            "isReissuable": true,
-            |            "quantity": 1
-            |          }
-            |        ],
-            |        "burns": [],
-            |        "sponsorFees": [],
-            |        "leases": [],
-            |        "leaseCancels": [],
-            |        "invokes": []
-            |      },
-            |      "error": null,
-            |      "vars": [
-            |        {
-            |          "name": "assetId",
-            |          "type": "ByteVector",
-            |          "value": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
-            |        }
-            |      ]
-            |    }
-            |  ]
+            s"""
+               |[ {
+               |  "type" : "dApp",
+               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+               |  "function" : "default",
+               |  "args" : [ ],
+               |  "invocations" : [ ],
+               |  "result" : {
+               |    "data" : [ ],
+               |    "transfers" : [ ],
+               |    "issues" : [ ],
+               |    "reissues" : [ {
+               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+               |      "isReissuable" : true,
+               |      "quantity" : 1
+               |    } ],
+               |    "burns" : [ ],
+               |    "sponsorFees" : [ ],
+               |    "leases" : [ ],
+               |    "leaseCancels" : [ ],
+               |    "invokes" : [ ]
+               |  },
+               |  "error" : null,
+               |  "vars" : [ {
+               |    "name" : "i",
+               |    "type" : "Invocation",
+               |    "value" : {
+               |      "originCaller" : {
+               |        "type" : "Address",
+               |        "value" : {
+               |          "bytes" : {
+               |            "type" : "ByteVector",
+               |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |          }
+               |        }
+               |      },
+               |      "payments" : {
+               |        "type" : "Array",
+               |        "value" : [ ]
+               |      },
+               |      "callerPublicKey" : {
+               |        "type" : "ByteVector",
+               |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+               |      },
+               |      "feeAssetId" : {
+               |        "type" : "Unit",
+               |        "value" : { }
+               |      },
+               |      "originCallerPublicKey" : {
+               |        "type" : "ByteVector",
+               |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+               |      },
+               |      "transactionId" : {
+               |        "type" : "ByteVector",
+               |        "value" : "${invokeExpression.id()}"
+               |      },
+               |      "caller" : {
+               |        "type" : "Address",
+               |        "value" : {
+               |          "bytes" : {
+               |            "type" : "ByteVector",
+               |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |          }
+               |        }
+               |      },
+               |      "fee" : {
+               |        "type" : "Int",
+               |        "value" : 1000000
+               |      }
+               |    }
+               |  }, {
+               |    "name" : "default.@args",
+               |    "type" : "Array",
+               |    "value" : [ ]
+               |  }, {
+               |    "name" : "assetId",
+               |    "type" : "ByteVector",
+               |    "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+               |  }, {
+               |    "name" : "Reissue.@args",
+               |    "type" : "Array",
+               |    "value" : [ {
+               |      "type" : "ByteVector",
+               |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+               |    }, {
+               |      "type" : "Int",
+               |      "value" : 1
+               |    }, {
+               |      "type" : "Boolean",
+               |      "value" : true
+               |    } ]
+               |  }, {
+               |    "name" : "Reissue.@complexity",
+               |    "type" : "Int",
+               |    "value" : 1
+               |  }, {
+               |    "name" : "@complexityLimit",
+               |    "type" : "Int",
+               |    "value" : 51999
+               |  }, {
+               |    "name" : "cons.@args",
+               |    "type" : "Array",
+               |    "value" : [ {
+               |      "type" : "Reissue",
+               |      "value" : {
+               |        "assetId" : {
+               |          "type" : "ByteVector",
+               |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+               |        },
+               |        "quantity" : {
+               |          "type" : "Int",
+               |          "value" : 1
+               |        },
+               |        "isReissuable" : {
+               |          "type" : "Boolean",
+               |          "value" : true
+               |        }
+               |      }
+               |    }, {
+               |      "type" : "Array",
+               |      "value" : [ ]
+               |    } ]
+               |  }, {
+               |    "name" : "cons.@complexity",
+               |    "type" : "Int",
+               |    "value" : 1
+               |  }, {
+               |    "name" : "@complexityLimit",
+               |    "type" : "Int",
+               |    "value" : 51998
+               |  } ]
+               |} ]
+               |
           """.stripMargin
           )
         }
       }
 
       assert(ContinuationTransaction)
-      intercept[Exception](assert(RideV6)).getMessage should include(s"${BlockchainFeatures.ContinuationTransaction.description} feature has not been activated yet")
+      intercept[Exception](assert(RideV6)).getMessage should include(
+        s"${BlockchainFeatures.ContinuationTransaction.description} feature has not been activated yet"
+      )
     }
   }
 
   routePath("/stateChanges/info/") - {
-    "provides lease and lease cancel actions stateChanges" in {
-      val invokeAddress    = accountGen.sample.get.toAddress
-      val leaseId1         = ByteStr(bytes32gen.sample.get)
-      val leaseId2         = ByteStr(bytes32gen.sample.get)
-      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
-      val recipientAddress = accountGen.sample.get.toAddress
-      val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress)
-      val scriptResult = InvokeScriptResult(
-        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
-        leaseCancels = Seq(LeaseCancel(leaseCancelId))
-      )
-
-      (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
-      (transactionsApi.transactionById _)
-        .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
-        .once()
-
-      (blockchain.leaseDetails _)
-        .when(leaseId1)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
-      (blockchain.leaseDetails _)
-        .when(leaseId2)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
-      (blockchain.leaseDetails _)
-        .when(leaseCancelId)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), invoke.id(), 1)))
-      (blockchain.transactionMeta _).when(invoke.id()).returning(Some(TxMeta(Height(1), true, 1L)))
-
-      Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
-        json should matchJson(s"""
-                                   |{
-                                   |  "data" : [ ],
-                                   |  "transfers" : [ ],
-                                   |  "issues" : [ ],
-                                   |  "reissues" : [ ],
-                                   |  "burns" : [ ],
-                                   |  "sponsorFees" : [ ],
-                                   |  "leases" : [ {
-                                   |    "id" : "$leaseId1",
-                                   |    "originTransactionId" : "${invoke.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "$recipientAddress",
-                                   |    "amount" : 100,
-                                   |    "height" : 1,
-                                   |    "status" : "active",
-                                   |    "cancelHeight" : null,
-                                   |    "cancelTransactionId" : null
-                                   |  }, {
-                                   |    "id" : "$leaseId2",
-                                   |    "originTransactionId" : "${invoke.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "$recipientAddress",
-                                   |    "amount" : 100,
-                                   |    "height" : 1,
-                                   |    "status" : "active",
-                                   |    "cancelHeight" : null,
-                                   |    "cancelTransactionId" : null
-                                   |  } ],
-                                   |  "leaseCancels" : [ {
-                                   |    "id" : "$leaseCancelId",
-                                   |    "originTransactionId" : "${invoke.id()}",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "$recipientAddress",
-                                   |    "amount" : 100,
-                                   |    "height" : 1,
-                                   |    "status" : "canceled",
-                                   |    "cancelHeight" : 2,
-                                   |    "cancelTransactionId" : "$leaseCancelId"
-                                   |  } ],
-                                   |  "invokes" : [ ]
-                                   |}""".stripMargin)
+    "redirects to /transactions/info method" in {
+      val txId = ByteStr.fill(DigestLength)(1)
+      Get(routePath(s"/stateChanges/info/$txId")) ~> route ~> check {
+        status shouldBe StatusCodes.MovedPermanently
+        header(Location.name).map(_.value) shouldBe Some(s"/transactions/info/$txId")
       }
     }
   }
+
+  routePath("/minerInfo") - {
+    "returns info from wallet if miner private keys not specified in config" in {
+      val acc = wallet.generateNewAccount()
+
+      acc shouldBe defined
+      Get(routePath("/minerInfo")) ~> ApiKeyHeader ~> route ~> check {
+        responseAs[Seq[AccountMiningInfo]].map(_.address) shouldBe acc.toSeq.map(_.toAddress.toString)
+      }
+    }
+
+    "returns info only for miner private keys from config when specified" in {
+      val minerAccs   = Seq(TxHelpers.signer(1), TxHelpers.signer(2))
+      val minerConfig = debugApiRoute.ws.minerSettings.copy(privateKeys = minerAccs.map(_.privateKey))
+      val debugRoute  = debugApiRoute.copy(ws = debugApiRoute.ws.copy(minerSettings = minerConfig))
+
+      Get(routePath("/minerInfo")) ~> ApiKeyHeader ~> debugRoute.route ~> check {
+        responseAs[Seq[AccountMiningInfo]].map(_.address) shouldBe minerAccs.map(_.toAddress.toString)
+      }
+    }
+  }
+
+  private def routeWithBlockchain(blockchain: Blockchain & NG) =
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+
+  private def routeWithBlockchain(d: Domain) =
+    debugApiRoute
+      .copy(
+        blockchain = d.blockchain,
+        priorityPoolBlockchain = () => d.blockchain,
+        loadStateHash = d.levelDBWriter.loadStateHash
+      )
+      .route
 
   private[this] def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))

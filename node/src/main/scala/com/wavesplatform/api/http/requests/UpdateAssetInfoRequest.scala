@@ -1,13 +1,13 @@
 package com.wavesplatform.api.http.requests
 
-import cats.instances.option._
-import cats.syntax.traverse._
+import cats.instances.option.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, TxTimestamp, TxVersion}
-import play.api.libs.json.Json
+import play.api.libs.json.{Json, OFormat}
 
 case class UpdateAssetInfoRequest(
     version: TxVersion,
@@ -34,5 +34,5 @@ case class UpdateAssetInfoRequest(
 }
 
 object UpdateAssetInfoRequest {
-  implicit val jsonFormat = Json.format[UpdateAssetInfoRequest]
+  implicit val jsonFormat: OFormat[UpdateAssetInfoRequest] = Json.format[UpdateAssetInfoRequest]
 }

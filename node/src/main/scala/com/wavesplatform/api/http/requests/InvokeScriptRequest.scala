@@ -47,9 +47,7 @@ object InvokeScriptRequest {
       case JsDefined(JsString("list")) =>
         ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(
           e => JsError(e.message),
-          { v: EVALUATED =>
-            JsSuccess(v)
-          }
+          { (v: EVALUATED) => JsSuccess(v) }
         )
       case _ => JsError("type is missing")
     }

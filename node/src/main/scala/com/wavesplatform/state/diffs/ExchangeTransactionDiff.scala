@@ -3,18 +3,27 @@ package com.wavesplatform.state.diffs
 import cats.implicits.toFoldableOps
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange.OrderAuthentication.Eip712Signature
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderPriceMode, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.{Asset, TxVersion}
 
+import java.text.{DecimalFormat, DecimalFormatSymbols}
 import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
+
+  private val formatter = {
+    val symbols = DecimalFormatSymbols.getInstance
+    symbols.setGroupingSeparator('_')
+    new DecimalFormat("###,###.##", symbols)
+  }
 
   def apply(blockchain: Blockchain)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val buyer  = tx.buyOrder.senderAddress
@@ -57,6 +66,8 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
+      _                      <- checkOrderPkRecover(tx.order1, blockchain)
+      _                      <- checkOrderPkRecover(tx.order2, blockchain)
       buyerAndSellerScripted <- smartFeaturesChecks()
       portfolios             <- getPortfolios(blockchain, tx)
       _                      <- enoughVolume(tx, blockchain)
@@ -99,11 +110,28 @@ object ExchangeTransactionDiff {
         else
           Right(order.price.value)
 
+      def formatTxPrice: String = formatter.format(tx.price.value)
+
+      def formatOrderPrice(order: Order, convertedPrice: Long): String = {
+        val rawPriceStr =
+          if (order.price.value == convertedPrice) ""
+          else s" (assetDecimals price = ${formatter.format(order.price.value)})"
+        s"${formatter.format(convertedPrice)}$rawPriceStr"
+      }
+
       for {
         buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
         sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
-        _              <- Either.cond(tx.price.value <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
-        _              <- Either.cond(tx.price.value >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
+        _ <- Either.cond(
+          tx.price.value <= buyOrderPrice,
+          (),
+          GenericError(s"exchange.price = $formatTxPrice should be <= buyOrder.price = ${formatOrderPrice(tx.buyOrder, buyOrderPrice)}")
+        )
+        _ <- Either.cond(
+          tx.price.value >= sellOrderPrice,
+          (),
+          GenericError(s"exchange.price = $formatTxPrice should be >= sellOrder.price = ${formatOrderPrice(tx.sellOrder, sellOrderPrice)}")
+        )
       } yield ()
     }
 
@@ -137,13 +165,12 @@ object ExchangeTransactionDiff {
       ).foldM(Portfolio())(_.combine(_))
 
     lazy val feeDiffE =
-      matcherPortfolioE.flatMap(
-        matcherPortfolio =>
-          Seq(
-            Map[Address, Portfolio](matcher -> matcherPortfolio),
-            Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-            Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
-          ).foldM(Map.empty[Address, Portfolio])(Diff.combine)
+      matcherPortfolioE.flatMap(matcherPortfolio =>
+        Seq(
+          Map[Address, Portfolio](matcher -> matcherPortfolio),
+          Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+          Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+        ).foldM(Map.empty[Address, Portfolio])(Diff.combine)
       )
 
     for {
@@ -255,4 +282,27 @@ object ExchangeTransactionDiff {
     */
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
+
+  private def checkOrderPkRecover(order: Order, blockchain: Blockchain): Either[GenericError, Unit] = {
+    order.orderAuthentication match {
+      case Eip712Signature(signature) =>
+        for {
+          _ <- Either.cond(
+            !(EthOrders.recoverEthSignerKeyBigInt(order, signature.arr).toByteArray.length < EthereumKeyLength) || blockchain.isFeatureActivated(
+              BlockchainFeatures.ConsensusImprovements
+            ),
+            (),
+            GenericError("Invalid public key for Ethereum orders")
+          )
+          sigData = EthOrders.decodeSignature(signature.arr)
+          v       = BigInt(1, sigData.getV)
+          _ <- Either.cond(
+            !(v == 0 || v == 1 || v > 28) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+            (),
+            GenericError("Invalid order signature format")
+          )
+        } yield ()
+      case _ => Right(())
+    }
+  }
 }

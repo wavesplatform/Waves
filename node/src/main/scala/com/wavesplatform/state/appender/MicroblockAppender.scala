@@ -5,8 +5,8 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
-import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.network.*
+import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
@@ -21,22 +21,26 @@ import monix.execution.Scheduler
 import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging {
+  private val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
+
   def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
       microBlock: MicroBlock
-  ): Task[Either[ValidationError, BlockId]] = {
-
-    Task(metrics.microblockProcessingTimeStats.measureSuccessful {
+  ): Task[Either[ValidationError, BlockId]] =
+    Task(microblockProcessingTimeStats.measureSuccessful {
       blockchainUpdater
         .processMicroBlock(microBlock, verify)
         .map { totalBlockId =>
-          if (microBlock.transactionData.nonEmpty) log.trace {
-            s"Removing mined txs from ${microBlock.stringRepr(totalBlockId)}: ${microBlock.transactionData.map(_.id()).mkString(", ")}"
+          if (microBlock.transactionData.nonEmpty) {
+            utxStorage.removeAll(microBlock.transactionData)
+            log.trace(
+              s"Removing txs of ${microBlock.stringRepr(totalBlockId)} ${microBlock.transactionData.map(_.id()).mkString("(", ", ", ")")} from UTX pool"
+            )
           }
-          utxStorage.removeAll(microBlock.transactionData)
+
+          utxStorage.scheduleCleanup()
           totalBlockId
         }
     }).executeOn(scheduler)
-  }
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -48,7 +52,7 @@ object MicroblockAppender extends ScorexLogging {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
-      _ <- EitherT(Task.now(microBlock.signaturesValid()))
+      _       <- EitherT(Task.now(microBlock.signaturesValid()))
       blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
     } yield blockId).value.map {
       case Right(blockId) =>
@@ -65,9 +69,5 @@ object MicroblockAppender extends ScorexLogging {
         val idOpt = md.invOpt.map(_.totalBlockId)
         log.debug(s"${id(ch)} Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ve")
     }
-  }
-
-  private[this] object metrics {
-    val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
   }
 }

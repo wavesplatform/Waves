@@ -43,13 +43,32 @@ object BlockDiffer {
       hitSource: ByteStr,
       verify: Boolean
   ): TracedResult[ValidationError, Result] = {
-    val stateHeight = blockchain.height
+    val stateHeight        = blockchain.height
+    val heightWithNewBlock = stateHeight + 1
 
     // height switch is next after activation
     val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    val minerReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
+    val addressRewardsE = for {
+      daoAddress        <- blockchain.settings.functionalitySettings.daoAddressParsed
+      xtnBuybackAddress <- blockchain.settings.functionalitySettings.xtnBuybackAddressParsed
+    } yield {
+      val blockRewardShares = BlockRewardCalculator.getBlockRewardShares(
+        heightWithNewBlock,
+        blockchain.lastBlockReward.getOrElse(0L),
+        daoAddress,
+        xtnBuybackAddress,
+        blockchain
+      )
+      (
+        Portfolio.waves(blockRewardShares.miner),
+        daoAddress.fold(Diff.empty)(addr => Diff(portfolios = Map(addr -> Portfolio.waves(blockRewardShares.daoAddress)).filter(_._2.balance > 0))),
+        xtnBuybackAddress.fold(Diff.empty)(addr =>
+          Diff(portfolios = Map(addr -> Portfolio.waves(blockRewardShares.xtnBuybackAddress)).filter(_._2.balance > 0))
+        )
+      )
+    }
 
     val feeFromPreviousBlockE =
       if (stateHeight >= sponsorshipHeight) {
@@ -64,7 +83,8 @@ object BlockDiffer {
             pf.minus(pf.multiply(CurrentBlockFeePart))
           }
           .foldM(Portfolio.empty)(_.combine(_))
-      } else
+      }
+      else
         Right(Portfolio.empty)
 
     val initialFeeFromThisBlockE =
@@ -74,19 +94,23 @@ object BlockDiffer {
       } else
         Right(Portfolio.empty)
 
-    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, blockchain.lastBlockReward)
     val initDiffE =
       for {
-        feeFromPreviousBlock    <- feeFromPreviousBlockE
-        initialFeeFromThisBlock <- initialFeeFromThisBlockE
-        totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
-        patches                 <- patchesDiff(blockchainWithNewBlock)
-        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(patches)
+        feeFromPreviousBlock                                 <- feeFromPreviousBlockE
+        initialFeeFromThisBlock                              <- initialFeeFromThisBlockE
+        (minerReward, daoAddressDiff, xtnBuybackAddressDiff) <- addressRewardsE
+        totalReward                                          <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
+        patches                                              <- patchesDiff(blockchainWithNewBlock)
+        configAddressesDiff                                  <- daoAddressDiff.combineF(xtnBuybackAddressDiff)
+        totalRewardDiff <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(configAddressesDiff)
+        resultDiff      <- totalRewardDiff.combineF(patches)
       } yield resultDiff
 
     for {
       _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       resultDiff <- TracedResult(initDiffE.leftMap(GenericError(_)))
+      _          <- TracedResult(BalanceDiffValidation(blockchainWithNewBlock)(resultDiff))
       r <- apply(
         blockchainWithNewBlock,
         constraint,
@@ -130,14 +154,14 @@ object BlockDiffer {
         constraint,
         prevBlockTimestamp,
         Diff.empty,
-        true,
+        hasNg = true,
         micro.transactionData,
-        verify
+        verify = verify
       )
     } yield r
   }
 
-  private def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
+  def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
     transactionFee match {
       case (ia: IssuedAsset, fee) if sponsorshipEnabled =>
         Waves -> Sponsorship.toWaves(fee, blockchain.assetDescription(ia).get.sponsorship)
@@ -206,11 +230,10 @@ object BlockDiffer {
 
   private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
     Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
-      .foldM(Diff.empty) {
-        case (prevDiff, patch) =>
-          patch
-            .lift(CompositeBlockchain(blockchain, prevDiff))
-            .fold(prevDiff.asRight[String])(prevDiff.combineF)
+      .foldM(Diff.empty) { case (prevDiff, patch) =>
+        patch
+          .lift(CompositeBlockchain(blockchain, prevDiff))
+          .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
   }
 }

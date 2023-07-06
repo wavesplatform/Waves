@@ -1,13 +1,15 @@
 package com.wavesplatform.state.diffs
 
 import cats.Order as _
-import com.wavesplatform.account.{Address, KeyPair, PrivateKey}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PrivateKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.history.Domain
+import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -24,19 +26,22 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
+import com.wavesplatform.transaction.TxValidationError.{AccountBalanceError, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals, Default as DefaultPriceMode}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.{TestValues, TestWallet, crypto}
 import org.scalatest.{EitherValues, Inside}
+import org.web3j.crypto.Bip32ECKeyPair
 
 import scala.util.{Random, Try}
 
-class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet {
+class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet with EthHelpers {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
@@ -57,6 +62,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   val fsWithBlockV5: FunctionalitySettings =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+
+  val fsWithRideV6: FunctionalitySettings =
+    fsWithBlockV5.copy(preActivatedFeatures = fsWithBlockV5.preActivatedFeatures + (BlockchainFeatures.RideV6.id -> 0))
 
   private val estimator = ScriptEstimatorV2
 
@@ -928,6 +936,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     BlockchainFeatures.FairPoS             -> 0
   )
 
+  private val RideV6 = DomainPresets.RideV6.blockchainSettings.functionalitySettings
+
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
@@ -980,25 +990,25 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   property("ExchangeTransactions invalid if buyer scripts fails") {
     for {
-      buyerScriptSrc  <- script("Order", false)
+      buyerScriptSrc  <- script("Order", false, complex = true)
       sellerScriptSrc <- script("Order", true)
       txScript        <- script("ExchangeTransaction", true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
   property("ExchangeTransactions invalid if seller scripts fails") {
     for {
       buyerScriptSrc  <- script("Order", true)
-      sellerScriptSrc <- script("Order", false)
+      sellerScriptSrc <- script("Order", false, complex = true)
       txScript        <- script("ExchangeTransaction", true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1006,11 +1016,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     for {
       buyerScriptSrc  <- script("Order", true)
       sellerScriptSrc <- script("Order", true)
-      txScript        <- script("ExchangeTransaction", false)
+      txScript        <- script("ExchangeTransaction", false, complex = true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1033,6 +1043,138 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
       assertLeft(preconBlocks, blockWithExchange, fsWithOrderFeature)("Proof doesn't validate as signature")
+    }
+  }
+
+  property("ExchangeTransaction invalid if exchange.price > buyOrder.price or exchange.price < sellOrder.price") {
+    val buyer   = TxHelpers.signer(1)
+    val seller  = TxHelpers.signer(2)
+    val matcher = TxHelpers.signer(3)
+
+    val genesis            = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+    val amountAssetIssueTx = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", decimals = 8, version = TxVersion.V1)
+    val priceAssetIssueTx  = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", decimals = 6, version = TxVersion.V1)
+    val baseBlocks         = Seq(TestBlock.create(genesis :+ priceAssetIssueTx :+ amountAssetIssueTx))
+
+    val amountAsset = Asset.IssuedAsset(amountAssetIssueTx.assetId)
+    val priceAsset  = Asset.IssuedAsset(priceAssetIssueTx.assetId)
+
+    def mkTestOrder(tpe: OrderType, price: Long, version: Int, priceMode: OrderPriceMode) = TxHelpers.order(
+      tpe,
+      amountAsset,
+      priceAsset,
+      price = price,
+      sender = buyer,
+      matcher = matcher,
+      version = version.toByte,
+      priceMode = priceMode
+    )
+
+    // decimalPrice = 12.5
+    val cases = {
+      val case1OldTxs = for {
+        txVersion <- 1 to 2
+        // See ExchangeTxValidator
+        ordersVersions = txVersion match {
+          case 1 => 1 to 1
+          case 2 => 1 to 3
+        }
+
+        buyOrderVersion  <- ordersVersions
+        sellOrderVersion <- ordersVersions
+
+        r <- Seq(
+          // normalizedPrice = decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals) = 12_500_000
+          (
+            txVersion,
+            12_500_000L,
+            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, OrderPriceMode.Default),
+            "exchange.price = 12_500_000 should be <= buyOrder.price = 12_400_000"
+          ),
+          (
+            txVersion,
+            12_500_000L,
+            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, OrderPriceMode.Default),
+            "exchange.price = 12_500_000 should be >= sellOrder.price = 12_600_000"
+          )
+        )
+      } yield r
+
+      val case1NewTxs = Seq(
+        // normalizedPrice = decimalPrice * 10^(priceAssetDecimals - amountAssetDecimals) = 15
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000 (assetDecimals price = 12_400_000)"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000 (assetDecimals price = 12_600_000)"
+        )
+      )
+
+      val case2 = Seq(
+        // normalizedPrice = decimalPrice * 10^8 = 1_250_000_000
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_240_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 1_260_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000"
+        )
+      )
+
+      val mixedCase = Seq(
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 2, OrderPriceMode.Default),
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000 (assetDecimals price = 12_400_000)"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000 (assetDecimals price = 12_600_000)"
+        )
+      )
+
+      Table(
+        ("txVersion", "txPrice", "buyOrder", "sellOrder", "expectedError"),
+        (case1OldTxs ++ case2 ++ case1NewTxs ++ mixedCase)*
+      )
+    }
+
+    forAll(cases) { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
+      val exchange = TxHelpers.exchangeFromOrders(
+        order1 = buyOrder,
+        order2 = sellOrder,
+        price = txPrice,
+        matcher = matcher,
+        version = txVersion.toByte,
+        fee = TestValues.fee,
+        chainId = AddressScheme.current.chainId
+      )
+
+      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithRideV6) { blockDiffEi =>
+        blockDiffEi should produce(expectedError)
+      }
     }
   }
 
@@ -1747,9 +1889,119 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  def script(caseType: String, v: Boolean): Seq[String] = Seq(true, false).map { full =>
+  property(
+    s"orders' ETH public keys with leading zeros and shortened byte representation are allowed only after ${BlockchainFeatures.ConsensusImprovements} activation"
+  ) {
+    val signer = Bip32ECKeyPair.generateKeyPair("i1".getBytes)
+    signer.getPublicKey.toByteArray.length shouldBe <(EthereumKeyLength)
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      Seq(AddrWithBalance(signer.toWavesAddress))
+    ) { d =>
+      val issue = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder = Order(
+        4.toByte,
+        OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64))),
+        defaultSigner.publicKey,
+        AssetPair(issue.asset, Waves),
+        OrderType.BUY,
+        TxExchangeAmount.unsafeFrom(1),
+        TxOrderPrice.unsafeFrom(1),
+        System.currentTimeMillis(),
+        System.currentTimeMillis() + 10000,
+        TxMatcherFee.unsafeFrom(0.003.waves)
+      )
+      val signedBuyOrder = buyOrder.copy(
+        orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(buyOrder, signer)))
+      )
+      val sellOrder = TxHelpers.order(OrderType.SELL, issue.asset, Waves, version = Order.V4)
+
+      val tx = TxHelpers.exchange(signedBuyOrder, sellOrder, version = TxVersion.V3)
+
+      d.appendBlock(issue)
+
+      d.appendAndCatchError(tx) shouldBe TransactionDiffer.TransactionValidationError(
+        GenericError("Invalid public key for Ethereum orders"),
+        tx
+      )
+      d.appendBlock()
+      d.appendAndAssertSucceed(tx)
+    }
+  }
+
+  property(s"orders' native public keys with leading zeros are allowed before and after ${BlockchainFeatures.ConsensusImprovements} activation") {
+    val signer = KeyPair("h0".getBytes)
+    signer.publicKey.arr.head shouldBe 0.toByte
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      AddrWithBalance.enoughBalances(signer)
+    ) { d =>
+      val issue     = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder  = () => TxHelpers.order(OrderType.BUY, issue.asset, Waves, sender = signer)
+      val sellOrder = () => TxHelpers.order(OrderType.SELL, issue.asset, Waves)
+
+      val tx = () => TxHelpers.exchange(buyOrder(), sellOrder())
+
+      d.appendBlock(issue)
+      d.appendAndAssertSucceed(tx())
+
+      d.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements) shouldBe false
+      d.appendBlock()
+      d.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements) shouldBe true
+
+      d.appendAndAssertSucceed(tx())
+    }
+  }
+
+  property(
+    s"correctly recover signer public key when v < 27 in orders' signature data only after ${BlockchainFeatures.ConsensusImprovements} activation"
+  ) {
+    val signer =
+      Bip32ECKeyPair.create(EthEncoding.toBytes("0x01db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"), Array.emptyByteArray)
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      Seq(AddrWithBalance(signer.toWavesAddress))
+    ) { d =>
+      val issue = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder = Order(
+        4.toByte,
+        OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64))),
+        defaultSigner.publicKey,
+        AssetPair(issue.asset, Waves),
+        OrderType.BUY,
+        TxExchangeAmount.unsafeFrom(1),
+        TxOrderPrice.unsafeFrom(1),
+        System.currentTimeMillis(),
+        System.currentTimeMillis() + 10000,
+        TxMatcherFee.unsafeFrom(0.003.waves)
+      )
+      val signature = EthOrders.signOrder(buyOrder, signer)
+      val v         = signature.last
+      val signedBuyOrder = buyOrder.copy(
+        orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(signature.init :+ (v - 27).toByte))
+      )
+      val sellOrder = TxHelpers.order(OrderType.SELL, issue.asset, Waves, version = Order.V4)
+
+      val tx = TxHelpers.exchange(signedBuyOrder, sellOrder, version = TxVersion.V3)
+
+      d.appendBlock(issue)
+
+      d.appendAndCatchError(tx) shouldBe TransactionDiffer.TransactionValidationError(
+        GenericError("Invalid order signature format"),
+        tx
+      )
+      d.appendBlock()
+      d.appendAndAssertSucceed(tx)
+    }
+  }
+
+  def script(caseType: String, v: Boolean, complex: Boolean = false): Seq[String] = Seq(true, false).map { full =>
     val expr =
       s"""
+         |  strict c = ${if (complex) (1 to 16).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"}
          |  match tx {
          |   case _: $caseType => $v
          |   case _ => ${!v}

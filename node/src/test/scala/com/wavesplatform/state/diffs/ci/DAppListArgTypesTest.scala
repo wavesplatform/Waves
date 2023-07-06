@@ -11,6 +11,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, *}
 import com.wavesplatform.lang.v1.compiler.{TestCompiler, Types}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -41,9 +42,9 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
   private def rideList(args: EVALUATED*) =
     List(ARR(Vector(args*), false).explicitGet())
 
-  property("can't pass list as callable argument before V4 activation") {
+  property("NODE-801. can't pass list as callable argument before V4 activation") {
     // precompiled to avoid compilation error
-    val callable = CallableFunction(CallableAnnotation("i"), FUNC("f", List("args"), REF("nil")))
+    val callable = CallableFunction(CallableAnnotation("i"), FUNC("f", List("args"), REF(GlobalValNames.Nil)))
     val v3DApp   = DApp(DAppMeta(), Nil, List(callable), None)
 
     val (preparingTxs, invoke, _) = preconditions(ContractScript(V3, v3DApp).explicitGet(), rideList())
@@ -55,7 +56,7 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
     }
   }
 
-  property("list as callable argument is allowed after V4 activation") {
+  property("NODE-800. list as callable argument is allowed after V4 activation") {
     val args = rideList(CONST_STRING("value1").explicitGet(), CONST_STRING("value2").explicitGet())
     val dApp =
       TestCompiler(V4).compileContract(
@@ -86,7 +87,7 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
        """.stripMargin
     )
 
-  property("list as callable argument is checked for primitives after V6 activation") {
+  property("NODE-241, NODE-243, NODE-244.list as callable argument is checked for primitives after V6 activation") {
     val settings =
       TestFunctionalitySettings.Enabled
         .copy(preActivatedFeatures = Map(Ride4DApps.id -> 0, BlockV5.id -> 0, SynchronousCalls.id -> 0, RideV6F.id -> 3))
@@ -126,7 +127,7 @@ class DAppListArgTypesTest extends PropSpec with WithDomain with Inside {
     assert(forbidAfterActivation = true, rideList(rideList().head))
   }
 
-  property("list of object as callable argument is forbidden by serialization") {
+    property("NODE-799. list of object as callable argument is forbidden by serialization") {
     val (_, invoke, _) = preconditions(dApp, rideList(CaseObj(Types.UNIT, Map())))
     (the[Throwable] thrownBy invoke()).getMessage should include("Serialization of value Unit is unsupported")
   }

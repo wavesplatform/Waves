@@ -92,7 +92,7 @@ class MicroBlockMinerImpl(
             )
           )
         log.trace(s"Finished pack for ${accumulatedBlock.id()}")
-        val updatedTotalConstraint = updatedMdConstraint.constraints.head
+        val updatedTotalConstraint = updatedMdConstraint.head
         cb.onSuccess(unconfirmed -> updatedTotalConstraint)
       }
       Task.eval {
@@ -118,7 +118,7 @@ class MicroBlockMinerImpl(
           (signedBlock, microBlock) = blocks
           blockId <- appendMicroBlock(microBlock)
           _ = BlockStats.mined(microBlock, blockId)
-          _       <- broadcastMicroBlock(account, microBlock, blockId)
+          _ <- broadcastMicroBlock(account, microBlock, blockId)
         } yield {
           if (updatedTotalConstraint.isFull) Stop
           else Success(signedBlock, updatedTotalConstraint)
@@ -130,7 +130,12 @@ class MicroBlockMinerImpl(
           Task.now(Stop)
         } else {
           log.trace("UTX is empty, waiting for new transactions")
-          transactionAdded.headL.map(_ => Retry)
+          Task
+            .race(
+              transactionAdded.headL.map(_ => Retry),
+              if (utx.size > 0) Task.now(Retry) else Task.never
+            )
+            .map(_.merge)
         }
     }
   }

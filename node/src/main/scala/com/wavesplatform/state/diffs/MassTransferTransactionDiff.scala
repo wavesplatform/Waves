@@ -25,7 +25,7 @@ object MassTransferTransactionDiff {
     }
     val portfoliosEi = tx.transfers.toList.traverse(parseTransfer)
 
-    portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
+    portfoliosEi.flatMap { (list: List[(Map[Address, Portfolio], Long)]) =>
       val sender   = Address.fromPublicKey(tx.sender)
       val foldInit = (Map[Address, Portfolio](sender -> Portfolio(-tx.fee.value)), 0L)
       list

@@ -104,13 +104,13 @@ class GrpcScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite with
         waitForTx = true
       )
       for (nth <- 0 until actionsLimit) {
-        val assetInfo = sender.stateChanges(tx.id)._2.issues(nth)
+        val assetInfo = miner.stateChanges(tx.id)._2.issues(nth)
         assetInfo.quantity shouldBe asset.quantity
         assetInfo.name shouldBe asset.name
         assetInfo.description shouldBe asset.description
         assetInfo.decimals shouldBe asset.decimals
         assetInfo.isReissuable shouldBe asset.reissuable
-        sender.assertAssetBalance(acc.toAddress.toString, assetInfo.assetId, asset.quantity)
+        miner.assertAssetBalance(acc.toAddress.toString, assetInfo.assetId, asset.quantity)
       }
     }
 

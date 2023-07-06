@@ -4,23 +4,23 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
-import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.protobuf.{Amount, _}
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
+import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.lang.v1.traits.domain.*
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument.Value
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.state.{InvokeScriptResult => R}
+import com.wavesplatform.protobuf.{Amount, *}
+import com.wavesplatform.state.InvokeScriptResult as R
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.utils._
-import play.api.libs.json._
-import PBInvokeScriptResult.Call.Argument
-import PBInvokeScriptResult.Call.Argument.Value
-import com.wavesplatform.lang.v1.serialization.SerdeV1
-import com.wavesplatform.lang.v1.compiler.{Terms, Types}
+import com.wavesplatform.utils.*
+import play.api.libs.json.*
 
 final case class InvokeScriptResult(
     data: Seq[R.DataEntry] = Nil,
@@ -42,13 +42,13 @@ object InvokeScriptResult {
   type Issue       = com.wavesplatform.lang.v1.traits.domain.Issue
   type Reissue     = com.wavesplatform.lang.v1.traits.domain.Reissue
   type Burn        = com.wavesplatform.lang.v1.traits.domain.Burn
-  type DataEntry   = com.wavesplatform.state.DataEntry[_]
+  type DataEntry   = com.wavesplatform.state.DataEntry[?]
 
   val empty = InvokeScriptResult()
 
   final case class AttachedPayment(assetId: Asset, amount: Long)
   object AttachedPayment {
-    implicit val attachedPaymentWrites = Json.writes[AttachedPayment]
+    implicit val attachedPaymentWrites: OWrites[AttachedPayment] = Json.writes[AttachedPayment]
 
     def fromInvokePaymentList(ps: Seq[InvokeScriptTransaction.Payment]): Seq[AttachedPayment] =
       ps.map(p => AttachedPayment(p.assetId, p.amount))
@@ -56,7 +56,7 @@ object InvokeScriptResult {
 
   final case class Call(function: String, args: Seq[EVALUATED])
   object Call {
-    implicit val callWrites = Json.writes[Call]
+    implicit val callWrites: OWrites[Call] = Json.writes[Call]
 
     def fromFunctionCall(fc: FUNCTION_CALL): Call = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
   }
@@ -72,17 +72,17 @@ object InvokeScriptResult {
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
-    implicit val jsonWrites = Json.writes[Payment]
+    implicit val jsonWrites: OWrites[Payment] = Json.writes[Payment]
   }
 
   case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, id: ByteStr)
   object Lease {
-    implicit val recipientWrites = Writes[AddressOrAlias] {
+    implicit val recipientWrites: Writes[AddressOrAlias] = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
       case alias: Alias     => JsString(alias.toString)
       case _                => JsNull
     }
-    implicit val jsonWrites = Json.writes[Lease]
+    implicit val jsonWrites: OWrites[Lease] = Json.writes[Lease]
   }
 
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
@@ -91,7 +91,7 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
-  implicit val issueFormat = Writes[Issue] { iss =>
+  implicit val issueFormat: Writes[Issue] = Writes[Issue] { iss =>
     Json.obj(
       "assetId"        -> iss.id,
       "name"           -> iss.name,
@@ -103,11 +103,11 @@ object InvokeScriptResult {
       "nonce"          -> iss.nonce
     )
   }
-  implicit val reissueFormat      = Json.writes[Reissue]
-  implicit val burnFormat         = Json.writes[Burn]
-  implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
-  implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
-  implicit val errorMessageFormat = Json.writes[ErrorMessage]
+  implicit val reissueFormat: OWrites[Reissue]           = Json.writes[Reissue]
+  implicit val burnFormat: OWrites[Burn]                 = Json.writes[Burn]
+  implicit val sponsorFeeFormat: OWrites[SponsorFee]     = Json.writes[SponsorFee]
+  implicit val leaseCancelFormat: OWrites[LeaseCancel]   = Json.writes[LeaseCancel]
+  implicit val errorMessageFormat: OWrites[ErrorMessage] = Json.writes[ErrorMessage]
   implicit val invocationFormat: Writes[Invocation] = (i: Invocation) =>
     Json.obj(
       "dApp"         -> i.dApp.toString,
@@ -115,9 +115,9 @@ object InvokeScriptResult {
       "payment"      -> i.payments,
       "stateChanges" -> jsonFormat.writes(i.stateChanges)
     )
-  implicit val jsonFormat = Json.writes[InvokeScriptResult]
+  implicit val jsonFormat: OWrites[InvokeScriptResult] = Json.writes[InvokeScriptResult]
 
-  implicit val monoid = new Monoid[InvokeScriptResult] {
+  implicit val monoid: Monoid[InvokeScriptResult] = new Monoid[InvokeScriptResult] {
     override val empty: InvokeScriptResult =
       InvokeScriptResult.this.empty
 
@@ -138,7 +138,7 @@ object InvokeScriptResult {
   }
 
   def toBytes(isr: InvokeScriptResult): Array[Byte] = {
-    val pbValue = this.toPB(isr)
+    val pbValue = this.toPB(isr, addressForTransfer = false)
     PBUtils.encodeDeterministic(pbValue)
   }
 
@@ -147,16 +147,16 @@ object InvokeScriptResult {
     fromPB(pbValue)
   }
 
-  def toPB(isr: InvokeScriptResult): PBInvokeScriptResult = {
+  def toPB(isr: InvokeScriptResult, addressForTransfer: Boolean): PBInvokeScriptResult = {
     PBInvokeScriptResult(
       isr.data.map(PBTransactions.toPBDataEntry),
-      isr.transfers.map(
-        payment =>
-          PBInvokeScriptResult.Payment(
-            ByteString.copyFrom(PBRecipients.publicKeyHash(payment.address)),
-            Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
-          )
-      ),
+      isr.transfers.map { payment =>
+        val sender = if (addressForTransfer) payment.address.bytes else PBRecipients.publicKeyHash(payment.address)
+        PBInvokeScriptResult.Payment(
+          ByteString.copyFrom(sender),
+          Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
+        )
+      },
       isr.issues.map(toPbIssue),
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn),
@@ -164,12 +164,12 @@ object InvokeScriptResult {
       isr.sponsorFees.map(toPbSponsorFee),
       isr.leases.map(toPbLease),
       isr.leaseCancels.map(toPbLeaseCancel),
-      isr.invokes.map(toPbInvocation)
+      isr.invokes.map(toPbInvocation(_, addressForTransfer))
     )
   }
 
   def fromLangResult(invokeId: ByteStr, result: ScriptResult): InvokeScriptResult = {
-    import com.wavesplatform.lang.v1.traits.{domain => lang}
+    import com.wavesplatform.lang.v1.traits.domain as lang
 
     def langAddressToAddress(a: lang.Recipient.Address): Address =
       Address.fromBytes(a.bytes.arr).explicitGet()
@@ -186,28 +186,26 @@ object InvokeScriptResult {
 
       case ScriptResultV4(actions, _, _) =>
         // XXX need return value processing
-        val issues       = actions.collect { case i: lang.Issue         => i }
-        val reissues     = actions.collect { case ri: lang.Reissue      => ri }
-        val burns        = actions.collect { case b: lang.Burn          => b }
-        val sponsorFees  = actions.collect { case sf: lang.SponsorFee   => sf }
-        val dataOps      = actions.collect { case d: lang.DataOp        => DataEntry.fromLangDataOp(d) }
+        val issues       = actions.collect { case i: lang.Issue => i }
+        val reissues     = actions.collect { case ri: lang.Reissue => ri }
+        val burns        = actions.collect { case b: lang.Burn => b }
+        val sponsorFees  = actions.collect { case sf: lang.SponsorFee => sf }
+        val dataOps      = actions.collect { case d: lang.DataOp => DataEntry.fromLangDataOp(d) }
         val transfers    = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
-        val leases       = actions.collect { case l: lang.Lease         => langLeaseToLease(l) }
-        val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
-        val invokes = result.invokes.map {
-          case (dApp, fname, args, payments, r) =>
-            Invocation(
-              langAddressToAddress(dApp),
-              Call(fname, args),
-              payments.map {
-                case CaseObj(_, fields) =>
-                  ((fields("assetId"), fields("amount")): @unchecked) match {
-                    case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
-                    case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
-                  }
-              },
-              fromLangResult(invokeId, r)
-            )
+        val leases       = actions.collect { case l: lang.Lease => langLeaseToLease(l) }
+        val leaseCancels = actions.collect { case l: lang.LeaseCancel => l }
+        val invokes = result.invokes.map { case (dApp, fname, args, payments, r) =>
+          Invocation(
+            langAddressToAddress(dApp),
+            Call(fname, args),
+            payments.map { case CaseObj(_, fields) =>
+              ((fields("assetId"), fields("amount")): @unchecked) match {
+                case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
+                case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
+              }
+            },
+            fromLangResult(invokeId, r)
+          )
         }
         InvokeScriptResult(dataOps, transfers, issues, reissues, burns, sponsorFees, leases, leaseCancels, invokes)
 
@@ -215,7 +213,7 @@ object InvokeScriptResult {
     }
   }
 
-  import com.wavesplatform.protobuf.transaction.{InvokeScriptResult => PBISR}
+  import com.wavesplatform.protobuf.transaction.InvokeScriptResult as PBISR
 
   def rideExprToPB(arg: Terms.EXPR): PBISR.Call.Argument.Value = {
     import PBISR.Call.Argument.Value
@@ -236,12 +234,12 @@ object InvokeScriptResult {
     PBInvokeScriptResult.Call(c.function, args = c.args.map(a => PBISR.Call.Argument(rideExprToPB(a))))
   }
 
-  private def toPbInvocation(i: Invocation) = {
+  private def toPbInvocation(i: Invocation, addressForTransfer: Boolean) = {
     PBInvokeScriptResult.Invocation(
       ByteString.copyFrom(i.dApp.bytes),
       Some(toPbCall(i.call)),
       i.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
-      Some(toPB(i.stateChanges))
+      Some(toPB(i.stateChanges, addressForTransfer))
     )
   }
 
@@ -299,7 +297,8 @@ object InvokeScriptResult {
     val args = if (i.argsBytes.nonEmpty) i.argsBytes.map { bytes =>
       val (value, _) = SerdeV1.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()
       value.asInstanceOf[EVALUATED]
-    } else i.args.map(a => toVanillaTerm(a.value))
+    }
+    else i.args.map(a => toVanillaTerm(a.value))
     Call(i.function, args)
   }
 

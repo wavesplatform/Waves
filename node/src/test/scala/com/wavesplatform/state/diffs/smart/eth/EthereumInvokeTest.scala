@@ -11,6 +11,7 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -21,7 +22,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{EthABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
@@ -55,7 +56,8 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
        | let feeAssetId = t.feeAssetId == unit
        | let checkFunc  = t.function == "default"
        | let checkArgs  = t.args == [$passingArg]
-       | let payments   = ${if (version > V3) s"t.payments == [$payments]" else s"t.payment == ${if (payments.nonEmpty) payments else "unit"}"}
+       | let payments   = ${if (version > V3) s"t.payments == [$payments]"
+    else s"t.payment == ${if (payments.nonEmpty) payments else GlobalValNames.Unit}"}
        | ${assertProvenPart("t", proofs = false)} && dAppAddress && feeAssetId && checkFunc && checkArgs && payments && checkId
      """.stripMargin
   }
@@ -69,7 +71,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
          |   ${if (syncCall) s""" strict r = invoke(Address(base58'$dAppAddress'), "default", [], []) """ else ""}
          |   let check =
          |     value == $passingArg &&
-         |     ${if (version > V3) s"i.payments == [$payments]" else s"i.payment == ${if (payments.nonEmpty) payments else "unit"}"}
+         |     ${if (version > V3) s"i.payments == [$payments]" else s"i.payment == ${if (payments.nonEmpty) payments else GlobalValNames.Unit}"}
          |
          |   ${if (version > V3) """[ BooleanEntry("check", check) ]""" else """ WriteSet([DataEntry("check", check)]) """}
          | }
@@ -96,8 +98,8 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
     )
 
   private def hexData(script: Script, assets: Seq[IssuedAsset]) = {
-    val signature = ABIConverter(script).funcByMethodId.collectFirst { case (_, f) if f.name == "default" => f }.get
-    val args      = new Tuple(passingArg, Array[Tuple](assets.map(a => new Tuple(a.id.arr, paymentAmount))*))
+    val signature = EthABIConverter(script).funcByMethodId.collectFirst { case (_, f) if f.name == "default" => f }.get
+    val args      = Tuple.of(passingArg, Array[Tuple](assets.map(a => Tuple.of(a.id.arr, paymentAmount))*))
     val call      = new Function(signature.ethSignature).encodeCall(args).array()
     FastHex.encodeToString(call, 0, call.length)
   }
@@ -140,7 +142,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
 
   private def assert(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean = false) = {
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
-    withDomain(RideV6) { d =>
+    withDomain(BlockRewardDistribution) { d =>
       d.appendBlock(preparingTxs*)
       d.appendBlock(ethInvoke)
 

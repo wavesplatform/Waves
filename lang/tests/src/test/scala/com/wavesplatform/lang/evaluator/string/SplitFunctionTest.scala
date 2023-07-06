@@ -215,4 +215,14 @@ class SplitFunctionTest extends EvaluatorSpec {
       eval(str(f, limit))(V6) shouldBe a[Right[?, ?]]
     }
   }
+
+  property("OOP style function family call") {
+    eval(""" "a.a.a.".split_4C(".") """)(V6).map(_.toString) shouldBe Right("""["a", "a", "a", ""]""")
+    eval(
+      """
+        | let str = "a.a.a."
+        | str.split_4C(".")
+      """.stripMargin
+    )(V6).map(_.toString) shouldBe Right("""["a", "a", "a", ""]""")
+  }
 }

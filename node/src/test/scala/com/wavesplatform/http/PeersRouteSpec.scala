@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.ConcurrentHashMap
-
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.PeersApiRoute
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
@@ -11,6 +10,8 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
+
+import scala.concurrent.duration.{Duration, DurationInt}
 
 class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks with MockFactory {
 
@@ -30,6 +31,8 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     patch <- Gen.chooseNum(0, 3)
   } yield (major, minor, patch)
 
+  private implicit val timeout: Duration = 2.seconds
+
   private def genListOf[A](maxLength: Int, src: Gen[A]) = Gen.chooseNum(0, maxLength).flatMap(n => Gen.listOfN(n, src))
 
   routePath("/connected") in {
@@ -42,7 +45,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       applicationVersion <- versionGen
     } yield PeerInfo(remoteAddress, declaredAddress, applicationName, applicationVersion, nodeName, nodeNonce)
 
-    forAll(genListOf(TestsCount, gen)) { l: List[PeerInfo] =>
+    forAll(genListOf(TestsCount, gen)) { (l: List[PeerInfo]) =>
       val connections = new ConcurrentHashMap[Channel, PeerInfo]()
       val route       = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, connections).route
       l.foreach(i => connections.put(mock[Channel], i))

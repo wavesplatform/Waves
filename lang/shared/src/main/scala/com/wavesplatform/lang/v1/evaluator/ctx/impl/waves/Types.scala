@@ -40,11 +40,9 @@ object Types {
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
-    ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil)
+    ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil) :::
+      (if (version >= V7) List("rewards" -> LIST(TUPLE(List(addressType, LONG)))) else Nil)
   )
-
-  def optionAsset(version: StdLibVersion): UNIONLIKE =
-    UNION(assetType(version), UNIT)
 
   val transfer: CASETYPEREF = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
