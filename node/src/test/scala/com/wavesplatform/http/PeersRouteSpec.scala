@@ -45,7 +45,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       applicationVersion <- versionGen
     } yield PeerInfo(remoteAddress, declaredAddress, applicationName, applicationVersion, nodeName, nodeNonce)
 
-    forAll(genListOf(TestsCount, gen)) { l: List[PeerInfo] =>
+    forAll(genListOf(TestsCount, gen)) { (l: List[PeerInfo]) =>
       val connections = new ConcurrentHashMap[Channel, PeerInfo]()
       val route       = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, connections).route
       l.foreach(i => connections.put(mock[Channel], i))

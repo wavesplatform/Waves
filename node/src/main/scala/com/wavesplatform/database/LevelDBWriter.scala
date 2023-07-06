@@ -907,9 +907,9 @@ abstract class LevelDBWriter private[database] (
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val toHeigth = to.flatMap(this.heightOf).getOrElse(this.height)
-      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
-      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
+      val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
+      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeight)
+      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
       for {
         (wh, lh) <- merge(wbh, lbh)
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
