@@ -110,6 +110,7 @@ object BlockDiffer {
     for {
       _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       resultDiff <- TracedResult(initDiffE.leftMap(GenericError(_)))
+      _          <- TracedResult(BalanceDiffValidation(blockchainWithNewBlock)(resultDiff))
       r <- apply(
         blockchainWithNewBlock,
         constraint,
