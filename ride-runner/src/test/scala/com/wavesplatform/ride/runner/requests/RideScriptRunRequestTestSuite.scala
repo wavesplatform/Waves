@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.requests
 
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsSuccess, Json}
 
 class RideScriptRunRequestTestSuite extends BaseTestSuite with HasTestAccounts {
   private val expected = RideScriptRunRequest(
@@ -15,9 +15,11 @@ class RideScriptRunRequestTestSuite extends BaseTestSuite with HasTestAccounts {
     "Reads" - {
       "Tuple format" in {
         withClue(expected.detailedLogPrefix) {
-          Json.parse(s"""["$aliceAddr", { "foo": 1 }]""").validate[RideScriptRunRequest].get shouldBe expected.copy(
-            trace = false,
-            intAsString = false
+          Json.parse(s"""["$aliceAddr", { "foo": 1 }]""").validate[RideScriptRunRequest] shouldBe JsSuccess(
+            expected.copy(
+              trace = false,
+              intAsString = false
+            )
           )
         }
       }
@@ -32,8 +34,7 @@ class RideScriptRunRequestTestSuite extends BaseTestSuite with HasTestAccounts {
                         | "trace": true,
                         | "intAsString": true
                         |}""".stripMargin)
-              .validate[RideScriptRunRequest]
-              .get shouldBe expected
+              .validate[RideScriptRunRequest] shouldBe JsSuccess(expected)
           }
         }
 
@@ -45,8 +46,7 @@ class RideScriptRunRequestTestSuite extends BaseTestSuite with HasTestAccounts {
                         | "requestBody": { "foo": 1 },
                         | "intAsString": true
                         |}""".stripMargin)
-              .validate[RideScriptRunRequest]
-              .get shouldBe expected.copy(trace = false)
+              .validate[RideScriptRunRequest] shouldBe JsSuccess(expected.copy(trace = false))
           }
         }
 
@@ -58,8 +58,7 @@ class RideScriptRunRequestTestSuite extends BaseTestSuite with HasTestAccounts {
                         | "requestBody": { "foo": 1 },
                         | "trace": true
                         |}""".stripMargin)
-              .validate[RideScriptRunRequest]
-              .get shouldBe expected.copy(intAsString = false)
+              .validate[RideScriptRunRequest] shouldBe JsSuccess(expected.copy(intAsString = false))
           }
         }
       }

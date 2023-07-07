@@ -4,18 +4,18 @@ import cats.implicits.{toBifunctorOps, toTraverseOps}
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.requests.InvokeScriptRequest
 import com.wavesplatform.api.http.requests.InvokeScriptRequest.FunctionCallPart
-import com.wavesplatform.api.http.utils.UtilsInvocationRequest.empty32Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address as RideAddress
+import com.wavesplatform.state.BlockchainOverrides
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.AttachedPaymentExtractor
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{TransactionType, smart}
-import play.api.libs.json.{Json, Reads}
+import play.api.libs.json.*
 
 case class UtilsInvocationRequest(
     call: FunctionCallPart = FunctionCallPart("default", Nil),
@@ -24,8 +24,9 @@ case class UtilsInvocationRequest(
     feeAssetId: Option[String] = None,
     sender: Option[String] = None,
     senderPublicKey: String = ByteStr(empty32Bytes).toString,
-    payment: Seq[Payment] = Nil
-) {
+    payment: Seq[Payment] = Nil,
+    state: Option[BlockchainOverrides] = None
+) extends UtilsEvaluationRequest {
   def toInvocation: Either[ValidationError, Invocation] =
     for {
       senderPK <- PublicKey.fromBase58String(senderPublicKey)
@@ -49,7 +50,5 @@ case class UtilsInvocationRequest(
 }
 
 object UtilsInvocationRequest {
-  private val empty32Bytes = new Array[Byte](32)
-
   implicit val reads: Reads[UtilsInvocationRequest] = Json.using[Json.WithDefaultValues].reads[UtilsInvocationRequest]
 }

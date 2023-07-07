@@ -26,6 +26,7 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestSettings
@@ -100,7 +101,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             User("DataEntry"),
             List(CONST_STRING("argument").explicitGet(), CONST_STRING("abcde" * 1024).explicitGet())
           ),
-          REF("nil")
+          REF(GlobalValNames.Nil)
         )
       else if (emptyData)
         List(
@@ -108,7 +109,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             User("DataEntry"),
             List(CONST_STRING("").explicitGet(), CONST_STRING("abcde").explicitGet())
           ),
-          REF("nil")
+          REF(GlobalValNames.Nil)
         )
       else
         List(
@@ -117,7 +118,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             Native(1100),
             List(
               FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("sender").explicitGet(), GETTER(GETTER(REF("i"), "caller"), "bytes"))),
-              REF("nil")
+              REF(GlobalValNames.Nil)
             )
           )
         )
@@ -164,12 +165,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         List(
           FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(ByteStr(recipientAddress.bytes)).explicitGet())),
           CONST_LONG(recipientAmount),
-          a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
+          a.fold(REF(GlobalValNames.Unit): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
         )
       )
     )
 
-    val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) { case (elem, tail) =>
+    val payments: EXPR = transfers.foldRight(REF(GlobalValNames.Nil): EXPR) { case (elem, tail) =>
       FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
     }
 
@@ -204,12 +205,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             case recipientAddress: Alias   => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
           },
           CONST_LONG(amount),
-          a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
+          a.fold(REF(GlobalValNames.Unit): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
         )
       )
     )
 
-    val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) { case (elem, tail) =>
+    val payments: EXPR = transfers.foldRight(REF(GlobalValNames.Nil): EXPR) { case (elem, tail) =>
       FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
     }
 
@@ -909,7 +910,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
       if (version == V3)
         d.appendBlockE(ci) should produce(error)
-      else if (version == V6) {
+      else if (version >= V6) {
         d.appendBlockE(ci) should produceRejectOrFailedDiff(error)
       } else {
         d.appendBlock(ci)
@@ -942,7 +943,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       if (version == V3) {
         d.appendBlock(setScript, ci)
         d.liquidDiff.errorMessage(ci.id()) shouldBe None
-      } else if (version == V6) {
+      } else if (version >= V6) {
         d.appendBlockE(setScript, ci) should produceRejectOrFailedDiff("Data entry key should not be empty")
       } else {
         d.appendBlock(setScript, ci)
@@ -1555,12 +1556,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         List(
           FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(ByteStr(recipientAddress.bytes)).explicitGet())),
           CONST_LONG(recipientAmount),
-          a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
+          a.fold(REF(GlobalValNames.Unit): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
         )
       )
     )
 
-    val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) { case (elem, tail) =>
+    val payments: EXPR = transfers.foldRight(REF(GlobalValNames.Nil): EXPR) { case (elem, tail) =>
       FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
     }
 
@@ -1599,12 +1600,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             case recipientAddress: Alias   => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
           },
           CONST_LONG(recipientAmount),
-          a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
+          a.fold(REF(GlobalValNames.Unit): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
         )
       )
     )
 
-    val payments: EXPR = transfers.foldRight(REF("nil"): EXPR) { case (elem, tail) =>
+    val payments: EXPR = transfers.foldRight(REF(GlobalValNames.Nil): EXPR) { case (elem, tail) =>
       FUNCTION_CALL(Native(CREATE_LIST), List(elem, tail))
     }
 

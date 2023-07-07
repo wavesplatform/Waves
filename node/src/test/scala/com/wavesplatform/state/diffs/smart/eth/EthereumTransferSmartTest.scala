@@ -7,6 +7,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
@@ -32,7 +33,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     TestCompiler(version).compileExpression(
       s"""
          | let t = $getTx(base58'${tx.id()}').${if (version >= V3) "value" else "extract"}()
-         | ${if (version >= V3) checkEthTransfer(tx, Some(asset.fold("unit")(id => s"base58'$id'")), recipient) else "t == t"}
+         | ${if (version >= V3) checkEthTransfer(tx, Some(asset.fold(GlobalValNames.Unit)(id => s"base58'$id'")), recipient) else "t == t"}
        """.stripMargin
     )
 
@@ -75,7 +76,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val asset = IssuedAsset(issue.id())
 
     for {
-      version <- DirectiveDictionary[StdLibVersion].all
+      version <- DirectiveDictionary[StdLibVersion].all.init
       token   <- Seq(None, Some(ERC20Address(asset.id.take(20))))
     } {
       val transfer    = EthereumTransaction.Transfer(token, transferAmount, recipient.toAddress)
@@ -126,7 +127,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val genesis1 = TxHelpers.genesis(ethSender, ENOUGH_AMT)
     val genesis2 = TxHelpers.genesis(recipient.toAddress, ENOUGH_AMT)
 
-    DirectiveDictionary[StdLibVersion].all
+    DirectiveDictionary[StdLibVersion].all.init
       .foreach { version =>
         val script      = assetScript(version, dummyEthTransfer, recipient.toAddress)
         val issue       = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, Some(script), 1.waves, ts).explicitGet()

@@ -6,8 +6,6 @@ import cats.syntax.either.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
-import com.wavesplatform.api.http.requests.byteStrFormat
-import com.wavesplatform.api.http.utils.UtilsApiRoute.{DefaultAddress, DefaultPublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider.*
@@ -19,8 +17,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, Log, ScriptResult}
-import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -30,24 +28,25 @@ import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, InvokeScriptResult, Portfolio}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, InvokeScriptResult, OverriddenBlockchain, Portfolio}
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import com.wavesplatform.transaction.{Asset, TransactionType}
 import monix.eval.Coeval
 import play.api.libs.json.*
-import shapeless.Coproduct
+import shapeless.*
 
 import scala.util.control.NoStackTrace
 
 object UtilsEvaluator {
   def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
     ExpressionCompiler
-      .compileUntyped(str, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
+      .compileUntyped(str, NoLibraries, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
       .leftMap(GenericError(_))
 
   def toInvokeScriptLike(invocation: Invocation, dAppAddress: Address) =
@@ -85,41 +84,6 @@ object UtilsEvaluator {
   object ConflictingRequestStructure        extends ValidationError
   case class ParseJsonError(error: JsError) extends ValidationError
 
-  sealed trait Evaluation extends Product with Serializable {
-    def txLike: InvokeScriptTransactionLike
-    def dAppToExpr(dApp: DApp, script: Script): Either[ValidationError, EXPR]
-  }
-
-  object Evaluation {
-    def apply(scriptInfo: AccountScriptInfo, address: Address, request: JsObject): Either[ValidationError, Evaluation] =
-      apply(scriptInfo.script.stdLibVersion, address, request)
-
-    def apply(stdLibVersion: StdLibVersion, address: Address, request: JsObject): Either[ValidationError, Evaluation] = {
-      (request.value.get("expr"), request.validate[UtilsInvocationRequest]) match {
-        case (Some(_), JsSuccess(_, _)) if request.fields.size > 1 => Left(ConflictingRequestStructure)
-        case (Some(exprRequest), _) =>
-          parseCall(exprRequest, stdLibVersion).map { expr =>
-            ExprEvaluation(expr, UtilsEvaluator.emptyInvokeScriptLike(address))
-          }
-        case (None, JsSuccess(invocationRequest, _)) =>
-          invocationRequest.toInvocation.map { invocation =>
-            InvocationEvaluation(invocation, UtilsEvaluator.toInvokeScriptLike(invocation, address))
-          }
-        case (None, e: JsError) => Left(ParseJsonError(e))
-      }
-    }
-  }
-
-  case class ExprEvaluation(expr: Terms.EXPR, txLike: InvokeScriptTransactionLike) extends Evaluation {
-    def dAppToExpr(dApp: DApp, script: Script): Either[ValidationError, EXPR] =
-      Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey))
-  }
-
-  case class InvocationEvaluation(invocation: ContractEvaluator.Invocation, txLike: InvokeScriptTransactionLike) extends Evaluation {
-    def dAppToExpr(dApp: DApp, script: Script): Either[ValidationError, EXPR] =
-      ContractEvaluator.buildExprFromInvocation(dApp, invocation, script.stdLibVersion).bimap(e => GenericError(e.message), _.expr)
-  }
-
   def evaluate(
       evaluateScriptComplexityLimit: Int,
       blockchain: Blockchain,
@@ -130,23 +94,38 @@ object UtilsEvaluator {
       intAsString: Boolean,
       wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
   ): JsObject = {
-    val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
-    val evaluation = Evaluation(scriptInfo, address, request)
-    evaluation match {
-      case Left(e) => validationErrorToJson(e, maxTxErrorLogSize)
-      case Right(evaluation) =>
-        evaluate(
-          evaluateScriptComplexityLimit,
-          blockchain,
-          scriptInfo,
-          evaluation,
-          address,
-          trace,
-          maxTxErrorLogSize,
-          intAsString,
-          wrapDAppEnv
-        )
-    }
+    val r: Either[ValidationError, JsObject] = for {
+      evRequest <- parseEvaluateRequest(request)
+      overridden = evRequest.state.foldLeft(blockchain)(new OverriddenBlockchain(_, _))
+      scriptInfo <- overridden.accountScript(address) match {
+        case Some(x) => x.asRight
+        case None    => GenericError(s"There is no script on '$address'").asLeft
+      }
+      evaluation <- evRequest match {
+        case evRequest: UtilsExprRequest =>
+          evRequest.parseCall(scriptInfo.script.stdLibVersion).map { expr =>
+            ExprEvaluation(expr, UtilsEvaluator.emptyInvokeScriptLike(address))
+          }
+        case evRequest: UtilsInvocationRequest =>
+          evRequest.toInvocation.map { invocation =>
+            InvocationEvaluation(invocation, UtilsEvaluator.toInvokeScriptLike(invocation, address))
+          }
+
+        case _ => throw new RuntimeException("Impossible")
+      }
+    } yield evaluate(
+      evaluateScriptComplexityLimit,
+      overridden,
+      scriptInfo,
+      evaluation,
+      address,
+      trace,
+      maxTxErrorLogSize,
+      intAsString,
+      wrapDAppEnv
+    )
+
+    r.leftMap(validationErrorToJson(_, maxTxErrorLogSize)).merge
   }
 
   def evaluate(
@@ -212,6 +191,7 @@ object UtilsEvaluator {
           blockchain,
           Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
           ds,
+          script.stdLibVersion,
           invoke,
           dAppAddress,
           dAppPk,
@@ -219,12 +199,14 @@ object UtilsEvaluator {
           limitedExecution = false,
           limit,
           remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-          availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
-          availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
-          availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
+          availableActions = ActionLimits(
+            ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
+            ContractLimits.MaxBalanceScriptActionsAmountV6,
+            ContractLimits.MaxAssetScriptActionsAmountV6,
+            ContractLimits.MaxWriteSetSize,
+            ContractLimits.MaxTotalWriteSetSizeInBytes
+          ),
           availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
-          availableData = ContractLimits.MaxWriteSetSize,
-          availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
           currentDiff = paymentsDiff,
           invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil)),
           wrapDAppEnv = wrapDAppEnv
@@ -259,6 +241,7 @@ object UtilsEvaluator {
               .processActions(
                 StructuredCallableActions(r.actions, blockchain),
                 ds.stdLibVersion,
+                script.stdLibVersion,
                 dAppAddress,
                 dAppPk,
                 usedComplexity,
@@ -286,18 +269,4 @@ object UtilsEvaluator {
       diff
     else
       diff.combineE(Diff(Map(UtilsApiRoute.DefaultAddress -> Portfolio.waves(Long.MaxValue / 10)))).explicitGet()
-
-  def parseCall(js: JsReadable, version: StdLibVersion): Either[GenericError, EXPR] = {
-    val binaryCall = js
-      .asOpt[ByteStr]
-      .toRight(GenericError("Unable to parse expr bytes"))
-      .flatMap(bytes => SerdeV1.deserialize(bytes.arr).bimap(GenericError(_), _._1))
-
-    val textCall = js
-      .asOpt[String]
-      .toRight(GenericError("Unable to read expr string"))
-      .flatMap(UtilsEvaluator.compile(version))
-
-    binaryCall.orElse(textCall)
-  }
 }

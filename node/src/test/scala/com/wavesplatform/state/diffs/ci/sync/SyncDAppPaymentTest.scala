@@ -9,6 +9,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
@@ -331,7 +332,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
          | @Callable(i)
          | func default() = {
          |   ${sigVerify(bigComplexity)}
-         |   let asset = ${asset.fold("unit")(a => s"base58'$a'")}
+         |   let asset = ${asset.fold(GlobalValNames.Unit)(a => s"base58'$a'")}
          |   strict r = Address(base58'$dApp').invoke("default", [], [AttachedPayment(asset, $amount)])
          |   []
          | }

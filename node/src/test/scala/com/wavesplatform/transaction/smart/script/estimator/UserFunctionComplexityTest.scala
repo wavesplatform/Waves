@@ -4,12 +4,12 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
@@ -218,7 +218,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
     est(exprUNot).explicitGet() shouldBe 2
 
     val exprDataByIndex = LET_BLOCK(
-      LET("arr", FUNCTION_CALL(PureContext.listConstructor(checkSize = false), List(CONST_STRING("str_1").explicitGet(), REF("nil")))),
+      LET("arr", FUNCTION_CALL(PureContext.listConstructor(checkSize = false), List(CONST_STRING("str_1").explicitGet(), REF(GlobalValNames.Nil)))),
       FUNCTION_CALL(User("getString"), List(REF("arr"), CONST_LONG(0)))
     )
     est(exprDataByIndex).explicitGet() shouldBe 43

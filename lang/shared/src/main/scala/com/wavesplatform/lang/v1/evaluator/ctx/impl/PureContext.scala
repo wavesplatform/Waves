@@ -253,7 +253,7 @@ object PureContext {
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)))
     ) {
       IF(
-        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(eq, List(REF("@a"), REF(GlobalValNames.Unit))),
         FUNCTION_CALL(throwWithMessage, List(CONST_STRING("extract() called on unit value").explicitGet())),
         REF("@a")
       )
@@ -293,7 +293,7 @@ object PureContext {
             case _                                                    => base
           }
           IF(
-            FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF("unit"))),
+            FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF(GlobalValNames.Unit))),
             FUNCTION_CALL(throwWithMessage, List(CONST_STRING(errorMessage).explicitGet())),
             REF("@a")
           )
@@ -310,7 +310,7 @@ object PureContext {
       ("@alternative", TYPEPARAM('T'))
     ) {
       IF(
-        FUNCTION_CALL(eq, List(REF("@value"), REF("unit"))),
+        FUNCTION_CALL(eq, List(REF("@value"), REF(GlobalValNames.Unit))),
         REF("@alternative"),
         REF("@value")
       )
@@ -325,7 +325,7 @@ object PureContext {
       ("@msg", STRING)
     ) {
       IF(
-        FUNCTION_CALL(eq, List(REF("@a"), REF("unit"))),
+        FUNCTION_CALL(eq, List(REF("@a"), REF(GlobalValNames.Unit))),
         FUNCTION_CALL(throwWithMessage, List(REF("@msg"))),
         REF("@a")
       )
@@ -338,7 +338,7 @@ object PureContext {
       BOOLEAN,
       ("@a", PARAMETERIZEDUNION(List(TYPEPARAM('T'), UNIT)))
     ) {
-      FUNCTION_CALL(ne, List(REF("@a"), REF("unit")))
+      FUNCTION_CALL(ne, List(REF("@a"), REF(GlobalValNames.Unit)))
     }
 
   def fraction(fixLimitCheck: Boolean): BaseFunction[NoContext] =
@@ -1731,14 +1731,15 @@ object PureContext {
     }
   }
 
-  val unitVarName = "unit"
-
   private val nil: (String, (LIST, ContextfulVal[NoContext])) =
-    ("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet())))
+    (
+      GlobalValNames.Nil,
+      (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, limited = false).explicitGet()))
+    )
 
   private val commonVars: Map[String, (FINAL, ContextfulVal[NoContext])] =
     Map(
-      (unitVarName, (UNIT, ContextfulVal.pure(unit)))
+      (GlobalValNames.Unit, (UNIT, ContextfulVal.pure(unit)))
     )
 
   private val v1V2Vars: Map[String, (FINAL, ContextfulVal[NoContext])] = commonVars ++ Rounding.all.map(_.definition)
@@ -2046,6 +2047,6 @@ object PureContext {
       case V3      => v3Ctx(useNewPowPrecision)
       case V4      => v4Ctx(useNewPowPrecision)
       case V5      => v5Ctx(useNewPowPrecision)
-      case V6      => v6Ctx
+      case _       => v6Ctx
     }
 }

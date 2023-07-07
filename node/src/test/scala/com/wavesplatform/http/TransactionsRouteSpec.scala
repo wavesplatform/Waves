@@ -1,11 +1,12 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.{InvalidIds, *}
-import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
+import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
@@ -23,7 +24,9 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -31,9 +34,9 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, EthTxGenerator, TxHelpers, TxVersion}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
 import org.scalacheck.Gen.*
@@ -56,7 +59,8 @@ class TransactionsRouteSpec
     with TestWallet
     with WithDomain
     with EthHelpers
-    with BlockchainStubHelpers {
+    with BlockchainStubHelpers
+    with SharedSchedulerMixin {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -72,7 +76,7 @@ class TransactionsRouteSpec
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   )
 
   private val route = seal(transactionsApiRoute.route)
@@ -129,7 +133,7 @@ class TransactionsRouteSpec
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
     )
 
@@ -374,6 +378,25 @@ class TransactionsRouteSpec
                                  |  ],
                                  |  "invokes": []
                                  |}""".stripMargin)
+      }
+    }
+
+    "large-significand-format" in {
+      withDomain(RideV6) { d =>
+        val tx = TxHelpers.transfer()
+        d.appendBlock(tx)
+        val route = seal(transactionsApiRoute.copy(blockchain = d.blockchain, commonApi = d.transactionsApi).route)
+        Get(routePath(s"/address/$defaultAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          val result = responseAs[JsArray] \ 0 \ 0
+          (result \ "amount").as[String] shouldBe tx.amount.value.toString
+          (result \ "fee").as[String] shouldBe tx.fee.value.toString
+
+          (result \ "height").as[Int] shouldBe 1
+          (result \ "spentComplexity").as[Int] shouldBe 0
+          (result \ "version").as[Int] shouldBe tx.version
+          (result \ "type").as[Int] shouldBe tx.tpe.id
+          (result \ "timestamp").as[Long] shouldBe tx.timestamp
+        }
       }
     }
   }

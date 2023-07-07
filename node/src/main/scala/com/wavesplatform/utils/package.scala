@@ -21,7 +21,7 @@ package object utils {
   private val BytesLog = math.log(BytesMaxValue)
   private val BaseLog  = math.log(Base58MaxValue)
 
-  def base64Length(byteArrayLength: Int): Int = math.ceil(byteArrayLength * 8 / 6).toInt
+  def base64Length(byteArrayLength: Int): Int = math.ceil(byteArrayLength * 8 / 6.0).toInt
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =

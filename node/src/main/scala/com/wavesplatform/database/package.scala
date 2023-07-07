@@ -352,6 +352,7 @@ package object database {
       pbbm.transactionCount,
       pbbm.totalFeeInWaves,
       Option(pbbm.reward).filter(_ >= 0),
+      Seq.empty,
       Option(pbbm.vrf).collect { case bs if !bs.isEmpty => bs.toByteStr }
     )
   }

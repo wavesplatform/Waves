@@ -2,11 +2,10 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
-import com.wavesplatform.api.http.utils.UtilsEvaluator
+import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser
-import com.wavesplatform.ride.runner.requests.RequestParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import play.api.libs.json.*
 import scopt.{DefaultOParserSetup, OParser, OParserSetup}
@@ -44,11 +43,11 @@ object RideRunnerWithPreparedStateApp {
             addressSchemeCharacter = input.chainId,
             functionalitySettings = FunctionalitySettings(),
             genesisSettings = GenesisSettings(0, 0, 0, None, Nil, 0, 0.seconds),
-            rewardsSettings = RewardsSettings(1, 0, 1, 1)
+            rewardsSettings = RewardsSettings(1, 0, 1, 1, 1000)
           )
       }
 
-      val runResult = RequestParser.parse(StdLibVersion.VersionDic.latest, input.address, input.request) match {
+      val runResult = Evaluation.parse(StdLibVersion.VersionDic.latest, input.address, input.request) match {
         case Left(e) => UtilsEvaluator.validationErrorToJson(e, input.maxTxErrorLogSize)
         case Right(evaluation) =>
           val blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input)

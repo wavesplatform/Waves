@@ -12,6 +12,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, CONST_STRING, FUNC, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.*
@@ -37,7 +38,9 @@ class DAppDataEntryTypeTest
       BlockchainFeatures.DataTransaction.id -> 0,
       BlockchainFeatures.BlockReward.id     -> 0,
       BlockchainFeatures.BlockV5.id         -> 0
-    ), estimatorPreCheckHeight = Int.MaxValue)
+    ),
+    estimatorPreCheckHeight = Int.MaxValue
+  )
 
   private def dApp(constructor: String): Script = {
     val value = if (constructor == "BooleanEntry") CONST_LONG(1) else CONST_BOOLEAN(true)
@@ -59,7 +62,7 @@ class DAppDataEntryTypeTest
                     FunctionHeader.User(constructor),
                     List(CONST_STRING("key").explicitGet(), value)
                   ),
-                  REF("nil")
+                  REF(GlobalValNames.Nil)
                 )
               )
             )

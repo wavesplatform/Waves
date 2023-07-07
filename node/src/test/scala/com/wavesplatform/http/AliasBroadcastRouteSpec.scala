@@ -9,7 +9,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.{Schedulers, Time}
+import com.wavesplatform.utils.{SharedSchedulerMixin, Time}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
@@ -17,17 +17,22 @@ import play.api.libs.json.Json.*
 
 import scala.concurrent.duration.DurationInt
 
-class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
+class AliasBroadcastRouteSpec
+    extends RouteSpec("/alias/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with SharedSchedulerMixin {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
-  val route = AliasApiRoute(
+  private val route = AliasApiRoute(
     restAPISettings,
     stub[CommonTransactionsApi],
     stub[Wallet],
     utxPoolSynchronizer,
     stub[Time],
     stub[Blockchain],
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   ).route
 
   "returns StateCheckFiled" - {
@@ -35,7 +40,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
     "when state validation fails" in {
-      forAll(createAliasGen.retryUntil(_.version == 1)) { t: Transaction =>
+      forAll(createAliasGen.retryUntil(_.version == 1)) { (t: Transaction) =>
         posting("create", t.json()) should produce(StateCheckFailed(t, "foo"))
       }
     }

@@ -30,6 +30,7 @@ import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
@@ -47,22 +48,19 @@ object InvokeScriptDiff {
   def apply(
       blockchain: Blockchain,
       blockTime: Long,
+      rootVersion: StdLibVersion,
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
       remainingComplexity: Int,
       remainingCalls: Int,
-      remainingActions: Int,
-      remainingBalanceActionsV6: Int,
-      remainingAssetActionsV6: Int,
+      remainingActions: ActionLimits,
       remainingPayments: Int,
-      remainingData: Int,
-      remainingDataSize: Int,
       calledAddresses: Set[Address],
       invocationRoot: DAppEnvironment.InvocationTreeTracker,
       wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
   )(
       tx: InvokeScript
-  ): CoevalR[(Diff, EVALUATED, Int, Int, Int, Int, Int, Int)] = {
+  ): CoevalR[(Diff, EVALUATED, ActionLimits, Int)] = {
     val dAppAddress = tx.dApp
     val invoker     = tx.sender.toAddress
 
@@ -187,11 +185,7 @@ object InvokeScriptDiff {
               diff,
               (scriptResult, log),
               availableActions,
-              availableBalanceActions,
-              availableAssetActions,
-              availablePayments,
-              availableData,
-              availableDataSize
+              availablePayments
             ) <- {
               stats.invokedScriptExecution.measureForType(TransactionType.InvokeScript)({
                 val height = blockchain.height
@@ -214,6 +208,7 @@ object InvokeScriptDiff {
                   blockchain,
                   tthis,
                   directives,
+                  rootVersion,
                   tx.root,
                   tx.dApp,
                   pk,
@@ -222,11 +217,7 @@ object InvokeScriptDiff {
                   totalComplexityLimit,
                   remainingCalls - 1,
                   remainingActions,
-                  remainingBalanceActionsV6,
-                  remainingAssetActionsV6,
                   remainingPayments - tx.payments.size,
-                  remainingData,
-                  remainingDataSize,
                   paymentsPartInsideDApp,
                   invocationRoot,
                   wrapDAppEnv
@@ -249,11 +240,7 @@ object InvokeScriptDiff {
                   diff,
                   evaluated,
                   environment.availableActions,
-                  environment.availableBalanceActions,
-                  environment.availableAssetActions,
-                  environment.availablePayments,
-                  environment.availableData,
-                  environment.availableDataSize
+                  environment.availablePayments
                 )
               })
             }
@@ -269,6 +256,7 @@ object InvokeScriptDiff {
                   InvokeDiffsCommon.processActions(
                     StructuredCallableActions(actions, blockchain),
                     version,
+                    rootVersion,
                     dAppAddress,
                     pk,
                     storingComplexity.toInt,
@@ -301,6 +289,7 @@ object InvokeScriptDiff {
                     Coeval(
                       InvokeDiffsCommon.checkCallResultLimits(
                         version,
+                        rootVersion,
                         blockchain,
                         remainingComplexity - unusedComplexity,
                         log,
@@ -309,11 +298,7 @@ object InvokeScriptDiff {
                         assetActionsCount,
                         dataCount,
                         dataSize,
-                        availableActions,
-                        availableBalanceActions,
-                        availableAssetActions,
-                        availableData,
-                        availableDataSize
+                        availableActions
                       )
                     )
                   )
@@ -321,12 +306,8 @@ object InvokeScriptDiff {
                 } yield (
                   diff,
                   ret,
-                  availableActions - actionsCount,
-                  availableBalanceActions - balanceActionsCount,
-                  availableAssetActions - assetActionsCount,
-                  availablePayments,
-                  availableData - dataCount,
-                  availableDataSize - dataSize
+                  availableActions.decrease(actionsCount, balanceActionsCount, assetActionsCount, dataCount, dataSize),
+                  availablePayments
                 )
             }
 
@@ -334,11 +315,7 @@ object InvokeScriptDiff {
               actionsDiff,
               evaluated,
               remainingActions1,
-              remainingBalanceActions1,
-              remainingAssetActions1,
-              remainingPayments1,
-              remainingData1,
-              remainingDataSize1
+              remainingPayments1
             ) <-
               scriptResult match {
                 case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
@@ -361,13 +338,18 @@ object InvokeScriptDiff {
                   process(actions, unusedComplexity, actionsCount, balanceActionsCount, assetActionsCount, dataCount, dataSize, ret)
                 case _: IncompleteResult if limitedExecution =>
                   doProcessActions(Nil, 0).map(
-                    (_, unit, availableActions, availableBalanceActions, availableAssetActions, availablePayments, availableData, availableDataSize)
+                    (
+                      _,
+                      unit,
+                      availableActions,
+                      availablePayments
+                    )
                   )
                 case r: IncompleteResult =>
                   val usedComplexity = remainingComplexity - r.unusedComplexity
                   val error =
                     FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
-                  traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int, Int, Int, Int)])
+                  traced(error.asLeft[(Diff, EVALUATED, ActionLimits, Int)])
               }
             resultDiff <- traced(
               diff
@@ -383,11 +365,7 @@ object InvokeScriptDiff {
             resultDiff,
             evaluated,
             remainingActions1,
-            remainingBalanceActions1,
-            remainingAssetActions1,
-            remainingPayments1,
-            remainingData1,
-            remainingDataSize1
+            remainingPayments1
           )
         } yield result
 

@@ -66,8 +66,8 @@ lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
-lazy val `node-it`        = project.dependsOn(node, `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node)
+lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
+lazy val `node-generator` = project.dependsOn(node % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
@@ -124,7 +124,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.10",
+    scalaVersion         := "2.13.11",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -144,7 +144,7 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
-    crossPaths := false,
+    crossPaths        := false,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
@@ -174,7 +174,6 @@ inScope(Global)(
 )
 
 // ThisBuild options
-git.useGitDescribe       := true
 git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
@@ -207,6 +206,7 @@ checkPRRaw := Def
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
+      (`node-generator` / Compile / compile).value
     }
   )
   .value

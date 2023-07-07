@@ -529,32 +529,33 @@ object StateUpdate {
       .flatMap(id => blockchain.assetDescription(IssuedAsset(id)).map(ad => AssetInfo(id, ad.decimals, ad.name.toStringUtf8)))
 
   def container(
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       diff: DetailedDiff,
       minerAddress: Address
   ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata], Seq[AssetInfo]) = {
     val DetailedDiff(parentDiff, txsDiffs) = diff
-    val parentStateUpdate                  = atomic(blockchainBeforeWithMinerReward, parentDiff)
+    val parentStateUpdate                  = atomic(blockchainBeforeWithReward, parentDiff)
 
-    // miner reward is already in the blockchainBeforeWithMinerReward
+    // miner reward is already in the blockchainBeforeWithReward
     // if miner balance has been changed in parentDiff, it is already included in balance updates
     // if it has not, it needs to be manually requested from the blockchain and added to balance updates
+    // TODO: remove
     val parentStateUpdateWithMinerReward = parentStateUpdate.balances.find(_.address == minerAddress) match {
       case Some(_) => parentStateUpdate
       case None =>
-        val minerBalance = blockchainBeforeWithMinerReward.balance(minerAddress, Waves)
-        val reward       = blockchainBeforeWithMinerReward.blockReward(blockchainBeforeWithMinerReward.height).getOrElse(0L)
+        val minerBalance = blockchainBeforeWithReward.balance(minerAddress, Waves)
+        val reward       = blockchainBeforeWithReward.blockReward(blockchainBeforeWithReward.height).getOrElse(0L)
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
     val (txsStateUpdates, totalDiff) = txsDiffs.reverse
       .foldLeft((Seq.empty[StateUpdate], parentDiff)) { case ((updates, accDiff), txDiff) =>
         (
-          updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, accDiff), txDiff),
+          updates :+ atomic(CompositeBlockchain(blockchainBeforeWithReward, accDiff), txDiff),
           accDiff.combineF(txDiff).explicitGet()
         )
       }
-    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, totalDiff)
+    val blockchainAfter = CompositeBlockchain(blockchainBeforeWithReward, totalDiff)
     val metadata        = transactionsMetadata(blockchainAfter, totalDiff)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
     (parentStateUpdateWithMinerReward, txsStateUpdates, metadata, refAssets)
@@ -593,6 +594,7 @@ final case class BlockAppended(
     updatedWavesAmount: Long,
     vrf: Option[ByteStr],
     activatedFeatures: Seq[Int],
+    rewardShares: Seq[(Address, Long)],
     blockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate],
     transactionMetadata: Seq[TransactionMetadata],
@@ -608,21 +610,24 @@ object BlockAppended {
   def from(
       block: Block,
       diff: DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
-      minerReward: Option[Long],
+      blockchainBeforeWithReward: Blockchain,
+      reward: Option[Long],
       hitSource: ByteStr
   ): BlockAppended = {
-    val height = blockchainBeforeWithMinerReward.height
+    val height = blockchainBeforeWithReward.height
     val (blockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
-      StateUpdate.container(blockchainBeforeWithMinerReward, diff, block.sender.toAddress)
+      StateUpdate.container(blockchainBeforeWithReward, diff, block.sender.toAddress)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
-    val wavesAmount        = blockchainBeforeWithMinerReward.wavesAmount(height).toLong
-    val updatedWavesAmount = wavesAmount + minerReward.filter(_ => height > 0).getOrElse(0L)
+    val wavesAmount        = blockchainBeforeWithReward.wavesAmount(height).toLong
+    val updatedWavesAmount = wavesAmount + reward.filter(_ => height > 0).getOrElse(0L)
 
-    val activatedFeatures = blockchainBeforeWithMinerReward.activatedFeatures.collect {
+    val activatedFeatures = blockchainBeforeWithReward.activatedFeatures.collect {
       case (id, activationHeight) if activationHeight == height + 1 => id.toInt
     }.toSeq
+
+    val rewardShares =
+      BlockRewardCalculator.getSortedBlockRewardShares(height + 1, reward.getOrElse(0L), block.header.generator.toAddress, blockchainBeforeWithReward)
 
     BlockAppended(
       block.id(),
@@ -631,6 +636,7 @@ object BlockAppended {
       updatedWavesAmount,
       if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None,
       activatedFeatures,
+      rewardShares,
       blockStateUpdate,
       txsStateUpdates,
       txsMetadata,
@@ -662,16 +668,16 @@ object MicroBlockAppended {
   def from(
       microBlock: MicroBlock,
       diff: DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): MicroBlockAppended = {
     val (microBlockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
-      StateUpdate.container(blockchainBeforeWithMinerReward, diff, microBlock.sender.toAddress)
+      StateUpdate.container(blockchainBeforeWithReward, diff, microBlock.sender.toAddress)
 
     MicroBlockAppended(
       totalBlockId,
-      blockchainBeforeWithMinerReward.height,
+      blockchainBeforeWithReward.height,
       microBlock,
       microBlockStateUpdate,
       txsStateUpdates,

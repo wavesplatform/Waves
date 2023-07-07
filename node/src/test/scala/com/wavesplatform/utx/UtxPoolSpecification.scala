@@ -708,6 +708,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           r shouldBe true
           utxPool.all.size shouldEqual 0
+          utxPool.close()
         }
       }
 
@@ -716,6 +717,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         forAll(transferGen) { case (_, utxPool, txs) =>
           txs.foreach(utxPool.putIfNew(_).resultE should beRight)
           utxPool.all.size shouldEqual txs.size
+          utxPool.close()
         }
       }
 
@@ -725,6 +727,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             utxPool.putIfNew(t).resultE
           }) shouldBe Symbol("right")
           utxPool.all.size shouldEqual txs.size
+          utxPool.close()
         }
       }
     }
@@ -740,6 +743,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         val (utx, tx) = enoughFeeTxWithScriptedAccount.sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
         utx.putIfNew(tx).resultE should produce("signature from scripted account")
+        utx.close()
       }
 
       "any transaction from scripted account is not allowed if smartAccounts disabled in utx pool" - {
@@ -757,10 +761,12 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         "v1" in {
           val (utx1, tx1) = enoughFeeTxWithScriptedAccount(1).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
           utx1.putIfNew(tx1).resultE.left.value
+          utx1.close()
         }
         "v2" in {
           val (utx2, tx2) = enoughFeeTxWithScriptedAccount(2).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
           utx2.putIfNew(tx2).resultE should produce("denied from UTX pool")
+          utx2.close()
         }
       }
 
@@ -791,6 +797,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           utxPool.putIfNew(transfer).resultE should beRight
           val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Limit(100 nanos))
           tx.get should contain(transfer)
+          utxPool.close()
         }
 
         "retries until estimate" in withDomain() { d =>
@@ -812,6 +819,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           val (result, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
           result shouldBe None
           (System.nanoTime() - startTime).nanos.toMillis shouldBe 3000L +- 1000
+          utxPool.close()
         }
       }
 
@@ -902,6 +910,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScript(secondSigner, dApp(4)))
         utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
+        utx.close()
       }
 
       "correct events for InvokeScriptTransaction with big complexity on alwaysUnlimitedExecution = true" in withDomain(
@@ -936,6 +945,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         event.diff.scriptsComplexity shouldBe 1011
         event.diff.portfolios(secondAddress) shouldBe Portfolio.waves(-1)
         event.diff.portfolios(recipient) shouldBe Portfolio.waves(1)
+        utx.close()
       }
 
       "sync calls are fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
@@ -980,6 +990,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScript(secondSigner, dApp(4)))
         utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+        utx.close()
       }
 
       "invoke expression" in {
@@ -1002,6 +1013,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           val (result, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
           result shouldBe Some(Seq(invoke))
+          utx.close()
         }
       }
     }
@@ -1054,7 +1066,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
 
           (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-          (blockchain.accountScript _).when(*).onCall { _: Address =>
+          (blockchain.accountScript _).when(*).onCall { (_: Address) =>
             utx.removeAll(rest)
             None
           }

@@ -13,7 +13,7 @@ import play.api.libs.json.Json
 class ReissueTransactionV1Specification extends PropSpec {
 
   property("Reissue serialization roundtrip") {
-    forAll(reissueGen) { tx: ReissueTransaction =>
+    forAll(reissueGen) { (tx: ReissueTransaction) =>
       val recovered = ReissueTxSerializer.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }
@@ -45,7 +45,7 @@ class ReissueTransactionV1Specification extends PropSpec {
   }
 
   property("Reissue serialization from TypedTransaction") {
-    forAll(reissueGen) { tx: ReissueTransaction =>
+    forAll(reissueGen) { (tx: ReissueTransaction) =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }

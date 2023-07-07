@@ -5,7 +5,7 @@ import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause, Sched
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
-import com.wavesplatform.api.http.utils.UtilsEvaluator
+import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
@@ -199,7 +199,7 @@ class DefaultRequestService(
     val (evaluation, failJson) =
       if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
       else // Note: the latest version here for simplicity
-        RequestParser.parse(StdLibVersion.VersionDic.latest, request.address, request.requestBody) match {
+        Evaluation.parse(StdLibVersion.VersionDic.latest, request.address, request.requestBody) match {
           case Right(x) => (Some(x), JsObject.empty)
           case Left(e)  => (None, UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize))
         }

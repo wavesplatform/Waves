@@ -22,17 +22,9 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
 
   override def remainingCalls: Int = underlying.remainingCalls
 
-  override def availableActions: Int = underlying.availableActions
-
-  override def availableBalanceActions: Int = underlying.availableBalanceActions
-
-  override def availableAssetActions: Int = underlying.availableAssetActions
+  override def availableActions: DAppEnvironment.ActionLimits = underlying.availableActions
 
   override def availablePayments: Int = underlying.availablePayments
-
-  override def availableData: Int = underlying.availableData
-
-  override def availableDataSize: Int = underlying.availableDataSize
 
   override def currentDiff: Diff = underlying.currentDiff
 

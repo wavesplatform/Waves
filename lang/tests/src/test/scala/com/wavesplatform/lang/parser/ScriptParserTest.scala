@@ -6,7 +6,8 @@ import com.wavesplatform.lang.hacks.Global.MaxLiteralLength
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.Parser.GenericMethod
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
+import com.wavesplatform.lang.v1.parser.Parser.{GenericMethod, LibrariesOffset}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import com.wavesplatform.test.*
@@ -15,7 +16,7 @@ import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
 
 class ScriptParserTest extends PropSpec with ScriptGenParser {
-  implicit val offset: Int = 0
+  implicit val offset: LibrariesOffset = NoLibraries
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
     case Success(r, _) => r

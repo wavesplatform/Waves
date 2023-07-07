@@ -123,7 +123,7 @@ object WavesContext {
         case V3      => fromV3Funcs(proofsEnabled, version, typeDefs) ++ balanceV123Functions
         case V4      => fromV4Funcs(proofsEnabled, version, typeDefs)
         case V5      => fromV5Funcs(proofsEnabled, ds, typeDefs)
-        case V6      => fromV5Funcs(proofsEnabled, ds, typeDefs)
+        case _       => fromV5Funcs(proofsEnabled, ds, typeDefs)
       }
     commonFuncs ++ versionSpecificFuncs
   }

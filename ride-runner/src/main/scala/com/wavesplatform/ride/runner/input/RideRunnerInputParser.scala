@@ -13,7 +13,7 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
@@ -27,7 +27,7 @@ import scala.util.Try
 
 object RideRunnerInputParser extends DefaultReads {
 
-  implicit val jsonConfiguration = JsonConfiguration[Json.WithDefaultValues](
+  implicit val jsonConfiguration: JsonConfiguration.Aux[Json.WithDefaultValues] = JsonConfiguration[Json.WithDefaultValues](
     discriminator = "type",
     typeNaming = JsonNaming { fullName =>
       fullName.split('.').last.replace("RunnerDataEntry", "").toLowerCase(Locale.US)
@@ -59,9 +59,9 @@ object RideRunnerInputParser extends DefaultReads {
     if (x.isEmpty) JsSuccess(None) else parseByteStr(x, "Option[BlockId]").map(Some(_))
   }
 
-  implicit def byteArrayReads(hint: String) = StringReads.flatMapResult(parseByteArrayBase58(_, hint))
+  implicit def byteArrayReads(hint: String): Reads[Array[Byte]] = StringReads.flatMapResult(parseByteArrayBase58(_, hint))
 
-  implicit val byteStrReads = byteArrayReads("ByteStr").map(ByteStr(_))
+  implicit val byteStrReads: Reads[ByteStr] = byteArrayReads("ByteStr").map(ByteStr(_))
 
   implicit val byteStringReads: Reads[ByteString] = byteArrayReads("ByteString").map(unsafeWrap)
 
@@ -145,7 +145,7 @@ object RideRunnerInputParser extends DefaultReads {
       .successOrErrorToString("TransferTransactionLike")
   }
 
-  implicit val leaseInfoReads = DebugApiRoute.leaseInfoFormat
+  implicit val leaseInfoReads: Format[LeaseBalance] = DebugApiRoute.leaseInfoFormat
 
   implicit val balanceSnapshotReads: Reads[BalanceSnapshot]       = Json.format // format solves "ambiguous" error
   implicit val runnerLeaseBalanceReads: Reads[RunnerLeaseBalance] = Json.reads

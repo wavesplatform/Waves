@@ -117,6 +117,9 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
     val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, appenderScheduler) _
 
     f(miner, appender, appenderScheduler)
+
+    appenderScheduler.shutdown()
+    utx.close()
   }
 
   private def forgeAndAppendBlock(d: Domain, miner: MinerImpl, appender: Appender)(implicit scheduler: Scheduler) = {

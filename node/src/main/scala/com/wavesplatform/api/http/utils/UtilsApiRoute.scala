@@ -168,7 +168,7 @@ case class UtilsApiRoute(
           result
             .fold(
               e => ScriptCompilerError(e),
-              { cr: CompileResult =>
+              { (cr: CompileResult) =>
                 Json.obj(
                   "script"     -> ByteStr(cr.bytes).base64,
                   "complexity" -> cr.verifierComplexity,
