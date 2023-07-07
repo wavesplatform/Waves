@@ -102,7 +102,8 @@ object KvPairs {
         val x = readBlockMeta(xs)
         SignedBlockHeaderWithVrf(
           SignedBlockHeader(PBBlocks.vanilla(x.getHeader), x.signature.toByteStr),
-          x.vrf.toByteStr
+          x.vrf.toByteStr,
+          x.reward
         )
       },
       x =>
@@ -110,7 +111,8 @@ object KvPairs {
           PBBlockMeta(
             header = Some(PBBlocks.protobuf(x.header.header)),
             signature = UnsafeByteOperations.unsafeWrap(x.header.signature.arr),
-            vrf = UnsafeByteOperations.unsafeWrap(x.vrf.arr)
+            vrf = UnsafeByteOperations.unsafeWrap(x.vrf.arr),
+            reward = x.blockReward
           )
         )
     )

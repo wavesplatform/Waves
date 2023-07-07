@@ -157,7 +157,8 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
       BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Vector.empty, 0, ByteStr.empty),
       ByteStr.empty
     ),
-    vrf = ByteStr.empty
+    vrf = ByteStr.empty,
+    blockReward = 600_000_000L
   )
 
   private def test(f: (RideDbAccess, BlockPersistentCache) => Unit): Unit = withDb { db =>

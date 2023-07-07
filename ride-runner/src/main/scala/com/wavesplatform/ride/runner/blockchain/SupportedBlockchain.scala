@@ -29,6 +29,9 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   // Ride: blockInfoByHeight
 //  override def hitSource(height: Int): Option[ByteStr]
 
+  // Ride: blockInfoByHeight
+  //  override def blockReward(height: Int): Option[Long] = kill("blockReward")
+
   // Ride: wavesBalance, height, lastBlock
 //  override def height: Int = sharedBlockchain.heightUntagged
 
@@ -77,9 +80,6 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
 
   override def transactionInfo(id: BlockId): Option[(TxMeta, Transaction)] = kill("transactionInfo")
-
-  /** Block reward related */
-  override def blockReward(height: Int): Option[Long] = kill("blockReward")
 
   override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
 

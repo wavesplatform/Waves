@@ -9,5 +9,6 @@ case class RunnerBlockInfo(
     baseTarget: Long = 130,
     generationSignature: ByteStr = ByteStr(new Array[Byte](64)),
     generatorPublicKey: PublicKey = EmptyPublicKey,
-    VRF: Option[ByteStr] = None
+    VRF: Option[ByteStr] = None,
+    blockReward: Long = 600_000_000L // 6 WAVES
 )

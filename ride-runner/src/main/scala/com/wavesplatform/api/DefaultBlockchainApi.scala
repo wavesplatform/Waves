@@ -366,6 +366,7 @@ object DefaultBlockchainApi {
       ),
       signature = signature.toByteStr
     ),
-    blockWithHeight.vrf.toByteStr
+    vrf = blockWithHeight.vrf.toByteStr,
+    blockReward = blockWithHeight.rewardShares.map(_.reward).sum
   )
 }

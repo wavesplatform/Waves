@@ -112,6 +112,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = _hitSource.get(height) // VRF
 
+  // Ride: blockInfoByHeight
+  override def blockReward(height: Int): Option[Long] = input.blocks.get(height).map(_.blockReward)
+
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
 
@@ -244,9 +247,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
 
   override def transactionInfo(id: BlockId): Option[(TxMeta, Transaction)] = kill("transactionInfo")
-
-  /** Block reward related */
-  override def blockReward(height: Int): Option[Long] = kill("blockReward")
 
   override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
 

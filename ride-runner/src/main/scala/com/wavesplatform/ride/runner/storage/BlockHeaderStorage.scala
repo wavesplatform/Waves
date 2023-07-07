@@ -67,12 +67,14 @@ class BlockHeaderStorage(
         append.body match {
           case Body.Empty => // Ignore
           case Body.Block(block) =>
+            val stateUpdate = append.getStateUpdate
             val newFullBlock = BlockInfo(
               Height(event.height),
               event.id.toByteStr,
               SignedBlockHeaderWithVrf(
                 SignedBlockHeader(PBBlocks.vanilla(block.getBlock.getHeader), block.getBlock.signature.toByteStr),
-                block.vrf.toByteStr
+                block.vrf.toByteStr,
+                blockReward = stateUpdate.balances.map(x => x.getAmountAfter.amount - x.amountBefore).sum
               )
             )
             log.debug(s"Update at ${newFullBlock.height} with ${newFullBlock.id.toString.take(5)}")
@@ -92,7 +94,8 @@ class BlockHeaderStorage(
                   last.header.header.header.copy(transactionsRoot = microBlock.updatedTransactionsRoot.toByteStr),
                   signature = microBlock.getMicroBlock.signature.toByteStr
                 ),
-                last.header.vrf
+                last.header.vrf,
+                last.header.blockReward
               )
             )
             persistentCache.set(newLiquidBlock.height, newLiquidBlock.header)
