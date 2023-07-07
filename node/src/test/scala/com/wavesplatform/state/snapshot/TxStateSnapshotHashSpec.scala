@@ -1,4 +1,4 @@
-package com.wavesplatform.state
+package com.wavesplatform.state.snapshot
 
 import cats.data.Ior
 import com.google.common.primitives.{Ints, Longs, UnsignedBytes}
@@ -10,6 +10,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.state.*
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.KeyType
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
@@ -98,7 +99,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
     aliases = Map(addr1Alias1 -> address1, addr2Alias -> address2, addr1Alias2 -> address1),
     orderFills = Map(orderId -> volumeAndFee),
     leaseState = Map(leaseId -> leaseDetails),
-    scripts = Map(address2 -> Some(accountScriptInfo)),
+    scripts = Map(TxHelpers.signer(2).publicKey -> Some(accountScriptInfo)),
     assetScripts = Map(assetId1 -> Some(assetScriptInfo)),
     accountData = Map(address1 -> Map(dataEntry.key -> dataEntry)),
     sponsorship = Map(assetId1 -> sponsorship)

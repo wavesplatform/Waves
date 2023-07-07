@@ -310,7 +310,7 @@ abstract class Caches extends Blockchain with Storage {
     }
     for (((address, _), (entry, _)) <- updatedDataWithNodes) stateHash.addDataEntry(address, entry.entry)
     for ((address, lease)           <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
-    for ((address, script)          <- snapshot.accountScripts) stateHash.addAccountScript(address, script.map(_.script))
+    for ((address, script)          <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
     for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, script.map(_.script))
     for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
     for ((assetId, sponsorship)     <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
@@ -326,7 +326,7 @@ abstract class Caches extends Blockchain with Storage {
       orderFillsWithNodes,
       updatedDataWithNodes,
       addressTransactions.asMap(),
-      snapshot.accountScripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
+      snapshot.accountScriptsByAddress.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       stateHash.result()
     )
 
@@ -343,7 +343,7 @@ abstract class Caches extends Blockchain with Storage {
     for (id                                  <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
     for ((alias, address)                    <- snapshot.aliases) aliasCache.put(Alias.create(alias.name).explicitGet(), Some(address))
     leaseBalanceCache.putAll(leaseBalances.asJava)
-    scriptCache.putAll(snapshot.accountScripts.asJava)
+    scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
     assetScriptCache.putAll(snapshot.assetScripts.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }

@@ -53,7 +53,7 @@ object TxStateSnapshotHashBuilder {
       addEntry(KeyType.Alias, address.bytes, alias.name.getBytes(StandardCharsets.UTF_8))()
     }
 
-    snapshot.accountScripts.foreach { case (address, sv) =>
+    snapshot.accountScriptsByAddress.foreach { case (address, sv) =>
       addEntry(KeyType.AccountScript, address.bytes)(sv.fold(Array.emptyByteArray)(_.script.bytes().arr))
     }
 

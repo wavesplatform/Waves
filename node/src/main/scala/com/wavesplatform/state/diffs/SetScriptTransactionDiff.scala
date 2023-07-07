@@ -45,7 +45,7 @@ object SetScriptTransactionDiff {
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
-        accountScripts = Map(tx.sender.toAddress -> scriptWithComplexities)
+        accountScripts = Map(tx.sender -> scriptWithComplexities)
       )
     } yield snapshot
 

@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.data.Ior
 import cats.implicits.catsSyntaxSemigroup
 import com.google.common.hash.{BloomFilter, Funnels}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
@@ -21,7 +22,7 @@ case class Diff(
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, LeaseDetails],
-    scripts: Map[Address, Option[AccountScriptInfo]],
+    scripts: Map[PublicKey, Option[AccountScriptInfo]],
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
     accountData: Map[Address, Map[String, DataEntry[?]]],
     sponsorship: Map[IssuedAsset, Sponsorship],
@@ -80,7 +81,7 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
-      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+      scripts: Map[PublicKey, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
@@ -116,7 +117,7 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
-      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+      scripts: Map[PublicKey, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,

@@ -3,7 +3,7 @@ import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
@@ -33,7 +33,7 @@ case class StateSnapshot(
     leaseStates: Map[ByteStr, LeaseDetails] = Map(),
     aliases: Map[Alias, Address] = Map(),
     orderFills: Map[ByteStr, VolumeAndFee] = Map(),
-    accountScripts: Map[Address, Option[AccountScriptInfo]] = Map(),
+    accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
     accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
@@ -82,12 +82,12 @@ case class StateSnapshot(
           height
         )
       }.toSeq,
-      accountScripts.map { case (_, scriptOpt) =>
+      accountScripts.map { case (publicKey, scriptOpt) =>
         scriptOpt.fold(
-          S.AccountScript()
+          S.AccountScript(publicKey.toByteString)
         )(script =>
           S.AccountScript(
-            script.publicKey.toByteString,
+            publicKey.toByteString,
             script.script.bytes().toByteString,
             script.verifierComplexity
           )
@@ -126,6 +126,9 @@ case class StateSnapshot(
 
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
     assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap
+
+  lazy val accountScriptsByAddress: Map[Address, Option[AccountScriptInfo]] =
+    accountScripts.map { case (pk, script) => (pk.toAddress, script) }
 
   lazy val hashString: String =
     Integer.toHexString(hashCode())
@@ -198,7 +201,7 @@ object StateSnapshot {
         .map(of => of.orderId.toByteStr -> VolumeAndFee(of.volume, of.fee))
         .toMap
 
-    val accountScripts: Map[Address, Option[AccountScriptInfo]] =
+    val accountScripts: Map[PublicKey, Option[AccountScriptInfo]] =
       pbSnapshot.accountScripts.map { pbInfo =>
         val info =
           if (pbInfo.script.isEmpty)
@@ -211,7 +214,7 @@ object StateSnapshot {
                 pbInfo.verifierComplexity
               )
             )
-        pbInfo.senderPublicKey.toAddress -> info
+        pbInfo.senderPublicKey.toPublicKey -> info
       }.toMap
 
     val accountData: Map[Address, Map[String, DataEntry[?]]] =
@@ -255,7 +258,7 @@ object StateSnapshot {
       leaseStates: Map[ByteStr, LeaseDetails] = Map(),
       aliases: Map[Alias, Address] = Map(),
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
-      accountScripts: Map[Address, Option[AccountScriptInfo]] = Map(),
+      accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,

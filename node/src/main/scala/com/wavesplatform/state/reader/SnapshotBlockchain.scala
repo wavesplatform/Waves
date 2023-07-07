@@ -127,14 +127,14 @@ case class SnapshotBlockchain(
     }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
-    snapshot.accountScripts.get(address) match {
+    snapshot.accountScriptsByAddress.get(address) match {
       case None            => inner.accountScript(address)
       case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }
 
   override def hasAccountScript(address: Address): Boolean =
-    snapshot.accountScripts.get(address) match {
+    snapshot.accountScriptsByAddress.get(address) match {
       case None          => inner.hasAccountScript(address)
       case Some(None)    => false
       case Some(Some(_)) => true
