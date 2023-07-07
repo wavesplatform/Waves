@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 import cats.data.Ior
-import cats.implicits.{catsSyntaxEitherId, toBifunctorOps, toTraverseOps}
+import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
@@ -317,8 +317,6 @@ object StateSnapshot {
         leaseBalance.combineF[Either[String, *]](blockchain.leaseBalance(address)).map(address -> _)
       }
       .map(newBalances => StateSnapshot(leaseBalances = newBalances.toMap))
-
-  import cats.implicits.*
 
   private def leaseBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, Map[Address, LeaseBalance]] =
     portfolios.toSeq
