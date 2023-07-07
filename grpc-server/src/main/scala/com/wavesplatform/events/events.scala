@@ -438,7 +438,7 @@ object StateUpdate {
       )
     }.toVector
 
-    val updatedScripts = snapshot.accountScripts.map { case (address, newScript) =>
+    val updatedScripts = snapshot.accountScriptsByAddress.map { case (address, newScript) =>
       ScriptUpdate(ByteStr(address.bytes), blockchain.accountScript(address).map(_.script.bytes()), newScript.map(_.script.bytes()))
     }.toVector
 
