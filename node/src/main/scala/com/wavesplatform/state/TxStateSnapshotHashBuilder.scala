@@ -87,8 +87,8 @@ object TxStateSnapshotHashBuilder {
 
     snapshot.assetVolumes.foreach { case (asset, volume) =>
       addEntry(KeyType.AssetVolume, asset.id.arr)(
-        volume.volume.toByteArray,
-        booleanToBytes(volume.isReissuable)
+        booleanToBytes(volume.isReissuable),
+        volume.volume.toByteArray
       )
     }
 

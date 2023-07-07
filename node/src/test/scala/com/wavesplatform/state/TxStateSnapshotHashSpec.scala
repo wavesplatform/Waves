@@ -67,7 +67,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
   private val updatedAssetInfo1       = AssetInfo("updTest1", "updDesc1", Height(2))
   private val updatedAssetVolumeInfo1 = AssetVolumeInfo(false, 124)
   private val updatedAssetInfo2       = AssetInfo("updTest2", "updDesc2", Height(2))
-  private val updatedAssetVolumeInfo3 = AssetVolumeInfo(false, 124)
+  private val updatedAssetVolumeInfo3 = AssetVolumeInfo(false, 125)
   private val sponsorship             = SponsorshipValue(12)
 
   private val testScript = ScriptCompiler
@@ -134,17 +134,13 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
           Array(KeyType.AssetStatic.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.arr ++
             Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetVolume.id.toByte) ++ assetId1.id.arr ++
-            snapshot.assetVolumes(assetId1).volume.toByteArray ++
-            (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId1).volume.toByteArray,
           Array(KeyType.AssetVolume.id.toByte) ++ assetId2.id.arr ++
-            snapshot.assetVolumes(assetId2).volume.toByteArray ++
-            (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId2).volume.toByteArray,
           Array(KeyType.AssetVolume.id.toByte) ++ assetId3.id.arr ++
-            snapshot.assetVolumes(assetId3).volume.toByteArray ++
-            (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId3).volume.toByteArray,
           Array(KeyType.AssetVolume.id.toByte) ++ assetId4.id.arr ++
-            snapshot.assetVolumes(assetId4).volume.toByteArray ++
-            (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId4).volume.toByteArray,
           Array(
             KeyType.AssetNameDescription.id.toByte
           ) ++ assetId1.id.arr ++ updatedAssetInfo1.name.toByteArray ++ updatedAssetInfo1.description.toByteArray ++ Ints.toByteArray(
