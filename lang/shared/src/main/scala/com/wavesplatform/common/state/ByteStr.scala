@@ -67,7 +67,7 @@ object ByteStr {
 
   def fromLong(longValue: Long): ByteStr = {
     val buf = new Array[Byte](8)
-    var b = longValue
+    var b   = longValue
 
     for (i <- (buf.length - 1) to 0 by -1) {
       buf(i) = b.toByte

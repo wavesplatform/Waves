@@ -215,7 +215,9 @@ class DebugApiRouteSpec
       }
       val route = handleAllExceptions(routeWithBlockchain(blockchain))
       validatePost(TxHelpers.invoke()) ~> route ~> check {
-        responseAs[String] shouldBe """{"error":0,"message":"Error is unknown"}"""
+        responseAs[
+          String
+        ] shouldBe """{"error":0,"message":"Error is unknown"}"""
         response.status shouldBe StatusCodes.InternalServerError
       }
     }
