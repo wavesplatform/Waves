@@ -17,7 +17,7 @@ import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails, SnapshotBlockchain}
+import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -215,7 +215,7 @@ class BlockchainUpdaterImpl(
                   val miningConstraints = MiningConstraints(rocksdb, height)
                   val reward            = nextReward()
 
-                  val referencedBlockchain = CompositeBlockchain(rocksdb, reward)
+                  val referencedBlockchain = SnapshotBlockchain(rocksdb, reward)
                   BlockDiffer
                     .fromBlock(
                       referencedBlockchain,
@@ -242,7 +242,7 @@ class BlockchainUpdaterImpl(
 
                   blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
 
-                  val referencedBlockchain = CompositeBlockchain(rocksdb, ng.reward)
+                  val referencedBlockchain = SnapshotBlockchain(rocksdb, ng.reward)
                   BlockDiffer
                     .fromBlock(
                       referencedBlockchain,
@@ -274,7 +274,7 @@ class BlockchainUpdaterImpl(
 
                     blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
 
-                    val referencedBlockchain = CompositeBlockchain(rocksdb, ng.reward)
+                    val referencedBlockchain = SnapshotBlockchain(rocksdb, ng.reward)
                     BlockDiffer
                       .fromBlock(
                         referencedBlockchain,
