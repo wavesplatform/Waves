@@ -102,7 +102,7 @@ case class StateSnapshot(
       transactionStatus = if (txSucceeded) TransactionStatus.SUCCEEDED else TransactionStatus.FAILED
     )
 
-  //ignores lease balances from portfolios
+  // ignores lease balances from portfolios
   def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
     StateSnapshot
       .balances(portfolios, SnapshotBlockchain(blockchain, this))
@@ -111,6 +111,15 @@ case class StateSnapshot(
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
+
+  def addScriptsComplexity(scriptsComplexity: Long): StateSnapshot =
+    copy(scriptsComplexity = this.scriptsComplexity + scriptsComplexity)
+
+  def setScriptsComplexity(newScriptsComplexity: Long): StateSnapshot =
+    copy(scriptsComplexity = newScriptsComplexity)
+
+  def setScriptResults(newScriptResults: Map[ByteStr, InvokeScriptResult]): StateSnapshot =
+    copy(scriptResults = newScriptResults)
 
   def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
     scriptResults.get(txId).flatMap(_.error)
@@ -237,20 +246,20 @@ object StateSnapshot {
 
   def fromDiff(diff: Diff, blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
     for {
-      b <- balances(diff.portfolios, blockchain).leftMap(GenericError(_))
-      lb <- leaseBalances(diff, blockchain).leftMap(GenericError(_))
+      b  <- balances(diff.portfolios, blockchain).leftMap(GenericError(_))
+      lb <- leaseBalances(diff.portfolios, blockchain).leftMap(GenericError(_))
     } yield StateSnapshot(
       VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
       b,
       lb,
-      assetStatics(diff),
-      assetVolumes(diff, blockchain),
-      assetNamesAndDescriptions(diff),
+      assetStatics(diff.issuedAssets),
+      assetVolumes(blockchain, diff.issuedAssets, diff.updatedAssets),
+      assetNamesAndDescriptions(diff.issuedAssets, diff.updatedAssets),
       diff.assetScripts,
       diff.sponsorship.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-      resolvedLeaseStates(diff, blockchain),
+      resolvedLeaseStates(blockchain, diff.leaseState, diff.aliases),
       diff.aliases,
-      orderFills(diff, blockchain),
+      orderFills(diff.orderFills, blockchain),
       diff.scripts,
       diff.accountData,
       diff.scriptResults,
@@ -258,7 +267,45 @@ object StateSnapshot {
       diff.scriptsComplexity
     )
 
-  //ignores lease balances from portfolios
+  def build(
+      blockchain: Blockchain,
+      portfolios: Map[Address, Portfolio] = Map(),
+      orderFills: Map[ByteStr, VolumeAndFee] = Map(),
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] = VectorMap(),
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map(),
+      sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
+      leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+      aliases: Map[Alias, Address] = Map(),
+      accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
+      accountScripts: Map[Address, Option[AccountScriptInfo]] = Map(),
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
+      scriptsComplexity: Long = 0
+  ): Either[ValidationError, StateSnapshot] =
+    for {
+      b  <- balances(portfolios, blockchain).leftMap(GenericError(_))
+      lb <- leaseBalances(portfolios, blockchain).leftMap(GenericError(_))
+    } yield StateSnapshot(
+      VectorMap(),
+      b,
+      lb,
+      assetStatics(issuedAssets),
+      assetVolumes(blockchain, issuedAssets, updatedAssets),
+      assetNamesAndDescriptions(issuedAssets, updatedAssets),
+      assetScripts,
+      sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
+      resolvedLeaseStates(blockchain, leaseStates, aliases),
+      aliases,
+      this.orderFills(orderFills, blockchain),
+      accountScripts,
+      accountData,
+      scriptResults,
+      ethereumTransactionMeta,
+      scriptsComplexity
+    )
+
+  // ignores lease balances from portfolios
   private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
     flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets)) =>
       val assetBalancesE = flatTraverse(assets) {
@@ -295,8 +342,8 @@ object StateSnapshot {
 
   import cats.implicits.*
 
-  private def leaseBalances(diff: Diff, blockchain: Blockchain): Either[String, Map[Address, LeaseBalance]] =
-    diff.portfolios.toSeq
+  private def leaseBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, Map[Address, LeaseBalance]] =
+    portfolios.toSeq
       .flatTraverse {
         case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
           val bLease = blockchain.leaseBalance(address)
@@ -309,8 +356,8 @@ object StateSnapshot {
       }
       .map(_.toMap)
 
-  private def assetStatics(diff: Diff): Map[IssuedAsset, AssetStatic] =
-    diff.issuedAssets.map { case (asset, info) =>
+  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): Map[IssuedAsset, AssetStatic] =
+    issuedAssets.map { case (asset, info) =>
       asset ->
         AssetStatic(
           asset.id.toByteString,
@@ -321,9 +368,13 @@ object StateSnapshot {
         )
     }
 
-  private def assetVolumes(diff: Diff, blockchain: Blockchain): Map[IssuedAsset, AssetVolumeInfo] = {
-    val issued = diff.issuedAssets.view.mapValues(_.volume).toMap
-    val updated = diff.updatedAssets.collect {
+  private def assetVolumes(
+      blockchain: Blockchain,
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]]
+  ): Map[IssuedAsset, AssetVolumeInfo] = {
+    val issued = issuedAssets.view.mapValues(_.volume).toMap
+    val updated = updatedAssets.collect {
       case (asset, Ior.Right(volume))   => (asset, volume)
       case (asset, Ior.Both(_, volume)) => (asset, volume)
     }
@@ -335,27 +386,34 @@ object StateSnapshot {
     }
   }
 
-  private def assetNamesAndDescriptions(diff: Diff): Map[IssuedAsset, AssetInfo] = {
-    val issued = diff.issuedAssets.view.mapValues(_.dynamic).toMap
-    val updated = diff.updatedAssets.collect {
+  private def assetNamesAndDescriptions(
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]]
+  ): Map[IssuedAsset, AssetInfo] = {
+    val issued = issuedAssets.view.mapValues(_.dynamic).toMap
+    val updated = updatedAssets.collect {
       case (asset, Ior.Left(info))    => (asset, info)
       case (asset, Ior.Both(info, _)) => (asset, info)
     }
     issued ++ updated
   }
 
-  private def resolvedLeaseStates(diff: Diff, blockchain: Blockchain): Map[ByteStr, LeaseDetails] =
-    diff.leaseState.view
+  private def resolvedLeaseStates(
+      blockchain: Blockchain,
+      leaseStates: Map[ByteStr, LeaseDetails],
+      aliases: Map[Alias, Address]
+  ): Map[ByteStr, LeaseDetails] =
+    leaseStates.view
       .mapValues(details =>
         details.copy(recipient = details.recipient match {
           case address: Address => address
-          case alias: Alias     => diff.aliases.getOrElse(alias, blockchain.resolveAlias(alias).explicitGet())
+          case alias: Alias     => aliases.getOrElse(alias, blockchain.resolveAlias(alias).explicitGet())
         })
       )
       .toMap
 
-  private def orderFills(diff: Diff, blockchain: Blockchain): Map[ByteStr, VolumeAndFee] =
-    diff.orderFills.map { case (orderId, value) =>
+  private def orderFills(volumeAndFees: Map[ByteStr, VolumeAndFee], blockchain: Blockchain): Map[ByteStr, VolumeAndFee] =
+    volumeAndFees.map { case (orderId, value) =>
       val newInfo = value |+| blockchain.filledVolumeAndFee(orderId)
       orderId -> newInfo
     }
@@ -379,7 +437,7 @@ object StateSnapshot {
         s1.orderFills ++ s2.orderFills,
         s1.accountScripts ++ s2.accountScripts,
         combineDataEntries(s1.accountData, s2.accountData),
-        s1.scriptResults ++ s2.scriptResults,
+        s1.scriptResults |+| s2.scriptResults,
         s1.ethereumTransactionMeta ++ s2.ethereumTransactionMeta,
         s1.scriptsComplexity + s2.scriptsComplexity
       )

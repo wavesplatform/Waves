@@ -201,14 +201,6 @@ case class Diff(
       transactions.find(_.transaction.id() == txId)
     else None
 
-  def withScriptsComplexity(newScriptsComplexity: Long): Diff = copy(scriptsComplexity = newScriptsComplexity)
-
-  def withScriptResults(newScriptResults: Map[ByteStr, InvokeScriptResult]): Diff = copy(scriptResults = newScriptResults)
-
-  def withScriptRuns(newScriptRuns: Int): Diff = copy(scriptsRun = newScriptRuns)
-
-  def withPortfolios(newPortfolios: Map[Address, Portfolio]): Diff = copy(portfolios = newPortfolios)
-
   def combineF(newer: Diff): Either[String, Diff] =
     Diff
       .combine(portfolios, newer.portfolios)
@@ -361,16 +353,5 @@ object Diff {
 
     def hashString: String =
       Integer.toHexString(d.hashCode())
-
-    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Either[ValidationError, Diff] =
-      StateSnapshot
-        .fromDiff(d, blockchain)
-        .map { s =>
-          val txInfo = NewTransactionInfo.create(tx, applied, s, blockchain)
-          d.copy(
-            transactions = Vector(txInfo),
-            transactionFilter = mkFilterForTransactions(tx)
-          )
-        }
   }
 }

@@ -23,8 +23,9 @@ import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio, StateSnapshot}
+import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult, Portfolio, StateSnapshot}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
@@ -76,9 +77,10 @@ object UtilsEvaluator {
       dAppToExpr: DApp => Either[ValidationError, EXPR]
   ): Either[ValidationError, (EVALUATED, Int, Log[Id], InvokeScriptResult)] =
     for {
-      _            <- InvokeScriptTxValidator.checkAmounts(invoke.payments).toEither.leftMap(_.head)
-      ds           <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
-      paymentsDiff <- InvokeDiffsCommon.paymentsPart(invoke, dAppAddress, Map())
+      _                <- InvokeScriptTxValidator.checkAmounts(invoke.payments).toEither.leftMap(_.head)
+      ds               <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
+      payments         <- InvokeDiffsCommon.paymentsPart(invoke, dAppAddress, Map())
+      paymentsSnapshot <- StateSnapshot.build(blockchain, payments)
       environment = new DAppEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new IllegalStateException("No input entity available")),
@@ -100,7 +102,7 @@ object UtilsEvaluator {
         availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
         availableData = ContractLimits.MaxWriteSetSize,
         availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
-        currentDiff = paymentsDiff,
+        currentSnapshot = paymentsSnapshot,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
       ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
@@ -124,10 +126,10 @@ object UtilsEvaluator {
         case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
         case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
-      diff <- ScriptResult
+      snapshot <- ScriptResult
         .fromObj(ctx, invoke.id(), evaluated, ds.stdLibVersion, unusedComplexity = 0)
         .bimap(
-          _ => Right(Diff.empty),
+          _ => Right(StateSnapshot.empty),
           r =>
             InvokeDiffsCommon
               .processActions(
@@ -137,7 +139,7 @@ object UtilsEvaluator {
                 dAppPk,
                 usedComplexity,
                 invoke,
-                CompositeBlockchain(blockchain, paymentsDiff),
+                SnapshotBlockchain(blockchain, paymentsSnapshot),
                 System.currentTimeMillis(),
                 isSyncCall = false,
                 limitedExecution = false,
@@ -149,17 +151,17 @@ object UtilsEvaluator {
               .resultE
         )
         .merge
-      totalDiff <- diff.combineE(paymentsDiff)
-      totalSnapshot <- StateSnapshot.fromDiff(addWavesToDefaultInvoker(totalDiff), blockchain)
-      _         <- TransactionDiffer.validateBalance(blockchain, InvokeScript, totalSnapshot)
-      _         <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalSnapshot, Int.MaxValue, enableExecutionLog = true).resultE
-      rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
-      innerScriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
+      totalDiff     = snapshot |+| paymentsSnapshot
+      totalSnapshot = addWavesToDefaultInvoker(totalDiff, blockchain)
+      _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, totalSnapshot)
+      _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalSnapshot, Int.MaxValue, enableExecutionLog = true).resultE
+      rootScriptResult  = snapshot.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
+      innerScriptResult = environment.currentSnapshot.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
     } yield (evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)
 
-  private def addWavesToDefaultInvoker(diff: Diff) =
-    if (diff.portfolios.get(UtilsApiRoute.DefaultAddress).exists(_.balance >= Long.MaxValue / 10))
-      diff
+  private def addWavesToDefaultInvoker(snapshot: StateSnapshot, blockchain: Blockchain) =
+    if (snapshot.balances.get((UtilsApiRoute.DefaultAddress, Waves)).exists(_ >= Long.MaxValue / 10))
+      snapshot
     else
-      diff.combineE(Diff(Map(UtilsApiRoute.DefaultAddress -> Portfolio.waves(Long.MaxValue / 10)))).explicitGet()
+      snapshot.addBalances(Map(UtilsApiRoute.DefaultAddress -> Portfolio.waves(Long.MaxValue / 10)), blockchain).explicitGet()
 }

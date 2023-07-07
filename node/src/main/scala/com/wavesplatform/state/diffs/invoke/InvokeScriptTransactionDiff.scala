@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
+import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
 import com.wavesplatform.account.*
@@ -30,7 +31,7 @@ import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
@@ -49,7 +50,7 @@ object InvokeScriptTransactionDiff {
 
   def apply(blockchain: Blockchain, blockTime: Long, limitedExecution: Boolean, enableExecutionLog: Boolean)(
       tx: InvokeScriptTransactionLike
-  ): TracedResult[ValidationError, Diff] = {
+  ): TracedResult[ValidationError, StateSnapshot] = {
 
     val accScriptEi =
       for {
@@ -70,7 +71,7 @@ object InvokeScriptTransactionDiff {
         invocation: ContractEvaluator.Invocation
     ) = {
       case class MainScriptResult(
-          invocationDiff: Diff,
+          invocationSnapshot: StateSnapshot,
           scriptResult: ScriptResult,
           log: Log[Id],
           availableActions: Int,
@@ -113,7 +114,7 @@ object InvokeScriptTransactionDiff {
               enableExecutionLog
             )
           } yield MainScriptResult(
-            environment.currentDiff,
+            environment.currentSnapshot,
             result,
             log,
             environment.availableActions,
@@ -148,7 +149,7 @@ object InvokeScriptTransactionDiff {
 
       for {
         MainScriptResult(
-          invocationDiff,
+          invocationSnapshot,
           scriptResult,
           log,
           availableActions,
@@ -158,7 +159,7 @@ object InvokeScriptTransactionDiff {
           availableDataSize,
           limit
         ) <- executeMainScript()
-        otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
+        otherIssues = invocationSnapshot.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
         doProcessActions = InvokeDiffsCommon.processActions(
           _,
@@ -167,7 +168,7 @@ object InvokeScriptTransactionDiff {
           pk,
           _,
           tx,
-          CompositeBlockchain(blockchain, invocationDiff),
+          SnapshotBlockchain(blockchain, invocationSnapshot),
           blockTime,
           isSyncCall = false,
           limitedExecution,
@@ -222,7 +223,7 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-        totalDiff <- TracedResult(invocationDiff.withScriptsComplexity(0).combineF(resultDiff)).leftMap(GenericError(_))
+        totalDiff = invocationSnapshot.setScriptsComplexity(0) |+| resultDiff
       } yield totalDiff
     }
 
@@ -237,7 +238,10 @@ object InvokeScriptTransactionDiff {
             input <- buildThisValue(Coproduct[TxOrd](tx: TransactionBase), blockchain, directives, tthis)
           } yield (directives, tthis, input)).leftMap(GenericError(_))
 
-          paymentsPart <- TracedResult(if (version < V5) Right(Diff.empty) else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()))
+          paymentsPart <- TracedResult(
+            if (version < V5) Right(StateSnapshot.empty)
+            else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()).flatMap(StateSnapshot.build(blockchain, _))
+          )
 
           environment = new DAppEnvironment(
             AddressScheme.current.chainId,

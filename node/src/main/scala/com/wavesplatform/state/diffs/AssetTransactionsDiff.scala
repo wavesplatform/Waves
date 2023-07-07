@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address}
 import scala.collection.immutable.VectorMap
 
 object AssetTransactionsDiff {
-  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = { // TODO: unify with InvokeScript action diff?
+  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, StateSnapshot] = { // TODO: unify with InvokeScript action diff?
     def requireValidUtf(): Boolean = {
       def isValid(str: ByteString): Boolean = {
         val convertible = ByteString.copyFromUtf8(str.toStringUtf8) == str
@@ -40,23 +40,20 @@ object AssetTransactionsDiff {
     val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
 
     for {
-      _ <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
-      _ <- Either.cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
-      result <- DiffsCommon
-        .countVerifierComplexity(tx.script, blockchain, isAsset = true)
-        .flatTap(checkEstimationOverflow(blockchain, _))
-        .map(script =>
-          Diff(
-            portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value)),
-            issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
-            assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled)),
-            scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-          )
-        )
-    } yield result
+      _      <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
+      _      <- Either.cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
+      script <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = true)
+      _      <- checkEstimationOverflow(blockchain, script)
+      snapshot <- StateSnapshot.build(
+        blockchain,
+        portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value)),
+        issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
+        assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled))
+      )
+    } yield snapshot
   }
 
-  def setAssetScript(blockchain: Blockchain)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
+  def setAssetScript(blockchain: Blockchain)(tx: SetAssetScriptTransaction): Either[ValidationError, StateSnapshot] =
     for {
       _      <- DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender.toAddress, issuerOnly = true)
       script <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = true)
@@ -65,16 +62,12 @@ object AssetTransactionsDiff {
           Left(GenericError("Cannot set script on an asset issued without a script"))
         else
           checkEstimationOverflow(blockchain, script)
-      scriptsRun =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
-          DiffsCommon.countScriptRuns(blockchain, tx)
-        else
-          Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
-    } yield Diff(
-      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
-      assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled)),
-      scriptsRun = scriptsRun
-    )
+      snapshot <- StateSnapshot.build(
+        blockchain,
+        portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
+        assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled))
+      )
+    } yield snapshot
 
   private def checkEstimationOverflow(blockchain: Blockchain, script: Option[(Script, Long)]): Either[GenericError, Unit] =
     if (blockchain.checkEstimationOverflow && script.exists(_._2 < 0))
@@ -82,22 +75,19 @@ object AssetTransactionsDiff {
     else
       Right(())
 
-  def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
+  def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, StateSnapshot] =
     DiffsCommon
       .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee.value, Reissue(tx.asset.id, tx.reissuable, tx.quantity.value))
-      .flatMap(_.combineE(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))))
 
-  def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
+  def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, StateSnapshot] =
     DiffsCommon
       .processBurn(blockchain, tx.sender.toAddress, tx.fee.value, Burn(tx.asset.id, tx.quantity.value))
-      .flatMap(_.combineE(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))))
 
-  def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
+  def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, StateSnapshot] =
     DiffsCommon
       .processSponsor(blockchain, tx.sender.toAddress, tx.fee.value, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee.map(_.value)))
-      .flatMap(_.combineE(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))))
 
-  def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
+  def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, StateSnapshot] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
       val minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval
 
@@ -124,10 +114,11 @@ object AssetTransactionsDiff {
           )
         )
         updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
-      } yield Diff(
-        portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
-        updatedAssets = Map(tx.assetId -> updatedInfo.leftIor),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-      )
+        snapshot <- StateSnapshot.build(
+          blockchain,
+          portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
+          updatedAssets = Map(tx.assetId -> updatedInfo.leftIor)
+        )
+      } yield snapshot
     }
 }

@@ -206,7 +206,7 @@ object TransactionDiffer {
     stats.transactionDiffValidation
       .measureForType(tx.tpe) {
         tx match {
-          case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
+          case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain)(gtx).traced
           case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
           case ci: InvokeTransaction             => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(ci)
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
@@ -215,7 +215,7 @@ object TransactionDiffer {
           case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx).traced
           case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx).traced
           case ttx: TransferTransaction          => TransferTransactionDiff(blockchain)(ttx).traced
-          case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
+          case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain)(mtx).traced
           case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
           case ltx: LeaseCancelTransaction       => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTs)(ltx).traced
           case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx).traced
@@ -227,10 +227,9 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(StateSnapshot.fromDiff(_, blockchain))
-      .map { txSnapshot =>
+      .map(txSnapshot =>
         initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, applied = true, txSnapshot, blockchain))
-      }
+      )
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
@@ -316,16 +315,15 @@ object TransactionDiffer {
       portfolios <- feePortfolios(blockchain, tx)
       ethereumMetaDiff = tx match {
         case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
-        case _                      => Diff.empty
+        case _                      => StateSnapshot.empty
       }
-      diff <- Diff(
+      snapshot <- StateSnapshot.build(
+        blockchain,
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      ).combineF(ethereumMetaDiff).leftMap(GenericError(_))
-      bound    <- diff.bindTransaction(blockchain, tx, applied = false)
-      snapshot <- StateSnapshot.fromDiff(bound, blockchain)
-    } yield snapshot
+      ).map(_ |+| ethereumMetaDiff)
+    } yield snapshot.withTransaction(NewTransactionInfo.create(tx, applied = false, snapshot, blockchain))
 
   private object isFailedTransaction {
     def unapply(

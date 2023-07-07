@@ -13,16 +13,21 @@ import com.wavesplatform.transaction.{Asset, TxValidationError}
 import scala.util.control.NonFatal
 
 object TransferTransactionDiff {
-  def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, StateSnapshot] =
     TransferDiff(blockchain)(tx.sender.toAddress, tx.recipient, tx.amount.value, tx.assetId, tx.fee.value, tx.feeAssetId)
-      .map(_.withScriptRuns(DiffsCommon.countScriptRuns(blockchain, tx)))
-  }
 }
 
 object TransferDiff {
   def apply(
       blockchain: Blockchain
-  )(senderAddress: Address, recipient: AddressOrAlias, amount: Long, assetId: Asset, fee: Long, feeAssetId: Asset): Either[ValidationError, Diff] = {
+  )(
+      senderAddress: Address,
+      recipient: AddressOrAlias,
+      amount: Long,
+      assetId: Asset,
+      fee: Long,
+      feeAssetId: Asset
+  ): Either[ValidationError, StateSnapshot] = {
 
     val isSmartAsset = feeAssetId match {
       case Waves => false
@@ -81,7 +86,8 @@ object TransferDiff {
           s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil}"
         )
       )
-    } yield Diff(portfolios = portfolios)
+      snapshot <- StateSnapshot.build(blockchain, portfolios = portfolios)
+    } yield snapshot
   }
 
   private def validateOverflow(blockchain: Blockchain, height: Int, amount: Long, fee: Long): Either[ValidationError, Unit] =

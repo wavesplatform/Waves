@@ -38,8 +38,12 @@ object SnapshotOps {
     private def balancePortfolios(blockchain: Blockchain): Map[Address, Portfolio] =
       s.balances
         .foldLeft(Map[Address, Portfolio]()) { case (portfolios, ((address, asset), balance)) =>
-          val portfolio = Portfolio.build(asset, balance - blockchain.balance(address, asset))
-          Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
+          val balanceDiff = balance - blockchain.balance(address, asset)
+          if (balanceDiff != 0) {
+            val portfolio = Portfolio.build(asset, balanceDiff)
+            Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
+          } else
+            portfolios
         }
 
     private def leasePortfolios(blockchain: Blockchain): Map[Address, Portfolio] =

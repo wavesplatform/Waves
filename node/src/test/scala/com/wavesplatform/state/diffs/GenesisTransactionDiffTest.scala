@@ -6,13 +6,15 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
+import org.scalamock.scalatest.PathMockFactory
 
-class GenesisTransactionDiffTest extends PropSpec with WithState {
+class GenesisTransactionDiffTest extends PropSpec with WithState with PathMockFactory {
 
   property("fails if height != 1") {
+    val blockchain = stub[Blockchain]
+    (() => blockchain.height).when().returning(2)
     val genesis = TxHelpers.genesis(TxHelpers.address(1))
-    val height  = 2
-    GenesisTransactionDiff(height)(genesis) should produce("GenesisTransaction cannot appear in non-initial block")
+    GenesisTransactionDiff(blockchain)(genesis) should produce("GenesisTransaction cannot appear in non-initial block")
   }
 
   property("Diff establishes Waves invariant") {
