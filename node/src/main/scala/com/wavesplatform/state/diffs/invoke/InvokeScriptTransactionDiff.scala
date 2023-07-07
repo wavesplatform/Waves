@@ -240,7 +240,7 @@ object InvokeScriptTransactionDiff {
 
           paymentsPart <- TracedResult(
             if (version < V5) Right(StateSnapshot.empty)
-            else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()).flatMap(StateSnapshot.build(blockchain, _))
+            else InvokeDiffsCommon.paymentsPart(blockchain, tx, dAppAddress, Map())
           )
 
           environment = new DAppEnvironment(

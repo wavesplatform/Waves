@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Diff, Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
@@ -74,7 +74,7 @@ object RollbackBenchmark extends ScorexLogging {
 
     log.info("Appending genesis block")
     rocksDBWriter.append(
-      SnapshotOps.fromDiff(Diff(portfolios = portfolios.toMap), rocksDBWriter).explicitGet(),
+      StateSnapshot.build(rocksDBWriter, portfolios.toMap).explicitGet(),
       0,
       0,
       None,
@@ -97,8 +97,8 @@ object RollbackBenchmark extends ScorexLogging {
           None
         )
         .explicitGet()
-    val nextDiff     = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L))).toMap)
-    val nextSnapshot = SnapshotOps.fromDiff(nextDiff, rocksDBWriter).explicitGet()
+    val portfolios2  = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L)))
+    val nextSnapshot = StateSnapshot.build(rocksDBWriter, portfolios2.toMap).explicitGet()
 
     log.info("Appending next block")
     rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, nextBlock)

@@ -79,8 +79,7 @@ object UtilsEvaluator {
     for {
       _                <- InvokeScriptTxValidator.checkAmounts(invoke.payments).toEither.leftMap(_.head)
       ds               <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
-      payments         <- InvokeDiffsCommon.paymentsPart(invoke, dAppAddress, Map())
-      paymentsSnapshot <- StateSnapshot.build(blockchain, payments)
+      paymentsSnapshot <- InvokeDiffsCommon.paymentsPart(blockchain, invoke, dAppAddress, Map())
       environment = new DAppEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new IllegalStateException("No input entity available")),

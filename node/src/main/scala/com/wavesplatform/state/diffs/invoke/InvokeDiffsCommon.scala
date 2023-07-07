@@ -176,20 +176,19 @@ object InvokeDiffsCommon {
             feeActionsCount
           ).map(_._2)
         }
-      paymentsAndFeeDiff <-
-        if (isSyncCall) {
-          TracedResult.wrapValue(Map[Address, Portfolio]())
-        } else if (version < V5) {
-          TracedResult(paymentsPart(tx, dAppAddress, feePortfolios))
-        } else {
-          TracedResult.wrapValue(txFeeDiff(blockchain, tx.root).explicitGet()._2)
-        }
+      paymentsAndFeeSnapshot <-
+        if (isSyncCall)
+          TracedResult.wrapValue(StateSnapshot.empty)
+        else if (version < V5)
+          TracedResult(paymentsPart(blockchain, tx, dAppAddress, feePortfolios))
+        else
+          TracedResult(StateSnapshot.build(blockchain, txFeeDiff(blockchain, tx.root).explicitGet()._2))
       complexityLimit =
         if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
         else Int.MaxValue
       compositeSnapshot <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(
         actions.list,
-        paymentsAndFeeDiff,
+        paymentsAndFeeSnapshot,
         complexityLimit
       )
         .leftMap {
@@ -271,7 +270,12 @@ object InvokeDiffsCommon {
     )
   }
 
-  def paymentsPart(tx: InvokeScriptLike, dAppAddress: Address, feePart: Map[Address, Portfolio]): Either[GenericError, Map[Address, Portfolio]] =
+  def paymentsPart(
+      blockchain: Blockchain,
+      tx: InvokeScriptLike,
+      dAppAddress: Address,
+      feePart: Map[Address, Portfolio]
+  ): Either[ValidationError, StateSnapshot] =
     tx.payments
       .traverse { case InvokeScriptTransaction.Payment(amt, assetId) =>
         assetId match {
@@ -290,6 +294,7 @@ object InvokeDiffsCommon {
       .flatMap(_.foldM(Map[Address, Portfolio]())(Portfolio.combine))
       .flatMap(Portfolio.combine(feePart, _))
       .leftMap(GenericError(_))
+      .flatMap(StateSnapshot.build(blockchain, _))
 
   def dataItemToEntry(item: DataOp): DataEntry[?] =
     item match {
@@ -434,10 +439,9 @@ object InvokeDiffsCommon {
       enableExecutionLog: Boolean
   )(
       actions: List[CallableAction],
-      paymentsPortfolio: Map[Address, Portfolio],
+      initSnapshot: StateSnapshot,
       remainingLimit: Int
   ): TracedResult[ValidationError, StateSnapshot] = {
-    val initSnapshot = StateSnapshot.build(sblockchain, paymentsPortfolio).explicitGet()
     actions.foldM(initSnapshot) { (currentSnapshot, action) =>
       val complexityLimit = remainingLimit
       val blockchain      = SnapshotBlockchain(sblockchain, currentSnapshot)
@@ -450,12 +454,18 @@ object InvokeDiffsCommon {
           diff <- Asset.fromCompatId(asset) match {
             case Waves =>
               val portfolio = Portfolio.combine(Map(address -> Portfolio(amount)), Map(dAppAddress -> Portfolio(-amount))).leftMap(GenericError(_))
-              TracedResult(portfolio.flatMap(p => StateSnapshot.build(blockchain, portfolios = p).leftMap(e =>
-                if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
-                  FailedTransactionError.asFailedScriptError(e)
-                else
-                  e
-              )))
+              TracedResult(
+                portfolio.flatMap(p =>
+                  StateSnapshot
+                    .build(blockchain, portfolios = p)
+                    .leftMap(e =>
+                      if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
+                        FailedTransactionError.asFailedScriptError(e)
+                      else
+                        e
+                    )
+                )
+              )
             case a @ IssuedAsset(id) =>
               TracedResult(
                 Portfolio
@@ -464,12 +474,16 @@ object InvokeDiffsCommon {
                     Map(dAppAddress -> Portfolio(assets = VectorMap(a -> -amount)))
                   )
                   .leftMap(GenericError(_))
-                  .flatMap(p => StateSnapshot.build(blockchain, portfolios = p).leftMap(e =>
-                    if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
-                      FailedTransactionError.asFailedScriptError(e)
-                    else
-                      e
-                  ))
+                  .flatMap(p =>
+                    StateSnapshot
+                      .build(blockchain, portfolios = p)
+                      .leftMap(e =>
+                        if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
+                          FailedTransactionError.asFailedScriptError(e)
+                        else
+                          e
+                      )
+                  )
               ).flatMap(nextDiff =>
                 blockchain
                   .assetScript(a)

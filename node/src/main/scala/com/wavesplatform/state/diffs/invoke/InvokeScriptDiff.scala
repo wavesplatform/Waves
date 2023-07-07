@@ -172,7 +172,7 @@ object InvokeScriptDiff {
           input <- traced(buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError(_)))
 
           result <- for {
-            paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(tx, tx.dApp, Map()).flatMap(StateSnapshot.build(blockchain, _)))
+            paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(blockchain, tx, tx.dApp, Map()))
             (
               resultSnapshot,
               (scriptResult, log),
