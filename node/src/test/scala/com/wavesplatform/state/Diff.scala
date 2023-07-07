@@ -3,8 +3,7 @@ package com.wavesplatform.state
 import cats.data.Ior
 import cats.implicits.catsSyntaxSemigroup
 import com.google.common.hash.{BloomFilter, Funnels}
-import com.wavesplatform.account.PublicKey
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.state.reader.LeaseDetails
@@ -172,8 +171,5 @@ object Diff {
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
       d.scriptResults.get(txId).flatMap(_.error)
-
-    def hashString: String =
-      Integer.toHexString(d.hashCode())
   }
 }
