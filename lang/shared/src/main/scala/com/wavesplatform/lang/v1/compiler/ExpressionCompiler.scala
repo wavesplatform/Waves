@@ -11,7 +11,8 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
+import com.wavesplatform.lang.v1.parser.Expressions.*
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -37,28 +38,29 @@ object ExpressionCompiler {
       errors: Iterable[CompilationError] = Iterable.empty
   )
 
-  def compile(input: String, ctx: CompilerContext, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] = {
-    Parser.parseExpr(input) match {
+  def compile(input: String, offset: LibrariesOffset, ctx: CompilerContext, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] = {
+    val parser = new Parser()(offset)
+    parser.parseExpr(input) match {
       case fastparse.Parsed.Success(xs, _) => ExpressionCompiler(ctx, xs, allowIllFormedStrings)
-      case f: fastparse.Parsed.Failure     => Left(Parser.toString(input, f))
+      case f: fastparse.Parsed.Failure     => Left(parser.toString(input, f))
     }
   }
 
-  def compileBoolean(input: String, ctx: CompilerContext): Either[String, EXPR] = {
-    compile(input, ctx).flatMap {
+  def compileBoolean(input: String, offset: LibrariesOffset, ctx: CompilerContext): Either[String, EXPR] = {
+    compile(input, offset, ctx).flatMap {
       case (expr, BOOLEAN) => Right(expr)
       case _               => Left("Script should return boolean")
     }
   }
 
-  def compileUntyped(input: String, ctx: CompilerContext): Either[String, EXPR] = {
-    compile(input, ctx)
+  def compileUntyped(input: String, offset: LibrariesOffset, ctx: CompilerContext): Either[String, EXPR] = {
+    compile(input, offset, ctx)
       .map { case (expr, _) => expr }
   }
 
   def compileWithParseResult(
       input: String,
-      offset: Int,
+      offset: LibrariesOffset,
       ctx: CompilerContext,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] =
@@ -88,9 +90,9 @@ object ExpressionCompiler {
           .leftMap(e => (s"Compilation failed: ${Show[CompilationError].show(e)}", e.start, e.end))
       }
 
-  def compileDecls(input: String, ctx: CompilerContext): Either[String, EXPR] = {
+  def compileDecls(input: String, offset: LibrariesOffset, ctx: CompilerContext): Either[String, EXPR] = {
     val adjustedDecls = s"$input\n${GlobalValNames.Unit}"
-    compileUntyped(adjustedDecls, ctx)
+    compileUntyped(adjustedDecls, offset, ctx)
   }
 
   private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR, Iterable[CompilationError])] =
@@ -894,7 +896,7 @@ object ExpressionCompiler {
   }
 
   private def makeIfCase(cond: Expressions.EXPR, ifTrue: Expressions.EXPR, ifFalse: Expressions.EXPR): Expressions.IF =
-    Expressions.IF(Pos(cond.position.start, ifFalse.position.end)(0), cond, ifTrue, ifFalse)
+    Expressions.IF(Pos(cond.position), cond, ifTrue, ifFalse)
 
   private def mkGet(path: Seq[(PART[String], Option[Single])], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
     path.map(_._1).foldRight(ref) { (field, exp) =>

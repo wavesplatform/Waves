@@ -178,7 +178,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
-  forAll(invalid_assets_names) { assetName: String =>
+  forAll(invalid_assets_names) { (assetName: String) =>
     test(s"Not able to create asset named $assetName") {
       for (v <- issueTxSupportedVersions) {
         assertApiError(

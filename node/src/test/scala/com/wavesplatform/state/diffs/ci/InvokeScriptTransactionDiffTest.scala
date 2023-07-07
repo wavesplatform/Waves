@@ -871,7 +871,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("argument passed to callable function has wrong type") {
+  property("NODE-60. Argument passed to callable function has wrong type") {
     val (genesis, setScript, ci) = simplePreconditionsAndSetContract(invocationParamsCount = 2)
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
       _ should produceRejectOrFailedDiff("Can't apply (CONST_BOOLEAN) to 'parseInt(str: String)'")
@@ -910,7 +910,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
       if (version == V3)
         d.appendBlockE(ci) should produce(error)
-      else if (version == V6) {
+      else if (version >= V6) {
         d.appendBlockE(ci) should produceRejectOrFailedDiff(error)
       } else {
         d.appendBlock(ci)
@@ -943,7 +943,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       if (version == V3) {
         d.appendBlock(setScript, ci)
         d.liquidDiff.errorMessage(ci.id()) shouldBe None
-      } else if (version == V6) {
+      } else if (version >= V6) {
         d.appendBlockE(setScript, ci) should produceRejectOrFailedDiff("Data entry key should not be empty")
       } else {
         d.appendBlock(setScript, ci)
@@ -952,7 +952,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("Function call args count should be equal @Callable func one") {
+  property("NODE-112. Function call args count should be equal @Callable func one") {
     Seq(0, 3)
       .foreach { invocationArgsCount =>
         val (genesis, setScript, ci) = simplePreconditionsAndSetContract(invocationArgsCount)

@@ -78,7 +78,7 @@ class DataTransactionSpecification extends PropSpec {
   }
 
   property("serialization from TypedTransaction") {
-    forAll(dataTransactionGen) { tx: DataTransaction =>
+    forAll(dataTransactionGen) { (tx: DataTransaction) =>
       val recovered = DataTransaction.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }

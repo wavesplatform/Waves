@@ -23,6 +23,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test.*
@@ -91,8 +92,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       )
 
       d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V5, 8192), version = TxVersion.V2))
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V5, 8193), version = TxVersion.V2))
-        .toString should include(
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V5, 8193), version = TxVersion.V2)).toString should include(
         "Script is too large: 8193 bytes > 8192 bytes"
       )
     }
@@ -122,9 +122,9 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
 
     intercept[RuntimeException](TxHelpers.exprScript(V6)(s"""
-                                                                          |strict a = ${byteVectorsList(9)}
-                                                                          |true
-                                                                          |""".stripMargin)).toString should include(
+                                                            |strict a = ${byteVectorsList(9)}
+                                                            |true
+                                                            |""".stripMargin)).toString should include(
       "Script is too large: 9140 bytes > 8192 bytes"
     )
   }
@@ -143,19 +143,18 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     (V6, 1024, 0.001.waves),
     (V6, 1025, 0.002.waves),
     (V6, 32 * 1024, 0.032.waves),
-    (V6, 160 * 1024, 0.16.waves),
+    (V6, 160 * 1024, 0.16.waves)
   )
 
   property("lowered contract fee after V6") {
     withDomain(DomainPresets.RideV6) { d =>
-      forAll(scriptSizes) {
-        case (ver, size, fee) =>
-          val script = exactSizeContract(ver, size)
-          val sstx = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2, fee = fee - 1)
-          d.appendBlockE(sstx) should produce("does not exceed minimal value")
-          val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2, fee = fee)
-          d.appendBlock(setScriptTransaction)
-          d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe fee
+      forAll(scriptSizes) { case (ver, size, fee) =>
+        val script = exactSizeContract(ver, size)
+        val sstx   = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2, fee = fee - 1)
+        d.appendBlockE(sstx) should produce("does not exceed minimal value")
+        val setScriptTransaction = TxHelpers.setScript(TxHelpers.defaultSigner, script, version = TxVersion.V2, fee = fee)
+        d.appendBlock(setScriptTransaction)
+        d.commonApi.calculateWavesFee(setScriptTransaction) shouldBe fee
       }
     }
   }
@@ -219,17 +218,15 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
   property("setting script results in account state") {
     val (genesis, setScript) = preconditionsAndSetContract
-    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) {
-      case (_, newState) =>
-        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) { case (_, newState) =>
+      newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
     }
   }
 
   property("setting contract results in account state") {
     val (genesis, setScript) = preconditionsAndSetContract
-    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) {
-      case (_, newState) =>
-        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) { case (_, newState) =>
+      newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
     }
   }
 
@@ -366,9 +363,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
     def assertSuccess(script: Script, settings: FunctionalitySettings): Unit = {
       val (genesis, setScript) = preconditionsAndSetCustomContract(script)
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
-        case (_, newState) =>
-          newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) { case (_, newState) =>
+        newState.accountScript(setScript.sender.toAddress).map(_.script) shouldBe setScript.script
       }
     }
 
@@ -540,7 +536,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
+  property("NODE-242. unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
     def checkForExpr(expr: String, version: StdLibVersion): Assertion = {
       val compileVersion = if (version == V6) V5 else version
       val script         = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())
@@ -654,7 +650,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
            |""".stripMargin
 
       ExpressionCompiler
-        .compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+        .compileBoolean(expr, NoLibraries, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
         .flatMap(ExprScript(V5, _))
         .explicitGet()
     }

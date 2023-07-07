@@ -4,8 +4,11 @@ import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
+import com.wavesplatform.features.BlockchainFeatures.BlockRewardDistribution
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -102,25 +105,10 @@ final case class EthereumTransaction(
 object EthereumTransaction {
   sealed trait Payload
 
-  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload {
-    def tryResolveAsset(blockchain: Blockchain): Either[ValidationError, Asset] =
-      tokenAddress
-        .fold[Either[ValidationError, Asset]](
-          Right(Waves)
-        )(a => blockchain.resolveERC20Address(a).toRight(GenericError(s"Can't resolve ERC20 address $a")))
-
-    def toTransferLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, TransferTransactionLike] =
-      for {
-        asset  <- tryResolveAsset(blockchain)
-        amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
-      } yield tx.toTransferLike(amount, recipient, asset)
-  }
-
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] = {
       for {
-        scriptInfo      <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
-        callAndPayments <- ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
+        callAndPayments <- decodeFuncCall(blockchain, blockchain.isFeatureActivated(BlockRewardDistribution))
         invocation = new InvokeScriptTransactionLike {
           override def funcCall: Terms.FUNCTION_CALL                  = callAndPayments._1
           override def payments: Seq[InvokeScriptTransaction.Payment] = callAndPayments._2
@@ -138,11 +126,43 @@ object EthereumTransaction {
       } yield invocation
     }
 
+    def decodeFuncCall(blockchain: Blockchain, check: Boolean): Either[ValidationError, (Terms.FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] =
+      for {
+        scriptInfo      <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
+        callAndPayments <- EthABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData, check)
+        _ <- Either.cond(
+          !check || PBTransactions
+            .toPBInvokeScriptData(dApp, Some(callAndPayments._1), callAndPayments._2)
+            .toByteArray
+            .length <= ContractLimits.MaxInvokeScriptSizeInBytes,
+          (),
+          GenericError(s"Ethereum Invoke bytes length exceeds limit = ${ContractLimits.MaxInvokeScriptSizeInBytes}")
+        )
+      } yield callAndPayments
+
     private def checkPaymentsAmount(blockchain: Blockchain, invocation: InvokeScriptTransactionLike): Either[ValidationError, Unit] =
       if (blockchain.height >= blockchain.settings.functionalitySettings.ethInvokePaymentsCheckHeight)
         InvokeScriptTxValidator.checkAmounts(invocation.payments).toEither.leftMap(_.head)
       else
         Right(())
+  }
+
+  case class Transfer(tokenAddress: Option[ERC20Address], amount: Long, recipient: Address) extends Payload {
+    def tryResolveAsset(blockchain: Blockchain): Either[ValidationError, Asset] =
+      tokenAddress
+        .fold[Either[ValidationError, Asset]](
+          Right(Waves)
+        )(a => blockchain.resolveERC20Address(a).toRight(GenericError(s"Can't resolve ERC20 address $a")))
+
+    def toTransferLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, TransferTransactionLike] =
+      for {
+        asset  <- tryResolveAsset(blockchain)
+        amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
+      } yield tx.toTransferLike(amount, recipient, asset)
+
+    def check(data: String) = {
+      Either.cond(tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == 136, (), GenericError("unconsumed bytes remaining"))
+    }
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {

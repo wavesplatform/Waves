@@ -27,10 +27,10 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, Authorized, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{Schedulers, SystemTime}
+import com.wavesplatform.transaction.EthTxGenerator.Arg
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
@@ -47,7 +47,8 @@ class LeaseRouteSpec
     with NTPTime
     with WithDomain
     with TestWallet
-    with PathMockFactory {
+    with PathMockFactory
+    with SharedSchedulerMixin {
   private def route(domain: Domain) =
     LeaseApiRoute(
       restAPISettings,
@@ -56,7 +57,7 @@ class LeaseRouteSpec
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
       CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain),
-      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      new RouteTimeout(60.seconds)(sharedScheduler)
     )
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
@@ -523,7 +524,7 @@ class LeaseRouteSpec
       stub[TransactionPublisher],
       SystemTime,
       commonApi,
-      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      new RouteTimeout(60.seconds)(sharedScheduler)
     ).route
 
     val lease       = TxHelpers.lease()

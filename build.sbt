@@ -46,12 +46,12 @@ lazy val `lang-testkit` = project
   .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
   .settings(
-    libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile")))
+    libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps
   )
 
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
-  .dependsOn(`lang-testkit`)
+  .dependsOn(`lang-testkit` % "test;test->test")
 
 lazy val `lang-tests-js` = project
   .in(file("lang/tests-js"))
@@ -62,11 +62,11 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
+lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node)
+lazy val `node-generator` = project.dependsOn(node % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
@@ -92,7 +92,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
   )
 
 lazy val `repl-jvm` = repl.jvm
-  .dependsOn(`lang-jvm`, `lang-testkit` % "test")
+  .dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
       "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
@@ -123,7 +123,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.10",
+    scalaVersion         := "2.13.11",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -154,7 +154,7 @@ inScope(Global)(
      * F - show full stack traces
      * u - select the JUnit XML reporter with output directory
      */
-    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
+    testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports", "-C", "com.wavesplatform.report.QaseReporter"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
@@ -172,7 +172,6 @@ inScope(Global)(
 )
 
 // ThisBuild options
-git.useGitDescribe       := true
 git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
@@ -189,22 +188,34 @@ buildTarballsForDocker := {
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := Def
-  .sequential(
-    `waves-node` / clean,
-    Def.task {
-      (`lang-tests` / Test / test).value
-      (`repl-jvm` / Test / test).value
-      (`lang-js` / Compile / fastOptJS).value
-      (`lang-tests-js` / Test / test).value
-      (`grpc-server` / Test / test).value
-      (node / Test / test).value
-      (`repl-js` / Compile / fastOptJS).value
-      (`node-it` / Test / compile).value
-      (benchmark / Test / compile).value
+checkPRRaw := Def.taskDyn {
+  val res = Def
+    .sequential(
+      `waves-node` / clean,
+      Def.task {
+        (`lang-tests` / Test / test).value
+        (`repl-jvm` / Test / test).value
+        (`lang-js` / Compile / fastOptJS).value
+        (`lang-tests-js` / Test / test).value
+        (`grpc-server` / Test / test).value
+        (node / Test / test).value
+        (`repl-js` / Compile / fastOptJS).value
+        (`node-it` / Test / compile).value
+        (benchmark / Test / compile).value
+        (`node-generator` / Compile / compile).value
+      }
+    )
+    .result
+    .value
+
+  Def.task {
+    (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
+    res match {
+      case Inc(inc: Incomplete) => throw inc
+      case Value(v)             => v
     }
-  )
-  .value
+  }
+}.value
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val newState = Project

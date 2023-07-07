@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
@@ -89,8 +90,8 @@ object ContractCompiler {
         .getOrElse(List.empty)
       unionInCallableErrs <- checkCallableUnions(af, annotationsWithErr._1.toList.flatten, version)
       compiledBody <- local {
-        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(
-          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
+        modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(_ =>
+          compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
         )
       }
       annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
@@ -98,11 +99,12 @@ object ContractCompiler {
       errorList     = annotatedFuncWithErr._2 ++ annotationsWithErr._2 ++ unionInCallableErrs ++ compiledBody._1.errors
       typedParams   = compiledBody._2
       parseNodeExpr = af.copy(f = compiledBody._1.parseNodeExpr.asInstanceOf[Expressions.FUNC])
-      resultAnnFunc = if (annotatedFuncWithErr._2.isEmpty && !compiledBody._1.dec.isItFailed) {
-        Some(annotatedFuncWithErr._1.get)
-      } else {
-        None
-      }
+      resultAnnFunc =
+        if (annotatedFuncWithErr._2.isEmpty && !compiledBody._1.dec.isItFailed) {
+          Some(annotatedFuncWithErr._1.get)
+        } else {
+          None
+        }
 
     } yield (resultAnnFunc, typedParams, parseNodeExpr, errorList)
   }
@@ -138,16 +140,16 @@ object ContractCompiler {
       allowIllFormedStrings: Boolean = false
   ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
-      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](
-        dec => compileDeclaration(dec, saveExprContext, allowIllFormedStrings)
+      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](dec =>
+        compileDeclaration(dec, saveExprContext, allowIllFormedStrings)
       )
       decs           = decsCompileResult.map(_.dec)
       parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
       duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
       annFuncArgTypesErr <- validateAnnotatedFuncsArgTypes(parsedDapp).handleError()
       compiledAnnFuncsWithErr <- parsedDapp.fs
-        .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](
-          af => local(compileAnnotatedFunc(af, version, saveExprContext, allowIllFormedStrings, source))
+        .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](af =>
+          local(compileAnnotatedFunc(af, version, saveExprContext, allowIllFormedStrings, source))
         )
       annotatedFuncs   = compiledAnnFuncsWithErr.filter(_._1.nonEmpty).map(_._1.get)
       parsedNodeAFuncs = compiledAnnFuncsWithErr.map(_._3)
@@ -177,14 +179,15 @@ object ContractCompiler {
 
       callableFuncsWithParams = compiledAnnFuncsWithErr.filter(_._1.exists(_.isInstanceOf[CallableFunction]))
       callableFuncs           = callableFuncsWithParams.map(_._1.get.asInstanceOf[CallableFunction])
-      callableFuncsTypeInfo = callableFuncsWithParams.map {
-        case (_, typedParams, _, _) => typedParams.map(_._2)
+      callableFuncsTypeInfo = callableFuncsWithParams.map { case (_, typedParams, _, _) =>
+        typedParams.map(_._2)
       }
 
-      mappedCallableTypes = if (version <= V3)
-        MetaMapper.toProto(MetaV1)(callableFuncsTypeInfo)
-      else
-        MetaMapper.toProto(MetaV2)(callableFuncsTypeInfo)
+      mappedCallableTypes =
+        if (version <= V3)
+          MetaMapper.toProto(MetaV1)(callableFuncsTypeInfo)
+        else
+          MetaMapper.toProto(MetaV2)(callableFuncsTypeInfo)
 
       metaWithErr <- mappedCallableTypes
         .leftMap(Generic(parsedDapp.position.start, parsedDapp.position.start, _))
@@ -216,19 +219,20 @@ object ContractCompiler {
       subExprErrorList = decsCompileResult.flatMap(_.errors) ++ compiledAnnFuncsWithErr.flatMap(_._4)
       parsedDappResult = parsedDapp.copy(decs = parsedNodeDecs, fs = parsedNodeAFuncs)
 
-      result = if (errorList.isEmpty && !compiledAnnFuncsWithErr.exists(_._1.isEmpty)) {
+      result =
+        if (errorList.isEmpty && !compiledAnnFuncsWithErr.exists(_._1.isEmpty)) {
 
-        var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
+          var resultDApp = DApp(metaWithErr._1.get, decs, callableFuncs, verifierFuncOptWithErr._1.get)
 
-        if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
-        if (needCompaction) {
-          resultDApp = ContractScriptCompactor.compact(resultDApp)
+          if (removeUnusedCode) resultDApp = ContractScriptCompactor.removeUnusedCode(resultDApp)
+          if (needCompaction) {
+            resultDApp = ContractScriptCompactor.compact(resultDApp)
+          }
+
+          (Some(resultDApp), parsedDappResult, subExprErrorList)
+        } else {
+          (None, parsedDappResult, errorList ++ subExprErrorList)
         }
-
-        (Some(resultDApp), parsedDappResult, subExprErrorList)
-      } else {
-        (None, parsedDappResult, errorList ++ subExprErrorList)
-      }
     } yield result
   }
 
@@ -311,23 +315,21 @@ object ContractCompiler {
     for {
       ctx <- get[Id, CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, PART.VALID[String]](handleValid)
-      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(
-        af => (af.anns.flatMap(_.args), af.f.args.map(_._1))
+      annotatedFuncArgs: Seq[(Seq[Expressions.PART[String]], Seq[Expressions.PART[String]])] = contract.fs.map(af =>
+        (af.anns.flatMap(_.args), af.f.args.map(_._1))
       )
-      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Option[PART.VALID[String]]] {
-        case (annSeq, argSeq) =>
-          for {
-            anns <- annSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
-            args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
-          } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
+      annAndFuncArgsIntersection = annotatedFuncArgs.toVector.traverse[CompileM, Option[PART.VALID[String]]] { case (annSeq, argSeq) =>
+        for {
+          anns <- annSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
+          args <- argSeq.toList.traverse[CompileM, PART.VALID[String]](handleValid)
+        } yield anns.map(a => args.find(p => a.v == p.v)).find(_.nonEmpty).flatten
       }
-      _ <- annotationVars.flatMap(
-        a =>
-          a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
-            raiseError[Id, CompilerContext, CompilationError, Unit](
-              Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var")
-            )
-          }
+      _ <- annotationVars.flatMap(a =>
+        a.find(v => ctx.varDefs.contains(v.v)).fold(().pure[CompileM]) { p =>
+          raiseError[Id, CompilerContext, CompilationError, Unit](
+            Generic(p.position.start, p.position.start, s"Annotation binding `${p.v}` overrides already defined var")
+          )
+        }
       )
       _ <- annAndFuncArgsIntersection.flatMap {
         _.headOption.flatten match {
@@ -353,8 +355,8 @@ object ContractCompiler {
       .map(
         _._2
           .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
-          .flatMap(
-            res => Either.cond(res._3.isEmpty, res._1.get, s"Compilation failed: [${res._3.map(e => Show[CompilationError].show(e)).mkString("; ")}]")
+          .flatMap(res =>
+            Either.cond(res._3.isEmpty, res._1.get, s"Compilation failed: [${res._3.map(e => Show[CompilationError].show(e)).mkString("; ")}]")
           )
       )
       .value
@@ -362,6 +364,7 @@ object ContractCompiler {
 
   def compile(
       input: String,
+      offset: LibrariesOffset,
       ctx: CompilerContext,
       version: StdLibVersion,
       source: ScriptResultSource = ScriptResultSource.CallableFunction,
@@ -369,20 +372,21 @@ object ContractCompiler {
       removeUnusedCode: Boolean = false,
       allowIllFormedStrings: Boolean = false
   ): Either[String, DApp] = {
-    Parser.parseContract(input) match {
+    val parser = new Parser()(offset)
+    parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
         ContractCompiler(ctx, xs, version, source, needCompaction, removeUnusedCode, allowIllFormedStrings) match {
           case Left(err) => Left(err)
           case Right(c)  => Right(c)
         }
       case f: fastparse.Parsed.Failure =>
-        Left(Parser.toString(input, f))
+        Left(parser.toString(input, f))
     }
   }
 
   def compileWithParseResult(
       input: String,
-      offset: Int,
+      offset: LibrariesOffset,
       ctx: CompilerContext,
       version: StdLibVersion,
       needCompaction: Boolean = false,
@@ -417,44 +421,57 @@ object ContractCompiler {
 
   def compileFreeCall(
       input: String,
+      offset: LibrariesOffset,
       ctx: CompilerContext,
       version: StdLibVersion
-  ): Either[String, EXPR] =
-    Parser.parseExpr(input) match {
+  ): Either[String, EXPR] = {
+    val parser = new Parser()(offset)
+    parser.parseExpr(input) match {
       case fastparse.Parsed.Success(expr, _) =>
         val p          = AnyPos
         val annotation = List(Expressions.ANNOTATION(p, PART.VALID(p, "Callable"), List(PART.VALID(p, FreeCallInvocationArg))))
         val function   = Expressions.FUNC(p, expr, PART.VALID(p, "default"), Nil)
         val dApp       = Expressions.DAPP(p, Nil, List(Expressions.ANNOTATEDFUNC(p, annotation, function)))
         ContractCompiler(ctx, dApp, version, FreeCall).map(_.callableFuncs.head.u.body)
-      case f =>
-        Left(f.toString)
+      case f: fastparse.Parsed.Failure =>
+        Left(parser.toString(input, f))
     }
+  }
 
-  private def checkCallableUnions(func: Expressions.ANNOTATEDFUNC, annotations: List[Annotation], version: StdLibVersion): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
+  private def checkCallableUnions(
+      func: Expressions.ANNOTATEDFUNC,
+      annotations: List[Annotation],
+      version: StdLibVersion
+  ): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
     @tailrec
     def containsUnion(tpe: Type): Boolean =
       tpe match {
-        case Expressions.Union(types) if types.size > 1 => true
+        case Expressions.Union(types) if types.size > 1                                                                            => true
         case Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.Union(types)))) if types.size > 1 => true
-        case Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, inner@Expressions.Single(PART.VALID(_, Type.ListTypeName), _)))) =>
+        case Expressions.Single(
+              PART.VALID(_, Type.ListTypeName),
+              Some(PART.VALID(_, inner @ Expressions.Single(PART.VALID(_, Type.ListTypeName), _)))
+            ) =>
           containsUnion(inner)
         case _ => false
       }
 
     val isCallable = annotations.exists {
       case CallableAnnotation(_) => true
-      case _ => false
+      case _                     => false
     }
 
     if (version < V6 || !isCallable) {
       Seq.empty[UnionNotAllowedForCallableArgs].pure[CompileM]
     } else {
-      func.f.args.filter { case (_, tpe) =>
-        containsUnion(tpe)
-      }.map { case (argName, _) =>
-        UnionNotAllowedForCallableArgs(argName.position.start, argName.position.end)
-      }.pure[CompileM]
+      func.f.args
+        .filter { case (_, tpe) =>
+          containsUnion(tpe)
+        }
+        .map { case (argName, _) =>
+          UnionNotAllowedForCallableArgs(argName.position.start, argName.position.end)
+        }
+        .pure[CompileM]
     }
   }
 }

@@ -10,7 +10,6 @@ class TupleSizeTest extends EvaluatorSpec {
 
   property("tuple size") {
     (ContractLimits.MinTupleSize to ContractLimits.MaxTupleSize)
-      .map(1 to)
-      .foreach(range => eval(s"(${range.mkString(",")}).size()") shouldBe Right(CONST_LONG(range.length)))
+      .foreach(size => eval(s"(${(1 to size).mkString(",")}).size()") shouldBe Right(CONST_LONG(size)))
   }
 }

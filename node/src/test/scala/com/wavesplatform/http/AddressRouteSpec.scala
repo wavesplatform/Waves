@@ -1,24 +1,24 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
-import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, HttpHeader, MediaTypes, StatusCodes, TransferEncodings}
 import akka.http.scaladsl.model.headers.{Accept, `Content-Type`, `Transfer-Encoding`}
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import akka.stream.scaladsl.Source
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
-import com.wavesplatform.crypto
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
+import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -30,9 +30,10 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.{Schedulers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
+import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
@@ -40,7 +41,7 @@ import play.api.libs.json.Json.JsValueWrapper
 
 import scala.concurrent.duration.*
 
-class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain with SharedSchedulerMixin {
 
   private val wallet = Wallet(WalletSettings(None, Some("123"), Some(ByteStr(Longs.toByteArray(System.nanoTime())))))
   wallet.generateNewAccounts(10)
@@ -53,19 +54,25 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
+  private val timeLimited: SchedulerService = Schedulers.timeBoundedFixedPool(
+    new HashedWheelTimer(),
+    5.seconds,
+    1,
+    "rest-time-limited"
+  )
+
+  override def afterAll(): Unit = {
+    timeLimited.shutdown()
+    super.afterAll()
+  }
   private val addressApiRoute: AddressApiRoute = AddressApiRoute(
     restAPISettings,
     wallet,
     blockchain,
     utxPoolSynchronizer,
     new TestTime,
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ),
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")),
+    timeLimited,
+    new RouteTimeout(60.seconds)(sharedScheduler),
     commonAccountApi,
     5
   )
@@ -311,7 +318,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
     (blockchain.accountScript _)
       .when(allAccounts(5).toAddress)
-      .onCall((_: Address) => Thread.sleep(100000).asInstanceOf[Nothing])
+      .onCall { (_: Address) =>
+        Thread.sleep(100000)
+        None
+      }
 
     implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
     implicit val timeout          = routeTestTimeout.duration

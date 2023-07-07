@@ -18,6 +18,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
@@ -879,6 +880,7 @@ class ContractCompilerTest extends PropSpec {
 
     Global.compileContract(
       dApp,
+      NoLibraries,
       dAppV4Ctx,
       V4,
       ScriptEstimatorV3(fixOverflow = true, overhead = true),
@@ -1037,6 +1039,7 @@ class ContractCompilerTest extends PropSpec {
         |  true
         |}
       """.stripMargin,
+      NoLibraries,
       getTestContext(V4).compilerContext,
       V4,
       ScriptEstimatorV3(fixOverflow = true, overhead = true),
@@ -1060,7 +1063,7 @@ class ContractCompilerTest extends PropSpec {
       )
   }
 
-  property("union as argument of non-@Callable function is allowed in V6") {
+  property("NODE-516. union as argument of non-@Callable function is allowed in V6") {
     val script =
       """
         |{-# STDLIB_VERSION 6 #-}
