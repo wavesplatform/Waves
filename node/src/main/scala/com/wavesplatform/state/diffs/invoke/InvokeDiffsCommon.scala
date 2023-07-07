@@ -60,7 +60,7 @@ object InvokeDiffsCommon {
             Sponsorship.toWaves(attachedFee, assetInfo.sponsorship),
             GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
           )
-          portfolioDiff <- Diff
+          portfolioDiff <- Portfolio
             .combine(
               Map[Address, Portfolio](tx.sender.toAddress        -> Portfolio.build(asset, -attachedFee)),
               Map[Address, Portfolio](assetInfo.issuer.toAddress -> Portfolio.build(-feeInWaves, asset, attachedFee))
@@ -276,19 +276,19 @@ object InvokeDiffsCommon {
       .traverse { case InvokeScriptTransaction.Payment(amt, assetId) =>
         assetId match {
           case asset @ IssuedAsset(_) =>
-            Diff.combine(
+            Portfolio.combine(
               Map(tx.sender.toAddress -> Portfolio.build(asset, -amt)),
               Map(dAppAddress         -> Portfolio.build(asset, amt))
             )
           case Waves =>
-            Diff.combine(
+            Portfolio.combine(
               Map(tx.sender.toAddress -> Portfolio(-amt)),
               Map(dAppAddress         -> Portfolio(amt))
             )
         }
       }
-      .flatMap(_.foldM(Map[Address, Portfolio]())(Diff.combine))
-      .flatMap(Diff.combine(feePart, _))
+      .flatMap(_.foldM(Map[Address, Portfolio]())(Portfolio.combine))
+      .flatMap(Portfolio.combine(feePart, _))
       .leftMap(GenericError(_))
 
   def dataItemToEntry(item: DataOp): DataEntry[?] =
@@ -449,7 +449,7 @@ object InvokeDiffsCommon {
           address <- resolveAddress(addressRepr, blockchain)
           diff <- Asset.fromCompatId(asset) match {
             case Waves =>
-              val portfolio = Diff.combine(Map(address -> Portfolio(amount)), Map(dAppAddress -> Portfolio(-amount))).leftMap(GenericError(_))
+              val portfolio = Portfolio.combine(Map(address -> Portfolio(amount)), Map(dAppAddress -> Portfolio(-amount))).leftMap(GenericError(_))
               TracedResult(portfolio.flatMap(p => StateSnapshot.build(blockchain, portfolios = p).leftMap(e =>
                 if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
                   FailedTransactionError.asFailedScriptError(e)
@@ -458,7 +458,7 @@ object InvokeDiffsCommon {
               )))
             case a @ IssuedAsset(id) =>
               TracedResult(
-                Diff
+                Portfolio
                   .combine(
                     Map(address     -> Portfolio(assets = VectorMap(a -> amount))),
                     Map(dAppAddress -> Portfolio(assets = VectorMap(a -> -amount)))

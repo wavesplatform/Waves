@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, Portfolio, StateSnapshot}
 import play.api.libs.json.{Json, Reads}
 
 case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatures.SynchronousCalls, Set('W')) {
@@ -42,7 +42,7 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
     val (leaseBalances, leaseStates) =
       patchData.toSeq.map { case (id, (ld, recipientAddress)) =>
         (
-          Diff
+          Portfolio
             .combine(
               Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))),
               Map(recipientAddress    -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
@@ -53,7 +53,7 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
           )
         )
       }.separate
-    val combinedLeaseBalances = leaseBalances.reduce(Diff.combine(_, _).explicitGet())
+    val combinedLeaseBalances = leaseBalances.reduce(Portfolio.combine(_, _).explicitGet())
     val leaseBalancesSnapshot = StateSnapshot.ofLeaseBalances(combinedLeaseBalances.view.mapValues(_.lease).toMap, blockchain)
     leaseBalancesSnapshot.explicitGet() |+| leaseStates.combineAll
   }

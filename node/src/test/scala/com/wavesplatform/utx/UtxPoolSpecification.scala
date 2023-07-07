@@ -14,7 +14,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
+import com.wavesplatform.history.{DefaultWavesSettings, SnapshotOps, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
@@ -1011,7 +1011,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val transfer1 = TxHelpers.transfer(amount = 10.waves)
         val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
 
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(StateSnapshot.fromDiff(d.createDiff(transfer1), d.blockchain).explicitGet()))
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(SnapshotOps.fromDiff(d.createDiff(transfer1), d.blockchain).explicitGet()))
         d.utxPool.addTransaction(transfer2, verify = false)
 
         d.utxPool.cleanUnconfirmed()

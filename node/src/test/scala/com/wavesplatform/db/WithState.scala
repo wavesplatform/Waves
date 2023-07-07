@@ -8,8 +8,8 @@ import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFacto
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain
 import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
+import com.wavesplatform.history.{Domain, SnapshotOps}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -19,7 +19,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
@@ -164,7 +164,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
         differ(state, block).map { result =>
-          val snapshot = StateSnapshot.fromDiff(result.snapshot.toDiff(state), state).explicitGet()
+          val snapshot = SnapshotOps.fromDiff(result.snapshot.toDiff(state), state).explicitGet()
           state.append(snapshot, result.carry, result.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
         }
       })

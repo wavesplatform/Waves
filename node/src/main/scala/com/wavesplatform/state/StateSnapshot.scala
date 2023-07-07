@@ -244,29 +244,6 @@ object StateSnapshot {
     )
   }
 
-  def fromDiff(diff: Diff, blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
-    for {
-      b  <- balances(diff.portfolios, blockchain).leftMap(GenericError(_))
-      lb <- leaseBalances(diff.portfolios, blockchain).leftMap(GenericError(_))
-    } yield StateSnapshot(
-      VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap,
-      b,
-      lb,
-      assetStatics(diff.issuedAssets),
-      assetVolumes(blockchain, diff.issuedAssets, diff.updatedAssets),
-      assetNamesAndDescriptions(diff.issuedAssets, diff.updatedAssets),
-      diff.assetScripts,
-      diff.sponsorship.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-      resolvedLeaseStates(blockchain, diff.leaseState, diff.aliases),
-      diff.aliases,
-      orderFills(diff.orderFills, blockchain),
-      diff.scripts,
-      diff.accountData,
-      diff.scriptResults,
-      diff.ethereumTransactionMeta,
-      diff.scriptsComplexity
-    )
-
   def build(
       blockchain: Blockchain,
       portfolios: Map[Address, Portfolio] = Map(),
@@ -281,13 +258,14 @@ object StateSnapshot {
       accountScripts: Map[Address, Option[AccountScriptInfo]] = Map(),
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
-      scriptsComplexity: Long = 0
+      scriptsComplexity: Long = 0,
+      transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap()
   ): Either[ValidationError, StateSnapshot] =
     for {
       b  <- balances(portfolios, blockchain).leftMap(GenericError(_))
       lb <- leaseBalances(portfolios, blockchain).leftMap(GenericError(_))
     } yield StateSnapshot(
-      VectorMap(),
+      transactions,
       b,
       lb,
       assetStatics(issuedAssets),

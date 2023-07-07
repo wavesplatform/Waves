@@ -425,23 +425,23 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Seq.empty
 
-  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, StateSnapshot] =
-    (for {
-      lt        <- leaseTransactions
-      ltMeta    <- transactionMeta(lt.id()).toSeq
-      recipient <- rocksdb.resolveAlias(lt.recipient).toSeq
-    } yield {
-      val diff = Diff(
+  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, StateSnapshot] = {
+    val snapshotsById =
+      for {
+        lt        <- leaseTransactions
+        ltMeta    <- transactionMeta(lt.id()).toSeq
+        recipient <- rocksdb.resolveAlias(lt.recipient).toSeq
         portfolios = Map(
           lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
           recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
-        ),
-        leaseState =
-          Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
-      )
-      val snapshot = StateSnapshot.fromDiff(diff, rocksdb).explicitGet()
-      lt.id() -> snapshot
-    }).toMap
+        )
+        leaseStates = Map(
+          lt.id() -> LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)
+        )
+        snapshot = StateSnapshot.build(rocksdb, portfolios, leaseStates = leaseStates).explicitGet()
+      } yield lt.id() -> snapshot
+    snapshotsById.toMap
+  }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
     log.info(s"Trying rollback blockchain to $blockId")

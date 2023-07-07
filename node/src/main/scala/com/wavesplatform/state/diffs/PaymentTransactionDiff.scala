@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits.toBifunctorOps
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.PaymentTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
@@ -14,7 +14,7 @@ object PaymentTransactionDiff {
       Left(GenericError(s"Payment transaction is deprecated after h=$blockVersion3AfterHeight"))
     else {
       for {
-        portfolios <- Diff.combine(
+        portfolios <- Portfolio.combine(
           Map(tx.recipient        -> Portfolio(tx.amount.value)),
           Map(tx.sender.toAddress -> Portfolio(-tx.amount.value - tx.fee.value))
         ).leftMap(GenericError(_))

@@ -30,10 +30,10 @@ object MassTransferTransactionDiff {
       val foldInit = (Map[Address, Portfolio](sender -> Portfolio(-tx.fee.value)), 0L)
       list
         .foldM(foldInit) { case ((totalPortfolios, totalTransferAmount), (portfolios, transferAmount)) =>
-          Diff.combine(totalPortfolios, portfolios).map((_, totalTransferAmount + transferAmount))
+          Portfolio.combine(totalPortfolios, portfolios).map((_, totalTransferAmount + transferAmount))
         }
         .flatMap { case (recipientPortfolios, totalAmount) =>
-          Diff.combine(
+          Portfolio.combine(
             recipientPortfolios,
             tx.assetId
               .fold(Map[Address, Portfolio](sender -> Portfolio(-totalAmount))) { asset =>

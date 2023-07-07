@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import cats.implicits.toBifunctorOps
+import com.wavesplatform.account.Address
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.*
@@ -74,8 +76,6 @@ object Portfolio {
   val empty: Portfolio = Portfolio()
 
   implicit class PortfolioExt(val self: Portfolio) extends AnyVal {
-    def spendableBalanceOf(assetId: Asset): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))
-
     def pessimistic: Portfolio = Portfolio(
       balance = Math.min(self.balance, 0),
       lease = LeaseBalance(
@@ -89,10 +89,25 @@ object Portfolio {
       Portfolio(f(self.balance), LeaseBalance.empty, self.assets.view.mapValues(f.apply).to(VectorMap))
 
     def minus(other: Portfolio): Portfolio =
-      Portfolio(self.balance - other.balance, LeaseBalance.empty, unsafeCombineAssets(self.assets, other.assets.view.mapValues(- _).to(VectorMap)))
-
-    def negate: Portfolio = Portfolio.empty minus self
+      Portfolio(self.balance - other.balance, LeaseBalance.empty, unsafeCombineAssets(self.assets, other.assets.view.mapValues(-_).to(VectorMap)))
 
     def assetIds: Set[Asset] = self.assets.keySet ++ Set[Asset](Waves)
   }
+
+  def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
+    if (portfolios1.isEmpty) Right(portfolios2)
+    else if (portfolios2.isEmpty) Right(portfolios1)
+    else
+      portfolios2.foldLeft[Either[String, Map[Address, Portfolio]]](Right(portfolios1)) {
+        case (Right(seed), kv @ (address, pf)) =>
+          seed.get(address).fold[Either[String, Map[Address, Portfolio]]](Right(seed + kv)) { oldPf =>
+            oldPf
+              .combine(pf)
+              .bimap(
+                err => s"$address: " + err,
+                newPf => seed + (address -> newPf)
+              )
+          }
+        case (r, _) => r
+      }
 }

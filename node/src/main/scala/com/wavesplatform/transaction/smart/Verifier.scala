@@ -89,10 +89,10 @@ object Verifier extends ScorexLogging {
       case _                                                                                 => false
     }
 
-  /** Verifies asset scripts and returns diff with complexity. In case of error returns spent complexity */
+  /** Verifies asset scripts and returns snapshot with complexity. In case of error returns spent complexity */
   def assets(blockchain: Blockchain, remainingComplexity: Int, enableExecutionLog: Boolean)(
       tx: TransactionBase
-  ): TracedResult[(Long, ValidationError), Diff] = {
+  ): TracedResult[(Long, ValidationError), StateSnapshot] = {
     case class AssetForCheck(asset: IssuedAsset, script: AssetScriptInfo, assetType: AssetContext)
 
     @tailrec
@@ -153,7 +153,7 @@ object Verifier extends ScorexLogging {
     result
       .flatMap(_ => additionalResult)
       .leftMap(ve => (complexity, ve))
-      .map(_ => Diff(scriptsComplexity = complexity))
+      .map(_ => StateSnapshot(scriptsComplexity = complexity))
   }
 
   private def logIfNecessary(

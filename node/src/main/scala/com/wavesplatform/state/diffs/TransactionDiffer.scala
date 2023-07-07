@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship, StateSnapshot}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -97,8 +97,8 @@ object TransactionDiffer {
         else
           err
       }
-      diff <- assetsVerifierDiff(blockchain, tx, runVerifiers, transactionSnapshot, remainingComplexity, enableExecutionLog)
-    } yield diff
+      snapshot <- assetsVerifierDiff(blockchain, tx, runVerifiers, transactionSnapshot, remainingComplexity, enableExecutionLog)
+    } yield snapshot
 
     result
       .leftMap {
@@ -151,7 +151,7 @@ object TransactionDiffer {
                 if (blockchain.height >= blockchain.settings.functionalitySettings.estimatorSumOverflowFixHeight)
                   for {
                     portfolios <- ExchangeTransactionDiff.getPortfolios(blockchain, etx)
-                    snapshot   <- StateSnapshot.fromDiff(Diff(portfolios = portfolios), blockchain)
+                    snapshot   <- StateSnapshot.build(blockchain, portfolios)
                     _          <- validateBalance(blockchain, etx.tpe, snapshot)
                   } yield portfolios
                 else
@@ -174,7 +174,7 @@ object TransactionDiffer {
       remainingComplexity: Int,
       enableExecutionLog: Boolean
   ): TracedResult[ValidationError, StateSnapshot] = {
-    val diff = if (verify) {
+    val snapshot = if (verify) {
       Verifier.assets(blockchain, remainingComplexity, enableExecutionLog)(tx).leftMap {
         case (spentComplexity, ScriptExecutionError(error, log, Some(assetId))) if transactionMayFail(tx) && acceptFailed(blockchain) =>
           FailedTransactionError.assetExecution(error, spentComplexity, log, assetId)
@@ -182,10 +182,10 @@ object TransactionDiffer {
           FailedTransactionError.notAllowedByAsset(spentComplexity, log, assetId)
         case (_, ve) => ve
       }
-    } else Diff.empty.asRight[ValidationError].traced
+    } else StateSnapshot.empty.asRight[ValidationError].traced
 
-    diff
-      .flatMap(d => StateSnapshot.fromDiff(d, blockchain).map(initSnapshot |+| _))
+    snapshot
+      .map(d => initSnapshot |+| d)
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
@@ -227,9 +227,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .map(txSnapshot =>
-        initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, applied = true, txSnapshot, blockchain))
-      )
+      .map(txSnapshot => initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, applied = true, txSnapshot, blockchain)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
@@ -246,7 +244,7 @@ object TransactionDiffer {
   private def validateFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] =
     for {
       fee      <- feePortfolios(blockchain, tx)
-      snapshot <- StateSnapshot.fromDiff(Diff(portfolios = fee), blockchain)
+      snapshot <- StateSnapshot.build(blockchain, fee)
       _        <- validateBalance(blockchain, tx.tpe, snapshot)
     } yield ()
 
@@ -259,8 +257,8 @@ object TransactionDiffer {
             .assetDescription(asset)
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
-      orderDiff = Diff(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
-      snapshot <- StateSnapshot.fromDiff(orderDiff, blockchain)
+      portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee))
+      snapshot <- StateSnapshot.build(blockchain, portfolios)
       _        <- validateBalance(blockchain, TransactionType.Exchange, snapshot)
     } yield ()
 
@@ -275,7 +273,7 @@ object TransactionDiffer {
                 .assetDescription(asset)
                 .toRight(GenericError(s"Referenced $asset not found"))
                 .flatMap(_ =>
-                  Diff
+                  Portfolio
                     .combine(
                       Map[Address, Portfolio](tx.senderAddress -> Portfolio.build(asset -> -amt)),
                       Map[Address, Portfolio](dAppAddress      -> Portfolio.build(asset -> amt))
@@ -283,7 +281,7 @@ object TransactionDiffer {
                     .leftMap(GenericError(_))
                 )
             case Waves =>
-              Diff
+              Portfolio
                 .combine(
                   Map[Address, Portfolio](tx.senderAddress -> Portfolio(-amt)),
                   Map[Address, Portfolio](dAppAddress      -> Portfolio(amt))
@@ -291,10 +289,9 @@ object TransactionDiffer {
                 .leftMap(GenericError(_))
           }
         }
-        .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
-      paymentsDiff = Diff(portfolios = portfolios)
-      snapshot <- StateSnapshot.fromDiff(paymentsDiff, blockchain)
-      _        <- BalanceDiffValidation(blockchain)(snapshot)
+        .flatMap(_.foldM(Map.empty[Address, Portfolio])(Portfolio.combine).leftMap(GenericError(_)))
+      paymentsSnapshot <- StateSnapshot.build(blockchain, portfolios)
+      _                <- BalanceDiffValidation(blockchain)(paymentsSnapshot)
     } yield ()
 
   // failed transactions related
@@ -317,12 +314,14 @@ object TransactionDiffer {
         case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
         case _                      => StateSnapshot.empty
       }
-      snapshot <- StateSnapshot.build(
-        blockchain,
-        portfolios = portfolios,
-        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-        scriptsComplexity = spentComplexity
-      ).map(_ |+| ethereumMetaDiff)
+      snapshot <- StateSnapshot
+        .build(
+          blockchain,
+          portfolios = portfolios,
+          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+          scriptsComplexity = spentComplexity
+        )
+        .map(_ |+| ethereumMetaDiff)
     } yield snapshot.withTransaction(NewTransactionInfo.create(tx, applied = false, snapshot, blockchain))
 
   private object isFailedTransaction {
@@ -359,7 +358,7 @@ object TransactionDiffer {
                 Sponsorship.toWaves(fee, assetInfo.sponsorship),
                 GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
               )
-              portfolios <- Diff
+              portfolios <- Portfolio
                 .combine(
                   Map(ptx.sender.toAddress       -> Portfolio.build(asset, -fee)),
                   Map(assetInfo.issuer.toAddress -> Portfolio.build(-wavesFee, asset, fee))

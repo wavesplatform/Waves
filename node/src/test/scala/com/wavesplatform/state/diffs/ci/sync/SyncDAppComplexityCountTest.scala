@@ -12,9 +12,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
-import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -220,7 +220,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
   private implicit class Ops(m: Map[Address, Portfolio]) {
     def |+|(m2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-      Diff.combine(m, m2).explicitGet()
+      Portfolio.combine(m, m2).explicitGet()
   }
 
   property("complexity border") {

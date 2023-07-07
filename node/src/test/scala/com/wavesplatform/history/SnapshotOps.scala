@@ -4,6 +4,7 @@ import cats.data.Ior
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -12,7 +13,6 @@ import scala.collection.immutable.VectorMap
 
 object SnapshotOps {
   implicit class TransactionStateSnapshotExt(val s: StateSnapshot) extends AnyVal {
-
     def toDiff(blockchain: Blockchain): Diff =
       Diff.withTransactions(
         s.transactions.values.toVector,
@@ -33,7 +33,7 @@ object SnapshotOps {
       )
 
     private def portfolios(blockchain: Blockchain): Map[Address, Portfolio] =
-      Diff.combine(balancePortfolios(blockchain), leasePortfolios(blockchain)).explicitGet()
+      Portfolio.combine(balancePortfolios(blockchain), leasePortfolios(blockchain)).explicitGet()
 
     private def balancePortfolios(blockchain: Blockchain): Map[Address, Portfolio] =
       s.balances
@@ -41,7 +41,7 @@ object SnapshotOps {
           val balanceDiff = balance - blockchain.balance(address, asset)
           if (balanceDiff != 0) {
             val portfolio = Portfolio.build(asset, balanceDiff)
-            Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
+            Portfolio.combine(portfolios, Map(address -> portfolio)).explicitGet()
           } else
             portfolios
         }
@@ -86,4 +86,23 @@ object SnapshotOps {
         orderId -> VolumeAndFee(info.volume - init.volume, info.fee - init.fee)
       }
   }
+
+  def fromDiff(diff: Diff, blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
+    StateSnapshot.build(
+      blockchain,
+      diff.portfolios,
+      diff.orderFills,
+      diff.issuedAssets,
+      diff.updatedAssets,
+      diff.assetScripts,
+      diff.sponsorship,
+      diff.leaseState,
+      diff.aliases,
+      diff.accountData,
+      diff.scripts,
+      diff.scriptResults,
+      diff.ethereumTransactionMeta,
+      diff.scriptsComplexity,
+      VectorMap() ++ diff.transactions.map(info => info.transaction.id() -> info).toMap
+    )
 }

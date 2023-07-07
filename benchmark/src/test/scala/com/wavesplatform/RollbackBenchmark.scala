@@ -74,7 +74,7 @@ object RollbackBenchmark extends ScorexLogging {
 
     log.info("Appending genesis block")
     rocksDBWriter.append(
-      StateSnapshot.fromDiff(Diff(portfolios = portfolios.toMap), rocksDBWriter).explicitGet(),
+      SnapshotOps.fromDiff(Diff(portfolios = portfolios.toMap), rocksDBWriter).explicitGet(),
       0,
       0,
       None,
@@ -98,7 +98,7 @@ object RollbackBenchmark extends ScorexLogging {
         )
         .explicitGet()
     val nextDiff     = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L))).toMap)
-    val nextSnapshot = StateSnapshot.fromDiff(nextDiff, rocksDBWriter).explicitGet()
+    val nextSnapshot = SnapshotOps.fromDiff(nextDiff, rocksDBWriter).explicitGet()
 
     log.info("Appending next block")
     rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, nextBlock)

@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.KeyType
 import com.wavesplatform.state.reader.LeaseDetails
@@ -107,7 +108,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
 
   property("correctly create transaction state snapshot hash from diff") {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
-      val snapshot = StateSnapshot.fromDiff(diff, d.blockchain).explicitGet()
+      val snapshot = SnapshotOps.fromDiff(diff, d.blockchain).explicitGet()
       TxStateSnapshotHashBuilder.createHashFromTxSnapshot(snapshot, succeeded = true).txStateSnapshotHash shouldBe hash(
         Seq(
           Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),

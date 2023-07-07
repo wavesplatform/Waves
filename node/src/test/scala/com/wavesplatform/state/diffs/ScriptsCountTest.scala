@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
@@ -11,7 +12,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.exchange.*
@@ -92,7 +93,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
 
     assertDiffAndState(Nil, TestBlock.create(Seq(genesis)), fs) { case (_, state) =>
       txs.foldLeft(Diff.empty) { (diff, tx) =>
-        val newState = CompositeBlockchain(state, diff)
+        val newState = SnapshotBlockchain(state, SnapshotOps.fromDiff(diff, state).explicitGet())
         val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet().toDiff(newState)
         // unsupported for snapshot
         // if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")

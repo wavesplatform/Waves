@@ -134,7 +134,7 @@ object ExchangeTransactionDiff {
     val seller: Address  = tx.sellOrder.sender.toAddress
 
     def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Either[String, Map[Address, Portfolio]] = {
-      Diff.combine(
+      Portfolio.combine(
         Map(buyer  -> Portfolio.build(asset, buyAssetChange)),
         Map(seller -> Portfolio.build(asset, sellAssetChange))
       )
@@ -153,7 +153,7 @@ object ExchangeTransactionDiff {
           Map[Address, Portfolio](matcher -> matcherPortfolio),
           Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
           Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
-        ).foldM(Map.empty[Address, Portfolio])(Diff.combine)
+        ).foldM(Map.empty[Address, Portfolio])(Portfolio.combine)
       )
 
     for {
@@ -173,7 +173,7 @@ object ExchangeTransactionDiff {
       priceDiff             <- getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange).leftMap(GenericError(_))
       amountDiff            <- getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange).leftMap(GenericError(_))
       feeDiff               <- feeDiffE.leftMap(GenericError(_))
-      totalDiff             <- Diff.combine(feeDiff, priceDiff).flatMap(Diff.combine(_, amountDiff)).leftMap(GenericError(_))
+      totalDiff             <- Portfolio.combine(feeDiff, priceDiff).flatMap(Portfolio.combine(_, amountDiff)).leftMap(GenericError(_))
     } yield totalDiff
   }
 

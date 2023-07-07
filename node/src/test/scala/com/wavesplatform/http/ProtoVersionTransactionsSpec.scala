@@ -14,7 +14,8 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -22,16 +23,6 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{
-  Asset,
-  CreateAliasTransaction,
-  DataTransaction,
-  Proofs,
-  Transaction,
-  TxNonNegativeAmount,
-  TxVersion,
-  VersionedTransaction
-}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
@@ -64,7 +55,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       transactionsApi,
       testWallet,
       blockchain,
-      mock[() => CompositeBlockchain],
+      mock[() => SnapshotBlockchain],
       () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,

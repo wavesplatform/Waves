@@ -5,6 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -97,7 +98,7 @@ class BalancesV4Test extends PropSpec with WithState {
     ) { case (d, s) =>
       val apiBalance =
         com.wavesplatform.api.common
-          .CommonAccountsApi(() => SnapshotBlockchain(s, StateSnapshot.fromDiff(d, s).explicitGet()), rdb, s)
+          .CommonAccountsApi(() => SnapshotBlockchain(s, SnapshotOps.fromDiff(d, s).explicitGet()), rdb, s)
           .balanceDetails(acc1.toAddress)
           .explicitGet()
       val data = d.accountData(dapp.toAddress)

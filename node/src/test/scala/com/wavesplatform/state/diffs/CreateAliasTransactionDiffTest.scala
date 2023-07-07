@@ -4,6 +4,7 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
@@ -70,7 +71,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
         addressTransactions(
           rdb,
-          Some(Height(newState.height + 1) -> StateSnapshot.fromDiff(blockDiff, newState).explicitGet()),
+          Some(Height(newState.height + 1) -> SnapshotOps.fromDiff(blockDiff, newState).explicitGet()),
           senderAcc,
           Set(TransactionType.CreateAlias),
           None
