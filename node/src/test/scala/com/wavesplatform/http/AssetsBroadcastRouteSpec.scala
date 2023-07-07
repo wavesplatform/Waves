@@ -160,12 +160,12 @@ class AssetsBroadcastRouteSpec
         }
         forAll(invalidBase58) { a =>
           posting(tr.copy(assetId = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
+            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError(s"Expected base58-encoded assetId"))))
           )
         }
         forAll(invalidBase58) { a =>
           posting(tr.copy(feeAssetId = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
+            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Expected base58-encoded assetId"))))
           )
         }
         forAll(nonPositiveLong) { fee =>
