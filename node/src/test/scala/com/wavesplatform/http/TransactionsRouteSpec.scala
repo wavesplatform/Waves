@@ -21,7 +21,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
@@ -67,19 +66,13 @@ class TransactionsRouteSpec
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime
-  private val getBlockchain =
-    () => {
-      (() => blockchain.carryFee).expects().returns(0)
-      (() => blockchain.settings).expects().returns(WavesSettings.default().blockchainSettings)
-      blockchain
-    }
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
     addressTransactions,
     testWallet,
     blockchain,
-    getBlockchain,
+    () => blockchain,
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
