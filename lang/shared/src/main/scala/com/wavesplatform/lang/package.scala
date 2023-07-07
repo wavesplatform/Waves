@@ -24,15 +24,16 @@ package object lang {
   implicit class StringOps(val s: String) extends AnyVal {
     def isWellFormed: Boolean = {
       var i = 0
-      while (i < s.length) {
+      var wellFormed = true
+      while (i < s.length && wellFormed) {
         val c = s.charAt(i)
         if (Character.isSurrogate(c)) {
-          if (s.codePointAt(i) == c) return false
-          i += 1
+          if (s.codePointAt(i) == c) wellFormed = false
+          else i += 1
         }
         i += 1
       }
-      true
+      wellFormed
     }
   }
 }
