@@ -4,16 +4,16 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val estimator = ScriptEstimatorV2
@@ -113,7 +113,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   test("can't set script with user function to asset before Ride4DApps activation") {
     assertBadRequestAndMessage(
       sender.setAssetScript(
-        Asset.IssuedAsset(ByteStr("Test".getBytes("UTF-8"))).id.toString,
+        Asset.IssuedAsset(ByteStr.fill(AssetIdLength)(1)).id.toString,
         smartAcc,
         issueFee,
         Some(scriptV2)

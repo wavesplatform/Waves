@@ -22,7 +22,7 @@ import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
-import com.wavesplatform.transaction.{Asset, TxHelpers}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
@@ -839,7 +839,10 @@ class UtilsRouteEvaluateSpec
         }
 
         // illegal payment asset id
-        Post(routePath(s"/script/evaluate/$secondAddress"), Json.parse("""{"payment":[{"amount":1,"assetId":"xxxxx"}]}""")) ~> route ~> check {
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse(s"""{"payment":[{"amount":1,"assetId":"${ByteStr.fill(AssetIdLength)(1)}"}]}""")
+        ) ~> route ~> check {
           responseAs[String] should include("Accounts balance errors")
         }
 

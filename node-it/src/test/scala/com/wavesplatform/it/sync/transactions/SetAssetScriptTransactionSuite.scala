@@ -98,11 +98,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       )
       assertApiError(
         broadcastSetAssetScriptJson(assetWOScript, firstKeyPair, setAssetScriptFee, version = v),
-        AssertiveApiError(WrongJson.Id, "failed to parse json message", matchMessage = true)
+        AssertiveApiError(WrongJson.Id, WrongJson.WrongJsonDataMessage, matchMessage = true)
       )
       assertApiError(
         broadcastSetAssetScriptJson(assetWOScript, firstKeyPair, setAssetScriptFee, Some(""), version = v),
-        AssertiveApiError(WrongJson.Id, "failed to parse json message", matchMessage = true)
+        AssertiveApiError(WrongJson.Id, WrongJson.WrongJsonDataMessage, matchMessage = true)
       )
       miner.assertBalances(firstAddress, balance, eff)
     }
@@ -158,7 +158,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       }
       assertApiError(broadcastSetAssetScriptJson(assetWAnotherOwner, secondKeyPair, setAssetScriptFee, Some(""), version = v)) { error =>
         error.id shouldBe WrongJson.Id
-        error.message shouldBe "failed to parse json message"
+        error.message shouldBe WrongJson.WrongJsonDataMessage
       }
     }
   }
@@ -180,10 +180,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   test("sender's waves balance is decreased by fee") {
     val script2 = ScriptCompiler(
       s"""
-           |match tx {
-           |  case _: SetAssetScriptTransaction => true
-           |  case _ => false
-           |}
+         |match tx {
+         |  case _: SetAssetScriptTransaction => true
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true,
       estimator
@@ -253,7 +253,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         ),
         (
           sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz9ekQuYn92natMnMq8").get)),
-          AssertiveApiError(WrongJson.Id, "failed to parse json", StatusCodes.BadRequest, true)
+          AssertiveApiError(WrongJson.Id, WrongJson.WrongJsonDataMessage, StatusCodes.BadRequest, true)
         ),
         (
           sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get)),
@@ -290,7 +290,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
       val noProof = request - "proofs"
       assertApiError(sender.postJson("/transactions/broadcast", noProof)) { error =>
-        error.message should include regex "failed to parse json message"
+        error.message should include regex WrongJson.WrongJsonDataMessage
 
         val validationErrors = (error.json \ "validationErrors" \ "obj.proofs").as[JsArray].value.flatMap(json => (json \ "msg").as[List[String]])
         validationErrors should contain("error.path.missing")
@@ -313,10 +313,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   test("try to update script to null") {
     for (v <- setAssetScrTxSupportedVersions) {
       assertApiError(broadcastSetAssetScriptJson(assetWScript, firstKeyPair, setAssetScriptFee, version = v)) { error =>
-        error.message should include regex "failed to parse json message"
+        error.message should include regex WrongJson.WrongJsonDataMessage
       }
       assertApiError(broadcastSetAssetScriptJson(assetWScript, firstKeyPair, setAssetScriptFee, Some(""), version = v)) { error =>
-        error.message should include regex "failed to parse json message"
+        error.message should include regex WrongJson.WrongJsonDataMessage
       }
     }
   }
@@ -401,7 +401,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
       nodes.waitForHeightAriseAndTxPresent(tx)
 
-      //try to change unchangeable script
+      // try to change unchangeable script
       val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
         version = v,
         accountA.publicKey,
