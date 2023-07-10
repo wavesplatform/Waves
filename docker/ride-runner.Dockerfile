@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
     # Clean
     apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
 
-# Temporarly here to experiment on a test env
 ENV RIDE_LOG_LEVEL=INFO
 ENV RIDE_HEAP_SIZE=2500m
 ENV RIDE_NETWORK=mainnet
