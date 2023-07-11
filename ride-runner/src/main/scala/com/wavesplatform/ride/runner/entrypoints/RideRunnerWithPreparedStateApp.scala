@@ -3,7 +3,6 @@ package com.wavesplatform.ride.runner.entrypoints
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
@@ -47,18 +46,14 @@ object RideRunnerWithPreparedStateApp {
           )
       }
 
-      val runResult = Evaluation.parse(StdLibVersion.VersionDic.latest, input.address, input.request) match {
+      val runResult = Evaluation.build(new ImmutableBlockchain(defaultFunctionalitySettings, input), input.address, input.request) match {
         case Left(e) => UtilsEvaluator.validationErrorToJson(e, input.maxTxErrorLogSize)
-        case Right(evaluation) =>
-          val blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input)
-          val address    = input.address
-          val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
+        case Right((evaluation, scriptInfo)) =>
           UtilsEvaluator.evaluate(
             evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
-            blockchain = blockchain,
             scriptInfo = scriptInfo,
             evaluation = evaluation,
-            address = address,
+            dAppAddress = input.address,
             trace = input.trace,
             maxTxErrorLogSize = input.maxTxErrorLogSize,
             intAsString = input.intAsString,

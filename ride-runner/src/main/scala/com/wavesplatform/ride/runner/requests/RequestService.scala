@@ -1,22 +1,25 @@
 package com.wavesplatform.ride.runner.requests
 
 import akka.http.scaladsl.model.StatusCodes
+import cats.syntax.either.*
 import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause, Scheduler as CaffeineScheduler}
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
 import com.wavesplatform.ride.runner.storage.{CacheKey, CacheWeights, SharedBlockchainStorage}
+import com.wavesplatform.state.AccountScriptInfo
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -84,6 +87,8 @@ class DefaultRequestService(
 
   private def isActive(request: RideScriptRunRequest): Boolean =
     currJobs.containsKey(request) || Option(activeRequests.policy().getIfPresentQuietly(request)).isDefined
+
+  private val blockchain = new ProxyBlockchain(sharedBlockchain)
 
   override def start(): Unit = if (isWorking.get()) {
     log.info("Starting queue...")
@@ -195,27 +200,18 @@ class DefaultRequestService(
       }
       .executeOn(runScriptScheduler)
 
-  private def evaluate(request: RideScriptRunRequest, prevResult: RideScriptRunResult): RideScriptRunResult = {
-    val (evaluation, failJson) =
-      if (prevResult.evaluation.isDefined) (prevResult.evaluation, JsObject.empty)
-      else // Note: the latest version here for simplicity
-        Evaluation.parse(StdLibVersion.VersionDic.latest, request.address, request.requestBody) match {
-          case Right(x) => (Some(x), JsObject.empty)
-          case Left(e)  => (None, UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize))
-        }
+  private def evaluate(request: RideScriptRunRequest, prevResult: RideScriptRunResult): RideScriptRunResult =
+    parse(request, prevResult) match {
+      case Left(e) =>
+        val failJson = UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize)
+        RideScriptRunResult(None, failJson.toString(), StatusCodes.BadRequest)
 
-    evaluation match {
-      case None => RideScriptRunResult(evaluation, failJson.toString(), StatusCodes.BadRequest)
-      case Some(ev) =>
-        val blockchain = new ProxyBlockchain(sharedBlockchain)
-        val address    = request.address
-        val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
+      case Right((evaluation, scriptInfo)) =>
         val initJsResult = UtilsEvaluator.evaluate(
-          settings.evaluateScriptComplexityLimit,
-          blockchain,
-          scriptInfo,
-          ev,
-          address,
+          evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
+          scriptInfo = scriptInfo,
+          evaluation = evaluation,
+          dAppAddress = request.address,
           trace = settings.enableTraces && request.trace,
           maxTxErrorLogSize = settings.maxTxErrorLogSize,
           intAsString = request.intAsString,
@@ -227,7 +223,7 @@ class DefaultRequestService(
         )
 
         val afterStateChanges = if (settings.enableStateChanges) initJsResult else initJsResult - "stateChanges"
-        val finalJsResult     = afterStateChanges ++ request.requestBody ++ Json.obj("address" -> address.toString)
+        val finalJsResult     = afterStateChanges ++ request.requestBody ++ Json.obj("address" -> request.address.toString)
         val finalStringResult = finalJsResult.toString()
 
         lazy val complexity = (finalJsResult \ "complexity").as[Int]
@@ -244,12 +240,26 @@ class DefaultRequestService(
         }
 
         RideScriptRunResult(
-          evaluation,
+          Some(evaluation),
           finalStringResult,
           if (isError) StatusCodes.BadRequest else StatusCodes.OK
         )
     }
-  }
+
+  private def parse(request: RideScriptRunRequest, prevResult: RideScriptRunResult): Either[ValidationError, (Evaluation, AccountScriptInfo)] =
+    prevResult.evaluation match {
+      case Some(evaluation) =>
+        evaluation.blockchain.accountScript(request.address) match {
+          case Some(scriptInfo) => (evaluation, scriptInfo).asRight
+          case None             => GenericError(s"There is no script on '${request.address}'").asLeft
+        }
+
+      case None =>
+        Evaluation.build(blockchain, request.address, request.requestBody) match {
+          case Right((evaluation, scriptInfo)) => (evaluation, scriptInfo).asRight
+          case Left(e)                         => e.asLeft
+        }
+    }
 
   // TODO #19 Change/move an error to an appropriate layer
   private def fail(reason: ApiError): RideScriptRunResult = RideScriptRunResult(

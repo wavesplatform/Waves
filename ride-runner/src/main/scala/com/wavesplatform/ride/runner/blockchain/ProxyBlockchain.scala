@@ -41,7 +41,6 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   // Ride: blockInfoByHeight
   override def blockReward(height: Int): Option[Long] = blockHeaderWithVrf(Height(height)).map(_.blockReward)
 
-  // TODO #?, tag)
   private def blockHeaderWithVrf(height: Height): Option[SignedBlockHeaderWithVrf] = sharedBlockchain.getOrFetchBlock(height)
 
   // Ride: wavesBalance, height, lastBlock

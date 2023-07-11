@@ -3,40 +3,36 @@ package com.wavesplatform.api.http.utils
 import cats.Id
 import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.EvaluatorFixProvider.*
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.compiler.ContractScriptCompactor
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
-import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.serialization.ScriptValuesJson
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, InvokeScriptResult, OverriddenBlockchain, Portfolio}
-import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, InvokeScriptResult, Portfolio}
+import com.wavesplatform.transaction.TransactionType.InvokeScript
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
-import com.wavesplatform.transaction.{Asset, TransactionType}
 import monix.eval.Coeval
 import play.api.libs.json.*
 import shapeless.*
@@ -44,42 +40,6 @@ import shapeless.*
 import scala.util.control.NoStackTrace
 
 object UtilsEvaluator {
-  def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
-    ExpressionCompiler
-      .compileUntyped(str, NoLibraries, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
-      .leftMap(GenericError(_))
-
-  def toInvokeScriptLike(invocation: Invocation, dAppAddress: Address) =
-    new InvokeScriptTransactionLike {
-      override def dApp: AddressOrAlias              = dAppAddress
-      override def funcCall: Terms.FUNCTION_CALL     = invocation.funcCall
-      override def root: InvokeScriptTransactionLike = this
-      override val sender: PublicKey                 = PublicKey(invocation.callerPk)
-      override def assetFee: (Asset, Long)           = (Asset.fromCompatId(invocation.feeAssetId), invocation.fee)
-      override def timestamp: Long                   = System.currentTimeMillis()
-      override def chainId: Byte                     = AddressScheme.current.chainId
-      override def id: Coeval[ByteStr]               = Coeval(invocation.transactionId)
-      override val tpe: TransactionType              = TransactionType.InvokeScript
-      override def payments: Seq[Payment] =
-        invocation.payments.payments.map { case (amount, assetId) =>
-          Payment(amount, Asset.fromCompatId(assetId))
-        }
-    }
-
-  def emptyInvokeScriptLike(dAppAddress: Address) =
-    new InvokeScriptTransactionLike {
-      override def dApp: AddressOrAlias              = dAppAddress
-      override def funcCall: Terms.FUNCTION_CALL     = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
-      override def payments: Seq[Payment]            = Seq.empty
-      override def root: InvokeScriptTransactionLike = this
-      override val sender: PublicKey                 = PublicKey(ByteStr(new Array[Byte](32)))
-      override def assetFee: (Asset, Long)           = Asset.Waves -> FeeConstants(InvokeScript) * ScriptExtraFee
-      override def timestamp: Long                   = System.currentTimeMillis()
-      override def chainId: Byte                     = AddressScheme.current.chainId
-      override def id: Coeval[ByteStr]               = Coeval.evalOnce(ByteStr.empty)
-      override val tpe: TransactionType              = TransactionType.InvokeScript
-    }
-
   object NoRequestStructure                 extends ValidationError
   object ConflictingRequestStructure        extends ValidationError
   case class ParseJsonError(error: JsError) extends ValidationError
@@ -87,53 +47,35 @@ object UtilsEvaluator {
   def evaluate(
       evaluateScriptComplexityLimit: Int,
       blockchain: Blockchain,
-      address: Address,
+      dAppAddress: Address,
       request: JsObject,
       trace: Boolean,
       maxTxErrorLogSize: Int,
       intAsString: Boolean,
       wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
-  ): JsObject = {
-    val r: Either[ValidationError, JsObject] = for {
-      evRequest <- parseEvaluateRequest(request)
-      overridden = evRequest.state.foldLeft(blockchain)(new OverriddenBlockchain(_, _))
-      scriptInfo <- overridden.accountScript(address) match {
-        case Some(x) => x.asRight
-        case None    => GenericError(s"There is no script on '$address'").asLeft
+  ): JsObject =
+    Evaluation
+      .build(blockchain, dAppAddress, request)
+      .map { case (evaluation, scriptInfo) =>
+        evaluate(
+          evaluateScriptComplexityLimit,
+          scriptInfo,
+          evaluation,
+          dAppAddress,
+          trace,
+          maxTxErrorLogSize,
+          intAsString,
+          wrapDAppEnv
+        )
       }
-      evaluation <- evRequest match {
-        case evRequest: UtilsExprRequest =>
-          evRequest.parseCall(scriptInfo.script.stdLibVersion).map { expr =>
-            ExprEvaluation(expr, UtilsEvaluator.emptyInvokeScriptLike(address))
-          }
-        case evRequest: UtilsInvocationRequest =>
-          evRequest.toInvocation.map { invocation =>
-            InvocationEvaluation(invocation, UtilsEvaluator.toInvokeScriptLike(invocation, address))
-          }
-
-        case _ => throw new RuntimeException("Impossible")
-      }
-    } yield evaluate(
-      evaluateScriptComplexityLimit,
-      overridden,
-      scriptInfo,
-      evaluation,
-      address,
-      trace,
-      maxTxErrorLogSize,
-      intAsString,
-      wrapDAppEnv
-    )
-
-    r.leftMap(validationErrorToJson(_, maxTxErrorLogSize)).merge
-  }
+      .leftMap(validationErrorToJson(_, maxTxErrorLogSize))
+      .merge
 
   def evaluate(
       evaluateScriptComplexityLimit: Int,
-      blockchain: Blockchain,
       scriptInfo: AccountScriptInfo,
       evaluation: Evaluation,
-      address: Address,
+      dAppAddress: Address,
       trace: Boolean,
       maxTxErrorLogSize: Int,
       intAsString: Boolean,
@@ -141,9 +83,9 @@ object UtilsEvaluator {
   ): JsObject = {
     val script = scriptInfo.script
     UtilsEvaluator
-      .executeExpression(blockchain, script, address, scriptInfo.publicKey, evaluateScriptComplexityLimit)(
+      .executeExpression(evaluation.blockchain, script, dAppAddress, scriptInfo.publicKey, evaluateScriptComplexityLimit)(
         evaluation.txLike,
-        evaluation.dAppToExpr(_, script),
+        evaluation.dAppToExpr,
         wrapDAppEnv
       )
       .fold(

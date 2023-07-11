@@ -99,7 +99,7 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
     val r = UtilsEvaluator.evaluate(
       evaluateScriptComplexityLimit = Int.MaxValue,
       blockchain = blockchain,
-      address = aliceAddr,
+      dAppAddress = aliceAddr,
       request = Json.obj("expr" -> "foo()"),
       trace = false,
       maxTxErrorLogSize = 0,

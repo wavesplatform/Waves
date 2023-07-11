@@ -76,7 +76,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       val apiResult = UtilsEvaluator.evaluate(
         evaluateScriptComplexityLimit = Int.MaxValue,
         blockchain = blockchain,
-        address = input.address,
+        dAppAddress = input.address,
         request = input.request,
         trace = input.trace,
         maxTxErrorLogSize = 0,
@@ -120,7 +120,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       val apiResult = UtilsEvaluator.evaluate(
         evaluateScriptComplexityLimit = Int.MaxValue,
         blockchain = blockchain,
-        address = input.address,
+        dAppAddress = input.address,
         request = input.request,
         trace = input.trace,
         maxTxErrorLogSize = 0,
