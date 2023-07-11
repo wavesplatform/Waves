@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
-import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
+import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
@@ -46,20 +46,16 @@ object RideRunnerWithPreparedStateApp {
           )
       }
 
-      val runResult = Evaluation.build(new ImmutableBlockchain(defaultFunctionalitySettings, input), input.address, input.request) match {
-        case Left(e) => UtilsEvaluator.validationErrorToJson(e, input.maxTxErrorLogSize)
-        case Right((evaluation, scriptInfo)) =>
-          UtilsEvaluator.evaluate(
-            evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
-            scriptInfo = scriptInfo,
-            evaluation = evaluation,
-            dAppAddress = input.address,
-            trace = input.trace,
-            maxTxErrorLogSize = input.maxTxErrorLogSize,
-            intAsString = input.intAsString,
-            wrapDAppEnv = identity
-          )
-      }
+      val runResult = UtilsEvaluator.evaluate(
+        evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
+        blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input),
+        dAppAddress = input.address,
+        request = input.request,
+        trace = input.trace,
+        maxTxErrorLogSize = input.maxTxErrorLogSize,
+        intAsString = input.intAsString,
+        wrapDAppEnv = identity
+      )
 
       println(Json.prettyPrint(runResult))
     }

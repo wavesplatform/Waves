@@ -201,12 +201,8 @@ class DefaultRequestService(
       .executeOn(runScriptScheduler)
 
   private def evaluate(request: RideScriptRunRequest, prevResult: RideScriptRunResult): RideScriptRunResult =
-    parse(request, prevResult) match {
-      case Left(e) =>
-        val failJson = UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize)
-        RideScriptRunResult(None, failJson.toString(), StatusCodes.BadRequest)
-
-      case Right((evaluation, scriptInfo)) =>
+    parse(request, prevResult)
+      .map { case (evaluation, scriptInfo) =>
         val initJsResult = UtilsEvaluator.evaluate(
           evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
           scriptInfo = scriptInfo,
@@ -244,7 +240,12 @@ class DefaultRequestService(
           finalStringResult,
           if (isError) StatusCodes.BadRequest else StatusCodes.OK
         )
-    }
+      }
+      .leftMap { e =>
+        val failJson = UtilsEvaluator.validationErrorToJson(e, settings.maxTxErrorLogSize)
+        RideScriptRunResult(None, failJson.toString(), StatusCodes.BadRequest)
+      }
+      .merge
 
   private def parse(request: RideScriptRunRequest, prevResult: RideScriptRunResult): Either[ValidationError, (Evaluation, AccountScriptInfo)] =
     prevResult.evaluation match {
