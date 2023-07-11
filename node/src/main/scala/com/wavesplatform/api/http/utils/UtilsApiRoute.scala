@@ -256,15 +256,17 @@ case class UtilsApiRoute(
         & jsonPostD[JsObject]
         & parameter("trace".as[Boolean] ? false)
         & optionalHeaderValueByType(Accept)
-    ) { (address, request, trace, accept) =>
+    ) { (address, request, enableTraces, accept) =>
       val apiResult = UtilsEvaluator.evaluate(
-        settings.evaluateScriptComplexityLimit,
         blockchain,
         address,
         request,
-        trace,
-        maxTxErrorLogSize,
-        intAsString = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
+        UtilsEvaluator.EvaluateOptions(
+          evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
+          maxTxErrorLogSize = maxTxErrorLogSize,
+          enableTraces = enableTraces,
+          intAsString = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
+        )
       )
       complete(apiResult ++ request ++ Json.obj("address" -> address.toString))
     }

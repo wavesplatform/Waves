@@ -74,13 +74,15 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
 
       val apiResult = UtilsEvaluator.evaluate(
-        evaluateScriptComplexityLimit = Int.MaxValue,
         blockchain = blockchain,
         dAppAddress = input.address,
         request = input.request,
-        trace = input.trace,
-        maxTxErrorLogSize = 0,
-        intAsString = true
+        options = UtilsEvaluator.EvaluateOptions(
+          evaluateScriptComplexityLimit = Int.MaxValue,
+          maxTxErrorLogSize = 0,
+          enableTraces = input.trace,
+          intAsString = true
+        )
       )
 
       withClue(Json.prettyPrint(apiResult)) {
@@ -118,13 +120,15 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
 
       val apiResult = UtilsEvaluator.evaluate(
-        evaluateScriptComplexityLimit = Int.MaxValue,
         blockchain = blockchain,
         dAppAddress = input.address,
         request = input.request,
-        trace = input.trace,
-        maxTxErrorLogSize = 0,
-        intAsString = true
+        options = UtilsEvaluator.EvaluateOptions(
+          evaluateScriptComplexityLimit = Int.MaxValue,
+          maxTxErrorLogSize = 0,
+          enableTraces = input.trace,
+          intAsString = true
+        )
       )
 
       withClue(Json.prettyPrint(apiResult)) {

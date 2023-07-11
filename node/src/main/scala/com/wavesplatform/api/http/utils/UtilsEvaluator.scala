@@ -44,56 +44,41 @@ object UtilsEvaluator {
   object ConflictingRequestStructure        extends ValidationError
   case class ParseJsonError(error: JsError) extends ValidationError
 
+  case class EvaluateOptions(evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int, enableTraces: Boolean, intAsString: Boolean)
+
   def evaluate(
-      evaluateScriptComplexityLimit: Int,
       blockchain: Blockchain,
       dAppAddress: Address,
       request: JsObject,
-      trace: Boolean,
-      maxTxErrorLogSize: Int,
-      intAsString: Boolean,
+      options: EvaluateOptions,
       wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
   ): JsObject =
     Evaluation
       .build(blockchain, dAppAddress, request)
-      .map { case (evaluation, scriptInfo) =>
-        evaluate(
-          evaluateScriptComplexityLimit,
-          scriptInfo,
-          evaluation,
-          dAppAddress,
-          trace,
-          maxTxErrorLogSize,
-          intAsString,
-          wrapDAppEnv
-        )
-      }
-      .leftMap(validationErrorToJson(_, maxTxErrorLogSize))
+      .map { case (evaluation, scriptInfo) => evaluate(evaluation, scriptInfo, dAppAddress, options, wrapDAppEnv) }
+      .leftMap(validationErrorToJson(_, options.maxTxErrorLogSize))
       .merge
 
   def evaluate(
-      evaluateScriptComplexityLimit: Int,
-      scriptInfo: AccountScriptInfo,
       evaluation: Evaluation,
+      scriptInfo: AccountScriptInfo,
       dAppAddress: Address,
-      trace: Boolean,
-      maxTxErrorLogSize: Int,
-      intAsString: Boolean,
+      options: EvaluateOptions,
       wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface
   ): JsObject = {
     val script = scriptInfo.script
     UtilsEvaluator
-      .executeExpression(evaluation.blockchain, script, dAppAddress, scriptInfo.publicKey, evaluateScriptComplexityLimit)(
+      .executeExpression(evaluation.blockchain, script, dAppAddress, scriptInfo.publicKey, options.evaluateScriptComplexityLimit)(
         evaluation.txLike,
         evaluation.dAppToExpr,
         wrapDAppEnv
       )
       .fold(
-        validationErrorToJson(_, maxTxErrorLogSize),
+        validationErrorToJson(_, options.maxTxErrorLogSize),
         { r =>
-          val traceObj = if (trace) Json.obj(TraceStep.logJson(r.log)) else Json.obj()
+          val traceObj = if (options.enableTraces) Json.obj(TraceStep.logJson(r.log)) else Json.obj()
           traceObj ++ Json.obj(
-            "result"       -> ScriptValuesJson.serializeValue(r.result, intAsString),
+            "result"       -> ScriptValuesJson.serializeValue(r.result, options.intAsString),
             "complexity"   -> r.complexity,
             "stateChanges" -> r.scriptResult
           )

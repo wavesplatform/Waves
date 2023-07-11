@@ -94,16 +94,17 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
       )
     }
     val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
-//    val counter = new CountedHeightCalls(scriptsSrcs)
-    val counter = new CountedHeightCallsTracker
+    val counter    = new CountedHeightCallsTracker
     val r = UtilsEvaluator.evaluate(
-      evaluateScriptComplexityLimit = Int.MaxValue,
       blockchain = blockchain,
       dAppAddress = aliceAddr,
       request = Json.obj("expr" -> "foo()"),
-      trace = false,
-      maxTxErrorLogSize = 0,
-      intAsString = true,
+      options = UtilsEvaluator.EvaluateOptions(
+        evaluateScriptComplexityLimit = Int.MaxValue,
+        maxTxErrorLogSize = 0,
+        enableTraces = false,
+        intAsString = true
+      ),
       wrapDAppEnv = underlying => new TrackedDAppEnvironment(underlying, counter)
     )
 

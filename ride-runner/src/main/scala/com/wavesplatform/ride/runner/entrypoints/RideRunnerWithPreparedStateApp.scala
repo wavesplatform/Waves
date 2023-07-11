@@ -47,14 +47,15 @@ object RideRunnerWithPreparedStateApp {
       }
 
       val runResult = UtilsEvaluator.evaluate(
-        evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
         blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input),
         dAppAddress = input.address,
         request = input.request,
-        trace = input.trace,
-        maxTxErrorLogSize = input.maxTxErrorLogSize,
-        intAsString = input.intAsString,
-        wrapDAppEnv = identity
+        options = UtilsEvaluator.EvaluateOptions(
+          evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
+          maxTxErrorLogSize = input.maxTxErrorLogSize,
+          enableTraces = input.trace,
+          intAsString = input.intAsString
+        )
       )
 
       println(Json.prettyPrint(runResult))

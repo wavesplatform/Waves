@@ -204,13 +204,15 @@ class DefaultRequestService(
     parse(request, prevResult)
       .map { case (evaluation, scriptInfo) =>
         val initJsResult = UtilsEvaluator.evaluate(
-          evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
           scriptInfo = scriptInfo,
           evaluation = evaluation,
           dAppAddress = request.address,
-          trace = settings.enableTraces && request.trace,
-          maxTxErrorLogSize = settings.maxTxErrorLogSize,
-          intAsString = request.intAsString,
+          options = UtilsEvaluator.EvaluateOptions(
+            evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
+            maxTxErrorLogSize = settings.maxTxErrorLogSize,
+            enableTraces = settings.enableTraces && request.trace,
+            intAsString = request.intAsString
+          ),
           wrapDAppEnv = underlying =>
             new TrackedDAppEnvironment(
               underlying,
