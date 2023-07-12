@@ -92,12 +92,13 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        (for {
-          prevStateHash <- ish.prevStateHash
-          diffHashes    <- ish.diffHashes
-        } yield {
-          blockChallenger.challengeBlock(newBlock, ch, prevStateHash, diffHashes)
-        }).sequence.void
+        // TODO: NODE-2594 get prev state hash
+        blockchainUpdater.lastBlockHeader
+          .flatMap(_.header.stateHash)
+          .traverse { prevStateHash =>
+            blockChallenger.challengeBlock(newBlock, ch, prevStateHash, ish.blockReward)
+          }
+          .void
 
       case Left(ve) =>
         Task {

@@ -1,7 +1,6 @@
 package com.wavesplatform.api.common
 
 import java.util.regex.Pattern
-import cats.syntax.either.*
 import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
@@ -74,16 +73,14 @@ object CommonAccountsApi {
     override def balanceDetails(address: Address): Either[String, BalanceDetails] = {
       val portfolio = blockchain.wavesPortfolio(address)
       val isBanned  = blockchain.hasBannedEffectiveBalance(address)
-      portfolio.effectiveBalance
-        .recover {
-          case _ if isBanned => 0L
-        }
+      portfolio
+        .effectiveBalance(isBanned)
         .map(effectiveBalance =>
           BalanceDetails(
             portfolio.balance,
             blockchain.generatingBalance(address),
             portfolio.balance - portfolio.lease.out,
-            if (isBanned) 0L else effectiveBalance,
+            effectiveBalance,
             portfolio.lease.in,
             portfolio.lease.out
           )

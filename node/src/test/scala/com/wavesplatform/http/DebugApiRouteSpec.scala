@@ -76,6 +76,7 @@ class DebugApiRouteSpec
   (blockchain.heightOf _).when(*).returns(None)
   (() => blockchain.height).when().returns(0)
   (blockchain.balanceSnapshots _).when(*, *, *).returns(Seq.empty)
+  (blockchain.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
 
   val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
     override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()

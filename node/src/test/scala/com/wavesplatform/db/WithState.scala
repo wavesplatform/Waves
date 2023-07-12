@@ -3,8 +3,10 @@ package com.wavesplatform.db
 import com.google.common.primitives.Shorts
 
 import java.nio.file.Files
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.{GenesisBlockVersion, GenesisGenerationSignature, GenesisGenerator, GenesisReference}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -20,7 +22,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers}
@@ -172,7 +174,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   def assertBalanceInvariant(diff: Diff): Unit = {
     val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
     portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+    portfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
     all(portfolioDiff.assets.values) shouldBe 0
   }
 
@@ -243,7 +245,29 @@ trait WithDomain extends WithState { _: Suite =>
       60.seconds
     )
 
-    Block.genesis(genesisSettings, rideV6Activated = true, txStateSnapshotActivated).explicitGet()
+    (for {
+      txs <- genesisSettings.transactions.toList.map { gts =>
+        for {
+          address <- Address.fromString(gts.recipient)
+          tx      <- GenesisTransaction.create(address, gts.amount, genesisSettings.timestamp)
+        } yield tx
+      }.sequence
+      baseTarget = genesisSettings.initialBaseTarget
+      timestamp  = genesisSettings.blockTimestamp
+      block <- Block.buildAndSign(
+        GenesisBlockVersion,
+        timestamp,
+        GenesisReference,
+        baseTarget,
+        GenesisGenerationSignature,
+        txs,
+        GenesisGenerator,
+        Seq.empty,
+        -1,
+        Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
+        None
+      )
+    } yield block).explicitGet()
   }
 }
 

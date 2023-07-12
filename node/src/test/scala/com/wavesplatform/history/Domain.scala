@@ -16,7 +16,7 @@ import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, Transacti
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.InitStateHash
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
@@ -341,7 +341,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     val timestamp =
       if (blockchain.height > 0)
         parent.timestamp + posSelector
-          .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e12.toLong)
+          .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
           .explicitGet()
       else
         System.currentTimeMillis() - (1 hour).toMillis

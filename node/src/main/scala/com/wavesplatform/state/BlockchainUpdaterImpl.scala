@@ -375,7 +375,7 @@ class BlockchainUpdaterImpl(
           }).map {
             _ map {
               case (
-                    BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, elidedTxs, diffHashesReversed),
+                    BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, elidedTxs, _),
                     discDiffs,
                     reward,
                     hitSource
@@ -393,8 +393,7 @@ class BlockchainUpdaterImpl(
                     reward,
                     hitSource,
                     cancelLeases(collectLeasesToCancel(newHeight), newHeight),
-                    elidedTxs = elidedTxs,
-                    diffHashesReversed = diffHashesReversed.toSeq.flatten
+                    elidedTxs = elidedTxs
                   )
                 )
                 publishLastBlockInfo()
@@ -519,7 +518,6 @@ class BlockchainUpdaterImpl(
                   this,
                   rocksdb.lastBlockTimestamp,
                   prevStateHash,
-                  ng.diffHashesReversed,
                   microBlock,
                   restTotalConstraint,
                   rocksdb.loadCacheData,
@@ -527,15 +525,14 @@ class BlockchainUpdaterImpl(
                 )
               }
             } yield {
-              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _, diffHashesReversed) = blockDifferResult
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _, _) = blockDifferResult
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)
 
               val transactionsRoot = ng.createTransactionsRoot(microBlock)
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
 
-              this.ngState =
-                Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, diffHashesReversed.toSeq.flatten, Some(blockId)))
+              this.ngState = Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
 
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))

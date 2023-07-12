@@ -57,6 +57,7 @@ package object appender {
       _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
     } yield Some(blockchainUpdater.height)
 
+  // TODO: NODE-2594 check challenged block state hash?
   private[appender] def appendChallengeBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       utx: UtxForAppender,

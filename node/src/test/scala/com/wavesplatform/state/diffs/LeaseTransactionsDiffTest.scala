@@ -42,7 +42,7 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
         val totalPortfolioDiff = totalDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
         total(totalPortfolioDiff.lease) shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
       }
 
@@ -50,7 +50,7 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
         val totalPortfolioDiff = totalDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
         total(totalPortfolioDiff.lease) shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
       }
     }

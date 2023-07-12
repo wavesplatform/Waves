@@ -83,6 +83,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
     (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
     (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
+    (blockchainUpdater.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
       .returning(

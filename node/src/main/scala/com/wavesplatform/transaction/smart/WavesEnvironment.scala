@@ -148,12 +148,12 @@ class WavesEnvironment(
       address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
       isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
-      effectiveBalance <- portfolio.effectiveBalance.recover { case _ if isBanned => 0L }
+      effectiveBalance <- portfolio.effectiveBalance(isBanned)
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
       blockchain.generatingBalance(address),
-      if (isBanned) 0L else effectiveBalance
+      effectiveBalance
     )
   }
 

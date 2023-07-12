@@ -56,7 +56,6 @@ case class NgState(
     microDiffs: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty,
     elidedTxs: Set[ByteStr] = Set.empty,
-    diffHashesReversed: Seq[ByteStr] = Seq.empty,
     internalCaches: NgStateCaches = new NgStateCaches
 ) {
   def cancelExpiredLeases(diff: Diff): Either[String, Diff] =
@@ -148,16 +147,14 @@ case class NgState(
       microblockCarry: Long,
       microblockTotalFee: Long,
       timestamp: Long,
-      diffHashesReversed: Seq[ByteStr],
       totalBlockId: Option[BlockId] = None
   ): NgState = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
-    val microDiffs                = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
-    val microBlocks               = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
-    val updatedDiffHashesReversed = diffHashesReversed ++ this.diffHashesReversed
+    val microDiffs  = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
+    val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
-    this.copy(microDiffs = microDiffs, microBlocks = microBlocks, diffHashesReversed = updatedDiffHashesReversed)
+    this.copy(microDiffs = microDiffs, microBlocks = microBlocks)
   }
 
   def carryFee: Long =

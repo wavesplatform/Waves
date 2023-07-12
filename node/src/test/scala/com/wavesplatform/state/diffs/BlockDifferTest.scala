@@ -15,9 +15,7 @@ import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
-
-import scala.concurrent.duration.*
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
 class BlockDifferTest extends FreeSpec with WithDomain {
   private val TransactionFee = 10
@@ -165,7 +163,6 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             blockchain,
             blockchain.lastBlockTimestamp,
             genesis.header.stateHash,
-            Seq.empty,
             correctMicroblock,
             MiningConstraint.Unlimited
           ) should beRight
@@ -175,7 +172,6 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             blockchain,
             blockchain.lastBlockTimestamp,
             genesis.header.stateHash,
-            Seq.empty,
             incorrectMicroblock,
             MiningConstraint.Unlimited
           ) shouldBe an[Left[InvalidStateHash, Result]]

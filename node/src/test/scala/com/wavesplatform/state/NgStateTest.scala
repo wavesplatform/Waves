@@ -22,7 +22,7 @@ class NgStateTest extends PropSpec {
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
-    microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 0L, 0L, 0L, Seq.empty))
+    microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 0L, 0L, 0L))
 
     ng.totalDiffOf(microBlocks.last.totalResBlockSig)
     microBlocks.foreach { m =>
@@ -37,7 +37,7 @@ class NgStateTest extends PropSpec {
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
-    microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 0L, 0L, 0L, Seq.empty))
+    microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 0L, 0L, 0L))
 
     ng.bestLiquidBlock.id() shouldBe microBlocks.last.totalResBlockSig
 
@@ -52,7 +52,7 @@ class NgStateTest extends PropSpec {
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
 
     microBlocks.foldLeft(1000) { case (thisTime, m) =>
-      ng = ng.append(m, Diff.empty, 0L, 0L, thisTime, Seq.empty)
+      ng = ng.append(m, Diff.empty, 0L, 0L, thisTime)
       thisTime + 50
     }
 
@@ -70,7 +70,7 @@ class NgStateTest extends PropSpec {
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
-    microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 1L, 0L, 0L, Seq.empty))
+    microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 1L, 0L, 0L))
 
     ng.totalDiffOf(block.id()).map(_._3) shouldBe Some(0L)
     microBlocks.zipWithIndex.foreach { case (m, i) =>
