@@ -10,6 +10,7 @@ import com.wavesplatform.ride.runner.TestScript
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
 
@@ -25,19 +26,19 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
     accounts = Map(
       scriptedAccAddr -> RunnerAccountState(
         scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = false))),
-        assetBalances = Map(btc -> 1),
-        regularBalance = Some(500_000)
+        assetBalances = Map(btc -> TxNonNegativeAmount(1)),
+        regularBalance = Some(TxNonNegativeAmount(500_000))
       ),
       aliceAddr -> RunnerAccountState(
         data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
         aliases = List(Alias.create("carl").explicitGet()),
-        assetBalances = Map(btc -> 2),
-        regularBalance = Some(1_300_000)
+        assetBalances = Map(btc -> TxNonNegativeAmount(2)),
+        regularBalance = Some(TxNonNegativeAmount(1_300_000))
       ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
-        assetBalances = Map(btc -> 3),
-        leasing = Some(RunnerLeaseBalance(in = 10, out = 100))
+        assetBalances = Map(btc -> TxNonNegativeAmount(3)),
+        leasing = Some(RunnerLeaseBalance(in = TxNonNegativeAmount(10), out = TxNonNegativeAmount(100)))
       )
     ),
     height = 3296627,
@@ -106,8 +107,8 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
                 publicKey = scriptedAcc.publicKey
               )
             ),
-            assetBalances = Map(btc -> 5),
-            regularBalance = Some(5 * 1_700_000 + 2)
+            assetBalances = Map(btc -> TxNonNegativeAmount(5)),
+            regularBalance = Some(TxNonNegativeAmount(5 * 1_700_000 + 2))
           )
         )
       )

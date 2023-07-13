@@ -17,7 +17,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScript
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxPositiveAmount, TxValidationError}
+import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxNonNegativeAmount, TxPositiveAmount, TxValidationError}
 import play.api.libs.json.*
 import play.api.libs.json.JsError.toJson
 
@@ -58,6 +58,8 @@ object RideRunnerInputParser extends DefaultReads {
   implicit val optBlockIdKeyReads: KeyReads[Option[BlockId]] = KeyReads { x =>
     if (x.isEmpty) JsSuccess(None) else parseByteStr(x, "Option[BlockId]").map(Some(_))
   }
+
+  implicit val txNonNegativeAmountReads: Reads[TxNonNegativeAmount] = com.wavesplatform.transaction.TxNonNegativeAmount.reads
 
   implicit def byteArrayReads(hint: String): Reads[Array[Byte]] = StringReads.flatMapResult(parseByteArrayBase58(_, hint))
 

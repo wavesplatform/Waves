@@ -1,3 +1,5 @@
 package com.wavesplatform.ride.runner.input
 
-case class RunnerLeaseBalance(in: Long = 0, out: Long = 0)
+import com.wavesplatform.transaction.TxNonNegativeAmount
+
+case class RunnerLeaseBalance(in: TxNonNegativeAmount = TxNonNegativeAmount(0), out: TxNonNegativeAmount = TxNonNegativeAmount(0))
