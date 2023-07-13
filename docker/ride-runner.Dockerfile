@@ -2,16 +2,17 @@
 # JDK for now, because I need jmap, e.g. ijmap -dump:format=b,file=heap-dump.hprof
 FROM eclipse-temurin:17-jdk
 
-# /usr/local/async-profiler/build/libasyncProfiler.so
-ENV ASYNCPROF_VERSION=2.9
-
 SHELL ["/bin/bash", "-c"]
 
-# Additional dependencies
-RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
-    export ASYNCPROF_ARCHIVE="async-profiler-${ASYNCPROF_VERSION}-linux-x64.tar.gz"; \
+# async profiler
+# /usr/local/async-profiler/build/libasyncProfiler.so
+ENV ASYNCPROF_VERSION=2.9
+RUN export ASYNCPROF_ARCHIVE="async-profiler-${ASYNCPROF_VERSION}-linux-x64.tar.gz"; \
     wget --quiet "https://github.com/jvm-profiling-tools/async-profiler/releases/download/v${ASYNCPROF_VERSION}/${ASYNCPROF_ARCHIVE}" -P /tmp/ && \
-      mkdir /usr/local/async-profiler; tar -xvzf /tmp/$ASYNCPROF_ARCHIVE --strip-components=1 -C /usr/local/async-profiler || exit 1; \
+      mkdir /usr/local/async-profiler; tar -xvzf /tmp/$ASYNCPROF_ARCHIVE --strip-components=1 -C /usr/local/async-profiler || exit 1;
+
+# Additional dependencies
+RUN apt-get update && apt-get install -y wget unzip gosu libjemalloc-dev graphviz || exit 1; \
     # Clean
     apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
 
@@ -26,11 +27,16 @@ ENV RIDE_INSTALL_PATH=/usr/share/ride-runner
 ENV RIDE_CONFIG=/etc/ride-runner/ride-runner.conf
 ENV RIDE_LOGBACK_CONFIG=$RIDE_INSTALL_PATH/doc/logback.sample.xml
 
+# jemalloc options
+# Add -e JEMALLOC_ENABLE=true to enable
+ENV MALLOC_CONF="prof:true,lg_prof_interval:29,lg_prof_sample:21"
+
 COPY ride-runner-target /tmp/
 COPY ride-runner.conf.template $RIDE_CONFIG
 
 # Setup node
 COPY ride-runner.entrypoint.sh $RIDE_INSTALL_PATH/bin/entrypoint.sh
+COPY jemalloc-report.sh $RIDE_INSTALL_PATH/bin/jemalloc-report.sh
 RUN mkdir -p $RDATA/heap-dumps/on-exit; \
     # Create user
     groupadd -r ride --gid=999; \

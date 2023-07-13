@@ -9,6 +9,8 @@ shopt -s nullglob
 #
 # GCLockerRetryAllocationCount to prevent false OOM
 #
+# Update the metrics if you change -XX:ThreadStackSize=1024 (1 KiB)
+#
 # UnlockDiagnosticVMOptions is required for GCLockerRetryAllocationCount, otherwise we get:
 #   Error: VM option 'GCLockerRetryAllocationCount' is diagnostic and must be enabled via -XX:+UnlockDiagnosticVMOptions.
 #   Error: The unlock option must precede 'GCLockerRetryAllocationCount'.
@@ -18,6 +20,7 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   --add-opens=java.base/java.util=ALL-UNNAMED
   -XX:+UnlockDiagnosticVMOptions
   -Xlog:gc::time,level,tags
+  -XX:NativeMemoryTracking=summary
   -XX:+ExitOnOutOfMemoryError
   -XX:+UseG1GC
   -XX:+ParallelRefProcEnabled
@@ -25,6 +28,7 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   -XX:GCLockerRetryAllocationCount=100
   -Xmx${RIDE_HEAP_SIZE}
   -XX:MaxMetaspaceSize=152m
+  -XX:ThreadStackSize=1024
   -Djdk.attach.allowAttachSelf=true
   -Dfile.encoding=UTF-8
   -Dlogback.configurationFile=${RIDE_LOGBACK_CONFIG}
@@ -39,11 +43,17 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
 echo "Ride runner is starting..."
 echo "JAVA_OPTS='${JAVA_OPTS}'"
 
-if [ $# -eq 0 ]
-  then
-    ARGS="$RIDE_APP $RIDE_CONFIG"
-  else
-    ARGS=$@
+if [ $# -eq 0 ]; then
+  ARGS="$RIDE_APP $RIDE_CONFIG"
+else
+  ARGS=$@
+fi
+
+if [[ -n "$JEMALLOC_ENABLE" && "$JEMALLOC_ENABLE" == "true" ]]; then
+  # jemalloc settings
+  mkdir -p ${RDATA}/jemalloc
+  export MALLOC_CONF="${MALLOC_CONF},prof_prefix:${RDATA}/jemalloc/jeprof.out"
+  export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so"
 fi
 
 java $JAVA_OPTS -cp "${RIDE_INSTALL_PATH}/lib/*" $ARGS
