@@ -167,16 +167,14 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance = _leaseBalance.getOrElse(address, LeaseBalance(0, 0))
 
-  private lazy val _balance: Map[Address, Map[Asset, Long]] = mapAccountState(_.balance)
-
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long =
-    _balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
+    input.accounts.get(address).flatMap(_.balance(mayBeAssetId)).getOrElse(0L)
 
   private lazy val _balanceSnapshots: Map[Address, Seq[BalanceSnapshot]] = for {
     (addr, state) <- input.accounts
   } yield {
-    val generatingBalance = state.generatingBalance.orElse(state.balance.get(Waves)).getOrElse(0L)
+    val generatingBalance = state.generatingBalance.orElse(state.balance(Waves)).getOrElse(0L)
     addr -> Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
   }
 

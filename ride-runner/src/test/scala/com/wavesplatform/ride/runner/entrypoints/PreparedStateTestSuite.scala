@@ -9,7 +9,7 @@ import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.ride.runner.TestScript
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
 
@@ -25,22 +25,18 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
     accounts = Map(
       scriptedAccAddr -> RunnerAccountState(
         scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = false))),
-        balance = Map(
-          Waves -> 500_000,
-          btc   -> 1
-        )
+        assetBalances = Map(btc -> 1),
+        regularBalance = Some(500_000)
       ),
       aliceAddr -> RunnerAccountState(
         data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
         aliases = List(Alias.create("carl").explicitGet()),
-        balance = Map(
-          Waves -> 1_300_000,
-          btc   -> 2
-        )
+        assetBalances = Map(btc -> 2),
+        regularBalance = Some(1_300_000)
       ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
-        balance = Map(btc -> 3),
+        assetBalances = Map(btc -> 3),
         leasing = Some(RunnerLeaseBalance(in = 10, out = 100))
       )
     ),
@@ -110,10 +106,8 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
                 publicKey = scriptedAcc.publicKey
               )
             ),
-            balance = Map(
-              Waves -> (5 * 1_700_000 + 2),
-              btc   -> 5
-            )
+            assetBalances = Map(btc -> 5),
+            regularBalance = Some(5 * 1_700_000 + 2)
           )
         )
       )

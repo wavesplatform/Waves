@@ -9,7 +9,6 @@ import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.environments.{DAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.input.{RideRunnerInput, RunnerAccountState, RunnerBlockInfo, RunnerScriptInfo}
 import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
 
@@ -119,11 +118,11 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
     request = Json.obj(),
     accounts = Map(
       aliceAddr -> RunnerAccountState(
-        balance = Map(Waves -> 10_000_000)
+        regularBalance = Some(10_000_000)
       ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
-        balance = Map(Waves -> 10_300_000)
+        regularBalance = Some(10_300_000)
       )
     ),
     height = DefaultHeight,
