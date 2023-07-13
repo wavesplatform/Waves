@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner.blockchain
 
+import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -12,7 +13,7 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
-import com.wavesplatform.ride.runner.input.{RideRunnerInput, RunnerAccountState, RunnerScriptInfo}
+import com.wavesplatform.ride.runner.input.RideRunnerInput
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
@@ -32,39 +33,35 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
 
-class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain {
+import scala.util.chaining.scalaUtilChainingOps
+
+class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain { blockchain =>
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
 
-  private lazy val _hasData: Map[Address, Boolean] = mapAccountState(_.data.nonEmpty)
-
   // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = _hasData.getOrElse(address, false)
-
-  private lazy val _accountData: Map[Address, Map[String, DataEntry[?]]] = for {
-    (addr, state) <- input.accounts
-    data          <- state.data
-  } yield addr -> data.map { case (key, entry) => key -> entry.toDataEntry(key) }
-
-  private lazy val _accountScript: Map[Address, RunnerScriptInfo] = for {
-    (addr, state) <- input.accounts
-    scriptInfo    <- state.scriptInfo
-  } yield addr -> scriptInfo
+  override def hasData(address: Address): Boolean = input.accounts.get(address).fold(false)(_.data.nonEmpty)
 
   // Ride: get*Value (data), get* (data)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = _accountData.getOrElse(acc, Map.empty).get(key)
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = for {
+    accountState <- input.accounts.get(acc)
+    data         <- accountState.data
+    entry        <- data.get(key)
+  } yield entry.toDataEntry(key)
 
-  // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = {
-    _accountScript.get(address).map { input =>
-      val complexityInfo = Set(ScriptEstimatorV1, ScriptEstimatorV2, this.estimator).map { estimator =>
-        estimator.version -> complexityInfoOf(isAsset = false, input.script)
+  private val accountScripts = mkCache[Address, Option[AccountScriptInfo]] { address =>
+    for {
+      accountState <- input.accounts.get(address)
+      scriptInfo   <- accountState.scriptInfo
+    } yield {
+      val complexityInfo = Set(ScriptEstimatorV1, ScriptEstimatorV2, blockchain.estimator).map { estimator =>
+        estimator.version -> complexityInfoOf(isAsset = false, scriptInfo.script)
       }
 
       val (lastEstimatorVersion, lastComplexityInfo) = complexityInfo.last
       AccountScriptInfo(
-        script = input.script,
-        publicKey = input.publicKey,
+        script = scriptInfo.script,
+        publicKey = scriptInfo.publicKey,
         verifierComplexity = lastComplexityInfo.verifierComplexity,
         complexitiesByEstimator = complexityInfo
           .map { case (v, complexityInfo) => v -> complexityInfo.callableComplexities }
@@ -74,43 +71,42 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     }
   }
 
+  // Ride: scriptHash
+  override def accountScript(address: Address): Option[AccountScriptInfo] = accountScripts.get(address)
+
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
-  private lazy val _blockHeader: Map[Int, SignedBlockHeader] = for {
-    (height, blockInfo) <- input.blocks
-  } yield height -> SignedBlockHeader(
-    header = BlockHeader(
-      version = 5,
-      timestamp = blockInfo.timestamp,
-      reference = ByteStr(Array.emptyByteArray),
-      baseTarget = blockInfo.baseTarget,
-      generationSignature = blockInfo.generationSignature,
-      generator = blockInfo.generatorPublicKey,
-      featureVotes = Nil,
-      rewardVote = -1,
-      transactionsRoot = ByteStr(Array.emptyByteArray)
-    ),
-    signature = ByteStr(Array.emptyByteArray)
-  )
+  private val blockHeaders = mkCache[Int, Option[SignedBlockHeader]] { height =>
+    input.blocks.get(height).map { blockInfo =>
+      SignedBlockHeader(
+        header = BlockHeader(
+          version = 5,
+          timestamp = blockInfo.timestamp,
+          reference = ByteStr(Array.emptyByteArray),
+          baseTarget = blockInfo.baseTarget,
+          generationSignature = blockInfo.generationSignature,
+          generator = blockInfo.generatorPublicKey,
+          featureVotes = Nil,
+          rewardVote = -1,
+          transactionsRoot = ByteStr(Array.emptyByteArray)
+        ),
+        signature = ByteStr(Array.emptyByteArray)
+      )
+    }
+  }
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
     // Dirty, but we have a clear error instead of "None.get"
-    Some(
-      _blockHeader.getOrElse(
-        height,
-        throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
-      )
-    )
-
-  private lazy val _hitSource: Map[Int, ByteStr] = for {
-    (height, blockInfo) <- input.blocks
-    vrf                 <- blockInfo.VRF
-  } yield height -> vrf
+    blockHeaders
+      .get(height)
+      .tap { r =>
+        if (r.isEmpty) throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
+      }
 
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = _hitSource.get(height) // VRF
+  override def hitSource(height: Int): Option[ByteStr] = input.blocks.get(height).flatMap(_.VRF)
 
   // Ride: blockInfoByHeight
   override def blockReward(height: Int): Option[Long] = input.blocks.get(height).map(_.blockReward)
@@ -118,30 +114,30 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
 
-  override val activatedFeatures: Map[Short, Int] =
-    settings.functionalitySettings.preActivatedFeatures ++
-      input.features.map(id => id -> (height - 1))
+  override val activatedFeatures: Map[Short, Int] = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
 
-  private lazy val assets: Map[IssuedAsset, AssetDescription] = input.assets.map { case (asset, info) =>
-    asset -> AssetDescription(
-      originTransactionId = asset.id,
-      issuer = info.issuerPublicKey,
-      name = info.name,
-      description = info.description,
-      decimals = info.decimals,
-      reissuable = info.reissuable,
-      totalVolume = info.quantity,
-      script = info.script.map { script =>
-        val complexityInfo = complexityInfoOf(isAsset = true, script)
-        AssetScriptInfo(script, complexityInfo.verifierComplexity)
-      },
-      sponsorship = info.minSponsoredAssetFee,
-      // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
-      lastUpdatedAt = Height(0),
-      nft = false,
-      sequenceInBlock = 0,
-      issueHeight = Height(0)
-    )
+  private val assets = mkCache[IssuedAsset, Option[AssetDescription]] { assetId =>
+    input.assets.get(assetId).map { info =>
+      AssetDescription(
+        originTransactionId = assetId.id,
+        issuer = info.issuerPublicKey,
+        name = info.name,
+        description = info.description,
+        decimals = info.decimals,
+        reissuable = info.reissuable,
+        totalVolume = info.quantity,
+        script = info.script.map { script =>
+          val complexityInfo = complexityInfoOf(isAsset = true, script)
+          AssetScriptInfo(script, complexityInfo.verifierComplexity)
+        },
+        sponsorship = info.minSponsoredAssetFee,
+        // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+        lastUpdatedAt = Height(0),
+        nft = false,
+        sequenceInBlock = 0,
+        issueHeight = Height(0)
+      )
+    }
   }
 
   // Ride: assetInfo
@@ -159,71 +155,69 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
     resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
 
-  private lazy val _leaseBalance: Map[Address, LeaseBalance] = for {
-    (addr, state) <- input.accounts
-    lease         <- state.leasing
-  } yield addr -> LeaseBalance(lease.in.value, lease.out.value)
-
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance = _leaseBalance.getOrElse(address, LeaseBalance(0, 0))
+  override def leaseBalance(address: Address): LeaseBalance = {
+    val r = for {
+      accountState <- input.accounts.get(address)
+      lease        <- accountState.leasing
+    } yield LeaseBalance(lease.in.value, lease.out.value)
+    r.getOrElse(LeaseBalance(0, 0))
+  }
 
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long =
     input.accounts.get(address).flatMap(_.balance(mayBeAssetId)).getOrElse(0L)
 
-  private lazy val _balanceSnapshots: Map[Address, Seq[BalanceSnapshot]] = for {
-    (addr, state) <- input.accounts
-  } yield {
-    val generatingBalance = state.generatingBalance.map(_.value).orElse(state.balance(Waves)).getOrElse(0L)
-    addr -> Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
+  private val balanceSnapshotsCache = mkCache[Address, Seq[BalanceSnapshot]] { address =>
+    val generatingBalance = input.accounts
+      .get(address)
+      .flatMap { addressState => addressState.generatingBalance.map(_.value).orElse(addressState.balance(Waves)) }
+      .getOrElse(0L)
+
+    Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
   }
 
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     // "to" always None
-    _balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
+    balanceSnapshotsCache.get(address).filter(_.height >= from)
 
   private def complexityInfoOf(isAsset: Boolean, script: Script): ComplexityInfo =
     estimate(height, activatedFeatures, this.estimator, script, isAsset = isAsset, withCombinedContext = true)
 
-  private lazy val transactionMetaById: Map[ByteStr, TxMeta] = for {
-    (id, tx) <- input.transactions
-  } yield id -> TxMeta(
-    height = Height(tx.height.getOrElse((height - 1).max(1))),
-    succeeded = true,
-    spentComplexity = 0
-  )
-
   // Ride: transactionHeightById
-  override def transactionMeta(id: ByteStr): Option[TxMeta] = transactionMetaById.get(id)
-
-  private lazy val transferById: Map[ByteStr, TransferTransactionLike] = for {
-    (id, tx) <- input.transactions
-  } yield id -> TransferTransaction(
-    version = tx.version,
-    sender = tx.senderPublicKey,
-    recipient = tx.recipient,
-    assetId = tx.assetId,
-    amount = TxPositiveAmount.from(tx.amount).explicitGet(),
-    feeAssetId = tx.feeAssetId,
-    fee = TxPositiveAmount.from(tx.fee).explicitGet(),
-    attachment = tx.attachment,
-    timestamp = tx.timestamp,
-    proofs = Proofs(tx.proofs),
-    chainId = chainId
-  )
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactions.get(id).map { tx =>
+    TxMeta(
+      height = Height(tx.height.getOrElse((height - 1).max(1))),
+      succeeded = true,
+      spentComplexity = 0
+    )
+  }
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    transferById.get(id).map { tx =>
+    input.transactions.get(id).map { inputTx =>
       val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
+      val tx = TransferTransaction(
+        version = inputTx.version,
+        sender = inputTx.senderPublicKey,
+        recipient = inputTx.recipient,
+        assetId = inputTx.assetId,
+        amount = TxPositiveAmount.from(inputTx.amount).explicitGet(),
+        feeAssetId = inputTx.feeAssetId,
+        fee = TxPositiveAmount.from(inputTx.fee).explicitGet(),
+        attachment = inputTx.attachment,
+        timestamp = inputTx.timestamp,
+        proofs = Proofs(inputTx.proofs),
+        chainId = chainId
+      )
       (meta.height, tx)
     }
 
-  private def mapAccountState[T](f: RunnerAccountState => T): Map[Address, T] = for {
-    (addr, state) <- input.accounts
-  } yield addr -> f(state)
+  private def mkCache[K, V](f: K => V): LoadingCache[K, V] = Caffeine
+    .newBuilder()
+    .build[K, V](new CacheLoader[K, V] { override def load(key: K): V = f(key) })
 
   // Not supported
 
