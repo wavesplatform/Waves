@@ -6,10 +6,13 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.{Compile, Def}
-import sbt.Keys.{concurrentRestrictions, _}
-
 Global / onChangedBuildSource := ReloadOnSourceChanges
+
+enablePlugins(GitVersioning)
+
+git.uncommittedSignifier := Some("DIRTY")
+git.useGitDescribe := true
+ThisBuild / git.useGitDescribe := true
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -170,9 +173,6 @@ inScope(Global)(
     )
   )
 )
-
-// ThisBuild options
-git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {

@@ -6,7 +6,6 @@ enablePlugins(
   UniversalDeployPlugin,
   JDebPackaging,
   SystemdPlugin,
-  GitVersioning,
   VersionObject,
   JavaAgent
 )
