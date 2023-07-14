@@ -1,11 +1,16 @@
 package com.wavesplatform.network
 
+import java.net.{InetSocketAddress, NetworkInterface, SocketAddress}
+import java.nio.channels.ClosedChannelException
+import java.util.concurrent.ConcurrentHashMap
+
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings.*
+import com.wavesplatform.state.Cast
 import com.wavesplatform.transaction.*
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel.*
 import io.netty.channel.group.ChannelGroup
@@ -15,10 +20,8 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
+import org.slf4j.LoggerFactory
 
-import java.net.{InetSocketAddress, NetworkInterface}
-import java.nio.channels.ClosedChannelException
-import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -201,22 +204,24 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
+    val connectionLogger = LoggerFacade(LoggerFactory.getLogger(s"${this.getClass}.connections"))
+
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
       val delay = (if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
       log.trace(s"Next connection attempt in $delay")
 
+      def mkAddressString(addresses: IterableOnce[SocketAddress]) =
+        addresses.iterator.map(_.toString).toVector.sorted.mkString("[", ",", "]")
+
       workerGroup.schedule(delay) {
-        val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+        val all      = peerInfo.values().iterator().asScala.flatMap(_.remoteAddress.cast[InetSocketAddress])
+        val incoming = peerInfo.values().asScala.view.map(_.remoteAddress).filterNot(outgoingChannels.containsKey)
 
-        def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
+        lazy val incomingStr = mkAddressString(incoming)
+        lazy val outgoingStr = mkAddressString(outgoingChannels.keySet.iterator().asScala)
 
-        val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-        val incoming = all.filterNot(outgoing.contains)
-
-        def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
-
-        log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+        connectionLogger.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
         if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
           peerDatabase
             .randomPeer(excluded = excludedAddresses ++ all)

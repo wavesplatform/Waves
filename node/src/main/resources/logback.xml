@@ -19,6 +19,7 @@
 
     <logger name="com.wavesplatform.utx.UtxPoolImpl.trace" level="OFF"/>
     <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
+    <logger name="com.wavesplatform.network.NetworkServer$.connections" level="DEBUG"/>
     <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
 
     <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
