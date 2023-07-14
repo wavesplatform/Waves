@@ -23,44 +23,46 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
   private lazy val defaultInput = RideRunnerInput(
     address = scriptedAccAddr,
     request = Json.obj("expr" -> "foo(1)"),
-    accounts = Map(
-      scriptedAccAddr -> RunnerAccountState(
-        scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = false))),
-        assetBalances = Map(btc -> TxNonNegativeAmount(1)),
-        regularBalance = Some(TxNonNegativeAmount(500_000))
+    state = RideRunnerBlockchainState(
+      height = 3296627,
+      accounts = Map(
+        scriptedAccAddr -> RideRunnerAccount(
+          scriptInfo = Some(RideRunnerScriptInfo(script = mkAccountScript(hasPayments = false))),
+          assetBalances = Map(btc -> TxNonNegativeAmount(1)),
+          regularBalance = Some(TxNonNegativeAmount(500_000))
+        ),
+        aliceAddr -> RideRunnerAccount(
+          data = Some(Map("a" -> RideRunnerIntegerDataEntry(11))),
+          aliases = List(Alias.create("carl").explicitGet()),
+          assetBalances = Map(btc -> TxNonNegativeAmount(2)),
+          regularBalance = Some(TxNonNegativeAmount(1_300_000))
+        ),
+        bobAddr -> RideRunnerAccount(
+          data = Some(Map.empty),
+          assetBalances = Map(btc -> TxNonNegativeAmount(3)),
+          leasing = Some(RideRunnerLeaseBalance(in = TxNonNegativeAmount(10), out = TxNonNegativeAmount(100)))
+        )
       ),
-      aliceAddr -> RunnerAccountState(
-        data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
-        aliases = List(Alias.create("carl").explicitGet()),
-        assetBalances = Map(btc -> TxNonNegativeAmount(2)),
-        regularBalance = Some(TxNonNegativeAmount(1_300_000))
+      assets = Map(
+        btc -> RideRunnerAsset(
+          description = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("Bitcoin".getBytes(StandardCharsets.UTF_8))),
+          reissuable = true,
+          quantity = 21000000
+        )
       ),
-      bobAddr -> RunnerAccountState(
-        data = Some(Map.empty),
-        assetBalances = Map(btc -> TxNonNegativeAmount(3)),
-        leasing = Some(RunnerLeaseBalance(in = TxNonNegativeAmount(10), out = TxNonNegativeAmount(100)))
-      )
-    ),
-    height = 3296627,
-    assets = Map(
-      btc -> RunnerAssetInfo(
-        description = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("Bitcoin".getBytes(StandardCharsets.UTF_8))),
-        reissuable = true,
-        quantity = 21000000
-      )
-    ),
-    blocks = Map(
-      3296627 -> RunnerBlockInfo(
-        timestamp = 1663299568885L,
-        VRF = Some(ByteStr.decodeBase58("GHC3DQuW9ncm5sNy5u3TVEF4CXu1fsLVHVHYxJzuZr7b").get)
-      )
-    ),
-    transactions = Map(
-      txId -> RunnerTransactionInfo(
-        amount = 93119130,
-        recipient = bobAddr,
-        timestamp = 1663299600039L,
-        height = Some(3281000)
+      blocks = Map(
+        3296627 -> RideRunnerBlock(
+          timestamp = 1663299568885L,
+          VRF = Some(ByteStr.decodeBase58("GHC3DQuW9ncm5sNy5u3TVEF4CXu1fsLVHVHYxJzuZr7b").get)
+        )
+      ),
+      transactions = Map(
+        txId -> RideRunnerTransaction(
+          amount = 93119130,
+          recipient = bobAddr,
+          timestamp = 1663299600039L,
+          height = Some(3281000)
+        )
       )
     )
   )
@@ -68,7 +70,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
   "PreparedState" - {
     "expr" in {
       val input      = defaultInput
-      val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
+      val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input.state)
 
       val apiResult = UtilsEvaluator.evaluate(
         blockchain = blockchain,
@@ -88,21 +90,12 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
     }
 
     "invoke" in {
-      val input = defaultInput.copy(
-        request = Json.obj( // See UtilsInvocationRequest
-          "call" -> Json.obj(
-            "function" -> "foo",
-            "args"     -> List(Json.obj("type" -> "integer", "value" -> 1))
-          ),
-          "senderPublicKey" -> alice.publicKey.toString,
-          "payment"         -> List(Json.obj("amount" -> 1, "assetId" -> btc.toString)),
-          "fee"             -> 1_300_000
-        ),
-        accounts = defaultInput.accounts.updated(
+      val state = defaultInput.state.copy(
+        accounts = defaultInput.state.accounts.updated(
           scriptedAccAddr,
-          RunnerAccountState(
+          RideRunnerAccount(
             scriptInfo = Some(
-              RunnerScriptInfo(
+              RideRunnerScriptInfo(
                 script = mkAccountScript(hasPayments = true),
                 publicKey = scriptedAcc.publicKey
               )
@@ -112,16 +105,24 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
           )
         )
       )
-      val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, input)
+      val blockchain = new ImmutableBlockchain(DefaultBlockchainSettings, state)
 
       val apiResult = UtilsEvaluator.evaluate(
         blockchain = blockchain,
-        dAppAddress = input.address,
-        request = input.request,
+        dAppAddress = defaultInput.address,
+        request = Json.obj( // See UtilsInvocationRequest
+          "call" -> Json.obj(
+            "function" -> "foo",
+            "args"     -> List(Json.obj("type" -> "integer", "value" -> 1))
+          ),
+          "senderPublicKey" -> alice.publicKey.toString,
+          "payment"         -> List(Json.obj("amount" -> 1, "assetId" -> btc.toString)),
+          "fee"             -> 1_300_000
+        ),
         options = UtilsEvaluator.EvaluateOptions(
           evaluateScriptComplexityLimit = Int.MaxValue,
           maxTxErrorLogSize = 0,
-          enableTraces = input.trace,
+          enableTraces = defaultInput.trace,
           intAsString = true
         )
       )

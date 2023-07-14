@@ -47,7 +47,7 @@ object RideRunnerWithPreparedStateApp {
       }
 
       val runResult = UtilsEvaluator.evaluate(
-        blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input),
+        blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input.state),
         dAppAddress = input.address,
         request = input.request,
         options = UtilsEvaluator.EvaluateOptions(

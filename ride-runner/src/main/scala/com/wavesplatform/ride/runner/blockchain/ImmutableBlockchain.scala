@@ -13,29 +13,17 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
-import com.wavesplatform.ride.runner.input.RideRunnerInput
+import com.wavesplatform.ride.runner.input.RideRunnerBlockchainState
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  Height,
-  LeaseBalance,
-  TxMeta,
-  VolumeAndFee
-}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
+import com.wavesplatform.transaction.{Asset, Proofs, TxPositiveAmount}
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain { blockchain =>
+class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerBlockchainState) extends SupportedBlockchain { blockchain =>
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
 
   // Ride: isDataStorageUntouched
@@ -74,9 +62,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] = accountScripts.get(address)
 
-  // Indirectly
-  override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
-
   private val blockHeaders = mkCache[Int, Option[SignedBlockHeader]] { height =>
     input.blocks.get(height).map { blockInfo =>
       SignedBlockHeader(
@@ -114,7 +99,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = input.height
 
-  override val activatedFeatures: Map[Short, Int] = settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
+  override val activatedFeatures: Map[Short, Int] =
+    settings.functionalitySettings.preActivatedFeatures ++ input.features.map(id => id -> height)
 
   private val assets = mkCache[IssuedAsset, Option[AssetDescription]] { assetId =>
     input.assets.get(assetId).map { info =>
@@ -142,9 +128,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
 
   // Ride: assetInfo
   override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = assets.get(id)
-
-  // Ride (indirectly): asset script validation
-  override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assets.get(id).flatMap(_.script)
 
   private lazy val resolveAlias: Map[Alias, Address] = for {
     (addr, state) <- input.accounts
@@ -183,6 +166,10 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     // "to" always None
     balanceSnapshotsCache.get(address).filter(_.height >= from)
 
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] =
+    if (height < this.height) None
+    else Some((this.height, balance(address, assetId)))
+
   private def complexityInfoOf(isAsset: Boolean, script: Script): ComplexityInfo =
     estimate(height, activatedFeatures, this.estimator, script, isAsset = isAsset, withCombinedContext = true)
 
@@ -218,35 +205,4 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   private def mkCache[K, V](f: K => V): LoadingCache[K, V] = Caffeine
     .newBuilder()
     .build[K, V](new CacheLoader[K, V] { override def load(key: K): V = f(key) })
-
-  // Not supported
-
-  override def score: BigInt = kill("score")
-
-  override def carryFee: Long = kill("carryFee")
-
-  override def heightOf(blockId: ByteStr): Option[Int] = kill("heightOf")
-
-  /** Features related */
-  override def approvedFeatures: Map[Short, Int] = kill("approvedFeatures")
-
-  override def featureVotes(height: Int): Map[Short, Int] = kill("featureVotes")
-
-  override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
-
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = kill("leaseDetails")
-
-  override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
-
-  override def transactionInfo(id: BlockId): Option[(TxMeta, Transaction)] = kill("transactionInfo")
-
-  override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
-
-  override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
-
-  override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
-
-  override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
-
-  private def kill(methodName: String) = throw new RuntimeException(methodName)
 }

@@ -4,7 +4,6 @@ import cats.syntax.option.*
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
-import com.wavesplatform.api.http.utils.UtilsInvocationRequest
 import com.wavesplatform.api.http.{DebugApiRoute, requests}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -15,9 +14,9 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxNonNegativeAmount, TxPositiveAmount, TxValidationError}
+import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxNonNegativeAmount, TxValidationError}
+import com.wavesplatform.utils.byteStrFormat
 import play.api.libs.json.*
 import play.api.libs.json.JsError.toJson
 
@@ -42,30 +41,23 @@ object RideRunnerInputParser extends DefaultReads {
     x.toIntOption.fold[JsResult[Int]](mkError("Int"))(JsSuccess(_))
   }
 
-  implicit val byteStrKeyReads: KeyReads[ByteStr] = KeyReads(parseByteStr(_))
+  implicit val byteStrKeyReads: KeyReads[ByteStr] = KeyReads(x => byteStrFormat.reads(JsString(x)))
 
   implicit val addressKeyReads: KeyReads[Address] = KeyReads { x =>
     Address.fromString(x).successOrErrorToString("Address")
   }
 
-  implicit val assetKeyReads: KeyReads[Asset] = KeyReads { x =>
-    val compatStr = if (x == "WAVES") None else Some(x)
-    Try(Asset.fromString(compatStr)).toEither.successOr(e => mkError("Asset", e.getMessage))
-  }
-
-  implicit val issuedAssetKeyReads: KeyReads[IssuedAsset] = KeyReads(parseByteStr(_, "IssuedAsset").map(IssuedAsset(_)))
+  implicit val issuedAssetKeyReads: KeyReads[IssuedAsset] = KeyReads(x => Asset.assetReads.reads(JsString(x)))
 
   implicit val optBlockIdKeyReads: KeyReads[Option[BlockId]] = KeyReads { x =>
-    if (x.isEmpty) JsSuccess(None) else parseByteStr(x, "Option[BlockId]").map(Some(_))
+    if (x.isEmpty) JsSuccess(None) else byteStrFormat.reads(JsString(x)).map(Some(_))
   }
 
   implicit val txNonNegativeAmountReads: Reads[TxNonNegativeAmount] = com.wavesplatform.transaction.TxNonNegativeAmount.reads
 
-  implicit def byteArrayReads(hint: String): Reads[Array[Byte]] = StringReads.flatMapResult(parseByteArrayBase58(_, hint))
+  implicit val byteArrayReads: Reads[Array[Byte]] = com.wavesplatform.utils.arrayReads
 
-  implicit val byteStrReads: Reads[ByteStr] = byteArrayReads("ByteStr").map(ByteStr(_))
-
-  implicit val byteStringReads: Reads[ByteString] = byteArrayReads("ByteString").map(unsafeWrap)
+  implicit val byteStringReads: Reads[ByteString] = byteArrayReads.map(unsafeWrap)
 
   implicit val stringOrBytesAsByteStrReads: Reads[StringOrBytesAsByteStr] = StringReads.flatMapResult { x =>
     JsSuccess(StringOrBytesAsByteStr(ByteStr(decodeBytesFromStrRaw(x))))
@@ -74,12 +66,6 @@ object RideRunnerInputParser extends DefaultReads {
   implicit val stringOrBytesAsByteStringReads: Reads[StringOrBytesAsByteString] = StringReads.flatMapResult { x =>
     JsSuccess(StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap(decodeBytesFromStrRaw(x))))
   }
-
-  implicit val assetReads: Reads[Asset] = StringReads.flatMapResult(assetKeyReads.readKey)
-
-  implicit val paymentReads: Reads[Payment] = Json.reads
-
-  implicit val utilsInvocationRequestReads: Reads[UtilsInvocationRequest] = Json.reads
 
   implicit val scriptReads: Reads[Script] = StringReads.flatMapResult { x =>
     Try {
@@ -149,31 +135,26 @@ object RideRunnerInputParser extends DefaultReads {
 
   implicit val leaseInfoReads: Format[LeaseBalance] = DebugApiRoute.leaseInfoFormat
 
-  implicit val balanceSnapshotReads: Reads[BalanceSnapshot]       = Json.format // format solves "ambiguous" error
-  implicit val runnerLeaseBalanceReads: Reads[RunnerLeaseBalance] = Json.reads
+  implicit val balanceSnapshotReads: Reads[BalanceSnapshot]               = Json.format // format solves "ambiguous" error
+  implicit val rideRunnerLeaseBalanceReads: Reads[RideRunnerLeaseBalance] = Json.reads
 
-  implicit val runnerScriptInfoReads: Reads[RunnerScriptInfo] = Json.reads
+  implicit val rideRunnerScriptInfoReads: Reads[RideRunnerScriptInfo] = Json.reads
 
-  implicit val binaryRunnerDataEntryReads: Reads[BinaryRunnerDataEntry]   = Json.reads
-  implicit val booleanRunnerDataEntryReads: Reads[BooleanRunnerDataEntry] = Json.reads
-  implicit val integerRunnerDataEntryReads: Reads[IntegerRunnerDataEntry] = Json.reads
-  implicit val stringRunnerDataEntryReads: Reads[StringRunnerDataEntry]   = Json.reads
+  implicit val rideRunnerBinaryDataEntryReads: Reads[RideRunnerBinaryDataEntry]   = Json.reads
+  implicit val rideRunnerBooleanDataEntryReads: Reads[RideRunnerBooleanDataEntry] = Json.reads
+  implicit val rideRunnerIntegerDataEntryReads: Reads[RideRunnerIntegerDataEntry] = Json.reads
+  implicit val rideRunnerStringDataEntryReads: Reads[RideRunnerStringDataEntry]   = Json.reads
+  implicit val rideRunnerDataEntryReads: Reads[RideRunnerDataEntry]               = Json.reads
 
-  implicit val runnerDataEntryReads: Reads[RunnerDataEntry] = Json.reads
+  implicit val rideRunnerAccountReads: Reads[RideRunnerAccount] = Json.reads
 
-  implicit val runnerAccountStateReads: Reads[RunnerAccountState] = Json.reads
+  implicit val rideRunnerAssetReads: Reads[RideRunnerAsset] = Json.reads
 
-  implicit val runnerAssetInfoReads: Reads[RunnerAssetInfo] = Json.reads
+  implicit val rideRunnerBlockReads: Reads[RideRunnerBlock] = Json.reads
 
-  implicit val runnerBlockInfoReads: Reads[RunnerBlockInfo] = Json.reads
-
-  implicit val runnerTransactionInfoReads: Reads[RunnerTransactionInfo] = Json.reads
+  implicit val rideRunnerTransactionReads: Reads[RideRunnerTransaction] = Json.reads
 
   implicit val stdLibVersionReads: Reads[StdLibVersion] = IntReads.map(StdLibVersion.VersionDic.idMap.apply)
-
-  implicit val txPositiveAmountReads: Reads[TxPositiveAmount] = LongReads.flatMapResult { x =>
-    TxPositiveAmount.from(x).successOrErrorToString("TxPositiveAmount")
-  }
 
   implicit val proofsReads: Reads[Proofs] = requests.proofsReads
 
@@ -182,16 +163,9 @@ object RideRunnerInputParser extends DefaultReads {
     else mkError("Char", s"Expected one char, got: $x")
   }
 
+  implicit val rideRunnerBlockchainStateReads: Reads[RideRunnerBlockchainState] = Json.reads
+
   implicit val rideRunnerInputReads: Reads[RideRunnerInput] = Json.reads
-
-  def parseByteStr(x: String, hint: String = "ByteStr"): JsResult[ByteStr] = parseByteArrayBase58(x, hint).map(ByteStr(_))
-
-  def parseByteArrayBase58(x: String, hint: String = "Array[Byte]"): JsResult[Array[Byte]] =
-    Try {
-      if (x.startsWith("base58:")) Base58.decode(x.substring(7))
-      else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
-      else Base58.decode(x)
-    }.toEither.successOr(e => mkError(hint, e.getMessage))
 
   def decodeBytesFromStrRaw(x: String): Array[Byte] = Try {
     if (x.startsWith("base58:")) Base58.decode(x.substring(7))

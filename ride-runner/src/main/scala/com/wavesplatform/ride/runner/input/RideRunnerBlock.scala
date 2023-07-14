@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.common.state.ByteStr
 
-case class RunnerBlockInfo(
+case class RideRunnerBlock(
     timestamp: Long = System.currentTimeMillis(),
     baseTarget: Long = 130,
     generationSignature: ByteStr = ByteStr(new Array[Byte](64)),

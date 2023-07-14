@@ -9,19 +9,19 @@ import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount}
 /** @param data
   *   Some(Map.empty) means the data was here
   */
-case class RunnerAccountState(
+case class RideRunnerAccount(
     assetBalances: Map[IssuedAsset, TxNonNegativeAmount] = Map.empty,
     regularBalance: Option[TxNonNegativeAmount] = None,
-    leasing: Option[RunnerLeaseBalance] = None,
+    leasing: Option[RideRunnerLeaseBalance] = None,
     generatingBalance: Option[TxNonNegativeAmount] = None,
-    data: Option[Map[String, RunnerDataEntry]] = None,
+    data: Option[Map[String, RideRunnerDataEntry]] = None,
     aliases: List[Alias] = Nil,
-    scriptInfo: Option[RunnerScriptInfo] = None
+    scriptInfo: Option[RideRunnerScriptInfo] = None
 ) {
   def balance(mayBeAssetId: Asset): Option[Long] = mayBeAssetId.fold(regularBalance)(assetBalances.get).map(_.value)
 }
 
-case class RunnerScriptInfo(
+case class RideRunnerScriptInfo(
     publicKey: PublicKey = EmptyPublicKey,
     script: Script
 )

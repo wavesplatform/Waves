@@ -24,40 +24,40 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
   // Ride: blockInfoByHeight, lastBlock
-//  override def blockHeader(height: Int): Option[SignedBlockHeader]
+  // override def blockHeader(height: Int): Option[SignedBlockHeader]
 
   // Ride: blockInfoByHeight
-//  override def hitSource(height: Int): Option[ByteStr]
+  // override def hitSource(height: Int): Option[ByteStr]
 
   // Ride: blockInfoByHeight
   //  override def blockReward(height: Int): Option[Long] = kill("blockReward")
 
   // Ride: wavesBalance, height, lastBlock
-//  override def height: Int = sharedBlockchain.heightUntagged
+  // override def height: Int = sharedBlockchain.heightUntagged
 
-//  override def activatedFeatures: Map[Short, Int]
+  // override def activatedFeatures: Map[Short, Int]
 
   // Ride: assetInfo
-//  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]
+  // override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
-//  override def resolveAlias(a: Alias): Either[ValidationError, Address]
+  // override def resolveAlias(a: Alias): Either[ValidationError, Address]
 
   // Ride: wavesBalance
-//  override def leaseBalance(address: Address): LeaseBalance
+  // override def leaseBalance(address: Address): LeaseBalance
 
   // Ride: assetBalance, wavesBalance
-//  override def balance(address: Address, mayBeAssetId: Asset): Long
+  // override def balance(address: Address, mayBeAssetId: Asset): Long
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
-//  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
+  // override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
   // Ride: transactionHeightById
-//  override def transactionMeta(id: ByteStr): Option[TxMeta]
+  // override def transactionMeta(id: ByteStr): Option[TxMeta]
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = kill("transferById")

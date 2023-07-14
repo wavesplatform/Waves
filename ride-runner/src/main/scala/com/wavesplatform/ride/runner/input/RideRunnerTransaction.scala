@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 
-case class RunnerTransactionInfo(
+case class RideRunnerTransaction(
     amount: Long = 1,
     assetId: Asset = Waves,
     fee: Long = 100_000,

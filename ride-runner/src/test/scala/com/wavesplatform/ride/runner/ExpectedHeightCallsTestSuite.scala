@@ -7,7 +7,7 @@ import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.environments.{DAppEnvironmentTracker, TrackedDAppEnvironment}
-import com.wavesplatform.ride.runner.input.{RideRunnerInput, RunnerAccountState, RunnerBlockInfo, RunnerScriptInfo}
+import com.wavesplatform.ride.runner.input.*
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.TxNonNegativeAmount
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
@@ -72,14 +72,14 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
   }
 
   private def invokeAliceFooTest(expectedHeightCalls: Int, scriptsSrcs: (Address, String)*): Unit = {
-    val input = scriptsSrcs.foldLeft(defaultInput) { case (r, (addr, scriptSrc)) =>
+    val input = scriptsSrcs.foldLeft(defaultInput.state) { case (r, (addr, scriptSrc)) =>
       val orig = r.accounts(addr)
       r.copy(accounts =
         r.accounts.updated(
           addr,
           orig.copy(scriptInfo =
             Some(
-              RunnerScriptInfo(
+              RideRunnerScriptInfo(
                 script = TestScript.scriptFrom(
                   s"""{-#STDLIB_VERSION 6 #-}
                      |{-#SCRIPT_TYPE ACCOUNT #-}
@@ -117,20 +117,22 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
   private lazy val defaultInput = RideRunnerInput(
     address = scriptedAccAddr,
     request = Json.obj(),
-    accounts = Map(
-      aliceAddr -> RunnerAccountState(
-        regularBalance = Some(TxNonNegativeAmount(10_000_000))
+    state = RideRunnerBlockchainState(
+      height = DefaultHeight,
+      accounts = Map(
+        aliceAddr -> RideRunnerAccount(
+          regularBalance = Some(TxNonNegativeAmount(10_000_000))
+        ),
+        bobAddr -> RideRunnerAccount(
+          data = Some(Map.empty),
+          regularBalance = Some(TxNonNegativeAmount(10_300_000))
+        )
       ),
-      bobAddr -> RunnerAccountState(
-        data = Some(Map.empty),
-        regularBalance = Some(TxNonNegativeAmount(10_300_000))
-      )
-    ),
-    height = DefaultHeight,
-    blocks = Map(
-      DefaultHeight -> RunnerBlockInfo(
-        timestamp = 1663299568885L,
-        VRF = Some(ByteStr.decodeBase58("GHC3DQuW9ncm5sNy5u3TVEF4CXu1fsLVHVHYxJzuZr7b").get)
+      blocks = Map(
+        DefaultHeight -> RideRunnerBlock(
+          timestamp = 1663299568885L,
+          VRF = Some(ByteStr.decodeBase58("GHC3DQuW9ncm5sNy5u3TVEF4CXu1fsLVHVHYxJzuZr7b").get)
+        )
       )
     )
   )

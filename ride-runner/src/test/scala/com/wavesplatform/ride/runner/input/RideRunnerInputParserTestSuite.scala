@@ -13,25 +13,6 @@ import java.nio.charset.StandardCharsets
 
 class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPropertyChecks with HasTestAccounts {
   "RideRunnerInputParser" - {
-    "bytesStrReads" - {
-      "allows Base58" in {
-        val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-        parse(s"base58:$rawContent") shouldBe JsSuccess(ByteStr.decodeBase58(rawContent).get)
-      }
-
-      "allows Base64" in {
-        val rawContent = "dGVzdA=="
-        parse(s"base64:$rawContent") shouldBe JsSuccess(ByteStr.decodeBase64(rawContent).get)
-      }
-
-      "Base58 string by default" in {
-        val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-        parse(rawContent) shouldBe JsSuccess(ByteStr.decodeBase58(rawContent).get)
-      }
-
-      def parse(rawContent: String) = RideRunnerInputParser.byteStrReads.reads(JsString(rawContent))
-    }
-
     "stringOrBytesReadsAsByteStr" - {
       "allows Base58" in {
         val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"

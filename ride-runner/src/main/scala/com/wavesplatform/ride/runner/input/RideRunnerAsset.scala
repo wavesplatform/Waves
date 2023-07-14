@@ -7,10 +7,10 @@ import com.wavesplatform.lang.script.Script
 
 import java.nio.charset.StandardCharsets
 
-case class RunnerAssetInfo(
+case class RideRunnerAsset(
     issuerPublicKey: PublicKey = EmptyPublicKey,
-    name: StringOrBytesAsByteString = RunnerAssetInfo.DefaultName,
-    description: StringOrBytesAsByteString = RunnerAssetInfo.DefaultDescription,
+    name: StringOrBytesAsByteString = RideRunnerAsset.DefaultName,
+    description: StringOrBytesAsByteString = RideRunnerAsset.DefaultDescription,
     decimals: Int = 8,
     reissuable: Boolean = false,
     quantity: Long = 9007199254740991L, // In JS: MAX_SAFE_INTEGER
@@ -18,7 +18,7 @@ case class RunnerAssetInfo(
     minSponsoredAssetFee: Long = 0L
 )
 
-object RunnerAssetInfo {
+object RideRunnerAsset {
   val DefaultName        = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("name".getBytes(StandardCharsets.UTF_8)))
   val DefaultDescription = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("description".getBytes(StandardCharsets.UTF_8)))
 }
