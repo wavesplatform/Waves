@@ -30,7 +30,7 @@ class SyncInvokeFailAndRejectTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
-  property("failed sync invoke doesn't affect state") {
+  property("NODE-329. Failed sync invoke doesn't affect state") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val failAssetIssue     = issue(script = Some(assetFailScript))
       val trueAssetIssue     = issue(dApp2Signer, script = Some(ExprScriptImpl(V3, false, TRUE)))
@@ -92,7 +92,7 @@ class SyncInvokeFailAndRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("sync invoke is rejected if insufficient fee is transferred at the end") {
+  property("NODE-330. Sync invoke is rejected if insufficient fee is transferred at the end") {
     val invoker = signer(10)
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(

@@ -23,7 +23,7 @@ class EthOrderSpec
     with JsonMatchers {
   import EthOrderSpec.{ethBuyOrder, ethSellOrder}
 
-  "ETH signed order" should "recover signer public key correctly" in {
+  "ETH signed order" should "recover signer public key correctly (NODE-637)" in {
     val testOrder = Order(
       Order.V4,
       EthSignature(
@@ -45,7 +45,7 @@ class EthOrderSpec
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
   }
 
-  it should s"recover signer public key with leading zeros correctly" in {
+  it should s"recover signer public key with leading zeros correctly (NODE-781)" in {
 
     val testOrder = Order(
       Order.V4,
@@ -70,7 +70,7 @@ class EthOrderSpec
     ) shouldBe "0x00d7cf9ff594b07273228e7dd591707d38a1dba0a39492fd64445ba9cbb3bf66c862b9752f02bf8d1a0f00ccb11ae550a7616bd965c10f0101202d75580786ee"
   }
 
-  it should "recover signer public key when v < 27 in signature data" in {
+  it should "recover signer public key when v < 27 in signature data (NODE-782)" in {
     val testOrder = Order(
       Order.V4,
       EthSignature(
@@ -92,7 +92,7 @@ class EthOrderSpec
     result.toAddress.toString shouldBe "3N8HNri7zQXVw8Bn9BZKGRpsznNUFXM24zL"
   }
 
-  it should "recover public key at json parse stage" in {
+  it should "recover public key at json parse stage (NODE-638)" in {
     val json  = Json.toJson(ethBuyOrder).as[JsObject] - "senderPublicKey"
     val order = Json.fromJson[Order](json).get
     order.senderPublicKey shouldBe ethBuyOrder.senderPublicKey
@@ -102,7 +102,7 @@ class EthOrderSpec
     )
   }
 
-  it should "be of version 4" in {
+  it should "be of version 4 (NODE-645)" in {
     val testOrder = Order(
       Order.V1,
       EthSignature(
@@ -122,7 +122,7 @@ class EthOrderSpec
     testOrder.isValid(123).labels shouldBe Set("eip712Signature available only in V4")
   }
 
-  it should "work in exchange transaction" in {
+  it should "work in exchange transaction (NODE-644)" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(ethBuyOrder.senderAddress, *)
@@ -136,7 +136,7 @@ class EthOrderSpec
     diff should containAppliedTx(transaction.id())
   }
 
-  it should "work in exchange transaction with an old order" in {
+  it should "work in exchange transaction with an old order (NODE-639)" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
@@ -166,7 +166,7 @@ class EthOrderSpec
     diff should containAppliedTx(transaction.id())
   }
 
-  it should "recover valid ids of exchange tx" in {
+  it should "recover valid ids of exchange tx (NODE-640)" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
@@ -277,7 +277,7 @@ class EthOrderSpec
     )
   }
 
-  it should "not work in exchange transaction with changed signature" in {
+  it should "not work in exchange transaction with changed signature (NODE-641)" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
@@ -301,7 +301,7 @@ class EthOrderSpec
     }
   }
 
-  it should "work in exchange transaction with asset script" in {
+  it should "work in exchange transaction with asset script (NODE-642)" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
@@ -339,7 +339,7 @@ class EthOrderSpec
     diff should containAppliedTx(transaction.id())
   }
 
-  it should "work in exchange transaction with matcher script" in {
+  it should "work in exchange transaction with matcher script (NODE-643)" in {
     val blockchain = createBlockchainStub { blockchain =>
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)

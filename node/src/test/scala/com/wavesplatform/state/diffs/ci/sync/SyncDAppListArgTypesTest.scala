@@ -78,7 +78,7 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
     }
   }
 
-  property("sync call args types check") {
+  property("NODE-316, NODE-317. Sync call args types check") {
     assert(forbidAfterActivation = false, "1")
     assert(forbidAfterActivation = false, """ "s" """)
     assert(forbidAfterActivation = false, "true")

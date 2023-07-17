@@ -157,7 +157,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
     }
   }
 
-  property("invoke with scripted payments") {
+  property("NODE-625. Invoke with scripted payments") {
     val allVersions  = DirectiveDictionary[StdLibVersion].all
     val lastVersion  = allVersions.last
     val dAppVersions = allVersions.filter(_ >= V3)

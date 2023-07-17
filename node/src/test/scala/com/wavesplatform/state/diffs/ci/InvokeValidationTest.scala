@@ -21,14 +21,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 class InvokeValidationTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  property("invoke by alias with wrong chainId") {
+  property("NODE-231. Invoke by alias with wrong chainId") {
     withDomain(RideV5) { d =>
       val alias = Alias.fromString("alias:X:alias").explicitGet()
       d.appendBlockE(invoke(alias)) should produce("Address belongs to another network: expected: 84(T), actual: 88(X)")
     }
   }
 
-  property("invoke unexisting function") {
+  property("NODE-234. Invoke unexisting function") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val script = TestCompiler(V5).compileContract(
         """
@@ -41,13 +41,13 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke address without script") {
+  property("NODE-235. Invoke address without script") {
     withDomain(RideV5) { d =>
       d.appendBlockE(invoke()) should produce(s"No contract at address $secondAddress")
     }
   }
 
-  property("invoke address with set expression") {
+  property("NODE-834. Invoke address with set expression") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val expression = TestCompiler(V5).compileExpression("true")
       d.appendBlock(setScript(secondSigner, expression))
@@ -55,7 +55,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("sync invoke address with set expression") {
+  property("NODE-835. Sync invoke address with set expression") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(2))) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
@@ -72,7 +72,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke payment balance in Waves should be checked before script execution only if spending exceeds fee, in asset — always") {
+  property("NODE-236. Invoke payment balance in Waves should be checked before script execution only if spending exceeds fee, in asset — always") {
     withDomain(RideV5, Seq(AddrWithBalance(secondAddress, ENOUGH_AMT), AddrWithBalance(signer(2).toAddress, invokeFee))) { d =>
       val script = TestCompiler(V5).compileContract(
         """
@@ -112,7 +112,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke tx size limit is 5 Kb") {
+  property("NODE-252. Invoke tx size limit is 5 Kb") {
     def array(size: Int): ARR = ARR(Vector.fill(size)(CONST_LONG(1)), 0, false).explicitGet()
 
     val txV1       = invoke(defaultAddress, Some("f"), Seq(array(557)), version = V1)
@@ -126,7 +126,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     (the[Exception] thrownBy tooBigTxV2).getMessage shouldBe "GenericError(InvokeScriptTransaction bytes length = 5129 exceeds limit = 5120)"
   }
 
-  property("unexisting payment asset") {
+  property("NODE-255. Unexisting payment asset") {
     withDomain(RideV5) { d =>
       val asset = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
       d.appendBlockE(invoke(defaultAddress, payments = Seq(Payment(1, asset)))) should produce(

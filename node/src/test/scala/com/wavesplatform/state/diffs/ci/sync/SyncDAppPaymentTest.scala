@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 
 class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
-  property("negative sync dApp payments amount rejects tx after enforceTransferValidationAfter") {
+  property("NODE-388. Negative sync dApp payments amount rejects tx after enforceTransferValidationAfter") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -48,6 +48,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("negative sync dApp payments are forbidden before and after RideV6 activation") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
@@ -82,7 +83,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("sync dApp self-payment is forbidden") {
+  property("NODE-385. Sync dApp self-payment is forbidden") {
     val invoker = TxHelpers.signer(0)
     val dApp    = TxHelpers.signer(1)
 
@@ -96,7 +97,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("payments in sync call should change sender/recipient waves balance") {
+  property("NODE-392. Payments in sync call should change sender/recipient waves balance") {
     val invoker       = TxHelpers.signer(1)
     val senderDApp    = TxHelpers.signer(2)
     val recipientDApp = TxHelpers.signer(3)
@@ -118,7 +119,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("should fail invoke when doesn't have enough asset amount for payment before sync call") {
+  property("NODE-396. Should fail invoke when doesn't have enough asset amount for payment before sync call") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -138,6 +139,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("negative balance rejects or fails") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
@@ -168,7 +170,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't use funds received by leasing for sync call payment") {
+  property("NODE-399. Can't use funds received by leasing for sync call payment") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -192,7 +194,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can use leased funds for sync call payment before allow-leased-balance-transfer-until") {
+  property("NODE-814. Can use leased funds for sync call payment before allow-leased-balance-transfer-until") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -217,7 +219,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't use leased funds for sync call payment after allow-leased-balance-transfer-until") {
+  property("NODE-399. Can't use leased funds for sync call payment after allow-leased-balance-transfer-until") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -242,7 +244,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("should not allow payments overflow") {
+  property("NODE-289. Should not allow payments overflow") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -261,7 +263,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("should not allow payments with not existing asset") {
+  property("NODE-326. Should not allow payments with not existing asset") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -280,7 +282,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("forbid sync call when invoke is not allowed by asset script after RideV6") {
+  property("NODE-394. Forbid sync call when invoke is not allowed by asset script after RideV6") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)
@@ -301,7 +303,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("allow sync call when transfer is not allowed by asset script after RideV6") {
+  property("NODE-395. Allow sync call when transfer is not allowed by asset script after RideV6") {
     val invoker     = TxHelpers.signer(1)
     val masterDApp  = TxHelpers.signer(2)
     val serviceDApp = TxHelpers.signer(3)

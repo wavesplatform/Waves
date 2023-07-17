@@ -42,7 +42,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       BlockchainFeatures.SynchronousCalls.id -> 0
     ))
 
-  property("Crosscontract call - internal invoke state update") {
+  property("NODE-27. Crosscontract call - internal invoke state update") {
 
     val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
@@ -139,7 +139,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     }
   }
 
-  property("Crosscontract call - same contract internal invoke - state update") {
+  property("NODE-28. Crosscontract call - same contract internal invoke - state update") {
 
     val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
@@ -224,7 +224,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     }
   }
 
-  property("Crosscontract call - multiple internal invokes - state update") {
+  property("NODE-29. Crosscontract call - multiple internal invokes - state update") {
 
     val (invokeEntry1Key, invokeEntry1Val) = ("entry1", 42)
     val transferAssetAmount                = 100542

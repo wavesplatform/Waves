@@ -878,7 +878,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.close()
       }
 
-      "InvokeScriptTransaction is fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
+      "NODE-258, NODE-259. InvokeScriptTransaction is fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
       ) { d =>
@@ -948,7 +948,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.close()
       }
 
-      "sync calls are fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
+      "NODE-333, NODE-334. Sync calls are fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))
       ) { d =>

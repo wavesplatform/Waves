@@ -264,7 +264,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     runScript(scriptSource, Coproduct(tx), V4, T) shouldBe evaluated(true)
   }
 
-  property("InvokeScriptTransaction binding") {
+  property("NODE-701. InvokeScriptTransaction binding") {
     val tx = TxHelpers.invoke(TxHelpers.secondAddress, func = Some("test"), invoker = TxHelpers.defaultSigner, payments = Seq(Payment(1, Waves)))
     val checkArgsScript = if (tx.funcCallOpt.get.args.nonEmpty) {
       tx.funcCallOpt.get.args

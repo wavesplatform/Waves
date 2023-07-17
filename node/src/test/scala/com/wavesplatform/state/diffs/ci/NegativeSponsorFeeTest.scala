@@ -34,7 +34,7 @@ class NegativeSponsorFeeTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
-  property("negative sponsor amount") {
+  property("NODE-117. Negative sponsor amount") {
     for (bigComplexity <- Seq(false, true)) {
       val invoker = TxHelpers.signer(0)
       val dApp    = TxHelpers.signer(1)

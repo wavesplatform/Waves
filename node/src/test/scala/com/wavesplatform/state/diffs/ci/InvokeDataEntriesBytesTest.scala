@@ -77,7 +77,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
     (balances, Seq(ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
   }
 
-  property("exceeding 5 Kb after activation") {
+  property("NODE-6. Exceeding 5 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true)
     withDomain(DomainPresets.RideV5, balances) { d =>
       d.appendBlock(preparingTxs*)
@@ -88,7 +88,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
     }
   }
 
-  property("exceeding 15 Kb after activation") {
+  property("NODE-8. Exceeding 15 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
     withDomain(DomainPresets.RideV5.configure(_.copy(enforceTransferValidationAfter = 2)).setFeaturesHeight(RideV6 -> 3), balances) { d =>
       d.appendBlock(preparingTxs*)
@@ -100,7 +100,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
     }
   }
 
-  property("exceeding 15 Kb with RideV6") {
+  property("NODE-8. Exceeding 15 Kb with RideV6") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
     withDomain(DomainPresets.RideV6, balances) { d =>
       d.appendBlock(preparingTxs*)
@@ -110,7 +110,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
     }
   }
 
-  property("reaching 5 Kb after activation") {
+  property("NODE-5. Reaching 5 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false)
     withDomain(DomainPresets.RideV5, balances) { d =>
       d.appendBlock(preparingTxs*)
@@ -120,7 +120,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
     }
   }
 
-  property("reaching 15 Kb after activation") {
+  property("NODE-7. Reaching 15 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true, reach15kb = true)
 
     withDomain(DomainPresets.RideV5, balances) { d =>

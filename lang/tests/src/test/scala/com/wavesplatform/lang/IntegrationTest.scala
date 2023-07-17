@@ -1047,7 +1047,7 @@ class IntegrationTest extends PropSpec with Inside {
     eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 
-  property("list result size limit") {
+  property("NODE-248. List result size limit") {
     val maxLongList = "[1" + ",1" * (PureContext.MaxListLengthV4 - 1) + "]"
     val consScript =
       s"""
@@ -1426,7 +1426,7 @@ class IntegrationTest extends PropSpec with Inside {
     eval(script) shouldBe CONST_BYTESTR(bytes(value.toUpperCase))
   }
 
-  property("string limit") {
+  property("NODE-246. String limit") {
     val almostMaxString               = "a" * (Terms.DataEntryValueMax - 1)
     val maxBytes                      = ("a" * Terms.DataEntryValueMax).getBytes(StandardCharsets.UTF_8)
     val constructingTooBigString      = s""" "$almostMaxString" + "aa" """
@@ -1439,7 +1439,7 @@ class IntegrationTest extends PropSpec with Inside {
     eval(constructingTooBigString, version = V4) should produce("String size = 32768 exceeds 32767 bytes")
   }
 
-  property("bytes limit") {
+  property("NODE-250. Bytes limit") {
     val bytes = ByteStr(("a" * (Terms.DataEntryValueMax / 4)).getBytes(StandardCharsets.UTF_8))
     val constructingMaxBytes =
       s""" base64'${bytes.base64Raw}' +

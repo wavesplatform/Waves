@@ -29,7 +29,7 @@ import scala.concurrent.duration.*
 
 class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatchers with JsonMatchers {
 
-  "Ethereum transaction" should s"allow public keys with leading zeros and shortened byte representation only after ${BlockchainFeatures.ConsensusImprovements.description} activation" in {
+  "Ethereum transaction" should s"allow public keys with leading zeros and shortened byte representation only after ${BlockchainFeatures.ConsensusImprovements.description} activation (NODE-878)" in {
     val senderAcc = Bip32ECKeyPair.generateKeyPair("i1".getBytes)
     senderAcc.getPublicKey.toByteArray.length shouldBe <(EthereumKeyLength)
 
@@ -68,7 +68,7 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     }
   }
 
-  "Ethereum transfer" should "work correctly for issued assets" in {
+  "Ethereum transfer" should "work correctly for issued assets (NODE-879)" in {
     val senderKp  = TxHelpers.secondSigner.toEthKeyPair
     val recipient = TxHelpers.address(2)
     val issuer    = TxHelpers.signer(3)
@@ -86,7 +86,7 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     }
   }
 
-  it should "preserve waves and asset invariant" in {
+  it should "preserve waves and asset invariant (NODE-880)" in {
     val senderKp  = TxHelpers.secondSigner.toEthKeyPair
     val recipient = TxHelpers.address(2)
     val issuer    = TxHelpers.signer(3)
@@ -121,7 +121,7 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     }
   }
 
-  it should "be handled with amount + fee > Long.MaxValue" in {
+  it should "be handled with amount + fee > Long.MaxValue (NODE-650)" in {
     val senderKp = TxHelpers.secondSigner.toEthKeyPair
     val issuer   = TxHelpers.signer(3)
 

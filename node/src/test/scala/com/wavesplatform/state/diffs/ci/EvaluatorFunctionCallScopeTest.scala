@@ -33,7 +33,7 @@ class EvaluatorFunctionCallScopeTest extends PropSpec with WithDomain {
       .withFeatures(BlockV5, SynchronousCalls)
       .copy(estimatorSumOverflowFixHeight = 4)
 
-  property("arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
+  property("NODE-135. Arg of the first function should NOT overlap var accessed from body of the second function AFTER fix") {
     val invoker  = TxHelpers.signer(0)
     val dApp     = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(invoker, dApp)

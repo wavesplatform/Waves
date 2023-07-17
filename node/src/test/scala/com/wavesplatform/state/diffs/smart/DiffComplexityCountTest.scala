@@ -95,7 +95,7 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
     (balances, Seq(issue, transfer1, setVerifier, setDApp), invokeFromScripted)
   }
 
-  property(s"evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
+  property(s"NODE-188. Evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (balances, preparingTxs, invoke) = paymentPreconditions
     withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs*)

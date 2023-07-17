@@ -64,7 +64,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
     )
   }
 
-  property(s"ScriptTransfer alias recipient is mapped correctly after ${BlockchainFeatures.SynchronousCalls} activation") {
+  property(s"NODE-19. ScriptTransfer alias recipient is mapped correctly after ${BlockchainFeatures.SynchronousCalls} activation") {
     val dAppAcc  = TxHelpers.signer(0)
     val invoker  = TxHelpers.signer(1)
     val receiver = TxHelpers.signer(2)
@@ -92,7 +92,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
     }
   }
 
-  property("unexisting ScriptTransfer alias recipient") {
+  property("NODE-20. Unexisting ScriptTransfer alias recipient") {
     withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """

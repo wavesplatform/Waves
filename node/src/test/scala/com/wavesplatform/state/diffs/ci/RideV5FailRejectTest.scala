@@ -48,7 +48,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke fails by ScriptTransfer script") {
+  property("NODE-523. Invoke fails by ScriptTransfer script") {
     assert { d =>
       val i     = issue(secondSigner, script = Some(assetFailScript))
       val asset = IssuedAsset(i.id())
@@ -66,7 +66,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke with ScriptTransfer fails by payment script") {
+  property("NODE-524. Invoke with ScriptTransfer fails by payment script") {
     assert { d =>
       val failAssetIssue = issue(script = Some(assetFailScript))
       val trueAssetIssue = issue(secondSigner, script = Some(ExprScriptImpl(V3, false, TRUE)))
@@ -89,7 +89,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke with failing payment is rejected due to dApp script") {
+  property("NODE-525. Invoke with failing payment is rejected due to dApp script") {
     assert { d =>
       val failAssetIssue = issue(script = Some(assetFailScript))
       val failAsset      = IssuedAsset(failAssetIssue.id())
@@ -106,7 +106,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke is rejected with a lack of funds without execution of ScriptTransfer script only after RideV6") {
+  property("NODE-526. Invoke is rejected with a lack of funds without execution of ScriptTransfer script only after RideV6") {
     val issueTx = issue(signer(10), script = Some(assetFailScript))
     val asset   = IssuedAsset(issueTx.id())
     val dApp = TestCompiler(V5).compileContract(
@@ -132,7 +132,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("failed invoke doesn't affect state") {
+  property("NODE-537. Failed invoke doesn't affect state") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
       val failAssetIssue = issue(script = Some(assetFailScript))
       val trueAssetIssue = issue(secondSigner, script = Some(ExprScriptImpl(V3, false, TRUE)))

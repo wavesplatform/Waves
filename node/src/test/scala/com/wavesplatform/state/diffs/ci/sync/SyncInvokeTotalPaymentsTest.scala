@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 class SyncInvokeTotalPaymentsTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  property("total payments limit") {
+  property("NODE-699. Total payments limit") {
     def setDAppsCallingEachOther(syncCalls: Int, syncPayments: Int): Seq[SetScriptTransaction] = {
       val totalCalls = syncCalls + 1
       val payments   = Seq.fill(syncPayments)(s"AttachedPayment(unit, 1)").mkString(",")

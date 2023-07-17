@@ -27,7 +27,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
 
   private val features = RideV6.blockchainSettings.functionalitySettings
 
-  property("reissue and burn actions result state") {
+  property("NODE-123. Reissue and burn actions result state") {
     val (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) = paymentPreconditions(0.005.waves, fail = false)
     assertDiffAndState(
       Seq(TestBlock.create(genesis :+ setScript :+ issue)),
@@ -42,7 +42,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     }
   }
 
-  property("asset script can allow burn and reissue") {
+  property("NODE-126. Asset script can allow burn and reissue") {
     val allowBurnAndReissueAsset =
       assetVerifier(
         """
@@ -61,6 +61,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     )(_.explicitGet())
   }
 
+  //TODO Find case
   property("action state changes affects subsequent actions") {
     val (genesis, setScript, invoke, issue, master, invoker, reissueAmount, burnAmount, transferAmount) =
       multiActionPreconditions(invokeFee = 0.029.waves, withScriptError = false)
@@ -106,7 +107,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     }
   }
 
-  property("diff contains delete entries") {
+  property("NODE-129. Diff contains delete entries") {
     val deleteEntryDApp = dApp(
       """
         | [

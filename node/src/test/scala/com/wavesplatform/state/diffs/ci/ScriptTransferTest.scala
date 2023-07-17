@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 class ScriptTransferTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  property("wrong address bytes length") {
+  property("NODE-281. Wrong address bytes length") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -38,7 +38,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("bad address checksum") {
+  property("NODE-282. Bad address checksum") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -54,7 +54,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("illegal alias") {
+  property("NODE-283. Illegal alias") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -73,7 +73,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("amount field absence") {
+  property("NODE-284. Amount field absence") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dAppResult = FUNCTION_CALL(
         Native(CREATE_LIST),
@@ -94,7 +94,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("assets from payment are available in ScriptTransfer") {
+  property("NODE-257. Assets from payment are available in ScriptTransfer") {
     val paymentAmount  = 100
     val transferAmount = 99
     val setScriptFee   = FeeConstants(TransactionType.SetScript) * FeeUnit
@@ -114,7 +114,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke fails if Transfer Transaction is prohibited in transfer asset") {
+  property("NODE-866. Invoke fails if Transfer Transaction is prohibited in transfer asset") {
     def test(transferCheck: String) = {
       withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
         val assetScript = TestCompiler(V5).compileAsset(
@@ -145,7 +145,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     test("false")
   }
 
-  property("assets from Reissue are available in ScriptTransfer") {
+  property("NODE-268. Assets from Reissue are available in ScriptTransfer") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val issueAmount    = 100
       val reissueAmount  = 50

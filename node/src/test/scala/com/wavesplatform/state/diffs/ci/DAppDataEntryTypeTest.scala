@@ -88,7 +88,7 @@ class DAppDataEntryTypeTest
     }
   }
 
-  property(s"DataEntry value type is checked") {
+  property(s"NODE-133. DataEntry value type is checked") {
     List("IntegerEntry", "StringEntry", "BinaryEntry", "BooleanEntry").foreach(assert)
   }
 }

@@ -162,7 +162,7 @@ class ContractSerdeTest extends FreeSpec {
         None
       )
 
-    "callable name limit" in serializers.foreach { ser =>
+    "NODE-232. Callable name limit" in serializers.foreach { ser =>
       val limit = ContractLimits.MaxDeclarationNameInBytes
 
       roundTrip(oneCallableDApp("a" * limit), ser)

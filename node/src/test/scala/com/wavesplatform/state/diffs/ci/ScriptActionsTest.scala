@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.TxHelpers.{invoke, issue, secondSigner, set
 class ScriptActionsTest extends PropSpec with WithDomain {
   import DomainPresets._
 
-  property("ScriptTransfer after burning whole amount") {
+  property("NODE-267. ScriptTransfer after burning whole amount") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val issueTx = issue(secondSigner)
       val asset   = IssuedAsset(issueTx.id())
@@ -32,7 +32,7 @@ class ScriptActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("Burn after transferring whole amount") {
+  property("NODE-269. Burn after transferring whole amount") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val issueTx = issue(secondSigner)
       val asset   = IssuedAsset(issueTx.id())
@@ -51,7 +51,7 @@ class ScriptActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("SponsorFee smart asset") {
+  property("NODE-277. SponsorFee smart asset") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val issueTx = issue(secondSigner, script = Some(ExprScriptImpl(V5, false, TRUE)))
       val asset   = IssuedAsset(issueTx.id())
@@ -69,7 +69,7 @@ class ScriptActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("SponsorFee foreign asset") {
+  property("NODE-278. SponsorFee foreign asset") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val issueTx = issue()
       val asset   = IssuedAsset(issueTx.id())

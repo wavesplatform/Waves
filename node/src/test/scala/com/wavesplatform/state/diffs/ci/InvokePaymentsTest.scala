@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 class InvokePaymentsTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  property("invoke allowed if Transfer Transaction is prohibited in payment asset") {
+  property("NODE-266. Invoke allowed if Transfer Transaction is prohibited in payment asset") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val assetScript = TestCompiler(V5).compileExpression(
         """
@@ -39,7 +39,7 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke fails if Transfer Transaction is allowed but Invoke is prohibited in payment asset") {
+  property("NODE-864. Invoke fails if Transfer Transaction is allowed but Invoke is prohibited in payment asset") {
     def test(invokeCheck: String) = {
       withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
         val assetScript = TestCompiler(V5).compileAsset(
@@ -67,7 +67,7 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
     test("false")
   }
 
-  property("invoke on insufficient balance is always rejected for asset payment and fails on big complexity for waves") {
+  property("NODE-272. Invoke on insufficient balance is always rejected for asset payment and fails on big complexity for waves") {
     val invoker = signer(2)
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(invoker.toAddress, invokeFee)) { d =>
       val dApp = TestCompiler(V5).compileContract(
@@ -97,7 +97,7 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("trying to attach lease IN balance to invoke payment") {
+  property("NODE-275. Trying to attach lease IN balance to invoke payment") {
     val invoker = signer(2)
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(invoker.toAddress, invokeFee)) { d =>
       val dApp = TestCompiler(V5).compileContract(
@@ -113,7 +113,7 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("trying to attach lease OUT balance to invoke payment") {
+  property("NODE-865. Trying to attach lease OUT balance to invoke payment") {
     val invoker  = signer(2)
     val leaseFee = FeeConstants(TransactionType.Lease) * FeeUnit
     withDomain(

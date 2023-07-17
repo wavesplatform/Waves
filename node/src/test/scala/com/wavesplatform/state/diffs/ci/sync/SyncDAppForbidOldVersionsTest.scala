@@ -65,7 +65,7 @@ class SyncDAppForbidOldVersionsTest
     (balances, Seq(ssTx1, ssTx2), invokeTx, proxyDApp.toAddress, callingDApp.toAddress)
   }
 
-  property("sync call is forbidden for V3 and V4 DApps") {
+  property("NODE-43. Sync call is forbidden for V3 and V4 DApps") {
     for {
       callingDAppVersion <- Seq(V3, V4)
       invokeExpression   <- Seq(false, true)

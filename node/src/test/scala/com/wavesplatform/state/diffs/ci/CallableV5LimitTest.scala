@@ -46,7 +46,7 @@ class CallableV5LimitTest extends PropSpec with ScalaCheckPropertyChecks with Wi
      """.stripMargin
   )
 
-  property("callable limit is 10000 from V5") {
+  property("NODE-132. Callable limit is 10000 from V5") {
     val dApp     = TxHelpers.signer(0)
     val syncDApp = TxHelpers.signer(1)
     val invoker  = TxHelpers.signer(2)

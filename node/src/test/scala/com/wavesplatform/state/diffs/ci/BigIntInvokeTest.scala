@@ -26,7 +26,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
 
   private val bigIntValue = 12345
 
-  property("BigInt is forbidden for DApp actions") {
+  property("NODE-121. BigInt is forbidden for DApp actions") {
     def dApp(action: EXPR => FUNCTION_CALL, version: StdLibVersion): Script = {
       ContractScriptImpl(
         version,
@@ -108,7 +108,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
     assert(burn, s"Some($bigIntValue))' instead of Burn")
   }
 
-  property("BigInt as Invoke return value") {
+  property("NODE-122. BigInt as Invoke return value") {
     def dApp1(nextDApp: Address, version: StdLibVersion): Script = TestCompiler(version).compileContract(
       s"""
          | @Callable(i)

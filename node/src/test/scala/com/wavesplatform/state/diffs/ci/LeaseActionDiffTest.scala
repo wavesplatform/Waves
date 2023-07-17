@@ -233,7 +233,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     (preparingTxs, invoke, leaseAmount, dAppAcc.toAddress, invoker.toAddress, leaseTxs, leaseCancel)
   }
 
-  property(s"Lease action is restricted before activation ${BlockchainFeatures.SynchronousCalls}") {
+  property(s"NODE-138. Lease action is restricted before activation ${BlockchainFeatures.SynchronousCalls}") {
     val (preparingTxs, _, _, _, _, _, _) = leasePreconditions()
     assertDiffEi(
       Seq(),
@@ -242,7 +242,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     )(_ should produce("Ride V5, dApp-to-dApp invocations feature has not been activated yet"))
   }
 
-  property(s"Lease action by address (invoker - recipient)") {
+  property(s"NODE-139. Lease action by address (invoker - recipient)") {
 
     val (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _, _) = leasePreconditions()
     withDomain(domainSettingsWithFS(v5Features)) { d =>
@@ -271,6 +271,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property(s"Lease action with active lease from dApp") {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: _, _) =>
@@ -309,7 +310,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with active lease from dApp and cancelled lease from invoker-recipient") {
+  property(s"NODE-141. Lease action with active lease from dApp and cancelled lease from invoker-recipient") {
     leasePreconditions(cancelLeaseFromInvoker = true) match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxToDAppCancel) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
@@ -350,7 +351,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with active lease from invoker-recipient") {
+  property(s"NODE-143. Lease action with active lease from invoker-recipient") {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _ :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
@@ -388,6 +389,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property(s"Lease action with active lease from invoker-recipient and cancelled lease from dApp") {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxFromDAppCancel) =>
@@ -433,7 +435,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with active lease from both dApp and invoker-recipient") {
+  property(s"NODE-144. Lease action with active lease from both dApp and invoker-recipient") {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
@@ -475,7 +477,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action by alias") {
+  property(s"NODE-145. Lease action by alias") {
     val (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _, _) = leasePreconditions(useAlias = true)
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -487,7 +489,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action cancelled by LeaseCancelTransaction") {
+  property(s"NODE-146. Lease action cancelled by LeaseCancelTransaction") {
     val (preparingTxs, invoke, _, dAppAcc, invoker, _, leaseCancelTx) = leasePreconditions(cancelLeaseActionByTx = true)
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -500,7 +502,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with empty address") {
+  property(s"NODE-147. Lease action with empty address") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customRecipient = Some(Recipient.Address(ByteStr.empty)))
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -511,7 +513,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with wrong address bytes length") {
+  property(s"NODE-148. Lease action with wrong address bytes length") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customRecipient = Some(Recipient.Address(ByteStr.fill(10)(127))))
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -522,7 +524,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with wrong address checksum") {
+  property(s"NODE-149. Lease action with wrong address checksum") {
     val address                               = TxHelpers.signer(3).toAddress
     val wrongChecksum                         = Array.fill[Byte](Address.ChecksumLength)(0)
     val wrongAddress                          = address.bytes.dropRight(Address.ChecksumLength) ++ wrongChecksum
@@ -536,7 +538,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with unexisting alias") {
+  property(s"NODE-150. Lease action with unexisting alias") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customRecipient = Some(Recipient.Alias("alias2")))
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -547,7 +549,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with illegal alias") {
+  property(s"NODE-151. Lease action with illegal alias") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customRecipient = Some(Recipient.Alias("#$%!?")))
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -558,7 +560,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with empty amount") {
+  property(s"NODE-152. Lease action with empty amount") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customAmount = Some(0))
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -569,7 +571,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action with negative amount") {
+  property(s"NODE-153. Lease action with negative amount") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customAmount = Some(-100))
     assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
@@ -578,7 +580,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     )(_ should produce("Negative lease amount"))
   }
 
-  property(s"Lease action spends all dApp balance") {
+  property(s"NODE-154. Lease action spends all dApp balance") {
     val setScriptFee                                = TxHelpers.ciFee(1)
     val dAppBalance                                 = ENOUGH_AMT - setScriptFee
     val (preparingTxs, invoke, _, dAppAcc, _, _, _) = leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance))
@@ -591,7 +593,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action on insufficient balance") {
+  property(s"NODE-155. Lease action on insufficient balance") {
     val setScriptFee                          = TxHelpers.ciFee(1)
     val dAppBalance                           = ENOUGH_AMT - setScriptFee
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance + 1))
@@ -604,7 +606,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action on insufficient balance with other leases") {
+  property(s"NODE-156. Lease action on insufficient balance with other leases") {
     val setScriptFee                                 = TxHelpers.ciFee(1)
     val dAppBalance                                  = ENOUGH_AMT - setScriptFee
     val (preparingTxs, invoke, _, _, _, leaseTxs, _) = leasePreconditions(customSetScriptFee = Some(setScriptFee), customAmount = Some(dAppBalance))
@@ -619,7 +621,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Duplicate lease action") {
+  property(s"NODE-157. Duplicate lease action") {
     val recipient                             = TxHelpers.signer(3).toAddress.toRide
     val amount                                = positiveLongGen.sample.get
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(duplicateLeaseDApp(recipient, amount)))
@@ -633,7 +635,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action to dApp itself") {
+  property(s"NODE-158. Lease action to dApp itself") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(selfLease = true)
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -644,7 +646,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"Lease action to dApp itself by alias") {
+  property(s"NODE-159. Lease action to dApp itself by alias") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(selfLease = true, useAlias = true)
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs)),
@@ -712,7 +714,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action with Lease action from same result") {
+  property(s"NODE-162. LeaseCancel action with Lease action from same result") {
     val recipient                                   = TxHelpers.signer(3).toAddress
     val amount                                      = 100
     val (preparingTxs, invoke, _, dAppAcc, _, _, _) = leasePreconditions(customDApp = Some(leaseWithLeaseCancelDApp(recipient.toRide, amount)))
@@ -741,7 +743,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action between two same Lease actions") {
+  property(s"NODE-163. LeaseCancel action between two same Lease actions") {
     val recipient                             = TxHelpers.signer(3).toAddress
     val amount                                = 100
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(leaseAfterLeaseCancelDApp(recipient.toRide, amount)))
@@ -754,7 +756,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action between two Lease actions with different nonces") {
+  property(s"NODE-164. LeaseCancel action between two Lease actions with different nonces") {
     val recipient = TxHelpers.signer(3).toAddress
     val amount    = 100
     val (preparingTxs, invoke, _, dAppAcc, invoker, _, _) =
@@ -771,7 +773,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action for lease performed via LeaseTransaction") {
+  property(s"NODE-165. LeaseCancel action for lease performed via LeaseTransaction") {
     val (preparingTxs, invoke, _, dAppAcc, invoker, leaseTxs, _) = leasePreconditions(useLeaseCancelDApp = true)
     val leaseFromDApp                                            = leaseTxs.head
     assertDiffAndState(
@@ -784,7 +786,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action with unexisting leaseId") {
+  property(s"NODE-166. LeaseCancel action with unexisting leaseId") {
     val leaseId                               = ByteStr.fill(32)(1.toByte)
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(singleLeaseCancelDApp(leaseId)))
     assertDiffAndState(
@@ -796,7 +798,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action with illegal leaseId") {
+  property(s"NODE-167. LeaseCancel action with illegal leaseId") {
     val leaseId                               = ByteStr.fromBytes(1)
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(singleLeaseCancelDApp(leaseId)))
     assertDiffAndState(
@@ -808,6 +810,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("LeaseCancel foreign leaseId") {
     val leaseTx                               = TxHelpers.lease(TxHelpers.signer(2))
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(singleLeaseCancelDApp(leaseTx.id())))
@@ -820,7 +823,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel actions with same lease id") {
+  property(s"NODE-168. LeaseCancel actions with same lease id") {
     val recipient                             = TxHelpers.signer(3).toAddress.toRide
     val amount                                = 100
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(duplicatedLeaseCancelDApp(recipient, amount)))
@@ -834,7 +837,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property(s"LeaseCancel action for already cancelled lease") {
+  property(s"NODE-169. LeaseCancel action for already cancelled lease") {
     val (preparingTxs, invoke, _, _, _, leaseTxs, leaseCancelTx) = leasePreconditions(useLeaseCancelDApp = true)
     assertDiffAndState(
       Seq(TestBlock.create(preparingTxs ++ leaseTxs ++ List(leaseCancelTx))),
@@ -938,6 +941,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Write case
   property("trying to spend lease IN balance in Lease action") {
     withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
       val dApp = TestCompiler(V5).compileContract(
@@ -955,6 +959,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Write case
   property("trying to spend lease OUT balance in Lease action") {
     withDomain(
       RideV5,
@@ -975,7 +980,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("ScriptTransfer after Lease of all available balance") {
+  property("NODE-270. ScriptTransfer after Lease of all available balance") {
     val setScriptFee = FeeConstants(TransactionType.SetScript) * FeeUnit
     withDomain(
       RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
@@ -996,7 +1001,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("ScriptTransfer after LeaseCancel of transferring balance") {
+  property("NODE-271. ScriptTransfer after LeaseCancel of transferring balance") {
     withDomain(
       RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
       Seq(AddrWithBalance(secondAddress, 1.006.waves))

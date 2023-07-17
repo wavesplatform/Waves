@@ -69,7 +69,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
     }.toMap)
   )
 
-  "correctly estimates complexity when child dApp invocation involves payment in smart asset" in {
+  "NODE-45. Correctly estimates complexity when child dApp invocation involves payment in smart asset" in {
     val invoker = TxHelpers.signer(0)
     val dApp0KP = TxHelpers.signer(1)
     val dApp1KP = TxHelpers.signer(2)

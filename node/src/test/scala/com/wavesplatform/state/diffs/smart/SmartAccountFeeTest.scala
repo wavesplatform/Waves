@@ -122,7 +122,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     )
   }
 
-  property(s"small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
+  property(s"NODE-189, NODE-224, NODE-225. Small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
     val (balances, preparingTxs, enoughPaidVerifierTxs, notEnoughPaidVerifierTxs, freeVerifierTxs) = preconditions
     withDomain(domainSettingsWithFS(features), balances) { d =>
       d.appendBlock(preparingTxs*)

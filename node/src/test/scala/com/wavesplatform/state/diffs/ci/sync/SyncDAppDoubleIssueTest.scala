@@ -47,7 +47,7 @@ class SyncDAppDoubleIssueTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
-  property("issue the same asset via 2 dApps") {
+  property("NODE-31. Issue the same asset via 2 dApps") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

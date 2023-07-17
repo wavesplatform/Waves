@@ -16,7 +16,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
   private val dApp2Signer  = signer(2)
   private val dApp2Address = signer(2).toAddress
 
-  property("can't reissue asset issued by other dApp in the chain") {
+  property("NODE-408. Can't reissue asset issued by other dApp in the chain") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -43,7 +43,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can transfer from parent dApp asset issued in the chain") {
+  property("NODE-409. Can transfer from parent dApp asset issued in the chain") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -74,7 +74,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't attach asset that will be issued later in the chain") {
+  property("NODE-410. Can't attach asset that will be issued later in the chain") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -102,6 +102,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Write case
   property("can't transfer asset that will be issued later from the same dApp") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp = TestCompiler(V5).compileContract(
@@ -124,7 +125,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't issue the same asset in two dApps in the chain") {
+  property("NODE-411. Can't issue the same asset in two dApps in the chain") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""

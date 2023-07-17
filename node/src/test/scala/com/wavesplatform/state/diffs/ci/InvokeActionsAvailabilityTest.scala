@@ -100,7 +100,7 @@ class InvokeActionsAvailabilityTest
 
   private val paymentAmount = 12345
 
-  property("actions availability in sync call") {
+  property("NODE-1. Actions availability in sync call") {
     val invoker     = TxHelpers.signer(0)
     val callingDApp = TxHelpers.signer(1)
     val proxyDApp   = TxHelpers.signer(2)

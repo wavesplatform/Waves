@@ -48,7 +48,7 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
       else
         ContractLimits.MaxCallableActionsAmountBeforeV6(version)
 
-    property(s"Allow not more $limit ScriptTransfer/Lease/LeaseCancel actions for V${version.id}") {
+    property(s"NODE-741. Allow not more $limit ScriptTransfer/Lease/LeaseCancel actions for V${version.id}") {
       val wavesTransferActionsCount = (limit - 8) / 2
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
@@ -88,7 +88,7 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
       else
         ContractLimits.MaxCallableActionsAmountBeforeV6(version)
 
-    property(s"Allow not more $limit Issue/Reissue/Burn/SponsorFee actions for V${version.id}") {
+    property(s"NODE-740. Allow not more $limit Issue/Reissue/Burn/SponsorFee actions for V${version.id}") {
       val actionsCount = limit / 2
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
@@ -122,7 +122,7 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
   }
 
   property(
-    s"""Allow ${ContractLimits.MaxBalanceScriptActionsAmountV6} ScriptTransfer/Lease/LeaseCancel, 
+    s"""NODE-742. Allow ${ContractLimits.MaxBalanceScriptActionsAmountV6} ScriptTransfer/Lease/LeaseCancel,
        |${ContractLimits.MaxAssetScriptActionsAmountV6} Issue/Reissue/Burn/SponsorFee 
        |and ${ContractLimits.MaxWriteSetSize} data actions for V6""".stripMargin
   ) {
@@ -140,6 +140,7 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
     }
   }
 
+  //TODO Find or write case
   property(
     s"Balance and asset action limits is determined by current invoke version before ${BlockchainFeatures.BlockRewardDistribution.description} activation"
   ) {
@@ -196,6 +197,7 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
     )
   }
 
+  //TODO Find or write case
   property(
     s"Balance and asset action limits is determined by root invoke version after ${BlockchainFeatures.BlockRewardDistribution.description} activation"
   ) {

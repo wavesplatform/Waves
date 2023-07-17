@@ -30,20 +30,20 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     ) ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route ~> check(body)
   }
 
-  "eth_chainId" in withDomain(DefaultWavesSettings) { d =>
+  "eth_chainId (NODE-673)" in withDomain(DefaultWavesSettings) { d =>
     routeTest(d, "eth_chainId")(resultInt shouldBe DefaultWavesSettings.blockchainSettings.addressSchemeCharacter.toLong)
   }
 
-  "eth_gasPrice" in withDomain() { d =>
+  "eth_gasPrice (NODE-674)" in withDomain() { d =>
     routeTest(d, "eth_gasPrice")(resultInt shouldBe 10000000000L)
   }
 
-  "eth_blockNumber" in withDomain() { d =>
+  "eth_blockNumber (NODE-675)" in withDomain() { d =>
     1 to 11 foreach (_ => d.appendBlock())
     routeTest(d, "eth_blockNumber")(resultInt shouldBe 11)
   }
 
-  "eth_getBlockByNumber" in withDomain() { d =>
+  "eth_getBlockByNumber (NODE-869)" in withDomain() { d =>
     1 to 5 foreach (_ => d.appendBlock())
     routeTest(d, "eth_getBlockByNumber", "0x123")((resultJson \ "number").as[String] shouldBe "0x123")
     routeTest(d, "eth_getBlockByNumber", "earliest")((resultJson \ "number").as[String] shouldBe "0x1")
@@ -52,19 +52,19 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     routeTest(d, "eth_getBlockByNumber", "xxx")(errorMessage shouldBe "Request parameter is not number nor supported tag")
   }
 
-  "eth_getBalance" in withDomain() { d =>
+  "eth_getBalance (NODE-676)" in withDomain() { d =>
     val address = randomAddress()
     d.appendBlock(GenesisTransaction.create(address, 123L, ntpTime.getTimestamp()).explicitGet())
     routeTest(d, "eth_getBalance", address.toEthAddress)(resultInt shouldBe 1230000000000L)
   }
 
   "eth_getCode" - {
-    "no contract" in withDomain() { d =>
+    "no contract (NODE-677)" in withDomain() { d =>
       val address = randomAddress()
       routeTest(d, "eth_getCode", address.toEthAddress)(result shouldBe "0x")
     }
 
-    "has contract" in withDomain(
+    "has contract (NODE-691)" in withDomain(
       settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
     ) { d =>
       val testKP = randomKeyPair()
@@ -91,7 +91,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
       routeTest(d, "eth_getCode", testKP.toAddress.toEthAddress)(result shouldBe "0xff")
     }
 
-    "has asset" in withDomain(
+    "has asset (NODE-870)" in withDomain(
       settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
     ) { d =>
       val issueTx = issue()
@@ -101,7 +101,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     }
   }
 
-  "eth_estimateGas" in withDomain() { d =>
+  "eth_estimateGas (NODE-678)" in withDomain() { d =>
     routeTest(d, "eth_estimateGas", Json.obj("to" -> TxHelpers.secondAddress.toEthAddress, "value" -> 0, "data" -> "0x00")) {
       resultInt shouldBe 500000
     }
@@ -119,19 +119,19 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
 
       val assetContract = EthEncoding.toHexString(issueTransaction.id().arr.take(20))
 
-      withClue("asset name")(
+      withClue("asset name (NODE-679)")(
         routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> "0x95d89b41"))(
           result shouldBe "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045445535400000000000000000000000000000000000000000000000000000000"
         )
       )
 
-      withClue("asset decimals")(
+      withClue("asset decimals (NODE-680)")(
         routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> "0x313ce567"))(
           result shouldBe "0x0000000000000000000000000000000000000000000000000000000000000002"
         )
       )
 
-      withClue("asset balance")(
+      withClue("asset balance (NODE-681)")(
         routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> ("0x70a08231" + randomKP.toAddress.toEthAddress)))(
           result shouldBe "0x00000000000000000000000000000000000000000000000000000000000186a0"
         )
@@ -139,7 +139,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     }
   }
 
-  "eth_getTransactionReceipt" - {
+  "eth_getTransactionReceipt (NODE-682)" - {
     "success" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)) { d =>
       val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10L, Asset.Waves)
 
@@ -173,7 +173,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     }
   }
 
-  "eth_getTransactionByHash" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)) { d =>
+  "eth_getTransactionByHash (NODE-871)" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)) { d =>
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10L, Asset.Waves)
 
     d.appendBlock(GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet())
@@ -205,7 +205,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     )
   }
 
-  "eth_sendRawTransaction" in withDomain(settingsWithFeatures(BlockchainFeatures.RideV6, BlockchainFeatures.BlockV5)) { d =>
+  "eth_sendRawTransaction (NODE-683)" in withDomain(settingsWithFeatures(BlockchainFeatures.RideV6, BlockchainFeatures.BlockV5)) { d =>
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10, Asset.Waves)
     d.appendBlock(
       GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet()
@@ -215,7 +215,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     )
   }
 
-  "eth/assets" in withDomain(
+  "eth/assets (NODE-684)" in withDomain(
     settingsWithFeatures(
       BlockchainFeatures.Ride4DApps,
       BlockchainFeatures.ReduceNFTFee,
@@ -325,13 +325,13 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
       }
   }
 
-  "absence of id" in withDomain() { d =>
+  "absence of id (NODE-872)" in withDomain() { d =>
       Post(routePath(""), Json.obj("method" -> "eth_chainId"))
         ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
         ~> check { responseAs[JsObject] shouldBe Json.obj("id" -> null, "jsonrpc" -> "2.0", "result" -> "0x54") }
   }
 
-  "absence of method" in withDomain() { d =>
+  "absence of method (NODE-873)" in withDomain() { d =>
       Post(routePath(""), Json.obj())
         ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
         ~> check { responseAs[JsObject] shouldBe Json.obj() }

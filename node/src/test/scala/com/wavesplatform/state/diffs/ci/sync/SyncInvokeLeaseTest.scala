@@ -38,7 +38,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
-  property("LeaseCancel for Lease from sync call current dApp and then new Lease") {
+  property("NODE-529. LeaseCancel for Lease from sync call current dApp and then new Lease") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       d.appendBlock(setScript(dApp1Signer, twoLeaseDApp(555)))
       d.appendAndAssertSucceed(invoke(dApp1Address))
@@ -53,7 +53,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
-  property("LeaseCancel for Lease from sync call current dApp and then new Lease with previous id") {
+  property("NODE-530. LeaseCancel for Lease from sync call current dApp and then new Lease with previous id") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       d.appendBlock(setScript(dApp1Signer, twoLeaseDApp(1)))
       d.appendAndAssertFailed(invoke(dApp1Address), "already in the state")
@@ -61,7 +61,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
-  property("double LeaseCancel for Lease from sync call current dApp") {
+  property("NODE-533. Double LeaseCancel for Lease from sync call current dApp") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
@@ -87,7 +87,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
-  property("LeaseCancel foreign Lease") {
+  property("NODE-531. LeaseCancel foreign Lease") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -115,7 +115,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
-  property("Lease with the same id as foreign Lease") {
+  property("NODE-532. Lease with the same id as foreign Lease") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -142,7 +142,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
-  property("Lease ahead of corresponding LeaseCancel") {
+  property("NODE-534. Lease ahead of corresponding LeaseCancel") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
@@ -165,7 +165,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
-  property("Lease after Lease with whole balance") {
+  property("NODE-535. Lease after Lease with whole balance") {
     val setScriptFee = FeeConstants(TransactionType.SetScript) * FeeUnit
     withDomain(RideV5, Seq(AddrWithBalance(dApp1Address, setScriptFee + 2))) { d =>
       val dApp = TestCompiler(V5).compileContract(

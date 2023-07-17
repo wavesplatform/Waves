@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class OnlyTransferIsAllowedTest extends PropSpec with WithState {
 
-  property("transfer is allowed but lease is not due to predicate") {
+  property("NODE-204. Transfer is allowed but lease is not due to predicate") {
 
     val scriptText =
       s"""

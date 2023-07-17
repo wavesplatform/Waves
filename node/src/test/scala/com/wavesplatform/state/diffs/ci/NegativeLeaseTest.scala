@@ -32,7 +32,7 @@ class NegativeLeaseTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
-  property("negative lease amount") {
+  property("NODE-115. Negative lease amount") {
     for (bigComplexity <- Seq(false, true)) {
       val invoker = TxHelpers.signer(0)
       val dApp    = TxHelpers.signer(1)

@@ -33,7 +33,7 @@ class NegativeTransferAmountTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
-  property("negative transfer amount") {
+  property("NODE-118. Negative transfer amount") {
     for (bigComplexity <- Seq(false, true)) {
       val invoker = TxHelpers.signer(0)
       val dApp    = TxHelpers.signer(1)

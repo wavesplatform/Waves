@@ -30,7 +30,7 @@ class EvaluatedPBSerializationTest
     with ApiMarshallers
     with SharedSchedulerMixin {
 
-  property("correctly serialize/deserialize EVALUATED args for callable functions") {
+  property("NODE-695, NODE-696. Correctly serialize/deserialize EVALUATED args for callable functions") {
     val masterDApp  = TxHelpers.signer(1)
     val serviceDApp = TxHelpers.signer(2)
     val invoker     = TxHelpers.signer(3)

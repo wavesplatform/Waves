@@ -64,7 +64,7 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
     (balances, List(issue, transfer1, transfer2, setVerifier, setDApp), invokeFromScripted, invokeFromNonScripted)
   }
 
-  property(s"fee for asset scripts is not required after activation ${BlockchainFeatures.SynchronousCalls}") {
+  property(s"NODE-2. Fee for asset scripts is not required after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (balances, preparingTxs, invokeFromScripted, invokeFromNonScripted) = paymentPreconditions
     withDomain(fsWithV5, balances) { d =>
       d.appendBlock(preparingTxs*)

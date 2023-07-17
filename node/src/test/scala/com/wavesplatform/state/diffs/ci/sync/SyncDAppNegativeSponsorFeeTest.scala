@@ -47,7 +47,7 @@ class SyncDAppNegativeSponsorFeeTest extends PropSpec with WithDomain {
       .configure(_.copy(enforceTransferValidationAfter = 3))
       .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4)
 
-  property("negative sponsor amount") {
+  property("NODE-36. Negative sponsor amount") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

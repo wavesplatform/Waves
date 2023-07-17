@@ -113,7 +113,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
   }
 
   "BlockchainUpdates" - {
-    "should return order ids in exchange metadata" in withDomainAndRepo(DomainPresets.RideV4) { case (d, repo) =>
+    "BU-91. Should return order ids in exchange metadata" in withDomainAndRepo(DomainPresets.RideV4) { case (d, repo) =>
       val issue = TxHelpers.issue()
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
       d.appendBlock(issue)
@@ -128,7 +128,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should process nested invoke with args" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+    "BU-92. Should process nested invoke with args" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       val script = TxHelpers.script("""
                                       |{-# STDLIB_VERSION 5 #-}
                                       |{-# CONTENT_TYPE DAPP #-}
@@ -160,7 +160,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     }
 
-    "should not freeze on micro rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+    "BU-93. Should not freeze on micro rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       val keyBlockId = d.appendKeyBlock().id()
       d.appendMicroBlock(TxHelpers.transfer())
       d.appendMicroBlock(TxHelpers.transfer())
@@ -186,7 +186,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     }
 
-    "should not freeze on block rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+    "BU-94. Should not freeze on block rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       val block1Id = d.appendKeyBlock().id()
       d.appendKeyBlock()
 
@@ -204,7 +204,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should not duplicate blocks" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+    "BU-95. Should not duplicate blocks" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       for (_ <- 1 to 99) d.appendBlock()
       d.appendKeyBlock()
       d.appendMicroBlock(TxHelpers.transfer())
@@ -224,7 +224,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should not freeze on block rollback without key-block" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+    "BU-96. Should not freeze on block rollback without key-block" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       val block1Id = d.appendBlock().id()
       val block2Id = d.appendBlock().id()
       d.appendBlock()
@@ -244,14 +244,14 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should survive invalid rollback" in withDomainAndRepo(RideV6.copy(dbSettings = dbSettings.copy(maxRollbackDepth = 0))) { (d, repo) =>
+    "BU-97. Should survive invalid rollback" in withDomainAndRepo(RideV6.copy(dbSettings = dbSettings.copy(maxRollbackDepth = 0))) { (d, repo) =>
       for (_ <- 1 to 10) d.appendBlock()
       intercept[RuntimeException](d.rollbackTo(1)) // Should fail
       d.appendBlock()
       repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest.of(1, 10)).futureValue.updates.map(_.height) shouldBe (1 to 10)
     }
 
-    "should survive invalid micro rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
+    "BU-98. Should survive invalid micro rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
       d.appendKeyBlock()
       val sub   = repo.createFakeObserver(SubscribeRequest(1))
       val mb1Id = d.appendMicroBlock(TxHelpers.transfer())
@@ -282,6 +282,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     }
 
+    //TODO Add case
     "should survive rollback to key block" in withDomainAndRepo(currentSettings) { (d, repo) =>
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
       val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
@@ -313,7 +314,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val totalWaves = 100_000_000_0000_0000L
       val reward     = 6_0000_0000
 
-      "on preactivated block reward" in {
+      "on preactivated block reward (BU-100)" in {
         val settings = currentSettings.setFeaturesHeight((BlockReward, 0))
 
         withDomainAndRepo(settings) { case (d, repo) =>
@@ -327,7 +328,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         }
       }
 
-      "on activation of block reward" in {
+      "on activation of block reward (BU-101)" in {
         val settings = currentSettings.setFeaturesHeight((BlockReward, 3))
 
         withNEmptyBlocksSubscription(settings = settings, count = 3) { result =>
@@ -354,6 +355,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         }
       }
 
+      //TODO Add case
       "on rollbacks" in {
         withDomainAndRepo(currentSettings) { case (d, repo) =>
           d.appendBlock()

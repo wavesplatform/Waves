@@ -76,7 +76,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> A -> B -> B
-  property("dApp calls itself that calls other dApp that calls itself - allowed") {
+  property("NODE-502. dApp calls itself that calls other dApp that calls itself - allowed") {
     def preconditions(invokeExpression: Boolean) = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -116,7 +116,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -> C -> A
-  property("dApp calls dApp chain with itself at the end - prohibited") {
+  property("NODE-503. dApp calls dApp chain with itself at the end - prohibited") {
     def preconditions(invokeExpression: Boolean) = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -163,7 +163,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   // 2 scenarios:
   // A -> B -> C -> B
   // A -> B -> C -[r]-> B
-  property("calling dApp is called again - prohibited") {
+  property("NODE-504. calling dApp is called again - prohibited") {
     def assert(reentrant: Boolean): Unit = {
       val preconditions = {
         val dApp1 = TxHelpers.signer(1)
@@ -201,7 +201,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -> B -[r]-> C -[r]-> B
-  property("calling twice dApp is called again after reentrant calls - prohibited") {
+  property("NODE-505. Calling twice dApp is called again after reentrant calls - prohibited") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -236,7 +236,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -> C -> D -> C
-  property("dApp from chain is called again - prohibited") {
+  property("NODE-506. dApp from chain is called again - prohibited") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -272,7 +272,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -> C -[r]-> D -> C
-  property("dApp is called after reentrant call - allowed") {
+  property("NODE-507. dApp is called after reentrant call - allowed") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -307,7 +307,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -[r]-> C -> D -> B
-  property("dApp is called after reentrant and usual call other dApp - allowed") {
+  property("NODE-508. dApp is called after reentrant and usual call other dApp - allowed") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -342,7 +342,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -[r]-> C -> B -> B
-  property("dApp is called from itself after reentrant call - allowed") {
+  property("NODE-509. dApp is called from itself after reentrant call - allowed") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -375,7 +375,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -[r]-> C -> D -> C
-  property("dApp that called from reentrant dApp is called again - prohibited") {
+  property("NODE-510. dApp that called from reentrant dApp is called again - prohibited") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -411,7 +411,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -[r]-> C -> D -> B -[r]-> E -> B
-  property("dApp is called after 2 reentrant call - allowed") {
+  property("NODE-511. dApp is called after 2 reentrant call - allowed") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -448,7 +448,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
   }
 
   // A -> B -[r]-> C -> D -> B -> E -> B
-  property("dApp is called after reentrant and simple call - prohibited") {
+  property("NODE-512. dApp is called after reentrant and simple call - prohibited") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)
@@ -487,7 +487,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
 
   // A -> B -> C -> D
   //        -[r]-> E -> C -> B
-  property("dApps (B - reentrant, C - simple) are called after calls from new chain - allowed") {
+  property("NODE-513. dApps (B - reentrant, C - simple) are called after calls from new chain - allowed") {
     val preconditions = {
       val dApp1 = TxHelpers.signer(1)
       val dApp2 = TxHelpers.signer(2)

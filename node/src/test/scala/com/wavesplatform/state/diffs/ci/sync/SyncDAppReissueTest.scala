@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class SyncDAppReissueTest extends PropSpec with WithDomain {
 
-  property("allow transfer after reissue enough funds") {
+  property("NODE-458. Allow transfer after reissue enough funds") {
     val invoker   = TxHelpers.signer(0)
     val dApp      = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
@@ -37,7 +37,7 @@ class SyncDAppReissueTest extends PropSpec with WithDomain {
     }
   }
 
-  property("negative reissue quantity") {
+  property("NODE-35. Negative reissue quantity") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -77,7 +77,7 @@ class SyncDAppReissueTest extends PropSpec with WithDomain {
     }
   }
 
-  property("reissue foreign asset") {
+  property("NODE-38. Reissue foreign asset") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

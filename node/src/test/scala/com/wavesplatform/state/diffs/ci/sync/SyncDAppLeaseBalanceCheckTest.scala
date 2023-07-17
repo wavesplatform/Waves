@@ -47,7 +47,7 @@ class SyncDAppLeaseBalanceCheckTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
 
-  property("negative balance always rejects tx after syncDAppCheckTransfersHeight") {
+  property("NODE-32. Negative balance always rejects tx after syncDAppCheckTransfersHeight") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

@@ -16,7 +16,7 @@ import scala.collection.immutable.VectorMap
 class InvokeFeeTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  property("invoke standard fee") {
+  property("NODE-128, NODE-223. Invoke standard fee") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -32,7 +32,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke sponsor fee") {
+  property("NODE-59, NODE-226. Invoke sponsor fee") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -52,7 +52,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke sponsored fee on failed transaction should be charged correctly") {
+  property("NODE-77. Invoke sponsored fee on failed transaction should be charged correctly") {
     val issuer  = secondSigner
     val invoker = signer(2)
     val dAppAcc = signer(3)
@@ -79,7 +79,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke is rejected if fee sponsor has not enough Waves") {
+  property("NODE-227. Invoke is rejected if fee sponsor has not enough Waves") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(signer(9).toAddress, 2.waves)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -96,7 +96,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke Issue fee") {
+  property("NODE-87. Invoke Issue fee") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -116,11 +116,11 @@ class InvokeFeeTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke negative fee") {
+  property("NODE-229. Invoke negative fee") {
     (the[Exception] thrownBy invoke(fee = -1)).getMessage should include("InsufficientFee")
   }
 
-  property("invoke sponsor fee via non-sponsored asset") {
+  property("NODE-253. Invoke sponsor fee via non-sponsored asset") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """
@@ -136,7 +136,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke sponsor fee via unexisting asset") {
+  property("NODE-254. Invoke sponsor fee via unexisting asset") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         """

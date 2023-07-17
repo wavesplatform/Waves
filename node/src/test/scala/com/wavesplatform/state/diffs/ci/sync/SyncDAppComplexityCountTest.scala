@@ -220,7 +220,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       Diff.combine(m, m2).explicitGet()
   }
 
-  property("complexity border") {
+  property("NODE-42, NODE-274, NODE-331. Complexity border") {
     Seq(true, false).foreach { b =>
       assert(1, 2700, invokeExpression = b)
       assert(2, 5477, invokeExpression = b)
@@ -255,7 +255,7 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
     assert(100, 26513, withVerifier = true, withPayment = true, withThroughPayment = true, withThroughTransfer = true, exceeding = true)
   }
 
-  property("fail-free complexity border") {
+  property("NODE-260, NODE-332, NODE-335, NODE-336, NODE-337, NODE-338. Fail-free complexity border") {
     Seq(true, false).foreach { b =>
       assert(14, 0, raiseError = true, reject = true, invokeExpression = b)
       assert(15, 1065, raiseError = true, invokeExpression = b)

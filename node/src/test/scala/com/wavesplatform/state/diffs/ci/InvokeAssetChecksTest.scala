@@ -27,7 +27,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
   private val lengthError     = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
   private val nonExistentError = s"Transfer error: asset '$nonExistentAsset' is not found on the blockchain"
 
-  property("invoke asset checks") {
+  property("NODE-3. Invoke asset checks") {
     val dApp = TestCompiler(V4).compileContract(
       s"""
          |@Callable(i)
@@ -110,6 +110,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
+  //TODO Find case
   property("attached invoke payment asset checks") {
     val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}"""
     def dApp(complex: Boolean) = TestCompiler(V5).compileContract(
@@ -148,7 +149,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  property("sync invoke asset checks") {
+  property("NODE-4. Sync invoke asset checks") {
     def dApp(callingDApp: Address): ContractScriptImpl = TestCompiler(V5).compileContract(
       s"""
          |let callingDApp = Address(base58'$callingDApp')
@@ -190,7 +191,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  property("issuing asset name and description limits") {
+  property("NODE-280. Issuing asset name and description limits") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       Seq(false, true).foreach { complex =>
         val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} """
@@ -224,7 +225,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  property("issuing asset decimals limits") {
+  property("NODE-868. Issuing asset decimals limits") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       def dApp(decimals: Int) = TestCompiler(V5).compileContract(
         s"""
@@ -249,7 +250,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  property("Issues with same nonces are allowed when any field differs") {
+  property("NODE-279. Issues with same nonces are allowed when any field differs") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""

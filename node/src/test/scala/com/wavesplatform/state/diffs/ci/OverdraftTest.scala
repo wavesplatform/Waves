@@ -40,6 +40,7 @@ class OverdraftTest extends PropSpec with WithDomain {
   private val allActivatedSettings =
     settingsForRide(DirectiveDictionary[StdLibVersion].all.last).blockchainSettings.functionalitySettings
 
+  //TODO Find case
   property("insufficient fee") {
     dAppVersionWithSettings.foreach {
       case (version, settings) =>
@@ -53,6 +54,7 @@ class OverdraftTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("overdraft") {
     dAppVersionWithSettings.foreach {
       case (version, settings) =>
@@ -67,7 +69,7 @@ class OverdraftTest extends PropSpec with WithDomain {
     }
   }
 
-  property("overdraft with payment V3") {
+  property("NODE-273. Overdraft with payment V3") {
     dAppVersionWithSettings.foreach {
       case (_, settings) =>
         val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
@@ -78,6 +80,7 @@ class OverdraftTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("overdraft with payment V4") {
     dAppVersions.filter(_ >= V4).foreach { version =>
       val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(version))
@@ -88,6 +91,7 @@ class OverdraftTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("attach unexisting tokens using multiple payment") {
     dAppVersions.foreach { version =>
       val master  = TxHelpers.signer(0)

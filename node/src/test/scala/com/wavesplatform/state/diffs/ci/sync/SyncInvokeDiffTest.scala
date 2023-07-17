@@ -33,6 +33,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
   private val dAppAddress    = dApp.toAddress
   private val thirdAddress   = thirdAcc.toAddress
 
+  //TODO Find case
   property("Crosscontract call (same account)") {
     val script =
       TestCompiler(V5).compileContract(
@@ -75,7 +76,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract call doesn't require extra fee") {
+  property("NODE-84. Crosscontract call doesn't require extra fee") {
     val script =
       TestCompiler(V5).compileContract(
         s"""
@@ -116,7 +117,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract call (two accounts)") {
+  property("NODE-296. Crosscontract call (two accounts)") {
     val script =
       TestCompiler(V5).compileContract(
         s"""
@@ -198,6 +199,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
+  //TODO Find case
   property("originCaller and originCallerPublicKey fields") {
     val script = TestCompiler(V5).compileContract(
       s"""
@@ -278,7 +280,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("non-NFT issue require extra fee") {
+  property("NODE-343. Non-NFT issue require extra fee") {
     val script = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -346,7 +348,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("non-NFT issue work") {
+  property("NODE-88. Non-NFT issue work") {
     val script = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -414,7 +416,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract call (two accounts, double call)") {
+  property("NODE-101. Crosscontract call (two accounts, double call)") {
     val script = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -487,7 +489,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract nested call (two accounts)") {
+  property("NODE-102. Crosscontract nested call (two accounts)") {
     val script = TestCompiler(V5).compileContract(
       s"""
              |{-# STDLIB_VERSION 5 #-}
@@ -557,7 +559,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract with payment") {
+  property("NODE-103. Crosscontract with payment") {
     val script = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -624,7 +626,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Infinite recursive crosscontract call") {
+  property("NODE-104. Infinite recursive crosscontract call") {
     val recursiveContract = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -648,7 +650,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Smart asset transfer by nested contract actions") {
+  property("NODE-105. Smart asset transfer by nested contract actions") {
     val (assetScript, _) = {
       val script = """
                      |{-# STDLIB_VERSION 5 #-}
@@ -725,7 +727,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Asset transfer disabled in nested contract actions") {
+  property("NODE-106. Asset transfer disabled in nested contract actions") {
     val (assetScript, _) = {
       val script = """
                      |{-# STDLIB_VERSION 5 #-}
@@ -802,7 +804,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Asset payment disabled by asset script") {
+  property("NODE-107. Asset payment disabled by asset script") {
     val (assetScript, _) = {
       val script = """
                      |{-# STDLIB_VERSION 5 #-}
@@ -882,7 +884,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Payment in transaction process after Invoke") {
+  property("NODE-108. Payment in transaction process after Invoke") {
     def script(asset: ByteStr) = TestCompiler(V5).compileContract(
       s"""
              | @Callable(i)
@@ -956,7 +958,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Check balances in payment and asset scripts") {
+  property("NODE-109. Check balances in payment and asset scripts") {
     val startBalance                = 1000
     val transferAmount              = 3
     val paymentFromClientDAppAmount = 5
@@ -1079,6 +1081,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
+  //TODO Find case
   property("Crosscontract call - internal invoke state update") {
     val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
@@ -1149,6 +1152,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
+  //TODO Find case
   property("Crosscontract call - same contract internal invoke - state update") {
     val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
@@ -1209,7 +1213,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  property("Crosscontract call - multiple internal invokes - state update") {
+  property("NODE-29. Crosscontract call - multiple internal invokes - state update") {
     val (invokeEntry1Key, invokeEntry1Val) = ("entry1", 42)
     val transferAssetAmount                = 123
     val paymentAssetAmount                 = 456

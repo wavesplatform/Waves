@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.{EthTxGenerator, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthHelpers {
-  "Ethereum transfer" should "rollback" in withDomain(DomainPresets.RideV6) { d =>
+  "Ethereum transfer" should "rollback (NODE-686)" in withDomain(DomainPresets.RideV6) { d =>
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
 
     withClue("genesis") {
@@ -32,7 +32,7 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
     }
   }
 
-  "Ethereum invoke" should "rollback" in withDomain(DomainPresets.RideV6) { d =>
+  "Ethereum invoke" should "rollback (NODE-685)" in withDomain(DomainPresets.RideV6) { d =>
     d.helpers.creditWavesToDefaultSigner()
     d.helpers.creditWavesFromDefaultSigner(TxHelpers.secondAddress)
 

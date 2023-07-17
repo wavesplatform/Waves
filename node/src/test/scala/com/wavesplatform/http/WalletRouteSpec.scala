@@ -13,17 +13,17 @@ class WalletRouteSpec extends RouteSpec("/wallet") with RestAPISettingsHelper wi
   private val routeWithIncorrectKeyHash = WalletApiRoute(brokenRestApiSettings, testWallet).route
 
   routePath("/seed") - {
-    "requires api-key header" in {
+    "requires api-key header (SAPI-93)" in {
       Get(routePath("/seed")) ~> route should produce(ApiKeyNotValid)
     }
 
-    "returns seed when api-key header is present" in {
+    "returns seed when api-key header is present (SAPI-94)" in {
       Get(routePath("/seed")) ~> ApiKeyHeader ~> route ~> check {
         (responseAs[JsObject] \ "seed").as[String] shouldEqual Base58.encode(testWallet.seed)
       }
     }
 
-    "doesn't work if invalid api-key-hash was set" in {
+    "doesn't work if invalid api-key-hash was set (SAPI-95)" in {
       Get(routePath("/seed")) ~> ApiKeyHeader ~> routeWithIncorrectKeyHash should produce(ApiKeyNotValid)
     }
   }

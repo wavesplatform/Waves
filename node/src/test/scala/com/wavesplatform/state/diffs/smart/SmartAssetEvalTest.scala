@@ -59,7 +59,7 @@ class SmartAssetEvalTest extends PropSpec with WithState {
     (genesis, issue, setAssetScript, assetTransfer)
   }
 
-  property("Smart asset with scrtipt that contains 'this' link") {
+  property("NODE-190. Smart asset with script that contains 'this' link") {
     val (genesis, issueTransaction, setAssetScriptTransaction, assetTransferTransaction) = preconditions
     assertDiffAndState(smartEnabledFS) { append =>
       append(Seq(genesis)).explicitGet()

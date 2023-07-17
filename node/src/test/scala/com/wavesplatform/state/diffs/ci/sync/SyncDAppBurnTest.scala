@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class SyncDAppBurnTest extends PropSpec with WithDomain {
 
-  property("negative balance rejects or fails tx") {
+  property("NODE-30. Negative balance rejects or fails tx") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -58,7 +58,7 @@ class SyncDAppBurnTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't burn transferred funds") {
+  property("NODE-459. Can't burn transferred funds") {
     val invoker   = TxHelpers.signer(0)
     val dApp      = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
@@ -82,7 +82,7 @@ class SyncDAppBurnTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't transfer burned funds") {
+  property("NODE-457. Can't transfer burned funds") {
     val invoker   = TxHelpers.signer(0)
     val dApp      = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
@@ -106,7 +106,7 @@ class SyncDAppBurnTest extends PropSpec with WithDomain {
     }
   }
 
-  property("reissue and burn actions in sync call result state") {
+  property("NODE-422. Reissue and burn actions in sync call result state") {
     val invoker = TxHelpers.signer(1)
     val dApp    = TxHelpers.signer(2)
 
@@ -132,7 +132,7 @@ class SyncDAppBurnTest extends PropSpec with WithDomain {
     }
   }
 
-  property("negative burn quantity") {
+  property("NODE-33. Negative burn quantity") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

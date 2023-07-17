@@ -16,14 +16,14 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
 
   val TestAsset: IssuedAsset = TestValues.asset
 
-  "Ethereum transfer" should "recover correct key" in {
+  "Ethereum transfer" should "recover correct key (NODE-646)" in {
     val senderAccount = TxHelpers.defaultSigner.toEthKeyPair
     val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
     val transaction   = EthTxGenerator.generateEthTransfer(senderAccount, senderAddress, 1, Waves)
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
   }
 
-  it should "recover correct key with leading zeros" in {
+  it should "recover correct key with leading zeros (NODE-874)" in {
     val senderAcc = Bip32ECKeyPair.create(
       EthEncoding.toBytes("0x00db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"),
       Array.emptyByteArray
@@ -34,7 +34,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     ) shouldBe "0x00d7cf9ff594b07273228e7dd591707d38a1dba0a39492fd64445ba9cbb3bf66c862b9752f02bf8d1a0f00ccb11ae550a7616bd965c10f0101202d75580786ee"
   }
 
-  it should "recover correct address chainId" in {
+  it should "recover correct address chainId (NODE-647)" in {
     val transfer      = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, Waves)
     val assetTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, TestValues.asset)
     val invoke        = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
@@ -52,7 +52,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     }
   }
 
-  it should "change id if signature is changed" in {
+  it should "change id if signature is changed (NODE-648)" in {
     val senderAccount = TxHelpers.defaultSigner.toEthKeyPair
     val secondAccount = TxHelpers.secondSigner.toEthKeyPair
     val transaction1  = EthTxGenerator.generateEthTransfer(senderAccount, TxHelpers.defaultAddress, 1, Waves)
@@ -60,7 +60,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     transaction1.id() shouldNot be(transaction2.id())
   }
 
-  it should "reject legacy transactions" in {
+  it should "reject legacy transactions (NODE-649)" in {
     val senderAccount     = TxHelpers.defaultEthSigner
     val eip155Transaction = EthTxGenerator.generateEthTransfer(senderAccount, TxHelpers.defaultAddress, 1, Waves)
 
@@ -72,7 +72,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     EthereumTransaction(legacyTransaction) should produce("Legacy transactions are not supported")
   }
 
-  it should "fail with empty to field" in {
+  it should "fail with empty to field (NODE-875)" in {
     val rawTransaction = RawTransaction.createTransaction(
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
@@ -86,7 +86,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     )
   }
 
-  it should "fail with invalid to field" in {
+  it should "fail with invalid to field (NODE-876)" in {
     val rawTransaction = RawTransaction.createTransaction(
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
@@ -100,7 +100,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     )
   }
 
-  it should "not accept zero transfers" in {
+  it should "not accept zero transfers (NODE-654)" in {
     val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
     val recipientAddress = TxHelpers.secondSigner.toAddress
     intercept[RuntimeException](EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, 0, Waves)).toString should include(
@@ -115,7 +115,7 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     intercept[UnsupportedOperationException](EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, -1, TestAsset))
   }
 
-  it should "not accept value + data" in {
+  it should "not accept value + data (NODE-655)" in {
     val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
     val recipientAddress = TxHelpers.secondSigner.toAddress
 
@@ -135,14 +135,14 @@ class EthereumTransactionSpec extends FlatSpec with BeforeAndAfterAll with WithD
     )
   }
 
-  "Ethereum invoke" should "recover correct key" in {
+  "Ethereum invoke" should "recover correct key (NODE-659)" in {
     val senderAccount = TxHelpers.defaultSigner.toEthKeyPair
     val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
     val transaction   = EthTxGenerator.generateEthInvoke(senderAccount, senderAddress, "test", Nil, Nil)
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
   }
 
-  it should "recover correct key with leading zeros" in {
+  it should "recover correct key with leading zeros (NODE-877)" in {
     val senderAcc = Bip32ECKeyPair.create(
       EthEncoding.toBytes("0x00db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"),
       Array.emptyByteArray

@@ -18,7 +18,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
   private val dApp3Signer  = signer(3)
   private val dApp3Address = signer(3).toAddress
 
-  property("invoke function with arguments named 'default' as default function") {
+  property("NODE-517. Invoke function with arguments named 'default' as default function") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -40,7 +40,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke dApp without default function as with default function") {
+  property("NODE-518. Invoke dApp without default function as with default function") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -62,7 +62,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke unexisting function") {
+  property("NODE-307. Invoke unexisting function") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -84,7 +84,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("defined arguments should be equal passed arguments to sync invoke") {
+  property("NODE-298. Defined arguments should be equal passed arguments to sync invoke") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -106,7 +106,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("max arguments limit") {
+  property("NODE-310, NODE-311. Max arguments limit") {
     def dApp(arguments: Int) =
       TestCompiler(V5).compileContract(
         s"""
@@ -131,7 +131,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     (the[Exception] thrownBy dApp(23)).getMessage should include("Script functions can have no more than 22 arguments")
   }
 
-  property("callable function argument overlaps global variable") {
+  property("NODE-300. Callable function argument overlaps global variable") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -162,7 +162,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("supported arguments type") {
+  property("NODE-314. Supported arguments type") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -199,7 +199,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("tx belongs to all call participants") {
+  property("NODE-13. Tx belongs to all call participants") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer, dApp3Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -232,7 +232,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("callable name length limit") {
+  property("NODE-305, NODE-306. Callable name length limit") {
     def dApp(length: Int) =
       TestCompiler(V5).compileContract(
         s"""
@@ -257,7 +257,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     (the[Exception] thrownBy dApp(256)).getMessage should include("size = 256 bytes exceeds 255")
   }
 
-  property("invoke address without script") {
+  property("NODE-308. Invoke address without script") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -273,7 +273,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
     }
   }
 
-  property("payments count limit") {
+  property("NODE-359. Payments count limit") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""

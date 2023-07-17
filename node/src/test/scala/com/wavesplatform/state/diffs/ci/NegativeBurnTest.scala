@@ -33,7 +33,7 @@ class NegativeBurnTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls, RideV6)
 
-  property("negative burn quantity") {
+  property("NODE-114. Negative burn quantity") {
     for (bigComplexity <- Seq(false, true)) {
       val invoker = TxHelpers.signer(0)
       val dApp    = TxHelpers.signer(1)

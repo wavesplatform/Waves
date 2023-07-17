@@ -27,7 +27,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   val publicKey = "73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK"
 
-  property("InvokeScriptTransaction serialization roundtrip") {
+  property("NODE-46. InvokeScriptTransaction serialization roundtrip") {
     val transaction = createInvoke()
 
     val bytes = transaction.bytes()
@@ -44,7 +44,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     Verifier.verifyAsEllipticCurveSignature(deser, checkWeakPk = false) should beRight // !!!!!!!!!!!!!!!
   }
 
-  property("protobuf roundtrip") {
+  property("NODE-89. Protobuf roundtrip") {
     val tx     = createInvoke()
     val caller = TxHelpers.defaultSigner
 
@@ -82,7 +82,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     convToPbTx shouldBe signed
   }
 
-  property("decode pre-encoded bytes") {
+  property("NODE-90. Decode pre-encoded bytes") {
     val bytes = Base64.decode(
       "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
     )
@@ -117,7 +117,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ByteStr(tx.bytes()) shouldBe ByteStr(bytes)
   }
 
-  property("JSON format validation for InvokeScriptTransaction") {
+  property("NODE-91. JSON format validation for InvokeScriptTransaction") {
     val dApp = KeyPair("test5".getBytes("UTF-8")).toAddress('D')
     val js = Json.parse(s"""{
                          "type": 16,
@@ -165,7 +165,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
-  property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
+  property("NODE-92. JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     val dApp = KeyPair("test6".getBytes("UTF-8")).toAddress('D')
     val js = Json.parse(s"""{
                          "type": 16,
@@ -201,7 +201,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
-  property("Signed InvokeScriptTransactionRequest parser") {
+  property("NODE-93. Signed InvokeScriptTransactionRequest parser") {
     val req = SignedInvokeScriptRequest(
       None,
       Some(1.toByte),
@@ -223,14 +223,14 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     req.toTx.explicitGet()
   }
 
-  property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
+  property(s"NODE-94. Can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(22)(CONST_LONG(0))).funcCallOpt.get.args.length shouldBe 22
     (the[Exception] thrownBy TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(23)(CONST_LONG(0)))).getMessage should include(
       "InvokeScript can't have more than 22 arguments"
     )
   }
 
-  property(s"can call a func with ARR") {
+  property(s"NODE-95. Can call a func with ARR") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction
       .create(
@@ -253,7 +253,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       .explicitGet()
   }
 
-  property(s"can't call a func with non native(simple) args - CaseObj") {
+  property(s"NODE-96. Can't call a func with non native(simple) args - CaseObj") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
@@ -274,7 +274,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ) should produce("is unsupported")
   }
 
-  property(s"can't call a func with non native(simple) args - BigInt") {
+  property(s"NODE-97. Can't call a func with non native(simple) args - BigInt") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
@@ -295,7 +295,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ) should produce("is unsupported")
   }
 
-  property("can't be more 5kb") {
+  property("NODE-98. Can't be more 5kb") {
     val largeString = "abcde" * 1024
     val pk          = KeyPair("test8".getBytes("UTF-8")).publicKey
     InvokeScriptTransaction.create(
@@ -312,7 +312,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ) should produce("InvokeScriptTransaction bytes length = 5223 exceeds limit = 5120")
   }
 
-  property("can't have zero amount") {
+  property("NODE-99. Can't have zero amount") {
     val req = SignedInvokeScriptRequest(
       None,
       Some(1.toByte),
@@ -334,7 +334,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     req.toTx shouldBe Left(NonPositiveAmount(0, "Waves"))
   }
 
-  property("can't have negative amount") {
+  property("NODE-100. Can't have negative amount") {
     val req = SignedInvokeScriptRequest(
       None,
       Some(1.toByte),

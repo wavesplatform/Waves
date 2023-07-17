@@ -46,7 +46,7 @@ class SyncDAppNegativeLeaseTest extends PropSpec with WithDomain {
       .configure(_.copy(enforceTransferValidationAfter = 3))
       .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4)
 
-  property("negative lease amount") {
+  property("NODE-418. Negative lease amount") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

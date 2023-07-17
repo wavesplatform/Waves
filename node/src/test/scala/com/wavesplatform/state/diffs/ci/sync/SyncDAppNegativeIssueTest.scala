@@ -45,7 +45,7 @@ class SyncDAppNegativeIssueTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
 
-  property("negative issue decimals") {
+  property("NODE-34. Negative issue decimals") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

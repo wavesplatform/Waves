@@ -16,7 +16,7 @@ import com.wavesplatform.utils.EthHelpers
 class EthereumInvokePaymentTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets.*
 
-  property("payment script should be executed before dApp") {
+  property("NODE-702. Payment script should be executed before dApp") {
     def sigVerify(c: Boolean) =
       s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
 
@@ -44,7 +44,7 @@ class EthereumInvokePaymentTest extends PropSpec with WithDomain with EthHelpers
     }
   }
 
-  property("forbid zero and negative payments") {
+  property("NODE-773. Forbid zero and negative payments") {
     for {
       amount  <- Seq(-1, 0)
       isAsset <- Seq(true, false)

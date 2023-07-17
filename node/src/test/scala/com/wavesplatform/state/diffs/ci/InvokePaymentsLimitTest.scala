@@ -71,7 +71,7 @@ class InvokePaymentsLimitTest extends PropSpec with Inside with WithState with D
     }
   }
 
-  property("payments limit") {
+  property("NODE-26. Payments limit") {
     assertLimit(V4, 2, nested = false)
     DirectiveDictionary[StdLibVersion].all.filter(_ >= V5).foreach(assertLimit(_, 10, nested = false))
     DirectiveDictionary[StdLibVersion].all.filter(_ >= V5).foreach(assertLimit(_, 10, nested = true))

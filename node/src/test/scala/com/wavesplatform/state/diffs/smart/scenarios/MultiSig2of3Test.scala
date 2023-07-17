@@ -58,7 +58,7 @@ class MultiSig2of3Test extends PropSpec with WithState {
     (genesis, setScript, transferUnsigned, Seq(sig0, sig1, sig2))
   }
 
-  property("2 of 3 multisig") {
+  property("NODE-198. 2 of 3 multisig") {
 
     val (genesis, script, transfer, sigs) = preconditionsAndTransfer
     val validProofs = Seq(

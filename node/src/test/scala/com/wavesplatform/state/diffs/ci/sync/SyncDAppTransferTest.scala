@@ -26,7 +26,7 @@ import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class SyncDAppTransferTest extends PropSpec with WithDomain {
 
-  property("negative transfer amount") {
+  property("NODE-37. Negative transfer amount") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -67,6 +67,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
+  //TODO Find case
   property("negative balance rejects or fails tx") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
@@ -106,7 +107,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoking ScriptTransfer in sync call results in accounts state") {
+  property("NODE-371. Invoking ScriptTransfer in sync call results in accounts state") {
     val invoker     = TxHelpers.signer(0)
     val invokerDApp = TxHelpers.signer(1)
     val senderDApp  = TxHelpers.signer(2)
@@ -131,7 +132,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoking default func ScriptTransfer in sync call results in accounts state") {
+  property("NODE-372. Invoking default func ScriptTransfer in sync call results in accounts state") {
     val invoker     = TxHelpers.signer(0)
     val invokerDApp = TxHelpers.signer(1)
     val senderDApp  = TxHelpers.signer(2)
@@ -156,7 +157,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("self-transfer in sync call is forbidden") {
+  property("NODE-390. Self-transfer in sync call is forbidden") {
     val invoker     = TxHelpers.signer(0)
     val invokerDApp = TxHelpers.signer(1)
     val senderDApp  = TxHelpers.signer(2)
@@ -172,7 +173,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("ScriptTransfer in sync call is allowed if funds were received from attached payment") {
+  property("NODE-393. ScriptTransfer in sync call is allowed if funds were received from attached payment") {
     val invoker     = TxHelpers.signer(0)
     val invokerDApp = TxHelpers.signer(1)
     val senderDApp  = TxHelpers.signer(2)
@@ -200,7 +201,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("ScriptTransfer with empty amount field in sync call should be failed") {
+  property("NODE-403. ScriptTransfer with empty amount field in sync call should be failed") {
     val invoker     = TxHelpers.signer(0)
     val invokerDApp = TxHelpers.signer(1)
     val senderDApp  = TxHelpers.signer(2)

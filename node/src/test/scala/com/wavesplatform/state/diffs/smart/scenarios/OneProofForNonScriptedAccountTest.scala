@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.{Proofs, TxHelpers}
 
 class OneProofForNonScriptedAccountTest extends PropSpec with WithState {
 
-  property("exactly 1 proof required for non-scripted accounts") {
+  property("NODE-203. Exactly 1 proof required for non-scripted accounts") {
     val s = {
       val master    = TxHelpers.signer(1)
       val recipient = TxHelpers.signer(2)

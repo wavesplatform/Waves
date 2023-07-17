@@ -37,7 +37,7 @@ class OverheadCallableCallTest extends PropSpec with WithDomain {
       .withFeatures(BlockV5, SynchronousCalls)
       .copy(estimationOverflowFixHeight = 999, estimatorSumOverflowFixHeight = 4)
 
-  property("overhead callable call should be safe both before and after fix") {
+  property("NODE-120. Overhead callable call should be safe both before and after fix") {
     val invoker = TxHelpers.signer(0)
     val dApp    = TxHelpers.signer(1)
 
