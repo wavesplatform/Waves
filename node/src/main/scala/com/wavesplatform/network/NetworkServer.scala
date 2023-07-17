@@ -204,7 +204,7 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
-    val connectionLogger = LoggerFacade(LoggerFactory.getLogger(s"${this.getClass}.connections"))
+    val connectionLogger = LoggerFacade(LoggerFactory.getLogger(s"${this.getClass.getName}.connections"))
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
       val delay = (if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else 5.seconds) +
