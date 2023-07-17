@@ -87,11 +87,7 @@ class DefaultBlockchainApi(
           case _: UpstreamTimeoutException => Task(closeUpstream())
           case _                           => Task.unit
         }
-        .onErrorRestartWith {
-          case e: UpstreamTimeoutException if working.get() => WrappedEvent.Failed(e)
-          // Probably we faced a gRPC balancer limits
-          case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.UNAVAILABLE => WrappedEvent.Failed(e)
-        }
+        .onErrorRestartWith { case e if working.get() => WrappedEvent.Failed(e) }
         .publish(scheduler)
 
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream

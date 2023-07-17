@@ -1,14 +1,12 @@
 package com.wavesplatform.api
 
 import com.wavesplatform.BaseTestSuite
-import com.wavesplatform.api.DefaultBlockchainApiTestSuite.EmptyChannel
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
-import io.grpc.{CallOptions, Channel, ClientCall, MethodDescriptor}
 import monix.eval.Task
 import monix.execution.ExecutionModel
 import monix.execution.exceptions.UpstreamTimeoutException
@@ -319,14 +317,4 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
     SubscribeEvent.defaultInstance.withUpdate(
       BlockchainUpdated.defaultInstance.withHeight(height)
     )
-}
-
-object DefaultBlockchainApiTestSuite {
-  object EmptyChannel extends Channel {
-    override def authority(): String = ???
-    override def newCall[RequestT, ResponseT](
-        methodDescriptor: MethodDescriptor[RequestT, ResponseT],
-        callOptions: CallOptions
-    ): ClientCall[RequestT, ResponseT] = ???
-  }
 }

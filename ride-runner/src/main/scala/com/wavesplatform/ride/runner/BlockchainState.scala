@@ -119,8 +119,13 @@ object BlockchainState extends ScorexLogging {
       case WrappedEvent.Closed      => forceRestart()
       case WrappedEvent.Failed(e) =>
         e match {
-          case e: StatusRuntimeException if grpcStatusesToRestart.contains(e.getStatus.getCode) => forceRestart()
-          case _: UpstreamTimeoutException                                                      => forceRestart()
+          case _: UpstreamTimeoutException => forceRestart()
+          case e: StatusRuntimeException
+              if grpcStatusesToRestart.contains(e.getStatus.getCode) ||
+                // During Node rollbacks
+                e.getStatus.getCode == Status.Code.INVALID_ARGUMENT
+                && e.getMessage.contains("Requested start height exceeds current blockchain height") =>
+            forceRestart()
 
           case _ =>
             Task {
