@@ -6,14 +6,15 @@ import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtR
 import com.wavesplatform.ride.runner.storage.RemoteData
 import com.wavesplatform.ride.runner.storage.persistent.KvPair
 import com.wavesplatform.state.Height
+import org.rocksdb.ColumnFamilyHandle
 
 import scala.collection.mutable
 
 trait ReadWrite extends ReadOnly {
   def put[V](key: Key[V], value: V): Int
-  def put(key: Array[Byte], value: Array[Byte]): Unit
+  def put(key: Array[Byte], value: Array[Byte], cfh: Option[ColumnFamilyHandle]): Unit
   def update[V](key: Key[V], default: => V)(f: V => V): Unit
-  def delete(key: Array[Byte]): Unit
+  def delete(key: Array[Byte], cfh: Option[ColumnFamilyHandle]): Unit
   def delete[V](key: Key[V]): Unit
 
   def writeToDb[T](key: Key[Option[T]], data: RemoteData[T]): Unit =
@@ -104,11 +105,11 @@ trait ReadWrite extends ReadOnly {
     val affectedEntryKeys = mutable.Set.empty[K]
 
     // TODO #123 Use deleteRange
-    iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight)) { e =>
+    iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight), entriesKey.columnFamilyHandle) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)
       val (_, key)      = keyWithHeight
-      delete(rawKey)
+      delete(rawKey, entriesKey.columnFamilyHandle)
 
       affectedEntryKeys.add(key)
     }

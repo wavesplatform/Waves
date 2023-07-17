@@ -20,9 +20,9 @@ trait ReadOnly {
     * @see
     *   RideRocksDb#newColumnFamilyOptions useFixedLengthPrefixExtractor
     */
-  def iterateOverPrefixContinue(seekKeyBytes: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit
+  def iterateOverPrefixContinue(seekKeyBytes: Array[Byte], cfh: Option[ColumnFamilyHandle])(f: DBEntry => Boolean): Unit
 
-  def prefixExists(prefix: Array[Byte]): Boolean
+  def prefixExists(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle]): Boolean
 
   def collect[KeyT, ValueT, T](
       kvPair: KvPair[KeyT, ValueT],
@@ -35,9 +35,9 @@ trait ReadOnly {
     r.result()
   }
 
-  def collectKeys[KeyT](kvPair: KvPair[KeyT, ?]): List[KeyT] = collectKeys(kvPair.prefixBytes)(kvPair.prefixedKeyAsBytes)
+  def collectKeys[KeyT](kvPair: KvPair[KeyT, ?]): List[KeyT] = collectKeys(kvPair.prefixBytes, kvPair.columnFamilyHandle)(kvPair.prefixedKeyAsBytes)
 
-  def collectKeys[KeyT](prefixBytes: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(implicit keyAsBytes: AsBytes[KeyT]): List[KeyT] = {
+  def collectKeys[KeyT](prefixBytes: Array[Byte], cfh: Option[ColumnFamilyHandle])(implicit keyAsBytes: AsBytes[KeyT]): List[KeyT] = {
     var r = List.empty[KeyT]
     iterateOverPrefix(prefixBytes, cfh) { dbEntry =>
       val key = keyAsBytes.read(dbEntry.getKey)
@@ -57,7 +57,7 @@ trait ReadOnly {
       true
     }
 
-  def iterateOverPrefix(keyBytes: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
+  def iterateOverPrefix(keyBytes: Array[Byte], cfh: Option[ColumnFamilyHandle])(f: DBEntry => Unit): Unit =
     iterateOverPrefixContinue(keyBytes, cfh) { x =>
       f(x)
       true

@@ -22,7 +22,7 @@ abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
       def check(clue: String, prefix: Array[Byte] = defaultPrefix, expectedKeys: List[ByteStr]): Unit = readOnly(db) { ro =>
         withClue(s"$clue:") {
           var keys = List.empty[ByteStr]
-          ro.iterateOverPrefix(prefix) { x =>
+          ro.iterateOverPrefix(prefix, None) { x =>
             keys = ByteStr(x.getKey) :: keys
           }
 
@@ -33,22 +33,22 @@ abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
       check("before insert", expectedKeys = List.empty)
 
       readWrite(db) { rw =>
-        rw.put(keyWithOtherPrefix.arr, defaultValue)
+        rw.put(keyWithOtherPrefix.arr, defaultValue, None)
       }
 
       check("after insert with other prefix", expectedKeys = List.empty)
 
       readWrite(db) { rw =>
-        rw.put(k1.arr, defaultValue)
-        rw.put(k2.arr, defaultValue)
-        rw.put(k3.arr, defaultValue)
+        rw.put(k1.arr, defaultValue, None)
+        rw.put(k2.arr, defaultValue, None)
+        rw.put(k3.arr, defaultValue, None)
       }
 
       check("after insert with 2-byte prefix", expectedKeys = List(k1, k2, k3))
       check("after insert with a key", k2.arr, expectedKeys = List(k2, k3))
 
       readWrite(db) { rw =>
-        rw.delete(k2.arr)
+        rw.delete(k2.arr, None)
       }
 
       check("after delete", expectedKeys = List(k1, k3))
@@ -59,27 +59,27 @@ abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
 
       def check(clue: String, exist: Boolean): Unit = readOnly(db) { ro =>
         withClue(s"$clue:") {
-          ro.prefixExists(rawKey.arr) shouldBe exist
-          ro.prefixExists(defaultPrefix) shouldBe exist
+          ro.prefixExists(rawKey.arr, None) shouldBe exist
+          ro.prefixExists(defaultPrefix, None) shouldBe exist
         }
       }
 
       check("before insert", exist = false)
 
       readWrite(db) { rw =>
-        rw.put(mkKey(3, otherPrefix).arr, defaultValue)
+        rw.put(mkKey(3, otherPrefix).arr, defaultValue, None)
       }
 
       check("after insert with other prefix", exist = false)
 
       readWrite(db) { rw =>
-        rw.put(rawKey.arr, defaultValue)
+        rw.put(rawKey.arr, defaultValue, None)
       }
 
       check("after insert with expected prefix", exist = true)
 
       readWrite(db) { rw =>
-        rw.delete(rawKey.arr)
+        rw.delete(rawKey.arr, None)
       }
 
       check("after delete", exist = false)

@@ -242,7 +242,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
         val onHeight = p.value
         removed = removed.prependedAll(onHeight.map(CacheKey.Alias))
 
-        ctx.delete(p.dbEntry.getKey)
+        ctx.delete(p.dbEntry.getKey, KvPairs.AliasesByHeight.columnFamilyHandle)
         onHeight.foreach(k => ctx.delete(KvPairs.Aliases.at(k)))
       }
       removed
@@ -404,7 +404,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
         val txsOnHeight = p.value
         removedTxs = removedTxs.prependedAll(txsOnHeight)
 
-        ctx.delete(p.dbEntry.getKey)
+        ctx.delete(p.dbEntry.getKey, KvPairs.TransactionsByHeight.columnFamilyHandle)
         txsOnHeight.foreach(txId => ctx.delete(KvPairs.Transactions.at(txId)))
       }
       removedTxs
@@ -448,7 +448,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     }
 
     override def removeFrom(fromHeight: Height)(implicit ctx: ReadWrite): Unit = {
-      ctx.iterateOverPrefix(Key.at(fromHeight)) { x => ctx.delete(x.getKey) }
+      ctx.iterateOverPrefix(Key.at(fromHeight)) { x => ctx.delete(x.getKey, Key.columnFamilyHandle) }
 
       val newLastHeight = Height(fromHeight - 1)
       lastHeight = if (ctx.has(Key.at(newLastHeight))) {
@@ -479,7 +479,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     log.trace("setActivatedFeatures")
   }
 
-  protected def mkLogger(name: String) = LoggerFacade(
+  private def mkLogger(name: String) = LoggerFacade(
     LoggerFactory.getLogger(s"com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches.$name")
   )
 }
