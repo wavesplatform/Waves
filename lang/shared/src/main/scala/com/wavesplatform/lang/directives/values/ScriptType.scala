@@ -1,10 +1,9 @@
 package com.wavesplatform.lang.directives.values
-import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveKey}
 
-//noinspection TypeAnnotation
 sealed abstract class ScriptType(text: String, id: Int) extends DirectiveValue(text, id) {
-  override val value: Any = text
-  override def key        = resolveKey[ScriptType]
+  override val value: Any        = text
+  override def key: DirectiveKey = DirectiveKey.SCRIPT_TYPE
 }
 case object Account extends ScriptType("ACCOUNT", 1)
 case object Asset   extends ScriptType("ASSET", 2)

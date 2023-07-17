@@ -1023,7 +1023,7 @@ object PureContext {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right {
           val i = m.indexOf(sub)
-          if (!global.isIllFormed(sub) && i != -1)
+          if (sub.isWellFormed && i != -1)
             CONST_LONG(m.codePointCount(0, i).toLong)
           else
             unit
@@ -1067,7 +1067,7 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
         val l = m.codePointCount(0, m.length)
-        Right(if (!global.isIllFormed(sub) && off >= 0 && off <= l) {
+        Right(if (sub.isWellFormed && off >= 0 && off <= l) {
           val i = m.indexOf(sub, m.offsetByCodePoints(0, off.toInt))
           if (i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
@@ -1113,7 +1113,7 @@ object PureContext {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right({
           val i = m.lastIndexOf(sub)
-          if (!global.isIllFormed(sub) && i != -1) {
+          if (sub.isWellFormed && i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
@@ -1161,7 +1161,7 @@ object PureContext {
         Right(if (off >= 0) {
           val offset = Math.min(off, m.codePointCount(0, m.length)).toInt
           val i      = m.lastIndexOf(sub, m.offsetByCodePoints(0, offset))
-          if (!global.isIllFormed(sub) && i != -1) {
+          if (sub.isWellFormed && i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
@@ -1205,7 +1205,7 @@ object PureContext {
 
   private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
-    else if (unicode && global.isIllFormed(sep)) List(CONST_STRING(str).explicitGet())
+    else if (unicode && !sep.isWellFormed) List(CONST_STRING(str).explicitGet())
     else if (sep == "")
       if (unicode) {
         (1 to str.codePointCount(0, str.length))

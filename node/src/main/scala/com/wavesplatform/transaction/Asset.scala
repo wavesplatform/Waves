@@ -13,23 +13,24 @@ sealed trait Asset
 object Asset {
   final case class IssuedAsset(id: ByteStr) extends Asset {
     override def toString: String = id.toString
-    override def hashCode(): Int = id.hashCode()
+    override def hashCode(): Int  = id.hashCode()
   }
 
   object IssuedAsset {
-    private val interner = Interners.newWeakInterner[IssuedAsset]()
+    private val interner                = Interners.newWeakInterner[IssuedAsset]()
     def apply(id: ByteStr): IssuedAsset = interner.intern(new IssuedAsset(id))
   }
 
   case object Waves extends Asset
 
+  val WavesName = "WAVES"
+
   implicit val assetReads: Reads[IssuedAsset] = Reads {
-    case JsString(str) if str.length > AssetIdStringLength =>
-      JsError(s"Too long assetId: length of $str exceeds $AssetIdStringLength")
     case JsString(str) =>
       Base58.tryDecodeWithLimit(str) match {
-        case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))
-        case _            => JsError("Expected base58-encoded assetId")
+        case Success(arr) if arr.length != AssetIdLength => JsError(s"Invalid validation. Size of asset id $str not equal $AssetIdLength bytes")
+        case Success(arr)                                => JsSuccess(IssuedAsset(ByteStr(arr)))
+        case _                                           => JsError("Expected base58-encoded assetId")
       }
     case _ => JsError("Expected base58-encoded assetId")
   }
@@ -37,11 +38,7 @@ object Asset {
     JsString(asset.id.toString)
   }
 
-  implicit val assetIdReads: Reads[Asset] = Reads {
-    case json: JsString => if (json.value.isEmpty) JsSuccess(Waves) else assetReads.reads(json)
-    case JsNull         => JsSuccess(Waves)
-    case _              => JsError("Expected base58-encoded assetId or null")
-  }
+  implicit val assetIdReads: Reads[Asset] = assetReads(false)
   implicit val assetIdWrites: Writes[Asset] = Writes {
     case Waves           => JsNull
     case IssuedAsset(id) => JsString(id.toString)
@@ -84,5 +81,12 @@ object Asset {
       case Waves                  => onWaves
       case asset @ IssuedAsset(_) => onAsset(asset)
     }
+  }
+
+  def assetReads(allowWavesStr: Boolean): Reads[Asset] = Reads {
+    case json: JsString =>
+      if (json.value.isEmpty || (allowWavesStr && json.value == WavesName)) JsSuccess(Waves) else assetReads.reads(json)
+    case JsNull => JsSuccess(Waves)
+    case _      => JsError("Expected base58-encoded assetId or null")
   }
 }

@@ -11,7 +11,7 @@ import play.api.libs.json.Json
 class LeaseTransactionSpecification extends PropSpec {
 
   property("Lease transaction serialization roundtrip") {
-    forAll(leaseGen) { tx: LeaseTransaction =>
+    forAll(leaseGen) { (tx: LeaseTransaction) =>
       val recovered = LeaseTxSerializer.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
@@ -42,7 +42,7 @@ class LeaseTransactionSpecification extends PropSpec {
   }
 
   property("Lease transaction from TransactionParser") {
-    forAll(leaseGen) { tx: LeaseTransaction =>
+    forAll(leaseGen) { (tx: LeaseTransaction) =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[LeaseTransaction], tx)
     }

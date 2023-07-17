@@ -20,14 +20,14 @@ import scala.util.{Failure, Random, Success}
 class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
 
   property("CreateAliasTransaction serialization roundtrip") {
-    forAll(createAliasGen) { tx: CreateAliasTransaction =>
+    forAll(createAliasGen) { (tx: CreateAliasTransaction) =>
       val recovered = CreateAliasTxSerializer.parseBytes(tx.bytes()).get
       recovered shouldEqual tx
     }
   }
 
   property("CreateAliasTransaction serialization from TypedTransaction") {
-    forAll(createAliasGen) { tx: CreateAliasTransaction =>
+    forAll(createAliasGen) { (tx: CreateAliasTransaction) =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered shouldEqual tx
     }

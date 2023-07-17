@@ -219,7 +219,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: InvokeScriptTransaction, publicKeyHash: Array[Byte])(implicit
+  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: TransactionBase, publicKeyHash: Array[Byte])(implicit
       pos: Position
   ): Unit = {
     checkBaseTx(actualId, actual, expected)
@@ -241,27 +241,27 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction)(implicit
+  def checkInvokeBaseTransactionMetadata(transactionMetadata: TransactionMetadata, expected: InvokeScriptTransaction)(implicit
       pos: Position
   ): Unit = {
-    val invokeScript = actual.head.getInvokeScript
+    val invokeScript = transactionMetadata.getInvokeScript
 
-    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
+    transactionMetadata.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
     invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
     invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
   }
 
   def checkEthereumInvokeBaseTransactionMetadata(
-      actual: Seq[TransactionMetadata],
+      transactionMetadata: TransactionMetadata,
       expected: EthereumTransaction,
       funcName: String,
       dAppAddress: Address
   )(implicit
       pos: Position
   ): Unit = {
-    val ethereumMetadata = actual.head.getEthereum
+    val ethereumMetadata = transactionMetadata.getEthereum
 
-    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.value().bytes
+    transactionMetadata.senderAddress.toByteArray shouldBe expected.senderAddress.value().bytes
     ethereumMetadata.getInvoke.dAppAddress.toByteArray shouldBe dAppAddress.bytes
     ethereumMetadata.getInvoke.functionName shouldBe funcName
     ethereumMetadata.fee shouldBe expected.fee
