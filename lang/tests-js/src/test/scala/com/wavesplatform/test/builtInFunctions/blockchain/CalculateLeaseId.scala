@@ -29,7 +29,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test("RIDE-37. English: Negative cases for calculateLeaseId function for version V5 and higher") {
+    test("RIDE-37. Negative cases for calculateLeaseId function for version V5 and higher") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
