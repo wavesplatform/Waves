@@ -1,10 +1,10 @@
-FROM eclipse-temurin:11-jre
+FROM eclipse-temurin:11-jre-jammy
 
 ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
 ENV WAVES_NETWORK=mainnet
 
-ENV YOURKIT_VERSION=2022.9
+ENV YOURKIT_VERSION=2023.5
 
 SHELL ["/bin/bash", "-c"]
 
