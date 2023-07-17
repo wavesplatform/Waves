@@ -90,7 +90,7 @@ package object network {
       case RawBytes(TransactionSpec.messageCode | PBTransactionSpec.messageCode, _) =>
       case _ =>
         logger.trace {
-          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
+          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(_.id().asShortText()).mkString(", ")})"
           val msgString = message match {
             case t: Transaction => s"transaction ${t.id()}"
             case BlockForged(b) => s"block ${b.id()}"
