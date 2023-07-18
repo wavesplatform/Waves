@@ -19,7 +19,7 @@ import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{BlockFromFuture, GenericError}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -221,15 +221,16 @@ class BlockChallengerImpl(
   private def blockRewardVote(settings: WavesSettings): Long =
     settings.rewardsSettings.desired.getOrElse(-1L)
 
-  // TODO: NODE-2594 fail if wait time is too long
-  private def waitForTimeAlign(blockTime: Long): Task[Unit] =
+  private def waitForTimeAlign(blockTime: Long): Task[Either[ValidationError, Unit]] =
     Task {
       val currentTime = timeService.correctedTime()
       blockTime - currentTime - MaxTimeDrift
     }.flatMap { timeDiff =>
-      if (timeDiff > 0) {
-        Task.sleep(timeDiff.millis)
-      } else Task.unit
+      if (timeDiff > 0 && timeDiff < settings.minerSettings.maxChallengeBlockWait.toMillis) {
+        Task.sleep(timeDiff.millis).as(Right(()))
+      } else if (timeDiff > 0) {
+        Task(Left(BlockFromFuture(blockTime)))
+      } else Task(Right(()))
     }
 
   private def computeStateHash(

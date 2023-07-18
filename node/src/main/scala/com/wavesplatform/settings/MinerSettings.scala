@@ -14,7 +14,8 @@ case class MinerSettings(
     minimalBlockGenerationOffset: FiniteDuration,
     maxTransactionsInMicroBlock: Int,
     minMicroBlockAge: FiniteDuration,
-    privateKeys: Seq[PrivateKey]
+    privateKeys: Seq[PrivateKey],
+    maxChallengeBlockWait: FiniteDuration
 ) {
   require(maxTransactionsInMicroBlock <= Miner.MaxTransactionsPerMicroblock)
 }

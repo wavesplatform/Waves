@@ -60,15 +60,16 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     DomainPresets.TransactionStateSnapshot.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   val testTime: TestTime = TestTime()
 
+  val invalidStateHash: ByteStr = ByteStr.fill(DigestLength)(1)
+
   property("NODE-883. Invalid challenging block should be ignored") {
     val sender           = TxHelpers.signer(1)
     val challengedMiner  = TxHelpers.signer(2)
     val challengingMiner = TxHelpers.signer(3)
     withDomain(settings, balances = AddrWithBalance.enoughBalances(sender)) { d =>
       d.appendBlock()
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val txs              = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
-      val challengedBlock  = d.createBlock(Block.ProtoBlockVersion, txs, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+      val txs             = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
+      val challengedBlock = d.createBlock(Block.ProtoBlockVersion, txs, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val invalidHashChallengingBlock = d.createChallengingBlock(challengingMiner, challengedBlock, stateHash = Some(Some(invalidStateHash)))
       val missedHashChallengingBlock  = d.createChallengingBlock(challengingMiner, challengedBlock, stateHash = Some(None))
 
@@ -86,7 +87,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, 2000.waves)
       )
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock =
         d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
@@ -114,21 +114,18 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      appendAndCheck(d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash))), d) {
-        case Some(block) =>
-          block.header.challengedHeader shouldBe defined
-          val challengedHeader = block.header.challengedHeader.get
+      appendAndCheck(d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash))), d) { block =>
+        block.header.challengedHeader shouldBe defined
+        val challengedHeader = block.header.challengedHeader.get
 
-          block.header.generator shouldBe challengingMiner.publicKey
-          block.header.generator == challengedHeader.generator shouldBe false
-          val isConsensusDataEqual =
-            block.header.timestamp == challengedHeader.timestamp &&
-              block.header.generationSignature == challengedHeader.generationSignature &&
-              block.header.baseTarget == challengedHeader.baseTarget
+        block.header.generator shouldBe challengingMiner.publicKey
+        block.header.generator == challengedHeader.generator shouldBe false
+        val isConsensusDataEqual =
+          block.header.timestamp == challengedHeader.timestamp &&
+            block.header.generationSignature == challengedHeader.generationSignature &&
+            block.header.baseTarget == challengedHeader.baseTarget
 
-          isConsensusDataEqual shouldBe false
-        case _ => fail("block should be defined")
+        isConsensusDataEqual shouldBe false
       }
     }
   }
@@ -140,16 +137,13 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner2 = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner1.toAddress, 1001.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
 
       appendAndCheck(
         d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash))),
         d
-      ) {
-        case Some(block) =>
-          block.header.challengedHeader shouldBe defined
-          block.header.generator shouldBe challengingMiner1.publicKey
-        case _ => fail("block should be defined")
+      ) { block =>
+        block.header.challengedHeader shouldBe defined
+        block.header.generator shouldBe challengingMiner1.publicKey
       }
 
       d.appendBlock(TxHelpers.transfer(challengingMiner1, challengingMiner2.toAddress, 1000.waves))
@@ -158,11 +152,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       appendAndCheck(
         d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash))),
         d
-      ) {
-        case Some(block) =>
-          block.header.challengedHeader shouldBe defined
-          block.header.generator shouldBe challengingMiner2.publicKey
-        case _ => fail("block should be defined")
+      ) { block =>
+        block.header.challengedHeader shouldBe defined
+        block.header.generator shouldBe challengingMiner2.publicKey
       }
     }
   }
@@ -194,22 +186,19 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          block.header.challengedHeader shouldBe defined
-          val challengedHeader = block.header.challengedHeader.get
+      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      appendAndCheck(originalBlock, d) { block =>
+        block.header.challengedHeader shouldBe defined
+        val challengedHeader = block.header.challengedHeader.get
 
-          challengedHeader.timestamp shouldBe originalBlock.header.timestamp
-          challengedHeader.baseTarget shouldBe originalBlock.header.baseTarget
-          challengedHeader.generationSignature shouldBe originalBlock.header.generationSignature
-          challengedHeader.featureVotes shouldBe originalBlock.header.featureVotes
-          challengedHeader.generator shouldBe originalBlock.header.generator
-          challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
-          challengedHeader.stateHash shouldBe originalBlock.header.stateHash
-          challengedHeader.headerSignature shouldBe originalBlock.signature
-        case _ => fail("block should be defined")
+        challengedHeader.timestamp shouldBe originalBlock.header.timestamp
+        challengedHeader.baseTarget shouldBe originalBlock.header.baseTarget
+        challengedHeader.generationSignature shouldBe originalBlock.header.generationSignature
+        challengedHeader.featureVotes shouldBe originalBlock.header.featureVotes
+        challengedHeader.generator shouldBe originalBlock.header.generator
+        challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
+        challengedHeader.stateHash shouldBe originalBlock.header.stateHash
+        challengedHeader.headerSignature shouldBe originalBlock.signature
       }
     }
   }
@@ -222,8 +211,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     val challengingMiner = TxHelpers.signer(3)
     withDomain(DomainPresets.ConsensusImprovements, balances = AddrWithBalance.enoughBalances(sender, challengedMiner, challengingMiner)) { d =>
       d.appendBlock()
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val txs              = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
+      val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
       val challengedBlock =
         d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val blockWithChallenge =
@@ -241,12 +229,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          block.transactionData shouldBe originalBlock.transactionData
-        case _ => fail("block should be defined")
+      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      appendAndCheck(originalBlock, d) { block =>
+        block.transactionData shouldBe originalBlock.transactionData
       }
     }
   }
@@ -256,8 +241,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val invalidChallengingBlock = d.createChallengingBlock(
         challengingMiner,
         originalBlock,
@@ -280,12 +264,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          block.header.reference shouldBe originalBlock.header.reference
-        case _ => fail("block should be defined")
+      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      appendAndCheck(originalBlock, d) { block =>
+        block.header.reference shouldBe originalBlock.header.reference
       }
     }
   }
@@ -295,7 +276,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val grandParent      = d.blockchain.lastBlockHeader.map(_.header.reference)
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, stateHash = None, ref = grandParent)
@@ -319,7 +299,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       appender(channel, lastValidMicroblock).runSyncUnsafe()
 
       val lastValidBlockId  = d.lastBlockId
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val invalidMicroblock = d.createMicroBlock(Some(invalidStateHash))(txs()*)
       val invalidBlockId = Block
         .create(
@@ -354,7 +333,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, 2000.waves)
       )
       (1 to 999).foreach(_ => d.appendBlock())
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock =
         d.createBlock(
           Block.ProtoBlockVersion,
@@ -387,7 +365,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       d.appendBlock(prevBlockTx)
 
-      val invalidStateHash   = ByteStr.fill(DigestLength)(1)
       val challengedBlockTxs = Seq(TxHelpers.transfer(sender), TxHelpers.transfer(sender))
       val originalBlock      = d.createBlock(Block.ProtoBlockVersion, challengedBlockTxs, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val originalMinerBalance    = d.balance(originalBlock.header.generator.toAddress)
@@ -399,8 +376,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.balance(originalBlock.header.generator.toAddress) shouldBe originalMinerBalance
       d.balance(
         challengingMiner.toAddress
-      ) shouldBe challengingMinerBalance + d.settings.blockchainSettings.rewardsSettings.initial + (prevBlockTx.fee.value - BlockDiffer
-        .CurrentBlockFeePart(prevBlockTx.fee.value)) + challengedBlockTxs.map(tx => BlockDiffer.CurrentBlockFeePart(tx.fee.value)).sum
+      ) shouldBe challengingMinerBalance + d.settings.blockchainSettings.rewardsSettings.initial +
+        (prevBlockTx.fee.value - BlockDiffer.CurrentBlockFeePart(prevBlockTx.fee.value)) +
+        challengedBlockTxs.map(tx => BlockDiffer.CurrentBlockFeePart(tx.fee.value)).sum
     }
   }
 
@@ -460,7 +438,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         EthTxGenerator.generateEthTransfer(recipientEth, dApp.toAddress, 1, Waves),
         EthTxGenerator.generateEthInvoke(recipientEth, dApp.toAddress, "foo", Seq.empty, Seq.empty)
       )
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val validOriginalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         challengedBlockTx +: recipientTxs,
@@ -562,8 +539,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         price = (price / 1e8).toLong,
         version = TxVersion.V3
       )
-      val txs              = exchangeTx +: invokeTxs
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
+      val txs = exchangeTx +: invokeTxs
       val validOriginalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         txs,
@@ -624,7 +600,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -657,7 +632,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -667,14 +641,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         stateHash = Some(Some(invalidStateHash))
       )
 
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          d.transactionsApi.transactionById(challengedBlockTx.id()).map(_.status).contains(TxMeta.Status.Elided) shouldBe true
-          block.transactionData.head.id() shouldBe challengedBlockTx.id()
+      appendAndCheck(originalBlock, d) { block =>
+        d.transactionsApi.transactionById(challengedBlockTx.id()).map(_.status).contains(TxMeta.Status.Elided) shouldBe true
+        block.transactionData.head.id() shouldBe challengedBlockTx.id()
 
-          d.appendBlock(TxHelpers.transfer(sender, challengedMiner.toAddress, 10.waves))
-          d.transactionDiffer(challengedBlockTx).resultE should produce("AlreadyInTheState")
-        case _ => fail("block should be defined")
+        d.appendBlock(TxHelpers.transfer(sender, challengedMiner.toAddress, 10.waves))
+        d.transactionDiffer(challengedBlockTx).resultE should produce("AlreadyInTheState")
       }
     }
   }
@@ -692,7 +664,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -765,7 +736,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -856,7 +826,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         IntegerDataEntry(challengingGeneratingKey, initChallengingBalance)
       )
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = invoke()
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -936,7 +905,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
@@ -980,7 +948,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
@@ -988,20 +955,18 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         stateHash = Some(Some(invalidStateHash))
       )
 
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          block.header.challengedHeader shouldBe defined
-          val challengedHeader = block.header.challengedHeader.get
+      appendAndCheck(originalBlock, d) { block =>
+        block.header.challengedHeader shouldBe defined
+        val challengedHeader = block.header.challengedHeader.get
 
-          challengedHeader.timestamp shouldBe originalBlock.header.timestamp
-          challengedHeader.baseTarget shouldBe originalBlock.header.baseTarget
-          challengedHeader.generationSignature shouldBe originalBlock.header.generationSignature
-          challengedHeader.featureVotes shouldBe originalBlock.header.featureVotes
-          challengedHeader.generator shouldBe originalBlock.header.generator
-          challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
-          challengedHeader.stateHash shouldBe originalBlock.header.stateHash
-          challengedHeader.headerSignature shouldBe originalBlock.signature
-        case _ => fail("block should be defined")
+        challengedHeader.timestamp shouldBe originalBlock.header.timestamp
+        challengedHeader.baseTarget shouldBe originalBlock.header.baseTarget
+        challengedHeader.generationSignature shouldBe originalBlock.header.generationSignature
+        challengedHeader.featureVotes shouldBe originalBlock.header.featureVotes
+        challengedHeader.generator shouldBe originalBlock.header.generator
+        challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
+        challengedHeader.stateHash shouldBe originalBlock.header.stateHash
+        challengedHeader.headerSignature shouldBe originalBlock.signature
       }
     }
   }
@@ -1028,7 +993,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
 
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
@@ -1036,20 +1000,18 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         stateHash = Some(Some(invalidStateHash))
       )
 
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          block.header.challengedHeader shouldBe defined
-          val challengedHeader = block.header.challengedHeader.get
+      appendAndCheck(originalBlock, d) { block =>
+        block.header.challengedHeader shouldBe defined
+        val challengedHeader = block.header.challengedHeader.get
 
-          challengedHeader.timestamp shouldBe originalBlock.header.timestamp
-          challengedHeader.baseTarget shouldBe originalBlock.header.baseTarget
-          challengedHeader.generationSignature shouldBe originalBlock.header.generationSignature
-          challengedHeader.featureVotes shouldBe originalBlock.header.featureVotes
-          challengedHeader.generator shouldBe originalBlock.header.generator
-          challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
-          challengedHeader.stateHash shouldBe originalBlock.header.stateHash
-          challengedHeader.headerSignature shouldBe originalBlock.signature
-        case _ => fail("block should be defined")
+        challengedHeader.timestamp shouldBe originalBlock.header.timestamp
+        challengedHeader.baseTarget shouldBe originalBlock.header.baseTarget
+        challengedHeader.generationSignature shouldBe originalBlock.header.generationSignature
+        challengedHeader.featureVotes shouldBe originalBlock.header.featureVotes
+        challengedHeader.generator shouldBe originalBlock.header.generator
+        challengedHeader.rewardVote shouldBe originalBlock.header.rewardVote
+        challengedHeader.stateHash shouldBe originalBlock.header.stateHash
+        challengedHeader.headerSignature shouldBe originalBlock.signature
       }
     }
   }
@@ -1123,7 +1085,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
@@ -1171,18 +1132,16 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         strictTime = true
       )
 
-      appendAndCheck(originalBlock, d) {
-        case Some(block) =>
-          block.header.challengedHeader should not be defined
-          block.header.timestamp shouldBe originalBlock.header.timestamp
-          block.header.baseTarget shouldBe originalBlock.header.baseTarget
-          block.header.generationSignature shouldBe originalBlock.header.generationSignature
-          block.header.featureVotes shouldBe originalBlock.header.featureVotes
-          block.header.generator shouldBe originalBlock.header.generator
-          block.header.rewardVote shouldBe originalBlock.header.rewardVote
-          block.header.transactionsRoot shouldBe originalBlock.header.transactionsRoot
-          block.header.stateHash shouldBe originalBlock.header.stateHash
-        case _ => fail("block should be defined")
+      appendAndCheck(originalBlock, d) { block =>
+        block.header.challengedHeader should not be defined
+        block.header.timestamp shouldBe originalBlock.header.timestamp
+        block.header.baseTarget shouldBe originalBlock.header.baseTarget
+        block.header.generationSignature shouldBe originalBlock.header.generationSignature
+        block.header.featureVotes shouldBe originalBlock.header.featureVotes
+        block.header.generator shouldBe originalBlock.header.generator
+        block.header.rewardVote shouldBe originalBlock.header.rewardVote
+        block.header.transactionsRoot shouldBe originalBlock.header.transactionsRoot
+        block.header.stateHash shouldBe originalBlock.header.stateHash
       }
 
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
@@ -1201,7 +1160,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
@@ -1268,7 +1226,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -1317,7 +1274,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -1405,7 +1361,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash  = ByteStr.fill(DigestLength)(1)
       val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -1495,7 +1450,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
@@ -1547,7 +1501,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
-  property("NODE-919. ") {
+  property("NODE-919. Transactions from challenging block should have unconfirmed status when creating of block is in progress") {
     def checkTxsStatus(txs: Seq[Transaction], expectedStatus: String, route: Route): Unit = {
       txs.foreach { tx =>
         Get(s"/transactions/status/${tx.id()}") ~> route ~> check {
@@ -1572,6 +1526,20 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val lock     = new ReentrantLock()
       lock.lock()
+
+      val challengingMiner = d.wallet.generateNewAccount().get
+
+      d.appendBlock(
+        TxHelpers.transfer(defaultSigner, challengingMiner.toAddress, 10000.waves),
+        TxHelpers.transfer(defaultSigner, challengedMiner.toAddress, 10000.waves)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val txs = Seq(TxHelpers.transfer(amount = 1.waves), TxHelpers.transfer(amount = 2.waves))
+      val invalidBlock =
+        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+
       val blockChallenger: BlockChallenger =
         new BlockChallengerImpl(
           d.blockchain,
@@ -1582,9 +1550,11 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
           d.posSelector,
           createBlockAppender(d)
         ) {
-          override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] = {
+          override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
             lock.lock()
-            super.getChallengingAccounts(challengedMiner)
+            val best = super.pickBestAccount(accounts)
+            testTime.setTime(invalidBlock.header.timestamp.max(best.explicitGet()._2))
+            best
           }
         }
       val appender =
@@ -1601,20 +1571,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         testTime,
         new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
       ).route
-
-      val challengingMiner = d.wallet.generateNewAccount().get
-
-      d.appendBlock(
-        TxHelpers.transfer(defaultSigner, challengingMiner.toAddress, 10000.waves),
-        TxHelpers.transfer(defaultSigner, challengedMiner.toAddress, 10000.waves)
-      )
-
-      (1 to 999).foreach(_ => d.appendBlock())
-
-      val txs              = Seq(TxHelpers.transfer(amount = 1.waves), TxHelpers.transfer(amount = 2.waves))
-      val invalidStateHash = ByteStr.fill(DigestLength)(1)
-      val invalidBlock =
-        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
 
       testTime.setTime(invalidBlock.header.timestamp)
       val challengeResult = appender(new EmbeddedChannel(), invalidBlock).runToFuture
@@ -1638,7 +1594,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     withDomain(settings, balances = AddrWithBalance.enoughBalances(defaultSigner)) { d =>
       val challengingMiner      = d.wallet.generateNewAccount().get
-      val invalidStateHash      = ByteStr.fill(DigestLength)(1)
       val originalBlock         = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val validChallengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
 
@@ -1661,7 +1616,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
-  private def appendAndCheck(block: Block, d: Domain)(check: Option[Block] => Unit): Unit = {
+  private def appendAndCheck(block: Block, d: Domain)(check: Block => Unit): Unit = {
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
     val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
@@ -1681,8 +1636,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     testTime.setTime(d.blockchain.lastBlockTimestamp.get + d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis * 2)
     appenderWithChallenger(block).runSyncUnsafe()
     if (!channel1.outboundMessages().isEmpty)
-      check(Some(PBBlockSpec.deserializeData(channel1.readOutbound[RawBytes]().data).get))
-    else check(None)
+      check(PBBlockSpec.deserializeData(channel1.readOutbound[RawBytes]().data).get)
+    else fail("block should be defined")
   }
 
   private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, Option[BigInt]]] =
@@ -1734,8 +1689,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
   private def rollbackMiddleScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
 
-    val tx               = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
-    val invalidStateHash = ByteStr.fill(DigestLength)(1)
+    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
       Seq(tx),
@@ -1744,11 +1698,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       stateHash = Some(Some(invalidStateHash))
     )
 
-    appendAndCheck(originalBlock, d) {
-      case Some(_) =>
-        (1 to 10).foreach(_ => d.appendBlock())
-      case _ => fail("block should be defined")
-    }
+    appendAndCheck(originalBlock, d)(_ => (1 to 10).foreach(_ => d.appendBlock()))
 
     d.blockchain.height shouldBe 1017
   }
@@ -1756,8 +1706,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
   private def rollbackLastScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
 
-    val tx               = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
-    val invalidStateHash = ByteStr.fill(DigestLength)(1)
+    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
       Seq(tx),
@@ -1766,10 +1715,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       stateHash = Some(Some(invalidStateHash))
     )
 
-    appendAndCheck(originalBlock, d) {
-      case Some(_) => ()
-      case _       => fail("block should be defined")
-    }
+    appendAndCheck(originalBlock, d)(_ => ())
 
     d.blockchain.height shouldBe 1007
   }
@@ -1787,8 +1733,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
 
-    val tx               = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
-    val invalidStateHash = ByteStr.fill(DigestLength)(1)
+    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
       Seq(tx),
@@ -1797,10 +1742,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       stateHash = Some(Some(invalidStateHash))
     )
 
-    appendAndCheck(originalBlock, d) {
-      case Some(_) => ()
-      case _       => fail("block should be defined")
-    }
+    appendAndCheck(originalBlock, d)(_ => ())
 
     d.blockchain.height shouldBe 1008
   }

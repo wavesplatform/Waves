@@ -23,6 +23,7 @@ class MinerSettingsSpecification extends FlatSpec {
                       |    max-transactions-in-micro-block: 400
                       |    min-micro-block-age: 3s
                       |    private-keys: ["${TxHelpers.defaultSigner.privateKey}"]
+                      |    max-challenge-block-wait = 120s
                       |  }
                       |}
       """.stripMargin)
@@ -38,5 +39,6 @@ class MinerSettingsSpecification extends FlatSpec {
     settings.maxTransactionsInMicroBlock should be(400)
     settings.minMicroBlockAge should be(3.seconds)
     settings.privateKeys should be(Seq(TxHelpers.defaultSigner.privateKey))
+    settings.maxChallengeBlockWait should be(120.seconds)
   }
 }
