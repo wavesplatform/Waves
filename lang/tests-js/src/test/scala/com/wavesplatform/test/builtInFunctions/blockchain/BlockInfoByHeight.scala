@@ -13,7 +13,7 @@ object BlockInfoByHeight extends JsTestBase {
   private val invalidBlockInfoByHeight = "blockInfoByHeight()"
 
   val tests: Tests = Tests {
-    test("Functions blockInfoByHeight compiles") {
+    test("RIDE-31. BlockInfoByHeight function should compile") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         for (
@@ -28,7 +28,7 @@ object BlockInfoByHeight extends JsTestBase {
       }
     }
 
-    test("negative cases blockInfoByHeight") {
+    test("RIDE-32. Negative cases for blockInfoByHeight function when invalid arguments are passed") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         for (

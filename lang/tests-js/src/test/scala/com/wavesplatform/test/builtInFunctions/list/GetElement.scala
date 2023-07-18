@@ -14,7 +14,7 @@ object GetElement extends JsTestBase {
   private val invalidErrorGetElement         = testData.invalidFunctionError("getElement", 2)
 
   val tests: Tests = Tests {
-    test("GetElement functions compiles with a list") {
+    test("RIDE-156. Function GetElement should compile for valid list") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -31,7 +31,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test("Compilation errors GetElement functions") {
+    test("RIDE-157. Function GetElement should throw an error for invalid data or type") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

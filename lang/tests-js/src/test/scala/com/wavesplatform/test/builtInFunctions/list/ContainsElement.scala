@@ -7,7 +7,6 @@ import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, intList
 import utest.{Tests, test}
 
 object ContainsElement extends JsTestBase {
-  // containsElement
   private val containsElement                     = "containsElement(bar, foo)"
   private val containsElementArgBeforeFunc        = "bar.containsElement(foo)"
   private val invalidContainsElement              = "containsElement(foo)"
@@ -15,7 +14,7 @@ object ContainsElement extends JsTestBase {
   private val invalidErrorContainsElement         = testData.invalidFunctionError("containsElement", 2)
 
   val tests: Tests = Tests {
-    test("ContainsElement functions compiles with a list") {
+    test("RIDE-154. Function ContainsElement should compile for valid list") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -32,7 +31,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test("Compilation errors Cons functions") {
+    test("RIDE-155. Function ContainsElement should throw an error for invalid data or type") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

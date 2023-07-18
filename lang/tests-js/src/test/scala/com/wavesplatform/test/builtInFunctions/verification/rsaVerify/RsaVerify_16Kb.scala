@@ -20,7 +20,7 @@ object RsaVerify_16Kb extends JsTestBase {
   private val invalidErrorRsaVerify_16Kb         = testData.invalidFunctionError("rsaVerify_16Kb", 4)
 
   val tests: Tests = Tests {
-    test("rsaVerify_16Kb functions compiles") {
+    test("RIDE-239. rsaVerify_16Kb function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -35,7 +35,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test("invalid functions rsaVerify_16Kb") {
+    test("RIDE-240. rsaVerify_16Kb function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -52,7 +52,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function rsaVerify_16Kb for V3") {
+    test("RIDE-241. Can't find a function makeString_2C for RIDE V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify_16Kb)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)

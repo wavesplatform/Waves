@@ -7,7 +7,6 @@ import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBinaryEntry, actu
 import utest.{Tests, test}
 
 object Keccak256_32Kb extends JsTestBase {
-  // keccak256_32Kb
   private val keccak256_32Kb                     = "keccak256_32Kb(callerTestData)"
   private val keccak256_32KbArgBeforeFunc        = "callerTestData.keccak256_32Kb()"
   private val invalidKeccak256_32Kb              = "keccak256_32Kb()"
@@ -15,7 +14,7 @@ object Keccak256_32Kb extends JsTestBase {
   private val invalidErrorKeccak256_32Kb         = testData.invalidFunctionError("keccak256_32Kb", 1)
 
   val tests: Tests = Tests {
-    test("keccak256_32Kb functions compiles with a ByteVector") {
+    test("RIDE-136. Function keccak256_32Kb should compile for valid ByteVector") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -30,7 +29,7 @@ object Keccak256_32Kb extends JsTestBase {
       }
     }
 
-    test("compilation errors keccak256_32Kb") {
+    test("RIDE-137. Function keccak256_32Kb should throw an error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (

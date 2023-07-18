@@ -14,7 +14,7 @@ object Sqrt extends JsTestBase {
   private val invalidSqrtFunction          = s"sqrt(callerTestData)"
 
   val tests: Tests = Tests {
-    test("Sqrt functions compiles with Int and BigInt") {
+    test("RIDE-189. Sqrt functions compile with Int and BigInt") {
       for (
         (data, function, dataType) <- Seq(
           (randomInt.toString, sqrtIntAndUnion, "Int"),
@@ -29,7 +29,7 @@ object Sqrt extends JsTestBase {
       }
     }
 
-    test("Sqrt functions compilation errors with Int and BigInt") {
+    test("RIDE-190. Sqrt functions should throw an error for invalid Int data") {
       for (
         (data, function, dataType) <- Seq(
           (randomStringArrayElement, sqrtIntAndUnion, "Int"),
@@ -44,7 +44,7 @@ object Sqrt extends JsTestBase {
       }
     }
 
-    test("Can't find a function Sqrt for V3 - V5") {
+    test("RIDE-191. Can't find a function Sqrt for V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (

@@ -14,7 +14,7 @@ object TakeRight extends JsTestBase {
   private val invalidTakeRightNotInt        = s"takeRight(callerTestData, $randomByteVectorArrayElement)"
 
   val tests: Tests = Tests {
-    test(" Functions TakeRight compiles") {
+    test("RIDE-58. TakeRight function should compile for valid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -29,7 +29,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test(" TakeRight Can't find a function overload") {
+    test("RIDE-59. TakeRight function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

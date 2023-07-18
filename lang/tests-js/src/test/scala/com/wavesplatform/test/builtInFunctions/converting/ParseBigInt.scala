@@ -21,7 +21,7 @@ object ParseBigInt extends JsTestBase {
   private val invalidFunctionErrorResultParseBigIntValue: String = testData.invalidFunctionError("parseBigIntValue", 1)
 
   val tests: Tests = Tests {
-    test(" Functions parseBigInt compiles") {
+    test("RIDE-62. ParseBigInt function should compile for valid values") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -36,7 +36,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test(" parseBigInt Can't find a function overload") {
+    test("RIDE-63. ParseBigInt function throws an error for invalid values") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -51,7 +51,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test(" parseBigInt invalid functions") {
+    test("RIDE-64. Function parseBigInt should throw an error for invalid functions") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -68,7 +68,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test(" Functions parseBigIntValue compiles") {
+    test("RIDE-65. ParseBigIntValue function should compile for valid values") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -83,7 +83,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test(" parseBigIntValue Can't find a function overload") {
+    test("RIDE-66. ParseBigIntValue function throws an error for invalid values") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -98,7 +98,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test(" parseBigIntValue invalid functions") {
+    test("RIDE-67. Function parseBigIntValue should throw an error for invalid functions") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (

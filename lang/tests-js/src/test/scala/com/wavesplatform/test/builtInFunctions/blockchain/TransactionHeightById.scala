@@ -15,7 +15,7 @@ object TransactionHeightById extends JsTestBase {
 
 
   val tests: Tests = Tests {
-    test("Functions TransactionHeightById compiles") {
+    test("RIDE-42. TransactionHeightById function should compile") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -30,7 +30,7 @@ object TransactionHeightById extends JsTestBase {
       }
     }
 
-    test("negative cases TransactionHeightById") {
+    test("RIDE-43. Negative cases for TransactionHeightById function") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (

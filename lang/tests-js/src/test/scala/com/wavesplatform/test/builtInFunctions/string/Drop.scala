@@ -13,7 +13,7 @@ object Drop extends JsTestBase {
   private val invalidDropArgBeforeFunc = s"callerTestData.drop(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test("Compiles drop functions") {
+    test("RIDE-211. function drop should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -28,7 +28,7 @@ object Drop extends JsTestBase {
       }
     }
 
-    test("invalid drop functions") {
+    test("RIDE-212. function drop throw a compilation error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

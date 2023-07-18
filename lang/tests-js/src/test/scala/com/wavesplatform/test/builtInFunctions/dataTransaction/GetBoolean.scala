@@ -29,7 +29,7 @@ object GetBoolean extends JsTestBase {
   private val invalidGetBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue()"
 
   val tests: Tests = Tests {
-    test(" Functions getBoolean dataTransaction compiles for versions V4 and more") {
+    test("RIDE-98. getBoolean functions for dataTransaction should compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -74,7 +74,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test(" Functions getBoolean dataTransaction compiles for versions V3") {
+    test("RIDE-99. getBoolean function for dataTransaction should compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       for (
         (data, binary) <- Seq(
@@ -93,7 +93,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test(" Can't find getBoolean functions overload for V4 and more") {
+    test("RIDE-100. getBoolean function should throw an error for invalid data type for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -114,7 +114,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test(" Can't find getBoolean functions overload for V3") {
+    test("RIDE-101. getBoolean function should throw an error for invalid data type for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       for (
         (data, binary) <- Seq(
@@ -133,7 +133,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test(" Invalid getBoolean functions for V4 and more") {
+    test("RIDE-102. Invalid getBoolean functions should not compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -150,7 +150,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test(" Invalid getBoolean functions for V3") {
+    test("RIDE-103. Invalid getBoolean functions should not compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       for (
         (data, binary) <- Seq(
