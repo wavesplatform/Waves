@@ -15,7 +15,7 @@ object CreateMerkleRoot extends JsTestBase {
   private val invalidErrorCreateMerkleRoot         = invalidFunctionError("createMerkleRoot", 3)
 
   val tests: Tests = Tests {
-    test("createMerkleRoot function compiles") {
+    test("RIDE-271. createMerkleRoot function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -30,7 +30,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test("compilation error: createMerkleRoot - Non-matching types: expected: ByteVector") {
+    test("RIDE-272. createMerkleRoot function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -47,7 +47,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function createMerkleRoot") {
+    test("RIDE-273. Can't find a function createMerkleRoot") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, createMerkleRoot)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)

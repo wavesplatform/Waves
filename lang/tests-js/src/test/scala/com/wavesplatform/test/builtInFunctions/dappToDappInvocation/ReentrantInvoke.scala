@@ -14,7 +14,7 @@ object ReentrantInvoke extends JsTestBase {
   private val invalidFunctionErrorResult: String  = testData.invalidFunctionError("reentrantInvoke", 4)
 
   val tests: Tests = Tests {
-    test(" functions invoke compiles for Issue V4 and more") {
+    test("RIDE-90. ReentrantInvoke function should compile for Issue RIDE V5 and more") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -29,7 +29,7 @@ object ReentrantInvoke extends JsTestBase {
       }
     }
 
-    test(" Functions invoke negative tests for V4 and more") {
+    test("RIDE-91. ReentrantInvoke function throws an error for invalid values for RIDE V5 and more") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

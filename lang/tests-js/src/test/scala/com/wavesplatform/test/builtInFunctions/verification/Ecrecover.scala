@@ -15,7 +15,7 @@ object Ecrecover extends JsTestBase {
   private val invalidErrorEcrecover         = invalidFunctionError("ecrecover", 2)
 
   val tests: Tests = Tests {
-    test("ecrecover function compiles") {
+    test("RIDE-274. ecrecover function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -30,7 +30,7 @@ object Ecrecover extends JsTestBase {
       }
     }
 
-    test("compilation error: ecrecover - Non-matching types: expected: ByteVector") {
+    test("RIDE-275. ecrecover function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -47,7 +47,7 @@ object Ecrecover extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function ecrecover") {
+    test("RIDE-276. Can't find a function ecrecover") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, ecrecover)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)

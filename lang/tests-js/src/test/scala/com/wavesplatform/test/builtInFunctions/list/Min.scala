@@ -24,7 +24,7 @@ object Min extends JsTestBase {
   private val invalidMinForBigInt       = "[callerTestData].min([callerTestData], [callerTestData])"
 
   val tests: Tests = Tests {
-    test("Min functions compiles with a list") {
+    test("RIDE-165. Function Min should compile with a list") {
       for (version <- actualVersionsWithoutV3) {
         for (
           (data, function, dataType) <- Seq(
@@ -39,7 +39,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test("Min for BigInt functions compiles with a address data type") {
+    test("RIDE-166. Function Min should compile with a BigInt") {
       for (version <- versionsSupportingTheNewFeatures) {
         for (
           (data, function, dataType) <- Seq(
@@ -54,7 +54,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test("Compilation error for min") {
+    test("RIDE-167. Function Min should throw an error for invalid data or type") {
       for (version <- actualVersionsWithoutV3) {
         for (
           (data, function, dataType, error) <- Seq(

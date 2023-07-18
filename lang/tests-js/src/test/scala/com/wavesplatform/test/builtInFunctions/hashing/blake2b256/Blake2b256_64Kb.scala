@@ -7,7 +7,6 @@ import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBinaryEntry, actu
 import utest.{Tests, test}
 
 object Blake2b256_64Kb extends JsTestBase {
-  // blake2b256_64Kb
   private val blake2b256_64Kb                     = "blake2b256_64Kb(callerTestData)"
   private val blake2b256_64KbArgBeforeFunc        = "callerTestData.blake2b256_64Kb()"
   private val invalidBlake2b256_64Kb              = "blake2b256_64Kb()"
@@ -15,7 +14,7 @@ object Blake2b256_64Kb extends JsTestBase {
   private val invalidErrorBlake2b256_64Kb  = testData.invalidFunctionError("blake2b256_64Kb", 1)
 
   val tests: Tests = Tests {
-    test("blake2b256_64Kb functions compiles with a ByteVector") {
+    test("RIDE-128. Function blake2b256_64Kb should compile for valid ByteVector") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -30,7 +29,7 @@ object Blake2b256_64Kb extends JsTestBase {
       }
     }
 
-    test("compilation errors blake2b256_64Kb") {
+    test("RIDE-128. Function blake2b256_64Kb должна выдавать ошибку при невалидных данных") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (

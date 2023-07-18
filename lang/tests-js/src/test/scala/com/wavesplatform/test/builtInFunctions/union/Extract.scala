@@ -16,7 +16,7 @@ object Extract extends JsTestBase {
   private val invalidErrorExtract = invalidFunctionError("extract", 1)
 
   val tests: Tests = Tests {
-    test("Extract functions compiles") {
+    test("RIDE-225. function extract should compile for valid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       for (
         (data, function) <- Seq(
@@ -29,7 +29,7 @@ object Extract extends JsTestBase {
       }
     }
 
-    test("invalid extract functions") {
+    test("RIDE-226. function extract throw a compilation error for invalid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       for (
         (data, function, error) <- Seq(
@@ -44,7 +44,7 @@ object Extract extends JsTestBase {
       }
     }
 
-    test("invalid extract functions for V4 - V6") {
+    test("RIDE-227. invalid extract functions for RIDE V4 - V6") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (

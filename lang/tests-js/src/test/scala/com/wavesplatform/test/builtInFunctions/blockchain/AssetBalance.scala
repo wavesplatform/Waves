@@ -16,7 +16,7 @@ object AssetBalance extends JsTestBase {
   private val invalidAssetBalanceFunc = "assetBalance()"
 
   val tests: Tests = Tests {
-    test("Functions assetBalance compiles for address, alias and 'this'") {
+    test("RIDE-27. Compile assetBalance function for address, alias, and 'this'") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -35,7 +35,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test("negative cases") {
+    test("RIDE-28. Invalid data must be validated") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

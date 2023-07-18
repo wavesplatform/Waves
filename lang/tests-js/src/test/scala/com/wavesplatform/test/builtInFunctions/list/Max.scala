@@ -17,7 +17,7 @@ object Max extends JsTestBase {
   private val invalidMaxForBigInt       = "[callerTestData].max([callerTestData], [callerTestData])"
 
   val tests: Tests = Tests {
-    test("Max functions compiles with a list") {
+    test("RIDE-162. Function Max should compile with a list") {
       for (version <- actualVersionsWithoutV3) {
         for (
           (data, function, dataType) <- Seq(
@@ -32,7 +32,7 @@ object Max extends JsTestBase {
       }
     }
 
-    test("Max for BigInt functions compiles with a address data type") {
+    test("RIDE-163. Function Max should compile with a BigInt") {
       for (version <- versionsSupportingTheNewFeatures) {
         for (
           (data, function, dataType) <- Seq(
@@ -47,7 +47,7 @@ object Max extends JsTestBase {
       }
     }
 
-    test("Compilation error for max") {
+    test("RIDE-164. Function Max should throw an error for invalid data or type") {
       for (version <- actualVersionsWithoutV3) {
         for (
           (data, function, dataType, error) <- Seq(

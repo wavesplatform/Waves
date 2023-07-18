@@ -22,7 +22,7 @@ object ValueOrElse extends JsTestBase {
   private val invalidErrorValueOrElse         = invalidFunctionError("valueOrElse", 2)
 
   val tests: Tests = Tests {
-    test("check: valueOrElse function compiles with String") {
+    test("RIDE-232. function valueOrElse should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -41,7 +41,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test("invalid valueOrElse functions") {
+    test("RIDE-233. function valueOrElse throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -58,7 +58,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test("Can't find a function valueOrElse V3") {
+    test("RIDE-234. Can't find a function valueOrElse for RIDE V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       for (
         (firstData, secondData, function) <- Seq(
