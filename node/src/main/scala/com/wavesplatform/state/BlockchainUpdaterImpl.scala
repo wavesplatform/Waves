@@ -375,7 +375,7 @@ class BlockchainUpdaterImpl(
           }).map {
             _ map {
               case (
-                    BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, elidedTxs, _),
+                    BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, _),
                     discDiffs,
                     reward,
                     hitSource
@@ -392,8 +392,7 @@ class BlockchainUpdaterImpl(
                     featuresApprovedWithBlock(block),
                     reward,
                     hitSource,
-                    cancelLeases(collectLeasesToCancel(newHeight), newHeight),
-                    elidedTxs = elidedTxs
+                    cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                   )
                 )
                 publishLastBlockInfo()
@@ -525,7 +524,7 @@ class BlockchainUpdaterImpl(
                 )
               }
             } yield {
-              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _, _) = blockDifferResult
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _) = blockDifferResult
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)
 
@@ -687,8 +686,10 @@ class BlockchainUpdaterImpl(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
-    to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1))
-      .fold[Blockchain](rocksdb)(CompositeBlockchain(rocksdb, _))
+    to.flatMap(id => ngState.flatMap(_.totalDiffOf(id)))
+      .fold[Blockchain](rocksdb) { case (block, diff, _, _, _) =>
+        CompositeBlockchain(rocksdb, diff, block, ByteStr.empty, 0L, None)
+      }
       .balanceSnapshots(address, from, to)
   }
 

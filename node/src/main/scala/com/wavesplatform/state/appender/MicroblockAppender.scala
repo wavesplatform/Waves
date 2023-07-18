@@ -57,16 +57,20 @@ object MicroblockAppender extends ScorexLogging {
     (for {
       _       <- EitherT(Task.now(microBlock.signaturesValid()))
       blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
-    } yield blockId).value.map {
+    } yield blockId).value.flatMap {
       case Right(blockId) =>
-        md.invOpt match {
-          case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
-          case None     => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
+        Task {
+          md.invOpt match {
+            case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
+            case None     => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
+          }
+          BlockStats.applied(microBlock, blockId)
         }
-        BlockStats.applied(microBlock, blockId)
       case Left(is: InvalidSignature) =>
-        val idOpt = md.invOpt.map(_.totalBlockId)
-        peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
+        Task {
+          val idOpt = md.invOpt.map(_.totalBlockId)
+          peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
+        }
       case Left(ish: InvalidStateHash) =>
         val idOpt = md.invOpt.map(_.totalBlockId)
         peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish")
@@ -82,9 +86,11 @@ object MicroblockAppender extends ScorexLogging {
           .void
 
       case Left(ve) =>
-        md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
-        val idOpt = md.invOpt.map(_.totalBlockId)
-        log.debug(s"${id(ch)} Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ve")
+        Task {
+          md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
+          val idOpt = md.invOpt.map(_.totalBlockId)
+          log.debug(s"${id(ch)} Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ve")
+        }
     }
   }
 }

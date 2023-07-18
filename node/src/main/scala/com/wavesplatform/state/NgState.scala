@@ -55,7 +55,6 @@ case class NgState(
     leasesToCancel: Map[ByteStr, Diff],
     microDiffs: Map[BlockId, CachedMicroDiff] = Map.empty,
     microBlocks: List[MicroBlockInfo] = List.empty,
-    elidedTxs: Set[ByteStr] = Set.empty,
     internalCaches: NgStateCaches = new NgStateCaches
 ) {
   def cancelExpiredLeases(diff: Diff): Either[String, Diff] =

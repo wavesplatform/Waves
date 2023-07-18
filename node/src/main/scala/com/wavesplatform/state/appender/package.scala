@@ -145,7 +145,7 @@ package object appender {
   private def validateChallengedHeader(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     for {
       _ <- Either.cond(
-        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot),
+        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchain.height + 1),
         (),
         BlockAppendError("Challenged header is not supported yet", block)
       )

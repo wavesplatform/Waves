@@ -155,8 +155,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           d.appendKeyBlock(signer)
           val correctMicroblock =
             d.createMicroBlock(
-              Some(d.computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer, blockTs, isChallenging = false, blockchain)),
-              None,
+              Some(d.computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer, blockTs, isChallenging = false, blockchain))
+            )(
               txs*
             )
           BlockDiffer.fromMicroBlock(
@@ -167,7 +167,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             MiningConstraint.Unlimited
           ) should beRight
 
-          val incorrectMicroblock = d.createMicroBlock(Some(ByteStr.fill(DigestLength)(1)), None, txs*)
+          val incorrectMicroblock = d.createMicroBlock(Some(ByteStr.fill(DigestLength)(1)))(txs*)
           BlockDiffer.fromMicroBlock(
             blockchain,
             blockchain.lastBlockTimestamp,

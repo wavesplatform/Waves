@@ -1,6 +1,7 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
+import cats.effect.concurrent.Ref
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
@@ -26,9 +27,32 @@ import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
-class BlockChallenger(
+trait BlockChallenger {
+  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit]
+  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit]
+  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)]
+  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
+  def getProcessingTx(id: ByteStr): Option[Transaction]
+  def allProcessingTxs: Seq[Transaction]
+}
+
+object BlockChallenger {
+  val NoOp: BlockChallenger = new BlockChallenger {
+    override def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit]            = Task.unit
+    override def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = Task.unit
+    override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
+      Left(GenericError("There are no suitable accounts"))
+    override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] = Right(Seq.empty)
+    override def getProcessingTx(id: ByteStr): Option[Transaction]                                                   = None
+    override def allProcessingTxs: Seq[Transaction]                                                                  = Seq.empty
+  }
+}
+
+class BlockChallengerImpl(
     blockchainUpdater: BlockchainUpdater & Blockchain,
     allChannels: ChannelGroup,
     wallet: Wallet,
@@ -36,20 +60,28 @@ class BlockChallenger(
     timeService: Time,
     pos: PoSSelector,
     appendBlock: Block => Task[Either[ValidationError, Option[BigInt]]]
-) extends ScorexLogging {
+) extends BlockChallenger
+    with ScorexLogging {
+
+  private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
   def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = {
     log.debug(s"Challenging block $block")
     (for {
+      _ <- EitherT.liftF(Task(processingTxs.putAll(block.transactionData.map(tx => tx.id() -> tx).toMap.asJava)))
       challengingBlock <- EitherT(
         createChallengingBlock(block, block.header.stateHash, block.signature, block.transactionData, prevStateHash, blockReward)
       )
       _ <- EitherT(appendBlock(challengingBlock))
+      _ <- EitherT.liftF[Task, ValidationError, Unit](Task(processingTxs.clear()))
     } yield {
       log.debug(s"Successfully challenged $block with $challengingBlock")
       allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
     }).fold(
-      err => log.debug(s"Could not challenge $block: $err"),
+      err => {
+        processingTxs.clear()
+        log.debug(s"Could not challenge $block: $err")
+      },
       identity
     )
   }
@@ -61,6 +93,7 @@ class BlockChallenger(
     (for {
       discarded <- EitherT(Task(blockchainUpdater.removeAfter(blockchainUpdater.lastBlockHeader.get.header.reference)))
       block     <- EitherT(Task(discarded.headOption.map(_._1).toRight(GenericError("Liquid block wasn't discarded"))))
+      _ <- EitherT.liftF(Task(processingTxs.putAll((block.transactionData ++ md.microBlock.transactionData).map(tx => tx.id() -> tx).toMap.asJava)))
       challengingBlock <- EitherT(
         createChallengingBlock(
           block,
@@ -72,11 +105,15 @@ class BlockChallenger(
         )
       )
       _ <- EitherT(appendBlock(challengingBlock))
+      _ <- EitherT.liftF[Task, ValidationError, Unit](Task(processingTxs.clear()))
     } yield {
       log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
       allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
     }).fold(
-      err => log.debug(s"Could not challenge microblock $idStr: $err"),
+      err => {
+        processingTxs.clear()
+        log.debug(s"Could not challenge microblock $idStr: $err")
+      },
       identity
     )
   }
@@ -100,6 +137,10 @@ class BlockChallenger(
           )
           .map((acc, _))
       }
+
+  def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
+
+  def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
 
   private def createChallengingBlock(
       challengedBlock: Block,
@@ -204,6 +245,7 @@ class BlockChallenger(
 
     txs
       .foldLeft(initStateHash -> initDiff) { case ((prevStateHash, accDiff), tx) =>
+        // TODO: NODE-2594 maybe blockchain with new block
         val compBlockchain = CompositeBlockchain(blockchain, accDiff)
         val minerDiff      = Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart)))
         txDiffer(compBlockchain, tx).resultE match {

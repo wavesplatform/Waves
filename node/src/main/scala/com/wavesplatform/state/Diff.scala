@@ -397,9 +397,11 @@ object Diff {
       }
       val affectedAddresses = specificAffectedAddresses ++ maybeDApp
 
+      val txFilter = d.transactionFilter.getOrElse(mkFilter())
+      txFilter.put(tx.id().arr)
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, TxMeta.Status.Elided, d.scriptsComplexity)),
-        transactionFilter = mkFilterForTransactions(tx)
+        transactions = d.transactions :+ NewTransactionInfo(tx, affectedAddresses, TxMeta.Status.Elided, d.scriptsComplexity),
+        transactionFilter = Some(txFilter)
       )
     }
 

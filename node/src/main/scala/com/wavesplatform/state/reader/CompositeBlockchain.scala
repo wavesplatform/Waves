@@ -140,13 +140,12 @@ final class CompositeBlockchain private (
 
   // TODO: NODE-2594 check for correctness
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeDiff.isEmpty) {
+    if (maybeDiff.isEmpty || to != blockMeta.map(_._1.id())) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bsHeight   = to.flatMap(this.heightOf).getOrElse(height + 1)
-      val bs         = BalanceSnapshot(bsHeight, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, bsHeight))
+      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, this.height))
       val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
       if (inner.height > 0 && (from < this.height || height2Fix))
         bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain

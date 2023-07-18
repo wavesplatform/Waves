@@ -28,11 +28,6 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createBlockStateHash(prevStateHash: ByteStr, diffHashes: Seq[ByteStr]): ByteStr =
-    diffHashes.foldLeft(prevStateHash) { case (acc, diffHash) =>
-      createHash(Seq(acc, diffHash))
-    }
-
   def createHashFromDiff(blockchain: Blockchain, diff: Diff): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 

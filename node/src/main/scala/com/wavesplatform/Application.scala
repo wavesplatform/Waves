@@ -31,7 +31,7 @@ import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.mining.{BlockChallenger, Miner, MinerDebugInfo, MinerImpl}
+import com.wavesplatform.mining.{BlockChallengerImpl, Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
@@ -156,7 +156,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       )
 
-    val blockChallenger = new BlockChallenger(
+    val blockChallenger = new BlockChallengerImpl(
       blockchainUpdater,
       allChannels,
       wallet,
@@ -233,6 +233,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         rdb,
         blockchainUpdater,
         utxStorage,
+        blockChallenger,
         tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(rdb, blockchainUpdater)
       )

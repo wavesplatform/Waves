@@ -23,12 +23,12 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
         BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
       preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-        val BlockDiffer.Result(diff, fees, totalFee, _, _, _, _) = differ(state, prevBlock, curBlock).explicitGet()
+        val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, prevBlock, curBlock).explicitGet()
         state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, curBlock)
         Some(curBlock)
       }
 
-      val BlockDiffer.Result(diff, _, _, _, detailedDiff, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
+      val BlockDiffer.Result(diff, _, _, _, detailedDiff, _) = differ(state, preconditions.lastOption, block).explicitGet()
       assertion(diff, detailedDiff)
     }
 

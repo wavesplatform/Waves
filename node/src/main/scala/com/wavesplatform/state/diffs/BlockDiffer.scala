@@ -29,7 +29,6 @@ object BlockDiffer {
       totalFee: Long,
       constraint: MiningConstraint,
       detailedDiff: DetailedDiff,
-      elidedTxs: Set[ByteStr],
       stateHash: Option[ByteStr]
   )
 
@@ -201,9 +200,14 @@ object BlockDiffer {
       case _ => transactionFee
     }
 
-  def createInitialBlockDiff(blockchain: Blockchain, miner: Address, blockReward: Option[Long] = None): Either[String, Diff] = {
+  def createInitialBlockDiff(
+      blockchain: Blockchain,
+      miner: Address,
+      blockReward: Option[Long] = None,
+      carry: Option[Long] = None
+  ): Either[String, Diff] = {
     val minerReward          = blockReward.orElse(blockchain.lastBlockReward).fold(Portfolio.empty)(Portfolio.waves)
-    val feeFromPreviousBlock = Portfolio(balance = blockchain.carryFee)
+    val feeFromPreviousBlock = Portfolio(balance = carry.getOrElse(blockchain.carryFee))
 
     minerReward
       .combine(feeFromPreviousBlock)
@@ -253,14 +257,14 @@ object BlockDiffer {
     txs
       .foldLeft(
         TracedResult(
-          Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), Set.empty, initStateHash).asRight[ValidationError]
+          Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), initStateHash).asRight[ValidationError]
         )
       ) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (
               TracedResult(
                 Right(
-                  result @ Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), elidedTxs, prevStateHash)
+                  result @ Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHash)
                 ),
                 _,
                 _
@@ -298,7 +302,6 @@ object BlockDiffer {
                 totalWavesFee,
                 updatedConstraint,
                 DetailedDiff(newParentDiff, thisTxDiff :: txDiffs),
-                elidedTxs,
                 prevStateHash.map(TxStateSnapshotHashBuilder.createHashFromDiff(currBlockchain, fullTxDiff).createHash(_))
               )
               TracedResult(result.leftMap(GenericError(_)))
@@ -307,7 +310,7 @@ object BlockDiffer {
 
           res.copy(resultE = res.resultE.recover {
             case _ if hasChallenge =>
-              result.copy(diff = result.diff.bindElidedTransaction(blockchain, tx), elidedTxs = result.elidedTxs + tx.id())
+              result.copy(diff = result.diff.bindElidedTransaction(blockchain, tx))
           })
       }
   }
