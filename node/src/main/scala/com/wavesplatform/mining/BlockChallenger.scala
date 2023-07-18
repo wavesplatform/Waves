@@ -1,7 +1,6 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import cats.effect.concurrent.Ref
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
