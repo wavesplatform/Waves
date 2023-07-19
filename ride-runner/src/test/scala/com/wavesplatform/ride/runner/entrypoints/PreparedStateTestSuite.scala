@@ -32,7 +32,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
           regularBalance = Some(TxNonNegativeAmount(500_000))
         ),
         aliceAddr -> RideRunnerAccount(
-          data = Some(Map("a" -> RideRunnerIntegerDataEntry(11))),
+          data = Some(Map("a" -> IntegerRideRunnerDataEntry(11))),
           aliases = List(Alias.create("carl").explicitGet()),
           assetBalances = Map(btc -> TxNonNegativeAmount(2)),
           regularBalance = Some(TxNonNegativeAmount(1_300_000))

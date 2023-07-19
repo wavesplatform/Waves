@@ -14,7 +14,7 @@ libraryDependencies ++= Dependencies.rideRunner.value
 
 // Causes "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended".
 // May ignore
-javaAgents ++= Dependencies.kanela
+// javaAgents ++= Dependencies.kanela // Disabled, because causes running logs before needed, so System.setProperty in RideRunnerWithPreparedStateApp has no effect.
 
 inConfig(Compile)(
   Seq(
@@ -23,16 +23,19 @@ inConfig(Compile)(
   )
 )
 
-val commonJavaOptions = Seq(
-  "-Djdk.attach.allowAttachSelf=true",
-  // JVM default charset for proper and deterministic getBytes behaviour
-  "-Dfile.encoding=UTF-8"
-) ++ Seq("lang", "math", "util").map(x => s"--add-opens=java.base/java.$x=ALL-UNNAMED") // For ehcache
+def commonJavaOptions(forPackager: Boolean = false): Seq[String] = {
+  val prefix = if (forPackager) "-J" else ""
+  Seq(
+    "-Djdk.attach.allowAttachSelf=true",
+    // JVM default charset for proper and deterministic getBytes behaviour
+    "-Dfile.encoding=UTF-8"
+  ) ++ Seq("lang", "math", "util").map(x => s"$prefix--add-opens=java.base/java.$x=ALL-UNNAMED")
+} // For ehcache
 
-run / javaOptions ++= commonJavaOptions
+run / javaOptions ++= commonJavaOptions()
 run / fork := true // For working instrumentation
 
-Test / javaOptions ++= commonJavaOptions
+Test / javaOptions ++= commonJavaOptions()
 Test / fork := true
 
 bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
@@ -54,7 +57,7 @@ inConfig(Universal)(
       "-J-XX:+UseG1GC",
       "-J-XX:+ParallelRefProcEnabled",
       "-J-XX:+UseStringDeduplication"
-    ) ++ commonJavaOptions
+    ) ++ commonJavaOptions(true)
   )
 )
 

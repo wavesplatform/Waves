@@ -29,7 +29,7 @@ object RideRunnerInputParser extends DefaultReads {
   implicit val jsonConfiguration: JsonConfiguration.Aux[Json.WithDefaultValues] = JsonConfiguration[Json.WithDefaultValues](
     discriminator = "type",
     typeNaming = JsonNaming { fullName =>
-      fullName.split('.').last.replace("RunnerDataEntry", "").toLowerCase(Locale.US)
+      fullName.split('.').last.replace(classOf[RideRunnerDataEntry].getSimpleName, "").toLowerCase(Locale.US)
     }
   )
 
@@ -140,10 +140,10 @@ object RideRunnerInputParser extends DefaultReads {
 
   implicit val rideRunnerScriptInfoReads: Reads[RideRunnerScriptInfo] = Json.reads
 
-  implicit val rideRunnerBinaryDataEntryReads: Reads[RideRunnerBinaryDataEntry]   = Json.reads
-  implicit val rideRunnerBooleanDataEntryReads: Reads[RideRunnerBooleanDataEntry] = Json.reads
-  implicit val rideRunnerIntegerDataEntryReads: Reads[RideRunnerIntegerDataEntry] = Json.reads
-  implicit val rideRunnerStringDataEntryReads: Reads[RideRunnerStringDataEntry]   = Json.reads
+  implicit val rideRunnerBinaryDataEntryReads: Reads[BinaryRideRunnerDataEntry]   = Json.reads
+  implicit val rideRunnerBooleanDataEntryReads: Reads[BooleanRideRunnerDataEntry] = Json.reads
+  implicit val rideRunnerIntegerDataEntryReads: Reads[IntegerRideRunnerDataEntry] = Json.reads
+  implicit val rideRunnerStringDataEntryReads: Reads[StringRideRunnerDataEntry]   = Json.reads
   implicit val rideRunnerDataEntryReads: Reads[RideRunnerDataEntry]               = Json.reads
 
   implicit val rideRunnerAccountReads: Reads[RideRunnerAccount] = Json.reads
