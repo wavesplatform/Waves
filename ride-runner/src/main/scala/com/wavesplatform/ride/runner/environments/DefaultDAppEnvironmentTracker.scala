@@ -8,6 +8,8 @@ import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 
+import scala.util.chaining.scalaUtilChainingOps
+
 class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], tag: TagT)
     extends DAppEnvironmentTracker
     with ScorexLogging {
@@ -97,10 +99,10 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
   private def withResolvedAlias(addressOrAlias: Recipient): Option[Address] = {
     addressOrAlias match {
       case addressOrAlias: Recipient.Address => toWavesAddress(addressOrAlias)
-      case Recipient.Alias(name)             =>
-        // TODO Add dependency?
+      case Recipient.Alias(name) =>
         com.wavesplatform.account.Alias
-          .create(name)
+          .create(name) // It should be Right, because we get the data from Blockchain Updates
+          .tap(_.foreach(x => sharedBlockchain.allTags.addDependent(CacheKey.Alias(x), tag)))
           .flatMap(sharedBlockchain.resolveAlias)
           .toOption
     }
