@@ -14,6 +14,9 @@ shopt -s nullglob
 # UnlockDiagnosticVMOptions is required for GCLockerRetryAllocationCount, otherwise we get:
 #   Error: VM option 'GCLockerRetryAllocationCount' is diagnostic and must be enabled via -XX:+UnlockDiagnosticVMOptions.
 #   Error: The unlock option must precede 'GCLockerRetryAllocationCount'.
+#
+# Temporarily:
+#   -XX:+AlwaysPreTouch
 JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   --add-opens=java.base/java.lang=ALL-UNNAMED
   --add-opens=java.base/java.math=ALL-UNNAMED
@@ -27,6 +30,7 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   -XX:+UseStringDeduplication
   -XX:GCLockerRetryAllocationCount=100
   -Xmx${RIDE_HEAP_SIZE}
+  -XX:+AlwaysPreTouch
   -XX:MaxMetaspaceSize=152m
   -XX:ThreadStackSize=1024
   -Djdk.attach.allowAttachSelf=true
@@ -38,7 +42,10 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   -Dwaves.defaults.blockchain.type=$RIDE_NETWORK
   -Dwaves.defaults.directory=$RDATA"
 
-[ -n "${ASYNCPROF_OPTS}" ] && JAVA_OPTS="-agentpath:/usr/local/async-profiler/build/libasyncProfiler.so=$ASYNCPROF_OPTS $JAVA_OPTS"
+if [[ -n "${ASYNCPROF_OPTS}" ]]; then
+  echo "async-profiler enabled"
+  JAVA_OPTS="-agentpath:/usr/local/async-profiler/build/libasyncProfiler.so=$ASYNCPROF_OPTS $JAVA_OPTS"
+fi
 
 echo "Ride runner is starting..."
 echo "JAVA_OPTS='${JAVA_OPTS}'"
@@ -51,6 +58,7 @@ fi
 
 if [[ -n "$JEMALLOC_ENABLE" && "$JEMALLOC_ENABLE" == "true" ]]; then
   # jemalloc settings
+  echo "jemalloc enabled"
   mkdir -p ${RDATA}/jemalloc
   export MALLOC_CONF="${MALLOC_CONF},prof_prefix:${RDATA}/jemalloc/jeprof.out"
   export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libjemalloc.so"

@@ -526,24 +526,22 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
     val dependencies: Map[CacheKey, Tag]            = Map.empty
 
     def doOnComplete(access: Access): Unit
-    def runTest(): Unit = {
-      withDb { db =>
-        db.batchedReadWrite { implicit rw =>
-          val blockchain = SharedBlockchainStorage[Tag](
-            settings = SharedBlockchainStorage.Settings(
-              blockchain = DefaultBlockchainSettings,
-              commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
-            ),
-            db = db,
-            persistentCaches = DefaultPersistentCaches(db),
-            blockchainApi = testBlockchainApi
-          )
+    def runTest(): Unit = withDb { db =>
+      db.batchedReadWrite { implicit rw =>
+        val blockchain = SharedBlockchainStorage[Tag](
+          settings = SharedBlockchainStorage.Settings(
+            blockchain = DefaultBlockchainSettings,
+            commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+          ),
+          db = db,
+          persistentCaches = DefaultPersistentCaches(db),
+          blockchainApi = testBlockchainApi
+        )
 
-          dependencies.foreach(Function.tupled(blockchain.addDependent))
-          preEvents.foreach(blockchain.process)
-          val affectedTags = trackAffectedEvents.foldLeft(AffectedTags.empty[Int])((r, event) => r ++ blockchain.process(event))
-          doOnComplete(new Access(blockchain, affectedTags))
-        }
+        dependencies.foreach(Function.tupled(blockchain.allTags.addDependent))
+        preEvents.foreach(blockchain.process)
+        val affectedTags = trackAffectedEvents.foldLeft(AffectedTags.empty[Int])((r, event) => r ++ blockchain.process(event))
+        doOnComplete(new Access(blockchain, affectedTags))
       }
     }
 

@@ -26,7 +26,6 @@ import com.wavesplatform.state.{AssetDescription, DataEntry, Height, LeaseBalanc
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -38,30 +37,7 @@ class SharedBlockchainStorage[TagT] private (
 ) extends ScorexLogging {
   private val blockHeaders = new BlockHeaderStorage(blockchainApi, persistentCaches.blockHeaders)
 
-  // We can look up tags to determine if a key has been known, because tags are always in RAM
-  //   not exist - we don't known this key
-  //   exist, but empty - we known this key, but doesn't remember why
-  //   exist and non-empty - we know, why do we need this key (but there are probably more tags)
-  private val allTags = new ConcurrentHashMap[CacheKey, Set[TagT]]()
-
-  def addDependent(key: CacheKey, tag: TagT): Unit = allTags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
-
-  private val emptyTags = Seq.empty[TagT]
-  def removeTags(xs: collection.Set[TagT]): Unit = {
-    allTags.replaceAll { (_: CacheKey, orig: Set[TagT]) =>
-      if (orig.size >= xs.size) orig -- xs
-      else orig.diff(xs)
-    }
-
-    // TODO: Use removeIf to remove empty keys in JRE 17
-    val emptyKeys = allTags.reduceEntries[Seq[CacheKey]](
-      4, // parallelismThreshold
-      entry => if (entry.getValue.isEmpty) Seq(entry.getKey) else Seq.empty,
-      _ ++ _
-    )
-
-    emptyKeys.foreach(k => allTags.remove(k, emptyTags))
-  }
+  val allTags = new CacheKeyTags[TagT]
 
   def load()(implicit ctx: ReadOnly): Unit = blockHeaders.load()
 
@@ -286,7 +262,7 @@ class SharedBlockchainStorage[TagT] private (
   private def removeCacheIfPresent[CacheKeyT <: CacheKey](hint: String, key: CacheKeyT): AffectedTags[TagT] =
     runIfTagPresent(s"remove $hint", key) { commonCache.remove(key) }
 
-  private def runIfTagPresent(hint: => String, key: CacheKey)(f: => Unit): AffectedTags[TagT] = Option(allTags.get(key)) match {
+  private def runIfTagPresent(hint: => String, key: CacheKey)(f: => Unit): AffectedTags[TagT] = allTags.get(key) match {
     case None => empty
     case Some(tags) =>
       f

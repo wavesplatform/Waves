@@ -53,7 +53,7 @@ class DefaultRequestService(
   }
 
   private def clearIgnored(): Unit = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
-    sharedBlockchain.removeTags(ignoredRequests.asScala)
+    sharedBlockchain.allTags.removeTags(ignoredRequests.asScala)
     ignoredRequests.clear()
   }
 

@@ -13,7 +13,7 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
     with ScorexLogging {
   override def height(): Unit = {
     // log.trace(s"[$tag] height")
-    sharedBlockchain.addDependent(CacheKey.Height, tag)
+    sharedBlockchain.allTags.addDependent(CacheKey.Height, tag)
   }
 
   override def lastBlockOpt(): Unit = {
@@ -25,26 +25,26 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
   override def transactionById(id: Array[Byte]): Unit = {
     val txId = CacheKey.Transaction(TransactionId @@ ByteStr(id))
     // log.trace(s"[$tag] transactionById($txId)")
-    sharedBlockchain.addDependent(txId, tag)
+    sharedBlockchain.allTags.addDependent(txId, tag)
   }
 
   override def transferTransactionById(id: Array[Byte]): Unit = {
     val txId = CacheKey.Transaction(TransactionId @@ ByteStr(id))
     // log.trace(s"[$tag] transferTransactionById($txId)")
-    sharedBlockchain.addDependent(txId, tag)
+    sharedBlockchain.allTags.addDependent(txId, tag)
   }
 
   // TODO A: this can change
   override def transactionHeightById(id: Array[Byte]): Unit = {
     val txId = CacheKey.Transaction(TransactionId @@ ByteStr(id))
     // log.trace(s"[$tag] transactionHeightById($txId)")
-    sharedBlockchain.addDependent(txId, tag)
+    sharedBlockchain.allTags.addDependent(txId, tag)
   }
 
   override def assetInfoById(id: Array[Byte]): Unit = {
     val asset = Asset.IssuedAsset(ByteStr(id))
     // log.trace(s"[$tag] transactionHeightById($asset)")
-    sharedBlockchain.addDependent(CacheKey.Asset(asset), tag)
+    sharedBlockchain.allTags.addDependent(CacheKey.Asset(asset), tag)
   }
 
   // TODO Two different cases for H, where H < currHeight - 100 and H >= currHeight - 100
@@ -57,7 +57,7 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
   override def data(addressOrAlias: Recipient, key: String): Unit =
     withResolvedAlias(addressOrAlias).foreach { addr =>
       // log.trace(s"[$tag] data($addr, $key)")
-      sharedBlockchain.addDependent(CacheKey.AccountData(addr, key), tag)
+      sharedBlockchain.allTags.addDependent(CacheKey.AccountData(addr, key), tag)
     }
 
   // TODO #16 We don't support it for now, use GET /utils/script/evaluate , see ScriptBlockchain
@@ -65,14 +65,14 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
 
   override def resolveAlias(name: String): Unit = {
     // log.trace(s"[$tag] resolveAlias($name)")
-    com.wavesplatform.account.Alias.create(name).foreach(x => sharedBlockchain.addDependent(CacheKey.Alias(x), tag))
+    com.wavesplatform.account.Alias.create(name).foreach(x => sharedBlockchain.allTags.addDependent(CacheKey.Alias(x), tag))
   }
 
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Unit = {
     withResolvedAlias(addressOrAlias).foreach { addr =>
       val asset = Asset.fromCompatId(assetId.map(ByteStr(_)))
       // log.trace(s"[$tag] accountBalanceOf($addr, $asset)")
-      sharedBlockchain.addDependent(CacheKey.AccountBalance(addr, asset), tag)
+      sharedBlockchain.allTags.addDependent(CacheKey.AccountBalance(addr, asset), tag)
     }
   }
 
@@ -80,14 +80,14 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
     withResolvedAlias(addressOrAlias).foreach { addr =>
       // log.trace(s"[$tag] accountWavesBalanceOf($addr)")
       // TODO merge?
-      sharedBlockchain.addDependent(CacheKey.AccountBalance(addr, Asset.Waves), tag)
-      sharedBlockchain.addDependent(CacheKey.AccountLeaseBalance(addr), tag)
+      sharedBlockchain.allTags.addDependent(CacheKey.AccountBalance(addr, Asset.Waves), tag)
+      sharedBlockchain.allTags.addDependent(CacheKey.AccountLeaseBalance(addr), tag)
     }
 
   override def accountScript(addressOrAlias: Recipient): Unit =
     withResolvedAlias(addressOrAlias).foreach { addr =>
       // log.trace(s"[$tag] accountScript($addr)")
-      sharedBlockchain.addDependent(CacheKey.AccountScript(addr), tag)
+      sharedBlockchain.allTags.addDependent(CacheKey.AccountScript(addr), tag)
     }
 
   override def callScript(dApp: Recipient.Address): Unit =
