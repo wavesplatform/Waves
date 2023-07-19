@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import com.wavesplatform.state.{AssetScriptInfo, BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -21,9 +20,11 @@ object CacheWeights {
     false,
     true,
     new SizeOfFilter {
+      private val excludeClassNames = Set(classOf[SharedBlockchainStorage[?]].getName)
       override def filterFields(klazz: Class[?], fields: util.Collection[Field]): util.Collection[Field] = fields
       override def filterClass(klazz: Class[?]): Boolean = {
-        val remove = klazz.getName.contains("$$Lambda$") // Because we can't determine the its size
+        // Because we can't determine their sizes or they shared among all objects
+        val remove = klazz.getName.contains("$$Lambda$") || excludeClassNames.contains(klazz.getName)
         !remove
       }
     }
@@ -33,7 +34,7 @@ object CacheWeights {
   private def ofAny(x: Any): Int = {
     val longWeight = sizeOf.deepSizeOf(x)
     if (longWeight.isValidInt) longWeight.toInt
-    else throw new ArithmeticException(s"Weight of ${getSimpleName(x)} overflow: $longWeight")
+    else throw new ArithmeticException(s"Weight of ${x.getClass.getSimpleName} overflow: $longWeight")
   }
 
   val OfCachedRemoteDataOverhead = 16 // = 12 (header) + 4 (ref)

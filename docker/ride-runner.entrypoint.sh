@@ -42,7 +42,7 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   -Dwaves.defaults.blockchain.type=$RIDE_NETWORK
   -Dwaves.defaults.directory=$RDATA"
 
-if [[ -n "${ASYNCPROF_OPTS}" ]]; then
+if [[ -n "${ASYNCPROF_ENABLE}" && "${ASYNCPROF_ENABLE}" == "true" ]]; then
   echo "async-profiler enabled"
   JAVA_OPTS="-agentpath:/usr/local/async-profiler/build/libasyncProfiler.so=$ASYNCPROF_OPTS $JAVA_OPTS"
 fi
@@ -56,7 +56,7 @@ else
   ARGS=$@
 fi
 
-if [[ -n "$JEMALLOC_ENABLE" && "$JEMALLOC_ENABLE" == "true" ]]; then
+if [[ -n "${JEMALLOC_ENABLE}" && "${JEMALLOC_ENABLE}" == "true" ]]; then
   # jemalloc settings
   echo "jemalloc enabled"
   mkdir -p ${RDATA}/jemalloc

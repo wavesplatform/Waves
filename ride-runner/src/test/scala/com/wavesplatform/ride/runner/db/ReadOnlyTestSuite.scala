@@ -3,11 +3,10 @@ package com.wavesplatform.ride.runner.db
 import com.google.common.primitives.Shorts
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.storage.persistent.HasDb
 
 abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
-  private val testName      = getSimpleName(this).replace("TestSuite", "")
+  private val testName      = getClass.getSimpleName.replace("TestSuite", "")
   private val defaultPrefix = Shorts.toByteArray(1)
   private val otherPrefix   = Shorts.toByteArray(2)
   private val defaultValue  = Array[Byte](3)

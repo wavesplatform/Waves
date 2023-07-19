@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import com.wavesplatform.history.DefaultBlockchainSettings
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.entrypoints.AppInitializer
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.freespec.AnyFreeSpecLike
@@ -17,7 +16,7 @@ trait BaseTestSuite extends AnyFreeSpecLike with Matchers with BeforeAndAfterAll
 
   protected def isA[T](x: Any)(implicit ct: ClassTag[T]): T = x match {
     case x: T => x
-    case _    => fail(s"Expected $x to be ${getSimpleName(ct.runtimeClass)}")
+    case _    => fail(s"Expected $x to be ${ct.runtimeClass.getSimpleName}")
   }
 }
 

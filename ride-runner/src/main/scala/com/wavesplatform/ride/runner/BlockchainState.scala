@@ -6,7 +6,6 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.state.Height
@@ -150,7 +149,7 @@ object BlockchainState extends ScorexLogging {
     val updateType  = UpdateType.from(update)
     log.info(s"$orig + $updateType(id=$currBlockId, h=$h)")
     def logStatusChanged(updated: BlockchainState): Unit =
-      log.info(s"Status changed: ${getSimpleName(orig)} -> ${getSimpleName(updated)}")
+      log.info(s"Status changed: ${orig.getClass.getSimpleName} -> ${updated.getClass.getSimpleName}")
 
     orig match {
       case orig: Starting =>

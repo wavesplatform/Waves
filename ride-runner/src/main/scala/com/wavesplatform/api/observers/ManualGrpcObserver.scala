@@ -1,6 +1,5 @@
 package com.wavesplatform.api.observers
 
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.grpc.stub.{ClientCallStreamObserver, ClientResponseObserver}
 import org.slf4j.LoggerFactory
@@ -8,7 +7,7 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicBoolean
 
 class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[RequestT, EventT] with ScorexLogging {
-  protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"${getSimpleName(this)}#${hashCode()}"))
+  protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getSimpleName}#${hashCode()}"))
 
   private val working                                           = new AtomicBoolean(false)
   private var requestStream: ClientCallStreamObserver[RequestT] = null

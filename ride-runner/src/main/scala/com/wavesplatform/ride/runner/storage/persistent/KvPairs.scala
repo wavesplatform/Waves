@@ -22,7 +22,6 @@ import com.wavesplatform.database.rocksdb.{
   writeBlockMeta
 }
 import com.wavesplatform.database.{AddressId, toPbTransaction, toVanillaTransaction, protobuf as pb}
-import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.ride.runner.db.Heights
@@ -42,7 +41,7 @@ sealed abstract class KvPair[KeyT, ValueT](
     prefix: Short,
     val columnFamilyHandle: Option[ColumnFamilyHandle] = None
 )(implicit keyAsBytes: AsBytes[KeyT], valueAsBytes: AsBytes[ValueT]) {
-  val name        = getSimpleName(this)
+  val name        = getClass.getSimpleName
   val prefixBytes = Shorts.toByteArray(prefix)
 
   val prefixedKeyAsBytes: AsBytes[KeyT] = keyAsBytes.prefixed(prefixBytes)
