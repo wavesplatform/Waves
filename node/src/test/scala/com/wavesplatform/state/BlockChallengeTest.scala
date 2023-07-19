@@ -1553,7 +1553,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
           override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
             lock.lock()
             val best = super.pickBestAccount(accounts)
-            testTime.setTime(invalidBlock.header.timestamp.max(best.explicitGet()._2))
+            testTime.setTime(invalidBlock.header.timestamp.max(best.explicitGet()._2 + d.lastBlock.header.timestamp))
             best
           }
         }
