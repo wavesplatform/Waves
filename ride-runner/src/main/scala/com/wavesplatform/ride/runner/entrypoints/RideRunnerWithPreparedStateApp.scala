@@ -31,35 +31,38 @@ object RideRunnerWithPreparedStateApp {
 
       val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
       AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
-      val input = RideRunnerInputParser.parse(inputJson)
 
-      val defaultFunctionalitySettings = input.chainId match {
-        case 'W' => BlockchainSettings(input.chainId, FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
-        case 'T' => BlockchainSettings(input.chainId, FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
-        case 'S' => BlockchainSettings(input.chainId, FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
-        case _ =>
-          BlockchainSettings(
-            addressSchemeCharacter = input.chainId,
-            functionalitySettings = FunctionalitySettings(),
-            genesisSettings = GenesisSettings(0, 0, 0, None, Nil, 0, 0.seconds),
-            rewardsSettings = RewardsSettings(1, 0, 1, 1, 1000)
-          )
-      }
-
-      val runResult = UtilsEvaluator.evaluate(
-        blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input.state),
-        dAppAddress = input.address,
-        request = input.request,
-        options = UtilsEvaluator.EvaluateOptions(
-          evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
-          maxTxErrorLogSize = input.maxTxErrorLogSize,
-          enableTraces = input.trace,
-          intAsString = input.intAsString
-        )
-      )
-
+      val runResult = run(inputJson)
       println(Json.prettyPrint(runResult))
     }
+  }
+
+  def run(inputJson: JsValue): JsObject = {
+    val input = RideRunnerInputParser.parse(inputJson)
+    val defaultFunctionalitySettings = input.chainId match {
+      case 'W' => BlockchainSettings(input.chainId, FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
+      case 'T' => BlockchainSettings(input.chainId, FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
+      case 'S' => BlockchainSettings(input.chainId, FunctionalitySettings.STAGENET, GenesisSettings.STAGENET, RewardsSettings.STAGENET)
+      case _ =>
+        BlockchainSettings(
+          addressSchemeCharacter = input.chainId,
+          functionalitySettings = FunctionalitySettings(),
+          genesisSettings = GenesisSettings(0, 0, 0, None, Nil, 0, 0.seconds),
+          rewardsSettings = RewardsSettings(1, 1, 1, 1, 1)
+        )
+    }
+
+    UtilsEvaluator.evaluate(
+      blockchain = new ImmutableBlockchain(defaultFunctionalitySettings, input.state),
+      dAppAddress = input.address,
+      request = input.request,
+      options = UtilsEvaluator.EvaluateOptions(
+        evaluateScriptComplexityLimit = input.evaluateScriptComplexityLimit,
+        maxTxErrorLogSize = input.maxTxErrorLogSize,
+        enableTraces = input.trace,
+        intAsString = input.intAsString
+      )
+    )
   }
 
   private final case class Args(
