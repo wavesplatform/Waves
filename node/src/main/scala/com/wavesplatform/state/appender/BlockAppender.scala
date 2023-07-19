@@ -92,7 +92,7 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        // TODO: NODE-2594 get prev state hash
+        // TODO: get prev state hash (NODE-2568)
         blockchainUpdater.lastBlockHeader
           .flatMap(_.header.stateHash)
           .traverse { prevStateHash =>

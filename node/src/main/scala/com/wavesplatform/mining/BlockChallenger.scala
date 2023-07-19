@@ -167,6 +167,20 @@ class BlockChallengerImpl(
         )
 
       initialBlockDiff <- BlockDiffer.createInitialBlockDiff(blockchainUpdater, acc.toAddress, blockReward).leftMap(GenericError(_))
+      blockWithoutChallengeAndStateHash <- Block.buildAndSign(
+        challengedBlock.header.version,
+        blockTime,
+        challengedBlock.header.reference,
+        consensusData.baseTarget,
+        consensusData.generationSignature,
+        txs,
+        acc,
+        blockFeatures(blockchainUpdater, settings),
+        blockRewardVote(settings),
+        None,
+        None
+      )
+      hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
       challengingBlock <-
         Block.buildAndSign(
           challengedBlock.header.version,
@@ -184,8 +198,8 @@ class BlockChallengerImpl(
               TxStateSnapshotHashBuilder.createHashFromDiff(blockchainUpdater, initialBlockDiff).createHash(prevStateHash),
               initialBlockDiff,
               acc,
-              blockTime,
-              blockchainUpdater
+              lastBlockHeader.timestamp,
+              CompositeBlockchain(blockchainUpdater, Diff.empty, blockWithoutChallengeAndStateHash, hitSource, 0, None)
             )
           ),
           Some(
@@ -238,14 +252,13 @@ class BlockChallengerImpl(
       initStateHash: ByteStr,
       initDiff: Diff,
       signer: KeyPair,
-      timestamp: Long,
+      prevBlockTimestamp: Long,
       blockchain: Blockchain
   ): ByteStr = {
-    val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, timestamp) _
+    val txDiffer = TransactionDiffer(Some(prevBlockTimestamp), blockchain.lastBlockTimestamp.get) _
 
     txs
       .foldLeft(initStateHash -> initDiff) { case ((prevStateHash, accDiff), tx) =>
-        // TODO: NODE-2594 maybe blockchain with new block
         val compBlockchain = CompositeBlockchain(blockchain, accDiff)
         val minerDiff      = Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart)))
         txDiffer(compBlockchain, tx).resultE match {

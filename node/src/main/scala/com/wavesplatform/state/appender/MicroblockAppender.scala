@@ -76,7 +76,7 @@ object MicroblockAppender extends ScorexLogging {
         peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish")
         md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
 
-        // TODO: NODE-2594 get prev state hash
+        // TODO: get prev state hash (NODE-2568)
         blockchainUpdater
           .blockHeader(blockchainUpdater.height - 1)
           .flatMap(_.header.stateHash)

@@ -50,7 +50,7 @@ import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import java.util.concurrent.locks.ReentrantLock
-import scala.concurrent.Await
+import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.DurationInt
 
 class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers {
@@ -1523,9 +1523,10 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     val challengedMiner = TxHelpers.signer(1)
     withDomain(settings, balances = AddrWithBalance.enoughBalances(defaultSigner)) { d =>
-      val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val lock     = new ReentrantLock()
-      lock.lock()
+      val channels      = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+      val promise       = Promise[Unit]()
+      val lockChallenge = new ReentrantLock()
+      lockChallenge.lock()
 
       val challengingMiner = d.wallet.generateNewAccount().get
 
@@ -1551,7 +1552,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
           createBlockAppender(d)
         ) {
           override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
-            lock.lock()
+            promise.success(())
+            lockChallenge.lock()
             val best = super.pickBestAccount(accounts)
             testTime.setTime(invalidBlock.header.timestamp.max(best.explicitGet()._2 + d.lastBlock.header.timestamp))
             best
@@ -1575,11 +1577,14 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       testTime.setTime(invalidBlock.header.timestamp)
       val challengeResult = appender(new EmbeddedChannel(), invalidBlock).runToFuture
 
-      checkTxsStatus(txs, TransactionsApiRoute.Status.Unconfirmed, route)
+      Await.ready(
+        promise.future.map(_ => checkTxsStatus(txs, TransactionsApiRoute.Status.Confirmed, route))(monix.execution.Scheduler.Implicits.global),
+        1.minute
+      )
 
-      lock.unlock()
+      lockChallenge.unlock()
 
-      Await.result(challengeResult, 1.minute)
+      Await.ready(challengeResult, 1.minute)
 
       checkTxsStatus(txs, TransactionsApiRoute.Status.Confirmed, route)
     }
