@@ -24,7 +24,7 @@ import play.api.libs.json.Json
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.FiniteDuration
-import scala.jdk.CollectionConverters.SetHasAsScala
+import scala.jdk.CollectionConverters.{SetHasAsJava, SetHasAsScala}
 
 trait RequestService extends AutoCloseable {
   def start(): Unit
@@ -53,8 +53,9 @@ class DefaultRequestService(
   }
 
   private def clearIgnored(): Unit = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
-    sharedBlockchain.allTags.removeTags(ignoredRequests.asScala)
-    ignoredRequests.clear()
+    val toRemove = ignoredRequests.asScala.toSet // copying
+    sharedBlockchain.allTags.removeTags(toRemove)
+    ignoredRequests.removeAll(toRemove.asJava)
   }
 
   private val requestsExpiry = new Expiry[RideScriptRunRequest, RideScriptRunResult] {
