@@ -1,7 +1,6 @@
 name        := "ride-runner"
 description := "Allows to execute RIDE code independently from Waves NODE"
-
-mainClass := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithPreparedStateApp")
+mainClass   := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithBlockchainUpdatesApp")
 
 enablePlugins(
   JavaServerAppPackaging,
@@ -11,10 +10,6 @@ enablePlugins(
 )
 
 libraryDependencies ++= Dependencies.rideRunner.value
-
-// Causes "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended".
-// May ignore
-// javaAgents ++= Dependencies.kanela // Disabled, because causes running logs before needed, so System.setProperty in RideRunnerWithPreparedStateApp has no effect.
 
 inConfig(Compile)(
   Seq(
@@ -42,6 +37,10 @@ bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => 
 
 linuxScriptReplacements += ("network" -> network.value.toString)
 
+// Causes "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended".
+// May ignore
+javaAgents ++= Dependencies.kanela
+
 inConfig(Universal)(
   Seq(
     mappings ++= Seq(
@@ -65,7 +64,8 @@ inConfig(Universal)(
 inTask(assembly)(
   Seq(
     test            := {},
-    assemblyJarName := s"ride-runner-all-${version.value}.jar",
+    mainClass       := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithPreparedStateApp"),
+    assemblyJarName := s"ride-runner-with-prepared-state-${version.value}.jar",
     assemblyMergeStrategy := {
       case p
           if p.endsWith(".proto") ||

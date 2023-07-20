@@ -183,6 +183,8 @@ object Dependencies {
     ).map(_ % circeVersion)
   }
 
+  // https://github.com/sbt/sbt-javaagent#scopes
+  // dist (only sbt-native-packager), because causes using logs before needed, so System.setProperty in RideRunnerWithPreparedStateApp has no effect.
   lazy val kanela =
-    Seq("io.kamon" % "kanela-agent" % "1.0.17")
+    Seq("io.kamon" % "kanela-agent" % "1.0.17" % "dist")
 }
