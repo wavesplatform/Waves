@@ -5,7 +5,7 @@ import cats.syntax.either.*
 import com.github.benmanes.caffeine.cache.{Caffeine, Expiry, RemovalCause, Scheduler as CaffeineScheduler}
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.http.ApiError
-import com.wavesplatform.api.http.ApiError.CustomValidationError
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, Unknown}
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
@@ -16,6 +16,7 @@ import com.wavesplatform.ride.runner.storage.{CacheKey, CacheWeights, SharedBloc
 import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.ScorexLogging
+import io.grpc.{Status, StatusException, StatusRuntimeException}
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
@@ -196,10 +197,17 @@ class DefaultRequestService(
           case e: Throwable =>
             log.error(s"An error during running $request: ${e.getMessage}")
             rideScriptFailedCalls.increment()
-            fail(CustomValidationError(e.getMessage))
+            fail(e match {
+              case e: StatusRuntimeException if isServerError(e.getStatus) => Unknown
+              case e: StatusException if isServerError(e.getStatus)        => Unknown
+              case e                                                       => CustomValidationError(e.getMessage)
+            })
         }
       }
       .executeOn(runScriptScheduler)
+
+  private def isServerError(status: Status): Boolean =
+    status.getCode == Status.INTERNAL.getCode || status.getCode == Status.RESOURCE_EXHAUSTED.getCode
 
   private def evaluate(request: RideScriptRunRequest, prevResult: RideScriptRunResult): RideScriptRunResult =
     parse(request, prevResult)
