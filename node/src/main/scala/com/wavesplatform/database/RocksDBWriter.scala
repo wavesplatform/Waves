@@ -760,7 +760,7 @@ class RocksDBWriter(
             case Some(addr) =>
               val key        = Keys.maliciousMinerBanHeights(addr.bytes)
               val banHeights = rw.get(key)
-              rw.put(key, banHeights.tail)
+              if (banHeights.size > 1) rw.put(key, banHeights.tail) else rw.delete(key)
             case _ => ()
           }
 

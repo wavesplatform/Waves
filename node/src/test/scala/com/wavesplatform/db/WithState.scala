@@ -213,7 +213,13 @@ trait WithDomain extends WithState { _: Suite =>
           TxHelpers.genesis(address, amount)
         }
         if (genesis.nonEmpty) {
-          domain.appendBlock(createGenesisWithStateHash(genesis, bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, 1)))
+          domain.appendBlock(
+            createGenesisWithStateHash(
+              genesis,
+              bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, 1),
+              Some(settings.blockchainSettings.genesisSettings.initialBaseTarget)
+            )
+          )
         }
         test(domain)
       } finally bcu.shutdown()
@@ -231,7 +237,7 @@ trait WithDomain extends WithState { _: Suite =>
       .filter(v => v >= from && v <= to)
       .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
 
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean): Block = {
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean, baseTarget: Option[Long] = None): Block = {
     val timestamp = txs.map(_.timestamp).max
     val genesisSettings = GenesisSettings(
       timestamp,
@@ -241,7 +247,7 @@ trait WithDomain extends WithState { _: Suite =>
       txs.map { tx =>
         GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
       },
-      2L,
+      baseTarget.getOrElse(2L),
       60.seconds
     )
 

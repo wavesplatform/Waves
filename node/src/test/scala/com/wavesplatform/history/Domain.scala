@@ -405,7 +405,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       else NxtLikeConsensusBlockData(60, generationSignature)
 
     val resultBt =
-      if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, blockchain.height + 1)) {
+      if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, blockchain.height)) {
         consensus.baseTarget
       } else if (blockchain.height % 2 != 0) parent.baseTarget
       else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
@@ -606,14 +606,21 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
-      val hitSource =
+      val (hitSource, challengedHitSource) =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
-          block.header.generationSignature
+          block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature)
         else {
-          val hs = bcu.hitSource(bcu.height).get
-          crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet()
+          val hs =
+            if (bcu.isFeatureActivated(BlockchainFeatures.FairPoS, bcu.height) && bcu.height > 100)
+              bcu.hitSource(bcu.height - 100).get
+            else bcu.hitSource(bcu.height).get
+
+          crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet() ->
+            block.header.challengedHeader.map(ch =>
+              crypto.verifyVRF(ch.generationSignature, hs.arr, ch.generator, bcu.isFeatureActivated(RideV6)).explicitGet()
+            )
         }
-      bcu.processBlock(block, hitSource)
+      bcu.processBlock(block, hitSource, challengedHitSource)
     }
   }
 

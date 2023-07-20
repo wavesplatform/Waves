@@ -249,7 +249,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         txs = Some(originalBlock.transactionData :+ TxHelpers.transfer(TxHelpers.defaultSigner))
       )
 
-      d.appendBlockE(invalidChallengingBlock) shouldBe Left(GenericError(s"Block $invalidChallengingBlock has invalid signature"))
+      d.appendBlockE(invalidChallengingBlock) shouldBe Left(
+        GenericError(s"Invalid block challenge: ${GenericError(s"Block ${invalidChallengingBlock.toOriginal} has invalid signature")}")
+      )
 
       val correctChallengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, stateHash = None)
       d.appendBlockE(correctChallengingBlock) should beRight
@@ -277,7 +279,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
       val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
-      val grandParent      = d.blockchain.lastBlockHeader.map(_.header.reference)
+      val grandParent      = d.blockchain.blockHeader(d.blockchain.height - 2).map(_.id())
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, stateHash = None, ref = grandParent)
 
       d.appendBlockE(challengingBlock) shouldBe Left(BlockAppendError("References incorrect or non-existing block", challengingBlock))
@@ -937,6 +939,65 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.blockchain.accountData(dApp.toAddress, "check") shouldBe Some(BooleanDataEntry("check", true))
     }
   }
+
+  ignore("NODE-908. Challenging block delay should not be more than 120s") {
+    val challengedMiner = TxHelpers.signer(1)
+
+    val wavesSettings = settings
+      .addFeatures(BlockchainFeatures.FairPoS)
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(genesisSettings = settings.blockchainSettings.genesisSettings.copy(initialBaseTarget = 22))
+      )
+
+    withDomain(
+      wavesSettings,
+      balances = Seq(AddrWithBalance(defaultSigner.toAddress, 200000001.waves))
+    ) { d =>
+      val challengingMiner = d.wallet.generateNewAccount().get
+
+      d.appendBlock(
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          Seq(
+            TxHelpers.transfer(defaultSigner, challengedMiner.toAddress, 100000000.waves),
+            TxHelpers.transfer(defaultSigner, challengingMiner.toAddress, 100000000.waves)
+          ),
+          generator = challengedMiner
+        )
+      )
+
+      val generators = Seq(challengingMiner, challengedMiner)
+
+      (1 to 10000).foreach { _ =>
+        val bestAcc = generators
+          .map { acc =>
+            acc -> d.posSelector
+              .getValidBlockDelay(
+                d.blockchain.height,
+                acc,
+                d.blockchain.blockHeader(d.blockchain.height - 1).get.header.baseTarget,
+                d.blockchain.balance(acc.toAddress)
+              )
+              .explicitGet()
+          }
+          .minBy(_._2)
+          ._1
+
+        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = bestAcc))
+      }
+
+      d.posSelector
+        .getValidBlockDelay(
+          d.blockchain.height,
+          challengingMiner,
+          d.blockchain.lastBlockHeader.get.header.baseTarget,
+          d.blockchain.generatingBalance(challengingMiner.toAddress, d.blockchain.lastBlockId) +
+            d.blockchain.generatingBalance(challengedMiner.toAddress, d.blockchain.lastBlockId)
+        )
+        .explicitGet() < 120.seconds.toMillis shouldBe true
+    }
+  }
+
   property("NODE-909. Empty key block can be challenged") {
     val sender = TxHelpers.signer(1)
     withDomain(settings, balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
@@ -1132,6 +1193,10 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         strictTime = true
       )
 
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+
+      d.appendBlockE(challengingBlock) shouldBe Left(GenericError("Invalid block challenge"))
+
       appendAndCheck(originalBlock, d) { block =>
         block.header.challengedHeader should not be defined
         block.header.timestamp shouldBe originalBlock.header.timestamp
@@ -1144,8 +1209,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         block.header.stateHash shouldBe originalBlock.header.stateHash
       }
 
-      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
-      d.appendBlockE(challengingBlock) should beLeft
+      createBlockAppender(d)(challengingBlock).runSyncUnsafe() should produce("Could not verify VRF proof")
     }
   }
 

@@ -37,7 +37,7 @@ package object appender {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <-
         metrics.appendBlock
-          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
           .map { discardedDiffs =>
             utx.setPriorityDiffs(discardedDiffs)
             Some(blockchainUpdater.height)
@@ -51,13 +51,17 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] =
-    for {
-      hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
-    } yield Some(blockchainUpdater.height)
+  )(block: Block): Either[ValidationError, Option[Int]] = {
+    if (block.header.challengedHeader.nonEmpty) {
+      processsBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map(_._2)
+    } else {
+      for {
+        hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
+        _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
+      } yield Some(blockchainUpdater.height)
+    }
+  }
 
-  // TODO: NODE-2594 check challenged block state hash?
   private[appender] def appendChallengeBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       utx: UtxForAppender,
@@ -65,20 +69,28 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] = {
+  )(block: Block): Either[ValidationError, Option[Int]] =
+    processsBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
+      utx.setPriorityDiffs(discardedDiffs)
+      newHeight
+    }
+
+  private def processsBlockWithChallenge(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      pos: PoSSelector,
+      time: Time,
+      verify: Boolean,
+      txSignParCheck: Boolean
+  )(block: Block): Either[ValidationError, (Seq[Diff], Option[Int])] = {
     val challengedBlock = block.toOriginal
     for {
-      _         <- if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
+      challengedHitSource <-
+        if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      newHeight <-
+      discardedDiffs <-
         metrics.appendBlock
-          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
-          .map { discardedDiffs =>
-            utx.setPriorityDiffs(discardedDiffs)
-            Some(blockchainUpdater.height)
-          }
-
-    } yield newHeight
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, Some(challengedHitSource), verify, txSignParCheck))
+    } yield discardedDiffs -> Some(blockchainUpdater.height)
   }
 
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =

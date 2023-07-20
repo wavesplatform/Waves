@@ -44,12 +44,45 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
+      challengedHitSource: Option[ByteStr] = None,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
       txSignParCheck: Boolean = true
-  ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
+  ): Either[ValidationError, Result] = {
+    challengedHitSource match {
+      case Some(hs) =>
+        fromBlockTraced(
+          blockchain,
+          maybePrevBlock,
+          block.toOriginal,
+          constraint,
+          hs,
+          loadCacheData,
+          verify,
+          enableExecutionLog,
+          txSignParCheck
+        ).resultE match {
+          case Left(_: InvalidStateHash) =>
+            fromBlockTraced(
+              blockchain,
+              maybePrevBlock,
+              block,
+              constraint,
+              hitSource,
+              loadCacheData,
+              verify,
+              enableExecutionLog,
+              txSignParCheck
+            ).resultE
+          case Left(err) => Left(GenericError(s"Invalid block challenge: $err"))
+          case _         => Left(GenericError("Invalid block challenge"))
+        }
+      case _ =>
+        fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
+
+    }
+  }
 
   def fromBlockTraced(
       blockchain: Blockchain,

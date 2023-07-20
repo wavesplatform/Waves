@@ -188,6 +188,7 @@ class BlockchainUpdaterImpl(
   override def processBlock(
       block: Block,
       hitSource: ByteStr,
+      challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
   ): Either[ValidationError, Seq[Diff]] =
@@ -222,6 +223,7 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
+                      challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
                       txSignParCheck = txSignParCheck
@@ -234,9 +236,7 @@ class BlockchainUpdaterImpl(
                     }
               }
             case Some(ng) =>
-              if (
-                ng.base.header.reference == block.header.reference && ng.base.header.challengedHeader.nonEmpty == block.header.challengedHeader.nonEmpty
-              ) {
+              if (ng.base.header.reference == block.header.reference) {
                 if (block.header.timestamp < ng.base.header.timestamp) {
                   val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
                   val miningConstraints = MiningConstraints(rocksdb, height)
@@ -251,6 +251,7 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
+                      challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
                       txSignParCheck = txSignParCheck
@@ -283,6 +284,7 @@ class BlockchainUpdaterImpl(
                         block,
                         miningConstraints.total,
                         hitSource,
+                        challengedHitSource,
                         rocksdb.loadCacheData,
                         verify,
                         txSignParCheck = txSignParCheck
@@ -339,6 +341,7 @@ class BlockchainUpdaterImpl(
                             block,
                             constraint,
                             hitSource,
+                            challengedHitSource,
                             rocksdb.loadCacheData,
                             verify,
                             txSignParCheck = txSignParCheck
