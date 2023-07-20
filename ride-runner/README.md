@@ -14,9 +14,6 @@ We have some limitations. If you faced one of them, please issue a ticket on Git
 2. Unsupported RIDE functions. A script fails with an error if tries to run one of this function:
    1. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
    2. [transferTransactionById](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#transfertransactionbyid)
-3. [wavesBalance](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#wavesbalance)
-   returns [BalanceDetails](https://docs.waves.tech/en/ride/structures/common-structures/balance-details), which has a
-   wrong `generating` value for now (have to wait 1000 blocks).
 
 ## How to build
 

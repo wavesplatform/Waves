@@ -112,7 +112,9 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     }
 
     val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
-    log.info(s"Current height: shared (local or network)=${sharedBlockchain.heightUntagged}, network=$lastHeightAtStart")
+    val heights           = Heights.calculate(settings.heightsSettings, sharedBlockchain.heightUntaggedOpt, lastHeightAtStart)
+    def localHeightStr    = sharedBlockchain.heightUntaggedOpt.fold("empty")(_.toString)
+    log.info(s"Heights: local=$localHeightStr, local hardened=${heights.lastKnownHardened}, network=$lastHeightAtStart, working=${heights.working}")
 
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
@@ -121,9 +123,6 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       rideScheduler
     )
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { requestService.close() }
-
-    val lastSafeKnownHeight = Height(math.max(0, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
-    val workingHeight       = Height(math.max(sharedBlockchain.heightUntagged, lastHeightAtStart))
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
@@ -134,7 +133,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     @volatile var lastServiceStatus = ServiceStatus()
     val events = blockchainUpdatesStream.downstream
       .doOnError(e => Task { log.error("Error!", e) })
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(heights.lastKnownHardened, heights.working))) {
         BlockchainState.applyWithRestarts(settings.rideRunner.blockchainState, processor, blockchainUpdatesStream, _, _)
       }
       .doOnNext { state =>
@@ -159,7 +158,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
-    blockchainUpdatesStream.start(Height(lastSafeKnownHeight + 1))
+    blockchainUpdatesStream.start(Height(heights.lastKnownHardened + 1))
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(

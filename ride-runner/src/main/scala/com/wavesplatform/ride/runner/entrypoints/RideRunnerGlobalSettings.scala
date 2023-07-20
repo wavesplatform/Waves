@@ -19,7 +19,9 @@ case class RideRunnerGlobalSettings(
     restApi: RestAPISettings,
     rideRunner: RideRunnerCommonSettings,
     rideCompareService: RideCompareService.Settings
-)
+) {
+  val heightsSettings = Heights.Settings(rideRunner.sharedBlockchain.blockchain.functionalitySettings)
+}
 
 object RideRunnerGlobalSettings {
   def fromRootConfig(config: Config): RideRunnerGlobalSettings = config.getConfig("waves").as[RideRunnerGlobalSettings]
