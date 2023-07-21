@@ -2,13 +2,10 @@ package com.wavesplatform.ride.runner.environments
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.ride.runner.storage.{CacheKey, SharedBlockchainStorage}
 import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
-
-import scala.util.chaining.scalaUtilChainingOps
 
 class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], tag: TagT)
     extends DAppEnvironmentTracker
@@ -56,60 +53,39 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
     // sharedBlockchain.blockHeaders.add(height, tag)
   }
 
-  override def data(addressOrAlias: Recipient, key: String): Unit =
-    withResolvedAlias(addressOrAlias).foreach { addr =>
-      // log.trace(s"[$tag] data($addr, $key)")
-      sharedBlockchain.allTags.addDependent(CacheKey.AccountData(addr, key), tag)
-    }
+  override def data(address: Address, key: String): Unit = {
+    // log.trace(s"[$tag] data($addr, $key)")
+    sharedBlockchain.allTags.addDependent(CacheKey.AccountData(address, key), tag)
+  }
 
   // TODO #16 We don't support it for now, use GET /utils/script/evaluate , see ScriptBlockchain
-  override def hasData(addressOrAlias: Recipient): Unit = {}
+  override def hasData(address: Address): Unit = {}
 
   override def resolveAlias(name: String): Unit = {
     // log.trace(s"[$tag] resolveAlias($name)")
     com.wavesplatform.account.Alias.create(name).foreach(x => sharedBlockchain.allTags.addDependent(CacheKey.Alias(x), tag))
   }
 
-  override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Unit = {
-    withResolvedAlias(addressOrAlias).foreach { addr =>
-      val asset = Asset.fromCompatId(assetId.map(ByteStr(_)))
-      // log.trace(s"[$tag] accountBalanceOf($addr, $asset)")
-      sharedBlockchain.allTags.addDependent(CacheKey.AccountBalance(addr, asset), tag)
-    }
+  override def accountBalanceOf(address: Address, assetId: Option[Array[Byte]]): Unit = {
+    val asset = Asset.fromCompatId(assetId.map(ByteStr(_)))
+    // log.trace(s"[$tag] accountBalanceOf($addr, $asset)")
+    sharedBlockchain.allTags.addDependent(CacheKey.AccountBalance(address, asset), tag)
   }
 
-  override def accountWavesBalanceOf(addressOrAlias: Recipient): Unit =
-    withResolvedAlias(addressOrAlias).foreach { addr =>
-      // log.trace(s"[$tag] accountWavesBalanceOf($addr)")
-      // TODO merge?
-      sharedBlockchain.allTags.addDependent(CacheKey.AccountBalance(addr, Asset.Waves), tag)
-      sharedBlockchain.allTags.addDependent(CacheKey.AccountLeaseBalance(addr), tag)
-    }
+  override def accountWavesBalanceOf(address: Address): Unit = {
+    // log.trace(s"[$tag] accountWavesBalanceOf($addr)")
+    // TODO merge?
+    sharedBlockchain.allTags.addDependent(CacheKey.AccountBalance(address, Asset.Waves), tag)
+    sharedBlockchain.allTags.addDependent(CacheKey.AccountLeaseBalance(address), tag)
+  }
 
-  override def accountScript(addressOrAlias: Recipient): Unit =
-    withResolvedAlias(addressOrAlias).foreach { addr =>
-      // log.trace(s"[$tag] accountScript($addr)")
-      sharedBlockchain.allTags.addDependent(CacheKey.AccountScript(addr), tag)
-    }
+  override def accountScript(address: Address): Unit = {
+    // log.trace(s"[$tag] accountScript($addr)")
+    sharedBlockchain.allTags.addDependent(CacheKey.AccountScript(address), tag)
+  }
 
-  override def callScript(dApp: Recipient.Address): Unit =
+  override def callScript(dApp: Address): Unit = {
     // log.trace(s"[$tag] callScript($addr)")
     accountScript(dApp)
-
-  private def withResolvedAlias(addressOrAlias: Recipient): Option[Address] = {
-    addressOrAlias match {
-      case addressOrAlias: Recipient.Address => toWavesAddress(addressOrAlias)
-      case Recipient.Alias(name) =>
-        com.wavesplatform.account.Alias
-          .create(name) // It should be Right, because we get the data from Blockchain Updates
-          .tap(_.foreach(x => sharedBlockchain.allTags.addDependent(CacheKey.Alias(x), tag)))
-          .flatMap(sharedBlockchain.resolveAlias)
-          .toOption
-    }
   }
-
-  private def toWavesAddress(addr: Recipient.Address): Option[Address] =
-    com.wavesplatform.account.Address
-      .fromBytes(addr.bytes.arr, sharedBlockchain.chainId)
-      .toOption
 }

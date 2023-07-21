@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.environments
 
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.account.Address
 
 trait DAppEnvironmentTracker {
   def height(): Unit
@@ -10,11 +10,11 @@ trait DAppEnvironmentTracker {
   def assetInfoById(id: Array[Byte]): Unit
   def lastBlockOpt(): Unit
   def blockInfoByHeight(height: Int): Unit
-  def data(addressOrAlias: Recipient, key: String): Unit
-  def hasData(addressOrAlias: Recipient): Unit
+  def data(addressOrAlias: Address, key: String): Unit
+  def hasData(address: Address): Unit
   def resolveAlias(name: String): Unit
-  def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Unit
-  def accountWavesBalanceOf(addressOrAlias: Recipient): Unit
-  def accountScript(addressOrAlias: Recipient): Unit
-  def callScript(dApp: Recipient.Address): Unit
+  def accountBalanceOf(address: Address, assetId: Option[Array[Byte]]): Unit
+  def accountWavesBalanceOf(address: Address): Unit
+  def accountScript(address: Address): Unit
+  def callScript(dApp: Address): Unit
 }

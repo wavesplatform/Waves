@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.environments
 
 import cats.Id
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -67,12 +68,12 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
   }
 
   override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Id[Option[Any]] = {
-    tracker.data(addressOrAlias, key)
+    withResolvedAlias(addressOrAlias).foreach(tracker.data(_, key))
     underlying.data(addressOrAlias, key, dataType)
   }
 
   override def hasData(addressOrAlias: Recipient): Id[Boolean] = {
-    tracker.hasData(addressOrAlias)
+    withResolvedAlias(addressOrAlias).foreach(tracker.hasData)
     underlying.hasData(addressOrAlias)
   }
 
@@ -82,17 +83,17 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
   }
 
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Id[Either[String, Long]] = {
-    tracker.accountBalanceOf(addressOrAlias, assetId)
+    withResolvedAlias(addressOrAlias).foreach(tracker.accountBalanceOf(_, assetId))
     underlying.accountBalanceOf(addressOrAlias, assetId)
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Id[Either[String, Environment.BalanceDetails]] = {
-    tracker.accountWavesBalanceOf(addressOrAlias)
+    withResolvedAlias(addressOrAlias).foreach(tracker.accountWavesBalanceOf)
     underlying.accountWavesBalanceOf(addressOrAlias)
   }
 
   override def accountScript(addressOrAlias: Recipient): Id[Option[Script]] = {
-    tracker.accountScript(addressOrAlias)
+    withResolvedAlias(addressOrAlias).foreach(tracker.accountScript)
     underlying.accountScript(addressOrAlias)
   }
 
@@ -104,7 +105,7 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (Terms.EVALUATED, Log[Id])], Int)] = {
-    underlying.callScript(dApp, func, args, payments, availableComplexity, reentrant)
+    toWavesAddress(dApp).foreach(tracker.callScript)
     underlying.callScript(dApp, func, args, payments, availableComplexity, reentrant)
   }
 
@@ -114,6 +115,15 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
   override def tthis: Tthis                 = underlying.tthis
   override def multiPaymentAllowed: Boolean = underlying.multiPaymentAllowed
   override def txId: ByteStr                = underlying.txId
+
+  // Utilities
+  private def withResolvedAlias(addressOrAlias: Recipient): Option[Address] = addressOrAlias match {
+    case addressOrAlias: Recipient.Address => toWavesAddress(addressOrAlias)
+    case Recipient.Alias(name)             => resolveAlias(name).flatMap(x => Address.fromBytes(x.bytes.arr, chainId)).toOption
+  }
+
+  private def toWavesAddress(addr: Recipient.Address): Option[Address] =
+    com.wavesplatform.account.Address.fromBytes(addr.bytes.arr, chainId).toOption
 
   // Functions those don't need Blockchain
   override def transferTransactionFromProto(b: Array[Byte]): Id[Option[Tx.Transfer]]       = underlying.transferTransactionById(b)

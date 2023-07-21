@@ -4,7 +4,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.history.DefaultBlockchainSettings
-import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.environments.{DAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.input.*
@@ -142,6 +141,8 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
 
     override def height(): Unit = heightCalls.incrementAndGet()
 
+    override def callScript(dApp: Address): Unit = {}
+
     override def transactionById(id: Array[Byte]): Unit = kill(s"transactionById(${ByteStr(id)})")
 
     override def transferTransactionById(id: Array[Byte]): Unit = kill(s"transferTransactionById(${ByteStr(id)})")
@@ -154,20 +155,18 @@ class ExpectedHeightCallsTestSuite extends BaseTestSuite with HasTestAccounts {
 
     override def blockInfoByHeight(height: Int): Unit = kill(s"blockInfoByHeight($height)")
 
-    override def data(addressOrAlias: Recipient, key: String): Unit = kill(s"data($addressOrAlias, $key)")
+    override def data(address: Address, key: String): Unit = kill(s"data($address, $key)")
 
-    override def hasData(addressOrAlias: Recipient): Unit = kill(s"hasData($addressOrAlias)")
+    override def hasData(address: Address): Unit = kill(s"hasData($address)")
 
     override def resolveAlias(name: String): Unit = kill(s"resolveAlias($name)")
 
-    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Unit =
-      kill(s"accountBalanceOf($addressOrAlias, ${assetId.map(ByteStr(_))})")
+    override def accountBalanceOf(address: Address, assetId: Option[Array[Byte]]): Unit =
+      kill(s"accountBalanceOf($address, ${assetId.map(ByteStr(_))})")
 
-    override def accountWavesBalanceOf(addressOrAlias: Recipient): Unit = kill(s"accountWavesBalanceOf($addressOrAlias)")
+    override def accountWavesBalanceOf(address: Address): Unit = kill(s"accountWavesBalanceOf($address)")
 
-    override def accountScript(addressOrAlias: Recipient): Unit = kill(s"accountScript($addressOrAlias)")
-
-    override def callScript(dApp: Recipient.Address): Unit = kill(s"callScript($dApp)")
+    override def accountScript(address: Address): Unit = kill(s"accountScript($address)")
 
     private def kill(methodName: String) = throw new RuntimeException(s"$methodName is not supported, contact with developers")
   }
