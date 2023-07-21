@@ -49,11 +49,12 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
           "updates activated features" in withDb { db =>
             db.batchedReadWrite { implicit rw =>
-              val blockchain = SharedBlockchainStorage[Tag](
+              val blockchain = SharedBlockchainStorage(
                 settings = SharedBlockchainStorage.Settings(
                   blockchain = DefaultBlockchainSettings,
                   commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
                 ),
+                allTags = new CacheKeyTags[Tag],
                 db = db,
                 persistentCaches = DefaultPersistentCaches(db),
                 blockchainApi = testBlockchainApi
@@ -527,18 +528,20 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
     def doOnComplete(access: Access): Unit
     def runTest(): Unit = withDb { db =>
+      val allTags = new CacheKeyTags[Tag]
       db.batchedReadWrite { implicit rw =>
-        val blockchain = SharedBlockchainStorage[Tag](
+        val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
             blockchain = DefaultBlockchainSettings,
             commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
           ),
+          allTags = allTags,
           db = db,
           persistentCaches = DefaultPersistentCaches(db),
           blockchainApi = testBlockchainApi
         )
 
-        dependencies.foreach(Function.tupled(blockchain.allTags.addDependent))
+        dependencies.foreach(Function.tupled(allTags.addDependent))
         preEvents.foreach(blockchain.process)
         val affectedTags = trackAffectedEvents.foldLeft(AffectedTags.empty[Int])((r, event) => r ++ blockchain.process(event))
         doOnComplete(new Access(blockchain, affectedTags))

@@ -14,7 +14,7 @@ import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{CommonCache, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKeyTags, CommonCache, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -61,10 +61,12 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
         BalanceResponse.WavesBalances(getBalance(address, Asset.Waves))
     }
 
-    val testDb = use(TestDb.mk())
+    val testDb  = use(TestDb.mk())
+    val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = testDb.storage.batchedReadWrite { implicit ctx =>
-      SharedBlockchainStorage[RideScriptRunRequest](
+      SharedBlockchainStorage(
         SharedBlockchainStorage.Settings(blockchainSettings, CommonCache.Settings(ConfigMemorySize.ofBytes(1024))),
+        allTags,
         testDb.storage,
         DefaultPersistentCaches(testDb.storage),
         blockchainApi
@@ -84,12 +86,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     )
 
     val requestService = use(
-      new DefaultRequestService(
-        settings = requestServiceSettings,
-        sharedBlockchain = sharedBlockchain,
-        requestScheduler = use(new TestJobScheduler()),
-        runScriptScheduler = testScheduler
-      ) {
+      new DefaultRequestService(requestServiceSettings, sharedBlockchain, allTags, use(new TestJobScheduler()), testScheduler) {
         override def start(): Unit = {
           super.start()
           testScheduler.tick()

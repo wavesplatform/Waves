@@ -31,13 +31,12 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT] private (
     settings: Settings,
+    allTags: CacheKeyTags[TagT],
     db: RideDbAccess,
     persistentCaches: PersistentCaches,
     blockchainApi: BlockchainApi
 ) extends ScorexLogging {
   private val blockHeaders = new BlockHeaderStorage(blockchainApi, persistentCaches.blockHeaders)
-
-  val allTags = new CacheKeyTags[TagT]
 
   def load()(implicit ctx: ReadOnly): Unit = blockHeaders.load()
 
@@ -502,11 +501,12 @@ class SharedBlockchainStorage[TagT] private (
 object SharedBlockchainStorage {
   def apply[TagT](
       settings: Settings,
+      allTags: CacheKeyTags[TagT],
       db: RideDbAccess,
       persistentCaches: PersistentCaches,
       blockchainApi: BlockchainApi
   )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] =
-    new SharedBlockchainStorage[TagT](settings, db, persistentCaches, blockchainApi).tap(_.load())
+    new SharedBlockchainStorage[TagT](settings, allTags, db, persistentCaches, blockchainApi).tap(_.load())
 
   case class Settings(blockchain: BlockchainSettings, commonCache: CommonCache.Settings)
 }

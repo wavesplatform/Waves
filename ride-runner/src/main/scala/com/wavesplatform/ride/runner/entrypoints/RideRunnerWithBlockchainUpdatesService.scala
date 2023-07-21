@@ -8,8 +8,8 @@ import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
-import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
+import com.wavesplatform.ride.runner.storage.{CacheKeyTags, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -106,9 +106,10 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       rideDb.close()
     }
 
+    val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = rideDb.access.batchedReadOnly { implicit ro =>
       val dbCaches = DefaultPersistentCaches(rideDb.access)
-      SharedBlockchainStorage[RideScriptRunRequest](settings.rideRunner.sharedBlockchain, rideDb.access, dbCaches, blockchainApi)
+      SharedBlockchainStorage(settings.rideRunner.sharedBlockchain, allTags, rideDb.access, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
@@ -119,6 +120,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       sharedBlockchain,
+      allTags,
       new SynchronizedJobScheduler()(rideScheduler),
       rideScheduler
     )

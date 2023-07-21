@@ -12,7 +12,7 @@ import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
-import com.wavesplatform.ride.runner.storage.{CacheKey, CacheWeights, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKey, CacheKeyTags, CacheWeights, SharedBlockchainStorage}
 import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.ScorexLogging
@@ -36,6 +36,7 @@ trait RequestService extends AutoCloseable {
 class DefaultRequestService(
     settings: DefaultRequestService.Settings,
     sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest],
+    allTags: CacheKeyTags[RideScriptRunRequest],
     requestScheduler: JobScheduler[RideScriptRunRequest],
     runScriptScheduler: Scheduler
 ) extends RequestService
@@ -55,7 +56,7 @@ class DefaultRequestService(
 
   private def clearIgnored(): Unit = if (ignoredRequests.size() >= settings.ignoredCleanupThreshold) {
     val toRemove = ignoredRequests.asScala.toSet // copying
-    sharedBlockchain.allTags.removeTags(toRemove)
+    allTags.removeTags(toRemove)
     ignoredRequests.removeAll(toRemove.asJava)
   }
 
@@ -225,7 +226,7 @@ class DefaultRequestService(
           wrapDAppEnv = underlying =>
             new TrackedDAppEnvironment(
               underlying,
-              new DefaultDAppEnvironmentTracker(sharedBlockchain, request)
+              new DefaultDAppEnvironmentTracker(allTags, request)
             )
         )
 
