@@ -66,7 +66,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
   private val updatedAssetInfo1       = AssetInfo("updTest1", "updDesc1", Height(2))
   private val updatedAssetVolumeInfo1 = AssetVolumeInfo(false, 124)
   private val updatedAssetInfo2       = AssetInfo("updTest2", "updDesc2", Height(2))
-  private val updatedAssetVolumeInfo3 = AssetVolumeInfo(false, 124)
+  private val updatedAssetVolumeInfo3 = AssetVolumeInfo(false, 125)
   private val sponsorship             = SponsorshipValue(12)
 
   private val testScript = ScriptCompiler
@@ -132,13 +132,13 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
           Array(KeyType.StaticAssetInfo.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.toAddress.bytes ++
             Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
           Array(KeyType.AssetReissuability.id.toByte) ++ assetId1.id.arr ++
-            (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ updatedAssetVolumeInfo1.volume.toByteArray,
           Array(KeyType.AssetReissuability.id.toByte) ++ assetId2.id.arr ++
-            (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ assetInfo2.volume.volume.toByteArray,
           Array(KeyType.AssetReissuability.id.toByte) ++ assetId3.id.arr ++
-            (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ updatedAssetVolumeInfo3.volume.toByteArray,
           Array(KeyType.AssetReissuability.id.toByte) ++ assetId4.id.arr ++
-            (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)),
+            (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ assetInfo4.volume.volume.toByteArray,
           Array(
             KeyType.AssetNameDescription.id.toByte
           ) ++ assetId1.id.arr ++ updatedAssetInfo1.name.toByteArray ++ updatedAssetInfo1.description.toByteArray ++ Ints.toByteArray(

@@ -97,14 +97,14 @@ object TxStateSnapshotHashBuilder {
     }
 
     val assetReissuabilities = txDiff.issuedAssets.map { case (asset, assetInfo) =>
-      asset -> assetInfo.volume.isReissuable
+      asset -> assetInfo.volume
     } ++ txDiff.updatedAssets.collect {
-      case (asset, Ior.Right(volume))   => asset -> volume.isReissuable
-      case (asset, Ior.Both(_, volume)) => asset -> volume.isReissuable
+      case (asset, Ior.Right(volume))   => asset -> volume
+      case (asset, Ior.Both(_, volume)) => asset -> volume
     }
 
-    assetReissuabilities.foreach { case (asset, isReissuable) =>
-      addEntry(KeyType.AssetReissuability, asset.id.arr)(booleanToBytes(isReissuable))
+    assetReissuabilities.foreach { case (asset, volume) =>
+      addEntry(KeyType.AssetReissuability, asset.id.arr)(booleanToBytes(volume.isReissuable), volume.volume.toByteArray)
     }
 
     val assetNameDescs = txDiff.issuedAssets.map { case (asset, assetInfo) =>
