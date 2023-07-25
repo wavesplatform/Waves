@@ -224,6 +224,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "version").as[Int] shouldBe 1
       (response \ "complexity").as[Long] shouldBe 123
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+      (response \ "publicKey").as[String] shouldBe allAccounts(1).publicKey.toString
     }
 
     (commonAccountApi.script _).expects(allAccounts(2).toAddress).returning(None).once()
@@ -238,6 +239,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "version").asOpt[Int] shouldBe None
       (response \ "complexity").as[Long] shouldBe 0
       (response \ "extraFee").as[Long] shouldBe 0
+      (response \ "publicKey").asOpt[String] shouldBe None
     }
 
     val contractWithMeta = DApp(
@@ -288,6 +290,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "verifierComplexity").as[Long] shouldBe 11
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities - "verify"
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+      (response \ "publicKey").as[String] shouldBe allAccounts(3).publicKey.toString
     }
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}/meta")) ~> route ~> check {
@@ -354,6 +357,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "verifierComplexity").as[Long] shouldBe 0
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe contractWithoutVerifierComplexities
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+      (response \ "publicKey").as[String] shouldBe allAccounts(6).publicKey.toString
     }
   }
 
@@ -373,6 +377,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "complexity").as[Long] shouldBe 201
       (response \ "verifierComplexity").as[Long] shouldBe 201
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+      (response \ "publicKey").as[String] shouldBe allAccounts(1).publicKey.toString
     }
 
     (blockchain.accountScript _).when(allAddresses(2)).returns(info(199, 2))
@@ -383,6 +388,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "complexity").as[Long] shouldBe 199
       (response \ "verifierComplexity").as[Long] shouldBe 199
       (response \ "extraFee").as[Long] shouldBe 0
+      (response \ "publicKey").as[String] shouldBe allAccounts(2).publicKey.toString
     }
 
     (blockchain.accountScript _).when(allAddresses(3)).returns(None)
@@ -393,6 +399,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (response \ "complexity").as[Long] shouldBe 0
       (response \ "verifierComplexity").as[Long] shouldBe 0
       (response \ "extraFee").as[Long] shouldBe 0
+      (response \ "publicKey").asOpt[String] shouldBe None
     }
   }
 

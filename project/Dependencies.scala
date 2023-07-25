@@ -1,12 +1,11 @@
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
-import sbt.{Def, _}
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.{Def, *}
 
 //noinspection TypeAnnotation
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.4.5" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.4.6-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
@@ -38,9 +37,9 @@ object Dependencies {
   val catsCore  = catsModule("core", "2.9.0")
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val playJson    = "com.typesafe.play" %% "play-json" % "2.9.4"
-  
-  val scalaTest   = "org.scalatest"     %% "scalatest" % "3.2.16" % Test
+  val playJson = "com.typesafe.play" %% "play-json" % "2.9.4"
+
+  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.16" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
@@ -125,7 +124,7 @@ object Dependencies {
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
+      "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
       playJson,
       akkaModule("actor"),
       akkaModule("stream"),
