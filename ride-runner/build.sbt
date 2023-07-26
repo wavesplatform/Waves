@@ -1,10 +1,11 @@
 name        := "ride-runner"
 description := "Allows to execute RIDE code independently from Waves NODE"
-mainClass   := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithBlockchainUpdatesApp")
 
 enablePlugins(
   JavaServerAppPackaging,
   UniversalDeployPlugin,
+  JDebPackaging,
+  SystemdPlugin,
   GitVersioning,
   JavaAgent
 )
@@ -13,24 +14,38 @@ libraryDependencies ++= Dependencies.rideRunner.value
 
 inConfig(Compile)(
   Seq(
+    // Affects sbt-native-packager
+    mainClass := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithBlockchainUpdatesService"),
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
   )
 )
 
-def commonJavaOptions(forPackager: Boolean = false): Seq[String] = {
-  val prefix = if (forPackager) "-J" else ""
-  Seq(
-    "-Djdk.attach.allowAttachSelf=true",
-    // JVM default charset for proper and deterministic getBytes behaviour
-    "-Dfile.encoding=UTF-8"
-  ) ++ Seq("lang", "math", "util").map(x => s"$prefix--add-opens=java.base/java.$x=ALL-UNNAMED")
-} // For ehcache
+def mkJavaOptions(forPackager: Boolean = false, extraOptions: Seq[String] = Seq.empty): Seq[String] = {
+  val options = Seq("lang", "math", "util").map(x => s"--add-opens=java.base/java.$x=ALL-UNNAMED") ++ // for ehcache/sizeoOf
+    Seq(
+      "-server",
+      "-XX:+ExitOnOutOfMemoryError",
+      "-XX:+UseG1GC",
+      "-XX:+ParallelRefProcEnabled",
+      "-XX:+UseStringDeduplication",
+      // Required for GCLockerRetryAllocationCount, otherwise we get:
+      //   Error: VM option 'GCLockerRetryAllocationCount' is diagnostic and must be enabled via -XX:+UnlockDiagnosticVMOptions.
+      //   Error: The unlock option must precede 'GCLockerRetryAllocationCount'.
+      "-XX:+UnlockDiagnosticVMOptions",
+      "-XX:GCLockerRetryAllocationCount=100", // prevents false OOM during native calls
+      "-Djdk.attach.allowAttachSelf=true",    // for ehcache/sizeoOf
+      // JVM default charset for proper and deterministic getBytes behaviour
+      "-Dfile.encoding=UTF-8"
+    ) ++ extraOptions
 
-run / javaOptions ++= commonJavaOptions()
+  if (forPackager) options.map(x => s"-J$x") else options
+}
+
+run / javaOptions ++= mkJavaOptions()
 run / fork := true // For working instrumentation
 
-Test / javaOptions ++= commonJavaOptions()
+Test / javaOptions ++= mkJavaOptions()
 Test / fork := true
 
 bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
@@ -43,20 +58,20 @@ javaAgents ++= Dependencies.kanela
 
 inConfig(Universal)(
   Seq(
-    mappings ++= Seq(
-      baseDirectory.value / "ride-runner-sample.conf" -> "doc/ride-runner.conf.sample",
-      // Logback doesn't allow .xml.sample. Need this, because we have node logback.xml in classpath too
-      (Compile / resourceDirectory).value / "logback.xml" -> "doc/logback.sample.xml"
-    ),
-    javaOptions ++= Seq(
-      // -J prefix is required by the bash script
-      "-J-server",
-      "-J-Xmx2g",
-      "-J-XX:+ExitOnOutOfMemoryError",
-      "-J-XX:+UseG1GC",
-      "-J-XX:+ParallelRefProcEnabled",
-      "-J-XX:+UseStringDeduplication"
-    ) ++ commonJavaOptions(true)
+    mappings ++=
+      (baseDirectory.value / "doc").listFiles().map { x => (x, s"doc/${x.getName}") }.toSeq ++
+        Seq(
+          (Compile / resourceDirectory).value / "logback.xml" -> "doc/logback.xml",
+          (baseDirectory.value / "README.md")                 -> "doc/README.md"
+        ),
+    javaOptions ++= mkJavaOptions(
+      forPackager = true,
+      Seq(
+        "-Xmx512m",
+        "-XX:MaxMetaspaceSize=152m",
+        "-XX:ThreadStackSize=1024" // Update the metrics if you change -XX:ThreadStackSize=1024 (1 KiB)
+      )
+    )
   )
 )
 

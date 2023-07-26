@@ -31,10 +31,11 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_)))
 
     log.info("Starting...")
+    // It has to be before other code: https://github.com/kamon-io/Kamon/issues/601#issuecomment-748995094
+    val metrics = new RideRunnerStats(globalConfig)
+
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = new Cleanup(actorSystem)
-
-    val metrics = new RideRunnerStats(globalConfig)
     cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
     log.info("Initializing thread pools...")

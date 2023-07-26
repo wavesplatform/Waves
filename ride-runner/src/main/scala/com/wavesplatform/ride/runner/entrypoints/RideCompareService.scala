@@ -9,6 +9,7 @@ import com.wavesplatform.ride.runner.http.{HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
+import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
@@ -35,14 +36,11 @@ object RideCompareService extends ScorexLogging {
     if (settings.rideCompareService.testRequests.isEmpty) throw new IllegalArgumentException("Specify waves.compare.test-requests in config")
 
     log.info("Starting...")
-    implicit val actorSystem = ActorSystem("compare-app", globalConfig)
-    val cs                   = new Cleanup(actorSystem)
+    val metrics = new RideRunnerStats(globalConfig)
 
-    val metricsEnabled = globalConfig.getBoolean("kamon.enable")
-    if (metricsEnabled) {
-      val metrics = new RideRunnerStats(globalConfig)
-      cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
-    }
+    implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
+    val cs                   = new Cleanup(actorSystem)
+    cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
     val httpBackend = HttpURLConnectionBackend()
     cs.cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") { httpBackend.close() }
@@ -64,7 +62,7 @@ object RideCompareService extends ScorexLogging {
       )
 
       val monixScheduler = Scheduler(
-        executor = if (metricsEnabled) ExecutorInstrumentation.instrument(executor, name) else executor,
+        executor = if (Kamon.enabled()) ExecutorInstrumentation.instrument(executor, name) else executor,
         executionModel = ExecutionModel.AlwaysAsyncExecution
       )
 

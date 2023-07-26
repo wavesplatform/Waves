@@ -1,6 +1,6 @@
 # To build: docker build -t wavesplatform/ride-runner:latest -f docker/ride-runner.Dockerfile docker
 # JDK for now, because I need jmap, e.g. ijmap -dump:format=b,file=heap-dump.hprof
-FROM eclipse-temurin:17-jdk
+FROM eclipse-temurin:17-jdk-jammy
 
 SHELL ["/bin/bash", "-c"]
 
@@ -31,12 +31,11 @@ ENV RIDE_LOGBACK_CONFIG=$RIDE_INSTALL_PATH/doc/logback.sample.xml
 # Add -e JEMALLOC_ENABLE=true to enable
 ENV MALLOC_CONF="prof:true,lg_prof_interval:29,lg_prof_sample:21"
 
-COPY ride-runner-target /tmp/
+COPY target /tmp/
 COPY ride-runner.conf.template $RIDE_CONFIG
 
 # Setup node
-COPY ride-runner.entrypoint.sh $RIDE_INSTALL_PATH/bin/entrypoint.sh
-COPY jemalloc-report.sh $RIDE_INSTALL_PATH/bin/jemalloc-report.sh
+COPY entrypoint.sh $RIDE_INSTALL_PATH/bin/entrypoint.sh
 RUN mkdir -p $RDATA/heap-dumps/on-exit; \
     # Create user
     groupadd -r ride --gid=999; \

@@ -1,23 +1,56 @@
 # Ride runner
 
-## REST API
-
-Is available on `6890` port by default.
-There is the only implemented endpoint: `/utils/script/evaluate`.
-See https://nodes.wavesnodes.com/api-docs/index.html#/utils/evaluateScript for more information about this endpoint.
-
-## Limitations
-
-We have some limitations. If you faced one of them, please issue a ticket on GitHub and tell us your use-case.
-
-1. Asset scripts aren't supported as in `GET /utils/script/evaluate` of Node REST API.
-2. Unsupported RIDE functions. A script fails with an error if tries to run one of this function:
-   1. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
-   2. [transferTransactionById](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#transfertransactionbyid)
+Allows running Ride without a local Waves Node:
+* As a service that emulates Waves Node REST API: `/utils/script/evaluate`;
+* As an application that allows to run Ride with a prepared state in a file.
 
 ## How to build
 
-Run from the repository root: `./build-with-docker.sh && docker build -t wavesplatform/ride-runner docker`
+1. A common step from the repository root: `./build-with-docker.sh`
+2. _Optional_. If you need a Docker image, run: `docker build -t wavesplatform/ride-runner ride-runner/docker`
+
+### Artifacts
+
+* DEB package: `ride-runner/target/ride-runner_${version}_all.deb`
+* Fat JAR for running RIDE with a prepared state: `ride-runner/target/ride-runner-with-prepared-state-${version}.jar`
+* Standalone app and service: `ride-runner/docker/ride-runner-targer/ride-runner.tgz`. 
+  It has the `ride-runner_${version}_all.db` directory. Notable:
+   * `/bin/ride-runner` - main entrypoint.
+       * Runs `RideRunnerWithBlockchainUpdatesService` by default.
+     * Use `-help` to see all available switches;
+   * `/conf/application.ini` - JVM options.
+
+## Service
+
+### How to install and run
+
+* Docker: ``
+* DEB package: `dpkg -i ride-runner_${version}_all.deb`
+* Standalone:
+  1. Extract the archive: `tar -xzf ride-runner.tgz`
+  2. _Optional_. Configure the service:
+     1. Update the Java options in `ride-runner-${version}/conf/application.ini`
+     2. Write a custom configuration for service:
+        1. Copy an example config to the `conf` directory: `cp ride-runner-$version/doc/ride-runner.conf ride-runner-$version/conf/`
+        2. [See](./src/main/resources/ride-runner.conf) all available options.
+  3. Run the service:
+     * Without a custom config: `./ride-runner-${version}/bin/ride-runner`
+     * With a custom config: `./ride-runner-${version}/bin/ride-runner $(pwd)/ride-runner-${version}/conf/ride-runner.conf`
+
+### REST API
+
+Is available on `6890` port by default. Available endpoints:
+1. `/utils/script/evaluate` - works almost as on Waves Node HTTP API. See https://nodes.wavesnodes.com/api-docs/index.html#/utils/evaluateScript for more information about this endpoint.
+2. `GET /ride/status` for health checks.
+
+### Limitations
+
+If you faced one of them, please issue a ticket on GitHub and tell us your use-case.
+
+1. Asset scripts aren't supported as in `GET /utils/script/evaluate` of Waves Node REST API.
+2. Unsupported RIDE functions. A script fails with an error if tries to run one of these functions:
+   1. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
+   2. [transferTransactionById](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#transfertransactionbyid)
 
 ## How to run
 

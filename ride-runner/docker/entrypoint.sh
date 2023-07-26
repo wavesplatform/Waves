@@ -4,33 +4,20 @@ shopt -s nullglob
 # Useful options:
 #   -XX:+HeapDumpOnOutOfMemoryError
 #   -XX:HeapDumpPath=${RDATA}/heap-dumps
-#
-# -Djdk.attach.allowAttachSelf=true for ehcache/sizeoOf
-#
-# GCLockerRetryAllocationCount to prevent false OOM
-#
-# Update the metrics if you change -XX:ThreadStackSize=1024 (1 KiB)
-#
-# UnlockDiagnosticVMOptions is required for GCLockerRetryAllocationCount, otherwise we get:
-#   Error: VM option 'GCLockerRetryAllocationCount' is diagnostic and must be enabled via -XX:+UnlockDiagnosticVMOptions.
-#   Error: The unlock option must precede 'GCLockerRetryAllocationCount'.
-#
-# Temporarily:
-#   -XX:+AlwaysPreTouch
+# Why are these options required? See ride-runner/build.sbt
 JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
   --add-opens=java.base/java.lang=ALL-UNNAMED
   --add-opens=java.base/java.math=ALL-UNNAMED
   --add-opens=java.base/java.util=ALL-UNNAMED
-  -XX:+UnlockDiagnosticVMOptions
-  -Xlog:gc::time,level,tags
-  -XX:NativeMemoryTracking=summary
+  ${JAVA_OPTS}
+  -server
+  -Xmx${RIDE_HEAP_SIZE}
   -XX:+ExitOnOutOfMemoryError
   -XX:+UseG1GC
   -XX:+ParallelRefProcEnabled
   -XX:+UseStringDeduplication
+  -XX:+UnlockDiagnosticVMOptions
   -XX:GCLockerRetryAllocationCount=100
-  -Xmx${RIDE_HEAP_SIZE}
-  -XX:+AlwaysPreTouch
   -XX:MaxMetaspaceSize=152m
   -XX:ThreadStackSize=1024
   -Djdk.attach.allowAttachSelf=true

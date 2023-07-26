@@ -180,7 +180,8 @@ lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   // TODO temporarily disabled
   //  (node / assembly).value
-  //  buildDebPackages.value
+  // (`ride-runner` / assembly).value
+  buildDebPackages.value
   buildTarballsForDocker.value
 }
 
@@ -189,7 +190,10 @@ buildTarballsForDocker := {
   // TODO temporarily disabled
   //  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
   //  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
-  IO.copyFile((`ride-runner` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/ride-runner-target/ride-runner.tgz"))
+  IO.copyFile(
+    (`ride-runner` / Universal / packageZipTarball).value,
+    (`ride-runner` / baseDirectory).value / "docker" / "target" / "ride-runner.tgz"
+  )
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
@@ -224,8 +228,9 @@ def checkPR: Command = Command.command("checkPR") { state =>
 
 lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
 buildDebPackages := {
-  (`grpc-server` / Debian / packageBin).value
-  (node / Debian / packageBin).value
+//  (`grpc-server` / Debian / packageBin).value
+//  (node / Debian / packageBin).value
+  (`ride-runner` / Debian / packageBin).value
 }
 
 def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>

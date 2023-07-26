@@ -81,7 +81,7 @@ object RideRunnerWithPreparedStateApp {
     OParser.sequence(
       head("RIDE script runner", Version.VersionString),
       opt[File]('i', "input")
-        .text("Path to JSON or HOCON (conf) file with prepared state and run arguments. It has highest priority than config.")
+        .text("Path to JSON or HOCON (conf) file with prepared state and run arguments. It has highest priority than the config.")
         .required()
         .action((x, c) => c.copy(rawInputFile = x)),
       opt[Unit]('v', "verbose")
