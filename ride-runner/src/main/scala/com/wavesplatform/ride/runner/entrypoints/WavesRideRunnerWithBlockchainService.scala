@@ -28,7 +28,7 @@ import scala.concurrent.duration.{Duration, DurationInt}
 
 object WavesRideRunnerWithBlockchainService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_)))
+    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
 
     log.info("Starting...")
     // It has to be before other code: https://github.com/kamon-io/Kamon/issues/601#issuecomment-748995094

@@ -98,7 +98,7 @@ You can use the following tags:
       2. [See](./src/main/resources/ride-runner.conf) all available options.
 3. Run the service:
    * Without a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner`
-   * With a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner $(pwd)/waves-ride-runner-${version}/conf/main.conf`
+   * With a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner ./waves-ride-runner-${version}/conf/main.conf`
 
 ### REST API
 

@@ -26,7 +26,7 @@ import scala.util.Using
 
 object WavesRideRunnerWithBlockchainApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_)))
+    val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_).getAbsoluteFile))
 
     log.info("Loading args...")
     val inputFile =
