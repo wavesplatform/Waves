@@ -1,13 +1,13 @@
 ${{header}}
 ${{loader-functions}}
 
-config_file=/etc/${{app_name}}/waves.conf
+config_file=/etc/${{app_name}}/main.conf
 
 if [ "$1" = configure ]; then
     # make sure the user exists
     if ! getent passwd ${{app_name}} > /dev/null; then
         adduser --system $quiet --home /var/lib/${{app_name}} --no-create-home --shell /bin/false --group \
-            --gecos "${{app_name}}" ${{app_name}}
+            --gecos "${{app_name}} node" ${{app_name}}
     fi
     # if the user was created manually, make sure the group is there as well
     if ! getent group ${{app_name}} > /dev/null; then
@@ -30,11 +30,10 @@ if [ "$1" = configure ]; then
 
     if [ ! -f "$config_file" ]; then
         echo Creating default config file ...
-        cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"
+        cp /usr/share/${{app_name}}/doc/main.conf "$config_file"
         chmod 600 "$config_file"
         chown ${{app_name}}:${{app_name}} "$config_file"
     fi
-
 
     echo Installing systemd service ...
     addService ${{app_name}} || true

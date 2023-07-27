@@ -38,7 +38,7 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-            <pattern>${default.pattern}</pattern>
+            <pattern>${logback.stdout.pattern:-${default.pattern}}</pattern>
         </encoder>
     </appender>
 

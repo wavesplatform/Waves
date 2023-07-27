@@ -11,10 +11,10 @@ Allows running Ride without a local Waves Node:
 
 ### Artifacts
 
-* DEB package: `ride-runner/target/ride-runner_${version}_all.deb`
-* Fat JAR for running RIDE with a prepared state: `ride-runner/target/ride-runner-with-prepared-state-${version}.jar`
-* Standalone app and service: `ride-runner/docker/ride-runner-targer/ride-runner.tgz`. 
-  It has the `ride-runner_${version}_all.db` directory. Notable:
+* DEB package: `ride-runner/target/waves-ride-runner_${version}_all.deb`
+* Fat JAR for running RIDE with a prepared state: `ride-runner/target/waves-ride-runner-${version}.jar`
+* Standalone app and service: `ride-runner/docker/ride-runner-targer/waves-ride-runner.tgz`. 
+  It has the `waves-ride-runner_${version}` directory. Notable:
    * `/bin/ride-runner` - main entrypoint.
        * Runs `RideRunnerWithBlockchainUpdatesService` by default.
      * Use `-help` to see all available switches;
@@ -24,18 +24,27 @@ Allows running Ride without a local Waves Node:
 
 ### How to install and run
 
-* Docker: ``
-* DEB package: `dpkg -i ride-runner_${version}_all.deb`
-* Standalone:
-  1. Extract the archive: `tar -xzf ride-runner.tgz`
-  2. _Optional_. Configure the service:
-     1. Update the Java options in `ride-runner-${version}/conf/application.ini`
-     2. Write a custom configuration for service:
-        1. Copy an example config to the `conf` directory: `cp ride-runner-$version/doc/ride-runner.conf ride-runner-$version/conf/`
-        2. [See](./src/main/resources/ride-runner.conf) all available options.
-  3. Run the service:
-     * Without a custom config: `./ride-runner-${version}/bin/ride-runner`
-     * With a custom config: `./ride-runner-${version}/bin/ride-runner $(pwd)/ride-runner-${version}/conf/ride-runner.conf`
+#### Docker
+
+#### DEB package
+
+1. Install the package: `dpkg -i ride-runner_${version}_all.deb`. It shouldn't start after installation.
+2. _Optional_. Configure the service:
+   1. Update the Java options in `/etc/ride-runner/application.ini`
+   2. Update a custom configuration for service: `/etc/ride-runner/ride-runner.conf`
+3. Start the service: `systemctl start ride-runner`
+ 
+#### Standalone
+
+1. Extract the archive: `tar -xzf waves-ride-runner.tgz`
+2. _Optional_. Configure the service:
+   1. Update the Java options in `waves-ride-runner-${version}/conf/application.ini`
+   2. Write a custom configuration for service:
+      1. Copy an example config to the `conf` directory: `cp waves-ride-runner-$version/doc/main.conf waves-ride-runner-$version/conf/`
+      2. [See](./src/main/resources/ride-runner.conf) all available options.
+3. Run the service:
+   * Without a custom config: `./waves-ride-runner-${version}/bin/ride-runner`
+   * With a custom config: `./waves-ride-runner-${version}/bin/ride-runner $(pwd)/waves-ride-runner-${version}/conf/main.conf`
 
 ### REST API
 

@@ -22,17 +22,17 @@ ENV RIDE_NETWORK=mainnet
 ENV RIDE_APP=com.wavesplatform.ride.runner.entrypoints.RideRunnerWithBlockchainUpdatesService
 
 # RIDE runner files
-ENV RDATA=/var/lib/ride-runner
-ENV RIDE_INSTALL_PATH=/usr/share/ride-runner
-ENV RIDE_CONFIG=/etc/ride-runner/ride-runner.conf
-ENV RIDE_LOGBACK_CONFIG=$RIDE_INSTALL_PATH/doc/logback.sample.xml
+ENV RDATA=/var/lib/waves-ride-runner
+ENV RIDE_INSTALL_PATH=/usr/share/waves-ride-runner
+ENV RIDE_CONFIG=/etc/waves-ride-runner/main.conf
+ENV RIDE_LOGBACK_CONFIG=$RIDE_INSTALL_PATH/doc/logback.xml
 
 # jemalloc options
 # Add -e JEMALLOC_ENABLE=true to enable
 ENV MALLOC_CONF="prof:true,lg_prof_interval:29,lg_prof_sample:21"
 
 COPY target /tmp/
-COPY ride-runner.conf.template $RIDE_CONFIG
+COPY main.conf $RIDE_CONFIG
 
 # Setup node
 COPY entrypoint.sh $RIDE_INSTALL_PATH/bin/entrypoint.sh
@@ -41,7 +41,7 @@ RUN mkdir -p $RDATA/heap-dumps/on-exit; \
     groupadd -r ride --gid=999; \
     useradd -r -g ride --uid=999 --home-dir=$RDATA --shell=/bin/bash ride; \
     # Unpack tgz packages
-    tar zxvf /tmp/ride-runner.tgz -C $RIDE_INSTALL_PATH --strip-components=1; \
+    tar zxvf /tmp/waves-ride-runner.tgz -C $RIDE_INSTALL_PATH --strip-components=1; \
     # Set permissions
     chown -R ride:ride $RDATA $RIDE_INSTALL_PATH && chmod 755 $RDATA; \
     # Cleanup
@@ -54,4 +54,4 @@ WORKDIR $RDATA
 HEALTHCHECK CMD curl -f http://localhost:6890/ride/status || exit 1
 
 STOPSIGNAL SIGINT
-ENTRYPOINT ["/usr/share/ride-runner/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/share/waves-ride-runner/bin/entrypoint.sh"]

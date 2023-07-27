@@ -1,4 +1,4 @@
-name        := "ride-runner"
+name        := "waves-ride-runner"
 description := "Allows to execute RIDE code independently from Waves NODE"
 
 enablePlugins(
@@ -75,12 +75,22 @@ inConfig(Universal)(
   )
 )
 
+inConfig(Debian)(
+  Seq(
+    maintainer               := "com.wavesplatform",
+    packageSource            := sourceDirectory.value / "package",
+    linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
+    debianPackageDependencies += "java11-runtime-headless",
+    maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))
+  )
+)
+
 // Fat JAR settings
 inTask(assembly)(
   Seq(
     test            := {},
     mainClass       := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithPreparedStateApp"),
-    assemblyJarName := s"ride-runner-with-prepared-state-${version.value}.jar",
+    assemblyJarName := s"waves-ride-runner-${version.value}.jar",
     assemblyMergeStrategy := {
       case p
           if p.endsWith(".proto") ||
