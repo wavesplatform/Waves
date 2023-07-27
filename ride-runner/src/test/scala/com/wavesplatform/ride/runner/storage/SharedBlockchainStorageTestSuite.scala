@@ -52,7 +52,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               val blockchain = SharedBlockchainStorage(
                 settings = SharedBlockchainStorage.Settings(
                   blockchain = DefaultBlockchainSettings,
-                  commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+                  blockchainDataCache = BlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
                 ),
                 allTags = new CacheKeyTags[Tag],
                 db = db,
@@ -533,7 +533,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
         val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
             blockchain = DefaultBlockchainSettings,
-            commonCache = CommonCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+            blockchainDataCache = BlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
           ),
           allTags = allTags,
           db = db,

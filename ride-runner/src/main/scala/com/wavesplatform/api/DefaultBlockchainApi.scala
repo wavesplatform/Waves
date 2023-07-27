@@ -332,8 +332,7 @@ class DefaultBlockchainApi(
 }
 
 object DefaultBlockchainApi {
-  // TODO remove nodeApiBaseUri?
-  case class Settings(nodeApiBaseUri: String, grpcApi: GrpcApiSettings, blockchainUpdatesApi: BlockchainUpdatesApiSettings)
+  case class Settings(grpcApi: GrpcApiSettings, blockchainUpdatesApi: BlockchainUpdatesApiSettings)
   case class GrpcApiSettings(maxConcurrentRequests: Option[Int])
   case class BlockchainUpdatesApiSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
 

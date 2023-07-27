@@ -73,11 +73,11 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
     val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
     val rideScheduler                   = mkScheduler(name = "ride", threads = settings.rideRunner.exactRideSchedulerThreads)
 
-    val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnector)
+    val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnectorExecutorThreads)
     cs.cleanup(CustomShutdownPhase.GrpcConnector) { grpcConnector.close() }
 
-    def mkGrpcChannel(name: String, settings: GrpcChannelSettings): ManagedChannel = {
-      val grpcApiChannel = grpcConnector.mkChannel(settings)
+    def mkGrpcChannel(name: String, target: String, settings: GrpcChannelSettings): ManagedChannel = {
+      val grpcApiChannel = grpcConnector.mkChannel(target, settings)
       cs.cleanupTask(CustomShutdownPhase.ApiClient, name) {
         grpcApiChannel.shutdown()
         try grpcApiChannel.awaitTermination(5, TimeUnit.SECONDS)
@@ -87,14 +87,15 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
     }
 
     log.info("Making gRPC channel to gRPC API...")
-    val grpcApiChannel = mkGrpcChannel("grpcApi", settings.rideRunner.grpcApiChannel)
+    val grpcApiChannel = mkGrpcChannel("grpcApi", settings.publicApi.grpcApi, settings.rideRunner.grpcApiChannel)
 
     log.info("Making gRPC channel to Blockchain Updates API...")
-    val blockchainUpdatesApiChannel = mkGrpcChannel("blockchainUpdatesApi", settings.rideRunner.blockchainUpdatesApiChannel)
+    val blockchainUpdatesApiChannel =
+      mkGrpcChannel("blockchainUpdatesApi", settings.publicApi.grpcBlockchainUpdatesApi, settings.rideRunner.blockchainUpdatesApiChannel)
 
     log.info("Creating general API gateway...")
     val blockchainApi = new DefaultBlockchainApi(
-      settings = settings.rideRunner.blockchainApi,
+      settings = settings.blockchainApi,
       grpcApiChannel = grpcApiChannel,
       blockchainUpdatesApiChannel = blockchainUpdatesApiChannel
     )
@@ -110,7 +111,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
     val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = rideDb.access.batchedReadOnly { implicit ro =>
       val dbCaches = DefaultPersistentCaches(rideDb.access)
-      SharedBlockchainStorage(settings.rideRunner.sharedBlockchain, allTags, rideDb.access, dbCaches, blockchainApi)
+      SharedBlockchainStorage(settings.sharedBlockchain, allTags, rideDb.access, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
@@ -119,7 +120,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
     log.info(s"Heights: local=$localHeightStr, local hardened=${heights.lastKnownHardened}, network=$lastHeightAtStart, working=${heights.working}")
 
     val requestService = new DefaultRequestService(
-      settings.rideRunner.requestsService,
+      settings.requestsService,
       sharedBlockchain,
       allTags,
       new SynchronizedJobScheduler()(rideScheduler),
@@ -137,7 +138,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
     val events = blockchainUpdatesStream.downstream
       .doOnError(e => Task { log.error("Error!", e) })
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(heights.lastKnownHardened, heights.working))) {
-        BlockchainState.applyWithRestarts(settings.rideRunner.blockchainState, processor, blockchainUpdatesStream, _, _)
+        BlockchainState.applyWithRestarts(settings.blockchainState, processor, blockchainUpdatesStream, _, _)
       }
       .doOnNext { state =>
         Task {
@@ -171,7 +172,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
           val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
           val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
           HttpServiceStatus(
-            healthy = lastServiceStatus.healthy && idleTimeMs < settings.rideRunner.unhealthyIdleTimeoutMs,
+            healthy = lastServiceStatus.healthy && idleTimeMs < settings.unhealthyIdleTimeoutMs,
             debug = Json.obj(
               "nowTime"             -> nowMs,
               "lastProcessedTime"   -> lastServiceStatus.lastProcessedTimeMs,
@@ -190,12 +191,6 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       .bindFlow(httpService.loggingCompositeRoute)
     val http = Await.result(httpFuture, 20.seconds)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { http.terminate(5.seconds) }
-
-//    val gc = blockchainEventsStreamScheduler.scheduleAtFixedRate(20.minutes, 20.minutes) {
-//      log.info("Running GC...")
-//      System.gc()
-//    }
-//    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { gc.cancel() }
 
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)

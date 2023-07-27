@@ -3,9 +3,9 @@ package com.wavesplatform.ride.runner.storage
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
-import com.wavesplatform.ride.runner.storage.CommonCache.Settings
+import com.wavesplatform.ride.runner.storage.BlockchainDataCache.Settings
 
-class CommonCache(settings: Settings) {
+class BlockchainDataCache(settings: Settings) {
   private val backend = Caffeine
     .newBuilder()
     .softValues()
@@ -30,6 +30,6 @@ class CommonCache(settings: Settings) {
   def remove[T <: CacheKey](key: T): Unit = backend.invalidate(key)
 }
 
-object CommonCache {
+object BlockchainDataCache {
   case class Settings(size: ConfigMemorySize)
 }

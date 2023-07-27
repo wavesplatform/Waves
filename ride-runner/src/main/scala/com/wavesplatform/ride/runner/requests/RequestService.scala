@@ -99,7 +99,7 @@ class DefaultRequestService(
       .takeWhile(_ => isWorking.get())
       .doOnNext(_ => Task(clearIgnored())) // This is the only place where we run scripts and thus add tags.
       .filter(isActive)
-      .mapParallelUnordered(settings.parallelization) { request =>
+      .mapParallelUnordered(settings.parallelRideRunThreads) { request =>
         log.debug(s"Processing ${request.shortLogPrefix}")
         if (createJob(request).inProgress) Task.unit
         else
@@ -288,7 +288,7 @@ object DefaultRequestService {
       enableStateChanges: Boolean,
       evaluateScriptComplexityLimit: Int,
       maxTxErrorLogSize: Int,
-      parallelization: Int,
+      parallelRideRunThreads: Int,
       cacheSize: ConfigMemorySize,
       cacheTtl: FiniteDuration,
       ignoredCleanupThreshold: Int

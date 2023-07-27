@@ -2,25 +2,55 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import com.typesafe.config.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
+import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings}
 import com.wavesplatform.ride.runner.BlockchainState
 import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
-import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
+import com.wavesplatform.ride.runner.storage.{BlockchainDataCache, SharedBlockchainStorage}
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 case class RideRunnerGlobalSettings(
+    publicApi: WavesPublicApiSettings,
+    blockchain: BlockchainSettings,
     restApi: RestAPISettings,
     rideRunner: RideRunnerCommonSettings,
     rideCompareService: WavesRideRunnerCompareService.Settings
 ) {
-  val heightsSettings = Heights.Settings(rideRunner.sharedBlockchain.blockchain.functionalitySettings)
+  val unhealthyIdleTimeoutMs: Long = (publicApi.noDataTimeout + 30.seconds).toMillis
+
+  val heightsSettings = Heights.Settings(blockchain.functionalitySettings)
+
+  val sharedBlockchain = SharedBlockchainStorage.Settings(
+    blockchain = blockchain,
+    blockchainDataCache = rideRunner.blockchainDataCache
+  )
+
+  val blockchainApi = DefaultBlockchainApi.Settings(
+    grpcApi = DefaultBlockchainApi.GrpcApiSettings(maxConcurrentRequests = rideRunner.grpcApiMaxConcurrentRequests),
+    blockchainUpdatesApi = DefaultBlockchainApi.BlockchainUpdatesApiSettings(
+      noDataTimeout = publicApi.noDataTimeout,
+      bufferSize = rideRunner.blockchainBlocksBufferSize
+    )
+  )
+
+  val blockchainState = BlockchainState.Settings(delayBeforeForceRestartBlockchainUpdates = rideRunner.delayBeforeForceRestartBlockchainUpdates)
+
+  val requestsService = DefaultRequestService.Settings(
+    enableTraces = rideRunner.enableTraces,
+    enableStateChanges = rideRunner.enableStateChanges,
+    evaluateScriptComplexityLimit = rideRunner.complexityLimit,
+    maxTxErrorLogSize = rideRunner.maxTxErrorLogSize.toBytes.toInt,
+    parallelRideRunThreads = rideRunner.parallelRideRunThreads.getOrElse(math.min(4, Runtime.getRuntime.availableProcessors() * 2)),
+    cacheSize = rideRunner.responseCache.size,
+    cacheTtl = rideRunner.responseCache.ttl,
+    ignoredCleanupThreshold = rideRunner.responseCache.gcThreshold
+  )
 }
 
 object RideRunnerGlobalSettings {
@@ -57,16 +87,35 @@ object RideRunnerGlobalSettings {
 
 case class RideRunnerCommonSettings(
     db: RideRocksDb.Settings,
-    unhealthyIdleTimeout: FiniteDuration,
+    enableTraces: Boolean,
+    enableStateChanges: Boolean,
+    complexityLimit: Int,
+    maxTxErrorLogSize: ConfigMemorySize,
+    responseCache: RideRunnerResponseCacheSettings,
+    blockchainDataCache: BlockchainDataCache.Settings,
+    parallelRideRunThreads: Option[Int],
     rideSchedulerThreads: Option[Int],
-    sharedBlockchain: SharedBlockchainStorage.Settings,
-    blockchainState: BlockchainState.Settings,
-    requestsService: DefaultRequestService.Settings,
-    blockchainApi: DefaultBlockchainApi.Settings,
-    grpcConnector: GrpcConnector.Settings,
+    // TODO unhealthy?
+    blockchainBlocksBufferSize: Int,
+    grpcApiMaxConcurrentRequests: Option[Int],
     grpcApiChannel: GrpcChannelSettings,
-    blockchainUpdatesApiChannel: GrpcChannelSettings
+    blockchainUpdatesApiChannel: GrpcChannelSettings,
+    delayBeforeForceRestartBlockchainUpdates: FiniteDuration
 ) {
-  val unhealthyIdleTimeoutMs    = unhealthyIdleTimeout.toMillis
-  val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)
+  val availableProcessors          = Runtime.getRuntime.availableProcessors()
+  val exactRideSchedulerThreads    = rideSchedulerThreads.getOrElse(availableProcessors * 2).min(4)
+  val grpcConnectorExecutorThreads = grpcApiMaxConcurrentRequests.fold(availableProcessors * 2)(_ + 1) // +1 for Blockchain Updates
 }
+
+case class WavesPublicApiSettings(
+    restApi: String,
+    grpcApi: String,
+    grpcBlockchainUpdatesApi: String,
+    noDataTimeout: FiniteDuration
+)
+
+case class RideRunnerResponseCacheSettings(
+    size: ConfigMemorySize,
+    ttl: FiniteDuration,
+    gcThreshold: Int
+)

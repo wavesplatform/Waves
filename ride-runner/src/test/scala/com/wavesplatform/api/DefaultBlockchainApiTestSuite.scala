@@ -56,7 +56,6 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
         withGrpc(blockchainUpdatesGrpcService) { channel =>
           val blockchainApi = new DefaultBlockchainApi(
             DefaultBlockchainApi.Settings(
-              "",
               DefaultBlockchainApi.GrpcApiSettings(None),
               DefaultBlockchainApi.BlockchainUpdatesApiSettings(upstreamTimeout, 2)
             ),
@@ -156,7 +155,6 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
         withGrpc(blockchainUpdatesGrpcService) { channel =>
           val blockchainApi = new DefaultBlockchainApi(
             DefaultBlockchainApi.Settings(
-              "",
               DefaultBlockchainApi.GrpcApiSettings(None),
               DefaultBlockchainApi.BlockchainUpdatesApiSettings(1.second, 2)
             ),
@@ -250,7 +248,6 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
         withGrpc(blockchainUpdatesGrpcService) { channel =>
           val blockchainApi = new DefaultBlockchainApi(
             DefaultBlockchainApi.Settings(
-              "",
               DefaultBlockchainApi.GrpcApiSettings(None),
               DefaultBlockchainApi.BlockchainUpdatesApiSettings(upstreamTimeout, 2)
             ),

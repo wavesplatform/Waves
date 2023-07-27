@@ -22,7 +22,7 @@ sealed trait BlockchainState extends Product with Serializable {
 }
 
 object BlockchainState extends ScorexLogging {
-  case class Settings(delayBeforeForceRestart: FiniteDuration)
+  case class Settings(delayBeforeForceRestartBlockchainUpdates: FiniteDuration)
 
   case class Starting(processedHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
     def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
@@ -110,7 +110,7 @@ object BlockchainState extends ScorexLogging {
         val startHeight = Height(r.processedHeight + 1)
         blockchainUpdatesStream.start(startHeight)
         r
-      }.delayExecution(settings.delayBeforeForceRestart)
+      }.delayExecution(settings.delayBeforeForceRestartBlockchainUpdates)
     }
 
     event match {

@@ -78,13 +78,11 @@ object WavesRideRunnerWithBlockchainApp extends ScorexLogging {
     val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
     val rideScheduler                   = mkScheduler(name = "ride", threads = settings.rideRunner.exactRideSchedulerThreads)
 
-    val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnector)
-    cs.cleanup(CustomShutdownPhase.GrpcConnector) {
-      grpcConnector.close()
-    }
+    val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnectorExecutorThreads)
+    cs.cleanup(CustomShutdownPhase.GrpcConnector) { grpcConnector.close() }
 
-    def mkGrpcChannel(name: String, settings: GrpcChannelSettings): ManagedChannel = {
-      val grpcApiChannel = grpcConnector.mkChannel(settings)
+    def mkGrpcChannel(name: String, target: String, settings: GrpcChannelSettings): ManagedChannel = {
+      val grpcApiChannel = grpcConnector.mkChannel(target, settings)
       cs.cleanupTask(CustomShutdownPhase.ApiClient, name) {
         grpcApiChannel.shutdown()
         try grpcApiChannel.awaitTermination(5, TimeUnit.SECONDS)
@@ -94,14 +92,15 @@ object WavesRideRunnerWithBlockchainApp extends ScorexLogging {
     }
 
     log.info("Making gRPC channel to gRPC API...")
-    val grpcApiChannel = mkGrpcChannel("grpcApi", settings.rideRunner.grpcApiChannel)
+    val grpcApiChannel = mkGrpcChannel("grpcApi", settings.publicApi.grpcApi, settings.rideRunner.grpcApiChannel)
 
     log.info("Making gRPC channel to Blockchain Updates API...")
-    val blockchainUpdatesApiChannel = mkGrpcChannel("blockchainUpdatesApi", settings.rideRunner.blockchainUpdatesApiChannel)
+    val blockchainUpdatesApiChannel =
+      mkGrpcChannel("blockchainUpdatesApi", settings.publicApi.grpcBlockchainUpdatesApi, settings.rideRunner.blockchainUpdatesApiChannel)
 
     log.info("Creating general API gateway...")
     val blockchainApi = new DefaultBlockchainApi(
-      settings = settings.rideRunner.blockchainApi,
+      settings = settings.blockchainApi,
       grpcApiChannel = grpcApiChannel,
       blockchainUpdatesApiChannel = blockchainUpdatesApiChannel
     )
@@ -113,7 +112,7 @@ object WavesRideRunnerWithBlockchainApp extends ScorexLogging {
     val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = db.access.batchedReadOnly { implicit rw =>
       val dbCaches = DefaultPersistentCaches(db.access)
-      SharedBlockchainStorage(settings.rideRunner.sharedBlockchain, allTags, db.access, dbCaches, blockchainApi)
+      SharedBlockchainStorage(settings.sharedBlockchain, allTags, db.access, dbCaches, blockchainApi)
     }
 
     val localHeightAtStart          = sharedBlockchain.heightUntaggedOpt
@@ -122,7 +121,7 @@ object WavesRideRunnerWithBlockchainApp extends ScorexLogging {
     log.info(s"Current height: shared (local or network)=$localHeightAtStart, network=$networkHeightAtStart")
 
     val requestService = new DefaultRequestService(
-      settings.rideRunner.requestsService,
+      settings.requestsService,
       sharedBlockchain,
       allTags,
       new SynchronizedJobScheduler()(rideScheduler),

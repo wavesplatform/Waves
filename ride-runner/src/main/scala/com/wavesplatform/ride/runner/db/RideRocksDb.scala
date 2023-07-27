@@ -51,7 +51,10 @@ class RideRocksDb(
 
 // TODO #101 Settings (those won't break a DB)
 object RideRocksDb extends ScorexLogging {
-  case class Settings(directory: String, version: Int)
+  case class Settings(directory: String) {
+    // Increase when need to delete the database
+    val version = 11
+  }
 
   def open(settings: Settings): RideDb = {
     log.debug(s"Open DB at ${settings.directory}")

@@ -40,7 +40,7 @@ class SharedBlockchainStorage[TagT] private (
 
   def load()(implicit ctx: ReadOnly): Unit = blockHeaders.load()
 
-  private val commonCache = new CommonCache(settings.commonCache)
+  private val commonCache = new BlockchainDataCache(settings.blockchainDataCache)
 
   def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.directReadWrite { implicit ctx =>
     blockHeaders.getOrFetch(atHeight)
@@ -508,5 +508,5 @@ object SharedBlockchainStorage {
   )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] =
     new SharedBlockchainStorage[TagT](settings, allTags, db, persistentCaches, blockchainApi).tap(_.load())
 
-  case class Settings(blockchain: BlockchainSettings, commonCache: CommonCache.Settings)
+  case class Settings(blockchain: BlockchainSettings, blockchainDataCache: BlockchainDataCache.Settings)
 }

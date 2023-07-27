@@ -51,7 +51,6 @@ class RestartDueToGrpcErrorTestSuite extends BaseTestSuite with TableDrivenPrope
     withGrpc(blockchainUpdatesGrpcService) { channel =>
       val blockchainApi = new DefaultBlockchainApi(
         DefaultBlockchainApi.Settings(
-          "",
           DefaultBlockchainApi.GrpcApiSettings(None),
           DefaultBlockchainApi.BlockchainUpdatesApiSettings(100.minutes, 2)
         ),
