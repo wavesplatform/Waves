@@ -694,12 +694,6 @@ class BlockchainUpdaterImpl(
     }.fold[Blockchain](rocksdb) { case (block, diff, _, _, _) =>
       CompositeBlockchain(rocksdb, diff, block, ByteStr.empty, 0L, None)
     }.balanceSnapshots(address, from, to)
-
-//    to.flatMap(id => ngState.flatMap(_.totalDiffOf(id)))
-//      .fold[Blockchain](rocksdb) { case (block, diff, _, _, _) =>
-//        CompositeBlockchain(rocksdb, diff, block, ByteStr.empty, 0L, None)
-//      }
-//      .balanceSnapshots(address, from, to)
   }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = readLock {

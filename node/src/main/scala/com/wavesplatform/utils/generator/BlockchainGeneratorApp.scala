@@ -2,12 +2,11 @@ package com.wavesplatform.utils.generator
 
 import java.io.{File, FileOutputStream, PrintWriter}
 import java.util.concurrent.TimeUnit
-
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.RDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
@@ -221,10 +220,161 @@ object BlockchainGeneratorApp extends ScorexLogging {
       quit = true
     }
 
+    var resultCounter = 0
+
     while (!Thread.currentThread().isInterrupted && !quit) synchronized {
       val times = miners.flatMap { kp =>
         val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
         time.toOption.map(kp -> _)
+      }
+
+      println(blockchain.height)
+
+      if (blockchain.height > 100000) {
+        val (maliciousAcc, maliciousTime) = times.minBy(_._2)
+        val maliciousBalance              = blockchain.generatingBalance(maliciousAcc.toAddress)
+        val maliciousBt = posSelector
+          .consensusData(
+            maliciousAcc,
+            blockchain.height,
+            blockchainSettings.genesisSettings.averageBlockDelay,
+            blockchain.lastBlockHeader.get.header.baseTarget,
+            blockchain.lastBlockHeader.get.header.timestamp,
+            blockchain.parentHeader(blockchain.lastBlockHeader.get.header, 2).map(_.timestamp),
+            maliciousTime
+          )
+          .toOption
+          .get
+          .baseTarget
+
+        val challengeMiners = miners.diff(Seq(maliciousAcc))
+
+        val (_, bestKeyBlockTimeAfterMalicious) = challengeMiners
+          .map { kp =>
+            val time = posSelector
+              .copy(blockchain = blockchain)
+              .getValidBlockDelay(blockchain.height + 1, kp, maliciousBt, blockchain.generatingBalance(kp.toAddress))
+              .toOption
+              .get + maliciousTime
+
+            kp -> time
+          }
+          .minBy(_._2)
+
+        def computeBestScoreChainTime(
+            maliciousScore: BigInt,
+            challengeScore: BigInt,
+            lastMaliciousBt: Long,
+            lastMaliciousTime: Long,
+            grandParentMaliciousTime: Long,
+            greatGrandParentMaliciousTime: Long,
+            lastChallengeBt: Long,
+            lastChallengeTime: Long,
+            grandParentChallengeTime: Long,
+            greatGrandParentChallengeTime: Long,
+            curHeight: Int
+        ): Long = {
+          if (maliciousScore < challengeScore) lastChallengeTime
+          else if (lastChallengeTime > bestKeyBlockTimeAfterMalicious) Long.MaxValue
+          else {
+            val newMaliciousTime =
+              posSelector
+                .copy(blockchain = blockchain)
+                .getValidBlockDelay(curHeight, maliciousAcc, lastMaliciousBt, maliciousBalance)
+                .toOption
+                .get + lastMaliciousTime
+            val (bestChallenger, bestChallengeTime) = challengeMiners
+              .map { kp =>
+                val time = posSelector
+                  .copy(blockchain = blockchain)
+                  .getValidBlockDelay(curHeight, kp, lastChallengeBt, blockchain.generatingBalance(kp.toAddress))
+                  .toOption
+                  .get + lastChallengeTime
+                kp -> time
+              }
+              .minBy(_._2)
+            val newMaliciousBt = posSelector
+              .consensusData(
+                maliciousAcc,
+                curHeight,
+                blockchainSettings.genesisSettings.averageBlockDelay,
+                lastMaliciousBt,
+                lastMaliciousTime,
+                Some(greatGrandParentMaliciousTime),
+                newMaliciousTime
+              )
+              .toOption
+              .get
+              .baseTarget
+            val newChallengeBt = posSelector
+              .consensusData(
+                bestChallenger,
+                curHeight,
+                blockchainSettings.genesisSettings.averageBlockDelay,
+                lastChallengeBt,
+                lastChallengeTime,
+                Some(greatGrandParentChallengeTime),
+                bestChallengeTime
+              )
+              .toOption
+              .get
+              .baseTarget
+
+            computeBestScoreChainTime(
+              maliciousScore + BigInt("18446744073709551616") / newMaliciousBt,
+              challengeScore + BigInt("18446744073709551616") / newChallengeBt,
+              newMaliciousBt,
+              newMaliciousTime,
+              lastMaliciousTime,
+              grandParentMaliciousTime,
+              newChallengeBt,
+              bestChallengeTime,
+              lastChallengeTime,
+              grandParentChallengeTime,
+              curHeight + 1
+            )
+          }
+        }
+
+        val (bestChallengeAcc, bestChallengeTimestamp) = challengeMiners
+          .flatMap { kp =>
+            val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp, Some(maliciousAcc))
+            time.toOption.map(kp -> _)
+          }
+          .minBy(_._2)
+
+        val challengeBt = posSelector
+          .consensusData(
+            bestChallengeAcc,
+            blockchain.height,
+            blockchainSettings.genesisSettings.averageBlockDelay,
+            blockchain.lastBlockHeader.get.header.baseTarget,
+            blockchain.lastBlockHeader.get.header.timestamp,
+            blockchain.parentHeader(blockchain.lastBlockHeader.get.header, 2).map(_.timestamp),
+            bestChallengeTimestamp
+          )
+          .toOption
+          .get
+          .baseTarget
+
+        val bestScoreChainTime =
+          computeBestScoreChainTime(
+            BigInt("18446744073709551616") / maliciousBt,
+            BigInt("18446744073709551616") / challengeBt,
+            maliciousBt,
+            maliciousTime,
+            blockchain.lastBlockHeader.get.header.timestamp,
+            blockchain.parentHeader(blockchain.lastBlockHeader.get.header).map(_.timestamp).get,
+            challengeBt,
+            bestChallengeTimestamp,
+            blockchain.lastBlockHeader.get.header.timestamp,
+            blockchain.parentHeader(blockchain.lastBlockHeader.get.header).map(_.timestamp).get,
+            blockchain.height + 1
+          )
+
+        if (bestScoreChainTime < bestKeyBlockTimeAfterMalicious) {
+          resultCounter += 1
+        }
       }
 
       for {
@@ -248,7 +398,10 @@ object BlockchainGeneratorApp extends ScorexLogging {
             case Right(_) =>
               blocks += block
               Output.writeBlock(block)
-              if (checkAverageTime() && blockchain.height > options.blocks) sys.exit(0)
+              if (checkAverageTime() && blockchain.height > options.blocks) {
+                println("RESULT " + resultCounter)
+                sys.exit(0)
+              }
 
             case Left(err) =>
               log.error(s"Error appending block: $err")

@@ -220,8 +220,16 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
-    val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
+  def nextBlockGenerationTime(
+      blockchain: Blockchain,
+      height: Int,
+      block: SignedBlockHeader,
+      account: KeyPair,
+      second: Option[KeyPair] = None
+  ): Either[String, Long] = {
+    val balance = blockchain.generatingBalance(account.toAddress, Some(block.id())) + second
+      .map(acc => blockchain.generatingBalance(acc.toAddress, Some(block.id())))
+      .getOrElse(0L)
 
     if (blockchain.isMiningAllowed(height, balance)) {
       val blockDelayE = pos.copy(blockchain = blockchain).getValidBlockDelay(height, account, block.header.baseTarget, balance)
