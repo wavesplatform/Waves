@@ -180,9 +180,9 @@ lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   // TODO temporarily disabled
   //  (node / assembly).value
-  // (`ride-runner` / assembly).value
+  (`ride-runner` / assembly).value
   buildDebPackages.value
-//  buildTarballsForDocker.value
+  buildTarballsForDocker.value
 }
 
 lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
@@ -192,7 +192,7 @@ buildTarballsForDocker := {
   //  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
   IO.copyFile(
     (`ride-runner` / Universal / packageZipTarball).value,
-    (`ride-runner` / baseDirectory).value / "docker" / "target" / "waves-ride-runner.tgz"
+    (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
   )
 }
 

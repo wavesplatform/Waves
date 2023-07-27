@@ -14,7 +14,7 @@ import scala.concurrent.duration.DurationInt
 import scala.io.Source
 import scala.util.Using
 
-object RideRunnerWithPreparedStateApp {
+object WavesRideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
     val setup: OParserSetup = new DefaultOParserSetup {
       override val showUsageOnError = Some(true)

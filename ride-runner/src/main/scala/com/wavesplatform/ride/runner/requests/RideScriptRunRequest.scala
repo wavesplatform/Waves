@@ -11,6 +11,7 @@ final case class RideScriptRunRequest(address: Address, requestBody: JsObject, t
 }
 
 object RideScriptRunRequest {
+  // Even a compiler says it is never used. But it is a lie.
   private implicit val jsonConfiguration: JsonConfiguration.Aux[Json.WithDefaultValues] = JsonConfiguration[Json.WithDefaultValues]()
 
   private val fallbackReads = Json.reads[RideScriptRunRequest]

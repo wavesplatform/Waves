@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y wget unzip gosu libjemalloc-dev graphvi
 ENV RIDE_LOG_LEVEL=INFO
 ENV RIDE_HEAP_SIZE=2500m
 ENV RIDE_NETWORK=mainnet
-ENV RIDE_APP=com.wavesplatform.ride.runner.entrypoints.RideRunnerWithBlockchainUpdatesService
+ENV RIDE_APP=com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithBlockchainService
 
 # RIDE runner files
 ENV RDATA=/var/lib/waves-ride-runner

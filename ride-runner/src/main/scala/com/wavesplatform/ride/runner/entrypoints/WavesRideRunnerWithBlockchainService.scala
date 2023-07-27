@@ -26,7 +26,7 @@ import java.util.concurrent.*
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 
-object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
+object WavesRideRunnerWithBlockchainService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val (globalConfig, settings) = AppInitializer.init(externalConfig = args.headOption.map(new File(_)))
 

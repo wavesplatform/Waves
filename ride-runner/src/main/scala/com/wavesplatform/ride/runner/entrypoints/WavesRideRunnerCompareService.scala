@@ -22,7 +22,7 @@ import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, Th
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 
-object RideCompareService extends ScorexLogging {
+object WavesRideRunnerCompareService extends ScorexLogging {
   case class Settings(
       requestsDelay: FiniteDuration,
       failedChecksToleranceTimer: FiniteDuration,

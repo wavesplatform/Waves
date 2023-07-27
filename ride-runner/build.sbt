@@ -15,7 +15,7 @@ libraryDependencies ++= Dependencies.rideRunner.value
 inConfig(Compile)(
   Seq(
     // Affects sbt-native-packager
-    mainClass := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithBlockchainUpdatesService"),
+    mainClass := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithBlockchainService"),
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
   )
@@ -89,7 +89,7 @@ inConfig(Debian)(
 inTask(assembly)(
   Seq(
     test            := {},
-    mainClass       := Some("com.wavesplatform.ride.runner.entrypoints.RideRunnerWithPreparedStateApp"),
+    mainClass       := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithPreparedStateApp"),
     assemblyJarName := s"waves-ride-runner-${version.value}.jar",
     assemblyMergeStrategy := {
       case p

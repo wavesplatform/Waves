@@ -18,7 +18,7 @@ import scala.concurrent.duration.FiniteDuration
 case class RideRunnerGlobalSettings(
     restApi: RestAPISettings,
     rideRunner: RideRunnerCommonSettings,
-    rideCompareService: RideCompareService.Settings
+    rideCompareService: WavesRideRunnerCompareService.Settings
 ) {
   val heightsSettings = Heights.Settings(rideRunner.sharedBlockchain.blockchain.functionalitySettings)
 }

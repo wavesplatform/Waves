@@ -15,7 +15,7 @@ Allows running Ride without a local Waves Node:
 * Fat JAR for running RIDE with a prepared state: `ride-runner/target/waves-ride-runner-${version}.jar`
 * Standalone app and service: `ride-runner/docker/ride-runner-targer/waves-ride-runner.tgz`. 
   It has the `waves-ride-runner_${version}` directory. Notable:
-   * `/bin/ride-runner` - main entrypoint.
+   * `/bin/waves-ride-runner` - main entrypoint.
        * Runs `RideRunnerWithBlockchainUpdatesService` by default.
      * Use `-help` to see all available switches;
    * `/conf/application.ini` - JVM options.
@@ -26,13 +26,67 @@ Allows running Ride without a local Waves Node:
 
 #### Docker
 
+##### Docker run
+
+```bash
+docker run \
+  -v $(pwd)/data:/var/lib/waves-ride-runner \
+  -v $(pwd)/config/main.conf:/etc/waves-ride-runner/main.conf:ro \
+  -p 127.0.0.1:6869:6869 \
+  -p 127.0.0.1:9095:9095 \
+  -e RIDE_NETWORK="mainnet" \
+  -e RIDE_HEAP_SIZE="1g" \
+  -ti wavesplatform/ride-runner:latest
+```
+
+##### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  ride-runner:
+    image: wavesplatform/ride-runner:latest
+    restart: "unless-stopped"
+    ports:
+      - 127.0.0.1:6890:6890
+      - 127.0.0.1:9095:9095
+    environment:
+      - RIDE_NETWORK=mainnet
+      - RIDE_HEAP_SIZE=1g
+    volumes:
+      - ./waves-ride-runner/data:/var/lib/waves-ride-runner
+      - ./waves-ride-runner/config/main.conf:/etc/waves-ride-runner/main.conf:ro
+```
+
+##### Environment variables
+
+**You can run container with predefined environment variables:**
+
+| Env variable     | Default   | Description                                                                                                                                                                                       |
+|------------------|:----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `RIDE_LOG_LEVEL` | `INFO`    | Logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`                                                                                                                 |
+| `RIDE_HEAP_SIZE` | `2500m`   | Default Java Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). |
+| `RIDE_NETWORK`   | `mainnet` | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`.                                                                                                                  |
+| `JAVA_OPTS`      |           | Additional JVM configuration options. Some options are mandatory and specified in [entrypoint.sh](./docker/entrypoint.sh)                                                                         |
+
+Notes:
+1. All variables are optional.
+2. Environment variables override values in the configuration file.
+
+##### Image tags
+
+You can use the following tags:
+
+- `latest` - current version of Mainnet;
+- `vX.X.X` - specific version.
+
 #### DEB package
 
-1. Install the package: `dpkg -i ride-runner_${version}_all.deb`. It shouldn't start after installation.
+1. Install the package: `dpkg -i waves-ride-runner_${version}_all.deb`. It shouldn't start after installation.
 2. _Optional_. Configure the service:
-   1. Update the Java options in `/etc/ride-runner/application.ini`
-   2. Update a custom configuration for service: `/etc/ride-runner/ride-runner.conf`
-3. Start the service: `systemctl start ride-runner`
+   1. Update the Java options in `/etc/waves-ride-runner/application.ini`
+   2. Update a custom configuration for service: `/etc/waves-ride-runner/main.conf`
+3. Start the service: `systemctl start waves-ride-runner`
  
 #### Standalone
 
@@ -43,8 +97,8 @@ Allows running Ride without a local Waves Node:
       1. Copy an example config to the `conf` directory: `cp waves-ride-runner-$version/doc/main.conf waves-ride-runner-$version/conf/`
       2. [See](./src/main/resources/ride-runner.conf) all available options.
 3. Run the service:
-   * Without a custom config: `./waves-ride-runner-${version}/bin/ride-runner`
-   * With a custom config: `./waves-ride-runner-${version}/bin/ride-runner $(pwd)/waves-ride-runner-${version}/conf/main.conf`
+   * Without a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner`
+   * With a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner $(pwd)/waves-ride-runner-${version}/conf/main.conf`
 
 ### REST API
 
@@ -60,13 +114,6 @@ If you faced one of them, please issue a ticket on GitHub and tell us your use-c
 2. Unsupported RIDE functions. A script fails with an error if tries to run one of these functions:
    1. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
    2. [transferTransactionById](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#transfertransactionbyid)
-
-## How to run
-
-Consider the following directory structure:
-
-- `./config/local.conf` - a local configuration;
-- `./data` - where `ride-runner` caches are stored.
 
 ### Configuration options
 
@@ -94,60 +141,6 @@ kamon {
 }
 ```
 
-### Environment variables
-
-**You can run container with predefined environment variables:**
-
-| Env variable     | Description                                                                                                                                                                                       |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `RIDE_LOG_LEVEL` | Logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`                                                                                                                 |
-| `RIDE_HEAP_SIZE` | Default Java Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). |
-| `RIDE_NETWORK`   | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`.                                                                                                                  |
-| `JAVA_OPTS`      | Additional JVM configuration options.                                                                                                                                                             |
-
-**Note: All variables are optional.**
-
-**Note: Environment variables override values in the configuration file.**
-
-### Image tags
-
-You can use the following tags:
-
-- `latest` - currrent version of Mainnet
-- `vX.X.X` - specific version
-
-### Docker run example
-
-```sh
-docker run \
-  -v $(pwd)/config/local.conf:/etc/ride-runner/local.conf:ro \
-  -v $(pwd)/data:/var/lib/ride-runner \
-  -p 127.0.0.1:6869:6869 \
-  -p 127.0.0.1:9095:9095 \
-  -e RIDE_NETWORK="mainnet" \
-  -e RIDE_HEAP_SIZE="1g" \
-  -ti wavesplatform/ride-runner:latest
-```
-
-### Docker Compose example
-
-```yaml
-version: '3.8'
-services:
-  ride-runner:
-    image: wavesplatform/ride-runner:latest
-    restart: "unless-stopped"
-    ports:
-      - 127.0.0.1:6890:6890
-      - 127.0.0.1:9095:9095
-    environment:
-      - RIDE_NETWORK=mainnet
-      - RIDE_HEAP_SIZE=1g
-    volumes:
-      - ./ride-runner/config/local.conf:/etc/ride-runner/local.conf:ro
-      - ./ride-runner/data:/var/lib/ride-runner
-```
-
-### Grafana
+## Grafana
 
 There is an [example](./doc/grafana-prometheus-dashboard.json) dashboard for Grafana and Prometheus.
