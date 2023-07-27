@@ -28,7 +28,7 @@ Allows running Ride without a local Waves Node:
 
 ##### Docker run
 
-```bash
+```shell
 docker run \
   -v $(pwd)/data:/var/lib/waves-ride-runner \
   -v $(pwd)/config/main.conf:/etc/waves-ride-runner/main.conf:ro \
@@ -139,6 +139,22 @@ kamon {
   # Enable a Prometheus scraping endpoint on 9095
   modules.prometheus-reporter.enabled = true
 }
+```
+
+## Running Ride with prepared state
+
+You need an input file, that contains a description of the blockchain state in [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md).
+See the documented [example](./src/test/resources/sample-input.conf).
+
+How to run:
+```shell
+java -jar waves-ride-runner-${version}.jar -i ./sample-input.conf
+```
+You should see the result in JSON.
+
+Help:
+```shell
+java -jar waves-ride-runner-1.4.18-8f8a0f98d3a2304d9b05c369bd333c8f85044e75-DIRTY.jar --help
 ```
 
 ## Grafana
