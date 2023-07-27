@@ -1,6 +1,7 @@
 # Ride runner
 
 Allows running Ride without a local Waves Node:
+
 * As a service that emulates Waves Node REST API: `/utils/script/evaluate`;
 * As an application that allows to run Ride with a prepared state in a file.
 
@@ -13,12 +14,12 @@ Allows running Ride without a local Waves Node:
 
 * DEB package: `ride-runner/target/waves-ride-runner_${version}_all.deb`
 * Fat JAR for running RIDE with a prepared state: `ride-runner/target/waves-ride-runner-${version}.jar`
-* Standalone app and service: `ride-runner/docker/ride-runner-targer/waves-ride-runner.tgz`. 
+* Standalone app and service: `ride-runner/docker/ride-runner-targer/waves-ride-runner.tgz`.
   It has the `waves-ride-runner_${version}` directory. Notable:
-   * `/bin/waves-ride-runner` - main entrypoint.
-       * Runs `RideRunnerWithBlockchainUpdatesService` by default.
-     * Use `-help` to see all available switches;
-   * `/conf/application.ini` - JVM options.
+    * `/bin/waves-ride-runner` - main entrypoint.
+        * Runs `RideRunnerWithBlockchainUpdatesService` by default.
+        * Use `-help` to see all available switches;
+    * `/conf/application.ini` - JVM options.
 
 ## Service
 
@@ -31,8 +32,8 @@ Allows running Ride without a local Waves Node:
 ```shell
 docker run \
   -v $(pwd)/data:/var/lib/waves-ride-runner \
-  -v $(pwd)/config/main.conf:/etc/waves-ride-runner/main.conf:ro \
-  -p 127.0.0.1:6869:6869 \
+  -v $(pwd)/config/local.conf:/etc/waves-ride-runner/local.conf:ro \
+  -p 127.0.0.1:6890:6890 \
   -p 127.0.0.1:9095:9095 \
   -e RIDE_NETWORK="mainnet" \
   -e RIDE_HEAP_SIZE="1g" \
@@ -55,7 +56,32 @@ services:
       - RIDE_HEAP_SIZE=1g
     volumes:
       - ./waves-ride-runner/data:/var/lib/waves-ride-runner
-      - ./waves-ride-runner/config/main.conf:/etc/waves-ride-runner/main.conf:ro
+      - ./waves-ride-runner/config/local.conf:/etc/waves-ride-runner/local.conf:ro
+```
+
+##### Configuration options
+
+1. The image supports a config customization. To change a config field use corresponding JVM options. JVM options can be
+   sent to JVM using `JAVA_OPTS` environment variable (`-e` argument for Docker). Please refer
+   to ([complete configuration file](./src/main/resources/ride-runner.conf)) to get the full path of the configuration
+   item you want to change.
+2. The service is looking for a config in `/etc/waves-ride-runner/main.conf`. During image build, a default
+   configuration will be copied to this directory. While running container if the value of `RIDE_NETWORK` is
+   not `mainnet`, `testnet` or `stagenet`, a default configuration won't be enough for a correct service working.
+3. By default, `/etc/waves-ride-runner/main.conf` config includes `/etc/waves-ride-runner/local.conf`.
+    * Custom `local.conf` can be used to override default config entries.
+    * Custom `main.conf` can be used to override or the whole configuration.
+
+Example of `local.conf`:
+
+```conf
+kamon {
+  # Enable metrics
+  enable = true
+  
+  # Enable a Prometheus scraping endpoint on 9095
+  modules.prometheus-reporter.enabled = true
+}
 ```
 
 ##### Environment variables
@@ -70,6 +96,7 @@ services:
 | `JAVA_OPTS`      |           | Additional JVM configuration options. Some options are mandatory and specified in [entrypoint.sh](./docker/entrypoint.sh)                                                                         |
 
 Notes:
+
 1. All variables are optional.
 2. Environment variables override values in the configuration file.
 
@@ -84,26 +111,31 @@ You can use the following tags:
 
 1. Install the package: `dpkg -i waves-ride-runner_${version}_all.deb`. It shouldn't start after installation.
 2. _Optional_. Configure the service:
-   1. Update the Java options in `/etc/waves-ride-runner/application.ini`
-   2. Update a custom configuration for service: `/etc/waves-ride-runner/main.conf`
+    1. Update the Java options in `/etc/waves-ride-runner/application.ini`
+    2. Update a custom configuration for service: `/etc/waves-ride-runner/main.conf`
+       See [ride-runner.conf](./src/main/resources/ride-runner.conf) for all available options.
 3. Start the service: `systemctl start waves-ride-runner`
- 
+
 #### Standalone
 
 1. Extract the archive: `tar -xzf waves-ride-runner.tgz`
 2. _Optional_. Configure the service:
-   1. Update the Java options in `waves-ride-runner-${version}/conf/application.ini`
-   2. Write a custom configuration for service:
-      1. Copy an example config to the `conf` directory: `cp waves-ride-runner-$version/doc/main.conf waves-ride-runner-$version/conf/`
-      2. [See](./src/main/resources/ride-runner.conf) all available options.
+    1. Update the Java options in `waves-ride-runner-${version}/conf/application.ini`
+    2. Write a custom configuration for service:
+        1. Copy an example config to the `conf`
+           directory: `cp waves-ride-runner-$version/doc/main.conf waves-ride-runner-$version/conf/`
+        2. See [ride-runner.conf](./src/main/resources/ride-runner.conf) for all available options.
 3. Run the service:
-   * Without a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner`
-   * With a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner ./waves-ride-runner-${version}/conf/main.conf`
+    * Without a custom config: `./waves-ride-runner-${version}/bin/waves-ride-runner`
+    * With a custom
+      config: `./waves-ride-runner-${version}/bin/waves-ride-runner ./waves-ride-runner-${version}/conf/main.conf`
 
 ### REST API
 
 Is available on `6890` port by default. Available endpoints:
-1. `/utils/script/evaluate` - works almost as on Waves Node HTTP API. See https://nodes.wavesnodes.com/api-docs/index.html#/utils/evaluateScript for more information about this endpoint.
+
+1. `/utils/script/evaluate` - works almost as on Waves Node HTTP API.
+   See https://nodes.wavesnodes.com/api-docs/index.html#/utils/evaluateScript for more information about this endpoint.
 2. `GET /ride/status` for health checks.
 
 ### Limitations
@@ -112,47 +144,25 @@ If you faced one of them, please issue a ticket on GitHub and tell us your use-c
 
 1. Asset scripts aren't supported as in `GET /utils/script/evaluate` of Waves Node REST API.
 2. Unsupported RIDE functions. A script fails with an error if tries to run one of these functions:
-   1. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
-   2. [transferTransactionById](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#transfertransactionbyid)
-
-### Configuration options
-
-1. The image supports a config customization. To change a config field use corresponding JVM options. JVM options can be
-   sent to JVM using `JAVA_OPTS` environment variable (`-e` argument for Docker). Please refer
-   to ([complete configuration file](./src/main/resources/application.conf))
-   to get the full path of the configuration item you want to change.
-2. The service is looking for a config in the directory `/etc/ride-runner`. During image build, a default configuration
-   will be
-   copied to this directory. While running container if the value of `RIDE_NETWORK` is not `mainnet`, `testnet`
-   or `stagenet`, a default configuration won't be enough for a correct service working.
-3. By default, `/etc/ride-runne/rride-runner.conf` config includes `/etc/ride-runner/local.conf`.
-   Custom `/etc/ride-runner/local.conf` can be used to override default config entries.
-   Custom `/etc/ride-runner/ride-runner.conf` can be used to override or the whole configuration.
-
-Example of `local.conf`:
-
-```conf
-kamon {
-  # Enable metrics
-  enable = true
-  
-  # Enable a Prometheus scraping endpoint on 9095
-  modules.prometheus-reporter.enabled = true
-}
-```
+    1. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
+    2. [transferTransactionById](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#transfertransactionbyid)
 
 ## Running Ride with prepared state
 
-You need an input file, that contains a description of the blockchain state in [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md).
+You need an input file, that contains a description of the blockchain state
+in [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md).
 See the documented [example](./src/test/resources/sample-input.conf).
 
 How to run:
+
 ```shell
 java -jar waves-ride-runner-${version}.jar -i ./sample-input.conf
 ```
+
 You should see the result in JSON.
 
 Help:
+
 ```shell
 java -jar waves-ride-runner-1.4.18-8f8a0f98d3a2304d9b05c369bd333c8f85044e75-DIRTY.jar --help
 ```
