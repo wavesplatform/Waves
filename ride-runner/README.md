@@ -23,6 +23,11 @@ Allows running Ride without a local Waves Node:
 
 ## Service
 
+A default layout:
+
+* `/var/lib/waves-ride-runner` - the data.
+* `/etc/waves-ride-runner` - configs.
+
 ### How to install and run
 
 #### Docker
@@ -35,7 +40,6 @@ docker run \
   -v $(pwd)/config/local.conf:/etc/waves-ride-runner/local.conf:ro \
   -p 127.0.0.1:6890:6890 \
   -p 127.0.0.1:9095:9095 \
-  -e RIDE_NETWORK="mainnet" \
   -e RIDE_HEAP_SIZE="1g" \
   -ti wavesplatform/ride-runner:latest
 ```
@@ -52,7 +56,6 @@ services:
       - 127.0.0.1:6890:6890
       - 127.0.0.1:9095:9095
     environment:
-      - RIDE_NETWORK=mainnet
       - RIDE_HEAP_SIZE=1g
     volumes:
       - ./waves-ride-runner/data:/var/lib/waves-ride-runner
@@ -66,8 +69,11 @@ services:
    to ([complete configuration file](./src/main/resources/ride-runner.conf)) to get the full path of the configuration
    item you want to change.
 2. The service is looking for a config in `/etc/waves-ride-runner/main.conf`. During image build, a default
-   configuration will be copied to this directory. While running container if the value of `RIDE_NETWORK` is
-   not `mainnet`, `testnet` or `stagenet`, a default configuration won't be enough for a correct service working.
+   configuration will be copied to this directory.
+    * A default configuration is enough for a correct service working on MainNet;
+    * While running container if the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default
+      configuration won't be enough for correct working. This is a scenario of using `CUSTOM` network - correct
+      configuration must be provided when running container. 
 3. By default, `/etc/waves-ride-runner/main.conf` config includes `/etc/waves-ride-runner/local.conf`.
     * Custom `local.conf` can be used to override default config entries.
     * Custom `main.conf` can be used to override or the whole configuration.
