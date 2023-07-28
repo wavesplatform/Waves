@@ -19,16 +19,8 @@ class TestBlockchainApi(implicit val scheduler: Scheduler) extends BlockchainApi
   override def mkBlockchainUpdatesStream(scheduler: Scheduler): BlockchainApi.BlockchainUpdatesStream =
     new BlockchainApi.BlockchainUpdatesStream {
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = blockchainUpdatesUpstream
-
-      override def start(fromHeight: Height, toHeight: Height): Unit = {}
-
-      override def closeUpstream(): Unit   = blockchainUpdatesUpstream.onComplete()
-      override def closeDownstream(): Unit = {}
-
-      override def close(): Unit = {
-        closeUpstream()
-        closeDownstream()
-      }
+      override def start(fromHeight: Height, toHeight: Height): Unit    = {}
+      override def close(): Unit                                        = blockchainUpdatesUpstream.onComplete()
     }
 
   override def getCurrentBlockchainHeight(): Height = kill("getCurrentBlockchainHeight")

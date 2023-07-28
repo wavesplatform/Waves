@@ -35,8 +35,5 @@ object BlockchainApi {
 
     def start(fromHeight: Height): Unit = start(fromHeight, toHeight = Height(0))
     def start(fromHeight: Height, toHeight: Height): Unit
-
-    def closeUpstream(): Unit
-    def closeDownstream(): Unit
   }
 }

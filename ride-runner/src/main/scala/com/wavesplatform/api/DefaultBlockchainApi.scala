@@ -59,9 +59,8 @@ class DefaultBlockchainApi(
     settings: Settings,
     grpcApiChannel: Channel,
     blockchainUpdatesApiChannel: Channel
-) extends ScorexLogging
-    with BlockchainApi {
-
+) extends BlockchainApi
+    with ScorexLogging {
   private val grpcApiCalls = MayBeSemaphore(settings.grpcApi.maxConcurrentRequests)
 
   override def mkBlockchainUpdatesStream(scheduler: Scheduler): BlockchainUpdatesStream = {
@@ -84,9 +83,10 @@ class DefaultBlockchainApi(
         // Guarantees that we won't receive any message after WrapperEvent.Failed until we subscribe again
         .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout)
         .doOnError {
-          case _: UpstreamTimeoutException => Task(closeUpstream())
-          case _                           => Task.unit
+          case _: UpstreamTimeoutException => Task(closeUpstream(description = "upstream timeout"))
+          case e                           => Task(log.error("Unhandled", e))
         }
+        // The only way this stream continues and propagates a Failed message
         .onErrorRestartWith { case e if working.get() => WrappedEvent.Failed(e) }
         .publish(scheduler)
 
@@ -107,16 +107,16 @@ class DefaultBlockchainApi(
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
       }
 
-      override def closeUpstream(): Unit = currentUpstream.get().close(StopException)
-
-      override def closeDownstream(): Unit = {
-        log.info("Closing the downstream...")
-        s.onComplete()
-      }
-
       override def close(): Unit = if (working.compareAndSet(true, false)) {
         closeDownstream()
-        closeUpstream()
+        closeUpstream(description = "close")
+      }
+
+      private def closeUpstream(description: String): Unit = currentUpstream.get().close(StopException(description))
+
+      private def closeDownstream(): Unit = {
+        log.info("Closing the downstream...")
+        s.onComplete()
       }
     }
   }
@@ -336,8 +336,8 @@ object DefaultBlockchainApi {
   case class GrpcApiSettings(maxConcurrentRequests: Option[Int])
   case class BlockchainUpdatesApiSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
 
-  private case object StopException           extends RuntimeException("By a request") with NoStackTrace
-  private case object ReplaceWithNewException extends RuntimeException("Replace with a new observer") with NoStackTrace
+  private case object ReplaceWithNewException           extends RuntimeException("Replace with a new observer") with NoStackTrace
+  private case class StopException(description: String) extends RuntimeException(s"By a request: $description") with NoStackTrace
 
   def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
   def toPb(asset: Asset): ByteString     = asset.fold(ByteString.EMPTY)(x => UnsafeByteOperations.unsafeWrap(x.id.arr))
