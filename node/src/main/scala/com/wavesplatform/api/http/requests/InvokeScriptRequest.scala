@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
 import play.api.libs.json.*
 
@@ -94,7 +94,7 @@ case class SignedInvokeScriptRequest(
     version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
-    feeAssetId: Option[String],
+    feeAssetId: Option[Asset],
     dApp: String,
     call: Option[InvokeScriptRequest.FunctionCallPart],
     payment: Option[Seq[InvokeScriptTransaction.Payment]],
@@ -105,7 +105,6 @@ case class SignedInvokeScriptRequest(
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
       _dappAddress <- AddressOrAlias.fromString(dApp, checkChainId = false)
-      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.nonEmpty), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
         _sender,
@@ -113,7 +112,7 @@ case class SignedInvokeScriptRequest(
         call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeTransaction.DefaultCall),
         payment.getOrElse(Seq()),
         fee,
-        _feeAssetId,
+        feeAssetId.getOrElse(Asset.Waves),
         timestamp,
         proofs,
         chainId.getOrElse(_dappAddress.chainId)

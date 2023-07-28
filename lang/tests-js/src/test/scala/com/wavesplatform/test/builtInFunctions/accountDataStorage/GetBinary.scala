@@ -23,7 +23,7 @@ object GetBinary extends JsTestBase {
   private val invalidGetBinaryValue = s"getBinaryValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test("functions getBinary accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-4. Compile getBinary functions for address, alias, and 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -48,7 +48,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test("functions own data getBinary accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-5. Compile own data getBinary functions for address, alias, and 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (ownData <- Seq(ownDataGetBinary, ownDataGetBinaryArgBeforeFunc, ownDataGetBinaryValueArgBeforeFunc, ownDataGetBinaryValue)) {
@@ -58,7 +58,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test("negative tests for getBinary functions") {
+    test("RIDE-6. Test negative scenarios for getBinary functions") {
       val invalidFunction = s"getBinaryValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getBinaryValue()"
       for (version <- testData.actualVersions) {
@@ -79,8 +79,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-
-    test("Can't find a own data functions overload Binary accountDataStorage for old Versions") {
+    test("RIDE-7. Ensure no overload of own data Binary accountDataStorage for old versions") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (

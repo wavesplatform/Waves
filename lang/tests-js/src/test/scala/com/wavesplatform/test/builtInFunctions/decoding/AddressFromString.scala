@@ -17,7 +17,7 @@ object AddressFromString extends JsTestBase {
   private val invalidFunctionErrorForAddressFromStringValue = invalidFunctionError("addressFromStringValue", 1)
 
   val tests: Tests = Tests {
-    test("Functions addressFromString compiles") {
+    test("RIDE-116. Function addressFromString should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         for (
@@ -34,7 +34,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test("Compilation error: addressFromString invalid data or function") {
+    test("RIDE-117. Function addressFromString should throw an error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         for (

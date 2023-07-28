@@ -14,7 +14,7 @@ object Split_51C extends JsTestBase {
   private val invalidErrorSplit_51C  = testData.invalidFunctionError("split_51C", 2)
 
   val tests: Tests = Tests {
-    test("split_51C functions compiles") {
+    test("RIDE-205. split_51C function should compile for valid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       for (
         (data, list, function) <- Seq(
@@ -27,7 +27,7 @@ object Split_51C extends JsTestBase {
       }
     }
 
-    test("compilation error split_51C functions") {
+    test("RIDE-206. split_51C function should throw a compilation error for invalid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       for (
         (data, list, function, error) <- Seq(
@@ -41,7 +41,7 @@ object Split_51C extends JsTestBase {
       }
     }
 
-    test("Can't find a function split_51C with versions V3 - V5") {
+    test("RIDE-207. Can't find a function split_4C for RIDE versions V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (

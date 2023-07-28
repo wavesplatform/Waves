@@ -446,7 +446,7 @@ paths:
                 type: object
                 properties:
                   address:
-                    type: string
+                    $ref: '#/components/schemas/Address'
                   script:
                     type: string
                     format: byte
@@ -480,6 +480,8 @@ paths:
                     description: >-
                       Extra fee for transactions sending on behalf of the
                       account
+                  publicKey:
+                    $ref: '#/components/schemas/PublicKey'
   '/addresses/{address}':
     delete:
       tags:

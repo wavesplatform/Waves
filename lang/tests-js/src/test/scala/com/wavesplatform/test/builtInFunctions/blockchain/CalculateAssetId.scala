@@ -13,7 +13,7 @@ object CalculateAssetId extends JsTestBase {
   private val invalidCalculateAssetId       = "calculateAssetId()"
 
   val tests: Tests = Tests {
-    test("Functions CalculateAssetId for version V4 and more compiled for Issue") {
+    test("RIDE-33. CalculateAssetId function should compile for version V4 and higher when called for Issue operatio") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -28,7 +28,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test("negative cases CalculateAssetId for version V4 and more") {
+    test("RIDE-34. Negative cases for CalculateAssetId function for version V4 and higher") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -44,7 +44,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test("negative cases CalculateAssetId for version V3") {
+    test("RIDE-35. Negative cases for CalculateAssetId function for version V3") {
         val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
         for (
           (data, function) <- Seq(

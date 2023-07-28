@@ -19,13 +19,12 @@ object Log extends JsTestBase {
   private val logIntArgBeforeFunc    = s"callerTestData.log($randomInt, $randomInt, 4, 2, $union)"
   private val logBigInt              = s"log(callerTestData, 6, callerTestData, $randomInt, 2, $union)"
   private val logBigIntArgBeforeFunc = s"callerTestData.log(6, callerTestData, $randomInt, 2, $union)"
-
   private val invalidLogInt              = s"log(callerTestData, 10, $union)"
   private val invalidLogIntArgBeforeFunc = s"callerTestData.log(10, $union)"
   private val logError: String           = testData.invalidFunctionError("log", 6)
 
   val tests: Tests = Tests {
-    test("Log function compiles with Int") {
+    test("RIDE-177. Log function should compile with Int") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -40,7 +39,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test("Log function compiles with BigInt") {
+    test("RIDE-178. Log function should compile with BigInt for Ride V5, V6") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -55,7 +54,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test("compilation error: invalid log function") {
+    test("RIDE-179. Log function should throw an error for invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -76,7 +75,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test("compilation error: invalid log data BigInt") {
+    test("RIDE-180. Log function should throw an error for invalid data BigInt - Ride V5, V6") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (

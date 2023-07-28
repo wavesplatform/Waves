@@ -15,7 +15,7 @@ object Bn256Groth16Verify extends JsTestBase {
   private val invalidErrorBn256Groth16Verify         = testData.invalidFunctionError("bn256Groth16Verify", 3)
 
   val tests: Tests = Tests {
-    test("bn256Groth16Verify functions compiles") {
+    test("RIDE-265. bn256Groth16Verify function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -30,7 +30,7 @@ object Bn256Groth16Verify extends JsTestBase {
       }
     }
 
-    test("invalid functions bn256Groth16Verify") {
+    test("RIDE-266. bn256Groth16Verify function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -47,7 +47,7 @@ object Bn256Groth16Verify extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function bn256Groth16Verify") {
+    test("RIDE-267. Can't find a function bn256Groth16Verify") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, bn256Groth16Verify)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

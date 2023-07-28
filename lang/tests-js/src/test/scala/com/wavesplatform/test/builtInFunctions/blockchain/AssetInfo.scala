@@ -16,7 +16,7 @@ object AssetInfo extends JsTestBase {
 
 
   val tests: Tests = Tests {
-    test("Functions assetInfo compiles") {
+    test("RIDE-30. Compile assetInfo function for asset") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         for (
@@ -31,7 +31,7 @@ object AssetInfo extends JsTestBase {
       }
     }
 
-    test("negative cases") {
+    test("RIDE-29. Invalid data must be validated") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         for (

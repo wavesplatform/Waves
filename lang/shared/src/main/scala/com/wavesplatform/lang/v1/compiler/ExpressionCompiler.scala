@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1.compiler
 import cats.implicits.*
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.CommonError
 import com.wavesplatform.lang.v1.compiler.CompilationError.*
 import com.wavesplatform.lang.v1.compiler.CompilerContext.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -28,14 +27,13 @@ import com.wavesplatform.lang.v1.parser.Expressions.{
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
-import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.{CommonError, StringOps}
 
 import java.nio.charset.StandardCharsets
 import scala.util.Try
 
 object ExpressionCompiler {
-  private val global: BaseGlobal = com.wavesplatform.lang.Global
-
   case class CompilationStepResultExpr(
       ctx: CompilerContext,
       expr: Terms.EXPR,
@@ -126,7 +124,7 @@ object ExpressionCompiler {
 
       def adjustStr(expr: Expressions.CONST_STRING, str: String): Either[CompilationError, CompilationStepResultExpr] =
         CONST_STRING(str)
-          .filterOrElse(_ => allowIllFormedStrings || !global.isIllFormed(str), CommonError(s"String '$str' contains ill-formed characters"))
+          .filterOrElse(_ => allowIllFormedStrings || str.isWellFormed, CommonError(s"String '$str' contains ill-formed characters"))
           .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
           .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }

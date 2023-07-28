@@ -5,7 +5,7 @@ import sbt.{Def, *}
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.4.5" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.4.6-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
@@ -36,6 +36,8 @@ object Dependencies {
 
   val catsCore  = catsModule("core", "2.9.0")
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
+
+  val playJson = "com.typesafe.play" %% "play-json" % "2.9.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.16" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
@@ -87,6 +89,11 @@ object Dependencies {
     "org.scalamock"     %% "scalamock"       % "5.2.0"
   ).map(_ % Test)
 
+  lazy val qaseReportDeps = Seq(
+    playJson,
+    ("io.qase" % "qase-api" % "3.0.4").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+  ).map(_ % Test)
+
   lazy val logDeps = Seq(
     logback             % Runtime,
     janino              % Runtime,
@@ -118,8 +125,8 @@ object Dependencies {
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"       %% "play-json" % "2.9.4",
+      "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
+      playJson,
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,

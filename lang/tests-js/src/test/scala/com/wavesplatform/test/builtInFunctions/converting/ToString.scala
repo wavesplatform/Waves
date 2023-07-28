@@ -13,14 +13,13 @@ import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, a
 import utest.{Tests, test}
 
 object ToString extends JsTestBase {
-  // toString
   private val toStr                     = "toString(callerTestData)"
   private val toStrArgBeforeFunc        = "callerTestData.toString()"
   private val invalidToStr              = "toString()"
   private val invalidToStrArgBeforeFunc = "callerTestData.toString(callerTestData)"
 
   val tests: Tests = Tests {
-    test(" Functions toString compiles with int, string, boolean") {
+    test("RIDE-80. Functions toString function should compile with int, string, boolean") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -39,7 +38,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test(" Functions toString compiles with bigInt for V5, V6 versions") {
+    test("RIDE-81. Functions toString should compile with bigInt for V5, V6 versions") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -54,7 +53,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test(" toString negative tests") {
+    test("RIDE-82. toString function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (

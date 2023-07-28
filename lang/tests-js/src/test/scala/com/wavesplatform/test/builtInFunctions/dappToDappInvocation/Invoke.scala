@@ -14,7 +14,7 @@ object Invoke extends JsTestBase {
   private val invalidFunctionErrorResult: String = invalidFunctionError("invoke", 4)
 
   val tests: Tests = Tests {
-    test(" functions invoke compiles for Issue V4 and more") {
+    test("RIDE-88. Invoke function should compile for Issue RIDE V5 and more") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -29,7 +29,7 @@ object Invoke extends JsTestBase {
       }
     }
 
-    test(" Functions invoke negative tests for V4 and more") {
+    test("RIDE-89. Invoke function throws an error for invalid values for RIDE V5 and more") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

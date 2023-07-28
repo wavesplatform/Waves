@@ -219,7 +219,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: InvokeScriptTransaction, publicKeyHash: Array[Byte])(implicit
+  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: TransactionBase, publicKeyHash: Array[Byte])(implicit
       pos: Position
   ): Unit = {
     checkBaseTx(actualId, actual, expected)
@@ -230,14 +230,43 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction)(implicit
+  def checkEthereumInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction, publicKeyHash: Array[Byte])(
+      implicit pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.InvokeScript(value) =>
+        value.dApp.get.getPublicKeyHash.toByteArray shouldBe publicKeyHash
+      case _ => fail("not a InvokeScript transaction")
+    }
+  }
+
+  def checkInvokeBaseTransactionMetadata(transactionMetadata: TransactionMetadata, expected: InvokeScriptTransaction)(implicit
       pos: Position
   ): Unit = {
-    val invokeScript = actual.head.getInvokeScript
+    val invokeScript = transactionMetadata.getInvokeScript
 
-    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
+    transactionMetadata.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
     invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
     invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
+  }
+
+  def checkEthereumInvokeBaseTransactionMetadata(
+      transactionMetadata: TransactionMetadata,
+      expected: EthereumTransaction,
+      funcName: String,
+      dAppAddress: Address
+  )(implicit
+      pos: Position
+  ): Unit = {
+    val ethereumMetadata = transactionMetadata.getEthereum
+
+    transactionMetadata.senderAddress.toByteArray shouldBe expected.senderAddress.value().bytes
+    ethereumMetadata.getInvoke.dAppAddress.toByteArray shouldBe dAppAddress.bytes
+    ethereumMetadata.getInvoke.functionName shouldBe funcName
+    ethereumMetadata.fee shouldBe expected.fee
+    ethereumMetadata.timestamp shouldBe expected.timestamp
+    ethereumMetadata.senderPublicKey.toByteArray shouldBe expected.sender.arr
   }
 
   def checkArguments(expectedValues: List[Any], actualArguments: List[Any]): Unit = {

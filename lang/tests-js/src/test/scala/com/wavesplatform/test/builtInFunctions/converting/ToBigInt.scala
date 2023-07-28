@@ -15,7 +15,7 @@ object ToBigInt extends JsTestBase {
   private val invalidParseBigIntArgBeforeFunc = s"callerTestData.toBigInt(callerTestData, 123, $randomInt)"
 
   val tests: Tests = Tests {
-    test(" Functions toBigInt compiles") {
+    test("RIDE-72. ToBigInt function should compile for valid values") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -34,7 +34,7 @@ object ToBigInt extends JsTestBase {
       }
     }
 
-    test(" Functions toBigInt negative tests") {
+    test("RIDE-73. ToBigInt function throws an error for invalid values") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (

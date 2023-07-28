@@ -14,7 +14,7 @@ object Cons extends JsTestBase {
   private val invalidErrorCons         = invalidFunctionError("cons", 2)
 
   val tests: Tests = Tests {
-    test("Cons functions compiles with a list") {
+    test("RIDE-152. Function Cons should compile for valid list") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -31,7 +31,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test("Compilation errors Cons functions") {
+    test("RIDE-153. Function Cons should throw an error for invalid data or type") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

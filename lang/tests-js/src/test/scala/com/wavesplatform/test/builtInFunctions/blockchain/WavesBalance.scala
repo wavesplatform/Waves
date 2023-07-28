@@ -14,7 +14,7 @@ object WavesBalance extends JsTestBase {
   private val invalidWavesBalanceArg    = s"callerTestData.wavesBalance(callerTestData)"
 
   val tests: Tests = Tests {
-    test(" Functions wavesBalance for version V4 and more compiles for address, alias and 'this'") {
+    test("RIDE-46. wavesBalance function for version V4 and more should compile for address, alias, and 'this'") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
         for (
@@ -33,7 +33,7 @@ object WavesBalance extends JsTestBase {
       }
     }
 
-    test(" Functions wavesBalance for version V4 and more - negative cases") {
+    test("RIDE-47. Negative cases for wavesBalance function for version V4 and more") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
         for (
@@ -50,7 +50,7 @@ object WavesBalance extends JsTestBase {
       }
     }
 
-    test(" Functions wavesBalance for V3 compiles for address, alias and 'this'") {
+    test("RIDE-48. Functions wavesBalance for V3 compiles for address, alias and 'this'") {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
         for (
           (data, function) <- Seq(
@@ -67,7 +67,7 @@ object WavesBalance extends JsTestBase {
       }
     }
 
-    test("compilation error: wavesBalance for V3 Non-matching type") {
+    test("RIDE-49. compilation error: wavesBalance for V3 Non-matching type") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       for (
         (data, function, error) <- Seq(
