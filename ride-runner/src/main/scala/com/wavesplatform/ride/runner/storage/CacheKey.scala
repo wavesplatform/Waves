@@ -85,13 +85,13 @@ class GrpcCacheKeyConverters(chainId: Byte) {
   def accountDataRawKey(update: StateUpdate.DataEntryUpdate): String =
     update.dataEntry.orElse(update.dataEntryBefore).map(_.key).getOrElse(throw new RuntimeException(s"Can't get data key of $update"))
 
-  def accountDataValue(update: StateUpdate.DataEntryUpdate): Option[CacheKey.AccountData#ValueT] = update.dataEntry.map(accountDataValue)
-  def accountDataValue(dataEntry: DataTransactionData.DataEntry): CacheKey.AccountData#ValueT    = toVanillaDataEntry(dataEntry)
+  def accountDataValueBefore(update: StateUpdate.DataEntryUpdate): Option[CacheKey.AccountData#ValueT] = update.dataEntryBefore.map(accountDataValue)
+  def accountDataValueAfter(update: StateUpdate.DataEntryUpdate): Option[CacheKey.AccountData#ValueT]  = update.dataEntry.map(accountDataValue)
+  def accountDataValue(dataEntry: DataTransactionData.DataEntry): CacheKey.AccountData#ValueT          = toVanillaDataEntry(dataEntry)
 
-  def transactionIdKey(id: ByteString): CacheKey.Transaction =
-    CacheKey.Transaction(TransactionId(ByteStr(id.toByteArray)))
+  def transactionIdKey(id: ByteString): CacheKey.Transaction = CacheKey.Transaction(TransactionId(ByteStr(id.toByteArray)))
 
-  // Can't fail, because receive verified
+  // Can't fail, because we receive it verified
   def aliasKey(name: String): CacheKey.Alias   = CacheKey.Alias(Alias.createWithChainId(name, chainId).explicitGet())
   def aliasValue(pkBytes: ByteString): Address = pkBytes.toPublicKey.toAddress(chainId)
 
@@ -104,9 +104,8 @@ class GrpcCacheKeyConverters(chainId: Byte) {
         .toIssuedAsset
     )
 
-  def assetValue(asset: IssuedAsset, update: StateUpdate.AssetStateUpdate): Option[AssetDescription] =
-    update.after.map(assetValue(asset, _))
-
+  def assetValueBefore(asset: IssuedAsset, update: StateUpdate.AssetStateUpdate): Option[AssetDescription] = update.before.map(assetValue(asset, _))
+  def assetValueAfter(asset: IssuedAsset, update: StateUpdate.AssetStateUpdate): Option[AssetDescription]  = update.after.map(assetValue(asset, _))
   def assetValue(asset: IssuedAsset, update: StateUpdate.AssetDetails): AssetDescription = AssetDescription(
     originTransactionId = asset.id,
     issuer = update.issuer.toPublicKey,
@@ -127,18 +126,30 @@ class GrpcCacheKeyConverters(chainId: Byte) {
     issueHeight = Height(1)
   )
 
-  def accountBalanceKeyAndValue(update: StateUpdate.BalanceUpdate): (CacheKey.AccountBalance, Long) = {
+  def accountBalanceKeyAndValueBefore(update: StateUpdate.BalanceUpdate): (CacheKey.AccountBalance, Long) = {
+    val address    = toVanillaAddress(update.address, chainId)
+    val (asset, _) = toAssetAndAmount(update.getAmountAfter) // We have an asset only in getAmountAfter
+    (CacheKey.AccountBalance(address, asset), update.amountBefore)
+  }
+
+  def accountBalanceKeyAndValueAfter(update: StateUpdate.BalanceUpdate): (CacheKey.AccountBalance, Long) = {
     val address        = toVanillaAddress(update.address, chainId)
     val (asset, after) = toAssetAndAmount(update.getAmountAfter)
     (CacheKey.AccountBalance(address, asset), after)
   }
 
-  def accountLeaseBalanceKeyAndValue(update: StateUpdate.LeasingUpdate): (CacheKey.AccountLeaseBalance, LeaseBalance) = {
+  def accountLeaseBalanceKeyAndValueBefore(update: StateUpdate.LeasingUpdate): (CacheKey.AccountLeaseBalance, LeaseBalance) = {
     val address = toVanillaAddress(update.address, chainId)
-    (CacheKey.AccountLeaseBalance(address), toVanilla(update))
+    (CacheKey.AccountLeaseBalance(address), toVanillaBefore(update))
   }
 
-  private def toVanilla(x: StateUpdate.LeasingUpdate): LeaseBalance = LeaseBalance(x.inAfter, x.outAfter)
+  def accountLeaseBalanceKeyAndValueAfter(update: StateUpdate.LeasingUpdate): (CacheKey.AccountLeaseBalance, LeaseBalance) = {
+    val address = toVanillaAddress(update.address, chainId)
+    (CacheKey.AccountLeaseBalance(address), toVanillaAfter(update))
+  }
+
+  private def toVanillaBefore(x: StateUpdate.LeasingUpdate): LeaseBalance = LeaseBalance(x.inBefore, x.outBefore)
+  private def toVanillaAfter(x: StateUpdate.LeasingUpdate): LeaseBalance  = LeaseBalance(x.inAfter, x.outAfter)
 
   def accountScriptKey(update: StateUpdate.ScriptUpdate): CacheKey.AccountScript = {
     val address = toVanillaAddress(update.address, chainId)

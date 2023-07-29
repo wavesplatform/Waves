@@ -4,7 +4,7 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import cats.syntax.option.*
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.BaseTestSuite
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
 import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
 import com.wavesplatform.api.http.ApiError.CustomValidationError
@@ -33,9 +33,9 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
   private val cRequest = RideScriptRunRequest(carlAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
 
   private val accountScripts = Map(
-    aliceAddr -> ScriptUtil.from(aliceScriptSrc),
-    bobAddr   -> ScriptUtil.from(bobScriptSrc),
-    carlAddr  -> ScriptUtil.from(carlScriptSrc)
+    aliceAddr -> (alice.publicKey, ScriptUtil.from(aliceScriptSrc)),
+    bobAddr   -> (bob.publicKey, ScriptUtil.from(bobScriptSrc)),
+    carlAddr  -> (carl.publicKey, ScriptUtil.from(carlScriptSrc))
   )
 
   private val defaultRequestServiceSettings =
@@ -202,7 +202,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
           toVanilla(BlockWithHeight(mkPbBlock(height).some, height))
         override def getActivatedFeatures(height: Height): Map[Short, Height] =
           blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
-        override def getAccountScript(address: Address): Option[Script] = accountScripts.get(address)
+        override def getAccountScript(address: Address): Option[(PublicKey, Script)] = accountScripts.get(address)
         override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
           if (address == aliceAddr && key == "x") IntegerDataEntry("x", 0).some
           else super.getAccountDataEntry(address, key)

@@ -80,7 +80,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     } yield CacheKey.AccountData(address, key)
 
     // TODO: What if I move this to ReadOnly / ReadWrite?
-    override def get(maxHeight: Height, key: CacheKey.AccountData)(implicit ctx: ReadWrite): RemoteData[DataEntry[?]] =
+    override def get(maxHeight: Height, key: CacheKey.AccountData)(implicit ctx: ReadOnly): RemoteData[DataEntry[?]] =
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(key.address))
         .flatMap { addressId =>
@@ -135,7 +135,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
       address   <- addressIds.getAddress(addressId)
     } yield address
 
-    override def get(maxHeight: Height, key: Address)(implicit ctx: ReadWrite): RemoteData[WeighedAccountScriptInfo] =
+    override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[WeighedAccountScriptInfo] =
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(key))
         .flatMap { addressId =>
@@ -181,7 +181,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
 
       override def getAllKeys()(implicit ctx: ReadOnly): List[Asset.IssuedAsset] = ctx.collectKeys(KvPairs.AssetDescriptionsHistory)
 
-      override def get(maxHeight: Height, key: Asset.IssuedAsset)(implicit ctx: ReadWrite): RemoteData[WeighedAssetDescription] =
+      override def get(maxHeight: Height, key: Asset.IssuedAsset)(implicit ctx: ReadOnly): RemoteData[WeighedAssetDescription] =
         ctx
           .readHistoricalFromDbOpt(
             KvPairs.AssetDescriptionsHistory.at(key),
@@ -274,7 +274,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
       address              <- addressIds.getAddress(addressId)
     } yield (address, assetId)
 
-    override def get(maxHeight: Height, key: AccountAssetKey)(implicit ctx: ReadWrite): RemoteData[Long] = {
+    override def get(maxHeight: Height, key: AccountAssetKey)(implicit ctx: ReadOnly): RemoteData[Long] = {
       val (address, asset) = key
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(address))
@@ -330,7 +330,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
       address   <- addressIds.getAddress(addressId)
     } yield address
 
-    override def get(maxHeight: Height, key: Address)(implicit ctx: ReadWrite): RemoteData[LeaseBalance] =
+    override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[LeaseBalance] =
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(key))
         .flatMap { addressId =>
@@ -479,9 +479,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     log.trace("setActivatedFeatures")
   }
 
-  private def mkLogger(name: String) = LoggerFacade(
-    LoggerFactory.getLogger(s"com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches.$name")
-  )
+  private def mkLogger(name: String) = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.$name"))
 }
 
 object DefaultPersistentCaches {

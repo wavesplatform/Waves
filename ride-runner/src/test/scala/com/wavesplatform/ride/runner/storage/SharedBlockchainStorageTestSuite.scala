@@ -557,8 +557,12 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
     def allTagsAreAffected(access: Access): Unit = allTagsAreAffected(access.affectedTags)
 
-    def allTagsAreAffected(affectedTags: AffectedTags[Int]): Unit = withClue("affected tags") {
-      affectedTags shouldBe AffectedTags((1 to 9).toSet)
+    private val allTags = AffectedTags((1 to 9).toSet)
+    def allTagsAreAffected(affectedTags: AffectedTags[Int]): Unit = {
+      val sortedDiff = (allTags.xs -- affectedTags.xs).toList.sorted
+      withClue(s"affected tags, diff={${sortedDiff.mkString(", ")}}") {
+        affectedTags shouldBe allTags
+      }
     }
 
     def allDataIsUnknownCheck(access: Access): Unit = {
@@ -649,6 +653,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       withClue("account script") {
         access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Cached(
           WeighedAccountScriptInfo(
+            publicKey = alice.publicKey,
             scriptInfoWeight = 480,
             script = accountScript.script,
             verifierComplexity = accountScript.verifierComplexity,

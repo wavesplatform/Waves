@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import cats.syntax.option.*
 import com.typesafe.config.ConfigMemorySize
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.grpc.{BalanceResponse, BlockWithHeight}
 import com.wavesplatform.api.{HasBasicGrpcConverters, HasGrpc, TestBlockchainApi}
@@ -47,8 +47,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       override def getActivatedFeatures(height: Height): Map[Short, Height] =
         blockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
 
-      override def getAccountScript(address: Address): Option[Script] =
-        if (address == aliceAddr) aliceScript.some
+      override def getAccountScript(address: Address): Option[(PublicKey, Script)] =
+        if (address == aliceAddr) (alice.publicKey, aliceScript).some
         else None
 
       override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =

@@ -5,6 +5,7 @@ import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
 import com.wavesplatform.ride.runner.storage.BlockchainDataCache.Settings
 
+// TODO InMem cache?
 class BlockchainDataCache(settings: Settings) {
   private val backend = Caffeine
     .newBuilder()

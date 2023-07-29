@@ -4,7 +4,6 @@ import cats.syntax.option.*
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream
 import com.google.common.primitives.Shorts
 import com.google.protobuf.UnsafeByteOperations
-import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
@@ -88,8 +87,8 @@ object KvPairs {
     AsBytes
       .tuple2(intAsBytes, accountScriptInfoAsBytes)
       .transform(
-        { case (weight, x) => WeighedAccountScriptInfo(weight, x.script, x.verifierComplexity, x.complexitiesByEstimator) },
-        x => (x.scriptInfoWeight, AccountScriptInfo(EmptyPublicKey, x.script, x.verifierComplexity, x.complexitiesByEstimator))
+        { case (weight, x) => WeighedAccountScriptInfo(x.publicKey, weight, x.script, x.verifierComplexity, x.complexitiesByEstimator) },
+        x => (x.scriptInfoWeight, AccountScriptInfo(x.publicKey, x.script, x.verifierComplexity, x.complexitiesByEstimator))
       )
 
   object AccountScripts

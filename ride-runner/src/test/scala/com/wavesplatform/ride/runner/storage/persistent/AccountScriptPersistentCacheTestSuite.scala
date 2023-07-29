@@ -11,6 +11,7 @@ class AccountScriptPersistentCacheTestSuite extends PersistentCacheWithHistoryTe
   private val defaultAddressId      = AddressId(0L) // There is only one addressId
   protected override val defaultKey = alice.toAddress
   protected override val defaultValue = WeighedAccountScriptInfo(
+    publicKey = alice.publicKey,
     scriptInfoWeight = 0, // Doesn't matter here
     script = Script.fromBase64String("base64:BQkAAGYAAAACBQAAAAZoZWlnaHQAAAAAAAAAAABXs1wV").explicitGet(),
     verifierComplexity = 0,

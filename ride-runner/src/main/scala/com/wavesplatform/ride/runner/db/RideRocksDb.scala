@@ -53,7 +53,7 @@ class RideRocksDb(
 object RideRocksDb extends ScorexLogging {
   case class Settings(directory: String) {
     // Increase when need to delete the database
-    val version = 11
+    val version = 12
   }
 
   def open(settings: Settings): RideDb = {

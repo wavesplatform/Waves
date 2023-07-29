@@ -3,7 +3,7 @@ package com.wavesplatform.api
 import cats.syntax.option.*
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
@@ -173,7 +173,7 @@ class DefaultBlockchainApi(
       .map(x => toVanillaDataEntry(x.getEntry))
       .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
 
-  override def getAccountScript(address: Address): Option[Script] = {
+  override def getAccountScript(address: Address): Option[(PublicKey, Script)] = {
     val as = grpcCall("getAccountScript") {
       ClientCalls.blockingUnaryCall(
         grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
@@ -181,7 +181,9 @@ class DefaultBlockchainApi(
       )
     }
 
-    toVanillaScript(as.scriptBytes).tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.hashCode())}"))
+    toVanillaScript(as.scriptBytes)
+      .map((as.publicKey.toPublicKey, _))
+      .tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.hashCode())}"))
   }
 
   override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] = {

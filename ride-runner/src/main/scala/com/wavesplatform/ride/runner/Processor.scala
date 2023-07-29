@@ -40,6 +40,7 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
 
   private val accumulatedChanges = new AtomicReference(new ProcessResult[RideScriptRunRequest]())
 
+  /** A list of Append events (can't express this in types). The recent events in the front (head) of the list */
   @volatile private var lastLiquidBlockEvents = List.empty[BlockchainUpdated]
 
   override def startScripts(): Unit = requestsService.start()

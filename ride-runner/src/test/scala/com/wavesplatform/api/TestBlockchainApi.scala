@@ -1,6 +1,6 @@
 package com.wavesplatform.api
 
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.grpc.BalanceResponse
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
@@ -29,7 +29,7 @@ class TestBlockchainApi(implicit val scheduler: Scheduler) extends BlockchainApi
 
   override def getAccountDataEntries(address: Address): Seq[DataEntry[?]]               = kill(s"getAccountDataEntries(address=$address)")
   override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] = kill(s"getAccountDataEntry(address=$address, $key)")
-  override def getAccountScript(address: Address): Option[Script]                       = kill(s"getAccountScript(address=$address)")
+  override def getAccountScript(address: Address): Option[(PublicKey, Script)]          = kill(s"getAccountScript(address=$address)")
   override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf]         = kill(s"getBlockHeader(height=$height)")
 
   override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] =

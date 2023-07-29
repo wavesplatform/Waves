@@ -1,6 +1,6 @@
 package com.wavesplatform.api
 
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi.*
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
@@ -19,7 +19,7 @@ trait BlockchainApi {
   def getActivatedFeatures(height: Height): Map[Short, Height]
   def getAccountDataEntries(address: Address): Seq[DataEntry[?]]
   def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]]
-  def getAccountScript(address: Address): Option[Script]
+  def getAccountScript(address: Address): Option[(PublicKey, Script)]
   def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf]
   def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf]
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription]
