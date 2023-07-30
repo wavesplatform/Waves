@@ -31,20 +31,18 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           "ignores unrelated updates" in new Test {
             override val trackAffectedEvents = Seq(mkFilledAppendBlockEvent())
 
-            override def doOnComplete(access: Access): Unit = {
-              noTagsAreAffected(access)
-              allDataIsUnknownCheck(access)
-            }
+            override def checks(access: Access): Unit = access
+              .noTagsAffected()
+              .allDataIsUnknown()
           }.runTest()
 
           "can get the appended data" in new Test {
             override val trackAffectedEvents = Seq(mkFilledAppendBlockEvent())
             override val dependencies        = allDependencies
 
-            override def doOnComplete(access: Access): Unit = {
-              allTagsAreAffected(access)
-              allDataIsCachedCheck(access)
-            }
+            override def checks(access: Access): Unit = access
+              .allTagsAffected()
+              .allDataIsCached()
           }.runTest()
 
           "updates activated features" in withDb { db =>
@@ -82,10 +80,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
             override val preEvents           = Seq(mkEmptyAppendBlockEvent())
             override val trackAffectedEvents = Seq(mkFilledAppendMicroBlockEvent())
 
-            override def doOnComplete(access: Access): Unit = {
-              noTagsAreAffected(access)
-              allDataIsUnknownCheck(access)
-            }
+            override def checks(access: Access): Unit = access
+              .noTagsAffected()
+              .allDataIsUnknown()
           }.runTest()
 
           "can get the appended data" in new Test {
@@ -93,14 +90,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
             override val trackAffectedEvents = Seq(mkFilledAppendMicroBlockEvent())
             override val dependencies        = allDependencies
 
-            override def doOnComplete(access: Access): Unit = {
-              allTagsExceptHeightAreAffected(access)
-              allDataIsCachedCheck(access)
-            }
-
-            def allTagsExceptHeightAreAffected(access: Access): Unit = withClue("affected tags") {
-              access.affectedTags shouldBe AffectedTags((1 to 9).toSet - dependencies(CacheKey.Height))
-            }
+            override def checks(access: Access): Unit = access
+              .allTagsAffectedExcept(heightKey)
+              .allDataIsCached()
           }.runTest()
         }
       }
@@ -116,10 +108,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               mkRollbackEvent(filledAppend)
             )
 
-            override def doOnComplete(access: Access): Unit = {
-              noTagsAreAffected(access)
-              allDataIsUnknownCheck(access)
-            }
+            override def checks(access: Access): Unit = access
+              .noTagsAffected()
+              .allDataIsUnknown()
           }.runTest()
 
           "can get the restored data" in new Test {
@@ -133,37 +124,15 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
             override val dependencies = allDependencies
 
-            override def doOnComplete(access: Access): Unit = {
-              allTagsAreAffected(access)
-
-              withClue("account data") {
-                access.get(CacheKey.AccountData(aliceAddr, "x")) shouldBe RemoteData.Absence
-              }
-
-              withClue("transaction") {
-                access.get(CacheKey.Transaction(transactionId)) shouldBe RemoteData.Unknown
-              }
-
-              withClue("asset") {
-                access.get(CacheKey.Asset(asset)) shouldBe RemoteData.Absence
-              }
-
-              withClue("waves balance") {
-                access.get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe RemoteData.Cached(0L)
-              }
-
-              withClue("issued asset balance") {
-                access.get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe RemoteData.Cached(0L)
-              }
-
-              withClue("lease balance") {
-                access.get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe RemoteData.Cached(LeaseBalance(0L, 0L))
-              }
-
-              withClue("account script") {
-                access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Absence
-              }
-            }
+            override def checks(access: Access): Unit = access
+              .allTagsAffected()
+              .dataIs(
+                aliceAccountData = RemoteData.Absence,
+                assetInfo = RemoteData.Absence,
+                aliceWavesBalance = RemoteData.Cached(0L),
+                bobAssetBalance = RemoteData.Cached(0L),
+                aliceLeaseBalance = RemoteData.Cached(LeaseBalance(0L, 0L))
+              )
           }.runTest()
         }
 
@@ -177,10 +146,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               mkRollbackEvent(filledAppend)
             )
 
-            override def doOnComplete(access: Access): Unit = {
-              noTagsAreAffected(access)
-              allDataIsUnknownCheck(access)
-            }
+            override def checks(access: Access): Unit = access
+              .noTagsAffected()
+              .allDataIsUnknown()
           }.runTest()
 
           "can get the restored data" in new Test {
@@ -194,37 +162,15 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
             override val dependencies = allDependencies
 
-            override def doOnComplete(access: Access): Unit = {
-              allTagsAreAffected(access)
-
-              withClue("account data") {
-                access.get(CacheKey.AccountData(aliceAddr, "x")) shouldBe RemoteData.Absence
-              }
-
-              withClue("transaction") {
-                access.get(CacheKey.Transaction(transactionId)) shouldBe RemoteData.Unknown
-              }
-
-              withClue("asset") {
-                access.get(CacheKey.Asset(asset)) shouldBe RemoteData.Absence
-              }
-
-              withClue("waves balance") {
-                access.get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe RemoteData.Cached(0L)
-              }
-
-              withClue("issued asset balance") {
-                access.get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe RemoteData.Cached(0L)
-              }
-
-              withClue("lease balance") {
-                access.get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe RemoteData.Cached(LeaseBalance(0L, 0L))
-              }
-
-              withClue("account script") {
-                access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Absence
-              }
-            }
+            override def checks(access: Access): Unit = access
+              .allTagsAffected()
+              .dataIs(
+                aliceAccountData = RemoteData.Absence,
+                assetInfo = RemoteData.Absence,
+                aliceWavesBalance = RemoteData.Cached(0L),
+                bobAssetBalance = RemoteData.Cached(0L),
+                aliceLeaseBalance = RemoteData.Cached(LeaseBalance(0L, 0L))
+              )
           }.runTest()
         }
       }
@@ -239,9 +185,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
             override val preEvents           = Seq(mkEmptyAppendBlockEvent(1))
             override val trackAffectedEvents = Seq(filledAppend)
 
-            override def doOnComplete(access: Access): Unit = {
-              noTagsAreAffected(access.blockchain.undo(List(filledAppend)))
-              allDataIsUnknownCheck(access)
+            override def checks(access: Access): Unit = {
+              // TODO preEvents? trackAffected? etc?
+              access.allDataIsUnknown().blockchain.undo(List(filledAppend)) shouldBe empty
             }
           }.runTest()
 
@@ -253,9 +199,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
             override val dependencies = allDependencies
 
-            override def doOnComplete(access: Access): Unit = {
-              allTagsAreAffected(access.blockchain.undo(List(filledAppend)))
-              allDataIsRestoredCheck(access)
+            override def checks(access: Access): Unit = {
+              access.blockchain.undo(List(filledAppend)) shouldBe allTags
+              access.allDataIsRestored()
             }
           }.runTest()
         }
@@ -268,9 +214,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
             override val preEvents           = Seq(mkEmptyAppendBlockEvent(1))
             override val trackAffectedEvents = Seq(block2, microBlock)
 
-            override def doOnComplete(access: Access): Unit = {
-              noTagsAreAffected(access.blockchain.undo(List(microBlock, block2))) // Liquid block
-              allDataIsUnknownCheck(access)
+            override def checks(access: Access): Unit = {
+              access.blockchain.undo(List(microBlock, block2)) shouldBe empty // Liquid block
+              access.allDataIsUnknown()
             }
           }.runTest()
 
@@ -291,9 +237,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
               override val dependencies = allDependencies
 
-              override def doOnComplete(access: Access): Unit = {
-                allTagsAreAffected(access.blockchain.undo(List(microBlock, block2))) // Liquid block
-                allDataIsRestoredCheck(access)
+              override def checks(access: Access): Unit = {
+                access.blockchain.undo(List(microBlock, block2)) shouldBe allTags // Liquid block
+                access.allDataIsRestored()
               }
             }.runTest()
           }
@@ -301,42 +247,44 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       }
 
       "rollback to" - {
-        "block - does nothing" in new Test {
-          private val emptyAppend = mkEmptyAppendBlockEvent(2)
-          private val rollback    = mkRollbackEvent(emptyAppend)
+        "block" in new Test {
+          private val emptyAppend2 = mkEmptyAppendBlockEvent(2)
+          private val emptyAppend3 = mkEmptyAppendBlockEvent(3)
 
           override val trackAffectedEvents = Seq(
             mkFilledAppendBlockEvent(1),
-            emptyAppend,
-            rollback
+            emptyAppend2,
+            emptyAppend3,
+            mkRollbackEvent(emptyAppend3)
           )
 
           override val dependencies = allDependencies
 
-          override def doOnComplete(access: Access): Unit = {
-            noTagsAreAffected(access.blockchain.undo(List(rollback)))
-            allDataIsCachedCheck(access)
+          override def checks(access: Access): Unit = {
+            access.blockchain.undo(List(emptyAppend2)) shouldBe AffectedTags(Set(allDependencies(heightKey)))
+            access.allDataIsCached()
             withClue("height") { access.blockchain.height shouldBe 1 }
           }
         }.runTest()
 
-        "micro block - does nothing" in new Test {
-          private val emptyAppend = mkEmptyAppendMicroBlockEvent(2)
-          private val rollback    = mkRollbackEvent(emptyAppend)
+        "micro block" in new Test {
+          private val emptyAppend1 = mkMicroBlockAppendEvent(height = 2, forkNumber = 1, microBlockNumber = 1)
+          private val emptyAppend2 = mkMicroBlockAppendEvent(height = 2, forkNumber = 1, microBlockNumber = 2)
 
           override val trackAffectedEvents = Seq(
             mkFilledAppendBlockEvent(1),
             mkEmptyAppendBlockEvent(2),
-            emptyAppend,
-            rollback
+            emptyAppend1,
+            emptyAppend2,
+            mkRollbackEvent(emptyAppend2)
           )
 
           override val dependencies = allDependencies
 
-          override def doOnComplete(access: Access): Unit = {
-            noTagsAreAffected(access.blockchain.undo(List(rollback)))
-            allDataIsCachedCheck(access)
-            withClue("height") { access.blockchain.height shouldBe 2 }
+          override def checks(access: Access): Unit = {
+            access.blockchain.undo(List(emptyAppend1)) shouldBe AffectedTags(Set(allDependencies(heightKey)))
+            access.allDataIsCached()
+            withClue("height") { access.blockchain.height shouldBe 1 }
           }
         }.runTest()
       }
@@ -369,7 +317,6 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
     complexitiesByEstimator = Map(1 -> Map.empty)
   )
 
-  // TODO add aliases
   private val pbStateUpdate = StateUpdate.defaultInstance
     .withDataEntries(Seq(mkDataEntryUpdate(aliceAddr, "x", none, 1L.some)))
     .withAssets(
@@ -408,6 +355,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       Seq(
         StateUpdate.ScriptUpdate(
           address = aliceAddr.toByteString,
+          before = accountScript.script.bytes().toByteString, // Because otherwise we ignore it, see SharedBlockchainStorage.append
           after = accountScript.script.bytes().toByteString
         )
       )
@@ -431,8 +379,6 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
     _.withStateUpdate(pbStateUpdate).withTransactionIds(pbTransactionIds),
     _.withTransactions(pbTransactions)
   )
-
-  private def mkEmptyAppendMicroBlockEvent(height: Int) = mkMicroBlockAppendEvent(height, 1, 1)
 
   private def mkFilledAppendMicroBlockEvent(height: Int = 1) = mkMicroBlockAppendEvent(
     height,
@@ -508,28 +454,47 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       DefaultBlockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
   }
 
-  type Tag = Int
-  private abstract class Test {
-    val allDependencies: Map[CacheKey, Tag] = Map(
-      CacheKey.AccountData(aliceAddr, "x")                    -> 1,
-      CacheKey.Transaction(transactionId)                     -> 2,
-      CacheKey.Height                                         -> 3,
-      CacheKey.Alias(Alias.create("foo-alias").explicitGet()) -> 4,
-      CacheKey.Asset(asset)                                   -> 5,
-      CacheKey.AccountBalance(aliceAddr, Asset.Waves)         -> 6,
-      CacheKey.AccountBalance(bobAddr, asset)                 -> 7,
-      CacheKey.AccountLeaseBalance(aliceAddr)                 -> 8,
-      CacheKey.AccountScript(aliceAddr)                       -> 9
-    )
+  private lazy val heightKey        = CacheKey.Height
+  private lazy val accountScriptKey = CacheKey.AccountScript(aliceAddr)
+  private lazy val allDependencies: Map[CacheKey, Tag] = Map(
+    CacheKey.AccountData(aliceAddr, "x")                    -> 1,
+    CacheKey.Transaction(transactionId)                     -> 2,
+    heightKey                                               -> 3,
+    CacheKey.Alias(Alias.create("foo-alias").explicitGet()) -> 4,
+    CacheKey.Asset(asset)                                   -> 5,
+    CacheKey.AccountBalance(aliceAddr, Asset.Waves)         -> 6,
+    CacheKey.AccountBalance(bobAddr, asset)                 -> 7,
+    CacheKey.AccountLeaseBalance(aliceAddr)                 -> 8,
+    accountScriptKey                                        -> 9
+  )
+  private lazy val allTags = AffectedTags(allDependencies.values.toSet)
 
+  private type Tag = Int
+  private abstract class Test {
     val preEvents: Seq[BlockchainUpdated]           = Seq.empty
     val trackAffectedEvents: Seq[BlockchainUpdated] = Seq.empty
     val dependencies: Map[CacheKey, Tag]            = Map.empty
 
-    def doOnComplete(access: Access): Unit
+    def checks(access: Access): Unit
     def runTest(): Unit = withDb { db =>
       val allTags = new CacheKeyTags[Tag]
-      db.batchedReadWrite { implicit rw =>
+      db.directReadWrite { implicit rw =>
+        val persistentCaches = DefaultPersistentCaches(db)
+        if (dependencies.contains(accountScriptKey))
+          persistentCaches.accountScripts.set(
+            atHeight = Height(0),
+            key = aliceAddr,
+            data = RemoteData.Cached(
+              WeighedAccountScriptInfo(
+                publicKey = alice.publicKey,
+                scriptInfoWeight = 1,
+                script = accountScript.script,
+                verifierComplexity = 0,
+                complexitiesByEstimator = Map.empty
+              )
+            )
+          )
+
         val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
             blockchain = DefaultBlockchainSettings,
@@ -537,135 +502,105 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           ),
           allTags = allTags,
           db = db,
-          persistentCaches = DefaultPersistentCaches(db),
+          persistentCaches = persistentCaches,
           blockchainApi = testBlockchainApi
         )
 
+        log.debug("Preparing done, running the test")
         dependencies.foreach(Function.tupled(allTags.addDependent))
         preEvents.foreach(blockchain.process)
-        val affectedTags = trackAffectedEvents.foldLeft(AffectedTags.empty[Int])((r, event) => r ++ blockchain.process(event))
-        doOnComplete(new Access(blockchain, affectedTags))
-      }
-    }
-
-    // TODO move to access?
-    def noTagsAreAffected(access: Access): Unit = noTagsAreAffected(access.affectedTags)
-
-    def noTagsAreAffected(affectedTags: AffectedTags[Int]): Unit = withClue("affected tags") {
-      affectedTags shouldBe empty
-    }
-
-    def allTagsAreAffected(access: Access): Unit = allTagsAreAffected(access.affectedTags)
-
-    private val allTags = AffectedTags((1 to 9).toSet)
-    def allTagsAreAffected(affectedTags: AffectedTags[Int]): Unit = {
-      val sortedDiff = (allTags.xs -- affectedTags.xs).toList.sorted
-      withClue(s"affected tags, diff={${sortedDiff.mkString(", ")}}") {
-        affectedTags shouldBe allTags
-      }
-    }
-
-    def allDataIsUnknownCheck(access: Access): Unit = {
-      withClue("account data") {
-        access.get(CacheKey.AccountData(aliceAddr, "x")) shouldBe RemoteData.Unknown
-      }
-
-      withClue("transaction") {
-        access.get(CacheKey.Transaction(transactionId)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("asset") {
-        access.get(CacheKey.Asset(asset)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("waves balance") {
-        access.get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("issued asset balance") {
-        access.get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("lease balance") {
-        access.get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("account script") {
-        access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Unknown
-      }
-    }
-
-    def allDataIsRestoredCheck(access: Access): Unit = {
-      withClue("account data") {
-        access.get(CacheKey.AccountData(aliceAddr, "x")) shouldBe RemoteData.Unknown
-      }
-
-      withClue("transaction") {
-        access.get(CacheKey.Transaction(transactionId)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("asset") {
-        access.get(CacheKey.Asset(asset)) shouldBe RemoteData.Unknown
-      }
-
-      withClue("waves balance") {
-        access.get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe RemoteData.Cached(0L)
-      }
-
-      withClue("issued asset balance") {
-        access.get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe RemoteData.Cached(0L)
-      }
-
-      withClue("lease balance") {
-        access.get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe RemoteData.Cached(LeaseBalance(0L, 0L))
-      }
-
-      withClue("account script") {
-        access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Unknown
-      }
-    }
-
-    def allDataIsCachedCheck(access: Access): Unit = {
-      withClue("account data") {
-        access.get(CacheKey.AccountData(aliceAddr, "x")) shouldBe RemoteData.Cached(IntegerDataEntry("x", 1L))
-      }
-
-      withClue("transaction") {
-        access.get(CacheKey.Transaction(transactionId)) shouldBe RemoteData.Cached(Height(1))
-      }
-
-      withClue("asset") {
-        access.get(CacheKey.Asset(asset)).map(_.assetDescription) shouldBe RemoteData.Cached(assetDescription)
-      }
-
-      withClue("waves balance") {
-        access.get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe RemoteData.Cached(1L)
-      }
-
-      withClue("issued asset balance") {
-        access.get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe RemoteData.Cached(2L)
-      }
-
-      withClue("lease balance") {
-        access.get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe RemoteData.Cached(LeaseBalance(4L, 3L))
-      }
-
-      withClue("account script") {
-        access.get(CacheKey.AccountScript(aliceAddr)) shouldBe RemoteData.Cached(
-          WeighedAccountScriptInfo(
-            publicKey = alice.publicKey,
-            scriptInfoWeight = 480,
-            script = accountScript.script,
-            verifierComplexity = accountScript.verifierComplexity,
-            complexitiesByEstimator = accountScript.complexitiesByEstimator
-          )
-        )
+        val affectedTags = trackAffectedEvents.foldLeft(AffectedTags.empty[Tag])((r, event) => r ++ blockchain.process(event))
+        checks(new Access(blockchain, affectedTags))
       }
     }
   }
 
   private class Access(val blockchain: SharedBlockchainStorage[Tag], val affectedTags: AffectedTags[Tag])(implicit ctx: ReadWrite) {
     def get[T <: CacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCached(key)
+
+    def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {
+      affectedTags shouldBe empty
+      this
+    }
+
+    def allTagsAffected(): this.type = allTagsAffectedExcept()
+
+    def allTagsAffectedExcept(keys: CacheKey*): this.type = {
+      val expected   = AffectedTags(allTags.xs -- keys.map(allDependencies.apply))
+      val sortedDiff = (expected.xs -- affectedTags.xs).toList.sorted
+      withClue(s"affected tags, diff={${sortedDiff.mkString(", ")}}") {
+        affectedTags shouldBe expected
+      }
+      this
+    }
+
+    def allDataIsUnknown(): this.type = dataIs()
+
+    def allDataIsRestored(): this.type = dataIs(
+      aliceAccountData = RemoteData.Absence,
+      assetInfo = RemoteData.Absence,
+      aliceWavesBalance = RemoteData.Cached(0L),
+      bobAssetBalance = RemoteData.Cached(0L),
+      aliceLeaseBalance = RemoteData.Cached(LeaseBalance(0L, 0L))
+    )
+
+    def allDataIsCached(): this.type = dataIs(
+      aliceAccountData = RemoteData.Cached(IntegerDataEntry("x", 1L)),
+      transaction = RemoteData.Cached(Height(1)),
+      assetInfo = RemoteData.Cached(WeighedAssetDescription(0, assetDescription)),
+      aliceWavesBalance = RemoteData.Cached(1L),
+      bobAssetBalance = RemoteData.Cached(2L),
+      aliceLeaseBalance = RemoteData.Cached(LeaseBalance(4L, 3L)),
+      aliceAccountScript = RemoteData.Cached(
+        WeighedAccountScriptInfo(
+          publicKey = alice.publicKey,
+          scriptInfoWeight = 480,
+          script = accountScript.script,
+          verifierComplexity = accountScript.verifierComplexity,
+          complexitiesByEstimator = accountScript.complexitiesByEstimator
+        )
+      )
+    )
+
+    def dataIs(
+        aliceAccountData: RemoteData[CacheKey.AccountData#ValueT] = RemoteData.Unknown,
+        transaction: RemoteData[CacheKey.Transaction#ValueT] = RemoteData.Unknown,
+        assetInfo: RemoteData[CacheKey.Asset#ValueT] = RemoteData.Unknown,
+        aliceWavesBalance: RemoteData[CacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
+        bobAssetBalance: RemoteData[CacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
+        aliceLeaseBalance: RemoteData[CacheKey.AccountLeaseBalance#ValueT] = RemoteData.Unknown,
+        aliceAccountScript: RemoteData[CacheKey.AccountScript#ValueT] = RemoteData.Unknown
+    ): this.type = {
+      withClue("account data") {
+        get(CacheKey.AccountData(aliceAddr, "x")) shouldBe aliceAccountData
+      }
+
+      withClue("transaction") {
+        get(CacheKey.Transaction(transactionId)) shouldBe transaction
+      }
+
+      withClue("asset") {
+        get(CacheKey.Asset(asset)) shouldBe assetInfo
+      }
+
+      withClue("waves balance") {
+        get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe aliceWavesBalance
+      }
+
+      withClue("issued asset balance") {
+        get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe bobAssetBalance
+      }
+
+      withClue("lease balance") {
+        get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe aliceLeaseBalance
+      }
+
+      withClue("account script") {
+        get(CacheKey.AccountScript(aliceAddr)) shouldBe aliceAccountScript
+      }
+
+      this
+    }
   }
 
   // TODO
