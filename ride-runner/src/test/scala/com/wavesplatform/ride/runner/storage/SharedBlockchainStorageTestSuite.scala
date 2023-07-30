@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage
 
 import cats.syntax.option.*
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
+import com.google.protobuf.UnsafeByteOperations
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.account.Alias
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
@@ -13,9 +13,9 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.block.{Block, MicroBlock, SignedMicroBlock}
+import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
-import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
@@ -186,8 +186,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
             override val trackAffectedEvents = Seq(filledAppend)
 
             override def checks(access: Access): Unit = {
-              // TODO preEvents? trackAffected? etc?
-              access.allDataIsUnknown().blockchain.undo(List(filledAppend)) shouldBe empty
+              access.blockchain.undo(List(filledAppend)) shouldBe empty
+              access.allDataIsUnknown()
             }
           }.runTest()
 
@@ -334,11 +334,11 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       Seq(
         StateUpdate.BalanceUpdate(
           address = aliceAddr.toByteString,
-          amountAfter = Amount(toByteString(Asset.Waves), 1L).some
+          amountAfter = Amount(toPBAssetId(Asset.Waves), 1L).some
         ),
         StateUpdate.BalanceUpdate(
           address = bobAddr.toByteString,
-          amountAfter = Amount(toByteString(asset), 2L).some
+          amountAfter = Amount(toPBAssetId(asset), 2L).some
         )
       )
     )
@@ -448,6 +448,34 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       )
     )
 
+  private def mkPbRollbackStateUpdate(pbStateUpdate: StateUpdate): StateUpdate = {
+    StateUpdate(
+      dataEntries = pbStateUpdate.dataEntries.map { x =>
+        x.copy(dataEntryBefore = x.dataEntry, dataEntry = x.dataEntryBefore)
+      },
+      assets = pbStateUpdate.assets.map { x =>
+        x.copy(before = x.after, after = x.before)
+      },
+      balances = pbStateUpdate.balances.map { x =>
+        x.copy(
+          amountBefore = x.amountAfter.map(_.amount).getOrElse(0L),
+          amountAfter = x.amountAfter.map(_.copy(amount = x.amountBefore))
+        )
+      },
+      leasingForAddress = pbStateUpdate.leasingForAddress.map { x =>
+        x.copy(
+          inBefore = x.inAfter,
+          outBefore = x.outAfter,
+          inAfter = x.inBefore,
+          outAfter = x.outBefore
+        )
+      },
+      scripts = pbStateUpdate.scripts.map { x =>
+        x.copy(before = x.after, after = x.before)
+      }
+    )
+  }
+
   private val testBlockchainApi = new TestBlockchainApi()(monix.execution.schedulers.TestScheduler()) {
     override def getCurrentBlockchainHeight(): Height = Height(1)
     override def getActivatedFeatures(height: Height): Map[Short, Height] =
@@ -515,7 +543,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
     }
   }
 
-  private class Access(val blockchain: SharedBlockchainStorage[Tag], val affectedTags: AffectedTags[Tag])(implicit ctx: ReadWrite) {
+  private class Access(val blockchain: SharedBlockchainStorage[Tag], val affectedTags: AffectedTags[Tag]) {
     def get[T <: CacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCached(key)
 
     def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {
@@ -601,37 +629,6 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
       this
     }
-  }
-
-  // TODO
-  private def toByteString(asset: Asset): ByteString = asset.fold(ByteString.EMPTY)(_.id.toByteString)
-
-  private def mkPbRollbackStateUpdate(pbStateUpdate: StateUpdate): StateUpdate = {
-    StateUpdate(
-      dataEntries = pbStateUpdate.dataEntries.map { x =>
-        x.copy(dataEntryBefore = x.dataEntry, dataEntry = x.dataEntryBefore)
-      },
-      assets = pbStateUpdate.assets.map { x =>
-        x.copy(before = x.after, after = x.before)
-      },
-      balances = pbStateUpdate.balances.map { x =>
-        x.copy(
-          amountBefore = x.amountAfter.map(_.amount).getOrElse(0L),
-          amountAfter = x.amountAfter.map(_.copy(amount = x.amountBefore))
-        )
-      },
-      leasingForAddress = pbStateUpdate.leasingForAddress.map { x =>
-        x.copy(
-          inBefore = x.inAfter,
-          outBefore = x.outAfter,
-          inAfter = x.inBefore,
-          outAfter = x.outBefore
-        )
-      },
-      scripts = pbStateUpdate.scripts.map { x =>
-        x.copy(before = x.after, after = x.before)
-      }
-    )
   }
 
 }
