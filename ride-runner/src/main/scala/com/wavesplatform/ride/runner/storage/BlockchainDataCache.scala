@@ -28,6 +28,11 @@ class BlockchainDataCache(settings: Settings) {
 
   def set[T <: CacheKey, V](key: T, value: RemoteData[V])(implicit ev: V =:= T#ValueT): Unit = backend.put(key, value)
 
+  def updateIfExists[T <: CacheKey, V](key: T, newValue: RemoteData[V])(implicit ev: V =:= T#ValueT): Unit =
+    Option(backend.policy().getEntryIfPresentQuietly(key)).foreach { _ =>
+      backend.put(key, newValue)
+    }
+
   def remove[T <: CacheKey](key: T): Unit = backend.invalidate(key)
 }
 

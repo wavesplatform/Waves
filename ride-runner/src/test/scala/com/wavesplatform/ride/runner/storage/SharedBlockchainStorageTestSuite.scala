@@ -14,7 +14,7 @@ import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.block.{Block, MicroBlock, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
-import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SignedTransaction, Transaction}
+import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
@@ -37,8 +37,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           }.runTest()
 
           "can get the appended data" in new Test {
-            override val trackAffectedEvents = Seq(mkFilledAppendBlockEvent())
             override val dependencies        = allDependencies
+            override val trackAffectedEvents = Seq(mkFilledAppendBlockEvent())
 
             override def checks(access: Access): Unit = access
               .allTagsAffected()
@@ -86,9 +86,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           }.runTest()
 
           "can get the appended data" in new Test {
+            override val dependencies        = allDependencies
             override val preEvents           = Seq(mkEmptyAppendBlockEvent())
             override val trackAffectedEvents = Seq(mkFilledAppendMicroBlockEvent())
-            override val dependencies        = allDependencies
 
             override def checks(access: Access): Unit = access
               .allTagsAffectedExcept(heightKey)
@@ -114,15 +114,15 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           }.runTest()
 
           "can get the restored data" in new Test {
-            private val filledAppend = mkFilledAppendBlockEvent(2)
+            override val dependencies = allDependencies
 
             override val preEvents = Seq(mkEmptyAppendBlockEvent(1))
+
+            private val filledAppend = mkFilledAppendBlockEvent(2)
             override val trackAffectedEvents = Seq(
               filledAppend,
               mkRollbackEvent(filledAppend)
             )
-
-            override val dependencies = allDependencies
 
             override def checks(access: Access): Unit = access
               .allTagsAffected()
@@ -138,9 +138,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
         "micro block" - {
           "ignores unrelated updates" in new Test {
-            private val filledAppend = mkFilledAppendMicroBlockEvent()
-
             override val preEvents = Seq(mkEmptyAppendBlockEvent())
+
+            private val filledAppend = mkFilledAppendMicroBlockEvent()
             override val trackAffectedEvents = Seq(
               filledAppend,
               mkRollbackEvent(filledAppend)
@@ -152,15 +152,15 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           }.runTest()
 
           "can get the restored data" in new Test {
-            private val filledAppend = mkFilledAppendMicroBlockEvent()
+            override val dependencies = allDependencies
 
             override val preEvents = Seq(mkEmptyAppendBlockEvent())
+
+            private val filledAppend = mkFilledAppendMicroBlockEvent()
             override val trackAffectedEvents = Seq(
               filledAppend,
               mkRollbackEvent(filledAppend)
             )
-
-            override val dependencies = allDependencies
 
             override def checks(access: Access): Unit = access
               .allTagsAffected()
@@ -180,9 +180,9 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       "append" - {
         "block" - {
           "ignores unrelated updates" in new Test {
-            private val filledAppend = mkFilledAppendBlockEvent(2)
+            override val preEvents = Seq(mkEmptyAppendBlockEvent(1))
 
-            override val preEvents           = Seq(mkEmptyAppendBlockEvent(1))
+            private val filledAppend         = mkFilledAppendBlockEvent(2)
             override val trackAffectedEvents = Seq(filledAppend)
 
             override def checks(access: Access): Unit = {
@@ -192,12 +192,12 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           }.runTest()
 
           "can get the restored data" in new Test {
-            private val filledAppend = mkFilledAppendBlockEvent(2)
-
-            override val preEvents           = Seq(mkEmptyAppendBlockEvent(1))
-            override val trackAffectedEvents = Seq(filledAppend)
-
             override val dependencies = allDependencies
+
+            override val preEvents = Seq(mkEmptyAppendBlockEvent(1))
+
+            private val filledAppend         = mkFilledAppendBlockEvent(2)
+            override val trackAffectedEvents = Seq(filledAppend)
 
             override def checks(access: Access): Unit = {
               access.blockchain.undo(List(filledAppend)) shouldBe allTags
@@ -208,10 +208,10 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
         "micro block" - {
           "ignores unrelated updates" in new Test {
-            private val block2     = mkEmptyAppendBlockEvent(2)
-            private val microBlock = mkFilledAppendMicroBlockEvent(2)
+            override val preEvents = Seq(mkEmptyAppendBlockEvent(1))
 
-            override val preEvents           = Seq(mkEmptyAppendBlockEvent(1))
+            private val block2               = mkEmptyAppendBlockEvent(2)
+            private val microBlock           = mkFilledAppendMicroBlockEvent(2)
             override val trackAffectedEvents = Seq(block2, microBlock)
 
             override def checks(access: Access): Unit = {
@@ -222,6 +222,10 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
           "can get the restored data" - {
             "one micro block" in new Test {
+              override val dependencies = allDependencies
+
+              override val preEvents = Seq(mkEmptyAppendBlockEvent(1))
+
               private val block2 = mkFilledAppendBlockEvent(2)
               private val microBlock = mkMicroBlockAppendEvent(
                 2,
@@ -231,11 +235,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
                   StateUpdate.defaultInstance.withDataEntries(Seq(mkDataEntryUpdate(aliceAddr, "x", 1L.some, 2L.some)))
                 )
               )
-
-              override val preEvents           = Seq(mkEmptyAppendBlockEvent(1))
               override val trackAffectedEvents = Seq(block2, microBlock)
-
-              override val dependencies = allDependencies
 
               override def checks(access: Access): Unit = {
                 access.blockchain.undo(List(microBlock, block2)) shouldBe allTags // Liquid block
@@ -248,17 +248,16 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
       "rollback to" - {
         "block" in new Test {
+          override val dependencies = allDependencies
+
           private val emptyAppend2 = mkEmptyAppendBlockEvent(2)
           private val emptyAppend3 = mkEmptyAppendBlockEvent(3)
-
           override val trackAffectedEvents = Seq(
             mkFilledAppendBlockEvent(1),
             emptyAppend2,
             emptyAppend3,
             mkRollbackEvent(emptyAppend3)
           )
-
-          override val dependencies = allDependencies
 
           override def checks(access: Access): Unit = {
             access.blockchain.undo(List(emptyAppend2)) shouldBe AffectedTags(Set(allDependencies(heightKey)))
@@ -268,6 +267,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
         }.runTest()
 
         "micro block" in new Test {
+          override val dependencies = allDependencies
+
           private val emptyAppend1 = mkMicroBlockAppendEvent(height = 2, forkNumber = 1, microBlockNumber = 1)
           private val emptyAppend2 = mkMicroBlockAppendEvent(height = 2, forkNumber = 1, microBlockNumber = 2)
 
@@ -278,8 +279,6 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
             emptyAppend2,
             mkRollbackEvent(emptyAppend2)
           )
-
-          override val dependencies = allDependencies
 
           override def checks(access: Access): Unit = {
             access.blockchain.undo(List(emptyAppend1)) shouldBe AffectedTags(Set(allDependencies(heightKey)))
@@ -355,7 +354,6 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       Seq(
         StateUpdate.ScriptUpdate(
           address = aliceAddr.toByteString,
-          before = accountScript.script.bytes().toByteString, // Because otherwise we ignore it, see SharedBlockchainStorage.append
           after = accountScript.script.bytes().toByteString
         )
       )
@@ -367,6 +365,11 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       Transaction.defaultInstance
         .withCreateAlias(CreateAliasTransactionData.defaultInstance.withAlias("foo-alias"))
         .withSenderPublicKey(alice.publicKey.toByteString)
+    ),
+    SignedTransaction.defaultInstance.withWavesTransaction(
+      Transaction.defaultInstance
+        .withSenderPublicKey(alice.publicKey.toByteString)
+        .withSetScript(SetScriptTransactionData.defaultInstance)
     )
   )
 
@@ -499,29 +502,15 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
   private type Tag = Int
   private abstract class Test {
+    val dependencies: Map[CacheKey, Tag]            = Map.empty
     val preEvents: Seq[BlockchainUpdated]           = Seq.empty
     val trackAffectedEvents: Seq[BlockchainUpdated] = Seq.empty
-    val dependencies: Map[CacheKey, Tag]            = Map.empty
 
     def checks(access: Access): Unit
     def runTest(): Unit = withDb { db =>
       val allTags = new CacheKeyTags[Tag]
       db.directReadWrite { implicit rw =>
         val persistentCaches = DefaultPersistentCaches(db)
-        if (dependencies.contains(accountScriptKey))
-          persistentCaches.accountScripts.set(
-            atHeight = Height(0),
-            key = aliceAddr,
-            data = RemoteData.Cached(
-              WeighedAccountScriptInfo(
-                publicKey = alice.publicKey,
-                scriptInfoWeight = 1,
-                script = accountScript.script,
-                verifierComplexity = 0,
-                complexitiesByEstimator = Map.empty
-              )
-            )
-          )
 
         val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
@@ -569,7 +558,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       assetInfo = RemoteData.Absence,
       aliceWavesBalance = RemoteData.Cached(0L),
       bobAssetBalance = RemoteData.Cached(0L),
-      aliceLeaseBalance = RemoteData.Cached(LeaseBalance(0L, 0L))
+      aliceLeaseBalance = RemoteData.Cached(LeaseBalance(0L, 0L)),
+      aliceAccountScript = RemoteData.Absence
     )
 
     def allDataIsCached(): this.type = dataIs(

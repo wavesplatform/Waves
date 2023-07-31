@@ -6,9 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.transaction.DataTransactionData
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
+import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, DataTransactionData, Transaction}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{account, state, transaction}
@@ -92,8 +92,9 @@ class GrpcCacheKeyConverters(chainId: Byte) {
   def transactionIdKey(id: ByteString): CacheKey.Transaction = CacheKey.Transaction(TransactionId(ByteStr(id.toByteArray)))
 
   // Can't fail, because we receive it verified
-  def aliasKey(name: String): CacheKey.Alias   = CacheKey.Alias(Alias.createWithChainId(name, chainId).explicitGet())
-  def aliasValue(pkBytes: ByteString): Address = pkBytes.toPublicKey.toAddress(chainId)
+  def aliasKey(txData: CreateAliasTransactionData): CacheKey.Alias = aliasKey(txData.alias)
+  def aliasKey(alias: String): CacheKey.Alias                      = CacheKey.Alias(Alias.createWithChainId(alias, chainId).explicitGet())
+  def aliasValue(tx: Transaction): Address                         = tx.senderPublicKey.toPublicKey.toAddress(chainId)
 
   def assetKey(update: StateUpdate.AssetStateUpdate): CacheKey.Asset =
     CacheKey.Asset(

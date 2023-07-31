@@ -31,7 +31,7 @@ object Dependencies {
   val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.8" // 1.4.x and later is built for Java 11
   val janino             = "org.codehaus.janino" % "janino"            % "3.1.9"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
-  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
+  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.5-SNAPSHOT"
   val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.94.Final"
 
   val catsCore  = catsModule("core", "2.9.0")
