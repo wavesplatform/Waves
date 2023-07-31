@@ -39,7 +39,7 @@ object Evaluation {
     r <- evRequest match {
       case evRequest: UtilsExprRequest =>
         evRequest.parseCall(scriptInfo.script.stdLibVersion).map { expr =>
-          ExprEvaluation(blockchain, expr, emptyInvokeScriptLike(dAppAddress))
+          ExprEvaluation(overriddenBlockchain, expr, emptyInvokeScriptLike(dAppAddress))
         }
 
       case evRequest: UtilsInvocationRequest =>

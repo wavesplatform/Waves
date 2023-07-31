@@ -63,7 +63,7 @@ object AppInitializer extends ScorexLogging {
         rawVersion.toIntOption match {
           case Some(version) =>
             if (version != settings.rideRunner.db.version) {
-              log.info(s"Database version upgraded from $version to ${settings.rideRunner.db.version}, removing...")
+              log.info(s"Database version changed from $version to ${settings.rideRunner.db.version}, removing...")
               (true, true)
             } else {
               log.info(s"Current database version: $version")
