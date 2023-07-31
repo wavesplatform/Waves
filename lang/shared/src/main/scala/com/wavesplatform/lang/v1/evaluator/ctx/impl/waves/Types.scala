@@ -54,7 +54,7 @@ object Types {
 
   def verifierInput(version: StdLibVersion): UNIONLIKE =
     UNION.create(
-      buildOrderType(true) :: buildActiveTransactionTypes(proofsEnabled = true, v = version),
+      buildOrderType(proofsEnabled = true, version) :: buildActiveTransactionTypes(proofsEnabled = true, v = version),
       Some("VerifierInput")
     )
 
@@ -422,7 +422,7 @@ object Types {
 
   val assetPairType: CASETYPEREF = CASETYPEREF("AssetPair", List("amountAsset" -> optionByteVector, "priceAsset" -> optionByteVector))
 
-  def buildOrderType(proofsEnabled: Boolean): CASETYPEREF = {
+  def buildOrderType(proofsEnabled: Boolean, version: StdLibVersion): CASETYPEREF = {
     CASETYPEREF(
       "Order",
       addProofsIfNeeded(
@@ -437,18 +437,18 @@ object Types {
           "expiration"        -> LONG,
           "matcherFee"        -> LONG,
           "matcherFeeAssetId" -> optionByteVector
-        ) ++ proven,
+        ) ++ proven ++ (if (version >= V8) List("attachment" -> BYTESTR) else Nil),
         proofsEnabled
       )
     )
   }
 
-  def buildExchangeTransactionType(proofsEnabled: Boolean): CASETYPEREF = CASETYPEREF(
+  def buildExchangeTransactionType(proofsEnabled: Boolean, version: StdLibVersion): CASETYPEREF = CASETYPEREF(
     "ExchangeTransaction",
     addProofsIfNeeded(
       List(
-        "buyOrder"       -> buildOrderType(proofsEnabled),
-        "sellOrder"      -> buildOrderType(proofsEnabled),
+        "buyOrder"       -> buildOrderType(proofsEnabled, version),
+        "sellOrder"      -> buildOrderType(proofsEnabled, version),
         "price"          -> LONG,
         "amount"         -> LONG,
         "buyMatcherFee"  -> LONG,
@@ -513,7 +513,7 @@ object Types {
       buildReissueTransactionType(proofsEnabled),
       buildBurnTransactionType(proofsEnabled),
       buildMassTransferTransactionType(proofsEnabled, v),
-      buildExchangeTransactionType(proofsEnabled),
+      buildExchangeTransactionType(proofsEnabled, v),
       buildTransferTransactionType(proofsEnabled),
       buildSetAssetScriptTransactionType(proofsEnabled)
     ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty) ++
@@ -558,7 +558,7 @@ object Types {
       aliasType,
       transfer,
       assetPairType,
-      buildOrderType(proofsEnabled),
+      buildOrderType(proofsEnabled, stdLibVersion),
       transactionsCommonType
     ) ++
       transactionTypes ++

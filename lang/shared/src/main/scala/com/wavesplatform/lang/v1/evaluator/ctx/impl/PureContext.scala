@@ -2047,6 +2047,6 @@ object PureContext {
       case V3      => v3Ctx(useNewPowPrecision)
       case V4      => v4Ctx(useNewPowPrecision)
       case V5      => v5Ctx(useNewPowPrecision)
-      case V6      => v6Ctx
+      case _       => v6Ctx
     }
 }

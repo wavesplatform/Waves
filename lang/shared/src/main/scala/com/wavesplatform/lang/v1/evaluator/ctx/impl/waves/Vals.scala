@@ -28,7 +28,7 @@ object Vals {
     if (isTokenContext)
       UNION(buildAssetSupportedTransactions(proofsEnabled, version))
     else
-      UNION(buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version))
+      UNION(buildOrderType(proofsEnabled, version) :: buildActiveTransactionTypes(proofsEnabled, version))
 
   private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean, fixBigScriptField: Boolean): ContextfulVal[Environment] =
     new ContextfulVal.Lifted[Environment] {

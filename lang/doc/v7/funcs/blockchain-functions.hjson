@@ -1,0 +1,74 @@
+{
+  funcs: [
+    {
+      name: "assetInfo"
+      params: [ "ByteVector" ]
+      doc: "Gets the information about a [token](/blockchain/token.md)."
+      paramsDoc: [ "ID of the [token](/blockchain/token.md)." ]
+      complexity: 15
+    }
+    {
+      name: "blockInfoByHeight"
+      params: [ "Int" ]
+      doc: "Gets the information about a [block](/blockchain/block.md) by the [block height](/blockchain/block-height.md)"
+      paramsDoc: [ "Block height." ]
+      complexity: 5
+    }
+    {
+      name: "calculateAssetId"
+      params: [ "Issue" ]
+      doc: "Calculates ID of asset obtained by invoke script transaction's call of the Issue structure."
+      paramsDoc: [ "Structure of a token issue." ]
+      complexity: 10
+    }
+    {
+      name: "calculateLeaseId"
+      params: [ "Lease" ]
+      doc: "Calculates ID of lease obtained by invoke script transaction's call of the Lease structure."
+      paramsDoc: [ "Structure of a lease action." ]
+      complexity: 1
+    }
+    {
+      name: "transactionHeightById"
+      params: [ "ByteVector" ]
+      doc: "Gets the [block height](/blockchain/block-height.md) of a transaction."
+      paramsDoc: [ "ID of the transaction." ]
+      complexity: 20
+    }
+    {
+      name: "transferTransactionById"
+      params: [ "ByteVector" ]
+      doc: "Gets the data of a transfer transaction."
+      paramsDoc: [ "ID of the transfer transaction." ]
+      complexity: 60
+    }
+    {
+      name: "transferTransactionFromProto"
+      params: [ "ByteVector" ]
+      doc: "Deserializes transfer transaction: converts protobuf-encoded binary format to a TransferTransaction structure."
+      paramsDoc: [ "Transfer transaction in protobuf-encoded binary format." ]
+      complexity: 5
+    }
+    {
+      name: "scriptHash"
+      params: [ "Address|Alias" ]
+      doc: "blake2b hash of account's script"
+      paramsDoc: [ "account" ]
+      complexity: 200
+    }
+    {
+      name: "invoke"
+      params: [ "Address|Alias", "String|Unit", "List[Any]", "List[AttachedPayment]" ]
+      doc: "Invoke function from other dApp."
+      paramsDoc: [ "dApp", "function name", "arguments", "Attached payments" ]
+      complexity: 75
+    }
+    {
+      name: "reentrantInvoke"
+      params: [ "Address|Alias", "String|Unit", "List[Any]", "List[AttachedPayment]" ]
+      doc: "Invoke function from other dApp allowing reentrancy to the current one."
+      paramsDoc: [ "dApp", "function name", "arguments", "Attached payments" ]
+      complexity: 75
+    }
+  ]
+}
