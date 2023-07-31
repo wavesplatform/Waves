@@ -185,7 +185,7 @@ object TransactionDiffer {
     } else StateSnapshot.empty.asRight[ValidationError].traced
 
     snapshot
-      .map(d => initSnapshot |+| d)
+      .map(initSnapshot |+| _)
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
