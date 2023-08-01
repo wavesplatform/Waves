@@ -355,8 +355,15 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
         .getRemoteDataOpt(KvPairs.Transactions.at(key.id))
         .tap { r => log.trace(s"get($key): ${r.toFoundStr { h => s"height=$h" }}") }
 
-    override def setHeight(key: CacheKey.Transaction, height: RemoteData[Height])(implicit ctx: ReadWrite): Unit = {
+    override def setHeight(key: CacheKey.Transaction, height: RemoteData[Height])(implicit ctx: ReadWrite): Unit =
+      setHeight(key, ctx.getRemoteDataOpt(KvPairs.Transactions.at(key.id)), height)
+
+    override def updateHeightIfExist(key: CacheKey.Transaction, height: RemoteData[Height])(implicit ctx: ReadWrite): Unit = {
       val prevTxHeight = ctx.getRemoteDataOpt(KvPairs.Transactions.at(key.id))
+      if (prevTxHeight.loaded) setHeight(key, prevTxHeight, height)
+    }
+
+    private def setHeight(key: CacheKey.Transaction, prevTxHeight: RemoteData[Height], height: RemoteData[Height])(implicit ctx: ReadWrite): Unit = {
       prevTxHeight.mayBeValue.foreach { prevHeight =>
         updateTxsOnHeight(prevHeight)(_.filterNot(_ == key))
       }

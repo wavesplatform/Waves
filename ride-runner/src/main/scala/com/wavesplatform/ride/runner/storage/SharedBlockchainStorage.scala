@@ -67,10 +67,7 @@ class SharedBlockchainStorage[TagT] private (
           else
             RemoteData
               .loaded(blockchainApi.getAccountDataEntry(key.address, key.dataKey))
-              .tap { r =>
-                persistentCaches.accountDataEntries.set(atMaxHeight, key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.accountDataEntries.set(atMaxHeight, key, r) }
         }
 
       case key: CacheKey.Transaction =>
@@ -80,10 +77,7 @@ class SharedBlockchainStorage[TagT] private (
           else
             RemoteData
               .loaded(blockchainApi.getTransactionHeight(key.id))
-              .tap { r =>
-                persistentCaches.transactions.setHeight(key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.transactions.setHeight(key, r) }
         }
 
       case key: CacheKey.Alias =>
@@ -93,10 +87,7 @@ class SharedBlockchainStorage[TagT] private (
           else
             RemoteData
               .loaded(blockchainApi.resolveAlias(key.alias))
-              .tap { r =>
-                persistentCaches.aliases.setAddress(atMaxHeight, key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.aliases.setAddress(atMaxHeight, key, r) }
         }
 
       case key: CacheKey.Asset =>
@@ -107,10 +98,7 @@ class SharedBlockchainStorage[TagT] private (
             RemoteData
               .loaded(blockchainApi.getAssetDescription(key.asset))
               .map(toWeightedAssetDescription)
-              .tap { r =>
-                persistentCaches.assetDescriptions.set(atMaxHeight, key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.assetDescriptions.set(atMaxHeight, key, r) }
         }
 
       case key: CacheKey.AccountBalance =>
@@ -120,10 +108,7 @@ class SharedBlockchainStorage[TagT] private (
           else
             RemoteData
               .loaded(blockchainApi.getBalance(key.address, key.asset))
-              .tap { r =>
-                persistentCaches.accountBalances.set(atMaxHeight, key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.accountBalances.set(atMaxHeight, key, r) }
         }
 
       case key: CacheKey.AccountLeaseBalance =>
@@ -134,10 +119,7 @@ class SharedBlockchainStorage[TagT] private (
             RemoteData
               .loaded(blockchainApi.getLeaseBalance(key.address))
               .map(r => LeaseBalance(r.leaseIn, r.leaseOut))
-              .tap { r =>
-                persistentCaches.accountLeaseBalances.set(atMaxHeight, key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.accountLeaseBalances.set(atMaxHeight, key, r) }
         }
 
       case key: CacheKey.AccountScript =>
@@ -148,10 +130,7 @@ class SharedBlockchainStorage[TagT] private (
             RemoteData
               .loaded(blockchainApi.getAccountScript(key.address))
               .map(Function.tupled(toWeightedAccountScriptInfo))
-              .tap { r =>
-                persistentCaches.accountScripts.set(atMaxHeight, key, r)
-              // numberCounter.increment()
-              }
+              .tap { r => persistentCaches.accountScripts.set(atMaxHeight, key, r) }
         }
 
       case CacheKey.Height => RemoteData.loaded(Some(height)) // TODO remove this
@@ -355,7 +334,7 @@ class SharedBlockchainStorage[TagT] private (
           evt.transactionIds.foldLeft(empty) { case (r, txId) =>
             val cacheKey = conv.transactionIdKey(txId)
             val v        = RemoteData.loaded(atHeight)
-            persistentCaches.transactions.setHeight(cacheKey, v)
+            persistentCaches.transactions.updateHeightIfExist(cacheKey, v)
             r ++ updateCacheIfExists("append.transaction", cacheKey)(v)
           }
       }
