@@ -1,19 +1,17 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
-import com.wavesplatform.account.Address
 import com.wavesplatform.ride.runner.storage.*
 import com.wavesplatform.state.{DataEntry, Height, LeaseBalance}
-import com.wavesplatform.transaction.Asset
 
 trait PersistentCaches {
   def blockHeaders: BlockPersistentCache
 
   def accountDataEntries: PersistentCache[CacheKey.AccountData, DataEntry[?]]
-  def accountScripts: PersistentCache[Address, WeighedAccountScriptInfo]
-  def assetDescriptions: PersistentCache[Asset.IssuedAsset, WeighedAssetDescription]
+  def accountScripts: PersistentCache[CacheKey.AccountScript, WeighedAccountScriptInfo]
+  def assetDescriptions: PersistentCache[CacheKey.Asset, WeighedAssetDescription]
   def aliases: AliasPersistentCache
-  def accountBalances: PersistentCache[AccountAssetKey, Long]
-  def accountLeaseBalances: PersistentCache[Address, LeaseBalance]
+  def accountBalances: PersistentCache[CacheKey.AccountBalance, Long]
+  def accountLeaseBalances: PersistentCache[CacheKey.AccountLeaseBalance, LeaseBalance]
   def transactions: TransactionPersistentCache
 
   def addressIds: AddressIdPersistentCache

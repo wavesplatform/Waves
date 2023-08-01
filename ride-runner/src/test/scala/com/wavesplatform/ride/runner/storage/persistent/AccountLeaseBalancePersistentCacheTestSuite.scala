@@ -1,12 +1,11 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
-import com.wavesplatform.account.Address
 import com.wavesplatform.ride.runner.db.RideDbAccess
-import com.wavesplatform.ride.runner.storage.RemoteData
+import com.wavesplatform.ride.runner.storage.{CacheKey, RemoteData}
 import com.wavesplatform.state.{Height, LeaseBalance}
 
 class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
-  private val cacheKey                                    = alice.publicKey.toAddress
+  private val cacheKey                                    = CacheKey.AccountLeaseBalance(alice.publicKey.toAddress)
   private val cacheValue: RemoteData[LeaseBalance]        = RemoteData.Cached(LeaseBalance(12L, 14L))
   private val defaultCacheValue: RemoteData[LeaseBalance] = RemoteData.Cached(LeaseBalance.empty) // Equal to RemoteData.Absence for this case
 
@@ -218,7 +217,7 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, PersistentCache[Address, LeaseBalance]) => Unit): Unit = withDb { db =>
+  private def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountLeaseBalance, LeaseBalance]) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadWrite(DefaultPersistentCaches(db)(_))
     f(db, caches.accountLeaseBalances)
   }

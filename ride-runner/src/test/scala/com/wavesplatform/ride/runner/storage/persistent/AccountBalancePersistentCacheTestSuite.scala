@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.storage.persistent
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.AddressId
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite, RideDbAccess}
-import com.wavesplatform.ride.runner.storage.{AccountAssetKey, RemoteData}
+import com.wavesplatform.ride.runner.storage.{CacheKey, RemoteData}
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
@@ -17,7 +17,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
   }
 
   private def tests(asset: Asset): Unit = {
-    val defaultKey                                  = (alice.publicKey.toAddress, asset)
+    val defaultKey                                  = CacheKey.AccountBalance(alice.publicKey.toAddress, asset)
     def getHistory(implicit ctx: ReadOnly): Heights = ctx.getOpt(KvPairs.AccountAssetsHistory.at((AddressId(0L), asset))).getOrElse(Vector.empty)
 
     "history" - {
@@ -37,7 +37,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
         }
       }
 
-      def removeTests(removeF: (ReadWrite, PersistentCache[AccountAssetKey, Long], Height) => Unit): Unit = {
+      def removeTests(removeF: (ReadWrite, PersistentCache[CacheKey.AccountBalance, Long], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
@@ -313,7 +313,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, PersistentCache[AccountAssetKey, Long]) => Unit): Unit = withDb { db =>
+  private def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountBalance, Long]) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadWrite(DefaultPersistentCaches(db)(_))
     f(db, caches.accountBalances)
   }

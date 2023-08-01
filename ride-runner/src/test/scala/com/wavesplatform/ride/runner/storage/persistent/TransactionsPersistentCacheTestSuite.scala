@@ -3,11 +3,11 @@ package com.wavesplatform.ride.runner.storage.persistent
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.ride.runner.db.RideDbAccess
-import com.wavesplatform.ride.runner.storage.RemoteData
+import com.wavesplatform.ride.runner.storage.{CacheKey, RemoteData}
 import com.wavesplatform.state.{Height, TransactionId}
 
 class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
-  private val defaultTxId        = mkTxId(0)
+  private val defaultKey         = mkTxKey(0)
   private val defaultHeight      = Height(10)
   private val defaultCachedValue = RemoteData.Cached(defaultHeight)
 
@@ -15,74 +15,51 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
     "set and get" - {
       "last set wins" in test { (db, cache) =>
         db.batchedReadWrite { implicit ctx =>
-          cache.setHeight(defaultTxId, defaultCachedValue)
+          cache.setHeight(defaultKey, defaultCachedValue)
         }
 
         db.batchedReadWrite { implicit ctx =>
-          cache.setHeight(defaultTxId, RemoteData.Absence)
+          cache.setHeight(defaultKey, RemoteData.Absence)
         }
 
         db.batchedReadOnly { implicit ctx =>
-          cache.getHeight(defaultTxId) shouldBe RemoteData.Absence
+          cache.getHeight(defaultKey) shouldBe RemoteData.Absence
         }
       }
 
       "unknown on empty" in test { (db, cache) =>
         db.batchedReadOnly { implicit ctx =>
-          cache.getHeight(defaultTxId) shouldBe RemoteData.Unknown
+          cache.getHeight(defaultKey) shouldBe RemoteData.Unknown
         }
       }
     }
 
-    "getAllKeys" in test { (db, cache) =>
-      val tx1 = mkTxId(1)
-      val tx2 = mkTxId(2)
-
-      db.batchedReadWrite { implicit ctx =>
-        cache.setHeight(defaultTxId, RemoteData.Cached(Height(1)))
-        cache.setHeight(tx1, RemoteData.Cached(Height(3)))
-      // TODO #121 move tx2 here
-      }
-
-      db.batchedReadWrite { implicit ctx =>
-        cache.setHeight(tx2, RemoteData.Cached(Height(3)))
-      }
-
-      db.batchedReadOnly { implicit ctx =>
-        withClue("from 1") { cache.getAllKeys(Height(1)) should contain theSameElementsAs List(defaultTxId, tx1, tx2) }
-        withClue("from 2") { cache.getAllKeys(Height(2)) should contain theSameElementsAs List(tx1, tx2) }
-      }
-    }
-
     "removeAllFrom" in test { (db, cache) =>
-      val tx1 = mkTxId(1)
-      val tx2 = mkTxId(2)
+      val k1 = mkTxKey(1)
+      val k2 = mkTxKey(2)
 
       db.batchedReadWrite { implicit ctx =>
-        cache.setHeight(defaultTxId, RemoteData.Cached(Height(1)))
-        cache.setHeight(tx1, RemoteData.Cached(Height(3)))
-      // TODO #121 move tx2 here
+        cache.setHeight(defaultKey, RemoteData.Cached(Height(1)))
+        cache.setHeight(k1, RemoteData.Cached(Height(3)))
       }
 
       db.batchedReadWrite { implicit ctx =>
-        cache.setHeight(tx2, RemoteData.Cached(Height(3)))
+        cache.setHeight(k2, RemoteData.Cached(Height(3)))
       }
 
       db.batchedReadWrite { implicit ctx =>
-        cache.removeAllFrom(Height(2)) should contain theSameElementsAs List(tx1, tx2)
+        cache.removeAllFrom(Height(2)) should contain theSameElementsAs List(k1, k2)
       }
 
       db.batchedReadOnly { implicit ctx =>
-        cache.getHeight(defaultTxId) shouldBe RemoteData.Cached(Height(1))
-        cache.getHeight(tx1) shouldBe RemoteData.Unknown
-        cache.getHeight(tx2) shouldBe RemoteData.Unknown
-
-        cache.getAllKeys(Height(1)) should contain theSameElementsAs List(defaultTxId)
+        cache.getHeight(defaultKey) shouldBe RemoteData.Cached(Height(1))
+        cache.getHeight(k1) shouldBe RemoteData.Unknown
+        cache.getHeight(k2) shouldBe RemoteData.Unknown
       }
     }
   }
 
-  private def mkTxId(n: Byte) = TransactionId(ByteStr(Array.fill[Byte](DigestLength)(n)))
+  private def mkTxKey(n: Byte) = CacheKey.Transaction(TransactionId(ByteStr(Array.fill[Byte](DigestLength)(n))))
 
   private def test(f: (RideDbAccess, TransactionPersistentCache) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))

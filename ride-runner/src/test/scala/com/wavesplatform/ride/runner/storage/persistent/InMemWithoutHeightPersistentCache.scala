@@ -11,7 +11,6 @@ class InMemWithoutHeightPersistentCache[KeyT, ValueT] extends PersistentCache[Ke
 
   def get(key: KeyT)(implicit ctx: ReadWrite): RemoteData[ValueT] = get(Height(Int.MaxValue), key)
 
-  override def getAllKeys()(implicit ctx: ReadOnly): List[KeyT] = List.empty
   override def get(maxHeight: Height, key: KeyT)(implicit ctx: ReadOnly): RemoteData[ValueT] =
     entries.get(key).fold[RemoteData[ValueT]](RemoteData.Unknown)(_._2)
   override def set(atHeight: Height, key: KeyT, data: RemoteData[ValueT])(implicit ctx: ReadWrite): Unit = entries.update(key, (atHeight, data))
