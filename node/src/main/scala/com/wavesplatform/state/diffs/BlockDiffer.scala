@@ -197,6 +197,22 @@ object BlockDiffer {
       case _ => transactionFee
     }
 
+  def createInitialBlockDiff(
+      blockchain: Blockchain,
+      miner: Address,
+      blockReward: Option[Long] = None,
+      carry: Option[Long] = None
+  ): Either[String, Diff] = {
+    val minerReward          = blockReward.orElse(blockchain.lastBlockReward).fold(Portfolio.empty)(Portfolio.waves)
+    val feeFromPreviousBlock = Portfolio(balance = carry.getOrElse(blockchain.carryFee))
+
+    minerReward
+      .combine(feeFromPreviousBlock)
+      .map { totalReward =>
+        Diff(portfolios = Map(miner -> totalReward).filter(!_._2.isEmpty))
+      }
+  }
+
   private[this] def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
@@ -226,17 +242,22 @@ object BlockDiffer {
 
     prepareCaches(blockGenerator, txs, loadCacheData)
 
+    val initStateHash =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
+        if (initDiff == Diff.empty || blockchain.height == 1)
+          prevStateHash
+        else
+          prevStateHash.map(TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(_))
+      } else None
+
     txs
       .foldLeft(
-        TracedResult(
-          Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), prevStateHash)
-            .asRight[ValidationError]
-        )
+        TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil), initStateHash).asRight[ValidationError])
       ) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (
               TracedResult(
-                Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHashOpt)),
+                Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHash)),
                 _,
                 _
               ),
@@ -266,14 +287,14 @@ object BlockDiffer {
               val result = for {
                 diff          <- currDiff.combineF(thisTxDiff).flatMap(_.combineF(minerDiff))
                 newParentDiff <- parentDiff.combineF(minerDiff)
+                fullTxDiff    <- thisTxDiff.combineF(minerDiff)
               } yield Result(
                 diff,
                 carryFee + carry,
                 totalWavesFee,
                 updatedConstraint,
                 DetailedDiff(newParentDiff, thisTxDiff :: txDiffs),
-                prevStateHashOpt
-                  .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxDiff(currBlockchain, thisTxDiff).createHash(prevStateHash))
+                prevStateHash.map(TxStateSnapshotHashBuilder.createHashFromDiff(currBlockchain, fullTxDiff).createHash(_))
               )
               TracedResult(result.leftMap(GenericError(_)))
             }

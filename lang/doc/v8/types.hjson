@@ -174,12 +174,12 @@
           type: ByteVector
         }
         {
-          name: proofs
-          type: List[ByteVector]
-        }
-        {
           name: attachment
           type: ByteVector|Unit
+        }
+        {
+          name: proofs
+          type: List[ByteVector]
         }
       ]
     }

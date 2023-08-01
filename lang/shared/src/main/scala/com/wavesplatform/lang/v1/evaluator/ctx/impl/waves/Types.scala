@@ -437,7 +437,7 @@ object Types {
           "expiration"        -> LONG,
           "matcherFee"        -> LONG,
           "matcherFeeAssetId" -> optionByteVector
-        ) ++ proven ++ (if (version >= V8) List("attachment" -> BYTESTR) else Nil),
+        ) ++ proven ++ (if (version >= V8) List("attachment" -> optionByteVector) else Nil),
         proofsEnabled
       )
     )

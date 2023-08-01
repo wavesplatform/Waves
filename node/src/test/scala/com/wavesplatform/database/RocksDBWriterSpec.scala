@@ -94,7 +94,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
   "readTransaction" - {
     val invoker = TxHelpers.signer(1002)
-    val dapp    = TxHelpers.signer(1002)
+    val dapp    = TxHelpers.signer(1003)
     "reads correct failed transactions" in withDomain(
       DomainPresets.RideV5,
       Seq(AddrWithBalance(invoker.toAddress, 100.waves), AddrWithBalance(dapp.toAddress, 100.waves))

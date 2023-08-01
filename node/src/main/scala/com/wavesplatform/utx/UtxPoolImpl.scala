@@ -407,7 +407,7 @@ case class UtxPoolImpl(
                             r.validatedTransactions + tx.id(),
                             r.removedTransactions,
                             r.stateHash.map(prevStateHash =>
-                              TxStateSnapshotHashBuilder.createHashFromTxDiff(updatedBlockchain, newDiff).createHash(prevStateHash)
+                              TxStateSnapshotHashBuilder.createHashFromDiff(updatedBlockchain, newDiff).createHash(prevStateHash)
                             )
                           )
                         )

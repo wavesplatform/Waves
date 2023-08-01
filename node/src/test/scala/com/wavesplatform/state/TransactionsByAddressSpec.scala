@@ -115,6 +115,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
     "distinct result avoiding inconsistent state" in {
       val startRead = new ReentrantLock()
       withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner), InterferableDB(_, startRead)) { d =>
+        d.appendBlock()
         d.appendMicroBlock(issue())
         startRead.lock()
         val txs = Future { d.addressTransactions(defaultAddress).map(_._2.tpe) }

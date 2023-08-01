@@ -28,7 +28,7 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createHashFromTxDiff(blockchain: Blockchain, txDiff: Diff): Result = {
+  def createHashFromDiff(blockchain: Blockchain, txDiff: Diff): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 
     def addEntry(keyType: KeyType.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -61,7 +61,11 @@ object TxStateSnapshotHashBuilder {
     }
 
     txDiff.scripts.foreach { case (address, sv) =>
-      addEntry(KeyType.AccountScript, address.bytes)(sv.fold(Array.emptyByteArray)(_.script.bytes().arr))
+      addEntry(KeyType.AccountScript, address.bytes)(
+        sv.fold(Seq(Array.emptyByteArray))(scriptInfo =>
+          Seq(scriptInfo.script.bytes().arr, scriptInfo.publicKey.arr, Longs.toByteArray(scriptInfo.verifierComplexity))
+        )*
+      )
     }
 
     for {
