@@ -15,7 +15,7 @@ libraryDependencies ++= Dependencies.rideRunner.value
 inConfig(Compile)(
   Seq(
     // Affects sbt-native-packager
-    mainClass := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithBlockchainService"),
+    mainClass                    := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithBlockchainService"),
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
   )
@@ -105,7 +105,7 @@ inTask(assembly)(
             .exists(p.replace('\\', '/').contains) =>
         MergeStrategy.last
 
-      case "logback.xml" => MergeStrategy.last
+      case "logback.xml" | "swagger-ui/openapi.yaml" => MergeStrategy.last
 
       case other => (assembly / assemblyMergeStrategy).value(other)
     }
