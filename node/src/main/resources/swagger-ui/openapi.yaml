@@ -5225,7 +5225,7 @@ components:
         - dApp
         - payment
         - call
-        - stateCahnges
+        - stateChanges
       properties:
         error:
           type: object
@@ -5237,7 +5237,7 @@ components:
         - dApp
         - payment
         - call
-        - stateCahnges
+        - stateChanges
       properties:
         error:
           type: object
