@@ -3,10 +3,9 @@ package com.wavesplatform.ride.runner.storage
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
-import com.wavesplatform.ride.runner.storage.BlockchainDataCache.Settings
+import com.wavesplatform.ride.runner.storage.InMemBlockchainDataCache.Settings
 
-// TODO InMem cache?
-class BlockchainDataCache(settings: Settings) {
+class InMemBlockchainDataCache(settings: Settings) {
   private val backend = Caffeine
     .newBuilder()
     .softValues()
@@ -36,6 +35,6 @@ class BlockchainDataCache(settings: Settings) {
   def remove[T <: CacheKey](key: T): Unit = backend.invalidate(key)
 }
 
-object BlockchainDataCache {
+object InMemBlockchainDataCache {
   case class Settings(size: ConfigMemorySize)
 }

@@ -50,7 +50,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               val blockchain = SharedBlockchainStorage(
                 settings = SharedBlockchainStorage.Settings(
                   blockchain = DefaultBlockchainSettings,
-                  blockchainDataCache = BlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+                  blockchainDataCache = InMemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
                 ),
                 allTags = new CacheKeyTags[Tag],
                 db = db,
@@ -515,7 +515,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
         val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
             blockchain = DefaultBlockchainSettings,
-            blockchainDataCache = BlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+            blockchainDataCache = InMemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
           ),
           allTags = allTags,
           db = db,
@@ -533,7 +533,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
   }
 
   private class Access(val blockchain: SharedBlockchainStorage[Tag], val affectedTags: AffectedTags[Tag]) {
-    def get[T <: CacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCached(key)
+    def get[T <: CacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCachedInMem(key)
 
     def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {
       affectedTags shouldBe empty
@@ -571,11 +571,13 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
       aliceLeaseBalance = RemoteData.Cached(LeaseBalance(4L, 3L)),
       aliceAccountScript = RemoteData.Cached(
         WeighedAccountScriptInfo(
-          publicKey = alice.publicKey,
           scriptInfoWeight = 480,
-          script = accountScript.script,
-          verifierComplexity = accountScript.verifierComplexity,
-          complexitiesByEstimator = accountScript.complexitiesByEstimator
+          accountScriptInfo = AccountScriptInfo(
+            publicKey = alice.publicKey,
+            script = accountScript.script,
+            verifierComplexity = accountScript.verifierComplexity,
+            complexitiesByEstimator = accountScript.complexitiesByEstimator
+          )
         )
       )
     )

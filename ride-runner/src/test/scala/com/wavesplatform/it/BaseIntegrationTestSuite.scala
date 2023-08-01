@@ -14,7 +14,7 @@ import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{BlockchainDataCache, CacheKeyTags, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKeyTags, InMemBlockchainDataCache, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -65,7 +65,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = testDb.storage.batchedReadWrite { implicit ctx =>
       SharedBlockchainStorage(
-        SharedBlockchainStorage.Settings(blockchainSettings, BlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1024))),
+        SharedBlockchainStorage.Settings(blockchainSettings, InMemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1024))),
         allTags,
         testDb.storage,
         DefaultPersistentCaches(testDb.storage),

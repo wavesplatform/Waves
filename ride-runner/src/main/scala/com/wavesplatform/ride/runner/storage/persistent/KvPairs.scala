@@ -87,8 +87,8 @@ object KvPairs {
     AsBytes
       .tuple2(intAsBytes, accountScriptInfoAsBytes)
       .transform(
-        { case (weight, x) => WeighedAccountScriptInfo(x.publicKey, weight, x.script, x.verifierComplexity, x.complexitiesByEstimator) },
-        x => (x.scriptInfoWeight, AccountScriptInfo(x.publicKey, x.script, x.verifierComplexity, x.complexitiesByEstimator))
+        Function.tupled(WeighedAccountScriptInfo.apply),
+        x => (x.scriptInfoWeight, x.accountScriptInfo)
       )
 
   object AccountScripts

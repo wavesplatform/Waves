@@ -6,7 +6,7 @@ import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings}
 import com.wavesplatform.ride.runner.BlockchainState
 import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
-import com.wavesplatform.ride.runner.storage.{BlockchainDataCache, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{InMemBlockchainDataCache, SharedBlockchainStorage}
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -92,7 +92,7 @@ case class RideRunnerCommonSettings(
     complexityLimit: Int,
     maxTxErrorLogSize: ConfigMemorySize,
     responseCache: RideRunnerResponseCacheSettings,
-    blockchainDataCache: BlockchainDataCache.Settings,
+    blockchainDataCache: InMemBlockchainDataCache.Settings,
     parallelRideRunThreads: Option[Int],
     rideSchedulerThreads: Option[Int],
     // TODO unhealthy?
