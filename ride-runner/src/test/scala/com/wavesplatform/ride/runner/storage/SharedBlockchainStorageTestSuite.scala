@@ -128,6 +128,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               .allTagsAffected()
               .dataIs(
                 aliceAccountData = RemoteData.Absence,
+                transaction = RemoteData.Absence,
                 assetInfo = RemoteData.Absence,
                 aliceWavesBalance = RemoteData.Cached(0L),
                 bobAssetBalance = RemoteData.Cached(0L),
@@ -166,6 +167,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
               .allTagsAffected()
               .dataIs(
                 aliceAccountData = RemoteData.Absence,
+                transaction = RemoteData.Absence,
                 assetInfo = RemoteData.Absence,
                 aliceWavesBalance = RemoteData.Cached(0L),
                 bobAssetBalance = RemoteData.Cached(0L),
@@ -555,6 +557,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
 
     def allDataIsRestored(): this.type = dataIs(
       aliceAccountData = RemoteData.Absence,
+      transaction = RemoteData.Absence,
       assetInfo = RemoteData.Absence,
       aliceWavesBalance = RemoteData.Cached(0L),
       bobAssetBalance = RemoteData.Cached(0L),

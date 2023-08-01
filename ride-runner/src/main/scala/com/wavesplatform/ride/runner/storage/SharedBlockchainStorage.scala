@@ -274,7 +274,6 @@ class SharedBlockchainStorage[TagT] private (
               case Transaction.WavesTransaction(tx) =>
                 tx.data match {
                   case Data.CreateAlias(txData) =>
-                    // TODO store id to use it in rollbacks
                     val cacheKey = conv.aliasKey(txData)
                     val v        = RemoteData.Cached(conv.aliasValue(tx))
                     persistentCaches.aliases.setAddress(atHeight, cacheKey, v)
@@ -366,16 +365,16 @@ class SharedBlockchainStorage[TagT] private (
         } ++
         stateUpdate.scripts.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.accountScriptKey(x)
-          // Just a removing eliminates a complex logic here. In rare cases this could lead to a slow response (once).
+          // Just a removing eliminates a complex logic of restoring the old script here. In rare cases this could lead to a slow response (once).
           r ++ removeCache("rollback.accountScript", cacheKey)
         } ++
         stateUpdate.deletedAliases.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.aliasKey(x)
-          r ++ removeCache("rollback.alias", cacheKey)
+          r ++ updateCacheIfExists("rollback.alias", cacheKey)(RemoteData.Absence) // Because there is only one such alias
         } ++
         rollback.removedTransactionIds.foldLeft(empty) { case (r, txId) =>
           val cacheKey = conv.transactionIdKey(txId)
-          r ++ removeCache("rollback.transaction", cacheKey)
+          r ++ updateCacheIfExists("rollback.transaction", cacheKey)(RemoteData.Absence)
         }
     }
 
@@ -420,7 +419,7 @@ class SharedBlockchainStorage[TagT] private (
           tx.data match {
             case Data.CreateAlias(txData) =>
               val cacheKey = conv.aliasKey(txData)
-              r ++ removeCache("undo.alias", cacheKey)
+              r ++ updateCacheIfExists("undo.alias", cacheKey)(RemoteData.Absence)
 
             case Data.SetScript(_) =>
               val pk = tx.senderPublicKey.toPublicKey
@@ -463,7 +462,7 @@ class SharedBlockchainStorage[TagT] private (
       } ++
       append.transactionIds.foldLeft(empty) { case (r, txId) =>
         val cacheKey = conv.transactionIdKey(txId)
-        r ++ removeCache("undo.transaction", cacheKey)
+        r ++ updateCacheIfExists("undo.transaction", cacheKey)(RemoteData.Absence)
       }
   }
 
