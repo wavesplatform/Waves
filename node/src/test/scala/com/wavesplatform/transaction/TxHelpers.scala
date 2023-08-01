@@ -354,7 +354,7 @@ object TxHelpers {
       acc: KeyPair,
       asset: IssuedAsset,
       script: Script,
-      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit,
+      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit + ScriptExtraFee,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId

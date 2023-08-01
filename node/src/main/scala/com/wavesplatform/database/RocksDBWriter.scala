@@ -889,6 +889,13 @@ class RocksDBWriter(
     }
   }
 
+  def transactionSnapshot(id: ByteStr): Option[TransactionStateSnapshot] = readOnly { db =>
+    for {
+      meta     <- db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
+      snapshot <- db.get(Keys.transactionStateSnapshotAt(Height(meta.height), TxNum(meta.num.toShort), rdb.txSnapshotHandle))
+    } yield snapshot
+  }
+
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] =
     if (disabledAliases.contains(alias)) Left(AliasIsDisabled(alias))
     else aliasCache.get(alias).toRight(AliasDoesNotExist(alias))
