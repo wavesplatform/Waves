@@ -22,6 +22,8 @@ case class RideRunnerGlobalSettings(
     rideRunner: RideRunnerCommonSettings,
     rideCompareService: WavesRideRunnerCompareService.Settings
 ) {
+  // Consider the service as unhealthy if it don't update events in more than this duration.
+  // Should be more than publicApi.noDataTimeout, because it could be fixed after a restart of the blockchain updates stream.
   val unhealthyIdleTimeoutMs: Long = (publicApi.noDataTimeout + 30.seconds).toMillis
 
   val heightsSettings = Heights.Settings(blockchain.functionalitySettings)
@@ -95,7 +97,6 @@ case class RideRunnerCommonSettings(
     blockchainDataCache: InMemBlockchainDataCache.Settings,
     parallelRideRunThreads: Option[Int],
     rideSchedulerThreads: Option[Int],
-    // TODO unhealthy?
     blockchainBlocksBufferSize: Int,
     grpcApiMaxConcurrentRequests: Option[Int],
     grpcApiChannel: GrpcChannelSettings,
