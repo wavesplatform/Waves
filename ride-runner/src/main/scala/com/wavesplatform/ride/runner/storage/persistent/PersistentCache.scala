@@ -2,11 +2,9 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.RemoteData
-import com.wavesplatform.ride.runner.storage.persistent.PersistentCache.MaxHeight
 import com.wavesplatform.state.Height
 
 trait PersistentCache[KeyT, ValueT] {
-  def getLatest(key: KeyT)(implicit ctx: ReadOnly): RemoteData[ValueT] = get(MaxHeight, key)
   def get(maxHeight: Height, key: KeyT)(implicit ctx: ReadOnly): RemoteData[ValueT]
 
   def set(atHeight: Height, key: KeyT, data: RemoteData[ValueT])(implicit ctx: ReadWrite): Unit
@@ -19,8 +17,6 @@ trait PersistentCache[KeyT, ValueT] {
 }
 
 object PersistentCache {
-  private val MaxHeight = Height(Int.MaxValue)
-
   def empty[KeyT, ValueT]: PersistentCache[KeyT, ValueT] = new PersistentCache[KeyT, ValueT] {
     override def get(maxHeight: Height, key: KeyT)(implicit ctx: ReadOnly): RemoteData[ValueT]             = RemoteData.Unknown
     override def set(atHeight: Height, key: KeyT, data: RemoteData[ValueT])(implicit ctx: ReadWrite): Unit = {}
