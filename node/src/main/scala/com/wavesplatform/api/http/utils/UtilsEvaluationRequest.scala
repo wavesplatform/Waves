@@ -5,6 +5,7 @@ import cats.syntax.either.*
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.requests.InvokeScriptRequest
 import com.wavesplatform.api.http.requests.InvokeScriptRequest.FunctionCallPart
+import com.wavesplatform.api.http.utils.UtilsApiRoute.{DefaultAddress, DefaultPublicKey}
 import com.wavesplatform.api.http.utils.UtilsEvaluator.{ConflictingRequestStructure, ParseJsonError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, V6}
@@ -69,7 +70,7 @@ case class UtilsInvocationRequest(
     fee: Long = FeeConstants(TransactionType.InvokeScript) * FeeUnit,
     feeAssetId: Option[String] = None,
     sender: Option[String] = None,
-    senderPublicKey: String = ByteStr(empty32Bytes).toString,
+    senderPublicKey: String = DefaultPublicKey.toString,
     payment: Seq[Payment] = Nil,
     state: Option[BlockchainOverrides] = None
 ) extends UtilsEvaluationRequest {
@@ -80,10 +81,10 @@ case class UtilsInvocationRequest(
       functionCall = InvokeScriptRequest.buildFunctionCall(call)
       feeAssetId <- feeAssetId.traverse(decodeBase58)
       sender <-
-        if (sender.nonEmpty || senderPK.arr.sameElements(empty32Bytes))
+        if (sender.nonEmpty || senderPK == DefaultPublicKey)
           sender
             .map(Address.fromString(_, None).map(a => RideAddress(ByteStr(a.bytes))))
-            .getOrElse(Right(RideAddress(ByteStr(new Array[Byte](26)))))
+            .getOrElse(Right(RideAddress(ByteStr(DefaultAddress.bytes))))
         else
           Right(RideAddress(ByteStr(senderPK.toAddress.bytes)))
       payments <- AttachedPaymentExtractor
