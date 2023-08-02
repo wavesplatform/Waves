@@ -65,7 +65,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
   val lease: LeaseTransaction             = TxHelpers.lease(fee = TestValues.fee)
   val issue: IssueTransaction             = TxHelpers.issue(amount = 1000)
   val reissue: ReissueTransaction         = TxHelpers.reissue(issue.asset)
-  val data: DataTransaction               = TxHelpers.dataSingle()
+  val data: DataTransaction               = TxHelpers.dataSingle(fee = TestValues.fee * 3) // for compatibility with expected values
   val createAlias: CreateAliasTransaction = TxHelpers.createAlias("alias")
   val setScript1: SetScriptTransaction = TxHelpers.setScript(
     TxHelpers.defaultSigner,
