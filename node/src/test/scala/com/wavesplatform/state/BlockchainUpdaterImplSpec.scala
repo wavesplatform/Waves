@@ -58,7 +58,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     val recipient = TxHelpers.signer(2)
 
     val genesis      = TxHelpers.genesis(master.toAddress, timestamp = ts)
-    val genesisBlock = TestBlock.create(ts, Seq(genesis))
+    val genesisBlock = TestBlock.create(ts, Seq(genesis)).block
     val b1 = TestBlock
       .create(
         ts + 10,
@@ -71,16 +71,19 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           createTransfer(master, recipient.toAddress, ts + 5)
         )
       )
-    val b2 = TestBlock.create(
-      ts + 20,
-      b1.id(),
-      Seq(
-        createTransfer(master, recipient.toAddress, ts + 11),
-        createTransfer(recipient, master.toAddress, ts + 12),
-        createTransfer(recipient, master.toAddress, ts + 13),
-        createTransfer(recipient, master.toAddress, ts + 14)
+      .block
+    val b2 = TestBlock
+      .create(
+        ts + 20,
+        b1.id(),
+        Seq(
+          createTransfer(master, recipient.toAddress, ts + 11),
+          createTransfer(recipient, master.toAddress, ts + 12),
+          createTransfer(recipient, master.toAddress, ts + 13),
+          createTransfer(recipient, master.toAddress, ts + 14)
+        )
       )
-    )
+      .block
 
     (master, List(genesisBlock, b1, b2))
   }

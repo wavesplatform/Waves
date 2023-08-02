@@ -27,8 +27,8 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")))
   private val route = blocksApiRoute.route
 
-  private val testBlock1 = TestBlock.create(Nil)
-  private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
+  private val testBlock1 = TestBlock.create(Nil).block
+  private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion).block
 
   private val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
   private val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.id().toString)
@@ -291,7 +291,7 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     }
 
     "ideal blocks" in {
-      val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil))
+      val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil).block)
       val route  = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
       Get(routePath(s"/heightByTimestamp/10")) ~> route ~> check {
@@ -330,7 +330,7 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
 
     "random blocks" in {
       val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) { case ((ts, blocks), _) =>
-        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
+        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil).block
         (newBlock.header.timestamp, blocks :+ newBlock)
       }
 

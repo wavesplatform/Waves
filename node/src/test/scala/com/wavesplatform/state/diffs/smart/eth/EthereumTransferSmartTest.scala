@@ -5,9 +5,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6, V7, V8}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
@@ -94,7 +95,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
 
       withDomain(settingsForRide(version)) { d =>
         d.appendBlock(genesis1, genesis2, issue, preTransfer, setVerifier())
-        d.appendBlock(ethTransfer)
+        d.appendBlockE(ethTransfer)
 
         val transferPortfolio = if (token.isEmpty) Portfolio.waves(transferAmount) else Portfolio.build(asset, transferAmount)
         d.liquidDiff.portfolios(recipient.toAddress) shouldBe transferPortfolio
@@ -151,4 +152,8 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
         }
       }
   }
+
+  def settingsForRide(version: StdLibVersion): WavesSettings =
+    if (version >= V8) TransactionStateSnapshot else if (version == V7) ConsensusImprovements else RideV6
+
 }

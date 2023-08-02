@@ -73,7 +73,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
       )
     }
 
-    val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
+    val genesis = TestBlock.create(System.currentTimeMillis(), Nil).block
     (blockchainUpdater.isLastBlockId _).when(genesis.id()).returning(true)
     (blockchainUpdater.heightOf _).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
     (blockchainUpdater.heightOf _).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()

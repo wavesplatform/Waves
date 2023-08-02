@@ -341,8 +341,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
   private val updaterScenario = for {
     (miner1, miner2, b1) <- genesis
-    b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion)
-    b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion)
+    b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion).block
+    b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion).block
     tx1       = createTx(miner1, miner2.toAddress)
     tx2       = createTx(miner2, miner1.toAddress)
     tx3       = createTx(miner1, miner2.toAddress)
@@ -432,16 +432,18 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     for {
       miner1 <- accountGen
       miner2 <- accountGen
-      genesisBlock = TestBlock.create(
-        time = ntpNow,
-        ref = TestBlock.randomSignature(),
-        signer = TestBlock.defaultSigner,
-        txs = Seq(
-          GenesisTransaction.create(miner1.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
-          GenesisTransaction.create(miner2.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
-        ),
-        version = Block.GenesisBlockVersion
-      )
+      genesisBlock = TestBlock
+        .create(
+          time = ntpNow,
+          ref = TestBlock.randomSignature(),
+          signer = TestBlock.defaultSigner,
+          txs = Seq(
+            GenesisTransaction.create(miner1.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
+            GenesisTransaction.create(miner2.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
+          ),
+          version = Block.GenesisBlockVersion
+        )
+        .block
     } yield (miner1, miner2, genesisBlock)
 
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]], time: Time = ntpTime, settings: WavesSettings = testSettings)(

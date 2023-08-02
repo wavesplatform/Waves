@@ -117,7 +117,7 @@ object BlockDiffer {
         totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
         patches                 <- patchesDiff(blockchainWithNewBlock)
         resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(patches)
-      } yield resultDiff
+      } yield resultDiff.withPortfolios(resultDiff.portfolios.filter(!_._2.isEmpty))
 
     for {
       _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))

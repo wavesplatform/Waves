@@ -5,8 +5,9 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
-import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.{WithDomain, WithState}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
@@ -23,7 +24,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
   private val signerA, signerB = randomKeyPair()
 
-  private val testChain: Seq[Block] = {
+  private val testChain: Seq[BlockWithSigner] = {
     val master, recipient = randomKeyPair()
     getTwoMinersBlockChain(master, recipient, 9)
   }
@@ -136,15 +137,17 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             .explicitGet()
           val initStateHash  = TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(genesis.header.stateHash.get)
           val blockTs        = txs.map(_.timestamp).max
-          val blockStateHash = d.computeStateHash(txs, initStateHash, initDiff, signer, blockTs, blockchain).explicitGet()
+          val blockStateHash = WithState.computeStateHash(txs, initStateHash, initDiff, signer.toAddress, blockTs, blockchain).resultE.explicitGet()
 
           val correctBlock =
-            TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
+            TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash)).block
           BlockDiffer
             .fromBlock(blockchain, Some(genesis), correctBlock, MiningConstraint.Unlimited, correctBlock.header.generationSignature) should beRight
 
           val incorrectBlock =
-            TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(ByteStr.fill(DigestLength)(1)))
+            TestBlock
+              .create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(ByteStr.fill(DigestLength)(1)))
+              .block
           BlockDiffer.fromBlock(
             blockchain,
             Some(genesis),
@@ -156,7 +159,9 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           d.appendKeyBlock(signer = Some(signer))
           val correctMicroblock =
             d.createMicroBlock(
-              Some(d.computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer, blockTs, blockchain).explicitGet())
+              Some(
+                WithState.computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer.toAddress, blockTs, blockchain).resultE.explicitGet()
+              )
             )(txs*)
           BlockDiffer.fromMicroBlock(
             blockchain,
@@ -178,7 +183,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     }
   }
 
-  private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[BlockWithSigner], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
@@ -188,7 +193,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
 
-  private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[Block] = {
+  private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[BlockWithSigner] = {
     val genesisTx            = TxHelpers.genesis(from.toAddress, Long.MaxValue - 1)
     val features: Seq[Short] = Seq[Short](2)
 

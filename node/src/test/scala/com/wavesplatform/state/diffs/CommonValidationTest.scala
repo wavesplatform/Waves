@@ -130,7 +130,7 @@ class CommonValidationTest extends PropSpec with WithState {
       version = TxVersion.V1
     )
 
-    (TestBlock.create(Vector[Transaction](genesis, issue, transferWaves, transferAsset) ++ sponsor ++ setScript), transferBack)
+    (TestBlock.create(Vector[Transaction](genesis, issue, transferWaves, transferAsset) ++ sponsor ++ setScript).block, transferBack)
   }
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =

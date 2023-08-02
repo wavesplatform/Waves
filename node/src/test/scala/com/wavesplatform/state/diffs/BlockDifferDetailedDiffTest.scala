@@ -36,7 +36,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
     "works in case of one genesis transaction" in {
       val genesisBlock: (Address, Block) = {
         val master       = TxHelpers.signer(1)
-        val genesisBlock = TestBlock.create(System.currentTimeMillis(), Seq(TxHelpers.genesis(master.toAddress)))
+        val genesisBlock = TestBlock.create(System.currentTimeMillis(), Seq(TxHelpers.genesis(master.toAddress))).block
         (master.toAddress, genesisBlock)
       }
 
@@ -62,7 +62,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
         val genesis   = TxHelpers.genesis(a1.toAddress)
         val transfer1 = TxHelpers.transfer(a1, a2.toAddress, amount1, fee = transactionFee, version = TxVersion.V1)
         val transfer2 = TxHelpers.transfer(a2, a1.toAddress, amount2, fee = transactionFee, version = TxVersion.V1)
-        val block     = TestBlock.create(a1, Seq(genesis, transfer1, transfer2))
+        val block     = TestBlock.create(a1, Seq(genesis, transfer1, transfer2)).block
 
         (a1.toAddress, a2.toAddress, amount1, amount2, block)
       }
@@ -111,10 +111,10 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
               val transfer2 = TxHelpers.transfer(a2, a1.toAddress, amount2, fee = transactionFee, version = TxVersion.V1)
 
               val history = Seq(
-                TestBlock.create(a1, Seq(genesis)),
-                TestBlock.create(a1, Seq(transfer1))
+                TestBlock.create(a1, Seq(genesis)).block,
+                TestBlock.create(a1, Seq(transfer1)).block
               )
-              val block = TestBlock.create(miner, Seq(transfer2))
+              val block = TestBlock.create(miner, Seq(transfer2)).block
 
               (history, block, miner.toAddress)
             }

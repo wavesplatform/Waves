@@ -143,7 +143,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     blockchainUpdater.lastBlockId
       .flatMap(blockchainUpdater.liquidBlock)
       .orElse(rocksDBWriter.lastBlock)
-      .getOrElse(TestBlock.create(Nil))
+      .getOrElse(TestBlock.create(Nil).block)
   }
 
   def liquidDiff: Diff =
@@ -281,14 +281,16 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       stateHash
         .map(Right(_))
         .getOrElse(
-          WithState.computeStateHash(
-            txs,
-            lastBlock.header.stateHash.get,
-            Diff.empty,
-            defaultSigner.toAddress,
-            lastBlock.header.timestamp,
-            blockchain
-          )
+          WithState
+            .computeStateHash(
+              txs,
+              lastBlock.header.stateHash.get,
+              Diff.empty,
+              defaultSigner.toAddress,
+              lastBlock.header.timestamp,
+              blockchain
+            )
+            .resultE
         )
         .map(Some(_))
     } else Right(None)
@@ -430,6 +432,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
               WithState
                 .computeStateHash(txs, initStateHash, initDiff, generator.toAddress, blockWithoutStateHash.header.timestamp, blockchain)
+                .resultE
                 .map(Some(_))
             }
         } else Right(None)

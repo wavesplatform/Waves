@@ -404,7 +404,7 @@ object FPPoSSelectorTest {
       }
       .map { txs =>
         val lastTxTimestamp = txs.lastOption.fold(ts)(_._2.timestamp)
-        val genesisBlock    = TestBlock.create(lastTxTimestamp + 1, txs.map(_._2))
+        val genesisBlock    = TestBlock.create(lastTxTimestamp + 1, txs.map(_._2)).block
 
         val chain = (1 to blockCount foldLeft List(genesisBlock)) { (blocks, d) =>
           val newBlock = TestBlock
@@ -414,6 +414,7 @@ object FPPoSSelectorTest {
               Seq.empty,
               version = blockVersion
             )
+            .block
           newBlock :: blocks
         }
 

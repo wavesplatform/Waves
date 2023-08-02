@@ -145,13 +145,15 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           .map(bs => KeyPair(bs))
           .map { account =>
             val tx           = GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()
-            val genesisBlock = TestBlock.create(ts + 2, List(tx))
-            val secondBlock = TestBlock.create(
-              ts + 3,
-              genesisBlock.id(),
-              Seq.empty,
-              account
-            )
+            val genesisBlock = TestBlock.create(ts + 2, List(tx)).block
+            val secondBlock = TestBlock
+              .create(
+                ts + 3,
+                genesisBlock.id(),
+                Seq.empty,
+                account
+              )
+              .block
             (account, genesisBlock, secondBlock)
           }
           .sample

@@ -12,6 +12,7 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
@@ -60,24 +61,29 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .filter(v => v >= V3 && v <= lastVersion)
       .foreach(v => withDomain(settingsForRide(v))(assertion(v, _)))
 
-  private def testDiffTraced(preconditions: Seq[Block], block: Block, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
+  private def testDiffTraced(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
       assertion: ((StdLibVersion, TracedResult[ValidationError, Diff])) => Unit
   ): Unit =
     allVersions
       .filter(v => v >= from && v <= to)
       .foreach(v => assertDiffEiTraced(preconditions, block, settingsForRide(v).blockchainSettings.functionalitySettings)(r => assertion((v, r))))
 
-  private def testDiff(preconditions: Seq[Block], block: Block, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
+  private def testDiff(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit =
     testDiffTraced(preconditions, block, from, to)(assertion.compose(_._2.resultE))
 
-  private def testDiffAndState(preconditions: Seq[Block], block: Block, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
+  private def testDiffAndState(
+      preconditions: Seq[BlockWithSigner],
+      block: BlockWithSigner,
+      from: StdLibVersion = V3,
+      to: StdLibVersion = lastVersion
+  )(
       assertion: (Diff, Blockchain) => Unit
   ): Unit =
     allVersions
       .filter(v => v >= from && v <= to)
-      .foreach(v => assertDiffAndState(preconditions, block, settingsForRide(v).blockchainSettings.functionalitySettings)(assertion))
+      .foreach(v => assertNgDiffState(preconditions, block, settingsForRide(v).blockchainSettings.functionalitySettings)(assertion))
 
   private val assetAllowed   = TestCompiler(V3).compileAsset("tx.fee > -1")
   private val assetUsingThis = TestCompiler(V3).compileAsset("this == this")
@@ -910,7 +916,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
       if (version == V3)
         d.appendBlockE(ci) should produce(error)
-      else if (version == V6) {
+      else if (version >= V6) {
         d.appendBlockE(ci) should produceRejectOrFailedDiff(error)
       } else {
         d.appendBlock(ci)
@@ -943,7 +949,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       if (version == V3) {
         d.appendBlock(setScript, ci)
         d.liquidDiff.errorMessage(ci.id()) shouldBe None
-      } else if (version == V6) {
+      } else if (version >= V6) {
         d.appendBlockE(setScript, ci) should produceRejectOrFailedDiff("Data entry key should not be empty")
       } else {
         d.appendBlock(setScript, ci)
