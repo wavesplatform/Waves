@@ -141,8 +141,8 @@ object TxHelpers {
   def dataEntry(account: KeyPair, value: DataEntry[?]): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
 
-  def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
-    data(account, Seq(StringDataEntry(key, value)), TestValues.fee)
+  def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test", fee: Long = TestValues.fee): DataTransaction =
+    data(account, Seq(StringDataEntry(key, value)), fee)
 
   def data(account: KeyPair, entries: Seq[DataEntry[?]], fee: Long = TestValues.fee * 3, version: TxVersion = TxVersion.V1): DataTransaction =
     DataTransaction.selfSigned(version, account, entries, fee, timestamp).explicitGet()
