@@ -10,12 +10,17 @@ import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.test.DomainPresets.TransactionStateSnapshot
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.utils.{Schedulers, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import scala.concurrent.duration.*
@@ -340,6 +345,58 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
         Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
           val result = (responseAs[JsObject] \ "height").as[Int]
           result shouldBe (index + 1)
+        }
+      }
+    }
+  }
+
+  "NODE-968. Blocks API should return correct data for orders with attachment" in {
+    def checkOrderAttachment(blockInfo: JsObject, expectedAttachment: ByteStr): Assertion = {
+      implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
+      ((blockInfo \ "transactions").as[JsArray].value.head.as[JsObject] \ "order1" \ "attachment").asOpt[ByteStr] shouldBe Some(expectedAttachment)
+    }
+
+    val sender = TxHelpers.signer(1)
+    val issuer = TxHelpers.signer(2)
+    withDomain(TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, issuer)) { d =>
+      val attachment = ByteStr.fill(32)(1)
+      val issue      = TxHelpers.issue(issuer)
+      val exchange =
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(attachment)),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer),
+          version = TxVersion.V3
+        )
+
+      d.appendBlock(issue)
+      val exchangeBlock = d.appendBlock(exchange)
+
+      val route = new BlocksApiRoute(
+        d.settings.restAPISettings,
+        d.blocksApi,
+        SystemTime,
+        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      ).route
+
+      Get("/blocks/last") ~> route ~> check {
+        checkOrderAttachment(responseAs[JsObject], attachment)
+      }
+
+      d.liquidAndSolidAssert { () =>
+        Get(s"/blocks/at/3") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsObject], attachment)
+        }
+
+        Get(s"/blocks/seq/3/3") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+        }
+
+        Get(s"/blocks/address/${exchangeBlock.sender.toAddress}/3/3") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+        }
+
+        Get(s"/blocks/${exchangeBlock.id()}") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsObject], attachment)
         }
       }
     }

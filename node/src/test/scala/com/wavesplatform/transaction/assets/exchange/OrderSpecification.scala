@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderAuthentication.OrderProofs
@@ -246,7 +247,7 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
     }
   }
 
-  property("attachment field validation") {
+  property("NODE-963, NODE-964, NODE-965. Attachment field validation") {
     def createOrder(version: Int, attachment: Option[ByteStr]): Order =
       Order
         .buy(
@@ -274,10 +275,35 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
     createOrder(4, Some(ByteStr.fill(Order.MaxAttachmentSize + 1)(1)))
       .isValid(100)
       .hasError(s"attachment size should be <= ${Order.MaxAttachmentSize} bytes")
+    createOrder(4, Some(ByteStr.empty)).isValid(100).hasError("attachment size should be > 0")
+  }
+
+  property("NODE-966. Order V4 serialization roundtrip with non-existing attachment") {
+    val order = Order
+      .buy(
+        Order.V4,
+        TxHelpers.defaultSigner,
+        TxHelpers.secondSigner.publicKey,
+        AssetPair(Waves, IssuedAsset(ByteStr.fill(AssetIdLength)(1))),
+        100,
+        100,
+        100,
+        101,
+        100,
+        attachment = None
+      )
+      .explicitGet()
+
+    val recovered = PBOrders.vanilla(PBOrders.protobuf(order)).explicitGet()
+    checkFieldsEquality(recovered, order)
   }
 
   private[this] def checkFieldsEquality(left: Order, right: Order): Assertion = {
-    left.bytes() shouldEqual right.bytes()
+    if (left.version == Order.V4) {
+      left.bodyBytes() shouldEqual right.bodyBytes()
+    } else {
+      left.bytes() shouldEqual right.bytes()
+    }
     left.idStr() shouldBe right.idStr()
     left.senderPublicKey shouldBe right.senderPublicKey
     left.matcherPublicKey shouldBe right.matcherPublicKey
@@ -290,5 +316,6 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
     left.matcherFee shouldBe right.matcherFee
     left.proofs shouldBe right.proofs
     left.matcherFeeAssetId shouldBe right.matcherFeeAssetId
+    left.attachment shouldBe right.attachment
   }
 }

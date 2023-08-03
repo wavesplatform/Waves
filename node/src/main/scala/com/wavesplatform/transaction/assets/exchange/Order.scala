@@ -80,7 +80,8 @@ case class Order(
       case _ => Validation.success
     }) &&
     (attachment.isEmpty || version >= Order.V4) :| "non-empty attachment field is allowed only for version >= V4" &&
-    attachment.forall(_.size <= MaxAttachmentSize) :| s"attachment size should be <= $MaxAttachmentSize bytes"
+    attachment.forall(_.size <= MaxAttachmentSize) :| s"attachment size should be <= $MaxAttachmentSize bytes" &&
+    attachment.forall(!_.isEmpty) :| "attachment size should be > 0"
   }
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))

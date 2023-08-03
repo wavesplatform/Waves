@@ -1998,7 +1998,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property(s"non-empty attachment field is allowed only after ${BlockchainFeatures.TransactionStateSnapshot.description} activation") {
+  property(s"NODE-970. Non-empty attachment field is allowed only after ${BlockchainFeatures.TransactionStateSnapshot.description} activation") {
     val matcher = TxHelpers.defaultSigner
     val issuer  = TxHelpers.secondSigner
 
