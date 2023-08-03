@@ -100,7 +100,6 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
       blockchainUpdatesApiChannel = blockchainUpdatesApiChannel
     )
 
-    log.info("Opening a DB with caches...")
     val rideDb          = RideRocksDb.open(settings.rideRunner.db)
     val sendDbStatsTask = blockchainEventsStreamScheduler.scheduleAtFixedRate(30.seconds, 30.seconds) { rideDb.sendStats() }
     cs.cleanup(CustomShutdownPhase.Db) {
