@@ -16,7 +16,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.test.DomainPresets.TransactionStateSnapshot
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.utils.{Schedulers, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
