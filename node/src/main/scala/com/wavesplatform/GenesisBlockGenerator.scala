@@ -46,7 +46,10 @@ object GenesisBlockGenerator {
     val chainId: Byte = networkType.head.toByte
 
     private val features: Map[Short, Int] =
-      preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
+      preActivatedFeatures
+        .getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt, BlockchainFeatures.NG.id.toInt))
+        .map(f => f.toShort -> 0)
+        .toMap
 
     val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
       Int.MaxValue,

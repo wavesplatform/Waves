@@ -1,12 +1,12 @@
 package com.wavesplatform.utils.generator
 
-import java.io.{File, FileOutputStream, PrintWriter}
+import java.io.{File, FileOutputStream, FileWriter, PrintWriter}
 import java.util.concurrent.TimeUnit
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.RDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
@@ -26,7 +26,9 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import play.api.libs.json.Json
 import scopt.OParser
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.*
 import scala.language.reflectiveCalls
 
@@ -221,18 +223,29 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     var resultCounter = 0
+    val lowDiffs      = mutable.ListBuffer[Long]()
+    val mediumDiffs   = mutable.ListBuffer[Long]()
+    val bigDiffs      = mutable.ListBuffer[Long]()
 
     while (!Thread.currentThread().isInterrupted && !quit) synchronized {
-      val times = miners.flatMap { kp =>
-        val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
-        time.toOption.map(kp -> _)
-      }
+      val times = Await
+        .result(
+          Future.traverse(miners) { kp =>
+            Future {
+              val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
+              time.toOption.map(kp -> _)
+            }
+          },
+          Duration.Inf
+        )
+        .flatten
 
       println(blockchain.height)
 
       if (blockchain.height > 100000) {
         val (maliciousAcc, maliciousTime) = times.minBy(_._2)
         val maliciousBalance              = blockchain.generatingBalance(maliciousAcc.toAddress)
+
         val maliciousBt = posSelector
           .consensusData(
             maliciousAcc,
@@ -249,16 +262,21 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
         val challengeMiners = miners.diff(Seq(maliciousAcc))
 
-        val (_, bestKeyBlockTimeAfterMalicious) = challengeMiners
-          .map { kp =>
-            val time = posSelector
-              .copy(blockchain = blockchain)
-              .getValidBlockDelay(blockchain.height + 1, kp, maliciousBt, blockchain.generatingBalance(kp.toAddress))
-              .toOption
-              .get + maliciousTime
+        val (_, bestKeyBlockTimeAfterMalicious) = Await
+          .result(
+            Future.traverse(challengeMiners) { kp =>
+              Future {
+                val time = posSelector
+                  .copy(blockchain = blockchain)
+                  .getValidBlockDelay(blockchain.height + 1, kp, maliciousBt, blockchain.generatingBalance(kp.toAddress))
+                  .toOption
+                  .get + maliciousTime
 
-            kp -> time
-          }
+                kp -> time
+              }
+            },
+            Duration.Inf
+          )
           .minBy(_._2)
 
         def computeBestScoreChainTime(
@@ -283,15 +301,20 @@ object BlockchainGeneratorApp extends ScorexLogging {
                 .getValidBlockDelay(curHeight, maliciousAcc, lastMaliciousBt, maliciousBalance)
                 .toOption
                 .get + lastMaliciousTime
-            val (bestChallenger, bestChallengeTime) = challengeMiners
-              .map { kp =>
-                val time = posSelector
-                  .copy(blockchain = blockchain)
-                  .getValidBlockDelay(curHeight, kp, lastChallengeBt, blockchain.generatingBalance(kp.toAddress))
-                  .toOption
-                  .get + lastChallengeTime
-                kp -> time
-              }
+            val (bestChallenger, bestChallengeTime) = Await
+              .result(
+                Future.traverse(challengeMiners) { kp =>
+                  Future {
+                    val time = posSelector
+                      .copy(blockchain = blockchain)
+                      .getValidBlockDelay(curHeight, kp, lastChallengeBt, blockchain.generatingBalance(kp.toAddress))
+                      .toOption
+                      .get + lastChallengeTime
+                    kp -> time
+                  }
+                },
+                Duration.Inf
+              )
               .minBy(_._2)
             val newMaliciousBt = posSelector
               .consensusData(
@@ -374,6 +397,14 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
         if (bestScoreChainTime < bestKeyBlockTimeAfterMalicious) {
           resultCounter += 1
+
+          if (maliciousBalance < 2500000000000L) {
+            lowDiffs.append(bestKeyBlockTimeAfterMalicious - bestScoreChainTime)
+          } else if (maliciousBalance < 25000000000000L) {
+            mediumDiffs.append(bestKeyBlockTimeAfterMalicious - bestScoreChainTime)
+          } else {
+            bigDiffs.append(bestKeyBlockTimeAfterMalicious - bestScoreChainTime)
+          }
         }
       }
 
@@ -399,7 +430,17 @@ object BlockchainGeneratorApp extends ScorexLogging {
               blocks += block
               Output.writeBlock(block)
               if (checkAverageTime() && blockchain.height > options.blocks) {
-                println("RESULT " + resultCounter)
+                val writer = new FileWriter("results")
+                writer.write(lowDiffs.mkString(","))
+                writer.write("\n")
+                writer.write("=========\n")
+                writer.write(mediumDiffs.mkString(","))
+                writer.write("\n")
+                writer.write("=========\n")
+                writer.write(bigDiffs.mkString(","))
+                writer.write("\n")
+                writer.close()
+
                 sys.exit(0)
               }
 
