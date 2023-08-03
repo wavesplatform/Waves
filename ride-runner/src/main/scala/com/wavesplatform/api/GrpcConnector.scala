@@ -1,6 +1,7 @@
 package com.wavesplatform.api
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.wavesplatform.api.stats.MonitoringClientInterceptor
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 
@@ -20,6 +21,7 @@ class GrpcConnector(executorThreads: Int) extends AutoCloseable with ScorexLoggi
     log.info(s"Creating a channel to $target with settings: $grpcClientSettings")
     grpcClientSettings
       .toNettyChannelBuilder(target)
+      .intercept(MonitoringClientInterceptor)
       .executor(executor)
       .usePlaintext()
       .build()

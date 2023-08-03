@@ -56,9 +56,6 @@ object RideRunnerStats {
   val microBlockProcessingTime       = anyEventProcessingTime.withTag("tpe", "mb")
   val rollbackProcessingTime         = anyEventProcessingTime.withTag("tpe", "r")
 
-  private val grpcCallTimer                              = Kamon.timer("grpc.call", "gRPC calls time")
-  def grpcCallTimerFor(methodName: String, raw: Boolean) = grpcCallTimer.withTag("method", methodName).withTag("raw", raw)
-
   private val jobSchedulerSize = Kamon.gauge("job-scheduler.size", "A size of queues in a work scheduler")
   val prioritizedJobSize       = jobSchedulerSize.withTag("tpe", "prioritized")
   val regularJobSize           = jobSchedulerSize.withTag("tpe", "regular")

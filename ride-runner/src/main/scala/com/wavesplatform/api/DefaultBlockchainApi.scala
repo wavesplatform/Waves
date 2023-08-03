@@ -35,8 +35,6 @@ import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.ride.runner.stats.RideRunnerStats
-import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{ScorexLogging, StringBytes}
@@ -121,60 +119,55 @@ class DefaultBlockchainApi(
     }
   }
 
-  override def getCurrentBlockchainHeight(): Height =
-    grpcCall("getCurrentBlockchainHeight") {
-      Height(
-        ClientCalls.blockingUnaryCall(
-          grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
-          Empty()
-        )
+  override def getCurrentBlockchainHeight(): Height = grpcCall {
+    Height(
+      ClientCalls.blockingUnaryCall(
+        grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
+        Empty()
       )
+    )
+  }.tap { r => log.trace(s"getCurrentBlockchainHeight: $r") }
+
+  override def getActivatedFeatures(height: Height): Map[Short, Height] = grpcCall {
+    ClientCalls
+      .blockingUnaryCall(
+        grpcApiChannel.newCall(BlockchainApiGrpc.METHOD_GET_ACTIVATION_STATUS, CallOptions.DEFAULT),
+        ActivationStatusRequest(height)
+      )
+  }.features
+    .flatMap { x =>
+      if (x.blockchainStatus.isActivated) (x.id.toShort -> Height(x.activationHeight)).some
+      else none
     }
-      .tap { r => log.trace(s"getCurrentBlockchainHeight: $r") }
+    .toMap
+    .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
-  override def getActivatedFeatures(height: Height): Map[Short, Height] =
-    grpcCall("getActivatedFeatures") {
-      ClientCalls
-        .blockingUnaryCall(
-          grpcApiChannel.newCall(BlockchainApiGrpc.METHOD_GET_ACTIVATION_STATUS, CallOptions.DEFAULT),
-          ActivationStatusRequest(height)
-        )
-    }.features
-      .flatMap { x =>
-        if (x.blockchainStatus.isActivated) (x.id.toShort -> Height(x.activationHeight)).some
-        else none
-      }
-      .toMap
-      .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
+  override def getAccountDataEntries(address: Address): Seq[DataEntry[?]] = grpcCall {
+    ClientCalls
+      .blockingServerStreamingCall(
+        grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
+        DataRequest(toPb(address))
+      )
+  }.asScala
+    .flatMap(_.entry)
+    .map(toVanillaDataEntry)
+    .toSeq
+    .tap(r => log.trace(s"getAccountDataEntries($address): found ${r.length} elements"))
 
-  override def getAccountDataEntries(address: Address): Seq[DataEntry[?]] =
-    grpcCall("getAccountDataEntries") {
+  override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] = grpcCall {
+    firstOf(
       ClientCalls
         .blockingServerStreamingCall(
           grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-          DataRequest(toPb(address))
+          DataRequest(address = toPb(address), key = key)
         )
-    }.asScala
-      .flatMap(_.entry)
-      .map(toVanillaDataEntry)
-      .toSeq
-      .tap(r => log.trace(s"getAccountDataEntries($address): found ${r.length} elements"))
-
-  override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
-    grpcCall("getAccountDataEntry") {
-      firstOf(
-        ClientCalls
-          .blockingServerStreamingCall(
-            grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-            DataRequest(address = toPb(address), key = key)
-          )
-      )
-    }
-      .map(x => toVanillaDataEntry(x.getEntry))
-      .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
+    )
+  }
+    .map(x => toVanillaDataEntry(x.getEntry))
+    .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
 
   override def getAccountScript(address: Address): Option[(PublicKey, Script)] = {
-    val as = grpcCall("getAccountScript") {
+    val as = grpcCall {
       ClientCalls.blockingUnaryCall(
         grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
         AccountRequest(toPb(address))
@@ -187,7 +180,7 @@ class DefaultBlockchainApi(
   }
 
   override def getBlockHeader(height: Height): Option[SignedBlockHeaderWithVrf] = {
-    val x = grpcCall("getBlockHeader") {
+    val x = grpcCall {
       ClientCalls.blockingUnaryCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
         BlockRequest(request = BlockRequest.Request.Height(height))
@@ -198,7 +191,7 @@ class DefaultBlockchainApi(
   }
 
   override def getBlockHeaderRange(fromHeight: Height, toHeight: Height): List[SignedBlockHeaderWithVrf] = {
-    val xs = grpcCall("getBlockHeaderRange") {
+    val xs = grpcCall {
       ClientCalls.blockingServerStreamingCall(
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),
         BlockRangeRequest(fromHeight = fromHeight, toHeight = toHeight)
@@ -212,7 +205,7 @@ class DefaultBlockchainApi(
   }
 
   override def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = {
-    val xs = grpcCall("getAssetDescription") {
+    val xs = grpcCall {
       try
         ClientCalls
           .blockingUnaryCall(
@@ -252,7 +245,7 @@ class DefaultBlockchainApi(
   }
 
   override def resolveAlias(alias: Alias): Option[Address] = {
-    val xs = grpcCall("resolveAlias") {
+    val xs = grpcCall {
       try
         ClientCalls
           .blockingUnaryCall(
@@ -287,28 +280,25 @@ class DefaultBlockchainApi(
       }
       .tap(r => log.trace(s"getBalance($address, $asset): $r"))
 
-  override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances = {
+  override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances =
     getBalanceInternal(address, Asset.Waves)
       .fold(BalanceResponse.WavesBalances.defaultInstance) {
         case Balance.Waves(wavesBalance) => wavesBalance
         case x                           => throw new RuntimeException(s"Expected Balance.Waves, but got $x")
       }
       .tap(r => log.trace(s"getLeaseBalance($address): $r"))
-  }
 
-  private def getBalanceInternal(address: Address, asset: Asset): Option[Balance] =
-    grpcCall("getBalanceInternal") {
-      firstOf(
-        ClientCalls.blockingServerStreamingCall(
-          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
-          BalancesRequest(address = toPb(address), assets = Seq(toPb(asset)))
-        )
+  private def getBalanceInternal(address: Address, asset: Asset): Option[Balance] = grpcCall {
+    firstOf(
+      ClientCalls.blockingServerStreamingCall(
+        grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
+        BalancesRequest(address = toPb(address), assets = Seq(toPb(asset)))
       )
-    }
-      .map(_.balance)
+    )
+  }.map(_.balance)
 
   override def getTransactionHeight(id: ByteStr): Option[Height] = {
-    val ths = grpcCall("getTransactionHeight") {
+    val ths = grpcCall {
       firstOf(
         ClientCalls
           .blockingServerStreamingCall(
@@ -325,12 +315,7 @@ class DefaultBlockchainApi(
 
   private def firstOf[T](xs: java.util.Iterator[T]): Option[T] = if (xs.hasNext) xs.next().some else none
 
-  private def grpcCall[T](methodName: String)(f: => T): T =
-    RideRunnerStats.grpcCallTimerFor(methodName, raw = false).measure {
-      grpcApiCalls.limited {
-        RideRunnerStats.grpcCallTimerFor(methodName, raw = true).measure(f)
-      }
-    }
+  private def grpcCall[T](f: => T): T = grpcApiCalls.limited(f)
 }
 
 object DefaultBlockchainApi {

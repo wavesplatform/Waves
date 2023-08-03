@@ -178,8 +178,7 @@ git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
-  // TODO temporarily disabled
-  //  (node / assembly).value
+  (node / assembly).value
   (`ride-runner` / assembly).value
   buildDebPackages.value
   buildTarballsForDocker.value
@@ -239,8 +238,8 @@ def checkPR: Command = Command.command("checkPR") { state =>
 
 lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
 buildDebPackages := {
-//  (`grpc-server` / Debian / packageBin).value
-//  (node / Debian / packageBin).value
+  (`grpc-server` / Debian / packageBin).value
+  (node / Debian / packageBin).value
   (`ride-runner` / Debian / packageBin).value
 }
 
