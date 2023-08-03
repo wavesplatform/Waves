@@ -940,64 +940,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
-  ignore("NODE-908. Challenging block delay should not be more than 120s") {
-    val challengedMiner = TxHelpers.signer(1)
-
-    val wavesSettings = settings
-      .addFeatures(BlockchainFeatures.FairPoS)
-      .copy(blockchainSettings =
-        settings.blockchainSettings.copy(genesisSettings = settings.blockchainSettings.genesisSettings.copy(initialBaseTarget = 22))
-      )
-
-    withDomain(
-      wavesSettings,
-      balances = Seq(AddrWithBalance(defaultSigner.toAddress, 200000001.waves))
-    ) { d =>
-      val challengingMiner = d.wallet.generateNewAccount().get
-
-      d.appendBlock(
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          Seq(
-            TxHelpers.transfer(defaultSigner, challengedMiner.toAddress, 100000000.waves),
-            TxHelpers.transfer(defaultSigner, challengingMiner.toAddress, 100000000.waves)
-          ),
-          generator = challengedMiner
-        )
-      )
-
-      val generators = Seq(challengingMiner, challengedMiner)
-
-      (1 to 10000).foreach { _ =>
-        val bestAcc = generators
-          .map { acc =>
-            acc -> d.posSelector
-              .getValidBlockDelay(
-                d.blockchain.height,
-                acc,
-                d.blockchain.blockHeader(d.blockchain.height - 1).get.header.baseTarget,
-                d.blockchain.balance(acc.toAddress)
-              )
-              .explicitGet()
-          }
-          .minBy(_._2)
-          ._1
-
-        d.appendBlock(d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = bestAcc))
-      }
-
-      d.posSelector
-        .getValidBlockDelay(
-          d.blockchain.height,
-          challengingMiner,
-          d.blockchain.lastBlockHeader.get.header.baseTarget,
-          d.blockchain.generatingBalance(challengingMiner.toAddress, d.blockchain.lastBlockId) +
-            d.blockchain.generatingBalance(challengedMiner.toAddress, d.blockchain.lastBlockId)
-        )
-        .explicitGet() < 120.seconds.toMillis shouldBe true
-    }
-  }
-
   property("NODE-909. Empty key block can be challenged") {
     val sender = TxHelpers.signer(1)
     withDomain(settings, balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
