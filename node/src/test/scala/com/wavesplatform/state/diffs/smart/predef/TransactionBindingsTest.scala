@@ -780,7 +780,9 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     }
   }
 
-  property(s"Orders should contain attachment field in Ride version >= V8 after ${BlockchainFeatures.TransactionStateSnapshot} activation") {
+  property(
+    s"NODE-1039. Orders should contain attachment field in Ride version >= V8 after ${BlockchainFeatures.TransactionStateSnapshot} activation"
+  ) {
     val issuer   = TxHelpers.signer(1)
     val buyer    = TxHelpers.signer(2)
     val smartAcc = TxHelpers.signer(3)
