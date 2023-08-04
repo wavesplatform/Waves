@@ -1,7 +1,6 @@
 package com.wavesplatform.api
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.api.stats.MonitoringClientInterceptor
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.{ClientInterceptor, ManagedChannel}
 
