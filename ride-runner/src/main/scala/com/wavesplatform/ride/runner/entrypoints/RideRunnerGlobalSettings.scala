@@ -26,7 +26,7 @@ case class RideRunnerGlobalSettings(
   // Should be more than publicApi.noDataTimeout, because it could be fixed after a restart of the blockchain updates stream.
   val unhealthyIdleTimeoutMs: Long = (publicApi.noDataTimeout + 30.seconds).toMillis
 
-  val heightsSettings = Heights.Settings(blockchain.functionalitySettings)
+  val heightsSettings = Heights.Settings(rideRunner.onEmptyStartFrom, blockchain.functionalitySettings)
 
   val sharedBlockchain = SharedBlockchainStorage.Settings(
     blockchain = blockchain,
@@ -93,6 +93,7 @@ case class RideRunnerCommonSettings(
     enableStateChanges: Boolean,
     complexityLimit: Int,
     maxTxErrorLogSize: ConfigMemorySize,
+    onEmptyStartFrom: Option[Int],
     responseCache: RideRunnerResponseCacheSettings,
     blockchainDataCache: InMemBlockchainDataCache.Settings,
     parallelRideRunThreads: Option[Int],
