@@ -6202,6 +6202,79 @@
           ],
           "title": "gRPC response codes, rate",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "If this number is high, you could want to relax a limit of concurrent connections on a frontend of gRPC server",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 3,
+            "x": 0,
+            "y": 42
+          },
+          "id": 440,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "pluginVersion": "8.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "exemplar": false,
+              "expr": "grpc_blocked_total{job=\"$job\", instance=~\"$instance\"}",
+              "format": "time_series",
+              "hide": false,
+              "instant": false,
+              "interval": "1m",
+              "legendFormat": "__auto",
+              "range": true,
+              "rawQuery": false,
+              "refId": "B"
+            }
+          ],
+          "title": "Blocked calls",
+          "type": "stat"
         }
       ],
       "title": "gRPC",
@@ -6877,7 +6950,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -6893,7 +6967,7 @@
             "h": 12,
             "w": 18,
             "x": 0,
-            "y": 20
+            "y": 23
           },
           "id": 141,
           "links": [],
@@ -6985,7 +7059,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -7066,7 +7141,7 @@
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 20
+            "y": 23
           },
           "id": 204,
           "links": [],
@@ -7218,7 +7293,7 @@
             "h": 12,
             "w": 18,
             "x": 0,
-            "y": 32
+            "y": 35
           },
           "id": 139,
           "links": [],
@@ -7361,7 +7436,7 @@
             "h": 12,
             "w": 6,
             "x": 18,
-            "y": 32
+            "y": 35
           },
           "id": 225,
           "links": [],
@@ -7476,7 +7551,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 44
+            "y": 47
           },
           "id": 137,
           "links": [],
