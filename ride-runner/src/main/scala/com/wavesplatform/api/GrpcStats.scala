@@ -14,6 +14,14 @@ object GrpcStats {
 
   private val latencyStat                = Kamon.timer("grpc.latency")
   def latency(method: GrpcMethod): Timer = latencyStat.withTags(method.tagSet)
+
+  private val blockedCallStat = Kamon
+    .counter(
+      "grpc.blocked",
+      "A number of blocked calls. If this number is high, you could want to relax a limit of concurrent connections on a frontend of gRPC server"
+    )
+    .withoutTags()
+  def blockedCall(method: GrpcMethod): Counter = blockedCallStat.withTags(method.tagSet)
 }
 
 object GrpcMethod {

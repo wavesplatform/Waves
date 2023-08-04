@@ -16,7 +16,8 @@ final case class GrpcChannelSettings(
     keepAliveTimeout: FiniteDuration,
     idleTimeout: FiniteDuration,
     maxInboundMessageSize: ConfigMemorySize,
-    channelOptions: ChannelOptionsSettings
+    channelOptions: ChannelOptionsSettings,
+    maxConcurrentCalls: Option[Int] = None
 ) {
 
   def toNettyChannelBuilder(target: String): NettyChannelBuilder =
