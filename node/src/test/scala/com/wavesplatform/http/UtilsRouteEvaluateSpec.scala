@@ -879,7 +879,7 @@ class UtilsRouteEvaluateSpec
       }
     }
 
-    "taking into account sync call payments" in {
+    "taking into account sync call transfers" in {
       val thirdAddress = signer(2).toAddress
       withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 0.01 waves), AddrWithBalance(thirdAddress, 1 waves))) { d =>
         val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
@@ -904,7 +904,39 @@ class UtilsRouteEvaluateSpec
           routePath(s"/script/evaluate/$secondAddress"),
           Json.parse("""{"call": {"function":"call1"}}""")
         ) ~> route ~> check {
-          (responseAs[JsObject] \ "message").asOpt[JsObject] should not be defined
+          (responseAs[JsObject] \ "message").asOpt[String] should not be defined
+          (responseAs[JsObject] \ "result").asOpt[JsObject] shouldBe defined
+          (responseAs[JsObject] \ "call").asOpt[JsObject] shouldBe defined
+        }
+      }
+    }
+
+    "taking into account sync call payments" in {
+      val thirdAddress = signer(2).toAddress
+      withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 1 waves), AddrWithBalance(thirdAddress, 0.01 waves))) { d =>
+        val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+        val dApp1 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func call1() = {
+             |   strict r = Address(base58'$thirdAddress').invoke("call2", [], [AttachedPayment(unit, 100)])
+             |   []
+             | }
+           """.stripMargin
+        )
+        val dApp2 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func call2() = [ ScriptTransfer(Address(base58'$defaultAddress'), 100, unit) ]
+           """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp1))
+        d.appendBlock(setScript(signer(2), dApp2))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"call1"}}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "message").asOpt[String] should not be defined
           (responseAs[JsObject] \ "result").asOpt[JsObject] shouldBe defined
           (responseAs[JsObject] \ "call").asOpt[JsObject] shouldBe defined
         }
