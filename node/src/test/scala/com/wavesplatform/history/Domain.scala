@@ -1,5 +1,6 @@
 package com.wavesplatform.history
 
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
@@ -369,10 +370,10 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None
   ): Block = {
-    val reference    = ref.getOrElse(randomSig)
-    val parentHeight = ref.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
-    val parent       = blockchain.blockHeader(parentHeight).map(_.header).getOrElse(lastBlock.header)
-    val grandParent  = blockchain.blockHeader(parentHeight - 2).map(_.header)
+    val reference        = ref.getOrElse(randomSig)
+    val parentHeight     = ref.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
+    val parent           = blockchain.blockHeader(parentHeight).map(_.header).getOrElse(lastBlock.header)
+    val greatGrandParent = blockchain.blockHeader(parentHeight - 2).map(_.header)
 
     val timestamp =
       if (blockchain.height > 0)
@@ -391,7 +392,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
             settings.blockchainSettings.genesisSettings.averageBlockDelay,
             parent.baseTarget,
             parent.timestamp,
-            grandParent.map(_.timestamp),
+            greatGrandParent.map(_.timestamp),
             timestamp
           )
           .explicitGet()
@@ -599,22 +600,27 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
-      val (hitSource, challengedHitSource) =
+      val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
-          block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature)
+          Right(block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature))
         else {
           val parentHeight = bcu.heightOf(block.header.reference).getOrElse(bcu.height)
-          val hs =
+
+          val prevHs =
             if (bcu.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight) && parentHeight > 100)
               bcu.hitSource(parentHeight - 100).get
             else bcu.hitSource(parentHeight).get
 
-          crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet() ->
-            block.header.challengedHeader.map(ch =>
-              crypto.verifyVRF(ch.generationSignature, hs.arr, ch.generator, bcu.isFeatureActivated(RideV6)).explicitGet()
+          for {
+            hs <- crypto
+              .verifyVRF(block.header.generationSignature, prevHs.arr, block.header.generator, bcu.isFeatureActivated(RideV6, parentHeight))
+            challengedHs <- block.header.challengedHeader.traverse(ch =>
+              crypto.verifyVRF(ch.generationSignature, prevHs.arr, ch.generator, bcu.isFeatureActivated(RideV6, parentHeight))
             )
+          } yield hs -> challengedHs
         }
-      bcu.processBlock(block, hitSource, challengedHitSource)
+
+      hitSourcesE.flatMap { case (hitSource, challengedHitSource) => bcu.processBlock(block, hitSource, challengedHitSource) }
     }
   }
 

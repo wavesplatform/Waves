@@ -278,8 +278,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val originalBlock    = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
-      val grandParent      = d.blockchain.blockHeader(d.blockchain.height - 2).map(_.id())
+      val grandParent = d.blockchain.blockHeader(d.blockchain.height - 2).map(_.id())
+      val originalBlock =
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, ref = grandParent, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, stateHash = None, ref = grandParent)
 
       d.appendBlockE(challengingBlock) shouldBe Left(BlockAppendError("References incorrect or non-existing block", challengingBlock))
@@ -1613,6 +1614,77 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       createInvalidChallengingBlock(validChallengingBlock, _.copy(stateHash = Some(ByteStr.fill(DigestLength)(2)))).signatureValid() shouldBe false
       createInvalidChallengingBlock(validChallengingBlock, _.copy(headerSignature = ByteStr.fill(validChallengedHeader.headerSignature.size)(1)))
         .signatureValid() shouldBe false
+    }
+  }
+
+  property("NODE-934. Block with better timestamp should replace current liquid block regardless it is challenging or not") {
+    val challengedMiner    = TxHelpers.signer(1)
+    val sender             = TxHelpers.signer(2)
+    val currentBlockSender = TxHelpers.signer(3)
+    val bestBlockSender    = TxHelpers.signer(4)
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(sender, currentBlockSender, bestBlockSender)) { d =>
+      val challengingMiner       = d.wallet.generateNewAccount().get
+      val betterChallengingMiner = d.wallet.generateNewAccount().get
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, 1000.waves),
+        TxHelpers.transfer(sender, betterChallengingMiner.toAddress, 1000.waves),
+        TxHelpers.transfer(sender, challengedMiner.toAddress, 2000.waves)
+      )
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val txs       = Seq(TxHelpers.transfer(sender, TxHelpers.defaultAddress, amount = 1.waves))
+      val bestBlock = d.createBlock(Block.ProtoBlockVersion, txs, generator = bestBlockSender)
+      val originalBlock =
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          txs,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash))
+        )
+
+      val betterChallengingBlock = d.createChallengingBlock(betterChallengingMiner, originalBlock)
+      val worseChallengingBlock  = d.createChallengingBlock(challengingMiner, originalBlock)
+      val currentBlock           = d.createBlock(Block.ProtoBlockVersion, txs, generator = currentBlockSender)
+
+      bestBlock.header.timestamp < betterChallengingBlock.header.timestamp shouldBe true
+      betterChallengingBlock.header.timestamp < worseChallengingBlock.header.timestamp shouldBe true
+      worseChallengingBlock.header.timestamp < currentBlock.header.timestamp shouldBe true
+
+      d.appendBlockE(currentBlock) should beRight
+      val expectedHeight = d.blockchain.height
+
+      // replace block without challenge with challenging block
+      d.appendBlockE(worseChallengingBlock) should beRight
+      d.lastBlock shouldBe worseChallengingBlock
+      d.blockchain.height shouldBe expectedHeight
+
+      d.appendBlockE(currentBlock) should produce(
+        s"Competitors liquid block $currentBlock(timestamp=${currentBlock.header.timestamp}) is not better than existing"
+      )
+      d.lastBlock shouldBe worseChallengingBlock
+      d.blockchain.height shouldBe expectedHeight
+
+      // replace challenging block with better challenging block
+      d.appendBlockE(betterChallengingBlock) should beRight
+      d.lastBlock shouldBe betterChallengingBlock
+      d.blockchain.height shouldBe expectedHeight
+
+      d.appendBlockE(worseChallengingBlock) should produce(
+        s"Competitors liquid block $worseChallengingBlock(timestamp=${worseChallengingBlock.header.timestamp}) is not better than existing"
+      )
+      d.lastBlock shouldBe betterChallengingBlock
+      d.blockchain.height shouldBe expectedHeight
+
+      // replace challenging block with block without challenge
+      d.appendBlockE(bestBlock) should beRight
+      d.lastBlock shouldBe bestBlock
+      d.blockchain.height shouldBe expectedHeight
+
+      d.appendBlockE(betterChallengingBlock) should produce(
+        s"Competitors liquid block $betterChallengingBlock(timestamp=${betterChallengingBlock.header.timestamp}) is not better than existing"
+      )
+      d.lastBlock shouldBe bestBlock
+      d.blockchain.height shouldBe expectedHeight
     }
   }
 
