@@ -375,8 +375,9 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
-      rewardVote: Long = -1L
-  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote).explicitGet()
+      rewardVote: Long = -1L,
+      baseTarget: Option[Long] = None
+  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, baseTarget).explicitGet()
 
   def createBlockE(
       version: Byte,
@@ -386,7 +387,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
-      rewardVote: Long = -1L
+      rewardVote: Long = -1L,
+      baseTarget: Option[Long] = None
   ): Either[ValidationError, Block] = {
     val reference = ref.getOrElse(randomSig)
 
@@ -415,11 +417,12 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
               timestamp
             )
         else Right(NxtLikeConsensusBlockData(60, generationSignature))
-      resultBt =
+      resultBt = baseTarget.getOrElse {
         if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
           consensus.baseTarget
         } else if (parentHeight % 2 != 0) parent.baseTarget
         else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
+      }
       blockWithoutStateHash <- Block
         .buildAndSign(
           version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,

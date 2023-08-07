@@ -62,12 +62,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       gs <-
         if (vrfActivated(parentHeight + 1)) {
           crypto
-            .verifyVRF(
-              header.generationSignature,
-              parentHitSource.arr,
-              header.generator,
-              blockchain.isFeatureActivated(BlockchainFeatures.RideV6, parentHeight)
-            )
+            .verifyVRF(header.generationSignature, parentHitSource.arr, header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
             .map(_.arr)
         } else {
           generationSignature(parentHitSource, header.generator).asRight[ValidationError]
@@ -87,9 +82,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
       if (vrfActivated(height + 1)) {
         getHitSource(height)
-          .flatMap(hs =>
-            crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
-          )
+          .flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
       } else {
         blockchain
           .blockHeader(height)
@@ -160,7 +153,7 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
       gs <-
         if (vrfActivated(height + 1)) {
           val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-          crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)).map(_.arr)
+          crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).map(_.arr)
         } else {
           generationSignature(hitSource, account.publicKey).asRight[ValidationError]
         }

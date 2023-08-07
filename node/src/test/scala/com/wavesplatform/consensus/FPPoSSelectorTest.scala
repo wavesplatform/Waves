@@ -1,7 +1,6 @@
 package com.wavesplatform.consensus
 
 import java.nio.file.Files
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
@@ -11,7 +10,7 @@ import com.wavesplatform.database.RDB
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.*
+import com.wavesplatform.settings.{WavesSettings, *}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestRocksDB
@@ -223,6 +222,49 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
     }
   }
 
+  "PoSSelector should verify generation signature for new blocks which reference non-last block correctly" in {
+    Seq(1, 100).foreach { blockCount =>
+      withEnv(chainGen(List(ENOUGH_AMT, ENOUGH_AMT), blockCount, Block.ProtoBlockVersion), VRFActivated = true) {
+        case Env(pos, blockchain, miners, _) =>
+          val currentMiner = miners.head
+          val anotherMiner = miners(1)
+
+          val blockToApply = forgeBlock(currentMiner, blockchain, pos, Block.ProtoBlockVersion)()
+          val anotherBlock = forgeBlock(anotherMiner, blockchain, pos, Block.ProtoBlockVersion)()
+
+          blockToApply.header.reference shouldBe anotherBlock.header.reference
+
+          blockchain.processBlock(
+            blockToApply,
+            crypto.verifyVRF(blockToApply.header.generationSignature, blockchain.hitSource(blockCount + 1).get.arr, blockToApply.sender).explicitGet()
+          ) should beRight
+
+          blockchain.lastBlockId shouldBe Some(blockToApply.id())
+
+          pos.validateGenerationSignature(anotherBlock) should beRight
+      }
+    }
+
+    withEnv(chainGen(List(ENOUGH_AMT, ENOUGH_AMT), 1)) { case Env(pos, blockchain, miners, _) =>
+      val currentMiner = miners.head
+      val anotherMiner = miners(1)
+
+      val blockToApply = forgeBlock(currentMiner, blockchain, pos)()
+      val anotherBlock = forgeBlock(anotherMiner, blockchain, pos)()
+
+      blockToApply.header.reference shouldBe anotherBlock.header.reference
+
+      blockchain.processBlock(
+        blockToApply,
+        blockchain.blockHeader(2).get.header.generationSignature
+      ) should beRight
+
+      blockchain.lastBlockId shouldBe Some(blockToApply.id())
+
+      pos.validateGenerationSignature(anotherBlock) should beRight
+    }
+  }
+
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])], VRFActivated: Boolean = false)(f: Env => Unit): Unit = {
     // we are not using the db instance from WithDB trait as it should be recreated between property checks
     val path = Files.createTempDirectory("lvl").toAbsolutePath
@@ -265,7 +307,7 @@ object FPPoSSelectorTest {
     }
   }
 
-  final case class Env(pos: PoSSelector, blockchain: Blockchain with BlockchainUpdater, miners: Seq[KeyPair], blocks: Seq[Block])
+  final case class Env(pos: PoSSelector, blockchain: Blockchain & BlockchainUpdater, miners: Seq[KeyPair], blocks: Seq[Block])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
