@@ -33,16 +33,18 @@ object BlockAppender extends ScorexLogging {
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       if (
-        newBlock.header.challengedHeader.isDefined && (blockchainUpdater
-          .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference))
+        blockchainUpdater
+          .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
-        appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
-      } else if (blockchainUpdater.isLastBlockId(newBlock.header.reference)) {
-        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
+        if (newBlock.header.challengedHeader.isDefined) {
+          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
+        } else {
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
+        }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
-        Left(BlockAppendError("Block is not a child of the last block", newBlock))
+        Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
     }.executeOn(scheduler)
 
   def apply(

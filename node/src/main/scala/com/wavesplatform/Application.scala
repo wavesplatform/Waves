@@ -163,7 +163,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       settings,
       time,
       pos,
-      appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, scheduler)
+      minerScheduler,
+      appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)
     )
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler) _

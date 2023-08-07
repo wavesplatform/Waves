@@ -78,22 +78,22 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
 
   def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
     val blockGenSig = block.header.generationSignature
-    val height      = blockchain.height
 
-    if (vrfActivated(height + 1)) {
-      getHitSource(height).flatMap(hs =>
-        crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
-      )
-    } else {
-      blockchain.lastBlockHeader
-        .toRight(GenericError("No blocks in blockchain"))
-        .map(b => generationSignature(b.header.generationSignature, block.header.generator))
-        .ensureOr { expectedGenSig =>
-          GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(expectedGenSig)}; Found = $blockGenSig")
-        } { expectedGenSig =>
-          blockGenSig.arr sameElements expectedGenSig
-        }
-        .map(_ => block.header.generationSignature)
+    blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
+      if (vrfActivated(height + 1)) {
+        getHitSource(height)
+          .flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
+      } else {
+        blockchain.lastBlockHeader
+          .toRight(GenericError("No blocks in blockchain"))
+          .map(b => generationSignature(b.header.generationSignature, block.header.generator))
+          .ensureOr { expectedGenSig =>
+            GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(expectedGenSig)}; Found = $blockGenSig")
+          } { expectedGenSig =>
+            blockGenSig.arr sameElements expectedGenSig
+          }
+          .map(_ => block.header.generationSignature)
+      }
     }
   }
 

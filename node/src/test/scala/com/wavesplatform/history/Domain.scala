@@ -28,7 +28,7 @@ import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
-import com.wavesplatform.utils.{EthEncoding, SystemTime}
+import com.wavesplatform.utils.{EthEncoding, Schedulers, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, crypto, database}
@@ -80,6 +80,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     settings,
     testTime,
     posSelector,
+    Schedulers.singleThread("miner"),
     blockAppender
   )
 
@@ -368,23 +369,15 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None
   ): Block = {
-    val reference = ref.getOrElse(randomSig)
-    val parent = ref
-      .flatMap { bs =>
-        val height = blockchain.heightOf(bs)
-        height.flatMap(blockchain.blockHeader).map(_.header)
-      }
-      .getOrElse(lastBlock.header)
-
-    val grandParent = ref.flatMap { bs =>
-      val height = blockchain.heightOf(bs)
-      height.flatMap(h => blockchain.blockHeader(h - 2)).map(_.header)
-    }
+    val reference    = ref.getOrElse(randomSig)
+    val parentHeight = ref.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
+    val parent       = blockchain.blockHeader(parentHeight).map(_.header).getOrElse(lastBlock.header)
+    val grandParent  = blockchain.blockHeader(parentHeight - 2).map(_.header)
 
     val timestamp =
       if (blockchain.height > 0)
         parent.timestamp + posSelector
-          .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
+          .getValidBlockDelay(parentHeight, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
           .explicitGet()
       else
         System.currentTimeMillis() - (1 hour).toMillis
@@ -394,7 +387,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         posSelector
           .consensusData(
             generator,
-            blockchain.height,
+            parentHeight,
             settings.blockchainSettings.genesisSettings.averageBlockDelay,
             parent.baseTarget,
             parent.timestamp,
@@ -405,9 +398,9 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       else NxtLikeConsensusBlockData(60, generationSignature)
 
     val resultBt =
-      if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, blockchain.height)) {
+      if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
         consensus.baseTarget
-      } else if (blockchain.height % 2 != 0) parent.baseTarget
+      } else if (parentHeight % 2 != 0) parent.baseTarget
       else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
 
     val blockWithoutStateHash = Block
@@ -610,10 +603,11 @@ object Domain {
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature)
         else {
+          val parentHeight = bcu.heightOf(block.header.reference).getOrElse(bcu.height)
           val hs =
-            if (bcu.isFeatureActivated(BlockchainFeatures.FairPoS, bcu.height) && bcu.height > 100)
-              bcu.hitSource(bcu.height - 100).get
-            else bcu.hitSource(bcu.height).get
+            if (bcu.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight) && parentHeight > 100)
+              bcu.hitSource(parentHeight - 100).get
+            else bcu.hitSource(parentHeight).get
 
           crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet() ->
             block.header.challengedHeader.map(ch =>

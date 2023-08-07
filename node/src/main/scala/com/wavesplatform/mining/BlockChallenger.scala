@@ -25,6 +25,7 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
+import monix.execution.Scheduler
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
@@ -58,6 +59,7 @@ class BlockChallengerImpl(
     settings: WavesSettings,
     timeService: Time,
     pos: PoSSelector,
+    minerScheduler: Scheduler,
     appendBlock: Block => Task[Either[ValidationError, Option[BigInt]]]
 ) extends BlockChallenger
     with ScorexLogging {
@@ -66,12 +68,13 @@ class BlockChallengerImpl(
 
   def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = {
     log.debug(s"Challenging block $block")
+
     (for {
       _ <- EitherT.liftF(Task(processingTxs.putAll(block.transactionData.map(tx => tx.id() -> tx).toMap.asJava)))
       challengingBlock <- EitherT(
         createChallengingBlock(block, block.header.stateHash, block.signature, block.transactionData, prevStateHash, blockReward)
       )
-      _ <- EitherT(appendBlock(challengingBlock))
+      _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
       _ <- EitherT.liftF[Task, ValidationError, Unit](Task(processingTxs.clear()))
     } yield {
       log.debug(s"Successfully challenged $block with $challengingBlock")
@@ -103,7 +106,7 @@ class BlockChallengerImpl(
           blockReward
         )
       )
-      _ <- EitherT(appendBlock(challengingBlock))
+      _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
       _ <- EitherT.liftF[Task, ValidationError, Unit](Task(processingTxs.clear()))
     } yield {
       log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
@@ -218,7 +221,7 @@ class BlockChallengerImpl(
     } yield {
       challengingBlock
     }
-  }.flatMap {
+  }.executeOn(minerScheduler).flatMap {
     case res @ Right(block) => waitForTimeAlign(block.header.timestamp).map(_ => res)
     case err @ Left(_)      => Task(err)
   }

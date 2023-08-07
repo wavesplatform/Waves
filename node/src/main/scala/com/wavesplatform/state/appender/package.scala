@@ -53,7 +53,7 @@ package object appender {
       txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] = {
     if (block.header.challengedHeader.nonEmpty) {
-      processsBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map(_._2)
+      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map(_._2)
     } else {
       for {
         hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
@@ -70,12 +70,12 @@ package object appender {
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] =
-    processsBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
+    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
       utx.setPriorityDiffs(discardedDiffs)
       newHeight
     }
 
-  private def processsBlockWithChallenge(
+  private def processBlockWithChallenge(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,

@@ -1131,27 +1131,15 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
-        Seq.empty,
+        Seq(TxHelpers.transfer(sender, challengingMiner.toAddress, 1.waves)),
         strictTime = true
       )
 
-      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, ref = Some(d.lastBlockId))
 
       d.appendBlockE(challengingBlock) shouldBe Left(GenericError("Invalid block challenge"))
-
-      appendAndCheck(originalBlock, d) { block =>
-        block.header.challengedHeader should not be defined
-        block.header.timestamp shouldBe originalBlock.header.timestamp
-        block.header.baseTarget shouldBe originalBlock.header.baseTarget
-        block.header.generationSignature shouldBe originalBlock.header.generationSignature
-        block.header.featureVotes shouldBe originalBlock.header.featureVotes
-        block.header.generator shouldBe originalBlock.header.generator
-        block.header.rewardVote shouldBe originalBlock.header.rewardVote
-        block.header.transactionsRoot shouldBe originalBlock.header.transactionsRoot
-        block.header.stateHash shouldBe originalBlock.header.stateHash
-      }
-
-      createBlockAppender(d)(challengingBlock).runSyncUnsafe() should produce("Could not verify VRF proof")
+      d.appendBlockE(originalBlock) should beRight
+      d.appendBlockE(challengingBlock) shouldBe Left(GenericError("Invalid block challenge"))
     }
   }
 
@@ -1555,6 +1543,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
           d.settings,
           testTime,
           d.posSelector,
+          Schedulers.singleThread("miner"),
           createBlockAppender(d)
         ) {
           override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
@@ -1671,6 +1660,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.settings,
       testTime,
       d.posSelector,
+      Schedulers.singleThread("miner"),
       createBlockAppender(d)
     )
 
