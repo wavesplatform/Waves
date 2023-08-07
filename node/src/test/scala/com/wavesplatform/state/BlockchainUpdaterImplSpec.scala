@@ -16,16 +16,18 @@ import com.wavesplatform.history.{Domain, chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.*
+import com.wavesplatform.transaction.TxValidationError.BlockAppendError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Schedulers, SystemTime, Time}
 import com.wavesplatform.{EitherMatchers, NTPTime}
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.PublishToOneSubject
@@ -92,7 +94,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     (master, List(genesisBlock, b1, b2))
   }
 
-  "blochain update events sending" - {
+  "blockhain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
         val triggersMock = mock[BlockchainUpdateTriggers]
@@ -327,6 +329,37 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           (secondAddress, Waves)
         )
       }
+    }
+  }
+
+  "BlockchainUpdater should replace current liquid block with better one" in {
+    val currentBlockSender = TxHelpers.signer(1)
+    val anotherBlockSender = TxHelpers.signer(2)
+
+    withDomain(ConsensusImprovements, AddrWithBalance.enoughBalances(currentBlockSender, anotherBlockSender)) { d =>
+      val parent = d.appendBlock()
+
+      val currentBlock =
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = currentBlockSender, baseTarget = Some(100), ref = Some(parent.id()))
+      val betterBlock =
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, baseTarget = Some(99), ref = Some(parent.id()))
+      val worseBlock =
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, baseTarget = Some(101), ref = Some(parent.id()))
+
+      d.appendBlockE(currentBlock) should beRight
+
+      val appender = BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, Schedulers.singleThread("appender"), verify = false) _
+
+      appender(worseBlock).runSyncUnsafe(1.minute) shouldBe Left(
+        BlockAppendError(
+          s"Competitors liquid block $worseBlock(score=${worseBlock.blockScore()}) is not better than existing (ng.base $currentBlock(score=${currentBlock
+            .blockScore()}))",
+          worseBlock
+        )
+      )
+
+      appender(betterBlock).runSyncUnsafe(1.minute) should beRight
+      d.lastBlock shouldBe betterBlock
     }
   }
 }

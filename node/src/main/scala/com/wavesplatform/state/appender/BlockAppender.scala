@@ -30,12 +30,15 @@ object BlockAppender extends ScorexLogging {
       verify: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
+      if (
+        blockchainUpdater
+          .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
+      )
         appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
       else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
-        Left(BlockAppendError("Block is not a child of the last block", newBlock))
+        Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
     }.executeOn(scheduler)
 
   def apply(

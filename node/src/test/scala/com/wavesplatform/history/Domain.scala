@@ -285,7 +285,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
       generator: KeyPair = defaultSigner,
-      rewardVote: Long = -1L
+      rewardVote: Long = -1L,
+      baseTarget: Option[Long] = None
   ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
@@ -328,7 +329,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
         timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
         reference = reference,
-        baseTarget = consensus.baseTarget.max(PoSCalculator.MinBaseTarget),
+        baseTarget = baseTarget.getOrElse(consensus.baseTarget.max(PoSCalculator.MinBaseTarget)),
         generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
