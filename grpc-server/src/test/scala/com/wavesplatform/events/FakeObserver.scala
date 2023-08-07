@@ -70,12 +70,6 @@ object FakeObserver {
       ur.subscribe(request, obs)
       obs
     }
-
-    def createSubscriptionObserver(request: SubscribeRequest): FakeObserver[SubscribeEvent] = {
-      val obs = FakeObserver.apply[SubscribeEvent]
-      ur.subscribe(request, obs)
-      obs
-    }
   }
 
   // Matchers

@@ -33,6 +33,7 @@ import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
@@ -75,11 +76,7 @@ object InvokeScriptTransactionDiff {
           invocationDiff: Diff,
           scriptResult: ScriptResult,
           log: Log[Id],
-          availableActions: Int,
-          availableBalanceActions: Int,
-          availableAssetActions: Int,
-          availableData: Int,
-          availableDataSize: Int,
+          availableActions: ActionLimits,
           limit: Int
       )
 
@@ -120,10 +117,6 @@ object InvokeScriptTransactionDiff {
             result,
             log,
             environment.availableActions,
-            environment.availableBalanceActions,
-            environment.availableAssetActions,
-            environment.availableData,
-            environment.availableDataSize,
             fullLimit - paymentsComplexity
           )
         }
@@ -155,16 +148,13 @@ object InvokeScriptTransactionDiff {
           scriptResult,
           log,
           availableActions,
-          availableBalanceActions,
-          availableAssetActions,
-          availableData,
-          availableDataSize,
           limit
         ) <- executeMainScript()
         otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
         doProcessActions = InvokeDiffsCommon.processActions(
           _,
+          version,
           version,
           dAppAddress,
           pk,
@@ -197,6 +187,7 @@ object InvokeScriptTransactionDiff {
           for {
             _ <- InvokeDiffsCommon.checkCallResultLimits(
               version,
+              version,
               blockchain,
               storingComplexity,
               log,
@@ -205,11 +196,7 @@ object InvokeScriptTransactionDiff {
               assetActionsCount,
               dataCount,
               dataSize,
-              availableActions,
-              availableBalanceActions,
-              availableAssetActions,
-              availableData,
-              availableDataSize
+              availableActions
             )
             diff <- doProcessActions(StructuredCallableActions(actions, blockchain), storingComplexity.toInt)
           } yield diff
@@ -284,6 +271,7 @@ object InvokeScriptTransactionDiff {
             blockchain,
             tthis,
             directives,
+            version,
             tx,
             dAppAddress,
             pk,
@@ -292,12 +280,14 @@ object InvokeScriptTransactionDiff {
             enableExecutionLog,
             ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),
-            ContractLimits.MaxCallableActionsAmountBeforeV6(version),
-            ContractLimits.MaxBalanceScriptActionsAmountV6,
-            ContractLimits.MaxAssetScriptActionsAmountV6,
+            ActionLimits(
+              ContractLimits.MaxCallableActionsAmountBeforeV6(version),
+              ContractLimits.MaxBalanceScriptActionsAmountV6,
+              ContractLimits.MaxAssetScriptActionsAmountV6,
+              ContractLimits.MaxWriteSetSize,
+              ContractLimits.MaxTotalWriteSetSizeInBytes
+            ),
             ContractLimits.MaxTotalPaymentAmountRideV6 - tx.payments.size,
-            ContractLimits.MaxWriteSetSize,
-            ContractLimits.MaxTotalWriteSetSizeInBytes,
             paymentsPart,
             invocationTracker
           )

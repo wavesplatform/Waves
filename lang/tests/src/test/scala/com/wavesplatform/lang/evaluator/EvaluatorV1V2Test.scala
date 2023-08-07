@@ -27,6 +27,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
@@ -775,7 +776,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
 
     val expr = ExpressionCompiler
-      .compileUntyped(script, context.compilerContext)
+      .compileUntyped(script, NoLibraries, context.compilerContext)
       .explicitGet()
 
     evalPure[EVALUATED](
@@ -908,7 +909,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -1044,7 +1045,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
