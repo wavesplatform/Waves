@@ -254,6 +254,7 @@ class BlockchainUpdaterImpl(
                       log.trace(
                         s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
                       )
+                      BlockStats.replaced(ng.base, block)
                       val (mbs, diffs) = ng.allDiffs.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
                       blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
@@ -265,6 +266,7 @@ class BlockchainUpdaterImpl(
                     Right(None)
                   } else {
                     log.trace(s"New liquid block is better version of existing, swapping")
+                    BlockStats.replaced(ng.bestLiquidBlock, block)
                     val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(leveldb, height)
 
