@@ -5,8 +5,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.utils.EthTxGenerator
+import com.wavesplatform.transaction.{EthTxGenerator, TxHelpers}
 import com.wavesplatform.utils.{EthHelpers, JsonMatchers}
 import play.api.libs.json.Json
 

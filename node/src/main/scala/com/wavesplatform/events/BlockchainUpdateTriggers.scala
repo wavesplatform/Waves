@@ -10,14 +10,14 @@ trait BlockchainUpdateTriggers {
   def onProcessBlock(
       block: Block,
       diff: DetailedDiff,
-      minerReward: Option[Long],
+      reward: Option[Long],
       hitSource: ByteStr,
-      blockchainBeforeWithMinerReward: Blockchain
+      blockchainBeforeWithReward: Blockchain
   ): Unit
   def onProcessMicroBlock(
       microBlock: MicroBlock,
       diff: DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): Unit
@@ -30,14 +30,14 @@ object BlockchainUpdateTriggers {
     override def onProcessBlock(
         block: Block,
         diff: DetailedDiff,
-        minerReward: Option[Long],
+        reward: Option[Long],
         hitSource: ByteStr,
-        blockchainBeforeWithMinerReward: Blockchain
+        blockchainBeforeWithReward: Blockchain
     ): Unit = {}
     override def onProcessMicroBlock(
         microBlock: MicroBlock,
         diff: DetailedDiff,
-        blockchainBeforeWithMinerReward: Blockchain,
+        blockchainBeforeWithReward: Blockchain,
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
     ): Unit = {}
@@ -49,20 +49,20 @@ object BlockchainUpdateTriggers {
     override def onProcessBlock(
         block: Block,
         diff: BlockDiffer.DetailedDiff,
-        minerReward: Option[Long],
+        reward: Option[Long],
         hitSource: ByteStr,
-        blockchainBeforeWithMinerReward: Blockchain
+        blockchainBeforeWithReward: Blockchain
     ): Unit =
-      triggers.foreach(_.onProcessBlock(block, diff, minerReward, hitSource, blockchainBeforeWithMinerReward))
+      triggers.foreach(_.onProcessBlock(block, diff, reward, hitSource, blockchainBeforeWithReward))
 
     override def onProcessMicroBlock(
         microBlock: MicroBlock,
         diff: BlockDiffer.DetailedDiff,
-        blockchainBeforeWithMinerReward: Blockchain,
+        blockchainBeforeWithReward: Blockchain,
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
     ): Unit =
-      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
+      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot))
 
     override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
       triggers.foreach(_.onRollback(blockchainBefore, toBlockId, toHeight))

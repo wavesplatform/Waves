@@ -910,7 +910,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
       if (version == V3)
         d.appendBlockE(ci) should produce(error)
-      else if (version == V6) {
+      else if (version >= V6) {
         d.appendBlockE(ci) should produceRejectOrFailedDiff(error)
       } else {
         d.appendBlock(ci)
@@ -943,7 +943,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       if (version == V3) {
         d.appendBlock(setScript, ci)
         d.liquidDiff.errorMessage(ci.id()) shouldBe None
-      } else if (version == V6) {
+      } else if (version >= V6) {
         d.appendBlockE(setScript, ci) should produceRejectOrFailedDiff("Data entry key should not be empty")
       } else {
         d.appendBlock(setScript, ci)
