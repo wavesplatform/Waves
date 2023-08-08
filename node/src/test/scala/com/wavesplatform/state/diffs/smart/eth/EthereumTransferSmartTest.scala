@@ -67,8 +67,8 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
        |   case a: Address => a.bytes == base58'$recipient'
        |   case a: Alias   => throw("unexpected")
        | }
-       | ${assertProvenPart("t", proofs = false)} && amount && feeAssetId #&& recipient && attachment
-       | #${if (asset.isEmpty) "" else " && assetId"}
+       | ${assertProvenPart("t", proofs = false)} && amount && feeAssetId && recipient && attachment
+       | ${if (asset.isEmpty) "" else " && assetId"}
      """.stripMargin
 
   property("access to Ethereum transfer from RIDE script") {
