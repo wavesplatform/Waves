@@ -6,6 +6,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsNumber, JsObject, Json}
 
 class JsonManipulationsTestSuite extends BaseTestSuite with TableDrivenPropertyChecks {
+  private val ten = JsNumber(10)
   private val json = Json.parse(
     """{
       |  "extra1": {},
@@ -23,31 +24,108 @@ class JsonManipulationsTestSuite extends BaseTestSuite with TableDrivenPropertyC
   )
 
   "JsonManipulations" - {
-    "pick" in {
+    "pruneAll" in {
       val table = Table(
-        "path"        -> "expectedJson",
-        "foo.bar.baz" -> JsNumber(10).some,
-        "foo.bar" -> Json
-          .parse(
-            """{
-              |  "extra1": {},
-              |  "baz": 10,
-              |  "extra2": {}
-              |}""".stripMargin
-          )
-          .some,
-        ""        -> none,
-        "bar.baz" -> none,
-        "foo.baz" -> none
+        "paths" -> "expectedJson",
+        List("foo.bar.baz", "extra1") -> Json.parse(
+          """{
+            |  "extra1": {},
+            |  "foo": {
+            |    "bar": {
+            |      "baz": 10
+            |    }
+            |  }
+            |}""".stripMargin
+        ),
+        List("", "foo.bar.baz") -> Json.parse(
+          """{
+            |  "foo": {
+            |    "bar": {
+            |      "baz": 10
+            |    }
+            |  }
+            |}""".stripMargin
+        ),
+        List("") -> JsObject.empty,
+        Nil      -> JsObject.empty
       )
 
-      forAll(table) { (path, expectedJson) =>
-        JsonManipulations.pick(json, path.split('.').toList) shouldBe expectedJson
+      forAll(table) { (paths, expectedJson) =>
+        JsonManipulations.pruneAll(json, paths) shouldBe expectedJson
+      }
+    }
+
+    "prune" - {
+      "on object" in {
+        val table = Table(
+          "path" -> "expectedJson",
+          "foo.bar.baz" -> Json.parse(
+            """{
+              |  "foo": {
+              |    "bar": {
+              |      "baz": 10
+              |    }
+              |  }
+              |}""".stripMargin
+          ),
+          "foo.bar" -> Json.parse(
+            """{
+              |  "foo": {
+              |    "bar": {
+              |      "extra1": {},
+              |      "baz": 10,
+              |      "extra2": {}
+              |    }
+              |  }
+              |}""".stripMargin
+          ),
+          ""        -> JsObject.empty,
+          "bar.baz" -> JsObject.empty,
+          "foo.baz" -> JsObject.empty
+        )
+
+        forAll(table) { (path, expectedJson) =>
+          JsonManipulations.prune(json, path) shouldBe expectedJson
+        }
+      }
+
+      "on value" - {
+        "empty path" in { JsonManipulations.prune(ten, "") shouldBe JsObject.empty }
+        "non-empty path" in { JsonManipulations.prune(ten, "foo") shouldBe JsObject.empty }
+      }
+    }
+
+    "pick" - {
+      "on object" in {
+        val table = Table(
+          "path"        -> "expectedJson",
+          "foo.bar.baz" -> ten.some,
+          "foo.bar" -> Json
+            .parse(
+              """{
+                |  "extra1": {},
+                |  "baz": 10,
+                |  "extra2": {}
+                |}""".stripMargin
+            )
+            .some,
+          ""        -> none,
+          "bar.baz" -> none,
+          "foo.baz" -> none
+        )
+
+        forAll(table) { (path, expectedJson) =>
+          JsonManipulations.pick(json, path) shouldBe expectedJson
+        }
+      }
+
+      "on value" in {
+        JsonManipulations.pick(ten, "foo") shouldBe None
       }
     }
 
     "mkTrunk" in {
-      JsonManipulations.mkTrunk("foo.bar.baz", JsNumber(10)) shouldBe Json.parse(
+      JsonManipulations.mkTrunk("foo.bar.baz", ten) shouldBe Json.parse(
         """{
           |  "foo": {
           |    "bar": {
@@ -57,40 +135,7 @@ class JsonManipulationsTestSuite extends BaseTestSuite with TableDrivenPropertyC
           |}""".stripMargin
       )
 
-      JsonManipulations.mkTrunk("", JsNumber(10)) shouldBe JsNumber(10)
-    }
-
-    "prune" in {
-      val table = Table(
-        "path" -> "expectedJson",
-        "foo.bar.baz" -> Json.parse(
-          """{
-            |  "foo": {
-            |    "bar": {
-            |      "baz": 10
-            |    }
-            |  }
-            |}""".stripMargin
-        ),
-        "foo.bar" -> Json.parse(
-          """{
-            |  "foo": {
-            |    "bar": {
-            |      "extra1": {},
-            |      "baz": 10,
-            |      "extra2": {}
-            |    }
-            |  }
-            |}""".stripMargin
-        ),
-        ""        -> JsObject.empty,
-        "bar.baz" -> JsObject.empty,
-        "foo.baz" -> JsObject.empty
-      )
-
-      forAll(table) { (path, expectedJson) =>
-        JsonManipulations.prune(json, path.split('.').toList) shouldBe expectedJson
-      }
+      JsonManipulations.mkTrunk("", ten) shouldBe ten
     }
   }
 }

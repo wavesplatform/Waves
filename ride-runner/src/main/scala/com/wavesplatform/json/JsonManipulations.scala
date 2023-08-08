@@ -5,19 +5,28 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scala.annotation.tailrec
 
 object JsonManipulations {
+  def pruneAll(js: JsValue, paths: List[String]): JsObject =
+    paths.foldLeft(JsObject.empty) { case (r, path) =>
+      r.deepMerge(prune(js, path))
+    }
 
   /** @param path
     *   dot-separated path, e.g.: foo.bar.baz
     * @return
     *   Removes all subtrees except a subtree with specified path
     */
-  def prune(js: JsValue, path: String): JsValue = prune(js, path.split('.').toList)
+  def prune(js: JsValue, path: String): JsObject = prune(js, path.split('.').toList)
 
   /** @return
     *   Removes all subtrees except a subtree with specified path
     */
-  def prune(js: JsValue, path: List[String]): JsValue =
-    pick(js, path).fold[JsValue](JsObject.empty)(mkTrunk(path, _))
+  private def prune(js: JsValue, path: List[String]): JsObject =
+    pick(js, path).fold(JsObject.empty) { leaf =>
+      mkTrunk(path, leaf) match {
+        case trunk: JsObject => trunk
+        case _               => JsObject.empty // It's not a tree, just one leaf. Cut it!
+      }
+    }
 
   /** @param path
     *   dot-separated path, e.g.: foo.bar.baz
@@ -29,13 +38,18 @@ object JsonManipulations {
   /** @return
     *   A subtree by this path
     */
-  @tailrec def pick(js: JsValue, path: List[String]): Option[JsValue] = path match {
-    case Nil => Some(js)
-    case segment :: restSegments =>
-      (js \ segment).asOpt[JsValue] match {
-        case None          => None
-        case Some(subTree) => pick(subTree, restSegments)
-      }
+  private def pick(js: JsValue, path: List[String]): Option[JsValue] = {
+    @tailrec def loop(js: JsValue, path: List[String]): Option[JsValue] = path match {
+      case Nil => Some(js)
+      case segment :: restSegments =>
+        (js \ segment).asOpt[JsValue] match {
+          case None          => None
+          case Some(subTree) => loop(subTree, restSegments)
+        }
+    }
+
+    if (path.isEmpty) None
+    else loop(js, path)
   }
 
   /** @param path
@@ -48,7 +62,7 @@ object JsonManipulations {
   /** @return
     *   A nested object with specified path and the deepest nested leaf
     */
-  def mkTrunk(path: List[String], leaf: JsValue): JsValue = {
+  private def mkTrunk(path: List[String], leaf: JsValue): JsValue = {
     @tailrec def loop(reversedPath: List[String], acc: JsValue): JsValue = reversedPath match {
       case innerSegment :: outerSegments => loop(outerSegments, Json.obj(innerSegment -> acc))
       case Nil                           => acc
