@@ -69,23 +69,19 @@ class BlockChallengerImpl(
   def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = {
     log.debug(s"Challenging block $block")
 
-    (for {
-      _ <- EitherT.liftF(Task(processingTxs.putAll(block.transactionData.map(tx => tx.id() -> tx).toMap.asJava)))
-      challengingBlock <- EitherT(
-        createChallengingBlock(block, block.header.stateHash, block.signature, block.transactionData, prevStateHash, blockReward)
-      )
-      _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
-      _ <- EitherT.liftF[Task, ValidationError, Unit](Task(processingTxs.clear()))
-    } yield {
-      log.debug(s"Successfully challenged $block with $challengingBlock")
-      allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
-    }).fold(
-      err => {
-        processingTxs.clear()
-        log.debug(s"Could not challenge $block: $err")
-      },
-      identity
-    )
+    withProcessingTxs(block.transactionData) {
+      (for {
+        challengingBlock <- EitherT(
+          createChallengingBlock(block, block.header.stateHash, block.signature, block.transactionData, prevStateHash, blockReward)
+        )
+        _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+      } yield challengingBlock).value
+    }.map {
+      case Right(challengingBlock) =>
+        log.debug(s"Successfully challenged $block with $challengingBlock")
+        allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+      case Left(err) => log.debug(s"Could not challenge $block: $err")
+    }
   }
 
   def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = {
@@ -95,27 +91,27 @@ class BlockChallengerImpl(
     (for {
       discarded <- EitherT(Task(blockchainUpdater.removeAfter(blockchainUpdater.lastBlockHeader.get.header.reference)))
       block     <- EitherT(Task(discarded.headOption.map(_._1).toRight(GenericError("Liquid block wasn't discarded"))))
-      _ <- EitherT.liftF(Task(processingTxs.putAll((block.transactionData ++ md.microBlock.transactionData).map(tx => tx.id() -> tx).toMap.asJava)))
-      challengingBlock <- EitherT(
-        createChallengingBlock(
-          block,
-          md.microBlock.stateHash,
-          md.microBlock.totalResBlockSig,
-          block.transactionData ++ md.microBlock.transactionData,
-          prevStateHash,
-          blockReward
-        )
-      )
-      _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
-      _ <- EitherT.liftF[Task, ValidationError, Unit](Task(processingTxs.clear()))
+      txs = block.transactionData ++ md.microBlock.transactionData
+      challengingBlock <- EitherT(withProcessingTxs(txs) {
+        (for {
+          challengingBlock <- EitherT(
+            createChallengingBlock(
+              block,
+              md.microBlock.stateHash,
+              md.microBlock.totalResBlockSig,
+              txs,
+              prevStateHash,
+              blockReward
+            )
+          )
+          _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+        } yield challengingBlock).value
+      })
     } yield {
       log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
       allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
     }).fold(
-      err => {
-        processingTxs.clear()
-        log.debug(s"Could not challenge microblock $idStr: $err")
-      },
+      err => log.debug(s"Could not challenge microblock $idStr: $err"),
       identity
     )
   }
@@ -143,6 +139,10 @@ class BlockChallengerImpl(
   def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
 
   def allProcessingTxs: Seq[Transaction] = processingTxs.values.asScala.toSeq
+
+  private def withProcessingTxs[A](txs: Seq[Transaction])(body: Task[A]): Task[A] =
+    Task(processingTxs.putAll(txs.map(tx => tx.id() -> tx).toMap.asJava))
+      .bracket(_ => body)(_ => Task(processingTxs.clear()))
 
   private def createChallengingBlock(
       challengedBlock: Block,

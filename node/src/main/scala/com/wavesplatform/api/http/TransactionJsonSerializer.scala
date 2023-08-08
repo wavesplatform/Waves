@@ -293,11 +293,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           gen.writeNumberField("height", height.toInt, numbersAsString)
           val appStatus =
             if (isBlockV5(height)) {
-              status match {
-                case TxMeta.Status.Succeeded => Some(ApplicationStatus.Succeeded)
-                case TxMeta.Status.Failed    => Some(ApplicationStatus.ScriptExecutionFailed)
-                case TxMeta.Status.Elided    => Some(ApplicationStatus.Elided)
-              }
+              Some(applicationStatusFromTxStatus(status))
             } else
               None
           appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
@@ -323,11 +319,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           gen.writeNumberField("height", height.toInt, numbersAsString)
           val appStatus =
             if (isBlockV5(height)) {
-              status match {
-                case TxMeta.Status.Succeeded => Some(ApplicationStatus.Succeeded)
-                case TxMeta.Status.Failed    => Some(ApplicationStatus.ScriptExecutionFailed)
-                case TxMeta.Status.Elided    => Some(ApplicationStatus.Elided)
-              }
+              Some(applicationStatusFromTxStatus(status))
             } else
               None
           appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
@@ -525,13 +517,16 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
 object TransactionJsonSerializer {
   def applicationStatus(isBlockV5: Boolean, status: TxMeta.Status): JsObject =
     if (isBlockV5)
-      Json.obj("applicationStatus" -> (status match {
-        case TxMeta.Status.Succeeded => ApplicationStatus.Succeeded
-        case TxMeta.Status.Failed    => ApplicationStatus.ScriptExecutionFailed
-        case TxMeta.Status.Elided    => ApplicationStatus.Elided
-      }))
+      Json.obj("applicationStatus" -> applicationStatusFromTxStatus(status))
     else
       JsObject.empty
+
+  def applicationStatusFromTxStatus(status: TxMeta.Status): String =
+    status match {
+      case TxMeta.Status.Succeeded => ApplicationStatus.Succeeded
+      case TxMeta.Status.Failed    => ApplicationStatus.ScriptExecutionFailed
+      case TxMeta.Status.Elided    => ApplicationStatus.Elided
+    }
 
   def height(height: Int): JsObject =
     Json.obj("height" -> height)
