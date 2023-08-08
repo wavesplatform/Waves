@@ -1,39 +1,63 @@
 package com.wavesplatform.ride.runner.entrypoints
 
+import cats.syntax.either.*
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
+import monix.eval.Task
+import monix.execution.Scheduler.global
+import monix.reactive.Observable
+import org.slf4j.LoggerFactory
 import play.api.libs.json.*
-import scopt.{DefaultOParserSetup, OParser, OParserSetup}
+import scopt.{DefaultOParserSetup, OParser}
 
 import java.io.File
-import scala.concurrent.duration.DurationInt
-import scala.io.Source
-import scala.util.Using
+import scala.concurrent.Await
+import scala.concurrent.duration.{Duration, DurationInt}
 
 object WavesRideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
-    val setup: OParserSetup = new DefaultOParserSetup {
+    val setup = new DefaultOParserSetup {
       override val showUsageOnError = Some(true)
     }
 
     OParser.parse(commandParser, args, Args(), setup).foreach { args =>
       System.setProperty("logback.stdout.level", if (args.verbose) "TRACE" else "OFF")
+      val log = LoggerFactory.getLogger("Main")
 
-      val inputFileName = args.inputFile.getName
-      val inputRawJson =
-        if (inputFileName.endsWith(".conf")) ConfigFactory.parseFile(args.inputFile).resolve().root().render(ConfigRenderOptions.concise())
-        else if (inputFileName.endsWith(".json")) Using(Source.fromFile(args.inputFile))(_.getLines().mkString("\n")).get
-        else throw new IllegalArgumentException("Expected JSON or HOCON file")
+      val r = Observable
+        .fromIterable(args.input)
+        .mapParallelOrdered(2) { file => // TODO to args
+          Task[(File, Either[String, JsObject])] {
+            val inputFileName = file.getName
+            // TODO do not parse JSON!
+            val inputRawJson =
+              if (inputFileName.endsWith(".conf")) ConfigFactory.parseFile(file).resolve().root().render(ConfigRenderOptions.concise())
+              else throw new IllegalArgumentException(s"Expected $file to be a HOCON file")
 
-      val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
-      AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
+            val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
+            AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
 
-      val runResult = run(inputJson)
-      println(Json.prettyPrint(runResult))
+            (file, run(inputJson).asRight[String])
+          }.onErrorRecover { e =>
+            log.warn(s"Error during running $file", e)
+            (file, e.getMessage.asLeft[JsObject])
+          }
+        }
+        .foreach {
+          case (file, Left(error)) =>
+            System.err.println(s"[ERROR] $file: $error")
+          case (file, Right(runResult)) =>
+            println(s"""[OK] $file:
+                       |${Json.prettyPrint(runResult).split('\n').mkString("  ", "\n  ", "\n")}
+                       |""".stripMargin)
+        }(global)
+
+      Await.result(r, Duration.Inf)
+      println("\nDone")
     }
   }
 
@@ -66,10 +90,15 @@ object WavesRideRunnerWithPreparedStateApp {
   }
 
   private final case class Args(
-      private val rawInputFile: File = new File(""),
+      input: List[File] = Nil,
+      mode: Mode = Mode.Run,
       verbose: Boolean = false
-  ) {
-    val inputFile = rawInputFile.getAbsoluteFile // Otherwise Lightbend Config doesn't resolve correctly relative paths
+  )
+
+  sealed trait Mode
+  object Mode {
+    case object Run                             extends Mode
+    case class Test(junit: Option[File] = None) extends Mode
   }
 
   private val commandParser = {
@@ -80,14 +109,26 @@ object WavesRideRunnerWithPreparedStateApp {
 
     OParser.sequence(
       head("RIDE script runner", Version.VersionString),
-      opt[File]('i', "input")
-        .text("Path to JSON or HOCON (conf) file with prepared state and run arguments. It has highest priority than the config.")
-        .required()
-        .action((x, c) => c.copy(rawInputFile = x)),
       opt[Unit]('v', "verbose")
         .text("Print logs")
         .action((x, c) => c.copy(verbose = true)),
-      help("help").hidden()
+      help("help").hidden(),
+      arg[File]("<file>...")
+        .unbounded()
+        .required()
+        .text("Path to HOCON (conf) file (or files) with prepared state and run arguments.")
+        .action((x, c) => c.copy(input = x.getAbsoluteFile :: c.input)),
+      cmd("run")
+        .text("  Run scripts and print results to STDOUT.")
+        .action((_, c) => c.copy(mode = Mode.Run)),
+      cmd("test")
+        .text("  Expects that provided files are tests.")
+        .action((_, c) => c.copy(mode = Mode.Test()))
+        .children(
+          opt[File]("junit")
+            .text("Write a JUnit report to this file. An existed file will be overwritten.")
+            .action((x, c) => c.copy(mode = Mode.Test(Some(x))))
+        )
     )
   }
 }
