@@ -30,7 +30,7 @@ object WavesRideRunnerWithPreparedStateApp {
 
       val r = Observable
         .fromIterable(args.input)
-        .mapParallelOrdered(2) { file => // TODO to args
+        .mapParallelOrdered(args.parallelism) { file =>
           Task[(File, Either[String, JsObject])] {
             val inputFileName = file.getName
             // TODO do not parse JSON!
@@ -91,6 +91,7 @@ object WavesRideRunnerWithPreparedStateApp {
 
   private final case class Args(
       input: List[File] = Nil,
+      parallelism: Int = Runtime.getRuntime.availableProcessors(),
       mode: Mode = Mode.Run,
       verbose: Boolean = false
   )
@@ -112,6 +113,10 @@ object WavesRideRunnerWithPreparedStateApp {
       opt[Unit]('v', "verbose")
         .text("Print logs")
         .action((x, c) => c.copy(verbose = true)),
+      opt[Int]('p', "parallelism")
+        .optional()
+        .text("A number of parallel threads to process scripts. A number of available cores by default")
+        .action((x, c) => c.copy(parallelism = x)),
       help("help").hidden(),
       arg[File]("<file>...")
         .unbounded()
