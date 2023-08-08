@@ -160,8 +160,12 @@ object EthereumTransaction {
         amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
       } yield tx.toTransferLike(amount, recipient, asset)
 
-    def check(data: String) = {
-      Either.cond(tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == 136, (), GenericError("unconsumed bytes remaining"))
+    def checkAsset(data: String): Either[GenericError, Unit] = {
+      Either.cond(
+        tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == AssetDataLength,
+        (),
+        GenericError("unconsumed bytes remaining")
+      )
     }
   }
 
@@ -190,6 +194,7 @@ object EthereumTransaction {
   val GasPrice: BigInteger = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger
 
   val AmountMultiplier = 10000000000L
+  val AssetDataLength  = 136
 
   private val decodeMethod = {
     val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[?]])

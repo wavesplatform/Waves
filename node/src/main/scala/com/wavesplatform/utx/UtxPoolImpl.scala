@@ -151,7 +151,7 @@ case class UtxPoolImpl(
                   case EthereumTransaction(inv: EthereumTransaction.Invocation, _, _, _) =>
                     inv.decodeFuncCall(blockchain, true)
                   case et @ EthereumTransaction(tr: EthereumTransaction.Transfer, _, _, _) =>
-                    tr.check(et.underlying.getData)
+                    tr.checkAsset(et.underlying.getData)
                   case _ => Right(())
                 })
                   .flatMap(_ =>

@@ -3,6 +3,7 @@ package com.wavesplatform.utils
 import java.math.BigInteger
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.EthereumTransaction.AssetDataLength
 import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.assets.exchange.OrderAuthentication
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, SignedRawTransaction}
@@ -25,8 +26,7 @@ trait EthHelpers {
       EthereumTransaction.GasPrice,
       EthereumTransaction.GasPrice,
       EthEncoding.toHexString(new Array[Byte](20)),
-      (BigInt(123) * EthereumTransaction.AmountMultiplier).bigInteger,
-      ""
+      "0x" + "1" * AssetDataLength
     )
 
   val TestEthSignature: SignatureData =

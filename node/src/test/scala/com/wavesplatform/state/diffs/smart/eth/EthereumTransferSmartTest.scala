@@ -1,9 +1,11 @@
 package com.wavesplatform.state.diffs.smart.eth
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -16,10 +18,11 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.{ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
 import scala.collection.immutable.VectorMap
+import scala.math.Ordering.Implicits.infixOrderingOps
 
 class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets.*
@@ -73,32 +76,28 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val recipient = RandomKeyPair()
 
     val issue = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, None, 1.waves, ts).explicitGet()
-    val asset = IssuedAsset(issue.id())
 
     for {
-      version <- DirectiveDictionary[StdLibVersion].all.init
-      token   <- Seq(None, Some(ERC20Address(asset.id.take(20))))
+      version <- DirectiveDictionary[StdLibVersion].all
+      asset   <- Seq(Waves, IssuedAsset(issue.id()))
     } {
-      val transfer    = EthereumTransaction.Transfer(token, transferAmount, recipient.toAddress)
-      val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte)
+      val ethTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, recipient.toAddress, transferAmount, asset)
       val ethSender   = ethTransfer.senderAddress()
-      val preTransfer =
+      val transferIssuedAsset =
         TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.001.waves, ByteStr.empty, ts).explicitGet()
 
-      val genesis1 = GenesisTransaction.create(ethSender, ENOUGH_AMT, ts).explicitGet()
-      val genesis2 = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
-
       val function    = if (version >= V3) "transferTransactionById" else "transactionById"
-      val verifier    = Some(accountScript(version, function, ethTransfer, token.map(_ => asset), recipient.toAddress))
+      val verifier    = Some(accountScript(version, function, ethTransfer, asset.fold(None: Option[IssuedAsset])(Some(_)), recipient.toAddress))
       val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, 0.01.waves, ts).explicitGet()
 
-      withDomain(RideV6) { d =>
-        d.appendBlock(genesis1, genesis2, issue, preTransfer, setVerifier())
-        d.appendBlock(ethTransfer)
+      withDomain(settingsForRide(version.max(V6)), Seq(AddrWithBalance(ethSender), AddrWithBalance(recipient.toAddress))) { d =>
+        if (asset != Waves) d.appendBlock(issue, transferIssuedAsset)
+        d.appendBlock(setVerifier())
+        d.appendBlock(ProtoBlockVersion, ethTransfer)
 
-        val transferPortfolio = if (token.isEmpty) Portfolio.waves(transferAmount) else Portfolio.build(asset, transferAmount)
+        val transferPortfolio = Portfolio.build(asset, transferAmount)
         d.liquidDiff.portfolios(recipient.toAddress) shouldBe transferPortfolio
-        d.liquidDiff.portfolios(ethSender) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasPrice.longValue()).minus(transferPortfolio)
+        d.liquidDiff.portfolios(ethSender) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasLimit.longValue()).minus(transferPortfolio)
 
         d.appendBlock()
 
@@ -124,10 +123,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte) // needed to pass into asset script
     val ethSender        = dummyEthTransfer.senderAddress()
 
-    val genesis1 = TxHelpers.genesis(ethSender, ENOUGH_AMT)
-    val genesis2 = TxHelpers.genesis(recipient.toAddress, ENOUGH_AMT)
-
-    DirectiveDictionary[StdLibVersion].all.init
+    DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
         val script      = assetScript(version, dummyEthTransfer, recipient.toAddress)
         val issue       = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, Some(script), 1.waves, ts).explicitGet()
@@ -136,9 +132,9 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
         val preTransfer =
           TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.005.waves, ByteStr.empty, ts).explicitGet()
 
-        withDomain(RideV6) { d =>
-          d.appendBlock(genesis1, genesis2, issue, preTransfer)
-          d.appendBlock(ethTransfer)
+        withDomain(settingsForRide(version.max(V6)), Seq(AddrWithBalance(ethSender), AddrWithBalance(recipient.toAddress))) { d =>
+          d.appendBlock(issue, preTransfer)
+          d.appendBlock(ProtoBlockVersion, ethTransfer)
 
           d.liquidDiff.errorMessage(ethTransfer.id()) shouldBe None
           d.liquidDiff.portfolios(recipient.toAddress) shouldBe Portfolio.build(asset, transferAmount)
