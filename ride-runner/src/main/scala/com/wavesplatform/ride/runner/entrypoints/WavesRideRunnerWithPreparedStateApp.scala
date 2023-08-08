@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.runner.entrypoints
 
-import cats.syntax.either.*
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
@@ -9,14 +8,18 @@ import com.wavesplatform.ride.runner.input.RideRunnerInputParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import monix.eval.Task
 import monix.execution.Scheduler.global
+import monix.execution.schedulers.CanBlock
 import monix.reactive.Observable
 import org.slf4j.LoggerFactory
 import play.api.libs.json.*
 import scopt.{DefaultOParserSetup, OParser}
 
 import java.io.File
-import scala.concurrent.Await
-import scala.concurrent.duration.{Duration, DurationInt}
+import java.nio.file.Path
+import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.IteratorHasAsScala
+import scala.util.control.NoStackTrace
+import scala.util.{Failure, Success, Try}
 
 object WavesRideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
@@ -26,39 +29,65 @@ object WavesRideRunnerWithPreparedStateApp {
 
     OParser.parse(commandParser, args, Args(), setup).foreach { args =>
       System.setProperty("logback.stdout.level", if (args.verbose) "TRACE" else "OFF")
-      val log = LoggerFactory.getLogger("Main")
+      val log   = LoggerFactory.getLogger("Main")
+      val input = args.input.map(_.toPath.toAbsolutePath) // Otherwise Lightbend Config doesn't resolve correctly relative paths
+      // TODO separate method
+      val commonPath = input.reduce { (f1, f2) =>
+        val f1Components = f1.iterator().asScala.toSeq
+        val f2Components = f2.iterator().asScala.toSeq
+        val commonParts  = f1Components.zip(f2Components).takeWhile { case (left, right) => left == right }
+        val shortest     = if (f1Components.size <= f2Components.size) f1 else f2
+        shortest.getRoot.resolve(shortest.subpath(0, commonParts.size))
+      }
 
-      val r = Observable
-        .fromIterable(args.input)
-        .mapParallelOrdered(args.parallelism) { file =>
-          Task[(File, Either[String, JsObject])] {
-            val inputFileName = file.getName
-            // TODO do not parse JSON!
-            val inputRawJson =
-              if (inputFileName.endsWith(".conf")) ConfigFactory.parseFile(file).resolve().root().render(ConfigRenderOptions.concise())
-              else throw new IllegalArgumentException(s"Expected $file to be a HOCON file")
+      Observable
+        .fromIterable(input)
+        .mapParallelOrdered(args.parallelism) { path =>
+          Task {
+            if (path.getFileName.toString.endsWith(".conf"))
+              Try(ConfigFactory.parseFile(path.toFile).resolve().root().render(ConfigRenderOptions.concise())) match {
+                case Failure(e) => RunResult.Error(path, new RuntimeException("Can't parse HOCON file", e))
 
-            val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
-            AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
-
-            (file, run(inputJson).asRight[String])
-          }.onErrorRecover { e =>
-            log.warn(s"Error during running $file", e)
-            (file, e.getMessage.asLeft[JsObject])
+                case Success(inputRawJson) =>
+                  val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
+                  AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
+                  RunResult.Succeeded(path, run(inputJson))
+              }
+            else RunResult.Error(path, new RuntimeException("Isn't a HOCON file") with NoStackTrace)
+          }.onErrorRecover(RunResult.Error(path, _))
+        }
+        .foldLeftL(Stats(0, 0, 0)) { case (r, x) =>
+          val file = commonPath.relativize(x.path)
+          x match {
+            case _: RunResult.Succeeded =>
+              println(s"[OK] $file\n")
+              r.copy(succeeded = r.succeeded + 1)
+            case _: RunResult.Failed =>
+              println(s"[FAILED] $file\b")
+              r.copy(failed = r.failed + 1)
+            case x: RunResult.Error =>
+              log.warn(s"Error during running $file", x.exception)
+              System.err.println(s"[ERROR] $file: ${x.exception.getMessage}\b")
+              r.copy(error = r.error + 1)
           }
         }
-        .foreach {
-          case (file, Left(error)) =>
-            System.err.println(s"[ERROR] $file: $error")
-          case (file, Right(runResult)) =>
-            println(s"""[OK] $file:
-                       |${Json.prettyPrint(runResult).split('\n').mkString("  ", "\n  ", "\n")}
-                       |""".stripMargin)
-        }(global)
-
-      Await.result(r, Duration.Inf)
-      println("\nDone")
+        .tapEval { x => Task(println(s"Total $x")) }
+        .runSyncUnsafe()(global, CanBlock.permit)
     }
+  }
+
+  private case class Stats(succeeded: Int, failed: Int, error: Int) {
+    override def toString: String = s"succeeded: $succeeded, failed: $failed, error: $error"
+  }
+
+  private sealed trait RunResult extends Product with Serializable {
+    def path: Path
+  }
+
+  private object RunResult {
+    case class Succeeded(path: Path, result: JsObject)                  extends RunResult
+    case class Failed(path: Path, actual: JsObject, expected: JsObject) extends RunResult
+    case class Error(path: Path, exception: Throwable)                  extends RunResult
   }
 
   def run(inputJson: JsValue): JsObject = {

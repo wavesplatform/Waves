@@ -165,6 +165,8 @@ object RideRunnerInputParser extends DefaultReads {
 
   implicit val rideRunnerBlockchainStateReads: Reads[RideRunnerBlockchainState] = Json.reads
 
+  implicit val rideRunnerTest: Reads[RideRunnerTest] = Json.reads
+
   implicit val rideRunnerInputReads: Reads[RideRunnerInput] = Json.reads
 
   def decodeBytesFromStrRaw(x: String): Array[Byte] = Try {
