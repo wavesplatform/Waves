@@ -1,5 +1,7 @@
 package com.wavesplatform.mining
 
+import java.util.concurrent.atomic.AtomicReference
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
@@ -35,7 +37,6 @@ import org.scalacheck.Gen
 import org.scalatest.*
 import org.scalatest.enablers.Length
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
@@ -472,6 +473,9 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     val miner = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
     val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
     f(miner, blockAppender, appenderScheduler)
+    appenderScheduler.shutdown()
+    minerScheduler.shutdown()
+    utxPool.close()
   }
 }
 

@@ -203,10 +203,10 @@ object TransactionDiffer {
           case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
           case ci: InvokeTransaction             => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(ci)
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
-          case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
-          case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
-          case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx).traced
-          case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx).traced
+          case itx: IssueTransaction             => AssetTransactionsDiffs.issue(blockchain)(itx).traced
+          case rtx: ReissueTransaction           => AssetTransactionsDiffs.reissue(blockchain, currentBlockTs)(rtx).traced
+          case btx: BurnTransaction              => AssetTransactionsDiffs.burn(blockchain)(btx).traced
+          case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiffs.updateInfo(blockchain)(uaitx).traced
           case ttx: TransferTransaction          => TransferTransactionDiff(blockchain)(ttx).traced
           case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTs)(mtx).traced
           case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx).traced
@@ -214,8 +214,8 @@ object TransactionDiffer {
           case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx).traced
           case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx).traced
           case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx).traced
-          case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain)(sstx).traced
-          case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain)(stx).traced
+          case sstx: SetAssetScriptTransaction   => AssetTransactionsDiffs.setAssetScript(blockchain)(sstx).traced
+          case stx: SponsorFeeTransaction        => AssetTransactionsDiffs.sponsor(blockchain)(stx).traced
           case et: EthereumTransaction           => EthereumTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(et)
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }

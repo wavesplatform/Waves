@@ -222,7 +222,10 @@ trait WithDomain extends WithState { _: Suite =>
           )
         }
         test(domain)
-      } finally bcu.shutdown()
+      } finally {
+        domain.utxPool.close()
+        bcu.shutdown()
+      }
     }
 
   private val allVersions = DirectiveDictionary[StdLibVersion].all

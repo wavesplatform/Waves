@@ -18,8 +18,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.{EthereumTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.{EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets

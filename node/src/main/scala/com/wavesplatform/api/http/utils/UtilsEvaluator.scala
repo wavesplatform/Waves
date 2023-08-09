@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -28,6 +29,7 @@ import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio}
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -37,7 +39,7 @@ import shapeless.Coproduct
 object UtilsEvaluator {
   def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
     ExpressionCompiler
-      .compileUntyped(str, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
+      .compileUntyped(str, NoLibraries, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
       .leftMap(GenericError(_))
 
   def toInvokeScriptLike(invocation: Invocation, dAppAddress: Address) =
@@ -86,6 +88,7 @@ object UtilsEvaluator {
         blockchain,
         Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
         ds,
+        script.stdLibVersion,
         invoke,
         dAppAddress,
         dAppPk,
@@ -94,12 +97,14 @@ object UtilsEvaluator {
         enableExecutionLog = true,
         limit,
         remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-        availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
-        availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
-        availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
+        availableActions = ActionLimits(
+          ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
+          ContractLimits.MaxBalanceScriptActionsAmountV6,
+          ContractLimits.MaxAssetScriptActionsAmountV6,
+          ContractLimits.MaxWriteSetSize,
+          ContractLimits.MaxTotalWriteSetSizeInBytes
+        ),
         availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
-        availableData = ContractLimits.MaxWriteSetSize,
-        availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
         currentDiff = paymentsDiff,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
@@ -132,7 +137,7 @@ object UtilsEvaluator {
             InvokeDiffsCommon
               .processActions(
                 StructuredCallableActions(r.actions, blockchain),
-                ds.stdLibVersion,
+                ds.stdLibVersion,script.stdLibVersion,
                 dAppAddress,
                 dAppPk,
                 usedComplexity,

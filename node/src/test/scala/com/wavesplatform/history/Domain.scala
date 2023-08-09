@@ -368,7 +368,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       strictTime: Boolean = false,
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
-      challengedHeader: Option[ChallengedHeader] = None
+      challengedHeader: Option[ChallengedHeader] = None,
+      rewardVote: Long = -1L
   ): Block = {
     val reference        = ref.getOrElse(randomSig)
     val parentHeight     = ref.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
@@ -448,7 +449,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
-        rewardVote = -1L,
+        rewardVote = rewardVote,
         signer = generator,
         stateHash = resultStateHash,
         challengedHeader = challengedHeader
@@ -491,20 +492,14 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   val blocksApi: CommonBlocksApi = {
     def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
-      blockchainUpdater.liquidBlockMeta
-        .filter(_ => blockchainUpdater.height == height)
-        .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))
+      Application.loadBlockMetaAt(db, blockchainUpdater)(height)
 
-    def loadBlockInfoAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(
+    def loadBlockInfoAt(db: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
         height: Int
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
-      loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
-        meta -> blockchainUpdater
-          .liquidTransactions(meta.id)
-          .getOrElse(database.loadTransactions(Height(height), rdb))
-      }
+      Application.loadBlockInfoAt(db, blockchainUpdater)(height)
 
-    CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb.db, blockchainUpdater))
+    CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb, blockchainUpdater))
   }
 
   // noinspection ScalaStyle

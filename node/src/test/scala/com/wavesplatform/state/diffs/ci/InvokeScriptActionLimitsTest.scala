@@ -3,14 +3,16 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.account.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.{DBCacheSettings, WithState}
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.lang.v1.ContractLimits.*
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.*
@@ -18,9 +20,10 @@ import com.wavesplatform.transaction.{utils as _, *}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import org.scalatest.EitherValues
+import org.scalatest.{Assertion, EitherValues}
+import org.scalatest.matchers.Matcher
 
-class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSettings with EitherValues {
+class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues {
 
   private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
     Map(
@@ -137,6 +140,192 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     }
   }
 
+  property(
+    s"Balance and asset action limits is determined by current invoke version before ${BlockchainFeatures.BlockRewardDistribution.description} activation"
+  ) {
+    val settings = DomainPresets.RideV6
+
+    checkBalanceActionsLimits(V5, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkBalanceActionsLimits(V5, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkBalanceActionsLimits(V6, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkBalanceActionsLimits(V6, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = beRight,
+      moreV5MoreV6Result = produce("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"),
+      moreV5LessV6Result = beRight
+    )
+
+    checkAssetActionsLimits(V5, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkAssetActionsLimits(V5, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkAssetActionsLimits(V6, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkAssetActionsLimits(V6, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = beRight,
+      moreV5MoreV6Result = produce("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded"),
+      moreV5LessV6Result = beRight
+    )
+  }
+
+  property(
+    s"Balance and asset action limits is determined by root invoke version after ${BlockchainFeatures.BlockRewardDistribution.description} activation"
+  ) {
+    val settings = DomainPresets.BlockRewardDistribution
+
+    checkBalanceActionsLimits(V5, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkBalanceActionsLimits(V5, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkBalanceActionsLimits(V6, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = beRight,
+      moreV5MoreV6Result = produce("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"),
+      moreV5LessV6Result = beRight
+    )
+    checkBalanceActionsLimits(V6, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = beRight,
+      moreV5MoreV6Result = produce("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"),
+      moreV5LessV6Result = beRight
+    )
+
+    checkAssetActionsLimits(V5, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkAssetActionsLimits(V5, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = produce("Actions count limit is exceeded"),
+      moreV5MoreV6Result = produce("Actions count limit is exceeded"),
+      moreV5LessV6Result = produce("Actions count limit is exceeded")
+    )
+    checkAssetActionsLimits(V6, V5, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = beRight,
+      moreV5MoreV6Result = produce("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded"),
+      moreV5LessV6Result = beRight
+    )
+    checkAssetActionsLimits(V6, V6, settings)(
+      equalV5LessV6Result = beRight,
+      moreV5EqualV6Result = beRight,
+      moreV5MoreV6Result = produce("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded"),
+      moreV5LessV6Result = beRight
+    )
+  }
+
+  private def checkBalanceActionsLimits(rootVersion: StdLibVersion, nestedVersion: StdLibVersion, settings: WavesSettings)(
+      equalV5LessV6Result: Matcher[Either[?, ?]],
+      moreV5EqualV6Result: Matcher[Either[?, ?]],
+      moreV5MoreV6Result: Matcher[Either[?, ?]],
+      moreV5LessV6Result: Matcher[Either[?, ?]]
+  ): Assertion = {
+    val master           = TxHelpers.signer(0)
+    val invoker          = TxHelpers.signer(1)
+    val allActionsNested = TxHelpers.signer(2)
+    val lastNested       = TxHelpers.signer(3)
+
+    val fee = 10.waves
+
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(master, invoker, allActionsNested, lastNested)) { d =>
+      val setMasterScript           = TxHelpers.setScript(master, masterContract(rootVersion, allActionsNested.toAddress, lastNested.toAddress))
+      val setAllActionsNestedScript = TxHelpers.setScript(allActionsNested, allActionsNestedContract(nestedVersion))
+      val setLastNestedScript = TxHelpers.setScript(lastNested, balanceActionsNestedContract(nestedVersion, MaxCallableActionsAmountBeforeV6(V5) - 9))
+      val invoke              = () => TxHelpers.invoke(master.toAddress, Some("foo"), invoker = invoker, fee = fee)
+
+      // non-data actions count == limit for V5, balance actions count < limit for V6
+      d.appendBlock(setMasterScript, setAllActionsNestedScript, setLastNestedScript)
+      d.appendBlockE(invoke()) should equalV5LessV6Result
+
+      // non-data actions count > limit for V5, balance actions count == limit for V6
+      d.appendBlock(TxHelpers.setScript(lastNested, balanceActionsNestedContract(nestedVersion, MaxBalanceScriptActionsAmountV6 - 5)))
+      d.appendBlockE(invoke()) should moreV5EqualV6Result
+
+      // non-data actions count > limit for V5, balance actions count > limit for V6
+      d.appendBlock(TxHelpers.setScript(lastNested, balanceActionsNestedContract(nestedVersion, MaxBalanceScriptActionsAmountV6 - 5 + 1)))
+      d.appendBlockE(invoke()) should moreV5MoreV6Result
+
+      // non-data actions count > limit for V5, balance actions count < limit for V6
+      d.appendBlock(TxHelpers.setScript(lastNested, balanceActionsNestedContract(nestedVersion, MaxCallableActionsAmountBeforeV6(V5) - 9 + 1)))
+      d.appendBlockE(invoke()) should moreV5LessV6Result
+    }
+  }
+
+  private def checkAssetActionsLimits(rootVersion: StdLibVersion, nestedVersion: StdLibVersion, settings: WavesSettings)(
+      equalV5LessV6Result: Matcher[Either[?, ?]],
+      moreV5EqualV6Result: Matcher[Either[?, ?]],
+      moreV5MoreV6Result: Matcher[Either[?, ?]],
+      moreV5LessV6Result: Matcher[Either[?, ?]]
+  ): Assertion = {
+    val master           = TxHelpers.signer(0)
+    val invoker          = TxHelpers.signer(1)
+    val allActionsNested = TxHelpers.signer(2)
+    val lastNested       = TxHelpers.signer(3)
+
+    val fee = 10.waves
+
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(master, invoker, allActionsNested, lastNested)) { d =>
+      val setMasterScript           = TxHelpers.setScript(master, masterContract(rootVersion, allActionsNested.toAddress, lastNested.toAddress))
+      val setAllActionsNestedScript = TxHelpers.setScript(allActionsNested, allActionsNestedContract(nestedVersion))
+      val setLastNestedScript = TxHelpers.setScript(lastNested, assetActionsNestedContract(nestedVersion, MaxCallableActionsAmountBeforeV6(V5) - 10))
+      val invoke              = () => TxHelpers.invoke(master.toAddress, Some("foo"), invoker = invoker, fee = fee)
+
+      // non-data actions count == limit for V5, asset actions count < limit for V6
+      d.appendBlock(setMasterScript, setAllActionsNestedScript, setLastNestedScript)
+      d.appendBlockE(invoke()) should equalV5LessV6Result
+
+      // non-data actions count > limit for V5, asset actions count == limit for V6
+      d.appendBlock(TxHelpers.setScript(lastNested, assetActionsNestedContract(nestedVersion, MaxAssetScriptActionsAmountV6 - 7)))
+      d.appendBlockE(invoke()) should moreV5EqualV6Result
+
+      // non-data actions count > limit for V5, asset actions count > limit for V6
+      d.appendBlock(TxHelpers.setScript(lastNested, assetActionsNestedContract(nestedVersion, MaxAssetScriptActionsAmountV6 - 7 + 1)))
+      d.appendBlockE(invoke()) should moreV5MoreV6Result
+
+      // non-data actions count > limit for V5, asset actions count < limit for V6
+      d.appendBlock(TxHelpers.setScript(lastNested, assetActionsNestedContract(nestedVersion, MaxCallableActionsAmountBeforeV6(V5) - 10 + 1)))
+      d.appendBlockE(invoke()) should moreV5LessV6Result
+    }
+  }
+
   private def scenario(masterDApp: (Address, Alias) => Script, serviceDApp: Script): (Seq[Transaction], InvokeScriptTransaction, Address, Address) = {
     val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
@@ -166,6 +355,96 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       case _  => fsWithV6
     }
 
+  private def balanceActionsNestedContract(version: StdLibVersion, transferActionsCount: Int): Script = {
+    val recipient = TxHelpers.address(100)
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         |@Callable(i)
+         |func bar() = {
+         | let l = Lease(Address(base58'$recipient'), 2)
+         | [
+         |   ${s"ScriptTransfer(Address(base58'$recipient'), 1, unit), " * transferActionsCount}
+         |   l,
+         |   LeaseCancel(l.calculateLeaseId())
+         | ]
+         |}
+         |""".stripMargin
+    TestCompiler(version).compileContract(script)
+  }
+
+  private def assetActionsNestedContract(version: StdLibVersion, reissueActionsCount: Int): Script = {
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         |@Callable(i)
+         |func bar() = {
+         | let issue = Issue("newAsset", "desc", 100, 0, true)
+         | [
+         |   issue,
+         |   Burn(issue.calculateAssetId(), 10),
+         |   SponsorFee(issue.calculateAssetId(), 2),
+         |   ${(1 to reissueActionsCount).map(idx => s"Reissue(issue.calculateAssetId(), $idx, true)").mkString(",")}
+         | ]
+         |}
+         |""".stripMargin
+    TestCompiler(version).compileContract(script)
+  }
+
+  private def allActionsNestedContract(version: StdLibVersion): Script = {
+    val recipient = TxHelpers.address(100)
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         |@Callable(i)
+         |func bar() = {
+         | let l = Lease(Address(base58'$recipient'), 1)
+         | let issue = Issue("test", "test", 100, 0, true)
+         | [
+         |   BinaryEntry("bin", base58''),
+         |   BooleanEntry("bool", true),
+         |   DeleteEntry("bin"),
+         |   IntegerEntry("int", 1),
+         |   StringEntry("str", "str"),
+         |   issue,
+         |   Burn(issue.calculateAssetId(), 10),
+         |   Reissue(issue.calculateAssetId(), 10, true),
+         |   ScriptTransfer(Address(base58'$recipient'), 1, unit),
+         |   l,
+         |   LeaseCancel(l.calculateLeaseId()),
+         |   SponsorFee(issue.calculateAssetId(), 2)
+         | ]
+         |}
+         |""".stripMargin
+    TestCompiler(version).compileContract(script)
+  }
+
+  private def masterContract(version: StdLibVersion, allActionsServiceDApp: Address, serviceDApp: Address): Script = {
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         |@Callable(i)
+         |func foo() = {
+         | strict inv1 = invoke(Address(base58'$allActionsServiceDApp'), "bar", [], [])
+         | strict inv2 = invoke(Address(base58'$serviceDApp'), "bar", [], [])
+         | []
+         |}
+         |""".stripMargin
+    TestCompiler(version).compileContract(script)
+  }
+
   private def balanceActionsWithIssueServiceContract(version: StdLibVersion, wavesTransferActionsCount: Int): Script = {
     val script =
       s"""
@@ -192,7 +471,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  def balanceActionsWithIssueMasterContract(
+  private def balanceActionsWithIssueMasterContract(
       otherAcc: Address,
       alias: Alias,
       wavesTransferActionsCount: Int,
@@ -253,7 +532,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  def assetActionsMasterContract(
+  private def assetActionsMasterContract(
       alias: Alias,
       actionsCount: Int,
       version: StdLibVersion,

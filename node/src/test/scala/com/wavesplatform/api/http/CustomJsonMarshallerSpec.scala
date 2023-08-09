@@ -18,7 +18,7 @@ import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NTPTime, TestWallet}
 import org.scalactic.source.Position
@@ -36,7 +36,8 @@ class CustomJsonMarshallerSpec
     with NTPTime
     with ScalatestRouteTest
     with ApiErrorMatchers
-    with ApiMarshallers {
+    with ApiMarshallers
+    with SharedSchedulerMixin {
   private val blockchain      = mock[Blockchain]
   private val utx             = mock[UtxPool]
   private val publisher       = mock[TransactionPublisher]
@@ -72,7 +73,7 @@ class CustomJsonMarshallerSpec
       () => utx.size,
       publisher,
       ntpTime,
-      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      new RouteTimeout(60.seconds)(sharedScheduler)
     ).route
 
   property("/transactions/info/{id}") {
@@ -122,7 +123,7 @@ class CustomJsonMarshallerSpec
     accountsApi,
     assetsApi,
     1000,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   ).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {

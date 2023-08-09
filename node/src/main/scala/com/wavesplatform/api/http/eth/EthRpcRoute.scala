@@ -14,7 +14,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{ABIConverter, ERC20Address, EthereumTransaction}
+import com.wavesplatform.transaction.{EthABIConverter, ERC20Address, EthereumTransaction}
 import com.wavesplatform.utils.EthEncoding.*
 import com.wavesplatform.utils.{EthEncoding, Time}
 import org.web3j.abi.*
@@ -54,7 +54,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           complete(jsons.sequence.leftMap(CustomValidationError(_)).map(JsArray(_))) // TODO: Only first error is displayed
       }
     } ~ (get & path("abi" / AddrSegment)) { addr =>
-      complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
+      complete(blockchain.accountScript(addr).map(as => EthABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
       val id = (jso \ "id").getOrElse(JsNull)
       (jso \ "method").asOpt[String] match {

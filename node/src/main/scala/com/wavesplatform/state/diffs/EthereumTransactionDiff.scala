@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.BlockRewardDistribution
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
@@ -17,19 +18,21 @@ object EthereumTransactionDiff {
   def meta(blockchain: Blockchain)(e: EthereumTransaction): Diff = {
     val resultEi = e.payload match {
       case et: EthereumTransaction.Transfer =>
-        for (assetId <- et.tryResolveAsset(blockchain))
-          yield Diff(
-            ethereumTransactionMeta = Map(
-              e.id() -> EthereumTransactionMeta(
-                EthereumTransactionMeta.Payload.Transfer(
-                  EthereumTransactionMeta.Transfer(
-                    ByteString.copyFrom(PBRecipients.publicKeyHash(et.recipient)),
-                    Some(PBAmounts.fromAssetAndAmount(assetId, et.amount))
-                  )
+        for {
+          _       <- if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.check(e.underlying.getData) else Right(())
+          assetId <- et.tryResolveAsset(blockchain)
+        } yield Diff(
+          ethereumTransactionMeta = Map(
+            e.id() -> EthereumTransactionMeta(
+              EthereumTransactionMeta.Payload.Transfer(
+                EthereumTransactionMeta.Transfer(
+                  ByteString.copyFrom(PBRecipients.publicKeyHash(et.recipient)),
+                  Some(PBAmounts.fromAssetAndAmount(assetId, et.amount))
                 )
               )
             )
           )
+        )
 
       case ei: EthereumTransaction.Invocation =>
         for {
@@ -57,6 +60,7 @@ object EthereumTransactionDiff {
       case et: EthereumTransaction.Transfer =>
         for {
           _         <- checkLeadingZeros(e, blockchain)
+          _         <- TracedResult { if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.check(e.underlying.getData) else Right(()) }
           asset     <- TracedResult(et.tryResolveAsset(blockchain))
           transfer  <- TracedResult(et.toTransferLike(e, blockchain))
           assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue, enableExecutionLog)

@@ -22,11 +22,14 @@ object BlockchainFeatures {
   val SynchronousCalls                = BlockchainFeature(16, "Ride V5, dApp-to-dApp invocations")
   val RideV6                          = BlockchainFeature(17, "Ride V6, MetaMask support")
   val ConsensusImprovements           = BlockchainFeature(18, "Consensus and MetaMask updates")
-  val TransactionStateSnapshot        = BlockchainFeature(19, "Transaction State Snapshot")
+  val BlockRewardDistribution         = BlockchainFeature(19, "Block Reward Distribution")
+  val CappedReward                    = BlockchainFeature(20, "Capped XTN buy-back & DAO amounts")
+  val CeaseXtnBuyback                 = BlockchainFeature(21, "Cease XTN buy-back")
+  val TransactionStateSnapshot        = BlockchainFeature(22, "Transaction State Snapshot")
 
   // Not exposed
-  val ContinuationTransaction = BlockchainFeature(20, "Continuation Transaction")
-  val LeaseExpiration         = BlockchainFeature(21, "Lease Expiration")
+  val ContinuationTransaction = BlockchainFeature(23, "Continuation Transaction")
+  val LeaseExpiration         = BlockchainFeature(24, "Lease Expiration")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")
@@ -50,6 +53,9 @@ object BlockchainFeatures {
     SynchronousCalls,
     RideV6,
     ConsensusImprovements,
+    BlockRewardDistribution,
+    CappedReward,
+    CeaseXtnBuyback,
     TransactionStateSnapshot
   ).map(f => f.id -> f).toMap
 

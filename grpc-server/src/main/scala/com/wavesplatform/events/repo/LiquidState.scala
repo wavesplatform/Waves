@@ -37,6 +37,7 @@ object LiquidState {
       updatedWavesAmount = keyBlock.updatedWavesAmount,
       vrf = keyBlock.vrf,
       activatedFeatures = keyBlock.activatedFeatures,
+      rewardShares = keyBlock.rewardShares,
       blockStateUpdate = blockStateUpdate,
       transactionStateUpdates = transactionStateUpdates,
       transactionMetadata = transactionMetadata,
