@@ -102,11 +102,6 @@ class Parser(implicit offset: LibrariesOffset) {
       }
       .map(posAndVal => CONST_STRING(posAndVal._1, posAndVal._2))
 
-  def correctVarName[A: P]: P[PART[String]] =
-    (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
-      .filter { case (_, x, _) => !keywords.contains(x) }
-      .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
-
   def declNameP[A: P](check: Boolean = false): P[Unit] = {
     def symbolsForError   = CharPred(c => !c.isWhitespace && !excludeInError.contains(c))
     def checkedUnderscore = ("_" ~~/ !"_".repX(1)).opaque("not more than 1 underscore in a row")
@@ -242,13 +237,13 @@ class Parser(implicit offset: LibrariesOffset) {
       .map(Union(_))
 
   def tupleTypeP[A: P]: P[Tuple] =
-    ("(" ~
+    ("(" ~ comment ~
       P(unionTypeP).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
       )
-      ~/ ")")
+      ~ comment ~/ ")")
       .map(Tuple)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
