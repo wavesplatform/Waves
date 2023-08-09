@@ -42,6 +42,16 @@ object TxHelpers {
 
   def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
+  def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
+    val firstAccountNum = 100
+    val lastAccountNum = firstAccountNum + numberAccounts
+    val accountsSeq = (firstAccountNum until lastAccountNum).map { num =>
+      val recipient = signer(num).toAddress
+      ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
+    }
+    accountsSeq
+  }
+
   val matcher: SeedKeyPair = defaultSigner
 
   private[this] var lastTimestamp = System.currentTimeMillis()

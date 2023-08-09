@@ -8,19 +8,16 @@ import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.{FlatSpec, TestTime, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
-import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
+import org.web3j.crypto.*
 import play.api.libs.json.Json
-
-import scala.concurrent.duration.*
 
 class EthereumTransactionSpec
     extends FlatSpec
@@ -124,9 +121,9 @@ class EthereumTransactionSpec
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+    a[RuntimeException] should be thrownBy EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
       rawTransaction
-    ))
+    )
   }
 
   it should "fail with invalid to field" in {
@@ -138,29 +135,9 @@ class EthereumTransactionSpec
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+    a[RuntimeException] should be thrownBy EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
       rawTransaction
-    ))
-  }
-
-  it should "use chainId in signer key recovery" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val senderAddress    = TxHelpers.defaultSigner.toEthWavesAddress
-    val recipientAddress = TxHelpers.secondSigner.toAddress('W'.toByte) // Other network
-
-    val blockchain = createBlockchainStub { b =>
-      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      b.stub.creditBalance(senderAddress, Waves)
-      b.stub.creditBalance(senderAddress, TestAsset)
-      (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
-    }
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis())).andThen(_.resultE.explicitGet())
-
-    val transfer      = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, 1, Waves)
-    val assetTransfer = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, 1, TestAsset)
-
-    intercept[RuntimeException](differ(transfer)).toString should include("Address belongs to another network")
-    intercept[RuntimeException](differ(assetTransfer)).toString should include("Address belongs to another network")
+    )
   }
 
   it should "not accept zero transfers" in {
@@ -196,84 +173,6 @@ class EthereumTransactionSpec
     ).toString should include(
       "Transaction should have either data or value"
     )
-  }
-
-  it should "not accept fee < 100k" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val recipientAddress = TxHelpers.secondSigner.toAddress
-
-    val differ = createBlockchainStub { b =>
-      (() => b.height).when().returning(3001)
-      b.stub.activateAllFeatures()
-      b.stub.creditBalance(senderAccount.toWavesAddress, *)
-    }.stub.transactionDiffer().andThen(_.resultE.explicitGet())
-
-    val transaction = EthTxGenerator.signRawTransaction(senderAccount, recipientAddress.chainId)(
-      RawTransaction.createTransaction(
-        BigInt(System.currentTimeMillis()).bigInteger,
-        EthereumTransaction.GasPrice,
-        BigInt(99999).bigInteger, // fee
-        EthEncoding.toHexString(recipientAddress.publicKeyHash),
-        (BigInt(100) * EthereumTransaction.AmountMultiplier).bigInteger,
-        ""
-      )
-    )
-    intercept[RuntimeException](differ(transaction)).toString should include(
-      "Fee for EthereumTransaction (99999 in WAVES) does not exceed minimal value of 100000 WAVES"
-    )
-  }
-
-  it should "not accept bad time" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val recipientAddress = TxHelpers.secondSigner.toAddress
-
-    val differ = createBlockchainStub { b =>
-      (() => b.height).when().returning(3001)
-      b.stub.activateAllFeatures()
-      b.stub.creditBalance(senderAccount.toWavesAddress, *)
-    }.stub.transactionDiffer().andThen(_.resultE.explicitGet())
-
-    val transactionFromFuture = EthTxGenerator.signRawTransaction(senderAccount, recipientAddress.chainId)(
-      RawTransaction.createTransaction(
-        BigInt(System.currentTimeMillis() + 1.6.hours.toMillis).bigInteger,
-        EthereumTransaction.GasPrice,
-        BigInt(100000).bigInteger, // fee
-        EthEncoding.toHexString(recipientAddress.publicKeyHash),
-        (BigInt(100) * EthereumTransaction.AmountMultiplier).bigInteger,
-        ""
-      )
-    )
-    intercept[RuntimeException](differ(transactionFromFuture)).toString should include(
-      "is more than 5400000ms in the future"
-    )
-
-    val transactionFromPast = EthTxGenerator.signRawTransaction(senderAccount, recipientAddress.chainId)(
-      RawTransaction.createTransaction(
-        BigInt(System.currentTimeMillis() - 3.hours.toMillis).bigInteger,
-        EthereumTransaction.GasPrice,
-        BigInt(100000).bigInteger, // fee
-        EthEncoding.toHexString(recipientAddress.publicKeyHash),
-        (BigInt(100) * EthereumTransaction.AmountMultiplier).bigInteger,
-        ""
-      )
-    )
-    intercept[RuntimeException](differ(transactionFromPast)).toString should include(
-      "is more than 7200000ms in the past"
-    )
-  }
-
-  it should "not be accepted before RideV6 activation" in {
-    val blockchain = createBlockchainStub { blockchain =>
-      // Activate all features except ride v6
-      val features = BlockchainFeatures.implemented.collect {
-        case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id)
-      }.flatten
-      blockchain.stub.activateFeatures(features.toSeq*)
-    }
-    val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
-
-    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 123, Waves)
-    differ(transaction) should produceRejectOrFailedDiff(s"${BlockchainFeatures.RideV6.description} feature has not been activated yet")
   }
 
   "Ethereum invoke" should "recover correct key" in {

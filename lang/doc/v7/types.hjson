@@ -1287,6 +1287,10 @@
           name: vrf
           type: ByteVector|Unit
         }
+        {
+          name: rewards
+          type: List[(Address, Int)]
+        }
       ]
     }
     {

@@ -65,9 +65,9 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
   override def onProcessBlock(
       block: Block,
       diff: BlockDiffer.DetailedDiff,
-      minerReward: Option[Long],
+      reward: Option[Long],
       hitSource: ByteStr,
-      blockchainBeforeWithMinerReward: Blockchain
+      blockchainBeforeWithReward: Blockchain
   ): Unit = monitor.synchronized {
     require(
       liquidState.forall(_.totalBlockId == block.header.reference),
@@ -78,7 +78,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
       db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
-    val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward, minerReward, hitSource)
+    val ba = BlockAppended.from(block, diff, blockchainBeforeWithReward, reward, hitSource)
     liquidState = Some(LiquidState(ba, Seq.empty))
     handlers.forEach(_.handleUpdate(ba))
   }
@@ -86,7 +86,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
       diff: BlockDiffer.DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): Unit = monitor.synchronized {
@@ -96,7 +96,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
       s"Microblock reference ${microBlock.reference} does not match last block id ${liquidState.get.totalBlockId}"
     )
 
-    val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
+    val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
     liquidState = Some(ls.copy(microBlocks = ls.microBlocks :+ mba))
 
     handlers.forEach(_.handleUpdate(mba))

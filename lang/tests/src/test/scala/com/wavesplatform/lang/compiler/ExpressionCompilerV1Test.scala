@@ -20,6 +20,8 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNam
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
@@ -29,7 +31,7 @@ import com.wavesplatform.test.*
 import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec {
-  implicit val offset: Int = 0
+  implicit val offset: LibrariesOffset = NoLibraries
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions.*
@@ -321,7 +323,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       .compilerContext
 
     val e = ScriptEstimatorV3(fixOverflow = true, overhead = true)
-    Global.compileExpression(expr, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    Global.compileExpression(expr, NoLibraries, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
@@ -567,7 +569,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | func f(a: Any) = a._1 == a._2
         | true
       """.stripMargin
-    ExpressionCompiler.compile(script, compilerContext) should produce(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContext) should produce(
       "Compilation failed: [" +
         "Undefined field `_1` of variable of type `Any` in 19-23; " +
         "Undefined field `_2` of variable of type `Any` in 27-31" +
@@ -583,7 +585,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |t._2[ind] == 3
         |""".stripMargin
 
-    ExpressionCompiler.compile(script, compilerContextV4) shouldBe Right(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4) shouldBe Right(
       (
         LET_BLOCK(
           LET(
@@ -621,7 +623,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |t.some[ind] == 3
         |""".stripMargin
 
-    ExpressionCompiler.compile(script, compilerContextV4) should produce(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4) should produce(
       "Compilation failed: [Non-matching types: expected: List[T], actual: Nothing in 39-50; Undefined field `some` of variable of type `(Int, List[Int], Int)` in 39-45]"
     )
   }

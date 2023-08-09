@@ -16,6 +16,7 @@ import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -558,7 +559,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
          |""".stripMargin
 
     ExpressionCompiler
-      .compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+      .compileBoolean(expr, NoLibraries, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
       .flatMap(ExprScript(V5, _))
       .explicitGet()
   }

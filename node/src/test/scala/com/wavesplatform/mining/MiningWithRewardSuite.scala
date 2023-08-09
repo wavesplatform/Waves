@@ -132,6 +132,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
         _   = txs.foreach(tx => utxPool.putIfNew(tx(ts + 6, account)).resultE.explicitGet())
         env = Env(blocks, account, miner, blockchainUpdater)
         r <- f(env)
+        _ = scheduler.shutdown()
+        _ = utxPool.close()
       } yield r
     }
 
