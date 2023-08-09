@@ -177,7 +177,8 @@ object Dependencies {
       Dependencies.sttp3,
       Dependencies.sttp3Monix,
       Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
-      Dependencies.akkaHttpModule("akka-http-testkit")                % Test
+      Dependencies.akkaHttpModule("akka-http-testkit")                % Test,
+      "com.google.jimfs"                                              % "jimfs" % "1.3.0" % Test // For a file system tests
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 

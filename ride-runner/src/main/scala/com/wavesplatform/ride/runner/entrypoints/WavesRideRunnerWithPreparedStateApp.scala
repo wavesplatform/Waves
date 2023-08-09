@@ -3,6 +3,7 @@ package com.wavesplatform.ride.runner.entrypoints
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
+import com.wavesplatform.io.PathUtils
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
@@ -17,7 +18,6 @@ import scopt.{DefaultOParserSetup, OParser}
 import java.io.File
 import java.nio.file.Path
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.control.NoStackTrace
 import scala.util.{Failure, Success, Try}
 
@@ -29,17 +29,11 @@ object WavesRideRunnerWithPreparedStateApp {
 
     OParser.parse(commandParser, args, Args(), setup).foreach { args =>
       System.setProperty("logback.stdout.level", if (args.verbose) "TRACE" else "OFF")
-      val log   = LoggerFactory.getLogger("Main")
-      val input = args.input.map(_.toPath.toAbsolutePath) // Otherwise Lightbend Config doesn't resolve correctly relative paths
-      // TODO separate method
-      val commonPath = input.reduce { (f1, f2) =>
-        val f1Components = f1.iterator().asScala.toSeq
-        val f2Components = f2.iterator().asScala.toSeq
-        val commonParts  = f1Components.zip(f2Components).takeWhile { case (left, right) => left == right }
-        val shortest     = if (f1Components.size <= f2Components.size) f1 else f2
-        shortest.getRoot.resolve(shortest.subpath(0, commonParts.size))
-      }
+      val log        = LoggerFactory.getLogger("Main")
+      val input      = args.input.map(_.toPath.toAbsolutePath) // Otherwise Lightbend Config doesn't resolve correctly relative paths
+      val commonPath = input.reduceLeft(PathUtils.commonPath)
 
+      // TODO if one file
       Observable
         .fromIterable(input)
         .mapParallelOrdered(args.parallelism) { path =>
@@ -59,8 +53,8 @@ object WavesRideRunnerWithPreparedStateApp {
         .foldLeftL(Stats(0, 0, 0)) { case (r, x) =>
           val file = commonPath.relativize(x.path)
           x match {
-            case _: RunResult.Succeeded =>
-              println(s"[OK] $file\n")
+            case x: RunResult.Succeeded =>
+              println(s"[OK] $file:\n${Json.prettyPrint(x.result).split("\n").mkString("  ", "\n  ", "  ")}\n")
               r.copy(succeeded = r.succeeded + 1)
             case _: RunResult.Failed =>
               println(s"[FAILED] $file\b")
