@@ -33,9 +33,12 @@ object BlockAppender extends ScorexLogging {
       if (
         blockchainUpdater
           .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
-      )
+      ) {
+        log.debug(
+          s"Try to append key block $newBlock, last block in blockchain is ${blockchainUpdater.lastBlockHeader}(${blockchainUpdater.lastBlockId})"
+        )
         appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-      else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
+      } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
         Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
@@ -57,6 +60,10 @@ object BlockAppender extends ScorexLogging {
     span.markNtp("block.received")
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
 
+    log.debug(
+      s"Try to append new block $newBlock, last block in blockchain is ${blockchainUpdater.lastBlockHeader}(${blockchainUpdater.lastBlockId})"
+    )
+
     val append =
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
@@ -68,6 +75,7 @@ object BlockAppender extends ScorexLogging {
       case Right(None) => // block already appended
       case Right(Some(_)) =>
         log.debug(s"${id(ch)} Appended $newBlock")
+        log.debug(s"APPENDED: last block is ${blockchainUpdater.lastBlockHeader}(${blockchainUpdater.lastBlockId})")
 
         span.markNtp("block.applied")
         span.finishNtp()

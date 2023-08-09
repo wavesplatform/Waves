@@ -15,6 +15,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.state.appender.BlockAppender.log
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.*
@@ -211,6 +212,8 @@ class BlockchainUpdaterImpl(
                     s" ${if (leveldb.contains(block.header.reference)) "exits, it's not last persisted" else "doesn't exist"}"
                   Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
                 case lastBlockId =>
+                  log.debug(s"NG IS EMPTY. Try to append new block $block, last block in blockchain is ${leveldb.lastBlock})")
+
                   val height            = lastBlockId.fold(0)(leveldb.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(leveldb, height)
                   val reward            = nextReward()
@@ -235,6 +238,8 @@ class BlockchainUpdaterImpl(
             case Some(ng) =>
               if (ng.base.header.reference == block.header.reference) {
                 if (block.blockScore() > ng.base.blockScore()) {
+                  log.debug(s"Try to append new block (after score check) $block, last block in blockchain is ${ng.base})")
+
                   val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                   val miningConstraints = MiningConstraints(leveldb, height)
 
@@ -261,6 +266,8 @@ class BlockchainUpdaterImpl(
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
+                  log.debug(s"Try to append new block (after equality check) $block, last block in blockchain is ${ng.base})")
+
                   if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
                     log.trace(s"Existing liquid block is better than new one, discarding $block")
                     Right(None)
