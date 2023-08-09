@@ -5,7 +5,7 @@ import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.io.PathUtils
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
-import com.wavesplatform.ride.runner.input.RideRunnerInputParser
+import com.wavesplatform.ride.runner.input.{RideRunnerInput, RideRunnerInputParser}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import monix.eval.Task
 import monix.execution.Scheduler.global
@@ -37,7 +37,7 @@ object WavesRideRunnerWithPreparedStateApp {
         .fromIterable(input)
         .mapParallelOrdered(args.threads) { path =>
           val minimizedPath = if (args.minimizePaths) commonPath.relativize(path) else path
-          Task(run(path, minimizedPath)).onErrorRecover(RunResult.Error(minimizedPath, _))
+          Task(run(args.runMode, path, minimizedPath)).onErrorRecover(RunResult.Error(minimizedPath, _))
         }
         .foldLeftL(Stats(0, 0, 0)) { case (r, x) =>
           args.printMode.printRunResult(x)
@@ -58,21 +58,40 @@ object WavesRideRunnerWithPreparedStateApp {
     }
   }
 
-  private def run(path: Path, pathForResult: Path): RunResult = {
+  private def run(runMode: RunMode, path: Path, pathForResult: Path): RunResult = {
     if (path.getFileName.toString.endsWith(".conf"))
       Try(ConfigFactory.parseFile(path.toFile).resolve().root().render(ConfigRenderOptions.concise())) match {
         case Failure(e) => RunResult.Error(pathForResult, new RuntimeException("Can't parse HOCON file", e))
 
         case Success(inputRawJson) =>
           val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
+          // TODO concurrency issue, remove this
           AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
-          RunResult.Succeeded(pathForResult, run(inputJson))
+          val input = RideRunnerInputParser.parse(inputJson)
+          lazy val actual = {
+            val r = run(input)
+            if (input.postProcessing.enable) input.postProcessing.method.process(r)
+            else r
+          }
+
+          runMode match {
+            case RunMode.Run => RunResult.Succeeded(pathForResult, actual)
+            case _: RunMode.Test =>
+              input.test match {
+                case None =>
+                  RunResult.Error(pathForResult, new RuntimeException("Is not a test: expected to be have 'test' field.") with NoStackTrace)
+
+                case Some(test) =>
+                  if (actual == test.expected) RunResult.Succeeded(pathForResult, actual)
+                  else RunResult.Failed(pathForResult, actual, test.expected)
+              }
+          }
+
       }
     else RunResult.Error(pathForResult, new RuntimeException("Isn't a HOCON file") with NoStackTrace)
   }
 
-  def run(inputJson: JsValue): JsObject = {
-    val input = RideRunnerInputParser.parse(inputJson)
+  def run(input: RideRunnerInput): JsObject = {
     val defaultFunctionalitySettings = input.chainId match {
       case 'W' => BlockchainSettings(input.chainId, FunctionalitySettings.MAINNET, GenesisSettings.MAINNET, RewardsSettings.MAINNET)
       case 'T' => BlockchainSettings(input.chainId, FunctionalitySettings.TESTNET, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
@@ -142,7 +161,7 @@ object WavesRideRunnerWithPreparedStateApp {
         .text("Path to HOCON (conf) file (or files) with prepared state and run arguments.")
         .action((x, c) => c.copy(input = x.getAbsoluteFile :: c.input)),
       cmd("run")
-        .text("  Runs scripts and prints results to STDOUT.")
+        .text("  Runs scripts and prints results to STDOUT. The default run mode.")
         .action((_, c) => c.copy(runMode = RunMode.Run)),
       cmd("test")
         .text("  Expects that provided files are tests. Runs tests and prints results to STDOUT.")
@@ -202,22 +221,25 @@ object WavesRideRunnerWithPreparedStateApp {
     override def asString: String = s"Total succeeded: $succeeded, failed: $failed, error: $error"
   }
 
+  // TODO move path outside?
   private sealed trait RunResult extends Printable with Product with Serializable {
     def path: Path
   }
 
   private object RunResult {
-    case class Succeeded(path: Path, result: JsObject) extends RunResult {
+    private def padLeft(x: String, padding: String): String = x.split('\n').mkString(padding, s"\n$padding", padding)
+
+    case class Succeeded(path: Path, result: JsValue) extends RunResult {
       override def asJson: JsObject = Json.obj(
         "path"   -> path.toString,
         "status" -> "ok",
         "result" -> result
       )
 
-      override def asString: String = s"[OK] $path:\n${Json.prettyPrint(result).split("\n").mkString("  ", "\n  ", "  ")}"
+      override def asString: String = s"[OK] $path:\n${padLeft(Json.prettyPrint(result), "  ")}"
     }
 
-    case class Failed(path: Path, actual: JsObject, expected: JsObject) extends RunResult {
+    case class Failed(path: Path, actual: JsValue, expected: JsValue) extends RunResult {
       override def asJson: JsObject = Json.obj(
         "path"     -> path.toString,
         "status"   -> "failed",
@@ -225,7 +247,10 @@ object WavesRideRunnerWithPreparedStateApp {
         "expected" -> expected
       )
 
-      override def asString: String = s"[FAILED] $path\n"
+      override def asString: String =
+        s"[FAILED] $path\n" +
+          s"  expected:\n${padLeft(Json.prettyPrint(expected), "    ")}\n" +
+          s"  actual:\n${padLeft(Json.prettyPrint(actual), "    ")}"
     }
 
     case class Error(path: Path, exception: Throwable) extends RunResult {

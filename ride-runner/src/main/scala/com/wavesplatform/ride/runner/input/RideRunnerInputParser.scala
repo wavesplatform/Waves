@@ -21,15 +21,22 @@ import play.api.libs.json.*
 import play.api.libs.json.JsError.toJson
 
 import java.nio.charset.StandardCharsets
-import java.util.Locale
 import scala.util.Try
 
 object RideRunnerInputParser extends DefaultReads {
 
+  private val baseTypes = List(
+    classOf[RideRunnerDataEntry],
+    classOf[RideRunnerPostProcessingMethod]
+  ).map(_.getSimpleName)
+
   implicit val jsonConfiguration: JsonConfiguration.Aux[Json.WithDefaultValues] = JsonConfiguration[Json.WithDefaultValues](
     discriminator = "type",
+    // snakeCase
     typeNaming = JsonNaming { fullName =>
-      fullName.split('.').last.replace(classOf[RideRunnerDataEntry].getSimpleName, "").toLowerCase(Locale.US)
+      val nameWithoutBaseClass = baseTypes.foldLeft(fullName.split('.').last) { (r, x) => r.replace(x, "") }
+      if (nameWithoutBaseClass.head.isLower) nameWithoutBaseClass
+      else nameWithoutBaseClass.updated(0, nameWithoutBaseClass.head.toLower)
     }
   )
 
@@ -145,6 +152,13 @@ object RideRunnerInputParser extends DefaultReads {
   implicit val rideRunnerIntegerDataEntryReads: Reads[IntegerRideRunnerDataEntry] = Json.reads
   implicit val rideRunnerStringDataEntryReads: Reads[StringRideRunnerDataEntry]   = Json.reads
   implicit val rideRunnerDataEntryReads: Reads[RideRunnerDataEntry]               = Json.reads
+
+  implicit val rideRunnerPickPostProcessingMethod: Reads[PickRideRunnerPostProcessingMethod]       = Json.reads
+  implicit val rideRunnerPickAllPostProcessingMethod: Reads[PickAllRideRunnerPostProcessingMethod] = Json.reads
+  implicit val rideRunnerPrunePostProcessingMethod: Reads[PruneRideRunnerPostProcessingMethod]     = Json.reads
+  implicit val rideRunnerPostProcessingMethod: Reads[RideRunnerPostProcessingMethod]               = Json.reads
+
+  implicit val rideRunnerPostProcessing: Reads[RideRunnerPostProcessing] = Json.reads
 
   implicit val rideRunnerAccountReads: Reads[RideRunnerAccount] = Json.reads
 
