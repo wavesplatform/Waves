@@ -69,13 +69,12 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
-    val stateHeight = blockchain.height
+    val stateHeight        = blockchain.height
+    val heightWithNewBlock = stateHeight + 1
 
     // height switch is next after activation
     val ngHeight          = blockchain.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
     val sponsorshipHeight = Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-
-    val minerReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
 
     val feeFromPreviousBlockE =
       if (stateHeight >= sponsorshipHeight) {
@@ -101,20 +100,43 @@ object BlockDiffer {
       } else
         Right(Portfolio.empty)
 
-    val blockchainWithNewBlock = SnapshotBlockchain(blockchain, StateSnapshot.empty, block, hitSource, 0, None)
+    val addressRewardsE: Either[String, (Portfolio, Map[Address, Portfolio], Map[Address, Portfolio])] = for {
+      daoAddress        <- blockchain.settings.functionalitySettings.daoAddressParsed
+      xtnBuybackAddress <- blockchain.settings.functionalitySettings.xtnBuybackAddressParsed
+    } yield {
+      val blockRewardShares = BlockRewardCalculator.getBlockRewardShares(
+        heightWithNewBlock,
+        blockchain.lastBlockReward.getOrElse(0L),
+        daoAddress,
+        xtnBuybackAddress,
+        blockchain
+      )
+      (
+        Portfolio.waves(blockRewardShares.miner),
+        daoAddress.fold(Map[Address, Portfolio]())(addr => Map(addr -> Portfolio.waves(blockRewardShares.daoAddress)).filter(_._2.balance > 0)),
+        xtnBuybackAddress.fold(Map[Address, Portfolio]())(addr =>
+          Map(addr -> Portfolio.waves(blockRewardShares.xtnBuybackAddress)).filter(_._2.balance > 0)
+        )
+      )
+    }
+
+    val blockchainWithNewBlock = SnapshotBlockchain(blockchain, StateSnapshot.empty, block, hitSource, 0, blockchain.lastBlockReward)
     val initSnapshotAndFeeE =
       for {
-        feeFromPreviousBlock    <- feeFromPreviousBlockE.leftMap(GenericError(_))
-        initialFeeFromThisBlock <- initialFeeFromThisBlockE.leftMap(GenericError(_))
-        totalFee                <- initialFeeFromThisBlock.combine(feeFromPreviousBlock).leftMap(GenericError(_))
-        totalReward             <- minerReward.combine(totalFee).leftMap(GenericError(_))
+        feeFromPreviousBlock                             <- feeFromPreviousBlockE
+        initialFeeFromThisBlock                          <- initialFeeFromThisBlockE
+        totalFee                                         <- initialFeeFromThisBlock.combine(feeFromPreviousBlock)
+        (minerReward, daoPortfolio, xtnBuybackPortfolio) <- addressRewardsE
+        totalMinerReward                                 <- minerReward.combine(totalFee).flatMap(_.combine(feeFromPreviousBlock))
+        nonMinerRewardPortfolios                         <- Portfolio.combine(daoPortfolio, xtnBuybackPortfolio)
+        totalRewardPortfolios                            <- Portfolio.combine(Map(block.sender.toAddress -> totalMinerReward), nonMinerRewardPortfolios)
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
-        resultSnapshot <- patchesSnapshot.addBalances(Map(block.sender.toAddress -> totalReward), blockchainWithNewBlock)
+        resultSnapshot <- patchesSnapshot.addBalances(totalRewardPortfolios, blockchainWithNewBlock)
       } yield (resultSnapshot, totalFee)
 
     for {
       _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      (initSnapshot, totalFee) <- TracedResult(initSnapshotAndFeeE)
+      (initSnapshot, totalFee) <- TracedResult(initSnapshotAndFeeE.leftMap(GenericError(_)))
       r <- apply(
         blockchainWithNewBlock,
         constraint,
@@ -250,10 +272,11 @@ object BlockDiffer {
 
               val txInfo = txSnapshot.transactions.head._2
               for {
-                resultTxSnapshot <- txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+                resultTxSnapshot <- txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain).leftMap(GenericError(_))
                 newMinerSnapshot <- detailedSnapshot.parentSnapshot
                   .withTransaction(txInfo)
                   .addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+                  .leftMap(GenericError(_))
                 newDetailedSnapshot = DetailedSnapshot(
                   newMinerSnapshot,
                   detailedSnapshot.feePortfolios + (blockGenerator -> minerPortfolio)
@@ -262,7 +285,7 @@ object BlockDiffer {
                 val newSnapshot   = currSnapshot |+| resultTxSnapshot
                 val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
 
-                val result = Result(
+                Result(
                   newSnapshot,
                   carryFee + carry,
                   totalWavesFee,
@@ -271,7 +294,6 @@ object BlockDiffer {
                   prevStateHashOpt
                     .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, txInfo.applied).createHash(prevStateHash))
                 )
-                result
               }
             }
           }

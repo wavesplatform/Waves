@@ -8,7 +8,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.{BlockRewardDistribution, BlockV5, RideV6, SynchronousCalls}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider.*
 import com.wavesplatform.features.ScriptTransferValidationProvider.*
@@ -29,6 +29,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.*
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
@@ -143,6 +144,7 @@ object InvokeDiffsCommon {
   def processActions(
       actions: StructuredCallableActions,
       version: StdLibVersion,
+      rootVersion: StdLibVersion,
       dAppAddress: Address,
       dAppPublicKey: PublicKey,
       storingComplexity: Int,
@@ -159,7 +161,18 @@ object InvokeDiffsCommon {
     val verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
     val additionalScriptsCount = actions.complexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
     for {
-      _ <- checkActions(actions, version, dAppAddress, storingComplexity, tx, limitedExecution, totalComplexityLimit, log)
+      _ <- checkActions(
+        actions,
+        version,
+        rootVersion,
+        dAppAddress,
+        storingComplexity,
+        tx,
+        limitedExecution,
+        totalComplexityLimit,
+        log,
+        blockchain.isFeatureActivated(BlockRewardDistribution)
+      )
       feePortfolios <-
         if (isSyncCall)
           TracedResult.wrapValue(Map[Address, Portfolio]())
@@ -205,12 +218,14 @@ object InvokeDiffsCommon {
   private def checkActions(
       actions: StructuredCallableActions,
       version: StdLibVersion,
+      rootVersion: StdLibVersion,
       dAppAddress: Address,
       storingComplexity: Int,
       tx: InvokeScriptLike,
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
-      log: Log[Id]
+      log: Log[Id],
+      limitsByRootVersion: Boolean
   ): TracedResult[ValidationError, Unit] = {
     import actions.*
     for {
@@ -219,7 +234,7 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
       _ <- TracedResult(
-        checkScriptActionsAmount(version, actions.list, transferList, leaseList, leaseCancelList, dataEntries)
+        checkScriptActionsAmount(version, rootVersion, actions.list, transferList, leaseList, leaseCancelList, dataEntries, limitsByRootVersion)
           .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
       )
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
@@ -388,13 +403,15 @@ object InvokeDiffsCommon {
 
   private def checkScriptActionsAmount(
       version: StdLibVersion,
+      rootVersion: StdLibVersion,
       actions: List[CallableAction],
       transferList: List[AssetTransfer],
       leaseList: List[Lease],
       leaseCancelList: List[LeaseCancel],
-      dataEntries: Seq[DataEntry[?]]
+      dataEntries: Seq[DataEntry[?]],
+      limitsByRootVersion: Boolean
   ): Either[String, Unit] = {
-    if (version >= V6) {
+    if (!limitsByRootVersion && version >= V6 || limitsByRootVersion && rootVersion >= V6) {
       val balanceChangeActionsAmount = transferList.length + leaseList.length + leaseCancelList.length
       val assetsActionsAmount        = actions.length - dataEntries.length - balanceChangeActionsAmount
 
@@ -722,7 +739,8 @@ object InvokeDiffsCommon {
     }
 
   def checkCallResultLimits(
-      version: StdLibVersion,
+      currentVersion: StdLibVersion,
+      rootVersion: StdLibVersion,
       blockchain: Blockchain,
       usedComplexity: Long,
       log: Log[Id],
@@ -731,19 +749,24 @@ object InvokeDiffsCommon {
       assetActionsCount: Int,
       dataCount: Int,
       dataSize: Int,
-      availableActions: Int,
-      availableBalanceActions: Int,
-      availableAssetActions: Int,
-      availableData: Int,
-      availableDataSize: Int
+      availableActions: ActionLimits
   ): TracedResult[ValidationError, Unit] = {
     def error(message: String) = TracedResult(Left(FailedTransactionError.dAppExecution(message, usedComplexity, log)))
+    def checkLimitsByVersion(version: StdLibVersion) = {
+      if (version >= V6 && balanceActionsCount > availableActions.balanceActions) {
+        error("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded")
+      } else if (version >= V6 && assetActionsCount > availableActions.assetActions) {
+        error("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded")
+      } else if (version < V6 && actionsCount > availableActions.nonDataActions)
+        error("Actions count limit is exceeded")
+      else TracedResult(Right(()))
+    }
 
-    if (dataCount > availableData)
+    if (dataCount > availableActions.data)
       error("Stored data count limit is exceeded")
-    else if (dataSize > availableDataSize) {
+    else if (dataSize > availableActions.dataSize) {
       val limit   = ContractLimits.MaxTotalWriteSetSizeInBytes
-      val actual  = limit + dataSize - availableDataSize
+      val actual  = limit + dataSize - availableActions.dataSize
       val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
       if (blockchain.isFeatureActivated(RideV6)) {
         error(message)
@@ -755,14 +778,9 @@ object InvokeDiffsCommon {
         TracedResult(Left(FailOrRejectError(message)))
       } else
         TracedResult(Right(()))
-    } else if (version >= V6 && balanceActionsCount > availableBalanceActions) {
-      error("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded")
-    } else if (version >= V6 && assetActionsCount > availableAssetActions) {
-      error("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded")
-    } else if (version < V6 && actionsCount > availableActions)
-      error("Actions count limit is exceeded")
-    else
-      TracedResult(Right(()))
+    } else if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution)) {
+      checkLimitsByVersion(rootVersion)
+    } else checkLimitsByVersion(currentVersion)
   }
 
   def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Either[ValidationError, ScriptResult] =

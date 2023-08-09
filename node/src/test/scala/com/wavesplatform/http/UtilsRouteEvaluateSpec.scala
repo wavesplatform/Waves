@@ -23,6 +23,7 @@ import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.{Asset, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
+import monix.execution.schedulers.SchedulerService
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
@@ -37,6 +38,12 @@ class UtilsRouteEvaluateSpec
     with PathMockFactory
     with Inside
     with WithDomain {
+  private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
+    new HashedWheelTimer(),
+    5.seconds,
+    1,
+    "rest-time-limited"
+  )
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
@@ -45,14 +52,14 @@ class UtilsRouteEvaluateSpec
     restAPISettings,
     Int.MaxValue,
     () => ScriptEstimatorV3(true, false),
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ),
+    timeBounded,
     stub[Blockchain]("globalBlockchain")
   )
+
+  override def afterAll(): Unit = {
+    timeBounded.shutdown()
+    super.afterAll()
+  }
 
   routePath("/script/evaluate/{address}") - {
     val letFromContract = 1000
@@ -357,7 +364,8 @@ class UtilsRouteEvaluateSpec
         }
         evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
           (responseAs[JsObject] - "stateChanges") should matchJson(
-            s"""{"result":{"type":"BigInt","value":"${PureContext.BigIntMax.toString()}"},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+            s"""{"result":{"type":"BigInt","value":"${PureContext.BigIntMax
+              .toString()}"},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
 

@@ -1,6 +1,7 @@
 package com.wavesplatform.utx
 
 import cats.implicits.catsSyntaxSemigroup
+import cats.implicits.toTraverseOps
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -13,6 +14,7 @@ import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
+import com.wavesplatform.state.diffs.SetScriptTransactionDiff.*
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.SnapshotBlockchain
@@ -20,6 +22,7 @@ import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxStateSna
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.*
@@ -37,7 +40,7 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
-import scala.util.{Left, Right}
+import scala.util.Either.cond
 
 //noinspection ScalaStyle
 case class UtxPoolImpl(
@@ -134,21 +137,36 @@ case class UtxPoolImpl(
         .map(_.bytes().length)
         .sum
 
-      for {
-        _ <- Either.cond(
-          transactions.size < utxSettings.maxSize || skipSizeCheck,
-          (),
-          GenericError("Transaction pool size limit is reached")
-        )
-        _ <- Either.cond(
-          (transactionsBytes + tx.bytesSize) <= utxSettings.maxBytesSize || skipSizeCheck,
-          (),
-          GenericError("Transaction pool bytes size limit is reached")
-        )
-
-        _ <- LimitChecks.checkNotBlacklisted(tx)
-        _ <- LimitChecks.checkScripted(tx, () => skipSizeCheck)
-      } yield ()
+      import LimitChecks.*
+      cond(
+        skipSizeCheck || (transactionsBytes + tx.bytesSize) <= utxSettings.maxBytesSize,
+        (),
+        GenericError("Transaction pool bytes size limit is reached")
+      ).flatMap(_ =>
+        checkNotBlacklisted(tx)
+          .flatMap(_ =>
+            checkScripted(tx, () => skipSizeCheck)
+              .flatMap(_ =>
+                (tx match {
+                  case i: IssueTransaction          => i.script.traverse(scriptSizeValidation(_))
+                  case s: SetAssetScriptTransaction => s.script.traverse(scriptSizeValidation(_))
+                  case EthereumTransaction(inv: EthereumTransaction.Invocation, _, _, _) =>
+                    inv.decodeFuncCall(blockchain, true)
+                  case et @ EthereumTransaction(tr: EthereumTransaction.Transfer, _, _, _) =>
+                    tr.check(et.underlying.getData)
+                  case _ => Right(())
+                })
+                  .flatMap(_ =>
+                    cond(
+                      skipSizeCheck || transactions.size < utxSettings.maxSize,
+                      (),
+                      GenericError("Transaction pool size limit is reached")
+                    )
+                      .map(_ => ())
+                  )
+              )
+          )
+      )
     }
 
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify = true, forceValidate))
@@ -246,10 +264,9 @@ case class UtxPoolImpl(
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case t if inUTXPoolOrdering.isWhitelisted(t) => Set.empty
     case i: InvokeScriptTransaction =>
-      Set[Address](i.senderAddress)
-        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dApp).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.senderAddress).filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dApp).toOption
     case e: ExchangeTransaction =>
-      Set[Address](e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
+      Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
     case _                                                                => Set.empty
   }

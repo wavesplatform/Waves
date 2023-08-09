@@ -9,6 +9,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
@@ -34,8 +35,8 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
     val func = if (reentrant) "reentrantInvoke" else "invoke"
     val args = s"[sendEnd, $sendChangeDApp, $sendForceInvoke, $sendForceReentrant]"
     val compile =
-      if (invokeExpression) TestCompiler(V5).compileFreeCall(_)
-      else TestCompiler(V5).compileContract(_: String)
+      if (invokeExpression) TestCompiler(V5).compileFreeCall(_, offset = NoLibraries)
+      else TestCompiler(V5).compileContract(_, offset = NoLibraries, allowIllFormedStrings = false, compact = false)
     val prefix =
       if (invokeExpression)
         "let (end, useSecondAddress, forceInvoke, forceReentrant) = (false, false, false, false)"

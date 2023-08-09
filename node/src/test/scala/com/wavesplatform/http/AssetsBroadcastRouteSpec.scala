@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
-import com.wavesplatform.utils.{Time, *}
+import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen as G
 import org.scalamock.scalatest.PathMockFactory
@@ -25,7 +25,12 @@ import play.api.libs.json.*
 
 import scala.concurrent.duration.*
 
-class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
+class AssetsBroadcastRouteSpec
+    extends RouteSpec("/assets/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with SharedSchedulerMixin {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,
@@ -37,7 +42,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     stub[CommonAccountsApi],
     stub[CommonAssetsApi],
     1000,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   ).route
 
   private[this] val fixedIssueGen = for {
@@ -183,7 +188,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       stub[CommonAccountsApi],
       stub[CommonAssetsApi],
       1000,
-      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      new RouteTimeout(60.seconds)(sharedScheduler)
     ).route
 
     val seed               = "seed".getBytes("UTF-8")

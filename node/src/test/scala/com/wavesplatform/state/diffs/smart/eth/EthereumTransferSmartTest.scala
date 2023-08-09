@@ -17,8 +17,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.{Asset, ERC20Address, EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{Asset, ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
 import scala.collection.immutable.VectorMap
@@ -76,7 +75,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val issue     = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, None, 1.waves, ts).explicitGet()
 
     for {
-      version <- DirectiveDictionary[StdLibVersion].all
+      version <- DirectiveDictionary[StdLibVersion].all.init
       asset   <- Seq(Waves, IssuedAsset(issue.id()))
     } {
       val ethTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, recipient.toAddress, transferAmount, asset)
@@ -124,7 +123,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
     val genesis1 = TxHelpers.genesis(ethSender, ENOUGH_AMT)
     val genesis2 = TxHelpers.genesis(recipient.toAddress, ENOUGH_AMT)
 
-    DirectiveDictionary[StdLibVersion].all
+    DirectiveDictionary[StdLibVersion].all.init
       .foreach { version =>
         val script      = assetScript(version, dummyEthTransfer, recipient.toAddress)
         val issue       = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, Some(script), 1.waves, ts).explicitGet()

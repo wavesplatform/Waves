@@ -10,7 +10,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import com.wavesplatform.utils.{Schedulers, Time}
+import com.wavesplatform.utils.{SharedSchedulerMixin, Time}
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen as G
 import org.scalacheck.Gen.posNum
@@ -20,7 +20,12 @@ import play.api.libs.json.Json.*
 
 import scala.concurrent.duration.*
 
-class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
+class LeaseBroadcastRouteSpec
+    extends RouteSpec("/leasing/broadcast/")
+    with RequestGen
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with SharedSchedulerMixin {
   private[this] val publisher = DummyTransactionPublisher.rejecting(t => TransactionValidationError(GenericError("foo"), t))
   private[this] val route = LeaseApiRoute(
     restAPISettings,
@@ -29,7 +34,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
     publisher,
     stub[Time],
     stub[CommonAccountsApi],
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   ).route
   "returns StateCheckFailed" - {
 

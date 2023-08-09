@@ -11,6 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
@@ -19,12 +20,14 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
@@ -200,7 +203,10 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
       generatorPublicKey = blockH.generator,
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
+        getRewards(blockH.generator, bHeight)
+      else List.empty
     )
   }
 
@@ -242,6 +248,29 @@ class WavesEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+
+  private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward)) {
+      val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, generator.toAddress, blockchain)
+
+      rewardShares.map { case (addr, reward) =>
+        Address(ByteStr(addr.bytes)) -> reward
+      }
+    } else {
+      val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+      val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+
+      blockchain.blockReward(height).fold(Seq.empty[(Address, Long)]) { fullBlockReward =>
+        val configAddressesReward =
+          (daoAddress.toSeq ++ xtnBuybackAddress).map { addr =>
+            Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(fullBlockReward)
+          }
+        val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (fullBlockReward - configAddressesReward.map(_._2).sum)
+
+        (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
+      }
+    }
+  }
 }
 
 object DAppEnvironment {
@@ -306,6 +335,23 @@ object DAppEnvironment {
       call: FUNCTION_CALL,
       payments: Seq[InvokeScriptTransaction.Payment]
   )
+
+  case class ActionLimits(
+      nonDataActions: Int,
+      balanceActions: Int,
+      assetActions: Int,
+      data: Int,
+      dataSize: Int
+  ) {
+    def decrease(nonDataActionsCount: Int, balanceActionsCount: Int, assetActionsCount: Int, dataCount: Int, dataSize: Int): ActionLimits =
+      ActionLimits(
+        nonDataActions - nonDataActionsCount,
+        balanceActions - balanceActionsCount,
+        assetActions - assetActionsCount,
+        data - dataCount,
+        this.dataSize - dataSize
+      )
+  }
 }
 
 // todo move to separate class
@@ -317,6 +363,7 @@ class DAppEnvironment(
     blockchain: Blockchain,
     tthis: Environment.Tthis,
     ds: DirectiveSet,
+    rootVersion: StdLibVersion,
     tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
@@ -325,12 +372,8 @@ class DAppEnvironment(
     enableExecutionLog: Boolean,
     totalComplexityLimit: Int,
     var remainingCalls: Int,
-    var availableActions: Int,
-    var availableBalanceActions: Int,
-    var availableAssetActions: Int,
+    var availableActions: ActionLimits,
     var availablePayments: Int,
-    var availableData: Int,
-    var availableDataSize: Int,
     var currentSnapshot: StateSnapshot,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
@@ -376,21 +419,23 @@ class DAppEnvironment(
         payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
         InvokeScriptResult.empty
       )
-      (snapshot, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingPayments, remainingData, remainingDataSize) <-
+      (
+        snapshot,
+        evaluated,
+        remainingActions,
+        remainingPayments
+      ) <-
         InvokeScriptDiff( // This is a recursive call
           mutableBlockchain,
           blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+          rootVersion,
           limitedExecution,
           enableExecutionLog,
           totalComplexityLimit,
           availableComplexity,
           remainingCalls,
           availableActions,
-          availableBalanceActions,
-          availableAssetActions,
           availablePayments,
-          availableData,
-          availableDataSize,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
@@ -401,11 +446,7 @@ class DAppEnvironment(
       mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
-      availableBalanceActions = remainingBalanceActions
-      availableAssetActions = remainingAssetActions
       availablePayments = remainingPayments
-      availableData = remainingData
-      availableDataSize = remainingDataSize
       (
         evaluated,
         snapshot.scriptsComplexity.toInt,

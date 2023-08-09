@@ -42,8 +42,8 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{Assertion, EitherValues}
 
 import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
@@ -687,7 +687,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
     "blacklisting" - {
       "prevent a transfer transaction from specific addresses" in {
-        def test(utxPool: UtxPoolImpl, txs: Seq[Transaction]): Assertion = {
+        def test(utxPool: UtxPoolImpl, txs: Seq[Transaction]): Unit = {
           val r = txs.forall { tx =>
             utxPool.putIfNew(tx).resultE match {
               case Left(SenderIsBlacklisted(_)) => true
@@ -697,6 +697,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           r shouldBe true
           utxPool.all.size shouldEqual 0
+          utxPool.close()
         }
 
         withBlacklisted { case (_, utxPool, txs) => test(utxPool, txs) }
@@ -704,9 +705,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       }
 
       "allow a transfer transaction from blacklisted address to specific addresses" in {
-        def test(utxPool: UtxPoolImpl, txs: Seq[Transaction]): Assertion = {
+        def test(utxPool: UtxPoolImpl, txs: Seq[Transaction]): Unit = {
           txs.foreach(utxPool.putIfNew(_).resultE should beRight)
           utxPool.all.size shouldEqual txs.size
+          utxPool.close()
         }
 
         withBlacklistedAndAllowedByRule { case (_, utxPool, txs) => test(utxPool, txs) }
@@ -719,6 +721,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             utxPool.putIfNew(t).resultE
           }) shouldBe Symbol("right")
           utxPool.all.size shouldEqual txs.size
+          utxPool.close()
         }
       }
     }
@@ -782,6 +785,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           utxPool.putIfNew(transfer).resultE should beRight
           val (tx, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Limit(100 nanos))
           tx.get should contain(transfer)
+          utxPool.close()
         }
 
         "retries until estimate" in withDomain() { d =>
@@ -803,6 +807,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           val (result, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Estimate(3 seconds))
           result shouldBe None
           (System.nanoTime() - startTime).nanos.toMillis shouldBe 3000L +- 1000
+          utxPool.close()
         }
       }
 
@@ -893,6 +898,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScript(secondSigner, dApp(4)))
         utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
+        utx.close()
       }
 
       "correct events for InvokeScriptTransaction with big complexity on alwaysUnlimitedExecution = true" in withDomain(
@@ -927,6 +933,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         event.snapshot.scriptsComplexity shouldBe 1011
         event.snapshot.balances((secondAddress, Waves)) shouldBe d.blockchainUpdater.balance(secondAddress, Waves) - 1
         event.snapshot.balances((recipient, Waves)) shouldBe d.blockchainUpdater.balance(recipient, Waves) + 1
+        utx.close()
       }
 
       "sync calls are fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
@@ -971,6 +978,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScript(secondSigner, dApp(4)))
         utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+        utx.close()
       }
 
       "invoke expression" in {
@@ -993,6 +1001,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           val (result, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Estimate(3 seconds))
           result shouldBe Some(Seq(invoke))
+          utx.close()
         }
       }
     }

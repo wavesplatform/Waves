@@ -18,8 +18,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount}
 
 import scala.collection.immutable.VectorMap
 

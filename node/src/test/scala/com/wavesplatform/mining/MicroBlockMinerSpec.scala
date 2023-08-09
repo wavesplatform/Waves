@@ -1,5 +1,7 @@
 package com.wavesplatform.mining
 
+import java.util.concurrent.CountDownLatch
+
 import com.wavesplatform.TestValues
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.ProtoBlockVersion
@@ -23,7 +25,6 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalamock.scalatest.PathMockFactory
 
-import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -100,6 +101,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
       val lastBlock  = generateBlocks(baseBlock, constraint, 0)
       lastBlock.transactionData should have size constraint.rest.toInt
+      utxPool.close()
     }
   }
 
@@ -107,20 +109,21 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
     withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
       import Scheduler.Implicits.global
       val utxEvents = ConcurrentSubject.publish[UtxEvent]
+      val eventHasBeenSent = new CountDownLatch(1)
+      val inner = new UtxPoolImpl(
+        ntpTime,
+        d.blockchainUpdater,
+        RideV6.utxSettings,
+        RideV6.maxTxErrorLogSize,
+        RideV6.minerSettings.enable,
+        { event =>
+          utxEvents.onNext(event)
+          eventHasBeenSent.countDown()
+        }
+      )
 
       val utxPool = new UtxPool {
-        val eventHasBeenSent = new CountDownLatch(1)
-        val inner = new UtxPoolImpl(
-          ntpTime,
-          d.blockchainUpdater,
-          RideV6.utxSettings,
-          RideV6.maxTxErrorLogSize,
-          RideV6.minerSettings.enable,
-          { event =>
-            utxEvents.onNext(event)
-            eventHasBeenSent.countDown()
-          }
-        )
+
 
         override def packUnconfirmed(
             rest: MultiDimensionalMiningConstraint,
@@ -147,14 +150,18 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         override def setPriorityDiffs(diffs: Seq[StateSnapshot]): Unit = inner.setPriorityDiffs(diffs)
       }
 
+      val miner    = Schedulers.singleThread("miner")
+      val appender = Schedulers.singleThread("appender")
+      val mbminer  = Schedulers.singleThread("micro-block-miner")
+
       val microBlockMiner = new MicroBlockMinerImpl(
         _ => (),
         null,
         d.blockchainUpdater,
         utxPool,
         RideV6.minerSettings,
-        Schedulers.singleThread("miner"),
-        Schedulers.singleThread("appender"),
+        miner,
+        appender,
         utxEvents.collect { case _: UtxEvent.TxAdded => () },
         identity
       )
@@ -163,12 +170,17 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
       microBlockMiner
         .generateMicroBlockSequence(defaultSigner, block, constraint, 0)
-        .runToFuture(Schedulers.singleThread("micro-block-miner"))
+        .runToFuture(mbminer)
 
       utxPool.putIfNew(transfer(amount = 123))
 
       while (d.lastBlockId == block.id()) Thread.sleep(100)
       d.balance(secondAddress) shouldBe 123
+
+      miner.shutdown()
+      appender.shutdown()
+      mbminer.shutdown()
+      inner.close()
     }
   }
 }

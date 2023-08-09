@@ -13,6 +13,7 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.ContractLimits.{MaxContractSizeInBytes, MaxContractSizeInBytesV6, MaxExprSizeInBytes}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -24,7 +25,6 @@ object SetScriptTransactionDiff {
       // Validate script size limit
       _ <- tx.script match {
         case Some(script) =>
-          import com.wavesplatform.lang.v1.ContractLimits.{MaxContractSizeInBytes, MaxContractSizeInBytesV6, MaxExprSizeInBytes}
           if (script.isInstanceOf[ExprScript]) scriptSizeValidation(script, MaxExprSizeInBytes)
           else if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) scriptSizeValidation(script, MaxContractSizeInBytesV6)
           else scriptSizeValidation(script, MaxContractSizeInBytes)
@@ -49,7 +49,7 @@ object SetScriptTransactionDiff {
       )
     } yield snapshot
 
-  private[this] def scriptSizeValidation(value: Script, limit: Int): Either[GenericError, Unit] = {
+  def scriptSizeValidation(value: Script, limit: Int = MaxExprSizeInBytes): Either[GenericError, Unit] = {
     Either.cond(
       value.bytes().size <= limit,
       (),

@@ -1,5 +1,7 @@
 package com.wavesplatform.events
 
+import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RDB
@@ -10,6 +12,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
@@ -53,6 +56,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
+    .addService(ProtoReflectionService.newInstance())
     .build()
 
   override def start(): Unit = {
@@ -95,18 +99,18 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   override def onProcessBlock(
       block: Block,
       snapshot: DetailedSnapshot,
-      minerReward: Option[Long],
+      reward: Option[Long],
       hitSource: ByteStr,
-      blockchainBeforeWithMinerReward: Blockchain
-  ): Unit = repo.onProcessBlock(block, snapshot, minerReward, hitSource, blockchainBeforeWithMinerReward)
+      blockchainBeforeWithReward: Blockchain
+  ): Unit = repo.onProcessBlock(block, snapshot, reward, hitSource, blockchainBeforeWithReward)
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
       snapshot: DetailedSnapshot,
-      blockchainBeforeWithMinerReward: Blockchain,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
-  ): Unit = repo.onProcessMicroBlock(microBlock, snapshot, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
+  ): Unit = repo.onProcessMicroBlock(microBlock, snapshot, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
 
   override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
     repo.onRollback(blockchainBefore, toBlockId, toHeight)

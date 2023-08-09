@@ -34,9 +34,9 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, EthTxGenerator, TxHelpers, TxVersion}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
 import org.scalacheck.Gen.*
@@ -59,7 +59,8 @@ class TransactionsRouteSpec
     with TestWallet
     with WithDomain
     with EthHelpers
-    with BlockchainStubHelpers {
+    with BlockchainStubHelpers
+    with SharedSchedulerMixin {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -76,7 +77,7 @@ class TransactionsRouteSpec
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   )
 
   private val route = seal(transactionsApiRoute.route)
@@ -134,7 +135,7 @@ class TransactionsRouteSpec
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
     )
 

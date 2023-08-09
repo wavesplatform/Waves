@@ -30,17 +30,22 @@ import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.transaction.EthTxGenerator.Arg
+import com.wavesplatform.transaction.{AssetIdLength, EthTxGenerator, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
 import scala.concurrent.duration.*
 
-class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
+class AssetsRouteSpec
+    extends RouteSpec("/assets")
+    with Eventually
+    with RestAPISettingsHelper
+    with WithDomain
+    with TestWallet
+    with SharedSchedulerMixin {
   private val MaxDistributionDepth = 1
 
   def routeTest[A](
@@ -61,7 +66,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             d.accountsApi,
             d.assetsApi,
             MaxDistributionDepth,
-            new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+            new RouteTimeout(60.seconds)(sharedScheduler)
           ).route
         )
       )

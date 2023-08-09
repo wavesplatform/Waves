@@ -14,10 +14,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.{DiffMatchers, EthHelpers}
 import io.grpc.StatusException
 import monix.execution.Scheduler

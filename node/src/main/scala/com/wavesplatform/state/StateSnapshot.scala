@@ -103,10 +103,9 @@ case class StateSnapshot(
     )
 
   // ignores lease balances from portfolios
-  def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[ValidationError, StateSnapshot] =
+  def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, StateSnapshot] =
     StateSnapshot
       .balances(portfolios, SnapshotBlockchain(blockchain, this))
-      .leftMap(GenericError(_))
       .map(b => copy(balances = balances ++ b))
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
