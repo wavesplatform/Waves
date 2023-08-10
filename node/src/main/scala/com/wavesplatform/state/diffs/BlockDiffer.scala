@@ -127,9 +127,10 @@ object BlockDiffer {
         initialFeeFromThisBlock                          <- initialFeeFromThisBlockE
         totalFee                                         <- initialFeeFromThisBlock.combine(feeFromPreviousBlock)
         (minerReward, daoPortfolio, xtnBuybackPortfolio) <- addressRewardsE
-        totalMinerReward                                 <- minerReward.combine(totalFee).flatMap(_.combine(feeFromPreviousBlock))
-        nonMinerRewardPortfolios                         <- Portfolio.combine(daoPortfolio, xtnBuybackPortfolio)
-        totalRewardPortfolios                            <- Portfolio.combine(Map(block.sender.toAddress -> totalMinerReward), nonMinerRewardPortfolios)
+        totalMinerReward                                 <- minerReward.combine(totalFee)
+        totalMinerPortfolio = Map(block.sender.toAddress -> totalMinerReward)
+        nonMinerRewardPortfolios <- Portfolio.combine(daoPortfolio, xtnBuybackPortfolio)
+        totalRewardPortfolios    <- Portfolio.combine(totalMinerPortfolio, nonMinerRewardPortfolios)
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
         resultSnapshot <- patchesSnapshot.addBalances(totalRewardPortfolios, blockchainWithNewBlock)
       } yield (resultSnapshot, totalFee)
