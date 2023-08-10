@@ -298,7 +298,7 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).setScript(sender, script, fee, timestamp, version)), waitForTx)
     }
 
-    def scriptInfo(address: ByteString): ScriptResponse = {
+    def scriptInfo(address: ByteString): ScriptData = {
       accounts.getScript(AccountRequest.of(address))
     }
 
