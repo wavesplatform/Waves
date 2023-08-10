@@ -148,7 +148,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def nextReward(): Option[Long] = {
+  def computeNextReward: Option[Long] = {
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
@@ -218,7 +218,7 @@ class BlockchainUpdaterImpl(
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(rocksdb.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(rocksdb, height)
-                  val reward            = nextReward()
+                  val reward            = computeNextReward
 
                   val referencedBlockchain = CompositeBlockchain(rocksdb, reward)
                   BlockDiffer
@@ -325,7 +325,7 @@ class BlockchainUpdaterImpl(
                       }
 
                       val prevReward = ng.reward
-                      val reward     = nextReward()
+                      val reward     = computeNextReward
 
                       val prevHitSource = ng.hitSource
 

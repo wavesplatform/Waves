@@ -32,7 +32,7 @@ import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, Schedulers, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{Application, TestValues, crypto, database}
+import com.wavesplatform.{Application, TestValues, crypto}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -272,19 +272,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       Block.NgBlockVersion,
       Nil,
       ref.orElse(Some(lastBlockId)),
-      generator = signer,
-      stateHash = Some(
-        this.lastBlock.header.stateHash.map(prev =>
-          TxStateSnapshotHashBuilder
-            .createHashFromDiff(
-              this.blockchain,
-              BlockDiffer
-                .createInitialBlockDiff(this.blockchain, signer.toAddress, Some(this.settings.blockchainSettings.rewardsSettings.initial))
-                .explicitGet()
-            )
-            .createHash(prev)
-        )
-      )
+      generator = signer
     )
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
@@ -426,11 +414,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         val blockchain    = CompositeBlockchain(this.blockchain, Diff.empty, blockWithoutStateHash, ByteStr.empty, 0, None)
         val prevStateHash = this.blockchain.lastBlockHeader.flatMap(_.header.stateHash).getOrElse(InitStateHash)
 
-        val blockReward = if (this.blockchain.height == 0) 0 else this.settings.blockchainSettings.rewardsSettings.initial
-        val carry       = if (this.blockchain.height == 0) 0 else this.carryFee
-
         val initDiff = BlockDiffer
-          .createInitialBlockDiff(blockchain, generator.toAddress, Some(blockReward), Some(carry))
+          .createInitialBlockDiff(this.blockchain, generator.toAddress)
           .explicitGet()
         val initStateHash =
           if (initDiff == Diff.empty) prevStateHash

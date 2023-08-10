@@ -98,7 +98,7 @@ object BlockAppender extends ScorexLogging {
         blockchainUpdater.lastBlockHeader
           .flatMap(_.header.stateHash)
           .traverse { prevStateHash =>
-            blockChallenger.challengeBlock(newBlock, ch, prevStateHash, ish.blockReward)
+            blockChallenger.challengeBlock(newBlock, ch, prevStateHash)
           }
           .void
 

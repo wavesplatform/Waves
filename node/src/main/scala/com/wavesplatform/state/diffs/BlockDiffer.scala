@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, Authorized, BlockchainUpdater, GenesisTransaction, PaymentTransaction, Transaction}
 
 object BlockDiffer {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
@@ -182,7 +182,6 @@ object BlockDiffer {
         blockchainWithNewBlock,
         block.header.stateHash,
         r.stateHash,
-        blockchainWithNewBlock.lastBlockReward,
         block.header.challengedHeader.isDefined
       )
     } yield r
@@ -244,7 +243,7 @@ object BlockDiffer {
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
-      _ <- checkStateHash(blockchain, micro.stateHash, r.stateHash, blockchain.lastBlockReward, hasChallenge = false)
+      _ <- checkStateHash(blockchain, micro.stateHash, r.stateHash, hasChallenge = false)
     } yield r
   }
 
@@ -256,18 +255,32 @@ object BlockDiffer {
     }
 
   def createInitialBlockDiff(
-      blockchain: Blockchain,
-      miner: Address,
-      blockReward: Option[Long] = None,
-      carry: Option[Long] = None
+      blockchain: BlockchainUpdater & Blockchain,
+      miner: Address
   ): Either[String, Diff] = {
-    val minerReward          = blockReward.orElse(blockchain.lastBlockReward).fold(Portfolio.empty)(Portfolio.waves)
-    val feeFromPreviousBlock = Portfolio(balance = carry.getOrElse(blockchain.carryFee))
+    val fullReward           = blockchain.computeNextReward.fold(Portfolio.empty)(Portfolio.waves)
+    val feeFromPreviousBlock = Portfolio.waves(blockchain.carryFee)
 
-    minerReward
+    val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+    val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+
+    val rewardShares = BlockRewardCalculator.getBlockRewardShares(
+      blockchain.height + 1,
+      fullReward.balance,
+      daoAddress,
+      xtnBuybackAddress,
+      blockchain
+    )
+
+    Portfolio
+      .waves(rewardShares.miner)
       .combine(feeFromPreviousBlock)
-      .map { totalReward =>
-        Diff(portfolios = Map(miner -> totalReward).filter(!_._2.isEmpty))
+      .map { minerReward =>
+        val resultPf = Map(miner -> minerReward) ++
+          daoAddress.map(_ -> Portfolio.waves(rewardShares.daoAddress)) ++
+          xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
+
+        Diff(portfolios = resultPf.filter(!_._2.isEmpty))
       }
   }
 
@@ -417,7 +430,6 @@ object BlockDiffer {
       blockchain: Blockchain,
       blockStateHash: Option[ByteStr],
       computedStateHash: Option[ByteStr],
-      blockReward: Option[Long],
       hasChallenge: Boolean
   ): TracedResult[ValidationError, Unit] =
     TracedResult(
@@ -426,7 +438,7 @@ object BlockDiffer {
         (),
         if (hasChallenge) GenericError("Invalid block challenge")
         else
-          InvalidStateHash(blockStateHash, blockReward)
+          InvalidStateHash(blockStateHash)
       )
     )
 }

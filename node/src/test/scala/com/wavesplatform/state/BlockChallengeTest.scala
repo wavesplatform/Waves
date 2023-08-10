@@ -32,13 +32,12 @@ import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.utils.{JsonMatchers, Schedulers}
+import com.wavesplatform.utils.{JsonMatchers, Schedulers, SharedSchedulerMixin}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
@@ -53,7 +52,7 @@ import java.util.concurrent.locks.ReentrantLock
 import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.DurationInt
 
-class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers {
+class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers with SharedSchedulerMixin {
 
   implicit val appenderScheduler: Scheduler = Scheduler.singleThread("appender")
   val settings: WavesSettings =
@@ -689,7 +688,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       d.liquidAndSolidAssert { () =>
@@ -1170,7 +1169,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.settings.restAPISettings,
         d.blocksApi,
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       Get("/blocks/last") ~> route ~> check {
@@ -1243,7 +1242,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       d.liquidAndSolidAssert { () =>
@@ -1291,7 +1290,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       val extraFields =
@@ -1378,7 +1377,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       checkTxStatus(challengedBlockTx, 0, route)
@@ -1461,7 +1460,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         DummyTransactionPublisher.accepting,
         testTime,
         Schedulers.timeBoundedFixedPool(new HashedWheelTimer(), 5.seconds, 1, "rest-time-limited"),
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")),
+        new RouteTimeout(60.seconds)(sharedScheduler),
         d.accountsApi,
         1000
       ).route
@@ -1567,7 +1566,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       testTime.setTime(invalidBlock.header.timestamp)

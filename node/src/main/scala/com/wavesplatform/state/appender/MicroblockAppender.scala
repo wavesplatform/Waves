@@ -81,7 +81,7 @@ object MicroblockAppender extends ScorexLogging {
           .blockHeader(blockchainUpdater.height - 1)
           .flatMap(_.header.stateHash)
           .traverse { prevStateHash =>
-            blockChallenger.challengeMicroblock(md, ch, prevStateHash, ish.blockReward)
+            blockChallenger.challengeMicroblock(md, ch, prevStateHash)
           }
           .void
 

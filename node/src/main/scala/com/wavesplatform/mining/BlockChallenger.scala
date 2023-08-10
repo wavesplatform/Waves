@@ -32,8 +32,8 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait BlockChallenger {
-  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit]
-  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit]
+  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr): Task[Unit]
+  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr): Task[Unit]
   def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)]
   def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
@@ -42,8 +42,8 @@ trait BlockChallenger {
 
 object BlockChallenger {
   val NoOp: BlockChallenger = new BlockChallenger {
-    override def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit]            = Task.unit
-    override def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = Task.unit
+    override def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr): Task[Unit]            = Task.unit
+    override def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr): Task[Unit] = Task.unit
     override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
       Left(GenericError("There are no suitable accounts"))
     override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] = Right(Seq.empty)
@@ -66,13 +66,19 @@ class BlockChallengerImpl(
 
   private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
-  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = {
+  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr): Task[Unit] = {
     log.debug(s"Challenging block $block")
 
     withProcessingTxs(block.transactionData) {
       (for {
         challengingBlock <- EitherT(
-          createChallengingBlock(block, block.header.stateHash, block.signature, block.transactionData, prevStateHash, blockReward)
+          createChallengingBlock(
+            block,
+            block.header.stateHash,
+            block.signature,
+            block.transactionData,
+            prevStateHash
+          )
         )
         _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
       } yield challengingBlock).value
@@ -84,7 +90,7 @@ class BlockChallengerImpl(
     }
   }
 
-  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr, blockReward: Option[Long]): Task[Unit] = {
+  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr): Task[Unit] = {
     val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
     log.debug(s"Challenging microblock $idStr")
 
@@ -100,8 +106,7 @@ class BlockChallengerImpl(
               md.microBlock.stateHash,
               md.microBlock.totalResBlockSig,
               txs,
-              prevStateHash,
-              blockReward
+              prevStateHash
             )
           )
           _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
@@ -149,8 +154,7 @@ class BlockChallengerImpl(
       challengedStateHash: Option[ByteStr],
       challengedSignature: ByteStr,
       txs: Seq[Transaction],
-      prevStateHash: ByteStr,
-      blockReward: Option[Long]
+      prevStateHash: ByteStr
   ): Task[Either[ValidationError, Block]] = Task {
     val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
 
@@ -169,7 +173,7 @@ class BlockChallengerImpl(
           blockTime
         )
 
-      initialBlockDiff <- BlockDiffer.createInitialBlockDiff(blockchainUpdater, acc.toAddress, blockReward).leftMap(GenericError(_))
+      initialBlockDiff <- BlockDiffer.createInitialBlockDiff(blockchainUpdater, acc.toAddress).leftMap(GenericError(_))
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,

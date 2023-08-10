@@ -484,12 +484,7 @@ case class UtxPoolImpl(
           Set.empty,
           Set.empty,
           Set.empty,
-          prevStateHash.flatMap { prevHash =>
-            BlockDiffer
-              .createInitialBlockDiff(blockchain, blockchain.lastBlockHeader.get.header.generator.toAddress)
-              .toOption
-              .map(initDiff => TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(prevHash))
-          }
+          prevStateHash
         )
       )
     }

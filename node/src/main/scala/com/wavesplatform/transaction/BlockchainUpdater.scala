@@ -15,6 +15,7 @@ trait BlockchainUpdater {
       txSignParCheck: Boolean = true
   ): Either[ValidationError, Seq[Diff]]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId]
+  def computeNextReward: Option[Long]
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
   def lastBlockInfo: Observable[LastBlockInfo]
   def isLastBlockId(id: ByteStr): Boolean
