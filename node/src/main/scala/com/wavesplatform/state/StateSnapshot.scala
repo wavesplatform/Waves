@@ -293,13 +293,13 @@ object StateSnapshot {
           Right(VectorMap[(Address, Asset), Long]())
         case (assetId, balance) =>
           Portfolio
-            .sum(blockchain.balance(address, assetId), balance, "Asset balance sum overflow")
+            .sum(blockchain.balance(address, assetId), balance, s"$address -> Asset balance sum overflow")
             .map(newBalance => VectorMap((address, assetId: Asset) -> newBalance))
       }
       if (wavesAmount != 0)
         for {
           assetBalances   <- assetBalancesE
-          newWavesBalance <- Portfolio.sum(blockchain.balance(address), wavesAmount, "Waves balance sum overflow")
+          newWavesBalance <- Portfolio.sum(blockchain.balance(address), wavesAmount, s"$address -> Waves balance sum overflow")
         } yield assetBalances + ((address, Waves) -> newWavesBalance)
       else
         assetBalancesE
@@ -326,8 +326,8 @@ object StateSnapshot {
         case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
           val bLease = blockchain.leaseBalance(address)
           for {
-            newIn  <- Portfolio.sum(bLease.in, lease.in, "Lease in overflow")
-            newOut <- Portfolio.sum(bLease.out, lease.out, "Lease out overflow")
+            newIn  <- Portfolio.sum(bLease.in, lease.in, s"$address -> Lease in overflow")
+            newOut <- Portfolio.sum(bLease.out, lease.out, s"$address -> Lease out overflow")
           } yield Seq(address -> LeaseBalance(newIn, newOut))
         case _ =>
           Seq().asRight[String]
