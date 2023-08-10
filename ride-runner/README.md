@@ -73,7 +73,7 @@ services:
     * A default configuration is enough for a correct service working on MainNet;
     * While running container if the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default
       configuration won't be enough for correct working. This is a scenario of using `CUSTOM` network - correct
-      configuration must be provided when running container. 
+      configuration must be provided when running container.
 3. By default, `/etc/waves-ride-runner/main.conf` config includes `/etc/waves-ride-runner/local.conf`.
     * Custom `local.conf` can be used to override default config entries.
     * Custom `main.conf` can be used to override or the whole configuration.
@@ -162,7 +162,7 @@ See the documented [example](./src/test/resources/sample-input.conf).
 How to run:
 
 ```shell
-java -jar waves-ride-runner-${version}.jar -i ./sample-input.conf
+java -jar waves-ride-runner-${version}.jar ./sample-input.conf
 ```
 
 You should see the result in JSON.
@@ -172,6 +172,20 @@ Help:
 ```shell
 java -jar waves-ride-runner-1.4.18-8f8a0f98d3a2304d9b05c369bd333c8f85044e75-DIRTY.jar --help
 ```
+
+**Important note**: using multiple different networks may cause errors if you run multiple scripts (for example, if you
+passed files with glob pattern).
+
+### Functionality
+
+* Running one or multiple scripts;
+* Different run modes:
+  * A regular run to see what script returns;
+  * Running tests;
+* Human-readable and JSON outputs;
+* Creating a JUnit report.
+
+Run with `--help` to see more details.
 
 ## Grafana
 

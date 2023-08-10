@@ -43,7 +43,7 @@ object AppInitializer extends ScorexLogging {
     com.wavesplatform.settings.loadConfig(maybeExternalConfig)
   }
 
-  def setupChain(network: Char): Unit = {
+  def setupChain(network: Char): Unit = if (AddressScheme.current.chainId != network.toByte) {
     log.info(s"Chosen network: $network / ${network.toByte}")
 
     // Initialize global var with actual address scheme

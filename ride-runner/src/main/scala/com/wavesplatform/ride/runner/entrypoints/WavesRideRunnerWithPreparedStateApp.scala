@@ -79,7 +79,6 @@ object WavesRideRunnerWithPreparedStateApp {
         case Failure(e) => RunResultStatus.Error(new RuntimeException("Can't parse HOCON file", e))
         case Success(inputRawJson) =>
           val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
-          // TODO concurrency issue, remove this
           AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
           val input = RideRunnerInputParser.parse(inputJson)
           lazy val actual = {
