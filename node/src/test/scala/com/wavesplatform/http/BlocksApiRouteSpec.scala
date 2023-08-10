@@ -21,7 +21,7 @@ import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import com.wavesplatform.utils.{Schedulers, SharedSchedulerMixin, SystemTime}
+import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Assertion
@@ -393,7 +393,7 @@ class BlocksApiRouteSpec
         d.settings.restAPISettings,
         d.blocksApi,
         SystemTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       Get("/blocks/last") ~> route ~> check {

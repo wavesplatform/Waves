@@ -351,8 +351,9 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
       generator: KeyPair = defaultSigner,
-      stateHash: Option[Option[ByteStr]] = None
-  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash).explicitGet()
+      stateHash: Option[Option[ByteStr]] = None,
+      rewardVote: Long = -1L
+  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, rewardVote).explicitGet()
 
   def createBlockE(
       version: Byte,

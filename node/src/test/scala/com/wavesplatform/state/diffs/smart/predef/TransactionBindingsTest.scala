@@ -805,7 +805,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       TestCompiler(v).compileExpressionE(script) should produce("Undefined field `attachment` of variable of type `Order`")
 
       withDomain(
-        DomainPresets.ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 5),
+        DomainPresets.BlockRewardDistribution.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 5),
         AddrWithBalance.enoughBalances(issuer, smartAcc, buyer)
       ) { d =>
         val issue = TxHelpers.issue(issuer)

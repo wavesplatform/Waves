@@ -1404,7 +1404,7 @@ class TransactionsRouteSpec
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
 
       d.liquidAndSolidAssert { () =>
