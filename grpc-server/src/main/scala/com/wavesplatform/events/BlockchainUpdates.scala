@@ -1,7 +1,5 @@
 package com.wavesplatform.events
 
-import java.net.InetSocketAddress
-import java.util.concurrent.TimeUnit
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RDB
