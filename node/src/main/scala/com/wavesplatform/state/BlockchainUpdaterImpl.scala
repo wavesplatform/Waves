@@ -15,6 +15,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.*
@@ -191,7 +192,7 @@ class BlockchainUpdaterImpl(
         .orElse(lastBlockReward)
   }
 
-  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Seq[Diff]] =
+  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, BlockApplyResult] =
     writeLock {
       val height                             = leveldb.height
       val notImplementedFeatures: Set[Short] = leveldb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -202,7 +203,7 @@ class BlockchainUpdaterImpl(
           (),
           GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
         )
-        .flatMap[ValidationError, Seq[Diff]](_ =>
+        .flatMap[ValidationError, BlockApplyResult](_ =>
           (ngState match {
             case None =>
               leveldb.lastBlockId match {
@@ -394,8 +395,8 @@ class BlockchainUpdaterImpl(
                 log.info(s"New height: $newHeight")
               }
 
-              discDiffs
-            } getOrElse Nil
+              Applied(discDiffs, this.score)
+            } getOrElse Ignored
           }
         )
     }
@@ -746,6 +747,12 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
+  sealed trait BlockApplyResult
+  object BlockApplyResult {
+    case object Ignored                                          extends BlockApplyResult
+    case class Applied(discardedDiffs: Seq[Diff], score: BigInt) extends BlockApplyResult
+  }
+
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 

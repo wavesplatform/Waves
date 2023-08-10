@@ -18,6 +18,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -42,7 +43,7 @@ import scala.util.{Failure, Success, Try}
 object Importer extends ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
 
-  type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
+  type AppendBlock = Block => Task[Either[ValidationError, BlockApplyResult]]
 
   final case class ImportOptions(
       configFile: Option[File] = None,

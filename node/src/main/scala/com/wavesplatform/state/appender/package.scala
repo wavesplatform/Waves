@@ -8,6 +8,8 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.Time
@@ -30,17 +32,19 @@ package object appender {
       pos: PoSSelector,
       time: Time,
       verify: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] =
+  )(block: Block): Either[ValidationError, BlockApplyResult] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <- utx.priorityPool.lockedWrite {
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify))
-          .map { discardedDiffs =>
-            utx.removeAll(block.transactionData)
-            utx.setPriorityDiffs(discardedDiffs)
-            utx.scheduleCleanup()
-            Some(blockchainUpdater.height)
+          .map {
+            case res @ Applied(discardedDiffs, _) =>
+              utx.removeAll(block.transactionData)
+              utx.setPriorityDiffs(discardedDiffs)
+              utx.scheduleCleanup()
+              res
+            case res => res
           }
       }
     } yield newHeight
