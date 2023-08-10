@@ -22,8 +22,10 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.InitStateHash
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.InitStateHash
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.test.TestTime
@@ -177,10 +179,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): BlockApplyResult = blockchainUpdater.processBlock(b).explicitGet()
 
   // TODO: remove checkStateHash after NODE-2568 merge
-  def appendBlockE(b: Block, checkStateHash: Boolean = true): Either[ValidationError, Seq[Diff]] = blockchainUpdater.processBlock(b, checkStateHash)
+  def appendBlockE(b: Block, checkStateHash: Boolean = true): Either[ValidationError, BlockApplyResult] =
+    blockchainUpdater.processBlock(b, checkStateHash)
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -258,11 +261,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     lastBlock
   }
 
-  def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
+  def appendBlockE(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
     createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_))
 
   // TODO: remove after NODE-2568 merge
-  def appendBlockENoCheck(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
+  def appendBlockENoCheck(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
     createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_, checkStateHash = false))
 
   def appendBlock(version: Byte, txs: Transaction*): Block = {
@@ -281,9 +284,13 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       ref.orElse(Some(lastBlockId)),
       generator = signer
     )
-    val discardedDiffs = appendBlock(block)
-    utxPool.setPriorityDiffs(discardedDiffs)
-    utxPool.cleanUnconfirmed()
+    appendBlock(block) match {
+      case Applied(discardedDiffs, _) =>
+        utxPool.setPriorityDiffs(discardedDiffs)
+        utxPool.cleanUnconfirmed()
+      case Ignored => ()
+    }
+
     lastBlock
   }
 
@@ -591,7 +598,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
     // TODO: delete checkStateHash after NODE-2568 merge
-    def processBlock(block: Block, checkStateHash: Boolean = true): Either[ValidationError, Seq[Diff]] = {
+    def processBlock(block: Block, checkStateHash: Boolean = true): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           Right(block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature))

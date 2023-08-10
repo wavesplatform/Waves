@@ -9,6 +9,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.Time
@@ -32,17 +34,18 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] =
+  )(block: Block): Either[ValidationError, BlockApplyResult] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <-
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
-          .map { discardedDiffs =>
-            utx.setPriorityDiffs(discardedDiffs)
-            Some(blockchainUpdater.height)
+          .map {
+            case res @ Applied(discardedDiffs, _) =>
+              utx.setPriorityDiffs(discardedDiffs)
+              res
+            case res => res
           }
-
     } yield newHeight
 
   private[appender] def appendExtensionBlock(

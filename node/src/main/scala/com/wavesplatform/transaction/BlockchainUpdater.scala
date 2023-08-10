@@ -3,7 +3,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import monix.reactive.Observable
 
 trait BlockchainUpdater {
@@ -14,7 +14,7 @@ trait BlockchainUpdater {
       verify: Boolean = true,
       txSignParCheck: Boolean = true,
       checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge
-  ): Either[ValidationError, Seq[Diff]]
+  ): Either[ValidationError, BlockApplyResult]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId]
   def computeNextReward: Option[Long]
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
