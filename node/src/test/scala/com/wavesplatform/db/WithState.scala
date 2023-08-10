@@ -243,7 +243,13 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
        TracedResult(
          BlockDiffer
-           .createInitialBlockDiff(compBlockchain, blockWithoutStateHash.header.generator.toAddress, Some(blockReward), Some(carry))
+           .createInitialBlockDiff(
+             compBlockchain,
+             blockWithoutStateHash.header.generator.toAddress,
+             compBlockchain.height,
+             Some(blockReward),
+             Some(carry)
+           )
            .leftMap(GenericError(_))
        )
          .flatMap { initDiff =>

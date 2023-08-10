@@ -248,23 +248,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       Block.NgBlockVersion,
       Nil,
       ref.orElse(Some(lastBlockId)),
-      generator = signer.getOrElse(defaultSigner),
-      stateHash = Some(
-        this.lastBlock.header.stateHash.map(prev =>
-          TxStateSnapshotHashBuilder
-            .createHashFromDiff(
-              this.blockchain,
-              BlockDiffer
-                .createInitialBlockDiff(
-                  this.blockchain,
-                  signer.getOrElse(defaultSigner).toAddress,
-                  Some(this.settings.blockchainSettings.rewardsSettings.initial)
-                )
-                .explicitGet()
-            )
-            .createHash(prev)
-        )
-      )
+      generator = signer.getOrElse(defaultSigner)
     )
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
@@ -425,7 +409,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           val carry       = if (this.blockchain.height == 0) 0 else this.carryFee
 
           BlockDiffer
-            .createInitialBlockDiff(blockchain, generator.toAddress, Some(blockReward), Some(carry))
+            .createInitialBlockDiff(blockchain, generator.toAddress, blockchain.height, Some(blockReward), Some(carry))
             .leftMap(GenericError(_))
             .flatMap { initDiff =>
               val initStateHash =

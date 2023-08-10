@@ -133,7 +133,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           val signer     = TxHelpers.signer(2)
           val blockchain = CompositeBlockchain(d.blockchain, Some(d.settings.blockchainSettings.rewardsSettings.initial))
           val initDiff = BlockDiffer
-            .createInitialBlockDiff(blockchain, signer.toAddress)
+            .createInitialBlockDiff(blockchain, signer.toAddress, blockchain.height + 1)
             .explicitGet()
           val initStateHash  = TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(genesis.header.stateHash.get)
           val blockTs        = txs.map(_.timestamp).max

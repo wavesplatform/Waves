@@ -222,16 +222,33 @@ object BlockDiffer {
   def createInitialBlockDiff(
       blockchain: Blockchain,
       miner: Address,
+      heightWithNewBlock: Int,
       blockReward: Option[Long] = None,
       carry: Option[Long] = None
   ): Either[String, Diff] = {
-    val minerReward          = blockReward.orElse(blockchain.lastBlockReward).fold(Portfolio.empty)(Portfolio.waves)
+    val fullReward           = blockReward.orElse(blockchain.lastBlockReward).fold(Portfolio.empty)(Portfolio.waves)
     val feeFromPreviousBlock = Portfolio(balance = carry.getOrElse(blockchain.carryFee))
 
-    minerReward
+    val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+    val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+
+    val rewardShares = BlockRewardCalculator.getBlockRewardShares(
+      heightWithNewBlock,
+      fullReward.balance,
+      daoAddress,
+      xtnBuybackAddress,
+      blockchain
+    )
+
+    Portfolio
+      .waves(rewardShares.miner)
       .combine(feeFromPreviousBlock)
-      .map { totalReward =>
-        Diff(portfolios = Map(miner -> totalReward).filter(!_._2.isEmpty))
+      .map { minerReward =>
+        val resultPf = Map(miner -> minerReward) ++
+          daoAddress.map(_ -> Portfolio.waves(rewardShares.daoAddress)) ++
+          xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
+
+        Diff(portfolios = resultPf.filter(!_._2.isEmpty))
       }
   }
 
