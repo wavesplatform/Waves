@@ -556,7 +556,7 @@ object StateUpdate {
     val (totalSnapshot, txsStateUpdates) =
       snapshot.parentSnapshot.transactions
         .foldLeft((snapshot.parentSnapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), (_, txInfo)) =>
-          val txSnapshot = txInfo.snapshot.addBalances(snapshot.feePortfolios, blockchainBeforeWithMinerReward).explicitGet()
+          val txSnapshot = txInfo.snapshot.addBalances(snapshot.feePortfolios, blockchainBeforeWithReward).explicitGet()
           (
             accSnapshot |+| txSnapshot,
             updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot), txSnapshot)
