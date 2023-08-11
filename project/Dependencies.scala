@@ -178,8 +178,7 @@ object Dependencies {
       Dependencies.sttp3Monix,
       "org.scala-lang.modules"                                       %% "scala-xml" % "2.2.0", // JUnit reports
       Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
-      Dependencies.akkaHttpModule("akka-http-testkit")                % Test,
-      "com.google.jimfs"                                              % "jimfs"     % "1.3.0" % Test // For a file system tests
+      Dependencies.akkaHttpModule("akka-http-testkit")                % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 

@@ -4,7 +4,6 @@ import cats.syntax.option.*
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
-import com.wavesplatform.io.PathUtils
 import com.wavesplatform.ride.runner.RideTestSuite
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.{RideRunnerInput, RideRunnerInputParser}
@@ -36,7 +35,7 @@ object WavesRideRunnerWithPreparedStateApp {
     OParser.parse(commandParser, args, Args(), setup).foreach { args =>
       System.setProperty("logback.stdout.level", if (args.verbose) "TRACE" else "OFF")
       val log   = LoggerFactory.getLogger("Main")
-      val input = args.input.map(_.toPath.toAbsolutePath) // Otherwise Lightbend Config doesn't resolve correctly relative paths
+      val input = args.input.map(_.toPath)
 
       lazy val junitReport = {
         val junitFile = args.runMode match {
@@ -46,16 +45,13 @@ object WavesRideRunnerWithPreparedStateApp {
         junitFile.fold(new JUnitReport())(new FileJUnitReport(_))
       }
 
-      lazy val commonPath = input.reduceLeft(PathUtils.commonPath)
-
       Observable
         .fromIterable(input)
         .mapParallelOrdered(args.threads) { path =>
-          val minimizedPath = if (args.minimizePaths) commonPath.relativize(path) else path
-          val start         = System.nanoTime()
+          val start = System.nanoTime()
           Task(run(args.runMode, path))
             .onErrorRecover(RunResultStatus.Error(_))
-            .map(RunResult(minimizedPath, (System.nanoTime() - start).nanos, _))
+            .map(RunResult(path, (System.nanoTime() - start).nanos, _))
         }
         .foldLeftL(Stats(0, 0, 0)) { case (r, x) =>
           x.status match {
@@ -74,8 +70,9 @@ object WavesRideRunnerWithPreparedStateApp {
   }
 
   private def run(runMode: RunMode, path: Path): RunResultStatus =
-    if (path.getFileName.toString.endsWith(".conf"))
-      Try(ConfigFactory.parseFile(path.toFile).resolve().root().render(ConfigRenderOptions.concise())) match {
+    if (path.getFileName.toString.endsWith(".conf")) {
+      // toAbsolutePath is required, otherwise Lightbend Config incorrectly resolve relative paths
+      Try(ConfigFactory.parseFile(path.toAbsolutePath.toFile).resolve().root().render(ConfigRenderOptions.concise())) match {
         case Failure(e) => RunResultStatus.Error(new RuntimeException("Can't parse HOCON file", e))
         case Success(inputRawJson) =>
           val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
@@ -99,7 +96,7 @@ object WavesRideRunnerWithPreparedStateApp {
           }
 
       }
-    else RunResultStatus.Error(new RuntimeException("Isn't a HOCON file") with NoStackTrace)
+    } else RunResultStatus.Error(new RuntimeException("Isn't a HOCON file") with NoStackTrace)
 
   def run(input: RideRunnerInput): JsObject = {
     val defaultFunctionalitySettings = input.chainId match {
@@ -126,6 +123,96 @@ object WavesRideRunnerWithPreparedStateApp {
         intAsString = input.intAsString
       )
     )
+  }
+
+  private implicit val printModeRead: Read[PrintMode] = Read.stringRead.map {
+    case "text" => PrintMode.Text
+    case "json" => PrintMode.Json
+    case x      => throw new IllegalArgumentException(s"Unknown print mode: $x")
+  }
+
+  private val commandParser = {
+    import scopt.OParser
+
+    val builder = OParser.builder[Args]
+    import builder.*
+
+    OParser.sequence(
+      head("RIDE script runner", Version.VersionString),
+      opt[Unit]('v', "verbose")
+        .text("Print logs")
+        .action((_, c) => c.copy(verbose = true)),
+      opt[Int]('t', "threads")
+        .optional()
+        .text("A number of parallel threads to process scripts. A number of available cores by default.")
+        .action((x, c) => c.copy(threads = x)),
+      opt[PrintMode]('p', "printMode")
+        .optional()
+        .text("Print mode: 'text' or 'json'. 'text' by default.")
+        .action((x, c) => c.copy(printMode = x)),
+      opt[Unit]("printTotal")
+        .optional()
+        .text("Print statistics. Not printing by default.")
+        .action((_, c) => c.copy(printTotal = true)),
+      opt[Unit]('M', "monochrome")
+        .optional()
+        .text("Don't colorize. Colorize by default.")
+        .action((_, c) => c.copy(colorizer = MonochromeColorizer)),
+      help("help").hidden(),
+      arg[File]("<file>...")
+        .unbounded()
+        .required()
+        .text("Path to HOCON (conf) file (or files) with prepared state and run arguments.")
+        .action((x, c) => c.copy(input = x :: c.input)),
+      cmd("run")
+        .text("  Runs scripts and prints results to STDOUT. The default run mode.")
+        .action((_, c) => c.copy(runMode = RunMode.Run)),
+      cmd("test")
+        .text("  Expects that provided files are tests. Runs tests and prints results to STDOUT.")
+        .action((_, c) => c.copy(runMode = RunMode.Test()))
+        .children(
+          opt[File]("junit")
+            .text("Write a JUnit report to this file. An existed file will be overwritten.")
+            .action((x, c) => c.copy(runMode = RunMode.Test(Some(x))))
+        )
+    )
+  }
+
+  private final case class Args(
+      input: List[File] = Nil,
+      threads: Int = Runtime.getRuntime.availableProcessors(),
+      runMode: RunMode = RunMode.Run,
+      printMode: PrintMode = PrintMode.Text,
+      printTotal: Boolean = false,
+      colorizer: Colorizer = new RealColorizer,
+      verbose: Boolean = false
+  )
+
+  private sealed trait RunMode extends Product with Serializable
+  private object RunMode {
+    case object Run                             extends RunMode
+    case class Test(junit: Option[File] = None) extends RunMode
+  }
+
+  private sealed trait PrintMode {
+    def asPrinted(x: Printable, colorizer: Colorizer): String
+
+    def printRunResult(x: RunResult, colorizer: Colorizer): Unit = x.status match {
+      case _: RunResultStatus.Error => System.err.println(asPrinted(x, colorizer))
+      case _                        => println(asPrinted(x, colorizer))
+    }
+
+    def printTotal(x: Stats, colorizer: Colorizer): Unit = println(asPrinted(x, colorizer))
+  }
+
+  private object PrintMode {
+    case object Text extends PrintMode {
+      override def asPrinted(x: Printable, colorizer: Colorizer): String = x.asString(colorizer)
+    }
+
+    case object Json extends PrintMode {
+      override def asPrinted(x: Printable, colorizer: Colorizer): String = x.asJson.toString()
+    }
   }
 
   private sealed class JUnitReport {
@@ -221,104 +308,6 @@ object WavesRideRunnerWithPreparedStateApp {
 
   }
 
-  private implicit val printModeRead: Read[PrintMode] = Read.stringRead.map {
-    case "text" => PrintMode.Text
-    case "json" => PrintMode.Json
-    case x      => throw new IllegalArgumentException(s"Unknown print mode: $x")
-  }
-
-  private val commandParser = {
-    import scopt.OParser
-
-    val builder = OParser.builder[Args]
-    import builder.*
-
-    OParser.sequence(
-      head("RIDE script runner", Version.VersionString),
-      opt[Unit]('v', "verbose")
-        .text("Print logs")
-        .action((_, c) => c.copy(verbose = true)),
-      opt[Int]('t', "threads")
-        .optional()
-        .text("A number of parallel threads to process scripts. A number of available cores by default.")
-        .action((x, c) => c.copy(threads = x)),
-      opt[PrintMode]('p', "printMode")
-        .optional()
-        .text("Print mode: 'text' or 'json'. 'text' by default.")
-        .action((x, c) => c.copy(printMode = x)),
-      opt[Unit]("printTotal")
-        .optional()
-        .text("Print statistics. Not printing by default.")
-        .action((_, c) => c.copy(printTotal = true)),
-      opt[Unit]('M', "monochrome")
-        .optional()
-        .text("Don't colorize. Colorize by default.")
-        .action((_, c) => c.copy(colorizer = MonochromeColorizer)),
-      opt[Unit]("doNotMinimizePaths")
-        .optional()
-        .text(
-          "By default this tool finds a common part of paths of specified files and relativize all paths against it " +
-            "for security reasons. Use this option to disable this behavior."
-        )
-        .action((_, c) => c.copy(minimizePaths = false)),
-      help("help").hidden(),
-      arg[File]("<file>...")
-        .unbounded()
-        .required()
-        .text("Path to HOCON (conf) file (or files) with prepared state and run arguments.")
-        .action((x, c) => c.copy(input = x.getAbsoluteFile :: c.input)),
-      cmd("run")
-        .text("  Runs scripts and prints results to STDOUT. The default run mode.")
-        .action((_, c) => c.copy(runMode = RunMode.Run)),
-      cmd("test")
-        .text("  Expects that provided files are tests. Runs tests and prints results to STDOUT.")
-        .action((_, c) => c.copy(runMode = RunMode.Test()))
-        .children(
-          opt[File]("junit")
-            .text("Write a JUnit report to this file. An existed file will be overwritten.")
-            .action((x, c) => c.copy(runMode = RunMode.Test(Some(x))))
-        )
-    )
-  }
-
-  private final case class Args(
-      input: List[File] = Nil,
-      threads: Int = Runtime.getRuntime.availableProcessors(),
-      runMode: RunMode = RunMode.Run,
-      printMode: PrintMode = PrintMode.Text,
-      minimizePaths: Boolean = true,
-      printTotal: Boolean = false,
-      colorizer: Colorizer = new RealColorizer,
-      verbose: Boolean = false
-  )
-
-  private sealed trait RunMode extends Product with Serializable
-  private object RunMode {
-    case object Run                             extends RunMode
-    case class Test(junit: Option[File] = None) extends RunMode
-  }
-
-  private sealed trait PrintMode {
-    def asPrinted(x: Printable, colorizer: Colorizer): String
-
-    def printRunResult(x: RunResult, colorizer: Colorizer): Unit = x.status match {
-      case _: RunResultStatus.Error => System.err.println(asPrinted(x, colorizer))
-      case _                        => println(asPrinted(x, colorizer))
-    }
-
-    def printTotal(x: Stats, colorizer: Colorizer): Unit = println(asPrinted(x, colorizer))
-  }
-
-  private object PrintMode {
-    case object Text extends PrintMode {
-      override def asPrinted(x: Printable, colorizer: Colorizer): String = x.asString(colorizer)
-    }
-
-    case object Json extends PrintMode {
-      override def asPrinted(x: Printable, colorizer: Colorizer): String = x.asJson.toString()
-    }
-  }
-
   private case class Stats(succeeded: Int, failed: Int, error: Int) extends Printable {
     override def asJson: JsObject = Json.obj(
       "succeeded" -> succeeded,
@@ -408,6 +397,6 @@ object WavesRideRunnerWithPreparedStateApp {
   }
 
   private class RealColorizer extends Colorizer {
-    def colorize(text: String, color: Colorizer.Color): String = s"\u001b[${color.number}m${text}\u001b[0m"
+    def colorize(text: String, color: Colorizer.Color): String = s"\u001b[${color.number}m$text\u001b[0m"
   }
 }
