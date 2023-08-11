@@ -236,9 +236,11 @@ object WavesRideRunnerWithPreparedStateApp {
           {inner}
         </testsuites>
 
-      val pp = new scala.xml.PrettyPrinter(120, 2, minimizeEmpty = true)
+      val pp         = new scala.xml.PrettyPrinter(120, 2, minimizeEmpty = true)
+      val outputPath = output.toPath.toAbsolutePath
+      Files.createDirectories(outputPath.getParent)
       Files.write(
-        output.toPath.toAbsolutePath,
+        outputPath,
         pp.format(xml).getBytes(StandardCharsets.UTF_8),
         StandardOpenOption.CREATE,
         StandardOpenOption.TRUNCATE_EXISTING
