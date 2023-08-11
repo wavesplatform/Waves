@@ -159,7 +159,7 @@ object UtilsEvaluator {
         case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
         case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
-      diff <- ScriptResult
+      actionsDiff <- ScriptResult
         .fromObj(ctx, invoke.id(), evaluated, ds.stdLibVersion, unusedComplexity = 0)
         .bimap(
           _ => Right(Diff.empty),
@@ -173,7 +173,7 @@ object UtilsEvaluator {
                 dAppPk,
                 usedComplexity,
                 invoke,
-                CompositeBlockchain(blockchain, paymentsDiff),
+                CompositeBlockchain(blockchain, environment.currentDiff),
                 System.currentTimeMillis(),
                 isSyncCall = false,
                 limitedExecution = false,
@@ -184,12 +184,12 @@ object UtilsEvaluator {
               .resultE
         )
         .merge
-      totalDiff <- diff.combineE(paymentsDiff)
+      totalDiff <- environment.currentDiff.combineE(actionsDiff)
       _         <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
       _         <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
-      rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
-      innerScriptResult = underlyingEnvironment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
-    } yield ExecuteResult(evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)
+      invokeScriptResult     = actionsDiff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
+      syncCallsScriptResults = underlyingEnvironment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
+    } yield ExecuteResult(evaluated, usedComplexity, log, syncCallsScriptResults |+| invokeScriptResult)
 
   private def addWavesToDefaultInvoker(diff: Diff) =
     if (diff.portfolios.get(UtilsApiRoute.DefaultAddress).exists(_.balance >= Long.MaxValue / 10))
