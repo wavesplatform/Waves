@@ -396,14 +396,17 @@ object StateUpdate {
 
     val balances = ArrayBuffer.empty[BalanceUpdate]
     for {
-      ((address, asset), balance) <- snapshot.balances
-      before = blockchain.balance(address, asset)
-    } balances += BalanceUpdate(address, asset, before, balance)
+      ((address, asset), after) <- snapshot.balances
+      before = blockchain.balance(address, asset) if before != after
+    } balances += BalanceUpdate(address, asset, before, after)
 
-    val leaseBalanceUpdates = snapshot.leaseBalances.map { case (address, leaseBalance) =>
-      val before = blockchain.leaseBalance(address)
-      LeasingBalanceUpdate(address, before, leaseBalance)
-    }.toVector
+    val leaseBalanceUpdates = snapshot.leaseBalances
+      .map { case (address, after) =>
+        val before = blockchain.leaseBalance(address)
+        LeasingBalanceUpdate(address, before, after)
+      }
+      .filterNot(b => b.before == b.after)
+      .toVector
 
     val dataEntries = snapshot.accountData.toSeq.flatMap { case (address, data) =>
       data.toSeq.map { case (_, entry) =>
@@ -556,7 +559,8 @@ object StateUpdate {
     val (totalSnapshot, txsStateUpdates) =
       snapshot.parentSnapshot.transactions
         .foldLeft((snapshot.parentSnapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), (_, txInfo)) =>
-          val txSnapshot = txInfo.snapshot.addBalances(snapshot.feePortfolios, blockchainBeforeWithReward).explicitGet()
+          val relevantFeePortfolios = snapshot.feePortfolios.filter { case (address, _) => txInfo.affected.contains(address) }
+          val txSnapshot            = txInfo.snapshot.addBalances(relevantFeePortfolios, blockchainBeforeWithReward).explicitGet()
           (
             accSnapshot |+| txSnapshot,
             updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot), txSnapshot)
