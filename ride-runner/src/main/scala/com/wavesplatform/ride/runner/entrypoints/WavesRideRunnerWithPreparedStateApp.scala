@@ -19,6 +19,7 @@ import scopt.{DefaultOParserSetup, OParser, Read}
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, StandardOpenOption}
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.{DurationInt, DurationLong, FiniteDuration}
 import scala.jdk.CollectionConverters.EnumerationHasAsScala
@@ -231,7 +232,7 @@ object WavesRideRunnerWithPreparedStateApp {
       val (inner, totalTime) = render(rootTestSuite)
 
       val xml: Elem =
-        <testsuites time={formatSpentTime(totalTime)}>
+        <testsuites time={formatSpentTime(totalTime)} timestamp={Instant.now.toString}>
           {inner}
         </testsuites>
 
