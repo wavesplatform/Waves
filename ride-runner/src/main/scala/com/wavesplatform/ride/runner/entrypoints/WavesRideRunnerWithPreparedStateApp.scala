@@ -46,7 +46,7 @@ object WavesRideRunnerWithPreparedStateApp {
         junitFile.fold(new JUnitReport())(new FileJUnitReport(_))
       }
 
-      Observable
+      val stats = Observable
         .fromIterable(input)
         .mapParallelOrdered(args.threads) { path =>
           val start = System.nanoTime()
@@ -67,6 +67,7 @@ object WavesRideRunnerWithPreparedStateApp {
         .runSyncUnsafe()(global, CanBlock.permit)
 
       junitReport.writeReport()
+      System.exit(stats.appStatus)
     }
   }
 
@@ -312,6 +313,8 @@ object WavesRideRunnerWithPreparedStateApp {
   }
 
   private case class Stats(succeeded: Int, failed: Int, error: Int) extends Printable {
+    def appStatus: Int = if (failed == 0 && error == 0) 0 else 1
+
     override def asJson: JsObject = Json.obj(
       "succeeded" -> succeeded,
       "failed"    -> failed,
