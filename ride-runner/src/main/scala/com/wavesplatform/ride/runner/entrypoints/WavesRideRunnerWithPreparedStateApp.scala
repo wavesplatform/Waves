@@ -43,7 +43,7 @@ object WavesRideRunnerWithPreparedStateApp {
           case RunMode.Run         => none
           case RunMode.Test(junit) => junit
         }
-        junitFile.fold(new JUnitReport())(new FileJUnitReport(_))
+        junitFile.fold(new JUnitReport())(new FileJUnitReport(_, args.colorizer))
       }
 
       lazy val commonPath = input.reduceLeft(PathUtils.commonPath)
@@ -62,11 +62,11 @@ object WavesRideRunnerWithPreparedStateApp {
             case s: RunResultStatus.Error => log.warn(s"Error during running ${x.path}", s.exception)
             case _                        =>
           }
-          args.printMode.printRunResult(x)
+          args.printMode.printRunResult(x, args.colorizer)
           junitReport.addTestCase(x)
           r.updated(x)
         }
-        .tapEval { x => Task { if (args.printTotal) args.printMode.printTotal(x) } }
+        .tapEval { x => Task { if (args.printTotal) args.printMode.printTotal(x, args.colorizer) } }
         .runSyncUnsafe()(global, CanBlock.permit)
 
       junitReport.writeReport()
@@ -133,7 +133,7 @@ object WavesRideRunnerWithPreparedStateApp {
     def writeReport(): Unit                  = {}
   }
 
-  private class FileJUnitReport(output: File) extends JUnitReport {
+  private class FileJUnitReport(output: File, colorizer: Colorizer) extends JUnitReport {
     private val testCases = new ConcurrentHashMap[Path, RunResult]
 
     override def addTestCase(result: RunResult): Unit = testCases.put(result.path, result)
@@ -176,11 +176,11 @@ object WavesRideRunnerWithPreparedStateApp {
     private def render(testCase: RunResult): (Elem, FiniteDuration) = {
       val content = testCase.status match {
         case s: RunResultStatus.Succeeded =>
-          <system-out>{PCData(s.asString)}</system-out>
+          <system-out>{PCData(s.asString(colorizer))}</system-out>
 
         case s: RunResultStatus.Failed =>
           <failure message="Expected value did not match" type="AssertionError">
-            {PCData(s.asString)}
+            {PCData(s.asString(colorizer))}
           </failure>
 
         case s: RunResultStatus.Error =>
@@ -232,7 +232,6 @@ object WavesRideRunnerWithPreparedStateApp {
     val builder = OParser.builder[Args]
     import builder.*
 
-    // TODO coloring?
     OParser.sequence(
       head("RIDE script runner", Version.VersionString),
       opt[Unit]('v', "verbose")
@@ -250,6 +249,10 @@ object WavesRideRunnerWithPreparedStateApp {
         .optional()
         .text("Print statistics. Not printing by default.")
         .action((_, c) => c.copy(printTotal = true)),
+      opt[Unit]('M', "monochrome")
+        .optional()
+        .text("Don't colorize. Colorize by default.")
+        .action((_, c) => c.copy(colorizer = MonochromeColorizer)),
       opt[Unit]("doNotMinimizePaths")
         .optional()
         .text(
@@ -284,6 +287,7 @@ object WavesRideRunnerWithPreparedStateApp {
       printMode: PrintMode = PrintMode.Text,
       minimizePaths: Boolean = true,
       printTotal: Boolean = false,
+      colorizer: Colorizer = new RealColorizer,
       verbose: Boolean = false
   )
 
@@ -294,23 +298,23 @@ object WavesRideRunnerWithPreparedStateApp {
   }
 
   private sealed trait PrintMode {
-    def asPrinted(x: Printable): String
+    def asPrinted(x: Printable, colorizer: Colorizer): String
 
-    def printRunResult(x: RunResult): Unit = x.status match {
-      case _: RunResultStatus.Error => System.err.println(asPrinted(x))
-      case _                        => println(asPrinted(x))
+    def printRunResult(x: RunResult, colorizer: Colorizer): Unit = x.status match {
+      case _: RunResultStatus.Error => System.err.println(asPrinted(x, colorizer))
+      case _                        => println(asPrinted(x, colorizer))
     }
 
-    def printTotal(x: Stats): Unit = println(asPrinted(x))
+    def printTotal(x: Stats, colorizer: Colorizer): Unit = println(asPrinted(x, colorizer))
   }
 
   private object PrintMode {
     case object Text extends PrintMode {
-      override def asPrinted(x: Printable): String = x.asString
+      override def asPrinted(x: Printable, colorizer: Colorizer): String = x.asString(colorizer)
     }
 
     case object Json extends PrintMode {
-      override def asPrinted(x: Printable): String = x.asJson.toString()
+      override def asPrinted(x: Printable, colorizer: Colorizer): String = x.asJson.toString()
     }
   }
 
@@ -327,7 +331,7 @@ object WavesRideRunnerWithPreparedStateApp {
       case _: RunResultStatus.Error     => copy(error = error + 1)
     }
 
-    override def asString: String = s"Total succeeded: $succeeded, failed: $failed, error: $error"
+    override def asString(colorizer: Colorizer): String = s"Total succeeded: $succeeded, failed: $failed, error: $error"
   }
 
   private case class RunResult(path: Path, duration: FiniteDuration, status: RunResultStatus) extends Printable {
@@ -337,7 +341,8 @@ object WavesRideRunnerWithPreparedStateApp {
       "status"   -> status.asJson
     )
 
-    override def asString: String = s"[${duration.toCoarsest}] $path ${status.asString}"
+    override def asString(colorizer: Colorizer): String =
+      s"[${duration.toCoarsest}] ${colorizer.colorize(path.toString, Colorizer.Color.Blue)} ${status.asString(colorizer)}"
   }
 
   private sealed trait RunResultStatus extends Printable with Product with Serializable
@@ -351,7 +356,9 @@ object WavesRideRunnerWithPreparedStateApp {
         "result" -> result
       )
 
-      override def asString: String = s"succeeded:\n${padLeft(Json.prettyPrint(result), "  ")}"
+      override def asString(colorizer: Colorizer): String =
+        s"${colorizer.colorize("succeeded", Colorizer.Color.Green)}:\n" +
+          s"${padLeft(Json.prettyPrint(result), "  ")}"
     }
 
     case class Failed(actual: JsValue, expected: JsValue) extends RunResultStatus {
@@ -361,7 +368,7 @@ object WavesRideRunnerWithPreparedStateApp {
         "expected" -> expected
       )
 
-      override def asString: String = "failed:\n" +
+      override def asString(colorizer: Colorizer): String = s"${colorizer.colorize("failed", Colorizer.Color.Red)}:\n" +
         s"  expected:\n${padLeft(Json.prettyPrint(expected), "    ")}\n" +
         s"  actual:\n${padLeft(Json.prettyPrint(actual), "    ")}"
     }
@@ -373,12 +380,33 @@ object WavesRideRunnerWithPreparedStateApp {
         "message" -> exception.getMessage
       )
 
-      override def asString: String = s"error: ${exception.getMessage}"
+      override def asString(colorizer: Colorizer): String = s"${colorizer.colorize("error", Colorizer.Color.Red)}: ${exception.getMessage}"
     }
   }
 
   private sealed trait Printable {
     def asJson: JsObject
-    def asString: String
+    def asString(colorizer: Colorizer): String
+  }
+
+  private sealed trait Colorizer {
+    def colorize(text: String, color: Colorizer.Color): String
+  }
+
+  private object Colorizer {
+    sealed abstract class Color(val number: Int)
+    object Color {
+      case object Red   extends Color(31)
+      case object Green extends Color(32)
+      case object Blue  extends Color(34)
+    }
+  }
+
+  private object MonochromeColorizer extends Colorizer {
+    def colorize(text: String, color: Colorizer.Color): String = text
+  }
+
+  private class RealColorizer extends Colorizer {
+    def colorize(text: String, color: Colorizer.Color): String = s"\u001b[${color.number}m${text}\u001b[0m"
   }
 }
