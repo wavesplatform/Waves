@@ -55,14 +55,7 @@ object BalanceDiffValidation {
             Nil
         }
 
-    lazy val leaseOnlyCheck =
-      snapshot.leaseBalances
-        .filterNot { case (address, _) => snapshot.balances.contains((address, Waves)) }
-        .flatMap { case (address, leaseBalance) =>
-          checkWaves(address, b.balance(address), leaseBalance).fold(error => List(error), _ => Nil)
-        }
-
-    lazy val assetsCheck =
+    val assetsCheck =
       snapshot.balances
         .collectFirst {
           case ((address, asset), balance) if asset != Waves && balance < 0 =>
@@ -71,7 +64,7 @@ object BalanceDiffValidation {
         .getOrElse(Map())
 
     val positiveBalanceErrors =
-      wavesCheck ++ leaseOnlyCheck ++ assetsCheck
+      wavesCheck ++ assetsCheck
 
     if (positiveBalanceErrors.isEmpty) {
       Right(snapshot)
