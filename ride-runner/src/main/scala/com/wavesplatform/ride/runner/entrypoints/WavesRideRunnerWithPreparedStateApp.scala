@@ -43,7 +43,7 @@ object WavesRideRunnerWithPreparedStateApp {
           case RunMode.Run         => none
           case RunMode.Test(junit) => junit
         }
-        junitFile.fold(new JUnitReport())(new FileJUnitReport(_, args.colorizer))
+        junitFile.fold(new JUnitReport())(new FileJUnitReport(_))
       }
 
       lazy val commonPath = input.reduceLeft(PathUtils.commonPath)
@@ -133,7 +133,8 @@ object WavesRideRunnerWithPreparedStateApp {
     def writeReport(): Unit                  = {}
   }
 
-  private class FileJUnitReport(output: File, colorizer: Colorizer) extends JUnitReport {
+  private class FileJUnitReport(output: File) extends JUnitReport {
+    private val colorizer = MonochromeColorizer
     private val testCases = new ConcurrentHashMap[Path, RunResult]
 
     override def addTestCase(result: RunResult): Unit = testCases.put(result.path, result)
