@@ -1,93 +1,119 @@
 package com.wavesplatform.ride.runner.input
 
 import cats.syntax.option.*
-import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
-import com.wavesplatform.api.http.{DebugApiRoute, requests}
+import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.wavesplatform.account.*
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.json.JsonManipulations
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.ride.ScriptUtil
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
+import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxNonNegativeAmount, TxValidationError}
-import com.wavesplatform.utils.byteStrFormat
+import com.wavesplatform.transaction.{AssetIdLength, TransactionFactory, TxNonNegativeAmount, TxValidationError}
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.{ArbitraryTypeReader, ValueReader}
 import play.api.libs.json.*
-import play.api.libs.json.JsError.toJson
 
 import java.nio.charset.StandardCharsets
-import scala.util.Try
+import scala.jdk.CollectionConverters.CollectionHasAsScala
+import scala.util.{Success, Try}
 
-object RideRunnerInputParser extends DefaultReads {
+object RideRunnerInputParser extends ArbitraryTypeReader {
+  val Base58Prefix = "base58:"
 
-  private val baseTypes = List(
-    classOf[RideRunnerDataEntry],
-    classOf[RideRunnerPostProcessingMethod]
-  ).map(_.getSimpleName)
-
-  implicit val jsonConfiguration: JsonConfiguration.Aux[Json.WithDefaultValues] = JsonConfiguration[Json.WithDefaultValues](
-    discriminator = "type",
-    // snakeCase
-    typeNaming = JsonNaming { fullName =>
-      val nameWithoutBaseClass = baseTypes.foldLeft(fullName.split('.').last) { (r, x) => r.replace(x, "") }
-      if (nameWithoutBaseClass.head.isLower) nameWithoutBaseClass
-      else nameWithoutBaseClass.updated(0, nameWithoutBaseClass.head.toLower)
-    }
-  )
-
-  implicit val shortKeyReads: KeyReads[Short] = KeyReads { x =>
-    x.toShortOption.fold[JsResult[Short]](mkError("Short"))(JsSuccess(_))
-  }
-
-  implicit val intKeyReads: KeyReads[Int] = KeyReads { x =>
-    x.toIntOption.fold[JsResult[Int]](mkError("Int"))(JsSuccess(_))
-  }
-
-  implicit val byteStrKeyReads: KeyReads[ByteStr] = KeyReads(x => byteStrFormat.reads(JsString(x)))
-
-  implicit val addressKeyReads: KeyReads[Address] = KeyReads { x =>
-    Address.fromString(x).successOrErrorToString("Address")
-  }
-
-  implicit val issuedAssetKeyReads: KeyReads[IssuedAsset] = KeyReads(x => Asset.assetReads.reads(JsString(x)))
-
-  implicit val optBlockIdKeyReads: KeyReads[Option[BlockId]] = KeyReads { x =>
-    if (x.isEmpty) JsSuccess(None) else byteStrFormat.reads(JsString(x)).map(Some(_))
-  }
-
-  implicit val txNonNegativeAmountReads: Reads[TxNonNegativeAmount] = com.wavesplatform.transaction.TxNonNegativeAmount.reads
-
-  implicit val byteArrayReads: Reads[Array[Byte]] = com.wavesplatform.utils.arrayReads
-
-  implicit val byteStringReads: Reads[ByteString] = byteArrayReads.map(unsafeWrap)
-
-  implicit val stringOrBytesAsByteStrReads: Reads[StringOrBytesAsByteStr] = StringReads.flatMapResult { x =>
-    JsSuccess(StringOrBytesAsByteStr(ByteStr(decodeBytesFromStrRaw(x))))
-  }
-
-  implicit val stringOrBytesAsByteStringReads: Reads[StringOrBytesAsByteString] = StringReads.flatMapResult { x =>
-    JsSuccess(StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap(decodeBytesFromStrRaw(x))))
-  }
-
-  implicit val scriptReads: Reads[Script] = StringReads.flatMapResult { x =>
-    Try {
-      if (x.startsWith(Base64.Prefix)) Base64.decode(x).some
-      else none
-    }.toEither match {
-      case Left(e)            => mkError("Script", e.getMessage)
-      case Right(Some(bytes)) => ScriptReader.fromBytes(bytes).successOr(e => mkError("Script", e.m))
-      case Right(None)        => Try(ScriptUtil.from(x)).toEither.successOr(e => mkError("Script", e.getMessage))
+  private def jsValueReader[T: Reads]: ValueReader[T] = { (config: Config, path: String) =>
+    // config.getObject(path) doesn't work for primitive values.
+    // atPath("x") allows a consistent rendering for all types of content at specified path.
+    val fixedPath = if (path == "") "x" else s"x.$path"
+    val jsonStr   = config.atPath("x").root().render(ConfigRenderOptions.concise())
+    JsonManipulations
+      .pick(Json.parse(jsonStr), fixedPath)
+      .getOrElse(fail(s"Expected a value at $path"))
+      .validate[T] match {
+      case JsSuccess(value, _) => value
+      case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
     }
   }
 
-  implicit val accountScriptInfoReads: Reads[AccountScriptInfo] = Json.reads
+  implicit val jsValueValueReader: ValueReader[JsValue]   = jsValueReader
+  implicit val jsObjectValueReader: ValueReader[JsObject] = jsValueReader
 
-  implicit val aliasReads: Reads[Alias] = StringReads.flatMapResult { x =>
+  implicit val shortMapKeyValueReader: MapKeyValueReader[Short] = { key =>
+    key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
+  }
+
+  implicit val intMapKeyValueReader: MapKeyValueReader[Int] = { key =>
+    key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
+  }
+
+  implicit val byteStrMapKeyValueReader: MapKeyValueReader[ByteStr] = parseAsByteStr(_)
+
+  private def parseAsByteStr(x: String): ByteStr = ByteStr(parseAsByteArray(x))
+  private def parseAsByteArray(x: String): Array[Byte] = {
+    if (x.startsWith("base64:"))
+      Base64.tryDecode(x.substring(7)).fold(e => fail(s"Error parsing base64: ${e.getMessage}", e), identity)
+    else if (x.length > Base58.defaultDecodeLimit) fail(s"base58-encoded string length (${x.length}) exceeds maximum length of 192")
+    else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
+  }
+
+  implicit val addressMapKeyValueReader: MapKeyValueReader[Address] = Address.fromString(_).getOrFail
+
+  implicit val issuedAssetMapKeyValueReader: MapKeyValueReader[IssuedAsset] = { x =>
+    // TODO function with fail and success lambdas
+    Base58.tryDecodeWithLimit(x) match {
+      case Success(arr) if arr.length != AssetIdLength => fail(s"Invalid validation. Size of asset id $x not equal $AssetIdLength bytes")
+      case Success(arr)                                => IssuedAsset(ByteStr(arr))
+      case _                                           => fail("Expected base58-encoded assetId")
+    }
+  }
+
+  implicit val optBlockIdMapKeyValueReader: MapKeyValueReader[Option[BlockId]] = { x =>
+    if (x.isEmpty) None else parseAsByteStr(x).some
+  }
+
+  trait MapKeyValueReader[T] {
+    def readKey(key: String): T
+  }
+
+  implicit def arbitraryKeyMapValueReader[K, V: ValueReader](implicit kReader: MapKeyValueReader[K]): ValueReader[Map[K, V]] =
+    ValueReader[Map[String, V]].map { xs =>
+      xs.map { case (k, v) => kReader.readKey(k) -> v }
+    }
+
+  implicit val byteValueReader: ValueReader[Byte] = ValueReader[Int].map { x =>
+    if (x.isValidByte) x.toByte
+    else fail(s"Expected an integer value between ${Byte.MinValue} and ${Byte.MaxValue}")
+  }
+
+  implicit val txNonNegativeAmountValueReader: ValueReader[TxNonNegativeAmount] = ValueReader[Long].map { x =>
+    if (x < 0) fail(s"Expected $x >= 0") else TxNonNegativeAmount.unsafeFrom(x)
+  }
+
+  implicit val byteArrayValueReader: ValueReader[Array[Byte]] = ValueReader[String].map { v =>
+    if (v.startsWith("base64:")) Base64.tryDecode(v.substring(7)).fold(e => fail(s"Error parsing base64: ${e.getMessage}"), identity)
+    else if (v.length > Base58.defaultDecodeLimit) fail(s"base58-encoded string length (${v.length}) exceeds maximum length of 192")
+    else Base58.tryDecodeWithLimit(v).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
+  }
+
+  implicit val byteStringValueReader: ValueReader[ByteString] = byteArrayValueReader.map(UnsafeByteOperations.unsafeWrap)
+
+  implicit val byteStrValueReader: ValueReader[ByteStr] = byteArrayValueReader.map(ByteStr(_))
+
+  implicit val stringOrBytesAsByteArratValueReader: ValueReader[StringOrBytesAsByteArray] = ValueReader[String].map { x =>
+    StringOrBytesAsByteArray(decodeBytesFromStrRaw(x))
+  }
+
+  implicit val scriptValueReader: ValueReader[Script] = ValueReader[String].map { x =>
+    if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail
+    else ScriptUtil.from(x)
+  }
+
+  implicit val aliasValueReader: ValueReader[Alias] = ValueReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
 
     val separatorNumber = x.count(_ == ':')
@@ -96,14 +122,10 @@ object RideRunnerInputParser extends DefaultReads {
       else if (separatorNumber == 1) Alias.createWithChainId(x.substring(x.indexOf(":") + 1), chainId)
       else Alias.createWithChainId(x, chainId)
 
-    alias
-      .flatMap { x =>
-        Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId))
-      }
-      .successOrErrorToString("Alias")
+    alias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
   }
 
-  implicit val addressOrAliasReads: Reads[AddressOrAlias] = StringReads.flatMapResult { x =>
+  implicit val addressOrAliasValueReader: ValueReader[AddressOrAlias] = ValueReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
 
     val separatorNumber = x.count(_ == ':')
@@ -112,95 +134,82 @@ object RideRunnerInputParser extends DefaultReads {
       else if (separatorNumber == 1) Alias.createWithChainId(x.substring(x.indexOf(":") + 1), chainId)
       else Address.fromString(x)
 
-    addressOrAlias
-      .flatMap { x =>
-        Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId))
-      }
-      .successOrErrorToString("AddressOrAlias")
+    addressOrAlias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
   }
 
-  implicit val heightReads: Reads[Height] = Height.lift
+  implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
 
-  implicit val assetScriptInfoReads: Reads[AssetScriptInfo] = Json.reads
+  implicit val publicKeyValueReader: ValueReader[PublicKey] = ValueReader[ByteStr].map(PublicKey(_))
 
-  implicit val assetDescriptionReads: Reads[AssetDescription] = Json.reads
+  implicit val heightValueReader: ValueReader[Height] = ValueReader[Int].map(Height(_))
 
-  implicit val blockHeaderReads: Reads[BlockHeader]             = Json.reads
-  implicit val signedBlockHeaderReads: Reads[SignedBlockHeader] = Json.reads
-
-  implicit val txMetaReads: Reads[TxMeta] = Json.reads
-
-  implicit val transferTransactionLikeReads: Reads[TransferTransactionLike] = Reads { js =>
+  implicit val transferTransactionLikeValueReader: ValueReader[TransferTransactionLike] = jsObjectValueReader.map { js =>
     TransactionFactory
       .fromSignedRequest(js)
       .flatMap {
         case tx: TransferTransactionLike => Right(tx)
         case _                           => Left(TxValidationError.UnsupportedTransactionType)
       }
-      .successOrErrorToString("TransferTransactionLike")
+      .getOrFail
   }
 
-  implicit val leaseInfoReads: Format[LeaseBalance] = DebugApiRoute.leaseInfoFormat
-
-  implicit val balanceSnapshotReads: Reads[BalanceSnapshot]               = Json.format // format solves "ambiguous" error
-  implicit val rideRunnerLeaseBalanceReads: Reads[RideRunnerLeaseBalance] = Json.reads
-
-  implicit val rideRunnerScriptInfoReads: Reads[RideRunnerScriptInfo] = Json.reads
-
-  implicit val rideRunnerBinaryDataEntryReads: Reads[BinaryRideRunnerDataEntry]   = Json.reads
-  implicit val rideRunnerBooleanDataEntryReads: Reads[BooleanRideRunnerDataEntry] = Json.reads
-  implicit val rideRunnerIntegerDataEntryReads: Reads[IntegerRideRunnerDataEntry] = Json.reads
-  implicit val rideRunnerStringDataEntryReads: Reads[StringRideRunnerDataEntry]   = Json.reads
-  implicit val rideRunnerDataEntryReads: Reads[RideRunnerDataEntry]               = Json.reads
-
-  implicit val rideRunnerPickPostProcessingMethod: Reads[PickRideRunnerPostProcessingMethod]       = Json.reads
-  implicit val rideRunnerPickAllPostProcessingMethod: Reads[PickAllRideRunnerPostProcessingMethod] = Json.reads
-  implicit val rideRunnerPrunePostProcessingMethod: Reads[PruneRideRunnerPostProcessingMethod]     = Json.reads
-  implicit val rideRunnerPostProcessingMethod: Reads[RideRunnerPostProcessingMethod]               = Json.reads
-
-  implicit val rideRunnerPostProcessing: Reads[RideRunnerPostProcessing] = Json.reads
-
-  implicit val rideRunnerAccountReads: Reads[RideRunnerAccount] = Json.reads
-
-  implicit val rideRunnerAssetReads: Reads[RideRunnerAsset] = Json.reads
-
-  implicit val rideRunnerBlockReads: Reads[RideRunnerBlock] = Json.reads
-
-  implicit val rideRunnerTransactionReads: Reads[RideRunnerTransaction] = Json.reads
-
-  implicit val stdLibVersionReads: Reads[StdLibVersion] = IntReads.map(StdLibVersion.VersionDic.idMap.apply)
-
-  implicit val proofsReads: Reads[Proofs] = requests.proofsReads
-
-  implicit val charReads: Reads[Char] = StringReads.flatMapResult { x =>
-    if (x.length == 1) JsSuccess(x.head)
-    else mkError("Char", s"Expected one char, got: $x")
+  implicit val rideRunnerDataEntryValueReader: ValueReader[RideRunnerDataEntry] = ValueReader.relative[RideRunnerDataEntry] { config =>
+    config.getString("type") match {
+      case "integer" => IntegerRideRunnerDataEntry(config.getLong("value"))
+      case "boolean" => BooleanRideRunnerDataEntry(config.getBoolean("value"))
+      case "string"  => StringRideRunnerDataEntry(config.getString("value"))
+      case "binary"  => BinaryRideRunnerDataEntry(ByteStr(decodeBytesFromStrRaw(config.getString("value"))))
+      case x         => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
+    }
   }
 
-  implicit val rideRunnerBlockchainStateReads: Reads[RideRunnerBlockchainState] = Json.reads
+  implicit val rideRunnerPostProcessingMethodValueReader: ValueReader[RideRunnerPostProcessingMethod] =
+    ValueReader.relative[RideRunnerPostProcessingMethod] { config =>
+      config.getString("type") match {
+        case "pick"    => PickRideRunnerPostProcessingMethod(config.getString("path"))
+        case "pickAll" => PickAllRideRunnerPostProcessingMethod(config.getStringList("paths").asScala.toList)
+        case "prune"   => PruneRideRunnerPostProcessingMethod(config.getStringList("paths").asScala.toList)
+        case x         => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
+      }
+    }
 
-  implicit val rideRunnerTest: Reads[RideRunnerTest] = Json.reads
+  implicit val rideRunnerPostProcessingValueReader: ValueReader[RideRunnerPostProcessing] = arbitraryTypeValueReader[RideRunnerPostProcessing].value
 
-  implicit val rideRunnerInputReads: Reads[RideRunnerInput] = Json.reads
+  implicit val rideRunnerAccountValueReader: ValueReader[RideRunnerAccount] = arbitraryTypeValueReader[RideRunnerAccount].value
+
+  implicit val rideRunnerTransactionValueReader: ValueReader[RideRunnerTransaction] = arbitraryTypeValueReader[RideRunnerTransaction].value
+
+  implicit val stdLibVersionValueReader: ValueReader[StdLibVersion] = ValueReader[Int].map(StdLibVersion.VersionDic.idMap.apply)
+
+  implicit val charValueReader: ValueReader[Char] = ValueReader[String].map { x =>
+    if (x.length == 1) x.head else fail(s"Expected one char, got: $x")
+  }
+
+  implicit val shortValueReader: ValueReader[Short] = ValueReader[Int].map { x =>
+    if (x.isValidShort) x.toShort
+    else fail(s"Expected a value between ${Short.MinValue} and ${Short.MaxValue}")
+  }
+
+  implicit val rideRunnerBlockchainStateValueReader: ValueReader[RideRunnerBlockchainState] =
+    arbitraryTypeValueReader[RideRunnerBlockchainState].value
+
+  implicit val rideRunnerTestValueReader: ValueReader[RideRunnerTest] = arbitraryTypeValueReader[RideRunnerTest].value
+
+  implicit val rideRunnerInputValueReader: ValueReader[RideRunnerInput] = arbitraryTypeValueReader[RideRunnerInput].value
 
   def decodeBytesFromStrRaw(x: String): Array[Byte] = Try {
-    if (x.startsWith("base58:")) Base58.decode(x.substring(7))
+    if (x.startsWith(Base58Prefix)) Base58.decode(x.substring(7))
     else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
     else x.getBytes(StandardCharsets.UTF_8)
   }.getOrElse(x.getBytes(StandardCharsets.UTF_8))
 
-  def parseJson(x: String): JsValue      = Json.configured.parse(x)
-  def parse(x: JsValue): RideRunnerInput = x.as[RideRunnerInput]
-  def getChainId(x: JsValue): Char = (x \ "chainId").validate[Char] match {
-    case JsSuccess(value, _) => value
-    case e: JsError          => throw new IllegalArgumentException(s"Wrong chain id: ${toJson(e)}")
-  }
+  def parse(config: Config): RideRunnerInput = config.as[RideRunnerInput]
+
+  def getChainId(x: Config): Char = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
 
   private implicit final class ValidationErrorOps[E, T](private val self: Either[E, T]) extends AnyVal {
-    def successOr(f: E => JsError): JsResult[T]           = self.fold(f, JsSuccess(_))
-    def successOrErrorToString(hint: String): JsResult[T] = self.fold(e => mkError(hint, e.toString), JsSuccess(_))
+    def getOrFail: T = self.fold(e => fail(e.toString), identity)
   }
 
-  private def mkError(tpe: String, error: String = "") =
-    JsError(Seq(JsPath -> Seq(JsonValidationError(Seq(s"error.expected.$tpe") ++ Seq(error).filterNot(_ == "")))))
+  private def fail(message: String, cause: Throwable = null) = throw new IllegalArgumentException(message, cause)
 }

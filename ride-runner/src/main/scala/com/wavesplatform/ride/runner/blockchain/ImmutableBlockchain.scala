@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.blockchain
 
 import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache}
+import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -107,8 +108,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       AssetDescription(
         originTransactionId = assetId.id,
         issuer = info.issuerPublicKey,
-        name = info.name,
-        description = info.description,
+        name = UnsafeByteOperations.unsafeWrap(info.name),
+        description = UnsafeByteOperations.unsafeWrap(info.description),
         decimals = info.decimals,
         reissuable = info.reissuable,
         totalVolume = info.quantity,
@@ -194,9 +195,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
         amount = TxPositiveAmount.from(inputTx.amount).explicitGet(),
         feeAssetId = inputTx.feeAssetId,
         fee = TxPositiveAmount.from(inputTx.fee).explicitGet(),
-        attachment = inputTx.attachment,
+        attachment = ByteStr(inputTx.attachment),
         timestamp = inputTx.timestamp,
-        proofs = Proofs(inputTx.proofs),
+        proofs = Proofs(inputTx.proofs.map(ByteStr(_))),
         chainId = chainId
       )
       (meta.height, tx)

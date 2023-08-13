@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.runner.input
 
-import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.lang.script.Script
@@ -9,8 +8,8 @@ import java.nio.charset.StandardCharsets
 
 case class RideRunnerAsset(
     issuerPublicKey: PublicKey = EmptyPublicKey,
-    name: StringOrBytesAsByteString = RideRunnerAsset.DefaultName,
-    description: StringOrBytesAsByteString = RideRunnerAsset.DefaultDescription,
+    name: StringOrBytesAsByteArray = RideRunnerAsset.DefaultName,
+    description: StringOrBytesAsByteArray = RideRunnerAsset.DefaultDescription,
     decimals: Int = 8,
     reissuable: Boolean = false,
     quantity: Long = 9007199254740991L, // In JS: MAX_SAFE_INTEGER
@@ -19,6 +18,6 @@ case class RideRunnerAsset(
 )
 
 object RideRunnerAsset {
-  val DefaultName        = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("name".getBytes(StandardCharsets.UTF_8)))
-  val DefaultDescription = StringOrBytesAsByteString(UnsafeByteOperations.unsafeWrap("description".getBytes(StandardCharsets.UTF_8)))
+  val DefaultName        = StringOrBytesAsByteArray("name".getBytes(StandardCharsets.UTF_8))
+  val DefaultDescription = StringOrBytesAsByteArray("description".getBytes(StandardCharsets.UTF_8))
 }

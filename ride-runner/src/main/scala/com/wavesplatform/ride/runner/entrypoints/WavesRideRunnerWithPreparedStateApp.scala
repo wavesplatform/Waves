@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.entrypoints
 
 import cats.syntax.option.*
-import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Version
 import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.ride.runner.RideTestSuite
@@ -74,12 +74,11 @@ object WavesRideRunnerWithPreparedStateApp {
   private def run(runMode: RunMode, path: Path): RunResultStatus =
     if (path.getFileName.toString.endsWith(".conf")) {
       // toAbsolutePath is required, otherwise Lightbend Config incorrectly resolve relative paths
-      Try(ConfigFactory.parseFile(path.toAbsolutePath.toFile).resolve().root().render(ConfigRenderOptions.concise())) match {
+      Try(ConfigFactory.parseFile(path.toAbsolutePath.toFile).resolve()) match {
         case Failure(e) => RunResultStatus.Error(new RuntimeException("Can't parse HOCON file", e))
-        case Success(inputRawJson) =>
-          val inputJson = RideRunnerInputParser.parseJson(inputRawJson)
-          AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputJson)) // We must setup chain first to parse addresses
-          val input = RideRunnerInputParser.parse(inputJson)
+        case Success(inputConfig) =>
+          AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputConfig)) // We must setup chain first to parse addresses
+          val input = RideRunnerInputParser.parse(inputConfig)
           lazy val actual = {
             val r = run(input)
             if (input.postProcessing.enable) input.postProcessing.method.process(r)
@@ -90,7 +89,7 @@ object WavesRideRunnerWithPreparedStateApp {
             case RunMode.Run => RunResultStatus.Succeeded(actual)
             case _: RunMode.Test =>
               input.test match {
-                case None => RunResultStatus.Error(new RuntimeException("Is not a test: expected to be have 'test' field.") with NoStackTrace)
+                case None => RunResultStatus.Error(new RuntimeException("Is not a test: expected to have the 'test' field.") with NoStackTrace)
                 case Some(test) =>
                   if (actual == test.expected) RunResultStatus.Succeeded(actual)
                   else RunResultStatus.Failed(actual, test.expected)

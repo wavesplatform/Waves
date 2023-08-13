@@ -176,9 +176,11 @@ object Dependencies {
       kamonModule("prometheus"),
       Dependencies.sttp3,
       Dependencies.sttp3Monix,
-      "org.scala-lang.modules"                                       %% "scala-xml" % "2.2.0", // JUnit reports
+      "org.scala-lang.modules"                                       %% "scala-xml"              % "2.2.0", // JUnit reports
       Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
-      Dependencies.akkaHttpModule("akka-http-testkit")                % Test
+      Dependencies.akkaHttpModule("akka-http-testkit")                % Test,
+      "com.softwaremill.diffx"                                       %% "diffx-core"             % "0.8.3" % Test,
+      "com.softwaremill.diffx"                                       %% "diffx-scalatest-should" % "0.8.3" % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
