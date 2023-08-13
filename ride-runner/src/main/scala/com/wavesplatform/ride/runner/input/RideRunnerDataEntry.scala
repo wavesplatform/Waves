@@ -8,8 +8,6 @@ sealed trait RideRunnerDataEntry {
   def toDataEntry(key: String): DataEntry
 }
 
-// Note, play-json can't find descendants in the companion object
-
 case class BinaryRideRunnerDataEntry(value: ByteStr) extends RideRunnerDataEntry {
   override def toDataEntry(key: String): DataEntry = BinaryDataEntry(key, value)
 }
