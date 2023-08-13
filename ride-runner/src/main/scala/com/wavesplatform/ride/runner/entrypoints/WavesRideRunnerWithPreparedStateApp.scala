@@ -78,7 +78,7 @@ object WavesRideRunnerWithPreparedStateApp {
         case Failure(e) => RunResultStatus.Error(new RuntimeException("Can't parse HOCON file", e))
         case Success(inputConfig) =>
           AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputConfig)) // We must setup chain first to parse addresses
-          val input = RideRunnerInputParser.parse(inputConfig)
+          val input = RideRunnerInputParser.from(inputConfig)
           lazy val actual = {
             val r = run(input)
             if (input.postProcessing.enable) input.postProcessing.method.process(r)

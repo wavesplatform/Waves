@@ -8,7 +8,7 @@ import play.api.libs.json.JsSuccess
 class RideRunnerWithPreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
   "RideRunnerWithPreparedState" in {
     val sampleInput = ConfigFactory.parseResources("sample-input.conf").resolve()
-    val input       = RideRunnerInputParser.parse(sampleInput)
+    val input       = RideRunnerInputParser.from(sampleInput)
     val r           = WavesRideRunnerWithPreparedStateApp.run(input)
     (r \ "result" \ "value" \ "_2" \ "value").validate[BigInt] shouldBe JsSuccess(BigInt("9007199361531057"))
   }

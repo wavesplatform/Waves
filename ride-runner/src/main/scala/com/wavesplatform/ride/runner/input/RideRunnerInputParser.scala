@@ -14,14 +14,15 @@ import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{AssetIdLength, TransactionFactory, TxNonNegativeAmount, TxValidationError}
+import com.wavesplatform.transaction.{TransactionFactory, TxNonNegativeAmount, TxValidationError}
+import com.wavesplatform.utils.byteArrayFromString
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.{ArbitraryTypeReader, ValueReader}
 import play.api.libs.json.*
 
 import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters.CollectionHasAsScala
-import scala.util.{Success, Try}
+import scala.util.Try
 
 object RideRunnerInputParser extends ArbitraryTypeReader {
   val Base58Prefix = "base58:"
@@ -51,29 +52,14 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     key.toIntOption.getOrElse(fail(s"Expected an integer value between ${Int.MinValue} and ${Int.MaxValue}"))
   }
 
-  implicit val byteStrMapKeyValueReader: MapKeyValueReader[ByteStr] = parseAsByteStr(_)
-
-  private def parseAsByteStr(x: String): ByteStr = ByteStr(parseAsByteArray(x))
-  private def parseAsByteArray(x: String): Array[Byte] = {
-    if (x.startsWith("base64:"))
-      Base64.tryDecode(x.substring(7)).fold(e => fail(s"Error parsing base64: ${e.getMessage}", e), identity)
-    else if (x.length > Base58.defaultDecodeLimit) fail(s"base58-encoded string length (${x.length}) exceeds maximum length of 192")
-    else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
-  }
+  implicit val byteStrMapKeyValueReader: MapKeyValueReader[ByteStr] = byteStrDefaultBase58FromString(_)
 
   implicit val addressMapKeyValueReader: MapKeyValueReader[Address] = Address.fromString(_).getOrFail
 
-  implicit val issuedAssetMapKeyValueReader: MapKeyValueReader[IssuedAsset] = { x =>
-    // TODO function with fail and success lambdas
-    Base58.tryDecodeWithLimit(x) match {
-      case Success(arr) if arr.length != AssetIdLength => fail(s"Invalid validation. Size of asset id $x not equal $AssetIdLength bytes")
-      case Success(arr)                                => IssuedAsset(ByteStr(arr))
-      case _                                           => fail("Expected base58-encoded assetId")
-    }
-  }
+  implicit val issuedAssetMapKeyValueReader: MapKeyValueReader[IssuedAsset] = IssuedAsset.fromString(_, identity, fail(_))
 
   implicit val optBlockIdMapKeyValueReader: MapKeyValueReader[Option[BlockId]] = { x =>
-    if (x.isEmpty) None else parseAsByteStr(x).some
+    if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
   }
 
   trait MapKeyValueReader[T] {
@@ -94,18 +80,14 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     if (x < 0) fail(s"Expected $x >= 0") else TxNonNegativeAmount.unsafeFrom(x)
   }
 
-  implicit val byteArrayValueReader: ValueReader[Array[Byte]] = ValueReader[String].map { v =>
-    if (v.startsWith("base64:")) Base64.tryDecode(v.substring(7)).fold(e => fail(s"Error parsing base64: ${e.getMessage}"), identity)
-    else if (v.length > Base58.defaultDecodeLimit) fail(s"base58-encoded string length (${v.length}) exceeds maximum length of 192")
-    else Base58.tryDecodeWithLimit(v).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
-  }
+  implicit val byteArrayValueReader: ValueReader[Array[Byte]] = ValueReader[String].map(byteArrayFromString(_, identity, fail(_)))
 
   implicit val byteStringValueReader: ValueReader[ByteString] = byteArrayValueReader.map(UnsafeByteOperations.unsafeWrap)
 
   implicit val byteStrValueReader: ValueReader[ByteStr] = byteArrayValueReader.map(ByteStr(_))
 
   implicit val stringOrBytesAsByteArratValueReader: ValueReader[StringOrBytesAsByteArray] = ValueReader[String].map { x =>
-    StringOrBytesAsByteArray(decodeBytesFromStrRaw(x))
+    StringOrBytesAsByteArray(byteArrayDefaultUtf8FromString(x))
   }
 
   implicit val scriptValueReader: ValueReader[Script] = ValueReader[String].map { x =>
@@ -158,7 +140,7 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       case "integer" => IntegerRideRunnerDataEntry(config.getLong("value"))
       case "boolean" => BooleanRideRunnerDataEntry(config.getBoolean("value"))
       case "string"  => StringRideRunnerDataEntry(config.getString("value"))
-      case "binary"  => BinaryRideRunnerDataEntry(ByteStr(decodeBytesFromStrRaw(config.getString("value"))))
+      case "binary"  => BinaryRideRunnerDataEntry(ByteStr(byteArrayDefaultUtf8FromString(config.getString("value"))))
       case x         => fail(s"Expected one of types: integer, boolean, string, binary. Got $x")
     }
   }
@@ -197,13 +179,21 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
 
   implicit val rideRunnerInputValueReader: ValueReader[RideRunnerInput] = arbitraryTypeValueReader[RideRunnerInput].value
 
-  def decodeBytesFromStrRaw(x: String): Array[Byte] = Try {
+  private def byteArrayDefaultUtf8FromString(x: String): Array[Byte] = Try {
     if (x.startsWith(Base58Prefix)) Base58.decode(x.substring(7))
     else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
     else x.getBytes(StandardCharsets.UTF_8)
   }.getOrElse(x.getBytes(StandardCharsets.UTF_8))
 
-  def parse(config: Config): RideRunnerInput = config.as[RideRunnerInput]
+  private def byteStrDefaultBase58FromString(x: String): ByteStr = ByteStr(byteArrayDefaultBase58FromString(x))
+  private def byteArrayDefaultBase58FromString(x: String): Array[Byte] = {
+    if (x.startsWith("base64:"))
+      Base64.tryDecode(x.substring(7)).fold(e => fail(s"Error parsing base64: ${e.getMessage}", e), identity)
+    else if (x.length > Base58.defaultDecodeLimit) fail(s"base58-encoded string length (${x.length}) exceeds maximum length of 192")
+    else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
+  }
+
+  def from(config: Config): RideRunnerInput = config.as[RideRunnerInput]
 
   def getChainId(x: Config): Char = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
 

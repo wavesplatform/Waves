@@ -297,7 +297,7 @@ func bar() = {
         test = RideRunnerTest(expected = JsString("9007199361531056")).some
       )
 
-      val actual = RideRunnerInputParser.parse(ConfigFactory.parseResources("sample-input.conf").resolve())
+      val actual = RideRunnerInputParser.from(ConfigFactory.parseResources("sample-input.conf").resolve())
       actual shouldMatchTo expected
     }
   }

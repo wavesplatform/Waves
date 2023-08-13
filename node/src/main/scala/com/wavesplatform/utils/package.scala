@@ -63,11 +63,14 @@ package object utils {
     r
   }
 
+  def byteArrayFromString[T](v: String, onSuccess: Array[Byte] => T, onFailure: String => T): T = {
+    if (v.startsWith("base64:")) Base64.tryDecode(v.substring(7)).fold(e => onFailure(s"Error parsing base64: ${e.getMessage}"), onSuccess)
+    else if (v.length > Base58.defaultDecodeLimit) onFailure(s"base58-encoded string length (${v.length}) exceeds maximum length of 192")
+    else Base58.tryDecodeWithLimit(v).fold(e => onFailure(s"Error parsing base58: ${e.getMessage}"), onSuccess)
+  }
+
   val arrayReads: Reads[Array[Byte]] = Reads {
-    case JsString(v) if v.startsWith("base64:") =>
-      Base64.tryDecode(v.substring(7)).fold(e => JsError(s"Error parsing base64: ${e.getMessage}"), b => JsSuccess(b))
-    case JsString(v) if v.length > Base58.defaultDecodeLimit => JsError(s"base58-encoded string length (${v.length}) exceeds maximum length of 192")
-    case JsString(v) => Base58.tryDecodeWithLimit(v).fold(e => JsError(s"Error parsing base58: ${e.getMessage}"), b => JsSuccess(b))
+    case JsString(v) => byteArrayFromString(v, JsSuccess(_), JsError(_))
     case _           => JsError("Expected JsString")
   }
 
