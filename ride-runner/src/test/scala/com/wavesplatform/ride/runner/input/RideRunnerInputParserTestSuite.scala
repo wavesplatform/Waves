@@ -17,7 +17,7 @@ import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import net.ceedubs.ficus.Ficus.toFicusConfig
 import net.ceedubs.ficus.readers.ValueReader
 import org.scalatest.prop.TableDrivenPropertyChecks
-import play.api.libs.json.{JsString, Json}
+import play.api.libs.json.*
 
 import java.nio.charset.StandardCharsets
 import scala.util.{Success, Try}
@@ -27,6 +27,27 @@ class RideRunnerInputParserTestSuite extends BaseTestSuite with TableDrivenPrope
   private val txId = ByteStr.decodeBase58("8rc5Asw43qbq7LMZ6tu2aVbVkw72XmBt7tTnwMSNfaNq").get
 
   "RideRunnerInputParser" - {
+    "JsValue" in {
+      forAll(
+        Table(
+          "rawContent"         -> "expected",
+          "1"                  -> JsNumber(1),
+          "true"               -> JsBoolean(true),
+          """ "foo" """        -> JsString("foo"),
+          "null"               -> JsNull,
+          "[1,2]"              -> JsArray(Seq(JsNumber(1), JsNumber(2))),
+          """ { "foo": 1 } """ -> Json.obj("foo" -> 1)
+        )
+      ) { (rawContent, expected) =>
+        parseAs[JsValue](rawContent) shouldBe expected
+      }
+    }
+
+    "JsObject" in {
+      parseAs[JsObject](""" { "foo": 1 } """) shouldBe Json.obj("foo" -> 1)
+      Try(parseAs[JsObject]("1")).isFailure shouldBe true
+    }
+
     "StringOrBytesAsByteArray" - {
       "allows Base58" in {
         val rawContent = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
