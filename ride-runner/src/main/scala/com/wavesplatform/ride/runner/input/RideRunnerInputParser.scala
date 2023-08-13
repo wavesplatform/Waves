@@ -27,22 +27,8 @@ import scala.util.Try
 object RideRunnerInputParser extends ArbitraryTypeReader {
   val Base58Prefix = "base58:"
 
-  private def jsValueReader[T: Reads]: ValueReader[T] = { (config: Config, path: String) =>
-    // config.getObject(path) doesn't work for primitive values.
-    // atPath("x") allows a consistent rendering for all types of content at specified path.
-    val fixedPath = if (path == "") "x" else s"x.$path"
-    val jsonStr   = config.atPath("x").root().render(ConfigRenderOptions.concise())
-    JsonManipulations
-      .pick(Json.parse(jsonStr), fixedPath)
-      .getOrElse(fail(s"Expected a value at $path"))
-      .validate[T] match {
-      case JsSuccess(value, _) => value
-      case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
-    }
-  }
-
-  implicit val jsValueValueReader: ValueReader[JsValue]   = jsValueReader
-  implicit val jsObjectValueReader: ValueReader[JsObject] = jsValueReader
+  def from(config: Config): RideRunnerInput = config.as[RideRunnerInput]
+  def getChainId(x: Config): Char           = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
 
   implicit val shortMapKeyValueReader: MapKeyValueReader[Short] = { key =>
     key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))
@@ -62,23 +48,28 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     if (x.isEmpty) None else byteStrDefaultBase58FromString(x).some
   }
 
-  trait MapKeyValueReader[T] {
-    def readKey(key: String): T
+  implicit val charValueReader: ValueReader[Char] = ValueReader[String].map { x =>
+    if (x.length == 1) x.head else fail(s"Expected one char, got: $x")
   }
-
-  implicit def arbitraryKeyMapValueReader[K, V: ValueReader](implicit kReader: MapKeyValueReader[K]): ValueReader[Map[K, V]] =
-    ValueReader[Map[String, V]].map { xs =>
-      xs.map { case (k, v) => kReader.readKey(k) -> v }
-    }
 
   implicit val byteValueReader: ValueReader[Byte] = ValueReader[Int].map { x =>
     if (x.isValidByte) x.toByte
     else fail(s"Expected an integer value between ${Byte.MinValue} and ${Byte.MaxValue}")
   }
 
-  implicit val txNonNegativeAmountValueReader: ValueReader[TxNonNegativeAmount] = ValueReader[Long].map { x =>
-    if (x < 0) fail(s"Expected $x >= 0") else TxNonNegativeAmount.unsafeFrom(x)
+  implicit val shortValueReader: ValueReader[Short] = ValueReader[Int].map { x =>
+    if (x.isValidShort) x.toShort
+    else fail(s"Expected a value between ${Short.MinValue} and ${Short.MaxValue}")
   }
+
+  implicit val heightValueReader: ValueReader[Height] = ValueReader[Int].map(Height(_))
+
+  implicit val stdLibVersionValueReader: ValueReader[StdLibVersion] = ValueReader[Int].map(StdLibVersion.VersionDic.idMap.apply)
+
+  implicit val jsValueValueReader: ValueReader[JsValue]   = jsValueReader
+  implicit val jsObjectValueReader: ValueReader[JsObject] = jsValueReader
+
+  implicit val txNonNegativeAmountValueReader: ValueReader[TxNonNegativeAmount] = ValueReader[Long].map(TxNonNegativeAmount.unsafeFrom)
 
   implicit val byteArrayValueReader: ValueReader[Array[Byte]] = ValueReader[String].map(byteArrayFromString(_, identity, fail(_)))
 
@@ -94,6 +85,8 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail
     else ScriptUtil.from(x)
   }
+
+  implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
 
   implicit val aliasValueReader: ValueReader[Alias] = ValueReader[String].map { x =>
     val chainId = AddressScheme.current.chainId
@@ -119,11 +112,7 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     addressOrAlias.flatMap { x => Either.cond(x.chainId == chainId, x, TxValidationError.WrongChain(chainId, x.chainId)) }.getOrFail
   }
 
-  implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
-
   implicit val publicKeyValueReader: ValueReader[PublicKey] = ValueReader[ByteStr].map(PublicKey(_))
-
-  implicit val heightValueReader: ValueReader[Height] = ValueReader[Int].map(Height(_))
 
   implicit val transferTransactionLikeValueReader: ValueReader[TransferTransactionLike] = jsObjectValueReader.map { js =>
     TransactionFactory
@@ -155,30 +144,6 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
       }
     }
 
-  implicit val rideRunnerPostProcessingValueReader: ValueReader[RideRunnerPostProcessing] = arbitraryTypeValueReader[RideRunnerPostProcessing].value
-
-  implicit val rideRunnerAccountValueReader: ValueReader[RideRunnerAccount] = arbitraryTypeValueReader[RideRunnerAccount].value
-
-  implicit val rideRunnerTransactionValueReader: ValueReader[RideRunnerTransaction] = arbitraryTypeValueReader[RideRunnerTransaction].value
-
-  implicit val stdLibVersionValueReader: ValueReader[StdLibVersion] = ValueReader[Int].map(StdLibVersion.VersionDic.idMap.apply)
-
-  implicit val charValueReader: ValueReader[Char] = ValueReader[String].map { x =>
-    if (x.length == 1) x.head else fail(s"Expected one char, got: $x")
-  }
-
-  implicit val shortValueReader: ValueReader[Short] = ValueReader[Int].map { x =>
-    if (x.isValidShort) x.toShort
-    else fail(s"Expected a value between ${Short.MinValue} and ${Short.MaxValue}")
-  }
-
-  implicit val rideRunnerBlockchainStateValueReader: ValueReader[RideRunnerBlockchainState] =
-    arbitraryTypeValueReader[RideRunnerBlockchainState].value
-
-  implicit val rideRunnerTestValueReader: ValueReader[RideRunnerTest] = arbitraryTypeValueReader[RideRunnerTest].value
-
-  implicit val rideRunnerInputValueReader: ValueReader[RideRunnerInput] = arbitraryTypeValueReader[RideRunnerInput].value
-
   private def byteArrayDefaultUtf8FromString(x: String): Array[Byte] = Try {
     if (x.startsWith(Base58Prefix)) Base58.decode(x.substring(7))
     else if (x.startsWith(Base64.Prefix)) Base64.decode(x)
@@ -193,13 +158,32 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     else Base58.tryDecodeWithLimit(x).fold(e => fail(s"Error parsing base58: ${e.getMessage}"), identity)
   }
 
-  def from(config: Config): RideRunnerInput = config.as[RideRunnerInput]
-
-  def getChainId(x: Config): Char = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
+  private def jsValueReader[T: Reads]: ValueReader[T] = { (config: Config, path: String) =>
+    // config.getObject(path) doesn't work for primitive values.
+    // atPath("x") allows a consistent rendering for all types of content at specified path.
+    val fixedPath = if (path == "") "x" else s"x.$path"
+    val jsonStr   = config.atPath("x").root().render(ConfigRenderOptions.concise())
+    JsonManipulations
+      .pick(Json.parse(jsonStr), fixedPath)
+      .getOrElse(fail(s"Expected a value at $path"))
+      .validate[T] match {
+      case JsSuccess(value, _) => value
+      case JsError(errors)     => fail(s"Can't parse: ${errors.mkString("\n")}")
+    }
+  }
 
   private implicit final class ValidationErrorOps[E, T](private val self: Either[E, T]) extends AnyVal {
     def getOrFail: T = self.fold(e => fail(e.toString), identity)
   }
 
   private def fail(message: String, cause: Throwable = null) = throw new IllegalArgumentException(message, cause)
+
+  implicit def arbitraryKeyMapValueReader[K, V: ValueReader](implicit kReader: MapKeyValueReader[K]): ValueReader[Map[K, V]] =
+    ValueReader[Map[String, V]].map { xs =>
+      xs.map { case (k, v) => kReader.readKey(k) -> v }
+    }
+
+  trait MapKeyValueReader[T] {
+    def readKey(key: String): T
+  }
 }

@@ -170,6 +170,29 @@ let x = getIntegerValue(alice, "x")
       }
     }
 
+    "RideRunnerPostProcessingMethod" - {
+      def parse(tpe: String, valueKey: String, value: String) = parseAs[RideRunnerPostProcessingMethod](s"{ type = $tpe\n$valueKey = $value }")
+
+      "PickRideRunnerPostProcessingMethod" in {
+        parse("pick", "path", "foo.bar") shouldBe PickRideRunnerPostProcessingMethod("foo.bar")
+        Try(parse("pick", "xxx", "foo.bar")).isFailure shouldBe true
+      }
+
+      "PickAllRideRunnerPostProcessingMethod" in {
+        parse("pickAll", "paths", """[ "foo.bar", "baz"] """) shouldBe PickAllRideRunnerPostProcessingMethod(List("foo.bar", "baz"))
+        Try(parse("pickAll", "xxx", "foo.bar")).isFailure shouldBe true
+      }
+
+      "PruneRideRunnerPostProcessingMethod" in {
+        parse("prune", "paths", """[ "foo.bar", "baz"] """) shouldBe PruneRideRunnerPostProcessingMethod(List("foo.bar", "baz"))
+        Try(parse("pickAll", "xxx", "foo.bar")).isFailure shouldBe true
+      }
+
+      "wrong type" in {
+        Try(parse("xxx", "path", "foo.bar")).isFailure shouldBe true
+      }
+    }
+
     "file" in {
       val chainId   = 'N'.toByte
       val dAppAddr  = Address.fromString("3Kkqr1kzNhabCTNYQkyzSkztLzzwGtRcTFj", chainId.some).explicitGet()

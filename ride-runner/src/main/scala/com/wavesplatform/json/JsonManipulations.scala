@@ -1,6 +1,6 @@
 package com.wavesplatform.json
 
-import play.api.libs.json.{JsObject, JsValue, Json}
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
 import scala.annotation.tailrec
 
@@ -11,7 +11,7 @@ object JsonManipulations {
     }
 
   /** @param path
-    *   dot-separated path, e.g.: foo.bar.baz
+    *   dot-separated path, e.g.: "foo.bar.baz"
     * @return
     *   Removes all subtrees except a subtree with specified path
     */
@@ -28,8 +28,24 @@ object JsonManipulations {
       }
     }
 
+  /** @param paths
+    *   dot-separated paths, e.g.: "foo.bar.baz", "bar"
+    * @return
+    *   Subtrees by these paths in the same order
+    */
+  def pickAll(js: JsValue, paths: List[String]): JsValue = JsArray(
+    paths
+      .foldLeft(List.empty[JsValue]) { (r, path) =>
+        pick(js, path) match {
+          case None    => r
+          case Some(x) => x :: r
+        }
+      }
+      .reverse
+  )
+
   /** @param path
-    *   dot-separated path, e.g.: foo.bar.baz
+    *   dot-separated path, e.g.: "foo.bar.baz"
     * @return
     *   A subtree by this path
     */
@@ -53,7 +69,7 @@ object JsonManipulations {
   }
 
   /** @param path
-    *   dot-separated path, e.g.: foo.bar.baz
+    *   dot-separated path, e.g.: "foo.bar.baz"
     * @return
     *   A nested object with specified path and the deepest nested leaf
     */

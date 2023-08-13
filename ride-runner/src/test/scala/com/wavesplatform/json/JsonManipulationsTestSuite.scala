@@ -3,7 +3,7 @@ package com.wavesplatform.json
 import cats.syntax.option.*
 import com.wavesplatform.BaseTestSuite
 import org.scalatest.prop.TableDrivenPropertyChecks
-import play.api.libs.json.{JsNumber, JsObject, Json}
+import play.api.libs.json.{JsArray, JsNumber, JsObject, Json}
 
 class JsonManipulationsTestSuite extends BaseTestSuite with TableDrivenPropertyChecks {
   private val ten = JsNumber(10)
@@ -92,6 +92,28 @@ class JsonManipulationsTestSuite extends BaseTestSuite with TableDrivenPropertyC
       "on value" - {
         "empty path" in { JsonManipulations.prune(ten, "") shouldBe JsObject.empty }
         "non-empty path" in { JsonManipulations.prune(ten, "foo") shouldBe JsObject.empty }
+      }
+    }
+
+    "pickAll" - {
+      "on object" in {
+        val table = Table(
+          "path"                        -> "expectedJson",
+          List("foo.bar.baz")           -> JsArray(Seq(ten)),
+          List("extra2", "foo.bar.baz") -> JsArray(Seq(JsNumber(1), ten)),
+          List.empty                    -> JsArray.empty,
+          List("")                      -> JsArray.empty,
+          List("", "foo.bar.baz")       -> JsArray(Seq(ten))
+        )
+
+        forAll(table) { (paths, expectedJson) =>
+          JsonManipulations.pickAll(json, paths) shouldBe expectedJson
+        }
+      }
+
+      "on value" in {
+        JsonManipulations.pickAll(ten, List("foo")) shouldBe JsArray.empty
+        JsonManipulations.pickAll(ten, List.empty) shouldBe JsArray.empty
       }
     }
 
