@@ -9,7 +9,8 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, Unknown}
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
-import com.wavesplatform.ride.runner.caches.{CacheKey, CacheKeyTags, CacheWeights, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.caches.mem.{MemCacheKey, MemCacheWeights}
+import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
@@ -77,7 +78,7 @@ class DefaultRequestService(
     .newBuilder()
     .maximumWeight(settings.cacheSize.toBytes)
     .weigher { (key: RideScriptRunRequest, value: RideScriptRunResult) =>
-      CacheWeights.ofRideScriptRunRequest(key) + CacheWeights.ofRideScriptRunResult(value)
+      MemCacheWeights.ofRideScriptRunRequest(key) + MemCacheWeights.ofRideScriptRunResult(value)
     }
     .expireAfter(requestsExpiry)
     .scheduler(CaffeineScheduler.systemScheduler()) // Because we rely on eviction
@@ -166,7 +167,7 @@ class DefaultRequestService(
         case Some(job) => Task.fromCancelablePromise(job.result)
         case None =>
           Task {
-            sharedBlockchain.getOrFetch(CacheKey.AccountScript(request.address))
+            sharedBlockchain.getOrFetch(MemCacheKey.AccountScript(request.address))
           }.flatMap {
             case None => Task.now(fail(CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>

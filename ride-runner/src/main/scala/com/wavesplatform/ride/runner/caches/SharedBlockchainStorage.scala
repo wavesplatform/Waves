@@ -18,6 +18,7 @@ import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage.Settings
 import com.wavesplatform.ride.runner.caches.disk.DiskCaches
+import com.wavesplatform.ride.runner.caches.mem.{GrpcCacheKeyConverters, MemBlockchainDataCache, MemCacheKey, MemCacheWeights}
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
@@ -42,26 +43,26 @@ class SharedBlockchainStorage[TagT] private (
 
   def load()(implicit ctx: ReadOnly): Unit = blockHeaders.load()
 
-  private val inMemCache = new InMemBlockchainDataCache(settings.blockchainDataCache)
+  private val memCache = new MemBlockchainDataCache(settings.memBlockchainDataCache)
 
   def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.directReadWrite { implicit ctx =>
     blockHeaders.getOrFetch(atHeight)
   }
 
   //  Only for tests
-  private[caches] def getCachedInMem[T <: CacheKey](key: T): RemoteData[T#ValueT] = inMemCache.get(key)
+  private[caches] def getCachedInMem[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = memCache.get(key)
 
-  def getOrFetch[T <: CacheKey](key: T): Option[T#ValueT] = db.directReadWrite { implicit ctx =>
+  def getOrFetch[T <: MemCacheKey](key: T): Option[T#ValueT] = db.directReadWrite { implicit ctx =>
     getLatestInternal(heightUntagged, key)
   }
 
-  private def getLatestInternal[T <: CacheKey](atMaxHeight: Height, key: T)(implicit ctx: ReadWrite): Option[T#ValueT] = {
+  private def getLatestInternal[T <: MemCacheKey](atMaxHeight: Height, key: T)(implicit ctx: ReadWrite): Option[T#ValueT] = {
     val r = key match {
-      case key: CacheKey.AccountData =>
-        // If a key doesn't exist, the lambda will block other inMemCache updates.
-        // For any blockchain update use inMemCache.set first and then update a disk cache
+      case key: MemCacheKey.AccountData =>
+        // If a key doesn't exist, the lambda will block other memCache updates.
+        // For any blockchain update use memCache.set first and then update a disk cache
         //   to guarantee overwrite of fetched from gRPC API data.
-        inMemCache.getOrLoad(key) { key =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.accountDataEntries.get(atMaxHeight, key)
           if (cached.loaded) cached
           else
@@ -70,8 +71,8 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.accountDataEntries.set(atMaxHeight, key, r) }
         }
 
-      case key: CacheKey.Transaction =>
-        inMemCache.getOrLoad(key) { key =>
+      case key: MemCacheKey.Transaction =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.transactions.getHeight(key)
           if (cached.loaded) cached
           else
@@ -80,8 +81,8 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.transactions.setHeight(key, r) }
         }
 
-      case key: CacheKey.Alias =>
-        inMemCache.getOrLoad(key) { key =>
+      case key: MemCacheKey.Alias =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.aliases.getAddress(key)
           if (cached.loaded) cached
           else
@@ -90,8 +91,8 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.aliases.setAddress(atMaxHeight, key, r) }
         }
 
-      case key: CacheKey.Asset =>
-        inMemCache.getOrLoad(key) { key =>
+      case key: MemCacheKey.Asset =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.assetDescriptions.get(atMaxHeight, key)
           if (cached.loaded) cached
           else
@@ -101,8 +102,8 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.assetDescriptions.set(atMaxHeight, key, r) }
         }
 
-      case key: CacheKey.AccountBalance =>
-        inMemCache.getOrLoad(key) { key =>
+      case key: MemCacheKey.AccountBalance =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.accountBalances.get(atMaxHeight, key)
           if (cached.loaded) cached
           else
@@ -111,8 +112,8 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.accountBalances.set(atMaxHeight, key, r) }
         }
 
-      case key: CacheKey.AccountLeaseBalance =>
-        inMemCache.getOrLoad(key) { key =>
+      case key: MemCacheKey.AccountLeaseBalance =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.accountLeaseBalances.get(atMaxHeight, key)
           if (cached.loaded) cached
           else
@@ -122,8 +123,8 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.accountLeaseBalances.set(atMaxHeight, key, r) }
         }
 
-      case key: CacheKey.AccountScript =>
-        inMemCache.getOrLoad(key) { key =>
+      case key: MemCacheKey.AccountScript =>
+        memCache.getOrLoad(key) { key =>
           val cached = diskCaches.accountScripts.get(atMaxHeight, key)
           if (cached.loaded) cached
           else
@@ -133,7 +134,7 @@ class SharedBlockchainStorage[TagT] private (
               .tap { r => diskCaches.accountScripts.set(atMaxHeight, key, r) }
         }
 
-      case CacheKey.Height => RemoteData.loaded(Some(height)) // TODO remove this
+      case MemCacheKey.Height => RemoteData.loaded(Some(height)) // TODO remove this
     }
 
     // TODO types!
@@ -173,7 +174,7 @@ class SharedBlockchainStorage[TagT] private (
   def activatedFeatures = activatedFeatures_.get()
 
   def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    getOrFetch(CacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
+    getOrFetch(MemCacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
 
   private def estimator: ScriptEstimator =
     EstimatorProvider.byActivatedFeatures(blockchainSettings.functionalitySettings, activatedFeatures, heightUntagged)
@@ -187,31 +188,31 @@ class SharedBlockchainStorage[TagT] private (
     diskCaches.accountDataEntries
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed data entries: $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
     diskCaches.accountScripts
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed : $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
     diskCaches.assetDescriptions
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed : $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
     diskCaches.aliases
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed : $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
     diskCaches.accountBalances
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed : $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
     diskCaches.accountLeaseBalances
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed : $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
     diskCaches.transactions
       .removeAllFrom(height)
 //      .tap { x => log.trace(s"removed transactions: $x") }
-      .foreach(inMemCache.remove)
+      .foreach(memCache.remove)
 
     val filteredFeatures = activatedFeatures.filterNot { case (_, featureHeight) => featureHeight >= height }
     if (filteredFeatures.size != activatedFeatures.size) updateFeatures(filteredFeatures)
@@ -231,22 +232,22 @@ class SharedBlockchainStorage[TagT] private (
       affected
     }
 
-  private def logIfTagPresent(hint: String, key: CacheKey): AffectedTags[TagT] =
+  private def logIfTagPresent(hint: String, key: MemCacheKey): AffectedTags[TagT] =
     getAffectedTags(s"log $hint", key)
 
-  private def updateCacheIfExists[CacheKeyT <: CacheKey](hint: String, key: CacheKeyT)(v: RemoteData[CacheKeyT#ValueT]): AffectedTags[TagT] = {
+  private def updateCacheIfExists[CacheKeyT <: MemCacheKey](hint: String, key: CacheKeyT)(v: RemoteData[CacheKeyT#ValueT]): AffectedTags[TagT] = {
     getAffectedTags(s"update $hint", key).tap { tags =>
-      if (tags.isEmpty) inMemCache.updateIfExists(key, v) // Not yet removed from inMemCache, but already removed from tags
-      else inMemCache.set(key, v)
+      if (tags.isEmpty) memCache.updateIfExists(key, v) // Not yet removed from memCache, but already removed from tags
+      else memCache.set(key, v)
     }
   }
 
-  private def removeCache[CacheKeyT <: CacheKey](hint: String, key: CacheKeyT): AffectedTags[TagT] = {
-    inMemCache.remove(key)
+  private def removeCache[CacheKeyT <: MemCacheKey](hint: String, key: CacheKeyT): AffectedTags[TagT] = {
+    memCache.remove(key)
     getAffectedTags(s"remove $hint", key)
   }
 
-  private def getAffectedTags(hint: => String, key: CacheKey): AffectedTags[TagT] = allTags.get(key) match {
+  private def getAffectedTags(hint: => String, key: MemCacheKey): AffectedTags[TagT] = allTags.get(key) match {
     case None       => empty
     case Some(tags) =>
       // log.trace(s"dep $hint: ${self.xs.toList.map(_.toString).sorted.mkString("; ")}")
@@ -256,7 +257,7 @@ class SharedBlockchainStorage[TagT] private (
   private def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (initialAffectedTags, txs, timer) = evt.body match {
       case Body.Block(block) =>
-        (logIfTagPresent("append.height", CacheKey.Height), block.getBlock.transactions, RideRunnerStats.blockProcessingTime.some)
+        (logIfTagPresent("append.height", MemCacheKey.Height), block.getBlock.transactions, RideRunnerStats.blockProcessingTime.some)
       case Body.MicroBlock(microBlock) => (empty, microBlock.getMicroBlock.getMicroBlock.transactions, RideRunnerStats.microBlockProcessingTime.some)
       case Body.Empty                  => (empty, Seq.empty, none)
     }
@@ -345,7 +346,7 @@ class SharedBlockchainStorage[TagT] private (
       removeAllFromCtx(Height(toHeight + 1))
 
       val stateUpdate = rollback.getRollbackStateUpdate
-      logIfTagPresent("rollback.height", CacheKey.Height) ++
+      logIfTagPresent("rollback.height", MemCacheKey.Height) ++
         stateUpdate.assets.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.assetKey(x)
           val v        = RemoteData.loaded(conv.assetValueAfter(cacheKey.asset, x).map(toWeightedAssetDescription))
@@ -387,7 +388,7 @@ class SharedBlockchainStorage[TagT] private (
       case last :: _ =>
         log.info(s"Undo to ${last.height - 1}")
         removeAllFromCtx(Height(last.height))
-        events.foldLeft(logIfTagPresent("undo.height", CacheKey.Height)) { case (r, event) =>
+        events.foldLeft(logIfTagPresent("undo.height", MemCacheKey.Height)) { case (r, event) =>
           val updates = event.update match {
             case Update.Append(append) =>
               log.debug(s"Undo id=${ByteStr(event.id.toByteArray)}")
@@ -467,12 +468,12 @@ class SharedBlockchainStorage[TagT] private (
   }
 
   private def toWeightedAssetDescription(x: AssetDescription): WeighedAssetDescription =
-    WeighedAssetDescription(x.script.fold(0)(CacheWeights.ofAssetScriptInfo), x)
+    WeighedAssetDescription(x.script.fold(0)(MemCacheWeights.ofAssetScriptInfo), x)
 
   private def toWeightedAccountScriptInfo(pk: PublicKey, script: Script): WeighedAccountScriptInfo = {
     val estimated = Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, script, isAsset = false))
     WeighedAccountScriptInfo(
-      scriptInfoWeight = CacheWeights.ofScript(script),
+      scriptInfoWeight = MemCacheWeights.ofScript(script),
       accountScriptInfo = AccountScriptInfo(
         publicKey = pk,
         script = script, // See WavesEnvironment.accountScript
@@ -496,5 +497,5 @@ object SharedBlockchainStorage {
   )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] =
     new SharedBlockchainStorage[TagT](settings, allTags, db, diskCaches, blockchainApi).tap(_.load())
 
-  case class Settings(blockchain: BlockchainSettings, blockchainDataCache: InMemBlockchainDataCache.Settings)
+  case class Settings(blockchain: BlockchainSettings, memBlockchainDataCache: MemBlockchainDataCache.Settings)
 }

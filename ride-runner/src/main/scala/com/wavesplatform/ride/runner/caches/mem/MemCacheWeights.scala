@@ -1,9 +1,10 @@
-package com.wavesplatform.ride.runner.caches
+package com.wavesplatform.ride.runner.caches.mem
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.caches.{SharedBlockchainStorage, WeighedAssetDescription}
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import com.wavesplatform.state.{AssetScriptInfo, BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -15,7 +16,7 @@ import java.lang.reflect.Field
 import java.util
 
 // Close size of objects in bytes
-object CacheWeights {
+object MemCacheWeights {
   private val sizeOf = SizeOf.newInstance(
     false,
     true,
@@ -78,11 +79,11 @@ object CacheWeights {
 
   def ofDataEntry(x: DataEntry[?]): Int = {
     // 24 = 12 (header) + 4 (ref, type) + 4 (ref, key) + 4 (ref, value) +
-    24 + CacheWeights.ofAsciiString(x.`type`) + CacheWeights.ofAsciiString(x.key) + (x match {
+    24 + ofAsciiString(x.`type`) + ofAsciiString(x.key) + (x match {
       case _: IntegerDataEntry => 24 // Long = 12 (header) + 4 (align) + 8 (value)
       case _: BooleanDataEntry => 16 // Boolean = 12 (header) + 1 (value) + 3 (align)
-      case x: BinaryDataEntry  => CacheWeights.ofByteStr(x.value)
-      case x: StringDataEntry  => CacheWeights.ofAsciiString(x.value)
+      case x: BinaryDataEntry  => ofByteStr(x.value)
+      case x: StringDataEntry  => ofAsciiString(x.value)
       case _: EmptyDataEntry   => 16 // Unit = 12 (header) + 4 (align)
     })
   }

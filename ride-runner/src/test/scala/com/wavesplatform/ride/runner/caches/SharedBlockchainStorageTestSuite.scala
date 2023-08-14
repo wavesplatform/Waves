@@ -17,6 +17,7 @@ import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
+import com.wavesplatform.ride.runner.caches.mem.{MemBlockchainDataCache, MemCacheKey}
 import com.wavesplatform.ride.runner.db.HasTestDb
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
@@ -51,7 +52,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
               val blockchain = SharedBlockchainStorage(
                 settings = SharedBlockchainStorage.Settings(
                   blockchain = DefaultBlockchainSettings,
-                  blockchainDataCache = InMemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+                  memBlockchainDataCache = MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
                 ),
                 allTags = new CacheKeyTags[Tag],
                 db = db,
@@ -488,24 +489,24 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
       DefaultBlockchainSettings.functionalitySettings.preActivatedFeatures.view.mapValues(Height(_)).toMap
   }
 
-  private lazy val heightKey        = CacheKey.Height
-  private lazy val accountScriptKey = CacheKey.AccountScript(aliceAddr)
-  private lazy val allDependencies: Map[CacheKey, Tag] = Map(
-    CacheKey.AccountData(aliceAddr, "x")                    -> 1,
-    CacheKey.Transaction(transactionId)                     -> 2,
-    heightKey                                               -> 3,
-    CacheKey.Alias(Alias.create("foo-alias").explicitGet()) -> 4,
-    CacheKey.Asset(asset)                                   -> 5,
-    CacheKey.AccountBalance(aliceAddr, Asset.Waves)         -> 6,
-    CacheKey.AccountBalance(bobAddr, asset)                 -> 7,
-    CacheKey.AccountLeaseBalance(aliceAddr)                 -> 8,
-    accountScriptKey                                        -> 9
+  private lazy val heightKey        = MemCacheKey.Height
+  private lazy val accountScriptKey = MemCacheKey.AccountScript(aliceAddr)
+  private lazy val allDependencies: Map[MemCacheKey, Tag] = Map(
+    MemCacheKey.AccountData(aliceAddr, "x")                    -> 1,
+    MemCacheKey.Transaction(transactionId)                     -> 2,
+    heightKey                                                  -> 3,
+    MemCacheKey.Alias(Alias.create("foo-alias").explicitGet()) -> 4,
+    MemCacheKey.Asset(asset)                                   -> 5,
+    MemCacheKey.AccountBalance(aliceAddr, Asset.Waves)         -> 6,
+    MemCacheKey.AccountBalance(bobAddr, asset)                 -> 7,
+    MemCacheKey.AccountLeaseBalance(aliceAddr)                 -> 8,
+    accountScriptKey                                           -> 9
   )
   private lazy val allTags = AffectedTags(allDependencies.values.toSet)
 
   private type Tag = Int
   private abstract class Test {
-    val dependencies: Map[CacheKey, Tag]            = Map.empty
+    val dependencies: Map[MemCacheKey, Tag]         = Map.empty
     val preEvents: Seq[BlockchainUpdated]           = Seq.empty
     val trackAffectedEvents: Seq[BlockchainUpdated] = Seq.empty
 
@@ -518,7 +519,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
         val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
             blockchain = DefaultBlockchainSettings,
-            blockchainDataCache = InMemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
+            memBlockchainDataCache = MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
           ),
           allTags = allTags,
           db = db,
@@ -536,7 +537,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
   }
 
   private class Access(val blockchain: SharedBlockchainStorage[Tag], val affectedTags: AffectedTags[Tag]) {
-    def get[T <: CacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCachedInMem(key)
+    def get[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCachedInMem(key)
 
     def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {
       affectedTags shouldBe empty
@@ -545,7 +546,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
 
     def allTagsAffected(): this.type = allTagsAffectedExcept()
 
-    def allTagsAffectedExcept(keys: CacheKey*): this.type = {
+    def allTagsAffectedExcept(keys: MemCacheKey*): this.type = {
       val expected   = AffectedTags(allTags.xs -- keys.map(allDependencies.apply))
       val sortedDiff = (expected.xs -- affectedTags.xs).toList.sorted
       withClue(s"affected tags, diff={${sortedDiff.mkString(", ")}}") {
@@ -587,40 +588,40 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
     )
 
     def dataIs(
-        aliceAccountData: RemoteData[CacheKey.AccountData#ValueT] = RemoteData.Unknown,
-        transaction: RemoteData[CacheKey.Transaction#ValueT] = RemoteData.Unknown,
-        assetInfo: RemoteData[CacheKey.Asset#ValueT] = RemoteData.Unknown,
-        aliceWavesBalance: RemoteData[CacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
-        bobAssetBalance: RemoteData[CacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
-        aliceLeaseBalance: RemoteData[CacheKey.AccountLeaseBalance#ValueT] = RemoteData.Unknown,
-        aliceAccountScript: RemoteData[CacheKey.AccountScript#ValueT] = RemoteData.Unknown
+        aliceAccountData: RemoteData[MemCacheKey.AccountData#ValueT] = RemoteData.Unknown,
+        transaction: RemoteData[MemCacheKey.Transaction#ValueT] = RemoteData.Unknown,
+        assetInfo: RemoteData[MemCacheKey.Asset#ValueT] = RemoteData.Unknown,
+        aliceWavesBalance: RemoteData[MemCacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
+        bobAssetBalance: RemoteData[MemCacheKey.AccountBalance#ValueT] = RemoteData.Unknown,
+        aliceLeaseBalance: RemoteData[MemCacheKey.AccountLeaseBalance#ValueT] = RemoteData.Unknown,
+        aliceAccountScript: RemoteData[MemCacheKey.AccountScript#ValueT] = RemoteData.Unknown
     ): this.type = {
       withClue("account data") {
-        get(CacheKey.AccountData(aliceAddr, "x")) shouldBe aliceAccountData
+        get(MemCacheKey.AccountData(aliceAddr, "x")) shouldBe aliceAccountData
       }
 
       withClue("transaction") {
-        get(CacheKey.Transaction(transactionId)) shouldBe transaction
+        get(MemCacheKey.Transaction(transactionId)) shouldBe transaction
       }
 
       withClue("asset") {
-        get(CacheKey.Asset(asset)) shouldBe assetInfo
+        get(MemCacheKey.Asset(asset)) shouldBe assetInfo
       }
 
       withClue("waves balance") {
-        get(CacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe aliceWavesBalance
+        get(MemCacheKey.AccountBalance(aliceAddr, Asset.Waves)) shouldBe aliceWavesBalance
       }
 
       withClue("issued asset balance") {
-        get(CacheKey.AccountBalance(bobAddr, asset)) shouldBe bobAssetBalance
+        get(MemCacheKey.AccountBalance(bobAddr, asset)) shouldBe bobAssetBalance
       }
 
       withClue("lease balance") {
-        get(CacheKey.AccountLeaseBalance(aliceAddr)) shouldBe aliceLeaseBalance
+        get(MemCacheKey.AccountLeaseBalance(aliceAddr)) shouldBe aliceLeaseBalance
       }
 
       withClue("account script") {
-        get(CacheKey.AccountScript(aliceAddr)) shouldBe aliceAccountScript
+        get(MemCacheKey.AccountScript(aliceAddr)) shouldBe aliceAccountScript
       }
 
       this

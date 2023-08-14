@@ -6,7 +6,8 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.ride.runner.caches.{CacheKey, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage
+import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.requests.RideScriptRunRequest
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{
@@ -26,11 +27,11 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   override def settings: BlockchainSettings = sharedBlockchain.blockchainSettings
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.getOrFetch(CacheKey.AccountData(address, key))
+  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.getOrFetch(MemCacheKey.AccountData(address, key))
 
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] =
-    sharedBlockchain.getOrFetch(CacheKey.AccountScript(address)).map(_.accountScriptInfo)
+    sharedBlockchain.getOrFetch(MemCacheKey.AccountScript(address)).map(_.accountScriptInfo)
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
@@ -50,7 +51,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
 
   // Ride: assetInfo
   override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] =
-    sharedBlockchain.getOrFetch(CacheKey.Asset(id)).map(_.assetDescription)
+    sharedBlockchain.getOrFetch(MemCacheKey.Asset(id)).map(_.assetDescription)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
@@ -60,11 +61,11 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance =
-    sharedBlockchain.getOrFetch(CacheKey.AccountLeaseBalance(address)).getOrElse(LeaseBalance.empty)
+    sharedBlockchain.getOrFetch(MemCacheKey.AccountLeaseBalance(address)).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long =
-    sharedBlockchain.getOrFetch(CacheKey.AccountBalance(address, mayBeAssetId)).getOrElse(0L)
+    sharedBlockchain.getOrFetch(MemCacheKey.AccountBalance(address, mayBeAssetId)).getOrElse(0L)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
@@ -75,7 +76,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
     List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
   }
 
-  private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.getOrFetch(CacheKey.Transaction(TransactionId(id)))
+  private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.getOrFetch(MemCacheKey.Transaction(TransactionId(id)))
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = {

@@ -1,5 +1,7 @@
 package com.wavesplatform.ride.runner.caches
 
+import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
+
 import java.util.concurrent.ConcurrentHashMap
 
 class CacheKeyTags[TagT] {
@@ -10,20 +12,20 @@ class CacheKeyTags[TagT] {
   //   not exist - we don't known this key
   //   exist, but empty - we known this key, but doesn't remember why
   //   exist and non-empty - we know, why do we need this key (but there are probably more tags)
-  private val allTags = new ConcurrentHashMap[CacheKey, Tags]()
+  private val allTags = new ConcurrentHashMap[MemCacheKey, Tags]()
 
-  def get(key: CacheKey): Option[Tags] = Option(allTags.get(key))
+  def get(key: MemCacheKey): Option[Tags] = Option(allTags.get(key))
 
-  def addDependent(key: CacheKey, tag: TagT): Unit = allTags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
+  def addDependent(key: MemCacheKey, tag: TagT): Unit = allTags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
 
   def removeTags(xs: collection.Set[TagT]): Unit = {
-    allTags.replaceAll { (_: CacheKey, orig: Tags) =>
+    allTags.replaceAll { (_: MemCacheKey, orig: Tags) =>
       if (orig.size >= xs.size) orig -- xs
       else orig.diff(xs)
     }
 
     // TODO: Use removeIf to remove empty keys in JRE 17
-    val emptyKeys = allTags.reduceEntries[Seq[CacheKey]](
+    val emptyKeys = allTags.reduceEntries[Seq[MemCacheKey]](
       4, // parallelismThreshold
       entry => if (entry.getValue.isEmpty) Seq(entry.getKey) else Seq.empty,
       _ ++ _

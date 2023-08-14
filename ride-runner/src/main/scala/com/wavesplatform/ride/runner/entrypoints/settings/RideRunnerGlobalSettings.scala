@@ -27,7 +27,7 @@ case class RideRunnerGlobalSettings(
 
   val sharedBlockchain = SharedBlockchainStorage.Settings(
     blockchain = blockchain,
-    blockchainDataCache = rideRunner.blockchainDataCache
+    memBlockchainDataCache = rideRunner.memBlockchainDataCache
   )
 
   val blockchainApi = DefaultBlockchainApi.Settings(

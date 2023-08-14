@@ -1,7 +1,8 @@
 package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.account.{AddressScheme, Alias}
-import com.wavesplatform.ride.runner.caches.{CacheKey, RemoteData}
+import com.wavesplatform.ride.runner.caches.RemoteData
+import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.Height
 
@@ -84,5 +85,5 @@ class AliasesDiskCacheTestSuite extends DiskTestSuite {
     f(db, caches.aliases)
   }
 
-  private def mkAliasKey(s: String) = CacheKey.Alias(Alias(AddressScheme.current.chainId, s))
+  private def mkAliasKey(s: String) = MemCacheKey.Alias(Alias(AddressScheme.current.chainId, s))
 }

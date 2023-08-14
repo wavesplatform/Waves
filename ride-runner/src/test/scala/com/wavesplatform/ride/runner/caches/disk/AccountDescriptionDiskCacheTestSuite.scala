@@ -2,15 +2,16 @@ package com.wavesplatform.ride.runner.caches.disk
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.runner.caches.{CacheKey, WeighedAssetDescription}
+import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
+import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
 import com.wavesplatform.state.{AssetDescription, Height}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
 import java.nio.charset.StandardCharsets
 
-class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[CacheKey.Asset, WeighedAssetDescription] {
-  protected override val defaultKey = CacheKey.Asset(Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0))))
+class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[MemCacheKey.Asset, WeighedAssetDescription] {
+  protected override val defaultKey = MemCacheKey.Asset(Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0))))
   protected override val defaultValue = WeighedAssetDescription(
     scriptWeight = 0,
     assetDescription = AssetDescription(
@@ -30,7 +31,7 @@ class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite
     )
   )
 
-  protected override def test(f: (RideDbAccess, DiskCache[CacheKey.Asset, WeighedAssetDescription]) => Unit): Unit = withDb { db =>
+  protected override def test(f: (RideDbAccess, DiskCache[MemCacheKey.Asset, WeighedAssetDescription]) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
     f(db, caches.assetDescriptions)
   }

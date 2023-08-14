@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.entrypoints.settings
 
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.GrpcChannelSettings
-import com.wavesplatform.ride.runner.caches.InMemBlockchainDataCache
+import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
 import com.wavesplatform.ride.runner.db.RideRocksDb
 
 import scala.concurrent.duration.FiniteDuration
@@ -15,7 +15,7 @@ case class RideRunnerCommonSettings(
     maxTxErrorLogSize: ConfigMemorySize,
     onEmptyStartFrom: Option[Int],
     responseCache: RideRunnerResponseCacheSettings,
-    blockchainDataCache: InMemBlockchainDataCache.Settings,
+    memBlockchainDataCache: MemBlockchainDataCache.Settings,
     parallelRideRunThreads: Option[Int],
     rideSchedulerThreads: Option[Int],
     blockchainBlocksBufferSize: Int,
