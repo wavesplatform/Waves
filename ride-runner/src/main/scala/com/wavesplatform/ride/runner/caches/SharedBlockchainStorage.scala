@@ -34,17 +34,13 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT] private (
     settings: Settings,
-    allTags: CacheKeyTags[TagT],
+    blockchainApi: BlockchainApi,
     db: RideDbAccess,
     diskCaches: DiskCaches,
-    blockchainApi: BlockchainApi
+    blockHeaders: BlockHeaderStorage,
+    memCache: MemBlockchainDataCache,
+    allTags: CacheKeyTags[TagT]
 ) extends ScorexLogging {
-  private val blockHeaders = new BlockHeaderStorage(blockchainApi, diskCaches.blockHeaders)
-
-  def load()(implicit ctx: ReadOnly): Unit = blockHeaders.load()
-
-  private val memCache = new MemBlockchainDataCache(settings.memBlockchainDataCache)
-
   def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.directReadWrite { implicit ctx =>
     blockHeaders.getOrFetch(atHeight)
   }
@@ -488,14 +484,18 @@ class SharedBlockchainStorage[TagT] private (
 }
 
 object SharedBlockchainStorage {
-  def apply[TagT](
+  def load[TagT](
       settings: Settings,
-      allTags: CacheKeyTags[TagT],
+      blockchainApi: BlockchainApi,
       db: RideDbAccess,
       diskCaches: DiskCaches,
-      blockchainApi: BlockchainApi
-  )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] =
-    new SharedBlockchainStorage[TagT](settings, allTags, db, diskCaches, blockchainApi).tap(_.load())
+      memCache: MemBlockchainDataCache,
+      allTags: CacheKeyTags[TagT]
+  )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] = {
+    val blockHeaders = new BlockHeaderStorage(blockchainApi, diskCaches.blockHeaders)
+    blockHeaders.load()
+    new SharedBlockchainStorage[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, memCache, allTags)
+  }
 
-  case class Settings(blockchain: BlockchainSettings, memBlockchainDataCache: MemBlockchainDataCache.Settings)
+  case class Settings(blockchain: BlockchainSettings)
 }

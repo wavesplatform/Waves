@@ -49,15 +49,13 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
 
           "updates activated features" in withDb { db =>
             db.batchedReadWrite { implicit rw =>
-              val blockchain = SharedBlockchainStorage(
-                settings = SharedBlockchainStorage.Settings(
-                  blockchain = DefaultBlockchainSettings,
-                  memBlockchainDataCache = MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
-                ),
-                allTags = new CacheKeyTags[Tag],
+              val blockchain = SharedBlockchainStorage.load(
+                settings = SharedBlockchainStorage.Settings(DefaultBlockchainSettings),
+                blockchainApi = testBlockchainApi,
                 db = db,
                 diskCaches = DefaultDiskCaches(db),
-                blockchainApi = testBlockchainApi
+                memCache = new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))),
+                allTags = new CacheKeyTags[Tag]
               )
 
               blockchain.activatedFeatures shouldBe DefaultBlockchainSettings.functionalitySettings.preActivatedFeatures
@@ -516,15 +514,13 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
       db.directReadWrite { implicit rw =>
         val diskCaches = DefaultDiskCaches(db)
 
-        val blockchain = SharedBlockchainStorage(
-          settings = SharedBlockchainStorage.Settings(
-            blockchain = DefaultBlockchainSettings,
-            memBlockchainDataCache = MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))
-          ),
-          allTags = allTags,
+        val blockchain = SharedBlockchainStorage.load(
+          settings = SharedBlockchainStorage.Settings(DefaultBlockchainSettings),
+          blockchainApi = testBlockchainApi,
           db = db,
           diskCaches = diskCaches,
-          blockchainApi = testBlockchainApi
+          memCache = new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))),
+          allTags = allTags
         )
 
         log.debug("Preparing done, running the test")

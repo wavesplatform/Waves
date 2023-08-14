@@ -25,10 +25,9 @@ case class RideRunnerGlobalSettings(
 
   val heightsSettings = Heights.Settings(rideRunner.onEmptyStartFrom, blockchain.functionalitySettings)
 
-  val sharedBlockchain = SharedBlockchainStorage.Settings(
-    blockchain = blockchain,
-    memBlockchainDataCache = rideRunner.memBlockchainDataCache
-  )
+  val sharedBlockchain = SharedBlockchainStorage.Settings(blockchain)
+
+  def memBlockchainDataCache = rideRunner.memBlockchainDataCache
 
   val blockchainApi = DefaultBlockchainApi.Settings(
     grpcApi = DefaultBlockchainApi.GrpcApiSettings(maxConcurrentRequests = rideRunner.grpcApiMaxConcurrentRequests),

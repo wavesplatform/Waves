@@ -65,12 +65,13 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val testDb  = use(mkTestDb())
     val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = testDb.access.batchedReadWrite { implicit ctx =>
-      SharedBlockchainStorage(
-        SharedBlockchainStorage.Settings(blockchainSettings, MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1024))),
-        allTags,
+      SharedBlockchainStorage.load(
+        SharedBlockchainStorage.Settings(blockchainSettings),
+        blockchainApi,
         testDb.access,
         DefaultDiskCaches(testDb.access),
-        blockchainApi
+        new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1024))),
+        allTags
       )
     }
 
