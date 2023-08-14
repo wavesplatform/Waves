@@ -2,8 +2,8 @@ package com.wavesplatform.ride.runner.entrypoints.settings
 
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.api.GrpcChannelSettings
+import com.wavesplatform.ride.runner.caches.InMemBlockchainDataCache
 import com.wavesplatform.ride.runner.db.RideRocksDb
-import com.wavesplatform.ride.runner.storage.InMemBlockchainDataCache
 
 import scala.concurrent.duration.FiniteDuration
 

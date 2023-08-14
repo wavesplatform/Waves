@@ -28,8 +28,8 @@
     <logger name="kamon" level="ERROR"/>
 
     <!-- App -->
-    <logger name="com.wavesplatform.ride.runner.storage" level="TRACE"/>
-    <logger name="com.wavesplatform.ride.runner.storage.persistent" level="TRACE"/>
+    <logger name="com.wavesplatform.ride.runner.caches" level="TRACE"/>
+    <logger name="com.wavesplatform.ride.runner.caches.persistent" level="TRACE"/>
     <logger name="com.wavesplatform.blockchain" level="TRACE"/>
     <logger name="com.wavesplatform.api" level="TRACE"/>
     <logger name="com.wavesplatform.api.http.CompositeHttpService" level="OFF"/>

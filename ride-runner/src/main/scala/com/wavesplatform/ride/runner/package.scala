@@ -4,7 +4,7 @@ import com.wavesplatform.features.{BlockchainFeatures, ComplexityCheckPolicyProv
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.ride.runner.storage.ActivatedFeatures
+import com.wavesplatform.ride.runner.caches.ActivatedFeatures
 import com.wavesplatform.state.Blockchain
 
 package object runner {

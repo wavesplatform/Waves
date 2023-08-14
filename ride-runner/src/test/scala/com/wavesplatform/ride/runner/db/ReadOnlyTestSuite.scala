@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.db
 import com.google.common.primitives.Shorts
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.runner.storage.persistent.HasDb
+import com.wavesplatform.ride.runner.caches.persistent.HasDb
 
 abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
   private val testName      = getClass.getSimpleName.replace("TestSuite", "")

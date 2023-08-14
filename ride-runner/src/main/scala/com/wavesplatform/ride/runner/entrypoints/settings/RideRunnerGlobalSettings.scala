@@ -3,9 +3,9 @@ package com.wavesplatform.ride.runner.entrypoints.settings
 import com.typesafe.config.*
 import com.wavesplatform.api.DefaultBlockchainApi
 import com.wavesplatform.ride.runner.BlockchainState
+import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage
 import com.wavesplatform.ride.runner.entrypoints.{Heights, WavesRideRunnerCompareService}
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
-import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*

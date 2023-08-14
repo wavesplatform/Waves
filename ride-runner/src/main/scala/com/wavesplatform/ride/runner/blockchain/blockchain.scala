@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
-import com.wavesplatform.ride.runner.storage.ActivatedFeatures
+import com.wavesplatform.ride.runner.caches.ActivatedFeatures
 import com.wavesplatform.state.AccountScriptInfo
 
 package object blockchain {

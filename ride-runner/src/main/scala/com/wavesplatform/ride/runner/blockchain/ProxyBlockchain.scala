@@ -6,8 +6,8 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.ride.runner.caches.{CacheKey, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.requests.RideScriptRunRequest
-import com.wavesplatform.ride.runner.storage.{CacheKey, SharedBlockchainStorage}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{
   AccountScriptInfo,

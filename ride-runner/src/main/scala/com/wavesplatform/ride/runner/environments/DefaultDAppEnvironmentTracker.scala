@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.environments
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.runner.storage.{CacheKey, CacheKeyTags}
+import com.wavesplatform.ride.runner.caches.{CacheKey, CacheKeyTags}
 import com.wavesplatform.state.TransactionId
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging

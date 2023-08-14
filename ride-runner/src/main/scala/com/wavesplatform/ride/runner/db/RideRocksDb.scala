@@ -1,10 +1,10 @@
 package com.wavesplatform.ride.runner.db
 
 import com.typesafe.config.ConfigMemorySize
+import com.wavesplatform.ride.runner.caches.persistent.KvPair
 import com.wavesplatform.ride.runner.db.RideRocksDb.RocksDbStatistics
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.dbStats
-import com.wavesplatform.ride.runner.storage.persistent.KvPair
 import com.wavesplatform.utils.*
 import monix.execution.{Cancelable, Scheduler}
 import org.rocksdb.{ColumnFamilyHandle, RocksDB, Statistics, TickerType, *}
