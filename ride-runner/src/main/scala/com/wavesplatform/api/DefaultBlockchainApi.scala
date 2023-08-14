@@ -234,7 +234,7 @@ class DefaultBlockchainApi(
         ClientCalls
           .blockingUnaryCall(
             grpcApiChannel.newCall(AccountsApiGrpc.METHOD_RESOLVE_ALIAS, CallOptions.DEFAULT),
-            alias.toString // TODO #6: check implementation
+            alias.name
           )
           .some
       catch {

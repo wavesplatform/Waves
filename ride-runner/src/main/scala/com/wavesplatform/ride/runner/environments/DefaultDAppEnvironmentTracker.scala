@@ -72,7 +72,6 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
 
   override def accountWavesBalanceOf(address: Address): Unit = {
     // log.trace(s"[$tag] accountWavesBalanceOf($addr)")
-    // TODO merge?
     allTags.addDependent(CacheKey.AccountBalance(address, Asset.Waves), tag)
     allTags.addDependent(CacheKey.AccountLeaseBalance(address), tag)
   }

@@ -16,7 +16,6 @@ import monix.execution.exceptions.UpstreamTimeoutException
 
 import scala.concurrent.duration.FiniteDuration
 
-// TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
 sealed trait BlockchainState extends Product with Serializable {
   def processedHeight: Height
 }
