@@ -76,30 +76,26 @@ object AssetTransactionsDiffs {
     else
       Right(())
 
-  def setAssetScript(b: Blockchain)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
-    countVerifierComplexity(tx.script, b, isAsset = true)
-      .flatMap(script =>
-        validateAsset(b, tx.asset, tx.sender.toAddress, issuerOnly = true)
-          .flatMap(_ =>
-            (if (!b.hasAssetScript(tx.asset)) Left(GenericError("Cannot set script on an asset issued without a script"))
-             else checkEstimationOverflow(b, script))
-              .flatMap(_ =>
-                adapt(b, tx.script)
-                  .map { _ =>
-                    val scriptsRun =
-                      if (b.isFeatureActivated(Ride4DApps)) countScriptRuns(b, tx)
-                      else Some(tx.sender.toAddress).count(b.hasAccountScript)
-                    Diff(
-                      scriptsRun = scriptsRun,
-                      assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled)),
-                      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value))
-                    )
-                  }
-              )
-          )
+  def setAssetScript(blockchain: Blockchain)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
+    for {
+      _      <- validateAsset(blockchain, tx.asset, tx.sender.toAddress, issuerOnly = true)
+      script <- countVerifierComplexity(tx.script, blockchain, isAsset = true)
+      _ <-
+        if (!blockchain.hasAssetScript(tx.asset)) Left(GenericError("Cannot set script on an asset issued without a script"))
+        else checkEstimationOverflow(blockchain, script)
+      _ <- checkScriptSize(blockchain, tx.script)
+    } yield {
+      val scriptsRun =
+        if (blockchain.isFeatureActivated(Ride4DApps)) countScriptRuns(blockchain, tx)
+        else Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+      Diff(
+        scriptsRun = scriptsRun,
+        assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled)),
+        portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value))
       )
+    }
 
-  private def adapt(b: Blockchain, scriptOpt: Option[Script]): Either[GenericError, Unit] =
+  private def checkScriptSize(b: Blockchain, scriptOpt: Option[Script]): Either[GenericError, Unit] =
     scriptOpt.fold(().asRight[GenericError]) { script =>
       cond(
         !b.isFeatureActivated(BlockRewardDistribution) || script.bytes().size <= MaxExprSizeInBytes,
@@ -108,10 +104,10 @@ object AssetTransactionsDiffs {
       )
     }
 
-  def issue(b: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = { // TODO: unify with InvokeScript action diff?
+  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = { // TODO: unify with InvokeScript action diff?
     // First 20 bytes of id should be unique
     def requireUnique(): Boolean =
-      b.resolveERC20Address(ERC20Address(tx.asset)).isEmpty
+      blockchain.resolveERC20Address(ERC20Address(tx.asset)).isEmpty
 
     def requireValidUtf(): Boolean = {
       def isValid(str: ByteString): Boolean = {
@@ -119,32 +115,27 @@ object AssetTransactionsDiffs {
         val convertible = str == ByteString.copyFromUtf8(str.toStringUtf8)
         wellFormed && convertible
       }
-      (isValid(tx.name) && isValid(tx.description)) || !b.isFeatureActivated(BlockV5)
+      (isValid(tx.name) && isValid(tx.description)) || !blockchain.isFeatureActivated(BlockV5)
     }
 
-    val assetInfo   = AssetInfo(tx.name, tx.description, Height @@ b.height)
+    val assetInfo   = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
     val assetVolume = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity.value))
-    val assetStatic = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals.value, b.isNFT(tx))
+    val assetStatic = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
+    val asset       = IssuedAsset(tx.id())
 
-    cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
-      .flatMap(_ =>
-        cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
-          .flatMap(_ =>
-            adapt(b, tx.script)
-              .flatMap { _ =>
-                val asset = IssuedAsset(tx.id())
-                countVerifierComplexity(tx.script, b, isAsset = true)
-                  .flatTap(checkEstimationOverflow(b, _))
-                  .map(script =>
-                    Diff(
-                      scriptsRun = countScriptRuns(b, tx),
-                      assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled)),
-                      issuedAssets = VectorMap(asset -> NewAssetInfo(assetStatic, assetInfo, assetVolume)),
-                      portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value))
-                    )
-                  )
-              }
-          )
+    for {
+      _      <- cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
+      _      <- cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
+      _      <- checkScriptSize(blockchain, tx.script)
+      script <- countVerifierComplexity(tx.script, blockchain, isAsset = true)
+      _      <- checkEstimationOverflow(blockchain, script)
+    } yield {
+      Diff(
+        scriptsRun = countScriptRuns(blockchain, tx),
+        assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled)),
+        issuedAssets = VectorMap(asset -> NewAssetInfo(assetStatic, assetInfo, assetVolume)),
+        portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value))
       )
+    }
   }
 }
