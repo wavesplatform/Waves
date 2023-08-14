@@ -17,14 +17,14 @@ import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
-import com.wavesplatform.ride.runner.db.HasDb
+import com.wavesplatform.ride.runner.db.HasTestDb
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 
 import java.nio.charset.StandardCharsets
 
-class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with HasGrpc with HasTestAccounts {
+class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with HasGrpc with HasTestAccounts {
   "SharedBlockchainStorage" - {
     "process with" - {
       "append" - {

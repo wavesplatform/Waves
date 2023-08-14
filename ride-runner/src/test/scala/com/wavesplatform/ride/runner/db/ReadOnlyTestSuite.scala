@@ -4,7 +4,7 @@ import com.google.common.primitives.Shorts
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.common.state.ByteStr
 
-abstract class ReadOnlyTestSuite extends BaseTestSuite with HasDb {
+abstract class ReadOnlyTestSuite extends BaseTestSuite with HasTestDb {
   private val testName      = getClass.getSimpleName.replace("TestSuite", "")
   private val defaultPrefix = Shorts.toByteArray(1)
   private val otherPrefix   = Shorts.toByteArray(2)

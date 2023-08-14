@@ -2,16 +2,16 @@ package com.wavesplatform.ride.runner.db
 
 import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.typesafe.config.ConfigMemorySize
-import com.wavesplatform.ride.runner.db.HasDb.mkTestDb
+import com.wavesplatform.ride.runner.db.HasTestDb.mkTestDb
 
 import java.nio.file.{Files, Path}
 import scala.util.Using
 
-trait HasDb {
+trait HasTestDb {
   protected def withDb[A](f: RideDbAccess => A): A = Using.resource(mkTestDb())(db => f(db.access))
 }
 
-object HasDb {
+object HasTestDb {
   def mkTestDb(path: Path = mkTempPath): RideDb = {
     val db = RideRocksDb.open(
       RideRocksDb.Settings(

@@ -15,8 +15,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, InMemBlockchainDataCache, SharedBlockchainStorage}
-import com.wavesplatform.ride.runner.db.HasDb
-import com.wavesplatform.ride.runner.db.HasDb.mkTestDb
+import com.wavesplatform.ride.runner.db.HasTestDb
+import com.wavesplatform.ride.runner.db.HasTestDb.mkTestDb
 import com.wavesplatform.ride.runner.requests.*
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -28,7 +28,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasDb {
+class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasTestDb {
   private val aRequest = RideScriptRunRequest(aliceAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
   private val bRequest = RideScriptRunRequest(bobAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
   private val cRequest = RideScriptRunRequest(carlAddr, Json.obj("expr" -> "default()"), trace = false, intAsString = true)
