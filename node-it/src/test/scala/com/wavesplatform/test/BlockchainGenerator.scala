@@ -163,7 +163,8 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                     genBlock.signer,
                     block.header.featureVotes,
                     block.header.rewardVote,
-                    None
+                    block.header.stateHash,
+                    block.header.challengedHeader
                   )
                   _ <- Await
                     .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
@@ -187,6 +188,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                   Nil,
                   0,
                   ByteStr.empty,
+                  None,
                   None
                 ),
                 ByteStr.empty,

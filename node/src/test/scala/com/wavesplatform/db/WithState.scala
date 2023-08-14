@@ -3,8 +3,10 @@ package com.wavesplatform.db
 import com.google.common.primitives.Shorts
 
 import java.nio.file.Files
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.{GenesisBlockVersion, GenesisGenerationSignature, GenesisGenerator, GenesisReference}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -20,14 +22,16 @@ import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Transaction, TxHelpers}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
 import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
+
+import scala.concurrent.duration.*
 
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
@@ -170,7 +174,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   def assertBalanceInvariant(diff: Diff): Unit = {
     val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
     portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+    portfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
     all(portfolioDiff.assets.values) shouldBe 0
   }
 
@@ -209,7 +213,13 @@ trait WithDomain extends WithState { _: Suite =>
           TxHelpers.genesis(address, amount)
         }
         if (genesis.nonEmpty) {
-          domain.appendBlock(genesis*)
+          domain.appendBlock(
+            createGenesisWithStateHash(
+              genesis,
+              bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, 1),
+              Some(settings.blockchainSettings.genesisSettings.initialBaseTarget)
+            )
+          )
         }
         test(domain)
       } finally {
@@ -229,6 +239,45 @@ trait WithDomain extends WithState { _: Suite =>
     allVersions
       .filter(v => v >= from && v <= to)
       .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
+
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean, baseTarget: Option[Long] = None): Block = {
+    val timestamp = txs.map(_.timestamp).max
+    val genesisSettings = GenesisSettings(
+      timestamp,
+      timestamp,
+      txs.map(_.amount.value).sum,
+      None,
+      txs.map { tx =>
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
+      },
+      baseTarget.getOrElse(2L),
+      60.seconds
+    )
+
+    (for {
+      txs <- genesisSettings.transactions.toList.map { gts =>
+        for {
+          address <- Address.fromString(gts.recipient)
+          tx      <- GenesisTransaction.create(address, gts.amount, genesisSettings.timestamp)
+        } yield tx
+      }.sequence
+      baseTarget = genesisSettings.initialBaseTarget
+      timestamp  = genesisSettings.blockTimestamp
+      block <- Block.buildAndSign(
+        GenesisBlockVersion,
+        timestamp,
+        GenesisReference,
+        baseTarget,
+        GenesisGenerationSignature,
+        txs,
+        GenesisGenerator,
+        Seq.empty,
+        -1,
+        Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
+        None
+      )
+    } yield block).explicitGet()
+  }
 }
 
 object WithState {

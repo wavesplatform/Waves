@@ -11,7 +11,7 @@ import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{EthABIConverter, ERC20Address, EthereumTransaction}
@@ -140,7 +140,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                       "contractAddress"   -> JsNull,
                       "logs"              -> Json.arr(),
                       "logsBloom"         -> toHexString(new Array[Byte](32)),
-                      "status"            -> (if (tm.succeeded) "0x1" else "0x0")
+                      "status"            -> (if (tm.status == TxMeta.Status.Succeeded) "0x1" else "0x0")
                     )
                   case _ => JsNull
                 }

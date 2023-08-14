@@ -107,12 +107,13 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
 
   property("correctly create transaction state snapshot hash from diff") {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
-      TxStateSnapshotHashBuilder.createHashFromTxDiff(d.blockchain, diff).txStateSnapshotHash shouldBe hash(
+      TxStateSnapshotHashBuilder.createHashFromDiff(d.blockchain, diff).txStateSnapshotHash shouldBe hash(
         Seq(
           Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),
           Array(KeyType.AssetBalance.id.toByte) ++ address2.bytes ++ assetId1.id.arr ++ Longs.toByteArray(addr2PortfolioDiff.assets.head._2),
           Array(KeyType.DataEntry.id.toByte) ++ address1.bytes ++ dataEntry.key.getBytes(StandardCharsets.UTF_8) ++ dataEntry.valueBytes,
-          Array(KeyType.AccountScript.id.toByte) ++ address2.bytes ++ testScript.bytes().arr,
+          Array(KeyType.AccountScript.id.toByte) ++ address2.bytes ++ accountScriptInfo.script.bytes().arr ++ accountScriptInfo.publicKey.arr ++ Longs
+            .toByteArray(accountScriptInfo.verifierComplexity),
           Array(KeyType.AssetScript.id.toByte) ++ assetId1.id.arr ++ testScript.bytes().arr,
           Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
             addr1PortfolioDiff.lease.out

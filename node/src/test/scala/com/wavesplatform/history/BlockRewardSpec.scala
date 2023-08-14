@@ -312,7 +312,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
       b6b = TestBlock.sign(
         miner,
-        b6a.copy(header = b6a.header.copy(baseTarget = b6a.header.baseTarget - 1L))
+        b6a.copy(header = b6a.header.copy(timestamp = b6a.header.timestamp - 1L))
       )
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
 

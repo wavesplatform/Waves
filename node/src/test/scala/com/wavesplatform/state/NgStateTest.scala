@@ -51,10 +51,9 @@ class NgStateTest extends PropSpec {
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
 
-    microBlocks.foldLeft(1000) {
-      case (thisTime, m) =>
-        ng = ng.append(m, Diff.empty, 0L, 0L, thisTime)
-        thisTime + 50
+    microBlocks.foldLeft(1000) { case (thisTime, m) =>
+      ng = ng.append(m, Diff.empty, 0L, 0L, thisTime)
+      thisTime + 50
     }
 
     ng.bestLastBlockInfo(0).blockId shouldBe block.id()
@@ -74,10 +73,9 @@ class NgStateTest extends PropSpec {
     microBlocks.foreach(m => ng = ng.append(m, Diff.empty, 1L, 0L, 0L))
 
     ng.totalDiffOf(block.id()).map(_._3) shouldBe Some(0L)
-    microBlocks.zipWithIndex.foreach {
-      case (m, i) =>
-        val u = ng.totalDiffOf(m.totalResBlockSig).map(_._3)
-        u shouldBe Some(i + 1)
+    microBlocks.zipWithIndex.foreach { case (m, i) =>
+      val u = ng.totalDiffOf(m.totalResBlockSig).map(_._3)
+      u shouldBe Some(i + 1)
     }
     ng.carryFee shouldBe microBlocks.size
   }

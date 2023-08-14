@@ -16,7 +16,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.Miner
+import com.wavesplatform.mining.{BlockChallenger, Miner}
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.ParSignatureChecker.sigverify
@@ -139,6 +139,7 @@ object Importer extends ScorexLogging {
               rdb,
               blockchainUpdater,
               utxPool,
+              BlockChallenger.NoOp,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(rdb, blockchainUpdater)
             )
@@ -362,6 +363,7 @@ object Importer extends ScorexLogging {
               Nil,
               0,
               ByteStr.empty,
+              None,
               None
             ),
             ByteStr.empty,

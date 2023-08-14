@@ -323,6 +323,7 @@ class AssetsRouteSpec
   routePath(s"/details/{id} - non-smart asset") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
     val issues = (1 to 10).map(i => (i, issueTransaction())).toMap
 
+    d.appendBlock()
     d.appendMicroBlock(issues(1))
     checkDetails(route, issues(1), issues(1).id().toString, assetDesc)
 

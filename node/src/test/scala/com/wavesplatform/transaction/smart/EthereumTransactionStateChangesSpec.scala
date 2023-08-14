@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{EthTxGenerator, TxHelpers}
@@ -78,7 +79,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     d.liquidAndSolidAssert { () =>
       d.commonApi.transactions.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
-          assert(!meta.succeeded, "should fail")
+          assert(meta.status == Status.Failed, "should fail")
           Json.toJson(meta.invokeScriptResult) should matchJson("""
                                                                   |{
                                                                   |  "data" : [ ],
@@ -131,7 +132,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
       d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
       d.commonApi.transactions.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
-          assert(meta.succeeded, "should succeed")
+          assert(meta.status == Status.Succeeded, "should succeed")
           Json.toJson(meta.invokeScriptResult) should matchJson("""{
                                                                   |  "data" : [ {
                                                                   |    "key" : "test",
@@ -192,7 +193,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     d.liquidAndSolidAssert { () =>
       d.commonApi.transactions.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
-          assert(!meta.succeeded, "should fail")
+          assert(meta.status == Status.Failed, "should fail")
           Json.toJson(meta.invokeScriptResult) should matchJson("""
                                                                   |{
                                                                   |  "data" : [ ],
@@ -284,7 +285,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
 
       d.commonApi.transactions.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
-          assert(meta.succeeded, "should succeed")
+          assert(meta.status == Status.Succeeded, "should succeed")
           Json.toJson(meta.invokeScriptResult) should matchJson("""{
                                                                   |  "data" : [ {
                                                                   |    "key" : "test",

@@ -83,6 +83,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
     (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
     (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
+    (blockchainUpdater.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
       .returning(
@@ -97,15 +98,15 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBFo
       )
 
     var minedBlock: Block = null
-    (blockchainUpdater.processBlock _).when(*, *, *, *).returning(Left(BlockFromFuture(100))).repeated(10)
+    (blockchainUpdater.processBlock _).when(*, *, *, *, *).returning(Left(BlockFromFuture(100))).repeated(10)
     (blockchainUpdater.processBlock _)
-      .when(*, *, *, *)
-      .onCall { (block, _, _, _) =>
+      .when(*, *, *, *, *)
+      .onCall { (block, _, _, _, _) =>
         minedBlock = block
         Right(Nil)
       }
       .once()
-    (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
+    (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0, false)))
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)

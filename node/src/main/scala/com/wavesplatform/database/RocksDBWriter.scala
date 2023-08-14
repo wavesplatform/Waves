@@ -15,7 +15,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, Status as PBStatus, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
@@ -427,6 +427,14 @@ class RocksDBWriter(
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
       blockHeightCache.put(blockMeta.id, Some(height))
 
+      blockMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
+        case Some(addr) =>
+          val key          = Keys.maliciousMinerBanHeights(addr.bytes)
+          val savedHeights = rw.get(key)
+          rw.put(key, height +: savedHeights)
+        case _ => ()
+      }
+
       val lastAddressId = loadMaxAddressId() + newAddresses.size
 
       rw.put(Keys.lastAddressId, Some(lastAddressId))
@@ -518,7 +526,7 @@ class RocksDBWriter(
 
         targetBf.put(tx.id().arr)
 
-        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
+        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, txm.status.protobuf, 0, size)))
         id -> size
       }
 
@@ -748,6 +756,14 @@ class RocksDBWriter(
             }
           }
 
+          discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
+            case Some(addr) =>
+              val key        = Keys.maliciousMinerBanHeights(addr.bytes)
+              val banHeights = rw.get(key)
+              if (banHeights.size > 1) rw.put(key, banHeights.tail) else rw.delete(key)
+            case _ => ()
+          }
+
           rw.delete(Keys.blockMetaAt(currentHeight))
           rw.delete(Keys.changedAddresses(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
@@ -868,8 +884,8 @@ class RocksDBWriter(
       tx <- db
         .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
-          case (tm, t: TransferTransaction) if tm.succeeded => t
-          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
+          case (tm, t: TransferTransaction) if tm.status == TxMeta.Status.Succeeded => t
+          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if tm.status == PBStatus.SUCCEEDED =>
             val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
             val transfer = meta.payload.transfer.get
             val tAmount  = transfer.amount.get
@@ -899,7 +915,7 @@ class RocksDBWriter(
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = {
     writableDB.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)).map { tm =>
-      TxMeta(Height(tm.height), !tm.failed, tm.spentComplexity)
+      TxMeta(Height(tm.height), TxMeta.Status.fromProtobuf(tm.status), tm.spentComplexity)
     }
   }
 
@@ -978,8 +994,10 @@ class RocksDBWriter(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
-    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
+    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, isBanned = false))) { addressId =>
       val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
+
+      val banHeights = effectiveBalanceBanHeights(address).toSet
 
       val lastBalance      = balancesCache.get((address, Asset.Waves))
       val lastLeaseBalance = leaseBalanceCache.get(address)
@@ -1010,7 +1028,11 @@ class RocksDBWriter(
         (wh, lh) <- merge(wbh, lbh)
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
-      } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
+      } yield {
+        val height   = wh.max(lh)
+        val isBanned = banHeights.contains(height)
+        BalanceSnapshot(height, wb.balance, lb.in, lb.out, isBanned)
+      }
     }
   }
 
@@ -1056,6 +1078,9 @@ class RocksDBWriter(
       new WavesBalanceIterator(aid, dbResource).asScala.toSeq
     }
   }
+
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] =
+    readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))

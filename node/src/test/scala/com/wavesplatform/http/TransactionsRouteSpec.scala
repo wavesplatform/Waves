@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
@@ -278,7 +279,7 @@ class TransactionsRouteSpec
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
-        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, 0L, Some(InvokeScriptResult()))))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), transaction, Status.Succeeded, 0L, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/address/${account.toAddress}/limit/1")) ~> route ~> check {
@@ -328,15 +329,15 @@ class TransactionsRouteSpec
           )
         )
         .anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(leaseId1).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(leaseId2).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId1).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId2).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returning(Map.empty).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(invokeAddress, *, *, None)
-        .returning(Observable(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
+        .returning(Observable(TransactionMeta.Invoke(Height(1), invoke, Status.Succeeded, 0L, Some(scriptResult))))
         .once()
       (blockchain.resolveAlias _).expects(recipientAlias).returning(Right(recipientAddress))
 
@@ -435,7 +436,7 @@ class TransactionsRouteSpec
             TransactionMeta.Ethereum(
               Height(1),
               transaction,
-              succeeded = true,
+              Status.Succeeded,
               15L,
               diff.ethereumTransactionMeta.values.headOption,
               diff.scriptResults.values.headOption
@@ -493,7 +494,7 @@ class TransactionsRouteSpec
             TransactionMeta.Ethereum(
               Height(1),
               transaction,
-              succeeded = true,
+              Status.Succeeded,
               15L,
               diff.ethereumTransactionMeta.values.headOption,
               diff.scriptResults.values.headOption
@@ -546,14 +547,14 @@ class TransactionsRouteSpec
       val leaseCancel = TxHelpers.leaseCancel(lease.id())
 
       val blockchain = createBlockchainStub { blockchain =>
-        (blockchain.transactionInfo _).when(lease.id()).returns(Some(TxMeta(Height(1), true, 0L) -> lease))
-        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((TxMeta(Height(1), true, 0L) -> leaseCancel)))
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some(TxMeta(Height(1), Status.Succeeded, 0L) -> lease))
+        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((TxMeta(Height(1), Status.Succeeded, 0L) -> leaseCancel)))
       }
 
       val transactionsApi = stub[CommonTransactionsApi]
-      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true, 0L)))
-      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true, 0L)))
-      (blockchain.transactionMeta _).when(lease.id()).returns(Some(TxMeta(Height(1), true, 0L)))
+      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, Status.Succeeded, 0L)))
+      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, Status.Succeeded, 0L)))
+      (blockchain.transactionMeta _).when(lease.id()).returns(Some(TxMeta(Height(1), Status.Succeeded, 0L)))
       (blockchain.leaseDetails _)
         .when(lease.id())
         .returns(
@@ -613,7 +614,11 @@ class TransactionsRouteSpec
       } yield (tx, succeed, height, acceptFailedActivationHeight)
 
       forAll(txAvailability) { case (tx, succeed, height, acceptFailedActivationHeight) =>
-        (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(Height(height), tx, succeed, 0L))).once()
+        val applicationStatus = if (succeed) Status.Succeeded else Status.Failed
+        (addressTransactions.transactionById _)
+          .expects(tx.id())
+          .returning(Some(TransactionMeta.Default(Height(height), tx, applicationStatus, 0L)))
+          .once()
         (() => blockchain.activatedFeatures)
           .expects()
           .returning(Map(BF.BlockV5.id -> acceptFailedActivationHeight))
@@ -642,7 +647,7 @@ class TransactionsRouteSpec
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
         .expects(transaction.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, succeeded = true, 0L, Some(InvokeScriptResult()))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), transaction, Status.Succeeded, 0L, Some(InvokeScriptResult()))))
         .once()
 
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
@@ -731,11 +736,11 @@ class TransactionsRouteSpec
         )
         .anyNumberOfTimes()
 
-      (blockchain.transactionMeta _).expects(leaseId1).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(leaseId2).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(nestedLeaseId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
-      (blockchain.transactionMeta _).expects(nestedLeaseCancelId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId1).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseId2).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(nestedLeaseId).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
+      (blockchain.transactionMeta _).expects(nestedLeaseCancelId).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (blockchain.resolveAlias _).expects(recipientAlias).returning(Right(recipientAddress))
@@ -743,7 +748,7 @@ class TransactionsRouteSpec
       val invoke = TxHelpers.invoke(invokeAddress)
       (addressTransactions.transactionById _)
         .expects(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
+        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, Status.Succeeded, 0L, Some(scriptResult))))
         .once()
 
       Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
@@ -841,7 +846,7 @@ class TransactionsRouteSpec
       txs.foreach(tx =>
         (addressTransactions.transactionById _)
           .expects(tx.id())
-          .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, 85L, Some(InvokeScriptResult()))))
+          .returns(Some(TransactionMeta.Invoke(Height(1), tx, Status.Succeeded, 85L, Some(InvokeScriptResult()))))
           .anyNumberOfTimes()
       )
 
@@ -914,7 +919,8 @@ class TransactionsRouteSpec
       } yield (tx, height, acceptFailedActivationHeight, succeed)
 
       forAll(txAvailability) { case (tx, height, acceptFailedActivationHeight, succeed) =>
-        (blockchain.transactionInfo _).expects(tx.id()).returning(Some(TxMeta(Height(height), succeed, 93L) -> tx)).anyNumberOfTimes()
+        val applicationStatus = if (succeed) Status.Succeeded else Status.Failed
+        (blockchain.transactionInfo _).expects(tx.id()).returning(Some(TxMeta(Height(height), applicationStatus, 93L) -> tx)).anyNumberOfTimes()
         (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
         (() => blockchain.activatedFeatures)
           .expects()
