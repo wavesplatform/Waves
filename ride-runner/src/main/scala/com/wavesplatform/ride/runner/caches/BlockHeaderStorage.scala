@@ -10,7 +10,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.ride.runner.caches.BlockHeaderStorage.BlockInfo
-import com.wavesplatform.ride.runner.caches.persistent.BlockPersistentCache
+import com.wavesplatform.ride.runner.caches.disk.BlockPersistentCache
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}

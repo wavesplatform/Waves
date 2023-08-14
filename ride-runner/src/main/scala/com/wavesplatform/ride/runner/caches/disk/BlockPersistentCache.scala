@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}

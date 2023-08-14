@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.ride.runner.caches.{CacheKey, RemoteData}

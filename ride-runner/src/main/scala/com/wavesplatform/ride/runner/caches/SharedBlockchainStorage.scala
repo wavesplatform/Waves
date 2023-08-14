@@ -17,7 +17,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage.Settings
-import com.wavesplatform.ride.runner.caches.persistent.PersistentCaches
+import com.wavesplatform.ride.runner.caches.disk.PersistentCaches
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats

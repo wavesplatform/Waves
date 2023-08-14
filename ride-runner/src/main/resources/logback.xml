@@ -29,7 +29,7 @@
 
     <!-- App -->
     <logger name="com.wavesplatform.ride.runner.caches" level="INFO"/>
-    <logger name="com.wavesplatform.ride.runner.caches.persistent" level="INFO"/>
+    <logger name="com.wavesplatform.ride.runner.caches.disk" level="INFO"/>
     <logger name="com.wavesplatform.blockchain" level="INFO"/>
     <logger name="com.wavesplatform.api" level="INFO"/>
     <logger name="com.wavesplatform.api.http.CompositeHttpService" level="OFF"/>

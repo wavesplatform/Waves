@@ -1,7 +1,7 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.runner.caches.persistent.syntax.*
+import com.wavesplatform.ride.runner.caches.disk.syntax.*
 import com.wavesplatform.state.Height
 
 import java.io.{ByteArrayOutputStream, OutputStream}

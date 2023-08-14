@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}

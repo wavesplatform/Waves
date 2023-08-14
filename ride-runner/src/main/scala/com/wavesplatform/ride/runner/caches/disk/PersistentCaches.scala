@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.state.{DataEntry, Height, LeaseBalance}

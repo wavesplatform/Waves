@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}

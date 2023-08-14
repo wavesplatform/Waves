@@ -16,7 +16,7 @@ import com.wavesplatform.protobuf.block.{Block, MicroBlock, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
-import com.wavesplatform.ride.runner.caches.persistent.{DefaultPersistentCaches, HasDb}
+import com.wavesplatform.ride.runner.caches.disk.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}

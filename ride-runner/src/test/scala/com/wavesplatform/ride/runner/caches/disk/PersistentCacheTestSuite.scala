@@ -1,66 +1,65 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
-import com.wavesplatform.ride.runner.caches.{CacheKey, RemoteData}
+import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.db.RideDbAccess
-import com.wavesplatform.state.{Height, LeaseBalance}
+import com.wavesplatform.state.Height
 
-class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
-  private val cacheKey                                    = CacheKey.AccountLeaseBalance(alice.publicKey.toAddress)
-  private val cacheValue: RemoteData[LeaseBalance]        = RemoteData.Cached(LeaseBalance(12L, 14L))
-  private val defaultCacheValue: RemoteData[LeaseBalance] = RemoteData.Cached(LeaseBalance.empty) // Equal to RemoteData.Absence for this case
+abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuite {
+  protected val testedClassName       = suiteName.replace("TestSuite", "")
+  private lazy val defaultCachedValue = RemoteData.Cached(defaultValue)
 
-  "AccountLeaseBalancePersistentCache" - {
+  s"$testedClassName" - {
     "set and get" - {
       "cached" - {
         "on the first height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(8), cacheKey, cacheValue)
+            cache.set(Height(8), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, RemoteData.Absence)
+            cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(8), cacheKey) shouldBe cacheValue
+            cache.get(Height(8), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "before the max height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(8), cacheKey, cacheValue)
+            cache.set(Height(8), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, RemoteData.Absence)
+            cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe cacheValue
+            cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "on the max height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(9), cacheKey, RemoteData.Absence)
+            cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(10), cacheKey, cacheValue)
+            cache.set(Height(10), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe cacheValue
+            cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "after the max height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(10), cacheKey, cacheValue)
+            cache.set(Height(10), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(11), cacheKey) shouldBe cacheValue
+            cache.get(Height(11), defaultKey) shouldBe defaultCachedValue
           }
         }
       }
@@ -68,43 +67,43 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
       "absence" - {
         "before the max height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(8), cacheKey, RemoteData.Absence)
+            cache.set(Height(8), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, cacheValue)
+            cache.set(Height(11), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe defaultCacheValue
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Absence
           }
         }
 
         "on the max height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(9), cacheKey, cacheValue)
+            cache.set(Height(9), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(10), cacheKey, RemoteData.Absence)
+            cache.set(Height(10), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe defaultCacheValue
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Absence
           }
         }
 
         "after the max height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(9), cacheKey, cacheValue)
+            cache.set(Height(9), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(10), cacheKey, RemoteData.Absence)
+            cache.set(Height(10), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(11), cacheKey) shouldBe defaultCacheValue
+            cache.get(Height(11), defaultKey) shouldBe RemoteData.Absence
           }
         }
       }
@@ -112,17 +111,17 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
       "unknown" - {
         "on empty" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe RemoteData.Unknown
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
 
         "before the first known height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, RemoteData.Absence)
+            cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe RemoteData.Unknown
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
       }
@@ -132,29 +131,29 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
       "the data is not available for 'get' after deletion" - {
         "on removed height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(9), cacheKey, RemoteData.Absence)
+            cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.removeFrom(Height(9), cacheKey)
+            cache.removeFrom(Height(9), defaultKey)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe RemoteData.Unknown
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
 
         "on next height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, RemoteData.Absence)
+            cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.removeFrom(Height(1), cacheKey)
+            cache.removeFrom(Height(1), defaultKey)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(11), cacheKey) shouldBe RemoteData.Unknown
+            cache.get(Height(11), defaultKey) shouldBe RemoteData.Unknown
           }
         }
       }
@@ -162,63 +161,62 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
       "returns the last known value before deleted heights" - {
         "cached" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(9), cacheKey, cacheValue)
+            cache.set(Height(9), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, RemoteData.Absence)
+            cache.set(Height(11), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.removeFrom(Height(10), cacheKey)
+            cache.removeFrom(Height(10), defaultKey)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe cacheValue
+            cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "absence" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(9), cacheKey, RemoteData.Absence)
+            cache.set(Height(9), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, cacheValue)
+            cache.set(Height(11), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.removeFrom(Height(10), cacheKey)
+            cache.removeFrom(Height(10), defaultKey)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe defaultCacheValue
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Absence
           }
         }
 
         "unknown if empty" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(10), cacheKey, RemoteData.Absence)
+            cache.set(Height(10), defaultKey, RemoteData.Absence)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.set(Height(11), cacheKey, cacheValue)
+            cache.set(Height(11), defaultKey, defaultCachedValue)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.removeFrom(Height(10), cacheKey)
+            cache.removeFrom(Height(10), defaultKey)
           }
 
           db.batchedReadWrite { implicit ctx =>
-            cache.get(Height(10), cacheKey) shouldBe RemoteData.Unknown
+            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
       }
     }
   }
 
-  private def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountLeaseBalance, LeaseBalance]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadWrite(DefaultPersistentCaches(db)(_))
-    f(db, caches.accountLeaseBalances)
-  }
+  protected def defaultKey: KeyT
+  protected def defaultValue: ValueT
+  protected def test(f: (RideDbAccess, PersistentCache[KeyT, ValueT]) => Unit): Unit
 }

@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.ride.runner.caches.persistent.DefaultPersistentCaches
+import com.wavesplatform.ride.runner.caches.disk.DefaultPersistentCaches
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}

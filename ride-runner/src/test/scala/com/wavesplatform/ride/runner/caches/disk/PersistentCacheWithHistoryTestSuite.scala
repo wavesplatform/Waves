@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}

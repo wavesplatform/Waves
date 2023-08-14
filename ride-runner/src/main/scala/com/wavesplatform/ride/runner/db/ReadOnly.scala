@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.db
 import com.wavesplatform.database.DBEntry
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.persistent.{AsBytes, KvPair}
+import com.wavesplatform.ride.runner.caches.disk.{AsBytes, KvPair}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
 

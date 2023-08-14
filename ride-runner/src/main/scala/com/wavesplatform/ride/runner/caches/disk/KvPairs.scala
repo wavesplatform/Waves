@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches.persistent
+package com.wavesplatform.ride.runner.caches.disk
 
 import cats.syntax.option.*
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream
@@ -23,8 +23,8 @@ import com.wavesplatform.database.rocksdb.{
 import com.wavesplatform.database.{AddressId, toPbTransaction, toVanillaTransaction, protobuf as pb}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
-import com.wavesplatform.ride.runner.caches.persistent.AsBytes.*
-import com.wavesplatform.ride.runner.caches.persistent.syntax.*
+import com.wavesplatform.ride.runner.caches.disk.AsBytes.*
+import com.wavesplatform.ride.runner.caches.disk.syntax.*
 import com.wavesplatform.ride.runner.caches.{DbKeyIndex, WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.ride.runner.db.Heights
 import com.wavesplatform.state

@@ -5,7 +5,7 @@ import com.wavesplatform.database.DBEntry
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats
 import com.wavesplatform.database.rocksdb.stats.RocksDBStats.DbHistogramExt
-import com.wavesplatform.ride.runner.caches.persistent.KvPair
+import com.wavesplatform.ride.runner.caches.disk.KvPair
 import org.rocksdb.*
 
 import scala.annotation.tailrec

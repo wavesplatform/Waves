@@ -13,8 +13,8 @@ import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
-import com.wavesplatform.ride.runner.caches.persistent.HasDb.mkTestDb
-import com.wavesplatform.ride.runner.caches.persistent.{DefaultPersistentCaches, HasDb}
+import com.wavesplatform.ride.runner.caches.disk.HasDb.mkTestDb
+import com.wavesplatform.ride.runner.caches.disk.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, InMemBlockchainDataCache, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.requests.*
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
