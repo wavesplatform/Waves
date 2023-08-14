@@ -5,12 +5,12 @@ import com.wavesplatform.ride.runner.caches.{CacheKey, RemoteData}
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.Height
 
-class AliasesPersistentCacheTestSuite extends PersistentTestSuite {
+class AliasesDiskCacheTestSuite extends DiskTestSuite {
   private val defaultKey         = mkAliasKey("satoshi")
   private val defaultValue       = alice.toAddress
   private val defaultCachedValue = RemoteData.Cached(defaultValue)
 
-  "AliasesPersistentCache" - {
+  "AliasesDiskCache" - {
     "set and get" - {
       "last set wins" in test { (db, cache) =>
         db.batchedReadWrite { implicit ctx =>
@@ -59,7 +59,6 @@ class AliasesPersistentCacheTestSuite extends PersistentTestSuite {
       db.batchedReadWrite { implicit ctx =>
         cache.setAddress(Height(1), defaultKey, RemoteData.Cached(aliceAddr))
         cache.setAddress(Height(3), k1, RemoteData.Cached(bobAddr))
-      // TODO #121 move k2 here
       }
 
       db.batchedReadWrite { implicit ctx =>
@@ -80,8 +79,8 @@ class AliasesPersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, AliasPersistentCache) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
+  private def test(f: (RideDbAccess, AliasDiskCache) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
     f(db, caches.aliases)
   }
 

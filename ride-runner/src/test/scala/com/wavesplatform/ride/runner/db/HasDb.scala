@@ -1,9 +1,8 @@
-package com.wavesplatform.ride.runner.caches.disk
+package com.wavesplatform.ride.runner.db
 
 import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.typesafe.config.ConfigMemorySize
-import com.wavesplatform.ride.runner.caches.disk.HasDb.mkTestDb
-import com.wavesplatform.ride.runner.db.{RideDb, RideDbAccess, RideRocksDb}
+import com.wavesplatform.ride.runner.db.HasDb.mkTestDb
 
 import java.nio.file.{Files, Path}
 import scala.util.Using

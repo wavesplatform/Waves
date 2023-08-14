@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.ride.runner.caches.disk.DefaultPersistentCaches
+import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
@@ -109,7 +109,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
 
     val allTags = new CacheKeyTags[RideScriptRunRequest]
     val sharedBlockchain = rideDb.access.batchedReadOnly { implicit ro =>
-      val dbCaches = DefaultPersistentCaches(rideDb.access)
+      val dbCaches = DefaultDiskCaches(rideDb.access)
       SharedBlockchainStorage(settings.sharedBlockchain, allTags, rideDb.access, dbCaches, blockchainApi)
     }
 

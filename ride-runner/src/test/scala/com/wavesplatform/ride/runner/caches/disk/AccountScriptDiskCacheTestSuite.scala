@@ -7,7 +7,7 @@ import com.wavesplatform.ride.runner.caches.{CacheKey, WeighedAccountScriptInfo}
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
 import com.wavesplatform.state.AccountScriptInfo
 
-class AccountScriptPersistentCacheTestSuite extends PersistentCacheWithHistoryTestSuite[CacheKey.AccountScript, WeighedAccountScriptInfo] {
+class AccountScriptDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[CacheKey.AccountScript, WeighedAccountScriptInfo] {
   private val defaultAddressId      = AddressId(0L) // There is only one addressId
   protected override val defaultKey = CacheKey.AccountScript(alice.toAddress)
   protected override val defaultValue = WeighedAccountScriptInfo(
@@ -19,8 +19,8 @@ class AccountScriptPersistentCacheTestSuite extends PersistentCacheWithHistoryTe
     )
   )
 
-  protected override def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountScript, WeighedAccountScriptInfo]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
+  protected override def test(f: (RideDbAccess, DiskCache[CacheKey.AccountScript, WeighedAccountScriptInfo]) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
     f(db, caches.accountScripts)
   }
 

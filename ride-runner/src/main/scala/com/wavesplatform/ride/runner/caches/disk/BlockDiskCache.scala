@@ -4,7 +4,7 @@ import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.state.Height
 
-trait BlockPersistentCache {
+trait BlockDiskCache {
   def getLastHeight(implicit ctx: ReadOnly): Option[Height]
   def get(height: Height)(implicit ctx: ReadOnly): Option[SignedBlockHeaderWithVrf]
   def getFrom(height: Height, n: Int)(implicit ctx: ReadOnly): List[SignedBlockHeaderWithVrf]

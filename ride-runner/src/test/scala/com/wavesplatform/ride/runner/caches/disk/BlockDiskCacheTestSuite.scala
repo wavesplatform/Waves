@@ -7,8 +7,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.Height
 
-class BlockPersistentCacheTestSuite extends PersistentTestSuite {
-  "BlockPersistentCache" - {
+class BlockDiskCacheTestSuite extends DiskTestSuite {
+  "BlockDiskCache" - {
     "get on empty return None" in test { (db, cache) =>
       db.batchedReadOnly { implicit ctx =>
         cache.get(Height(1)) shouldBe empty
@@ -161,8 +161,8 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
     blockReward = 600_000_000L
   )
 
-  private def test(f: (RideDbAccess, BlockPersistentCache) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
+  private def test(f: (RideDbAccess, BlockDiskCache) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
     f(db, caches.blockHeaders)
   }
 }

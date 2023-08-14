@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
 import java.nio.charset.StandardCharsets
 
-class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheWithHistoryTestSuite[CacheKey.Asset, WeighedAssetDescription] {
+class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[CacheKey.Asset, WeighedAssetDescription] {
   protected override val defaultKey = CacheKey.Asset(Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0))))
   protected override val defaultValue = WeighedAssetDescription(
     scriptWeight = 0,
@@ -30,8 +30,8 @@ class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheWithHist
     )
   )
 
-  protected override def test(f: (RideDbAccess, PersistentCache[CacheKey.Asset, WeighedAssetDescription]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
+  protected override def test(f: (RideDbAccess, DiskCache[CacheKey.Asset, WeighedAssetDescription]) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
     f(db, caches.assetDescriptions)
   }
 

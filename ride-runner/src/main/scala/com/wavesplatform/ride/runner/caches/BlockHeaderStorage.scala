@@ -10,7 +10,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.ride.runner.caches.BlockHeaderStorage.BlockInfo
-import com.wavesplatform.ride.runner.caches.disk.BlockPersistentCache
+import com.wavesplatform.ride.runner.caches.disk.BlockDiskCache
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
@@ -20,17 +20,13 @@ import scala.util.chaining.scalaUtilChainingOps
 /** @param liquidBlocks
   *   head contains the latest
   */
-class BlockHeaderStorage(
-    blockchainApi: BlockchainApi,
-    persistentCache: BlockPersistentCache
-) extends OptimisticLockable
-    with ScorexLogging {
+class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache) extends OptimisticLockable with ScorexLogging {
   private var liquidBlocks: List[BlockInfo] = Nil
 
   def load()(implicit ctx: ReadOnly): Unit = writeLock {
     liquidBlocks = for {
-      h <- persistentCache.getLastHeight.toList
-      b <- persistentCache.get(h)
+      h <- diskCache.getLastHeight.toList
+      b <- diskCache.get(h)
     } yield BlockInfo(h, b.header.id(), b)
   }
 
@@ -42,20 +38,20 @@ class BlockHeaderStorage(
   def latestHeight: Option[Height] = readLockCond(liquidBlocks.headOption)(_ => false).map(_.height)
 
   def getLocal(atHeight: Height)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
-    getFromLiquidBlockOr(atHeight, persistentCache.get(atHeight))
+    getFromLiquidBlockOr(atHeight, diskCache.get(atHeight))
 
   def getOrFetch(atHeight: Height)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
-    getFromLiquidBlockOr(atHeight, getFromPersistentOrFetch(atHeight))
+    getFromLiquidBlockOr(atHeight, getFromDiskOrFetch(atHeight))
 
   private def getFromLiquidBlockOr(atHeight: Height, or: => Option[SignedBlockHeaderWithVrf]): Option[SignedBlockHeaderWithVrf] =
     readLockCond(liquidBlocks.headOption.collect { case x if x.height == atHeight => x.header })(_ => false).orElse(or)
 
-  private def getFromPersistentOrFetch(atHeight: Height)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
-    persistentCache.get(atHeight).orElse {
+  private def getFromDiskOrFetch(atHeight: Height)(implicit ctx: ReadWrite): Option[SignedBlockHeaderWithVrf] =
+    diskCache.get(atHeight).orElse {
       blockchainApi.getBlockHeader(atHeight).tap {
-        case Some(r) => persistentCache.set(atHeight, r)
+        case Some(r) => diskCache.set(atHeight, r)
         case None =>
-          log.error(s"Can't find block on height=$atHeight (lastHeight=${persistentCache.getLastHeight}), please contact with developers")
+          log.error(s"Can't find block on height=$atHeight (lastHeight=${diskCache.getLastHeight}), please contact with developers")
           None
       }
     }
@@ -78,8 +74,8 @@ class BlockHeaderStorage(
               )
             )
             log.debug(s"Update at ${newFullBlock.height} with ${newFullBlock.id.toString.take(5)}")
-            persistentCache.set(newFullBlock.height, newFullBlock.header)
-            persistentCache.setLastHeight(newFullBlock.height)
+            diskCache.set(newFullBlock.height, newFullBlock.header)
+            diskCache.setLastHeight(newFullBlock.height)
             liquidBlocks = newFullBlock :: Nil
 
           case Body.MicroBlock(microBlock) =>
@@ -98,7 +94,7 @@ class BlockHeaderStorage(
                 last.header.blockReward
               )
             )
-            persistentCache.set(newLiquidBlock.height, newLiquidBlock.header)
+            diskCache.set(newLiquidBlock.height, newLiquidBlock.header)
             liquidBlocks = newLiquidBlock :: liquidBlocks
         }
 
@@ -109,23 +105,23 @@ class BlockHeaderStorage(
         liquidBlocks = preserved match {
           case Nil =>
             log.debug(s"Remove from ${toHeight + 1}")
-            persistentCache.removeFrom(Height(toHeight + 1))
-            persistentCache.setLastHeight(toHeight)
-            val header = getFromPersistentOrFetch(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
+            diskCache.removeFrom(Height(toHeight + 1))
+            diskCache.setLastHeight(toHeight)
+            val header = getFromDiskOrFetch(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
             BlockInfo(toHeight, header.header.id(), header) :: Nil
 
           case last :: _ =>
             log.debug(s"Replace at ${last.height} with ${last.id}")
-            persistentCache.set(last.height, last.header)
-            persistentCache.setLastHeight(last.height)
+            diskCache.set(last.height, last.header)
+            diskCache.setLastHeight(last.height)
             preserved
         }
     }
   }
 
   def removeFrom(height: Height)(implicit ctx: ReadWrite): Unit = writeLock {
-    persistentCache.removeFrom(height)
-    persistentCache.setLastHeight(Height(height - 1))
+    diskCache.removeFrom(height)
+    diskCache.setLastHeight(Height(height - 1))
     liquidBlocks = liquidBlocks.dropWhile(_.height >= height)
   }
 }

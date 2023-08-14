@@ -18,10 +18,8 @@ import java.lang.Long as JLong
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
 
-class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeadersLastHeight: Option[Height])
-    extends PersistentCaches
-    with ScorexLogging {
-  override val addressIds: AddressIdPersistentCache = new AddressIdPersistentCache {
+class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastHeight: Option[Height]) extends DiskCaches with ScorexLogging {
+  override val addressIds: AddressIdDiskCache = new AddressIdDiskCache {
     private val lastAddressIdKey = KvPairs.LastAddressId.at(())
     private val lastAddressId    = new AtomicLong(storage.directReadOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
@@ -70,7 +68,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     )
   }
 
-  override val accountDataEntries: PersistentCache[CacheKey.AccountData, DataEntry[?]] = new PersistentCache[CacheKey.AccountData, DataEntry[?]] {
+  override val accountDataEntries: DiskCache[CacheKey.AccountData, DataEntry[?]] = new DiskCache[CacheKey.AccountData, DataEntry[?]] {
     protected val log = mkLogger("AccountDataEntries")
 
     // TODO: What if I move this to ReadOnly / ReadWrite?
@@ -121,8 +119,8 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
         .flatMap { case (addressId, dataKey) => addressIds.getAddress(addressId).map(CacheKey.AccountData(_, dataKey)) }
   }
 
-  override val accountScripts: PersistentCache[CacheKey.AccountScript, WeighedAccountScriptInfo] =
-    new PersistentCache[CacheKey.AccountScript, WeighedAccountScriptInfo] {
+  override val accountScripts: DiskCache[CacheKey.AccountScript, WeighedAccountScriptInfo] =
+    new DiskCache[CacheKey.AccountScript, WeighedAccountScriptInfo] {
       protected val log = mkLogger("AccountScripts")
 
       override def get(maxHeight: Height, key: CacheKey.AccountScript)(implicit ctx: ReadOnly): RemoteData[WeighedAccountScriptInfo] =
@@ -165,8 +163,8 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
           .flatMap(addressIds.getAddress(_).map(CacheKey.AccountScript))
     }
 
-  override val assetDescriptions: PersistentCache[CacheKey.Asset, WeighedAssetDescription] =
-    new PersistentCache[CacheKey.Asset, WeighedAssetDescription] {
+  override val assetDescriptions: DiskCache[CacheKey.Asset, WeighedAssetDescription] =
+    new DiskCache[CacheKey.Asset, WeighedAssetDescription] {
       protected val log = mkLogger("AssetDescriptions")
 
       override def get(maxHeight: Height, key: CacheKey.Asset)(implicit ctx: ReadOnly): RemoteData[WeighedAssetDescription] =
@@ -202,7 +200,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
         ctx.removeFrom(KvPairs.AssetDescriptionsHistory, KvPairs.AssetDescriptions, fromHeight).map(CacheKey.Asset)
     }
 
-  override val aliases: AliasPersistentCache = new AliasPersistentCache {
+  override val aliases: AliasDiskCache = new AliasDiskCache {
     protected val log = mkLogger("Aliases")
 
     override def getAllKeys(fromHeight: Height)(implicit ctx: ReadOnly): Seq[CacheKey.Alias] = ctx
@@ -254,7 +252,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     private def dataKey(key: CacheKey.Alias): Key[(Height, Option[AddressId])] = KvPairs.Aliases.at(key.alias)
   }
 
-  override val accountBalances: PersistentCache[CacheKey.AccountBalance, Long] = new PersistentCache[CacheKey.AccountBalance, Long] {
+  override val accountBalances: DiskCache[CacheKey.AccountBalance, Long] = new DiskCache[CacheKey.AccountBalance, Long] {
     protected val log = mkLogger("AccountBalances")
 
     override def get(maxHeight: Height, key: CacheKey.AccountBalance)(implicit ctx: ReadOnly): RemoteData[Long] = {
@@ -302,8 +300,8 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
         .flatMap { case (addressId, asset) => addressIds.getAddress(addressId).map(CacheKey.AccountBalance(_, asset)) }
   }
 
-  override val accountLeaseBalances: PersistentCache[CacheKey.AccountLeaseBalance, LeaseBalance] =
-    new PersistentCache[CacheKey.AccountLeaseBalance, LeaseBalance] {
+  override val accountLeaseBalances: DiskCache[CacheKey.AccountLeaseBalance, LeaseBalance] =
+    new DiskCache[CacheKey.AccountLeaseBalance, LeaseBalance] {
       protected val log = mkLogger("AccountLeaseBalances")
 
       override def get(maxHeight: Height, key: CacheKey.AccountLeaseBalance)(implicit ctx: ReadOnly): RemoteData[LeaseBalance] =
@@ -347,7 +345,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
           .flatMap(addressIds.getAddress(_).map(CacheKey.AccountLeaseBalance))
     }
 
-  override val transactions: TransactionPersistentCache = new TransactionPersistentCache {
+  override val transactions: TransactionDiskCache = new TransactionDiskCache {
     protected val log = mkLogger("Transactions")
 
     override def getHeight(key: CacheKey.Transaction)(implicit ctx: ReadOnly): RemoteData[Height] =
@@ -389,7 +387,7 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
     }
   }
 
-  override val blockHeaders: BlockPersistentCache = new BlockPersistentCache {
+  override val blockHeaders: BlockDiskCache = new BlockDiskCache {
     protected val log = mkLogger("BlockHeaders")
 
     private val Key = KvPairs.SignedBlockHeadersWithVrf
@@ -460,9 +458,9 @@ class DefaultPersistentCaches private (storage: RideDbAccess, initialBlockHeader
   private def mkLogger(name: String) = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.$name"))
 }
 
-object DefaultPersistentCaches {
-  def apply(storage: RideDbAccess)(implicit ctx: ReadOnly): DefaultPersistentCaches =
-    new DefaultPersistentCaches(storage, getLastHeight())
+object DefaultDiskCaches {
+  def apply(storage: RideDbAccess)(implicit ctx: ReadOnly): DefaultDiskCaches =
+    new DefaultDiskCaches(storage, getLastHeight())
 
   def getLastHeight()(implicit ctx: ReadOnly): Option[Height] = ctx.getOpt(KvPairs.Height.Key)
 }

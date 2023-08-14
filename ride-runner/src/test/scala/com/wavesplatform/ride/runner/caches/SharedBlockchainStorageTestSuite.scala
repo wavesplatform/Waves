@@ -16,7 +16,8 @@ import com.wavesplatform.protobuf.block.{Block, MicroBlock, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
-import com.wavesplatform.ride.runner.caches.disk.{DefaultPersistentCaches, HasDb}
+import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
+import com.wavesplatform.ride.runner.db.HasDb
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
@@ -24,7 +25,7 @@ import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import java.nio.charset.StandardCharsets
 
 class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with HasGrpc with HasTestAccounts {
-  "SharedBlockchainStorageNewTest" - {
+  "SharedBlockchainStorage" - {
     "process with" - {
       "append" - {
         "block" - {
@@ -54,7 +55,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
                 ),
                 allTags = new CacheKeyTags[Tag],
                 db = db,
-                persistentCaches = DefaultPersistentCaches(db),
+                diskCaches = DefaultDiskCaches(db),
                 blockchainApi = testBlockchainApi
               )
 
@@ -512,7 +513,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
     def runTest(): Unit = withDb { db =>
       val allTags = new CacheKeyTags[Tag]
       db.directReadWrite { implicit rw =>
-        val persistentCaches = DefaultPersistentCaches(db)
+        val diskCaches = DefaultDiskCaches(db)
 
         val blockchain = SharedBlockchainStorage(
           settings = SharedBlockchainStorage.Settings(
@@ -521,7 +522,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasDb with Has
           ),
           allTags = allTags,
           db = db,
-          persistentCaches = persistentCaches,
+          diskCaches = diskCaches,
           blockchainApi = testBlockchainApi
         )
 

@@ -4,8 +4,8 @@ import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}
 import com.wavesplatform.state.Height
 
-abstract class PersistentCacheWithHistoryTestSuite[KeyT, ValueT] extends PersistentCacheTestSuite[KeyT, ValueT] {
-  s"$testedClassName" - {
+abstract class DiskCacheWithHistoryTestSuite[KeyT, ValueT] extends DiskCacheTestSuite[KeyT, ValueT] {
+  testedClassName - {
     "history" - {
       "empty" in test { (db, _) =>
         db.batchedReadOnly { implicit ctx =>
@@ -23,7 +23,7 @@ abstract class PersistentCacheWithHistoryTestSuite[KeyT, ValueT] extends Persist
         }
       }
 
-      def removeTests(removeF: (ReadWrite, PersistentCache[KeyT, ValueT], Height) => Unit): Unit = {
+      def removeTests(removeF: (ReadWrite, DiskCache[KeyT, ValueT], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)

@@ -4,12 +4,12 @@ import com.wavesplatform.ride.runner.caches.{CacheKey, RemoteData}
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.{Height, LeaseBalance}
 
-class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
+class AccountLeaseBalanceDiskCacheTestSuite extends DiskTestSuite {
   private val cacheKey                                    = CacheKey.AccountLeaseBalance(alice.publicKey.toAddress)
   private val cacheValue: RemoteData[LeaseBalance]        = RemoteData.Cached(LeaseBalance(12L, 14L))
   private val defaultCacheValue: RemoteData[LeaseBalance] = RemoteData.Cached(LeaseBalance.empty) // Equal to RemoteData.Absence for this case
 
-  "AccountLeaseBalancePersistentCache" - {
+  "AccountLeaseBalanceDiskCache" - {
     "set and get" - {
       "cached" - {
         "on the first height" in test { (db, cache) =>
@@ -217,8 +217,8 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountLeaseBalance, LeaseBalance]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadWrite(DefaultPersistentCaches(db)(_))
+  private def test(f: (RideDbAccess, DiskCache[CacheKey.AccountLeaseBalance, LeaseBalance]) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadWrite(DefaultDiskCaches(db)(_))
     f(db, caches.accountLeaseBalances)
   }
 }

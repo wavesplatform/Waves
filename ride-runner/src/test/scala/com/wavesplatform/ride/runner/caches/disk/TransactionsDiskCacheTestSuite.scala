@@ -6,12 +6,12 @@ import com.wavesplatform.ride.runner.caches.{CacheKey, RemoteData}
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.{Height, TransactionId}
 
-class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
+class TransactionsDiskCacheTestSuite extends DiskTestSuite {
   private val defaultKey         = mkTxKey(0)
   private val defaultHeight      = Height(10)
   private val defaultCachedValue = RemoteData.Cached(defaultHeight)
 
-  "TransactionsPersistentCache" - {
+  "TransactionsDiskCache" - {
     "set and get" - {
       "last set wins" in test { (db, cache) =>
         db.batchedReadWrite { implicit ctx =>
@@ -61,8 +61,8 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
 
   private def mkTxKey(n: Byte) = CacheKey.Transaction(TransactionId(ByteStr(Array.fill[Byte](DigestLength)(n))))
 
-  private def test(f: (RideDbAccess, TransactionPersistentCache) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultPersistentCaches(db)(_))
+  private def test(f: (RideDbAccess, TransactionDiskCache) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
     f(db, caches.transactions)
   }
 }

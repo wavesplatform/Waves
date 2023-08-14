@@ -7,11 +7,11 @@ import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite, RideDbAcc
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
-class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
+class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
   private val defaultCachedValue: RemoteData[Long] = RemoteData.Cached(1L)
   private val defaultCacheValue: RemoteData[Long]  = RemoteData.Cached(0L) // Equal to RemoteData.Absence for this case
 
-  "AccountBalancePersistentCache" - {
+  "AccountBalanceDiskCache" - {
     "with Waves" - tests(Asset.Waves)
     "with IssuedAsset" - tests(Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0))))
   }
@@ -37,7 +37,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
         }
       }
 
-      def removeTests(removeF: (ReadWrite, PersistentCache[CacheKey.AccountBalance, Long], Height) => Unit): Unit = {
+      def removeTests(removeF: (ReadWrite, DiskCache[CacheKey.AccountBalance, Long], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
@@ -313,8 +313,8 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, PersistentCache[CacheKey.AccountBalance, Long]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadWrite(DefaultPersistentCaches(db)(_))
+  private def test(f: (RideDbAccess, DiskCache[CacheKey.AccountBalance, Long]) => Unit): Unit = withDb { db =>
+    val caches = db.batchedReadWrite(DefaultDiskCaches(db)(_))
     f(db, caches.accountBalances)
   }
 }

@@ -4,11 +4,11 @@ import com.wavesplatform.ride.runner.caches.RemoteData
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.Height
 
-abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuite {
+abstract class DiskCacheTestSuite[KeyT, ValueT] extends DiskTestSuite {
   protected val testedClassName       = suiteName.replace("TestSuite", "")
   private lazy val defaultCachedValue = RemoteData.Cached(defaultValue)
 
-  s"$testedClassName" - {
+  testedClassName - {
     "set and get" - {
       "cached" - {
         "on the first height" in test { (db, cache) =>
@@ -218,5 +218,5 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
 
   protected def defaultKey: KeyT
   protected def defaultValue: ValueT
-  protected def test(f: (RideDbAccess, PersistentCache[KeyT, ValueT]) => Unit): Unit
+  protected def test(f: (RideDbAccess, DiskCache[KeyT, ValueT]) => Unit): Unit
 }
