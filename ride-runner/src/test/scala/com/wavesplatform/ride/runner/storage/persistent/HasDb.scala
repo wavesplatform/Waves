@@ -1,64 +1,40 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
-import com.wavesplatform.ride.runner.db.RideDbAccess
-import com.wavesplatform.ride.runner.db.RideRocksDb.newColumnFamilyOptions
-import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
-import org.rocksdb.{ColumnFamilyDescriptor, ColumnFamilyHandle, DBOptions, DbPath, RocksDB, Statistics}
+import com.typesafe.config.ConfigMemorySize
+import com.wavesplatform.ride.runner.db.{RideDb, RideDbAccess, RideRocksDb}
+import com.wavesplatform.ride.runner.storage.persistent.HasDb.mkTestDb
 
 import java.nio.file.{Files, Path}
-import java.util
-import scala.jdk.CollectionConverters.SeqHasAsJava
+import scala.util.Using
 
 trait HasDb {
-  protected def withDb[A](f: RideDbAccess => A): A = TestDb.mk().withDb(f)
+  protected def withDb[A](f: RideDbAccess => A): A = Using.resource(mkTestDb())(db => f(db.access))
 }
 
 object HasDb {
-  // TODO TestStorage
-  case class TestDb(path: Path, db: RocksDB, clean: Boolean = true) extends AutoCloseable {
-    val storage = RideDbAccess.fromRocksDb(db)
-
-    def withoutCleaning: TestDb = copy(clean = false)
-
-    def withDb[A](f: RideDbAccess => A): A = {
-      try f(storage)
-      finally close()
-    }
-
-    override def close(): Unit = {
-      db.close()
-      if (clean) MoreFiles.deleteRecursively(path, RecursiveDeleteOption.ALLOW_INSECURE)
-    }
-  }
-
-  object TestDb {
-    def mk(): TestDb = mk(mkTempPath)
-
-    def mk(path: Path): TestDb = {
-      val options = new DBOptions()
-        .setStatistics(new Statistics())
-        .setCreateIfMissing(true)
-        .setBytesPerSync(2 << 20)
-        .setCreateMissingColumnFamilies(true)
-        .setMaxOpenFiles(100)
-
-      val handles = new util.ArrayList[ColumnFamilyHandle]()
-      val db = RocksDB.open(
-        options,
-        path.toString,
-        Seq(
-          new ColumnFamilyDescriptor(
-            RocksDB.DEFAULT_COLUMN_FAMILY,
-            newColumnFamilyOptions(12.0, 16 << 10, 128 << 20, 32 << 20, 0.6)
-              .setCfPaths(Seq(new DbPath(path.resolve("default"), 0L)).asJava)
-          )
-        ).asJava,
-        handles
+  def mkTestDb(path: Path = mkTempPath): RideDb = {
+    val db = RideRocksDb.open(
+      RideRocksDb.Settings(
+        directory = path.toAbsolutePath.toString,
+        enableStatistics = false,
+        defaultColumnFamily = RideRocksDb.ColumnFamilySettings(
+          bitsPerKey = 12,
+          blockSize = ConfigMemorySize.ofBytes(16 << 10),
+          cacheCapacity = ConfigMemorySize.ofBytes(128 << 20),
+          writeBufferSize = ConfigMemorySize.ofBytes(32 << 20),
+          highPriPoolRatio = 0.6
+        )
       )
-      TestDb(path, db)
+    )
+    new RideDb {
+      override def access: RideDbAccess = db.access
+      override def close(): Unit = {
+        db.close()
+        MoreFiles.deleteRecursively(path, RecursiveDeleteOption.ALLOW_INSECURE)
+      }
     }
-
-    def mkTempPath: Path = Files.createTempDirectory("lvl-temp").toAbsolutePath
   }
+
+  def mkTempPath: Path = Files.createTempDirectory("lvl-temp").toAbsolutePath
 }

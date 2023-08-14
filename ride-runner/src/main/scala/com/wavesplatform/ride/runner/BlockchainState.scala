@@ -91,7 +91,6 @@ object BlockchainState extends ScorexLogging {
   ): Task[BlockchainState] = {
     def forceRestart(): Task[BlockchainState] = {
       val (currHeight, workingStateHeight) = orig match {
-        // TODO #62 replace origHeight in ResolvingFork by resolveHeight
         case orig: Starting      => (orig.processedHeight, orig.workingHeight)
         case Working(height)     => (height, height)
         case orig: ResolvingFork => (orig.processedHeight, orig.minResolveHeight)

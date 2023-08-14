@@ -15,10 +15,9 @@ import com.wavesplatform.state.Diff
 import com.wavesplatform.transaction.smart.{DAppEnvironment, DAppEnvironmentInterface}
 import monix.eval.Coeval
 
-// Why don't we pass a Blockchain instance with tracking instead of a tracker?
-// Because callScript calls to Blockchain not only from the script, but from a validation part too.
+// TrackedDAppEnvironment is better than TrackedBlockchain, because callScript calls to Blockchain not only from the
+// script, but from a validation part too. We should re-run a script only if we sure the result will change.
 class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironmentTracker) extends DAppEnvironmentInterface {
-
   override def ds: DirectiveSet = underlying.ds
 
   override def remainingCalls: Int = underlying.remainingCalls

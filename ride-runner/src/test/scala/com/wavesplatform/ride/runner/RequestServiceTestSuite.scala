@@ -14,9 +14,9 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.requests.*
-import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
+import com.wavesplatform.ride.runner.storage.persistent.HasDb.mkTestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
-import com.wavesplatform.ride.runner.storage.{InMemBlockchainDataCache, CacheKeyTags, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{CacheKeyTags, InMemBlockchainDataCache, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.transaction.Asset
 import monix.eval.Task
@@ -212,14 +212,14 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
           BalanceResponse.WavesBalances(getBalance(address, Asset.Waves))
       }
 
-      val testDb  = use(TestDb.mk())
+      val testDb  = use(mkTestDb())
       val allTags = new CacheKeyTags[RideScriptRunRequest]
-      val sharedBlockchain = testDb.storage.directReadWrite { implicit ctx =>
+      val sharedBlockchain = testDb.access.directReadWrite { implicit ctx =>
         SharedBlockchainStorage[RideScriptRunRequest](
           SharedBlockchainStorage.Settings(blockchainSettings, InMemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1024))),
           allTags,
-          testDb.storage,
-          DefaultPersistentCaches(testDb.storage),
+          testDb.access,
+          DefaultPersistentCaches(testDb.access),
           blockchainApi
         )
       }

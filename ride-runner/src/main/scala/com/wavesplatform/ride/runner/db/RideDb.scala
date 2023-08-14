@@ -1,6 +1,8 @@
 package com.wavesplatform.ride.runner.db
 
+import monix.execution.{Cancelable, Scheduler}
+
 trait RideDb extends AutoCloseable {
   def access: RideDbAccess
-  def sendStats(): Unit
+  def startCollectingStats(scheduler: Scheduler): Cancelable = Cancelable.empty
 }
