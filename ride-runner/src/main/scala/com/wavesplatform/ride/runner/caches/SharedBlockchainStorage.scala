@@ -218,7 +218,7 @@ class SharedBlockchainStorage[TagT] private (
     if (filteredFeatures.size != activatedFeatures.size) updateFeatures(filteredFeatures)
   }
 
-  private val empty = AffectedTags[TagT](Set.empty)
+  private val empty = AffectedTags.empty[TagT]
   def process(event: BlockchainUpdated): AffectedTags[TagT] =
     db.batchedReadWrite { implicit ctx =>
       val toHeight = Height(event.height)
@@ -251,7 +251,7 @@ class SharedBlockchainStorage[TagT] private (
     case None       => empty
     case Some(tags) =>
       // log.trace(s"dep $hint: ${self.xs.toList.map(_.toString).sorted.mkString("; ")}")
-      AffectedTags(tags)
+      tags
   }
 
   private def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {

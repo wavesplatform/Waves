@@ -78,12 +78,10 @@ object MemCacheKey {
 }
 
 class GrpcCacheKeyConverters(chainId: Byte) {
-  // TODO CacheKey instead of CacheKey.AccountData
-  def accountDataKey(update: StateUpdate.DataEntryUpdate): MemCacheKey.AccountData =
-    MemCacheKey.AccountData(update.address.toAddress(chainId), accountDataRawKey(update))
-
-  def accountDataRawKey(update: StateUpdate.DataEntryUpdate): String =
-    update.dataEntry.orElse(update.dataEntryBefore).map(_.key).getOrElse(throw new RuntimeException(s"Can't get data key of $update"))
+  def accountDataKey(update: StateUpdate.DataEntryUpdate): MemCacheKey.AccountData = {
+    val dataKey = update.dataEntry.orElse(update.dataEntryBefore).map(_.key).getOrElse(throw new RuntimeException(s"Can't get data key of $update"))
+    MemCacheKey.AccountData(update.address.toAddress(chainId), dataKey)
+  }
 
   def accountDataValueBefore(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] =
     update.dataEntryBefore.map(accountDataValue)

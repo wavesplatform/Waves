@@ -106,16 +106,13 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
 
 case class ProcessResult[TagT](
     newHeight: Int = 0,
-    affectedScripts: AffectedTags[TagT] = AffectedTags(Set.empty[TagT]),
-    all: Boolean = false // TODO #94 Remove
+    affected: AffectedTags[TagT] = AffectedTags.empty[TagT]
 ) {
-  def withAffectedTags(xs: AffectedTags[TagT]): ProcessResult[TagT] = if (all) this else copy(affectedScripts = affectedScripts ++ xs)
-  def combine(x: ProcessResult[TagT]): ProcessResult[TagT] =
-    if (all || x.all) ProcessResult[TagT](newHeight = math.max(newHeight, x.newHeight), all = true)
-    else copy(newHeight = math.max(newHeight, x.newHeight), affectedScripts = affectedScripts ++ x.affectedScripts)
+  def isEmpty: Boolean = affected.isEmpty
 
-  def withoutAffectedTags: ProcessResult[TagT] = copy(affectedScripts = AffectedTags.empty[TagT], all = false)
-
-  def isEmpty: Boolean    = affectedScripts.isEmpty && !all
-  def affected: Set[TagT] = affectedScripts.xs
+  def withoutAffectedTags: ProcessResult[TagT] = copy(affected = AffectedTags.empty[TagT])
+  def combine(x: ProcessResult[TagT]): ProcessResult[TagT] = copy(
+    newHeight = math.max(newHeight, x.newHeight),
+    affected = affected ++ x.affected
+  )
 }

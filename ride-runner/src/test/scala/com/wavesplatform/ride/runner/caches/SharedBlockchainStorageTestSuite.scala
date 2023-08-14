@@ -264,7 +264,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
           )
 
           override def checks(access: Access): Unit = {
-            access.blockchain.undo(List(emptyAppend2)) shouldBe AffectedTags(Set(allDependencies(heightKey)))
+            access.blockchain.undo(List(emptyAppend2)) shouldBe Set(allDependencies(heightKey))
             access.allDataIsCached()
             withClue("height") { access.blockchain.height shouldBe 1 }
           }
@@ -285,7 +285,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
           )
 
           override def checks(access: Access): Unit = {
-            access.blockchain.undo(List(emptyAppend1)) shouldBe AffectedTags(Set(allDependencies(heightKey)))
+            access.blockchain.undo(List(emptyAppend1)) shouldBe Set(allDependencies(heightKey))
             access.allDataIsCached()
             withClue("height") { access.blockchain.height shouldBe 1 }
           }
@@ -502,7 +502,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
     MemCacheKey.AccountLeaseBalance(aliceAddr)                 -> 8,
     accountScriptKey                                           -> 9
   )
-  private lazy val allTags = AffectedTags(allDependencies.values.toSet)
+  private lazy val allTags = allDependencies.values.toSet
 
   private type Tag = Int
   private abstract class Test {
@@ -547,8 +547,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
     def allTagsAffected(): this.type = allTagsAffectedExcept()
 
     def allTagsAffectedExcept(keys: MemCacheKey*): this.type = {
-      val expected   = AffectedTags(allTags.xs -- keys.map(allDependencies.apply))
-      val sortedDiff = (expected.xs -- affectedTags.xs).toList.sorted
+      val expected   = allTags -- keys.map(allDependencies.apply)
+      val sortedDiff = (expected -- affectedTags).toList.sorted
       withClue(s"affected tags, diff={${sortedDiff.mkString(", ")}}") {
         affectedTags shouldBe expected
       }
