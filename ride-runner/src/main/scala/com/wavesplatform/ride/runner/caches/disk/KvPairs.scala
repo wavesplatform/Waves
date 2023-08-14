@@ -9,23 +9,13 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
-import com.wavesplatform.database.rocksdb.{
-  Key,
-  readAccountScriptInfo,
-  readAssetDetails,
-  readAssetScript,
-  readBlockMeta,
-  writeAccountScriptInfo,
-  writeAssetDetails,
-  writeAssetScript,
-  writeBlockMeta
-}
+import com.wavesplatform.database.rocksdb.{Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
 import com.wavesplatform.database.{AddressId, toPbTransaction, toVanillaTransaction, protobuf as pb}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.ride.runner.caches.disk.AsBytes.*
 import com.wavesplatform.ride.runner.caches.disk.syntax.*
-import com.wavesplatform.ride.runner.caches.{DbKeyIndex, WeighedAccountScriptInfo, WeighedAssetDescription}
+import com.wavesplatform.ride.runner.caches.{WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.ride.runner.db.Heights
 import com.wavesplatform.state
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetVolumeInfo, DataEntry, LeaseBalance, TransactionId, TxMeta}
@@ -200,8 +190,6 @@ object KvPairs {
   object TransactionsByHeight
       extends KvPair[state.Height, List[TransactionId]](109)(implicitly, AsBytes.listAsBytes.consumeAll(transactionIdWithLenAsBytes))
   object Transactions extends KvPair[TransactionId, Option[state.Height]](110)
-
-  implicit val dbKeyIndex: AsBytes[DbKeyIndex] = AsBytes.intAsBytes.transform(DbKeyIndex(_), x => x)
 
   implicit val addressId: AsBytes[AddressId] = AsBytes.longAsBytes.transform(AddressId(_), x => x)
 

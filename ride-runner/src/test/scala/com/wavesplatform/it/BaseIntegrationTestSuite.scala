@@ -13,8 +13,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, InMemBlockchainDataCache, SharedBlockchainStorage}
-import com.wavesplatform.ride.runner.db.HasDb
-import com.wavesplatform.ride.runner.db.HasDb.mkTestDb
+import com.wavesplatform.ride.runner.db.HasTestDb.mkTestDb
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
@@ -28,7 +27,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasDb with HasMonixHelpers {
+abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasBasicGrpcConverters with HasMonixHelpers {
   protected val initX = 0L
 
   /** @param xPlusHeight

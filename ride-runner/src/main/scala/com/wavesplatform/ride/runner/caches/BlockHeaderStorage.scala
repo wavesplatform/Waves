@@ -17,10 +17,8 @@ import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
 
-/** @param liquidBlocks
-  *   head contains the latest
-  */
 class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache) extends OptimisticLockable with ScorexLogging {
+  // head contains the latest
   private var liquidBlocks: List[BlockInfo] = Nil
 
   def load()(implicit ctx: ReadOnly): Unit = writeLock {
@@ -30,8 +28,6 @@ class BlockHeaderStorage(blockchainApi: BlockchainApi, diskCache: BlockDiskCache
     } yield BlockInfo(h, b.header.id(), b)
   }
 
-//  def addDependent(atHeight: Int, tag: TagT): Unit = tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
-//
   /** @return
     *   None if there is no stored blocks
     */
