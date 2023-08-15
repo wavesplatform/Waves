@@ -273,7 +273,6 @@ class DefaultRequestService(
         }
     }
 
-  // TODO #19 Change/move an error to an appropriate layer
   private def fail(reason: ApiError): RideScriptRunResult = RideScriptRunResult(
     evaluation = None,
     lastResult = reason.json.toString(),

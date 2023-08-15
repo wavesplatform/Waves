@@ -30,7 +30,7 @@ trait ReadWrite extends ReadOnly {
   ): Unit = {
     // TODO duplicate
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
-    removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
+    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
     put(historyKey, preservedHistory.prepended(height))
     put(dataOnHeightKey(height), data.mayBeValue)
@@ -44,7 +44,7 @@ trait ReadWrite extends ReadOnly {
       default: => T
   ): Unit = {
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
-    removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
+    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
     put(historyKey, preservedHistory.prepended(height))
     put(dataOnHeightKey(height), data.mayBeValue.getOrElse(default))
@@ -59,7 +59,7 @@ trait ReadWrite extends ReadOnly {
     if (history.isEmpty) RemoteData.Unknown
     else {
       val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
-      removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
+      removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
       preservedHistory.headOption match {
         case None =>
@@ -83,7 +83,7 @@ trait ReadWrite extends ReadOnly {
     if (history.isEmpty) RemoteData.Unknown
     else {
       val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
-      removedHistory.foreach(h => delete(dataOnHeightKey(h))) // TODO #123 Use deleteRange
+      removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
       preservedHistory.headOption match {
         case None =>
@@ -104,7 +104,6 @@ trait ReadWrite extends ReadOnly {
   ): List[K] = {
     val affectedEntryKeys = mutable.Set.empty[K]
 
-    // TODO #123 Use deleteRange
     iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight), entriesKey.columnFamilyHandle) { e =>
       val rawKey        = e.getKey
       val keyWithHeight = entriesKey.parseKey(rawKey)

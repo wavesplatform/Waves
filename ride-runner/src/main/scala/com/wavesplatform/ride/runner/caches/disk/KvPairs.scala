@@ -60,7 +60,6 @@ object KvPairs {
   object AddressToId   extends KvPair[Address, AddressId](1)
   object IdToAddress   extends KvPair[AddressId, Address](2)
 
-  // TODO stats: how often keys are changed?
   object AccountDataEntriesHistory extends KvHistoryPair[(AddressId, String)](11)(tuple(implicitly, utf8StringAsBytes.consumeAll))
   object AccountDataEntries
       extends KvPair[(state.Height, (AddressId, String)), Option[DataEntry[?]]](12)(

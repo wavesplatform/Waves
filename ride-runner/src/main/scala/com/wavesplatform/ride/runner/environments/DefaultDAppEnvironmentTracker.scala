@@ -15,29 +15,31 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
   }
 
   override def lastBlockOpt(): Unit = {
-//    log.trace(s"[$tag] lastBlockOpt")
+    // log.trace(s"[$tag] lastBlockOpt")
     height()
   }
 
   // TODO A: this won't change
   override def transactionById(id: Array[Byte]): Unit = {
-    val txId = MemCacheKey.Transaction(TransactionId @@ ByteStr(id))
+    val txId = mkTxCacheKey(id)
     // log.trace(s"[$tag] transactionById($txId)")
     allTags.addDependent(txId, tag)
   }
 
   override def transferTransactionById(id: Array[Byte]): Unit = {
-    val txId = MemCacheKey.Transaction(TransactionId @@ ByteStr(id))
+    val txId = mkTxCacheKey(id)
     // log.trace(s"[$tag] transferTransactionById($txId)")
     allTags.addDependent(txId, tag)
   }
 
   // TODO A: this can change
   override def transactionHeightById(id: Array[Byte]): Unit = {
-    val txId = MemCacheKey.Transaction(TransactionId @@ ByteStr(id))
+    val txId = mkTxCacheKey(id)
     // log.trace(s"[$tag] transactionHeightById($txId)")
     allTags.addDependent(txId, tag)
   }
+
+  private def mkTxCacheKey(txId: Array[Byte]) = MemCacheKey.Transaction(TransactionId(ByteStr(txId)))
 
   override def assetInfoById(id: Array[Byte]): Unit = {
     val asset = Asset.IssuedAsset(ByteStr(id))
@@ -57,7 +59,7 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
     allTags.addDependent(MemCacheKey.AccountData(address, key), tag)
   }
 
-  // TODO #16 We don't support it for now, use GET /utils/script/evaluate , see ScriptBlockchain
+  // We don't support it for now because of no demand. Use GET /utils/script/evaluate if needed.
   override def hasData(address: Address): Unit = {}
 
   override def resolveAlias(name: String): Unit = {

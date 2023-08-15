@@ -23,8 +23,8 @@ class SynchronizedJobScheduler[T]()(implicit val scheduler: Scheduler) extends J
 
   override val jobs: Observable[T] = Observable
     .mergePrioritizedList(
-      // TODO buffer with drop new?
       1 -> prioritizedQueue.doOnNextAck((x, _) => Task(prioritizedItems.remove(x))),
+      // There could be used a buffer with timeout in a case of large queue and/or slow updates
       0 -> regularQueue.doOnNextAck((x, _) => Task(regularItems.remove(x)))
     )
 
