@@ -33,25 +33,6 @@ class AliasesDiskCacheTestSuite extends DiskTestSuite {
       }
     }
 
-    "getAllKeys" in test { (db, cache) =>
-      val k1 = mkAliasKey("samsung")
-      val k2 = mkAliasKey("toshiba")
-
-      db.batchedReadWrite { implicit ctx =>
-        cache.setAddress(Height(1), defaultKey, RemoteData.Cached(aliceAddr))
-        cache.setAddress(Height(3), k1, RemoteData.Cached(bobAddr))
-      }
-
-      db.batchedReadWrite { implicit ctx =>
-        cache.setAddress(Height(3), k2, RemoteData.Cached(carlAddr))
-      }
-
-      db.batchedReadOnly { implicit ctx =>
-        withClue("from 1") { cache.getAllKeys(Height(1)) should contain theSameElementsAs List(defaultKey, k1, k2) }
-        withClue("from 2") { cache.getAllKeys(Height(2)) should contain theSameElementsAs List(k1, k2) }
-      }
-    }
-
     "removeAllFrom" in test { (db, cache) =>
       val k1 = mkAliasKey("samsung")
       val k2 = mkAliasKey("toshiba")
@@ -73,8 +54,6 @@ class AliasesDiskCacheTestSuite extends DiskTestSuite {
         cache.getAddress(defaultKey) shouldBe RemoteData.Cached(aliceAddr)
         cache.getAddress(k1) shouldBe RemoteData.Unknown
         cache.getAddress(k2) shouldBe RemoteData.Unknown
-
-        cache.getAllKeys(Height(1)) should contain theSameElementsAs List(defaultKey)
       }
     }
   }

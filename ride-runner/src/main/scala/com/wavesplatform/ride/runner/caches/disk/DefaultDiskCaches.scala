@@ -212,8 +212,6 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
   override val aliases: AliasDiskCache = new AliasDiskCache {
     protected val log = mkLogger("Aliases")
 
-    override def getAllKeys(fromHeight: Height)(implicit ctx: ReadOnly): Seq[Alias] = ctx.collect(KvPairs.AliasesByHeight, fromHeight)(_.value)
-
     override def getAddress(key: Alias)(implicit ctx: ReadOnly): RemoteData[Address] =
       getRemoteDataOpt(key)._2.tap { r => log.trace(s"getAddress($key): ${r.toFoundStr()}") }
 
