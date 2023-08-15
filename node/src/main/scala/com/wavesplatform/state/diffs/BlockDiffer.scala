@@ -34,7 +34,7 @@ object BlockDiffer {
 
   case class DetailedSnapshot(
       parentSnapshot: StateSnapshot,
-      feePortfolios: Map[Address, Portfolio]
+      feePortfolios: Vector[Map[Address, Portfolio]]
   )
 
   case class Fraction(dividend: Int, divider: Int) {
@@ -240,7 +240,7 @@ object BlockDiffer {
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
 
     prepareCaches(blockGenerator, txs, loadCacheData)
-    val initDetailedSnapshot = DetailedSnapshot(initSnapshot, Map(blockGenerator -> initFeePortfolio))
+    val initDetailedSnapshot = DetailedSnapshot(initSnapshot, Vector(Map(blockGenerator -> initFeePortfolio)))
 
     txs
       .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initDetailedSnapshot, prevStateHash).asRight[ValidationError])) {
@@ -265,7 +265,8 @@ object BlockDiffer {
               // unless NG is activated, miner has already received all the fee from this block by the time the first
               // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
               // if NG is activated, just give them their 40%
-              val minerPortfolio = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
+              val minerPortfolio    = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
+              val minerPortfolioMap = Map(blockGenerator -> minerPortfolio)
 
               // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
               // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
@@ -273,15 +274,12 @@ object BlockDiffer {
 
               val txInfo = txSnapshot.transactions.head._2
               for {
-                resultTxSnapshot <- txSnapshot.addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain).leftMap(GenericError(_))
+                resultTxSnapshot <- txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_))
                 newMinerSnapshot <- detailedSnapshot.parentSnapshot
                   .withTransaction(txInfo)
-                  .addBalances(Map(blockGenerator -> minerPortfolio), currBlockchain)
+                  .addBalances(minerPortfolioMap, currBlockchain)
                   .leftMap(GenericError(_))
-                newDetailedSnapshot = DetailedSnapshot(
-                  newMinerSnapshot,
-                  detailedSnapshot.feePortfolios + (blockGenerator -> minerPortfolio)
-                )
+                newFeePortfolios = detailedSnapshot.feePortfolios :+ minerPortfolioMap
               } yield {
                 val newSnapshot   = currSnapshot |+| resultTxSnapshot
                 val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
@@ -291,7 +289,7 @@ object BlockDiffer {
                   carryFee + carry,
                   totalWavesFee,
                   updatedConstraint,
-                  newDetailedSnapshot,
+                  DetailedSnapshot(newMinerSnapshot, newFeePortfolios),
                   prevStateHashOpt
                     .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromTxSnapshot(txSnapshot, txInfo.applied).createHash(prevStateHash))
                 )

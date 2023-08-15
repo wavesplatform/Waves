@@ -12,6 +12,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
@@ -81,6 +82,52 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           Map(
             (senderAddress, Waves)    -> (senderBalanceBefore, transferSenderBalanceAfter),
             (recipientAddress, Waves) -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter)
+          )
+        )
+      }
+    }
+
+    "Return correct data for several transfers to miner" in {
+      val amount      = 1000
+      val recipient   = TxHelpers.defaultAddress
+      val fee1        = customFee
+      val fee2        = customFee + 12345
+      val fee3        = customFee + 56789
+      val transferTx1 = TxHelpers.transfer(sender, recipient, amount, Waves, fee1)
+      val transferTx2 = TxHelpers.transfer(sender, recipient, amount, Waves, fee2)
+      val transferTx3 = TxHelpers.transfer(sender, recipient, amount, Waves, fee3)
+
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(
+          AddrWithBalance(senderAddress, senderBalanceBefore)
+        )
+      )(_.appendMicroBlock(transferTx1, transferTx2, transferTx3)) { updates =>
+        val append = updates(1).append
+        checkTransfer(append.transactionIds(0), append.transactionAt(0), transferTx1, recipient.publicKeyHash)
+        checkTransfer(append.transactionIds(1), append.transactionAt(1), transferTx2, recipient.publicKeyHash)
+        checkTransfer(append.transactionIds(2), append.transactionAt(2), transferTx3, recipient.publicKeyHash)
+
+        val recipientBalanceBefore = 6.waves + CurrentBlockFeePart(fee1 + fee2 + fee3)
+        checkBalances(
+          append.transactionStateUpdates(0).balances,
+          Map(
+            (senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - (fee1 + amount)),
+            (recipient, Waves)     -> (recipientBalanceBefore, recipientBalanceBefore + amount)
+          )
+        )
+        checkBalances(
+          append.transactionStateUpdates(1).balances,
+          Map(
+            (senderAddress, Waves) -> (senderBalanceBefore - (fee1 + amount), senderBalanceBefore - (fee1 + fee2 + 2 * amount)),
+            (recipient, Waves)     -> (recipientBalanceBefore + amount, recipientBalanceBefore + 2 * amount)
+          )
+        )
+        checkBalances(
+          append.transactionStateUpdates(2).balances,
+          Map(
+            (senderAddress, Waves) -> (senderBalanceBefore - (fee1 + fee2 + 2 * amount), senderBalanceBefore - (fee1 + fee2 + fee3 + 3 * amount)),
+            (recipient, Waves)     -> (recipientBalanceBefore + 2 * amount, recipientBalanceBefore + 3 * amount)
           )
         )
       }

@@ -539,10 +539,10 @@ object StateUpdate {
 
   def container(
       blockchainBeforeWithReward: Blockchain,
-      snapshot: DetailedSnapshot,
+      detailedSnapshot: DetailedSnapshot,
       minerAddress: Address
   ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata], Seq[AssetInfo]) = {
-    val parentStateUpdate = atomic(blockchainBeforeWithReward, snapshot.parentSnapshot)
+    val parentStateUpdate = atomic(blockchainBeforeWithReward, detailedSnapshot.parentSnapshot)
 
     // miner reward is already in the blockchainBeforeWithReward
     // if miner balance has been changed in parentSnapshot, it is already included in balance updates
@@ -556,15 +556,20 @@ object StateUpdate {
         parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
     }
 
-    val (totalSnapshot, txsStateUpdates) =
-      snapshot.parentSnapshot.transactions
-        .foldLeft((snapshot.parentSnapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), (_, txInfo)) =>
-          val relevantFeePortfolios = snapshot.feePortfolios.filter { case (address, _) => txInfo.affected.contains(address) }
-          val txSnapshot            = txInfo.snapshot.addBalances(relevantFeePortfolios, blockchainBeforeWithReward).explicitGet()
-          (
-            accSnapshot |+| txSnapshot,
-            updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot), txSnapshot)
-          )
+    val (totalSnapshot, _, txsStateUpdates) =
+      detailedSnapshot.parentSnapshot.transactions
+        .foldLeft((detailedSnapshot.parentSnapshot, detailedSnapshot.feePortfolios.drop(1), Seq.empty[StateUpdate])) {
+          case ((accSnapshot, feePortfolios, updates), (_, txInfo)) =>
+            val relevantFeePortfolios =
+              feePortfolios
+                .reduce(Portfolio.combine(_, _).explicitGet())
+                .filter { case (address, _) => txInfo.affected.contains(address) }
+            val txSnapshot = txInfo.snapshot.addBalances(relevantFeePortfolios, blockchainBeforeWithReward).explicitGet()
+            (
+              accSnapshot |+| txSnapshot,
+              feePortfolios.drop(1),
+              updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot), txSnapshot)
+            )
         }
     val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
     val metadata        = transactionsMetadata(blockchainAfter, totalSnapshot)
