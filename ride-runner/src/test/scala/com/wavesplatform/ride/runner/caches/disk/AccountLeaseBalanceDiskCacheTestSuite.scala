@@ -1,12 +1,12 @@
 package com.wavesplatform.ride.runner.caches.disk
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.{Height, LeaseBalance}
 
 class AccountLeaseBalanceDiskCacheTestSuite extends DiskTestSuite {
-  private val cacheKey                                    = MemCacheKey.AccountLeaseBalance(alice.publicKey.toAddress)
+  private val cacheKey                                    = aliceAddr
   private val cacheValue: RemoteData[LeaseBalance]        = RemoteData.Cached(LeaseBalance(12L, 14L))
   private val defaultCacheValue: RemoteData[LeaseBalance] = RemoteData.Cached(LeaseBalance.empty) // Equal to RemoteData.Absence for this case
 
@@ -218,7 +218,7 @@ class AccountLeaseBalanceDiskCacheTestSuite extends DiskTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, DiskCache[MemCacheKey.AccountLeaseBalance, LeaseBalance]) => Unit): Unit = withDb { db =>
+  private def test(f: (RideDbAccess, DiskCache[Address, LeaseBalance]) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadWrite(DefaultDiskCaches(db)(_))
     f(db, caches.accountLeaseBalances)
   }

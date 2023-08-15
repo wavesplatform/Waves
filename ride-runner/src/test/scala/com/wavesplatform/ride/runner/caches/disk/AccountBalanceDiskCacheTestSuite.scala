@@ -1,9 +1,9 @@
 package com.wavesplatform.ride.runner.caches.disk
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.AddressId
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite, RideDbAccess}
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
@@ -18,7 +18,7 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
   }
 
   private def tests(asset: Asset): Unit = {
-    val defaultKey                                  = MemCacheKey.AccountBalance(alice.publicKey.toAddress, asset)
+    val defaultKey                                  = (aliceAddr, asset)
     def getHistory(implicit ctx: ReadOnly): Heights = ctx.getOpt(KvPairs.AccountAssetsHistory.at((AddressId(0L), asset))).getOrElse(Vector.empty)
 
     "history" - {
@@ -38,7 +38,7 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
         }
       }
 
-      def removeTests(removeF: (ReadWrite, DiskCache[MemCacheKey.AccountBalance, Long], Height) => Unit): Unit = {
+      def removeTests(removeF: (ReadWrite, DiskCache[(Address, Asset), Long], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
           db.batchedReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
@@ -314,7 +314,7 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
     }
   }
 
-  private def test(f: (RideDbAccess, DiskCache[MemCacheKey.AccountBalance, Long]) => Unit): Unit = withDb { db =>
+  private def test(f: (RideDbAccess, DiskCache[(Address, Asset), Long]) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadWrite(DefaultDiskCaches(db)(_))
     f(db, caches.accountBalances)
   }

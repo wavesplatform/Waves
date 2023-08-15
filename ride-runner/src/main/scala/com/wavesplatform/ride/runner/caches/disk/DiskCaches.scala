@@ -1,18 +1,20 @@
 package com.wavesplatform.ride.runner.caches.disk
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.ride.runner.caches.*
-import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.state.{DataEntry, Height, LeaseBalance}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 trait DiskCaches {
   def blockHeaders: BlockDiskCache
 
-  def accountDataEntries: DiskCache[MemCacheKey.AccountData, DataEntry[?]]
-  def accountScripts: DiskCache[MemCacheKey.AccountScript, WeighedAccountScriptInfo]
-  def assetDescriptions: DiskCache[MemCacheKey.Asset, WeighedAssetDescription]
+  def accountDataEntries: DiskCache[(Address, String), DataEntry[?]]
+  def accountScripts: DiskCache[Address, WeighedAccountScriptInfo]
+  def assetDescriptions: DiskCache[IssuedAsset, WeighedAssetDescription]
   def aliases: AliasDiskCache
-  def accountBalances: DiskCache[MemCacheKey.AccountBalance, Long]
-  def accountLeaseBalances: DiskCache[MemCacheKey.AccountLeaseBalance, LeaseBalance]
+  def accountBalances: DiskCache[(Address, Asset), Long]
+  def accountLeaseBalances: DiskCache[Address, LeaseBalance]
   def transactions: TransactionDiskCache
 
   def addressIds: AddressIdDiskCache

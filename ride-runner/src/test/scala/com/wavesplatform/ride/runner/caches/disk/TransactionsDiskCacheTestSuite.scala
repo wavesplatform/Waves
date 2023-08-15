@@ -3,7 +3,6 @@ package com.wavesplatform.ride.runner.caches.disk
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.{Height, TransactionId}
 
@@ -60,7 +59,7 @@ class TransactionsDiskCacheTestSuite extends DiskTestSuite {
     }
   }
 
-  private def mkTxKey(n: Byte) = MemCacheKey.Transaction(TransactionId(ByteStr(Array.fill[Byte](DigestLength)(n))))
+  private def mkTxKey(n: Byte) = TransactionId(ByteStr(Array.fill[Byte](DigestLength)(n)))
 
   private def test(f: (RideDbAccess, TransactionDiskCache) => Unit): Unit = withDb { db =>
     val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))

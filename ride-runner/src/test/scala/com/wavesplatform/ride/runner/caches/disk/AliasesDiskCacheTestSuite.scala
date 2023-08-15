@@ -2,13 +2,12 @@ package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.Height
 
 class AliasesDiskCacheTestSuite extends DiskTestSuite {
   private val defaultKey         = mkAliasKey("satoshi")
-  private val defaultValue       = alice.toAddress
+  private val defaultValue       = aliceAddr
   private val defaultCachedValue = RemoteData.Cached(defaultValue)
 
   "AliasesDiskCache" - {
@@ -85,5 +84,5 @@ class AliasesDiskCacheTestSuite extends DiskTestSuite {
     f(db, caches.aliases)
   }
 
-  private def mkAliasKey(s: String) = MemCacheKey.Alias(Alias(AddressScheme.current.chainId, s))
+  private def mkAliasKey(s: String) = Alias(AddressScheme.current.chainId, s)
 }

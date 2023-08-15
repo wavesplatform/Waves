@@ -64,12 +64,12 @@ class LazyBlockchain[TagT] private (
     //   to guarantee overwrite of fetched from gRPC API data.
     memCache
       .getOrLoad(MemCacheKey.AccountData(address, dataKey)) { key =>
-        val cached = diskCaches.accountDataEntries.get(atMaxHeight, key)
+        val cached = diskCaches.accountDataEntries.get(atMaxHeight, (key.address, key.dataKey))
         if (cached.loaded) cached
         else
           RemoteData
             .loaded(blockchainApi.getAccountDataEntry(key.address, key.dataKey))
-            .tap { r => diskCaches.accountDataEntries.set(atMaxHeight, key, r) }
+            .tap { r => diskCaches.accountDataEntries.set(atMaxHeight, (key.address, key.dataKey), r) }
       }
   }.mayBeValue
 
@@ -78,13 +78,13 @@ class LazyBlockchain[TagT] private (
     .directReadWrite { implicit ctx =>
       val atMaxHeight = heightUntagged
       memCache.getOrLoad(MemCacheKey.AccountScript(address)) { key =>
-        val cached = diskCaches.accountScripts.get(atMaxHeight, key)
+        val cached = diskCaches.accountScripts.get(atMaxHeight, key.address)
         if (cached.loaded) cached
         else
           RemoteData
             .loaded(blockchainApi.getAccountScript(key.address))
             .map(Function.tupled(toWeightedAccountScriptInfo))
-            .tap { r => diskCaches.accountScripts.set(atMaxHeight, key, r) }
+            .tap { r => diskCaches.accountScripts.set(atMaxHeight, key.address, r) }
       }
     }
     .mayBeValue
@@ -114,13 +114,13 @@ class LazyBlockchain[TagT] private (
     .directReadWrite { implicit ctx =>
       val atMaxHeight = heightUntagged
       memCache.getOrLoad(MemCacheKey.Asset(asset)) { key =>
-        val cached = diskCaches.assetDescriptions.get(atMaxHeight, key)
+        val cached = diskCaches.assetDescriptions.get(atMaxHeight, key.asset)
         if (cached.loaded) cached
         else
           RemoteData
             .loaded(blockchainApi.getAssetDescription(key.asset))
             .map(toWeightedAssetDescription)
-            .tap { r => diskCaches.assetDescriptions.set(atMaxHeight, key, r) }
+            .tap { r => diskCaches.assetDescriptions.set(atMaxHeight, key.asset, r) }
       }
     }
     .mayBeValue
@@ -130,15 +130,15 @@ class LazyBlockchain[TagT] private (
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
-  def resolveAlias(a: Alias): Either[ValidationError, Address] = db
+  override def resolveAlias(a: Alias): Either[ValidationError, Address] = db
     .directReadWrite { implicit ctx =>
       memCache.getOrLoad(MemCacheKey.Alias(a)) { key =>
-        val cached = diskCaches.aliases.getAddress(key)
+        val cached = diskCaches.aliases.getAddress(key.alias)
         if (cached.loaded) cached
         else
           RemoteData
             .loaded(blockchainApi.resolveAlias(key.alias))
-            .tap { r => diskCaches.aliases.setAddress(heightUntagged, key, r) }
+            .tap { r => diskCaches.aliases.setAddress(heightUntagged, key.alias, r) }
       }
     }
     .mayBeValue
@@ -149,13 +149,13 @@ class LazyBlockchain[TagT] private (
     .directReadWrite { implicit ctx =>
       val atMaxHeight = heightUntagged
       memCache.getOrLoad(MemCacheKey.AccountLeaseBalance(address)) { key =>
-        val cached = diskCaches.accountLeaseBalances.get(atMaxHeight, key)
+        val cached = diskCaches.accountLeaseBalances.get(atMaxHeight, key.address)
         if (cached.loaded) cached
         else
           RemoteData
             .loaded(blockchainApi.getLeaseBalance(key.address))
             .map(r => LeaseBalance(r.leaseIn, r.leaseOut))
-            .tap { r => diskCaches.accountLeaseBalances.set(atMaxHeight, key, r) }
+            .tap { r => diskCaches.accountLeaseBalances.set(atMaxHeight, key.address, r) }
       }
     }
     .mayBeValue
@@ -166,12 +166,12 @@ class LazyBlockchain[TagT] private (
     .directReadWrite { implicit ctx =>
       val atMaxHeight = heightUntagged
       memCache.getOrLoad(MemCacheKey.AccountBalance(address, asset)) { key =>
-        val cached = diskCaches.accountBalances.get(atMaxHeight, key)
+        val cached = diskCaches.accountBalances.get(atMaxHeight, (key.address, key.asset))
         if (cached.loaded) cached
         else
           RemoteData
             .loaded(blockchainApi.getBalance(key.address, key.asset))
-            .tap { r => diskCaches.accountBalances.set(atMaxHeight, key, r) }
+            .tap { r => diskCaches.accountBalances.set(atMaxHeight, (key.address, key.asset), r) }
       }
     }
     .mayBeValue
@@ -192,12 +192,12 @@ class LazyBlockchain[TagT] private (
 
   private def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
     memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>
-      val cached = diskCaches.transactions.getHeight(key)
+      val cached = diskCaches.transactions.getHeight(key.id)
       if (cached.loaded) cached
       else
         RemoteData
           .loaded(blockchainApi.getTransactionHeight(key.id))
-          .tap { r => diskCaches.transactions.setHeight(key, r) }
+          .tap { r => diskCaches.transactions.setHeight(key.id, r) }
     }
   }.mayBeValue
 
@@ -235,25 +235,25 @@ class LazyBlockchain[TagT] private (
     blockHeaders.removeFrom(height)
     diskCaches.accountDataEntries
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.AccountData(x._1, x._2)))
     diskCaches.accountScripts
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.AccountScript(x)))
     diskCaches.assetDescriptions
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.Asset(x)))
     diskCaches.aliases
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.Alias(x)))
     diskCaches.accountBalances
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.AccountBalance(x._1, x._2)))
     diskCaches.accountLeaseBalances
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.AccountLeaseBalance(x)))
     diskCaches.transactions
       .removeAllFrom(height)
-      .foreach(memCache.remove)
+      .foreach(x => memCache.remove(MemCacheKey.Transaction(x)))
 
     val features         = currentActivatedFeatures.get()
     val filteredFeatures = features.filterNot { case (_, featureHeight) => featureHeight >= height }
@@ -310,7 +310,7 @@ class LazyBlockchain[TagT] private (
                   case Data.CreateAlias(txData) =>
                     val cacheKey = conv.aliasKey(txData)
                     val v        = RemoteData.Cached(conv.aliasValue(tx))
-                    diskCaches.aliases.setAddress(atHeight, cacheKey, v)
+                    diskCaches.aliases.setAddress(atHeight, cacheKey.alias, v)
                     r ++ updateCacheIfExists(cacheKey)(v)
 
                   case Data.SetScript(_) =>
@@ -329,25 +329,25 @@ class LazyBlockchain[TagT] private (
           stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.assetKey(x)
             val v        = RemoteData.loaded(conv.assetValueAfter(cacheKey.asset, x).map(toWeightedAssetDescription))
-            diskCaches.assetDescriptions.set(atHeight, cacheKey, v)
+            diskCaches.assetDescriptions.set(atHeight, cacheKey.asset, v)
             r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>
             val (cacheKey, rawValue) = conv.accountBalanceKeyAndValueAfter(x)
             val v                    = RemoteData.loaded(rawValue)
-            diskCaches.accountBalances.set(atHeight, cacheKey, v)
+            diskCaches.accountBalances.set(atHeight, (cacheKey.address, cacheKey.asset), v)
             r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.leasingForAddress).foldLeft(empty) { case (r, x) =>
             val (cacheKey, rawValue) = conv.accountLeaseBalanceKeyAndValueAfter(x)
             val v                    = RemoteData.loaded(rawValue)
-            diskCaches.accountLeaseBalances.set(atHeight, cacheKey, v)
+            diskCaches.accountLeaseBalances.set(atHeight, cacheKey.address, v)
             r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.dataEntries).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.accountDataKey(x)
             val v        = RemoteData.loaded(conv.accountDataValueAfter(x))
-            diskCaches.accountDataEntries.set(atHeight, cacheKey, v)
+            diskCaches.accountDataEntries.set(atHeight, (cacheKey.address, cacheKey.dataKey), v)
             r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.scripts).foldLeft(empty) { case (r, x) =>
@@ -357,7 +357,7 @@ class LazyBlockchain[TagT] private (
               throw new RuntimeException("Impossible: there is a script, but no a corresponding transaction")
             )
             val v = RemoteData.loaded(toVanillaScript(x.after).map(toWeightedAccountScriptInfo(pk, _)))
-            diskCaches.accountScripts.set(atHeight, cacheKey, v)
+            diskCaches.accountScripts.set(atHeight, cacheKey.address, v)
             r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           // We have to do this, otherwise:
@@ -367,7 +367,7 @@ class LazyBlockchain[TagT] private (
           evt.transactionIds.foldLeft(empty) { case (r, txId) =>
             val cacheKey = conv.transactionIdKey(txId)
             val v        = RemoteData.loaded(atHeight)
-            diskCaches.transactions.updateHeightIfExist(cacheKey, v)
+            diskCaches.transactions.updateHeightIfExist(cacheKey.id, v)
             r ++ updateCacheIfExists(cacheKey)(v)
           }
       }
