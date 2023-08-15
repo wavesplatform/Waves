@@ -24,7 +24,7 @@ class CacheKeyTags[TagT] {
       else orig.diff(xs)
     }
 
-    // TODO: Use removeIf to remove empty keys in JRE 17
+    // TODO Use removeIf to remove empty keys in JRE 17
     val emptyKeys = allTags.reduceEntries[Seq[MemCacheKey]](
       4, // parallelismThreshold
       entry => if (entry.getValue.isEmpty) Seq(entry.getKey) else Seq.empty,

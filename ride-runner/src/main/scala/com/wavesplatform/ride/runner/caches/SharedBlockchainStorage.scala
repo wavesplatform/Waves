@@ -45,9 +45,6 @@ class SharedBlockchainStorage[TagT] private (
     blockHeaders.getOrFetch(atHeight)
   }
 
-  //  Only for tests
-  private[caches] def getCachedInMem[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = memCache.get(key)
-
   def getOrFetch[T <: MemCacheKey](key: T): Option[T#ValueT] = db.directReadWrite { implicit ctx =>
     getLatestInternal(heightUntagged, key)
   }

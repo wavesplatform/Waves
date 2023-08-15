@@ -32,7 +32,6 @@ final case class GrpcChannelSettings(
       .idleTimeout(idleTimeout.length, idleTimeout.unit)
       .withOption[Integer](ChannelOption.CONNECT_TIMEOUT_MILLIS, channelOptions.connectTimeout.toMillis.toInt)
       .tap { x =>
-        // TODO #102 gRPC stats and tracing
         InternalNettyChannelBuilder.setStatsEnabled(x, false)
         InternalNettyChannelBuilder.setTracingEnabled(x, false)
       }

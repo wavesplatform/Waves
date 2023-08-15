@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
 trait SupportedBlockchain extends Blockchain with ScorexLogging {
-  // TODO #16 We don't support it for now, use GET /utils/script/evaluate
+  // We don't support it for now (no demand), use GET /utils/script/evaluate if you need it.
   // Ride: isDataStorageUntouched
   override def hasData(address: Address): Boolean = kill(s"hasData($address)")
 

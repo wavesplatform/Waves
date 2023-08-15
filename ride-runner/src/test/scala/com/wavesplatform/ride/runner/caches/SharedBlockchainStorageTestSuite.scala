@@ -513,13 +513,14 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
       val allTags = new CacheKeyTags[Tag]
       db.directReadWrite { implicit rw =>
         val diskCaches = DefaultDiskCaches(db)
+        val memCache   = new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20)))
 
         val blockchain = SharedBlockchainStorage.load(
           settings = SharedBlockchainStorage.Settings(DefaultBlockchainSettings),
           blockchainApi = testBlockchainApi,
           db = db,
           diskCaches = diskCaches,
-          memCache = new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20))),
+          memCache = memCache,
           allTags = allTags
         )
 
@@ -527,13 +528,13 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
         dependencies.foreach(Function.tupled(allTags.addDependent))
         preEvents.foreach(blockchain.process)
         val affectedTags = trackAffectedEvents.foldLeft(AffectedTags.empty[Tag])((r, event) => r ++ blockchain.process(event))
-        checks(new Access(blockchain, affectedTags))
+        checks(new Access(blockchain, memCache, affectedTags))
       }
     }
   }
 
-  private class Access(val blockchain: SharedBlockchainStorage[Tag], val affectedTags: AffectedTags[Tag]) {
-    def get[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = blockchain.getCachedInMem(key)
+  private class Access(val blockchain: SharedBlockchainStorage[Tag], memCache: MemBlockchainDataCache, val affectedTags: AffectedTags[Tag]) {
+    def get[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = memCache.get(key)
 
     def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {
       affectedTags shouldBe empty
