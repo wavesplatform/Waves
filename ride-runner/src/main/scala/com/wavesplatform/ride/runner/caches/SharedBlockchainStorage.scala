@@ -18,7 +18,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.ride.runner.blockchain.SupportedBlockchain
+import com.wavesplatform.ride.runner.blockchain.{ActivatedFeatures, SupportedBlockchain}
 import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage.Settings
 import com.wavesplatform.ride.runner.caches.disk.DiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{GrpcCacheKeyConverters, MemBlockchainDataCache, MemCacheKey, MemCacheWeights}
@@ -109,7 +109,8 @@ class SharedBlockchainStorage[TagT] private (
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = heightUntagged
 
-  override def activatedFeatures = currentActivatedFeatures.get()
+  // Ride: environment initialization
+  override def activatedFeatures: ActivatedFeatures = currentActivatedFeatures.get()
 
   // Ride: assetInfo
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = db
@@ -132,18 +133,19 @@ class SharedBlockchainStorage[TagT] private (
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
-  def resolveAlias(a: Alias): Either[ValidationError, Address] = getAlias(a).toRight(AliasDoesNotExist(a))
-  // TODO remove
-  private def getAlias(a: Alias): Option[Address] = db.directReadWrite { implicit ctx =>
-    memCache.getOrLoad(MemCacheKey.Alias(a)) { key =>
-      val cached = diskCaches.aliases.getAddress(key)
-      if (cached.loaded) cached
-      else
-        RemoteData
-          .loaded(blockchainApi.resolveAlias(key.alias))
-          .tap { r => diskCaches.aliases.setAddress(heightUntagged, key, r) }
+  def resolveAlias(a: Alias): Either[ValidationError, Address] = db
+    .directReadWrite { implicit ctx =>
+      memCache.getOrLoad(MemCacheKey.Alias(a)) { key =>
+        val cached = diskCaches.aliases.getAddress(key)
+        if (cached.loaded) cached
+        else
+          RemoteData
+            .loaded(blockchainApi.resolveAlias(key.alias))
+            .tap { r => diskCaches.aliases.setAddress(heightUntagged, key, r) }
+      }
     }
-  }.mayBeValue
+    .mayBeValue
+    .toRight(AliasDoesNotExist(a))
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance = db
@@ -233,34 +235,27 @@ class SharedBlockchainStorage[TagT] private (
   }
 
   private def removeAllFromCtx(height: Height)(implicit ctx: ReadWrite): Unit = {
-    blockHeaders.removeFrom(height) // .tap { x => log.trace(s"removedBlocks: $x") }
+    blockHeaders.removeFrom(height)
     diskCaches.accountDataEntries
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed data entries: $x") }
       .foreach(memCache.remove)
     diskCaches.accountScripts
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed : $x") }
       .foreach(memCache.remove)
     diskCaches.assetDescriptions
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed : $x") }
       .foreach(memCache.remove)
     diskCaches.aliases
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed : $x") }
       .foreach(memCache.remove)
     diskCaches.accountBalances
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed : $x") }
       .foreach(memCache.remove)
     diskCaches.accountLeaseBalances
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed : $x") }
       .foreach(memCache.remove)
     diskCaches.transactions
       .removeAllFrom(height)
-//      .tap { x => log.trace(s"removed transactions: $x") }
       .foreach(memCache.remove)
 
     val features         = currentActivatedFeatures.get()
@@ -282,32 +277,23 @@ class SharedBlockchainStorage[TagT] private (
       affected
     }
 
-  private def logIfTagPresent(hint: String, key: MemCacheKey): AffectedTags[TagT] =
-    getAffectedTags(s"log $hint", key)
-
-  private def updateCacheIfExists[CacheKeyT <: MemCacheKey](hint: String, key: CacheKeyT)(v: RemoteData[CacheKeyT#ValueT]): AffectedTags[TagT] = {
-    getAffectedTags(s"update $hint", key).tap { tags =>
+  private def updateCacheIfExists[CacheKeyT <: MemCacheKey](key: CacheKeyT)(v: RemoteData[CacheKeyT#ValueT]): AffectedTags[TagT] = {
+    getAffectedTags(key).tap { tags =>
       if (tags.isEmpty) memCache.updateIfExists(key, v) // Not yet removed from memCache, but already removed from tags
       else memCache.set(key, v)
     }
   }
 
-  private def removeCache[CacheKeyT <: MemCacheKey](hint: String, key: CacheKeyT): AffectedTags[TagT] = {
+  private def removeCache[CacheKeyT <: MemCacheKey](key: CacheKeyT): AffectedTags[TagT] = {
     memCache.remove(key)
-    getAffectedTags(s"remove $hint", key)
+    getAffectedTags(key)
   }
 
-  private def getAffectedTags(hint: => String, key: MemCacheKey): AffectedTags[TagT] = allTags.get(key) match {
-    case None       => empty
-    case Some(tags) =>
-      // log.trace(s"dep $hint: ${self.xs.toList.map(_.toString).sorted.mkString("; ")}")
-      tags
-  }
+  private def getAffectedTags(key: MemCacheKey): AffectedTags[TagT] = allTags.get(key).getOrElse(AffectedTags.empty)
 
   private def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (initialAffectedTags, txs, timer) = evt.body match {
-      case Body.Block(block) =>
-        (logIfTagPresent("append.height", MemCacheKey.Height), block.getBlock.transactions, RideRunnerStats.blockProcessingTime.some)
+      case Body.Block(block)           => (getAffectedTags(MemCacheKey.Height), block.getBlock.transactions, RideRunnerStats.blockProcessingTime.some)
       case Body.MicroBlock(microBlock) => (empty, microBlock.getMicroBlock.getMicroBlock.transactions, RideRunnerStats.microBlockProcessingTime.some)
       case Body.Empty                  => (empty, Seq.empty, none)
     }
@@ -328,7 +314,7 @@ class SharedBlockchainStorage[TagT] private (
                     val cacheKey = conv.aliasKey(txData)
                     val v        = RemoteData.Cached(conv.aliasValue(tx))
                     diskCaches.aliases.setAddress(atHeight, cacheKey, v)
-                    r ++ updateCacheIfExists("append.alias", cacheKey)(v)
+                    r ++ updateCacheIfExists(cacheKey)(v)
 
                   case Data.SetScript(_) =>
                     val pk = tx.senderPublicKey.toPublicKey
@@ -347,25 +333,25 @@ class SharedBlockchainStorage[TagT] private (
             val cacheKey = conv.assetKey(x)
             val v        = RemoteData.loaded(conv.assetValueAfter(cacheKey.asset, x).map(toWeightedAssetDescription))
             diskCaches.assetDescriptions.set(atHeight, cacheKey, v)
-            r ++ updateCacheIfExists("append.asset", cacheKey)(v)
+            r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>
             val (cacheKey, rawValue) = conv.accountBalanceKeyAndValueAfter(x)
             val v                    = RemoteData.loaded(rawValue)
             diskCaches.accountBalances.set(atHeight, cacheKey, v)
-            r ++ updateCacheIfExists("append.accountBalance", cacheKey)(v)
+            r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.leasingForAddress).foldLeft(empty) { case (r, x) =>
             val (cacheKey, rawValue) = conv.accountLeaseBalanceKeyAndValueAfter(x)
             val v                    = RemoteData.loaded(rawValue)
             diskCaches.accountLeaseBalances.set(atHeight, cacheKey, v)
-            r ++ updateCacheIfExists("append.accountLeaseBalance", cacheKey)(v)
+            r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.dataEntries).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.accountDataKey(x)
             val v        = RemoteData.loaded(conv.accountDataValueAfter(x))
             diskCaches.accountDataEntries.set(atHeight, cacheKey, v)
-            r ++ updateCacheIfExists("append.data", cacheKey)(v)
+            r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           stateUpdate.flatMap(_.scripts).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.accountScriptKey(x)
@@ -375,7 +361,7 @@ class SharedBlockchainStorage[TagT] private (
             )
             val v = RemoteData.loaded(toVanillaScript(x.after).map(toWeightedAccountScriptInfo(pk, _)))
             diskCaches.accountScripts.set(atHeight, cacheKey, v)
-            r ++ updateCacheIfExists("append.accountScript", cacheKey)(v)
+            r ++ updateCacheIfExists(cacheKey)(v)
           } ++
           // We have to do this, otherwise:
           // 1. A transaction could be moved to a new block during NG process
@@ -385,7 +371,7 @@ class SharedBlockchainStorage[TagT] private (
             val cacheKey = conv.transactionIdKey(txId)
             val v        = RemoteData.loaded(atHeight)
             diskCaches.transactions.updateHeightIfExist(cacheKey, v)
-            r ++ updateCacheIfExists("append.transaction", cacheKey)(v)
+            r ++ updateCacheIfExists(cacheKey)(v)
           }
       }
     }
@@ -396,36 +382,36 @@ class SharedBlockchainStorage[TagT] private (
       removeAllFromCtx(Height(toHeight + 1))
 
       val stateUpdate = rollback.getRollbackStateUpdate
-      logIfTagPresent("rollback.height", MemCacheKey.Height) ++
+      getAffectedTags(MemCacheKey.Height) ++
         stateUpdate.assets.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.assetKey(x)
           val v        = RemoteData.loaded(conv.assetValueAfter(cacheKey.asset, x).map(toWeightedAssetDescription))
-          r ++ updateCacheIfExists("rollback.asset", cacheKey)(v)
+          r ++ updateCacheIfExists(cacheKey)(v)
         } ++
         stateUpdate.balances.foldLeft(empty) { case (r, x) =>
           val (cacheKey, rawValue) = conv.accountBalanceKeyAndValueAfter(x)
-          r ++ updateCacheIfExists("rollback.accountBalance", cacheKey)(RemoteData.loaded(rawValue))
+          r ++ updateCacheIfExists(cacheKey)(RemoteData.loaded(rawValue))
         } ++
         stateUpdate.leasingForAddress.foldLeft(empty) { case (r, x) =>
           val (cacheKey, rawValue) = conv.accountLeaseBalanceKeyAndValueAfter(x)
-          r ++ updateCacheIfExists("rollback.accountLeaseBalance", cacheKey)(RemoteData.loaded(rawValue))
+          r ++ updateCacheIfExists(cacheKey)(RemoteData.loaded(rawValue))
         } ++
         stateUpdate.dataEntries.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.accountDataKey(x)
-          r ++ updateCacheIfExists("rollback.data", cacheKey)(RemoteData.loaded(conv.accountDataValueAfter(x)))
+          r ++ updateCacheIfExists(cacheKey)(RemoteData.loaded(conv.accountDataValueAfter(x)))
         } ++
         stateUpdate.scripts.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.accountScriptKey(x)
           // Just a removing eliminates a complex logic of restoring the old script here. In rare cases this could lead to a slow response (once).
-          r ++ removeCache("rollback.accountScript", cacheKey)
+          r ++ removeCache(cacheKey)
         } ++
         stateUpdate.deletedAliases.foldLeft(empty) { case (r, x) =>
           val cacheKey = conv.aliasKey(x)
-          r ++ updateCacheIfExists("rollback.alias", cacheKey)(RemoteData.Absence) // Because there is only one such alias
+          r ++ updateCacheIfExists(cacheKey)(RemoteData.Absence) // Because there is only one such alias
         } ++
         rollback.removedTransactionIds.foldLeft(empty) { case (r, txId) =>
           val cacheKey = conv.transactionIdKey(txId)
-          r ++ updateCacheIfExists("rollback.transaction", cacheKey)(RemoteData.Absence)
+          r ++ updateCacheIfExists(cacheKey)(RemoteData.Absence)
         }
     }
 
@@ -438,7 +424,7 @@ class SharedBlockchainStorage[TagT] private (
       case last :: _ =>
         log.info(s"Undo to ${last.height - 1}")
         removeAllFromCtx(Height(last.height))
-        events.foldLeft(logIfTagPresent("undo.height", MemCacheKey.Height)) { case (r, event) =>
+        events.foldLeft(getAffectedTags(MemCacheKey.Height)) { case (r, event) =>
           val updates = event.update match {
             case Update.Append(append) =>
               log.debug(s"Undo id=${ByteStr(event.id.toByteArray)}")
@@ -470,7 +456,7 @@ class SharedBlockchainStorage[TagT] private (
           tx.data match {
             case Data.CreateAlias(txData) =>
               val cacheKey = conv.aliasKey(txData)
-              r ++ updateCacheIfExists("undo.alias", cacheKey)(RemoteData.Absence)
+              r ++ updateCacheIfExists(cacheKey)(RemoteData.Absence)
 
             case Data.SetScript(_) =>
               val pk = tx.senderPublicKey.toPublicKey
@@ -488,19 +474,19 @@ class SharedBlockchainStorage[TagT] private (
       stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
         val cacheKey = conv.assetKey(x)
         val v        = RemoteData.loaded(conv.assetValueBefore(cacheKey.asset, x).map(toWeightedAssetDescription))
-        r ++ updateCacheIfExists("undo.asset", cacheKey)(v)
+        r ++ updateCacheIfExists(cacheKey)(v)
       } ++
       stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>
         val (cacheKey, rawValue) = conv.accountBalanceKeyAndValueBefore(x)
-        r ++ updateCacheIfExists("undo.accountBalance", cacheKey)(RemoteData.loaded(rawValue))
+        r ++ updateCacheIfExists(cacheKey)(RemoteData.loaded(rawValue))
       } ++
       stateUpdate.flatMap(_.leasingForAddress).foldLeft(empty) { case (r, x) =>
         val (cacheKey, rawValue) = conv.accountLeaseBalanceKeyAndValueBefore(x)
-        r ++ updateCacheIfExists("undo.accountLeaseBalance", cacheKey)(RemoteData.loaded(rawValue))
+        r ++ updateCacheIfExists(cacheKey)(RemoteData.loaded(rawValue))
       } ++
       stateUpdate.flatMap(_.dataEntries).foldLeft(empty) { case (r, x) =>
         val cacheKey = conv.accountDataKey(x)
-        r ++ updateCacheIfExists("undo.accountLeaseBalance", cacheKey)(RemoteData.loaded(conv.accountDataValueBefore(x)))
+        r ++ updateCacheIfExists(cacheKey)(RemoteData.loaded(conv.accountDataValueBefore(x)))
       } ++
       stateUpdate.flatMap(_.scripts).foldLeft(empty) { case (r, x) =>
         val cacheKey = conv.accountScriptKey(x)
@@ -509,11 +495,11 @@ class SharedBlockchainStorage[TagT] private (
           throw new RuntimeException("Impossible: there is a script, but no a corresponding transaction")
         )
         val v = RemoteData.loaded(toVanillaScript(x.before).map(toWeightedAccountScriptInfo(pk, _)))
-        r ++ updateCacheIfExists("undo.accountScript", cacheKey)(v)
+        r ++ updateCacheIfExists(cacheKey)(v)
       } ++
       append.transactionIds.foldLeft(empty) { case (r, txId) =>
         val cacheKey = conv.transactionIdKey(txId)
-        r ++ updateCacheIfExists("undo.transaction", cacheKey)(RemoteData.Absence)
+        r ++ updateCacheIfExists(cacheKey)(RemoteData.Absence)
       }
   }
 
