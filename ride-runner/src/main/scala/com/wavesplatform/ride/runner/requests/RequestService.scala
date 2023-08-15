@@ -8,7 +8,6 @@ import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, Unknown}
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
 import com.wavesplatform.ride.runner.caches.mem.MemCacheWeights
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
@@ -92,8 +91,6 @@ class DefaultRequestService(
   private def isActive(request: RideScriptRunRequest): Boolean =
     currJobs.containsKey(request) || Option(activeRequests.policy().getIfPresentQuietly(request)).isDefined
 
-  private val blockchain = new ProxyBlockchain(sharedBlockchain)
-
   override def start(): Unit = if (isWorking.get()) {
     log.info("Starting queue...")
     queueTask = requestScheduler.jobs
@@ -167,7 +164,7 @@ class DefaultRequestService(
         case Some(job) => Task.fromCancelablePromise(job.result)
         case None =>
           Task {
-            sharedBlockchain.getAccountScript(request.address)
+            sharedBlockchain.accountScript(request.address)
           }.flatMap {
             case None => Task.now(fail(CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
@@ -269,7 +266,7 @@ class DefaultRequestService(
         }
 
       case None =>
-        Evaluation.build(blockchain, request.address, request.requestBody) match {
+        Evaluation.build(sharedBlockchain, request.address, request.requestBody) match {
           case Right((evaluation, scriptInfo)) => (evaluation, scriptInfo).asRight
           case Left(e)                         => e.asLeft
         }
