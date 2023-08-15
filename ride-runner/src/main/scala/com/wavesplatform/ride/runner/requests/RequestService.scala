@@ -9,7 +9,7 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, Unknown}
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.blockchain.ProxyBlockchain
-import com.wavesplatform.ride.runner.caches.mem.{MemCacheKey, MemCacheWeights}
+import com.wavesplatform.ride.runner.caches.mem.MemCacheWeights
 import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
@@ -167,7 +167,7 @@ class DefaultRequestService(
         case Some(job) => Task.fromCancelablePromise(job.result)
         case None =>
           Task {
-            sharedBlockchain.getOrFetch(MemCacheKey.AccountScript(request.address))
+            sharedBlockchain.getAccountScript(request.address)
           }.flatMap {
             case None => Task.now(fail(CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>

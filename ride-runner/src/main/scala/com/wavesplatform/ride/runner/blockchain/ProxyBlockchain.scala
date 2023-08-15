@@ -7,7 +7,6 @@ import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage
-import com.wavesplatform.ride.runner.caches.mem.MemCacheKey
 import com.wavesplatform.ride.runner.requests.RideScriptRunRequest
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{
@@ -27,11 +26,10 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   override def settings: BlockchainSettings = sharedBlockchain.blockchainSettings
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.getOrFetch(MemCacheKey.AccountData(address, key))
+  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.getAccountData(address, key)
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] =
-    sharedBlockchain.getOrFetch(MemCacheKey.AccountScript(address)).map(_.accountScriptInfo)
+  override def accountScript(address: Address): Option[AccountScriptInfo] = sharedBlockchain.getAccountScript(address)
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = blockHeaderWithVrf(Height(height)).map(_.header)
@@ -42,7 +40,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   // Ride: blockInfoByHeight
   override def blockReward(height: Int): Option[Long] = blockHeaderWithVrf(Height(height)).map(_.blockReward)
 
-  private def blockHeaderWithVrf(height: Height): Option[SignedBlockHeaderWithVrf] = sharedBlockchain.getOrFetchBlock(height)
+  private def blockHeaderWithVrf(height: Height): Option[SignedBlockHeaderWithVrf] = sharedBlockchain.getBlock(height)
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = sharedBlockchain.heightUntagged
@@ -50,8 +48,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   override def activatedFeatures: Map[Short, Int] = sharedBlockchain.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] =
-    sharedBlockchain.getOrFetch(MemCacheKey.Asset(id)).map(_.assetDescription)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = sharedBlockchain.getAsset(id)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
@@ -60,12 +57,10 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
   override def resolveAlias(a: Alias): Either[ValidationError, Address] = sharedBlockchain.resolveAlias(a)
 
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance =
-    sharedBlockchain.getOrFetch(MemCacheKey.AccountLeaseBalance(address)).getOrElse(LeaseBalance.empty)
+  override def leaseBalance(address: Address): LeaseBalance = sharedBlockchain.getLeaseBalance(address).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
-  override def balance(address: Address, mayBeAssetId: Asset): Long =
-    sharedBlockchain.getOrFetch(MemCacheKey.AccountBalance(address, mayBeAssetId)).getOrElse(0L)
+  override def balance(address: Address, mayBeAssetId: Asset): Long = sharedBlockchain.getBalance(address, mayBeAssetId).getOrElse(0L)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
@@ -76,11 +71,8 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[RideScriptRunReq
     List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
   }
 
-  private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.getOrFetch(MemCacheKey.Transaction(TransactionId(id)))
-
   // Ride: transactionHeightById
-  override def transactionMeta(id: ByteStr): Option[TxMeta] = {
-    // Other information is not used
-    withTransactions(id).map(TxMeta(_, succeeded = true, 0))
-  }
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = withTransactions(id).map(TxMeta(_, succeeded = true, 0)) // Other information not used
+
+  private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.getTransactionHeight(TransactionId(id))
 }

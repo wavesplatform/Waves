@@ -24,7 +24,9 @@ import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, LeaseBalance}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, LeaseBalance, TransactionId}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
 
@@ -41,98 +43,104 @@ class SharedBlockchainStorage[TagT] private (
     memCache: MemBlockchainDataCache,
     allTags: CacheKeyTags[TagT]
 ) extends ScorexLogging {
-  def getOrFetchBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.directReadWrite { implicit ctx =>
+  def getBlock(atHeight: Height): Option[SignedBlockHeaderWithVrf] = db.directReadWrite { implicit ctx =>
     blockHeaders.getOrFetch(atHeight)
   }
 
-  def getOrFetch[T <: MemCacheKey](key: T): Option[T#ValueT] = db.directReadWrite { implicit ctx =>
-    getLatestInternal(heightUntagged, key)
-  }
+  def getAccountData(address: Address, dataKey: String): Option[DataEntry[?]] = db.directReadWrite { implicit ctx =>
+    val atMaxHeight = heightUntagged
+    // If a key doesn't exist, the lambda will block other memCache updates.
+    // For any blockchain update use memCache.set first and then update a disk cache
+    //   to guarantee overwrite of fetched from gRPC API data.
+    memCache
+      .getOrLoad(MemCacheKey.AccountData(address, dataKey)) { key =>
+        val cached = diskCaches.accountDataEntries.get(atMaxHeight, key)
+        if (cached.loaded) cached
+        else
+          RemoteData
+            .loaded(blockchainApi.getAccountDataEntry(key.address, key.dataKey))
+            .tap { r => diskCaches.accountDataEntries.set(atMaxHeight, key, r) }
+      }
+  }.mayBeValue
 
-  private def getLatestInternal[T <: MemCacheKey](atMaxHeight: Height, key: T)(implicit ctx: ReadWrite): Option[T#ValueT] = {
-    val r = key match {
-      case key: MemCacheKey.AccountData =>
-        // If a key doesn't exist, the lambda will block other memCache updates.
-        // For any blockchain update use memCache.set first and then update a disk cache
-        //   to guarantee overwrite of fetched from gRPC API data.
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.accountDataEntries.get(atMaxHeight, key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.getAccountDataEntry(key.address, key.dataKey))
-              .tap { r => diskCaches.accountDataEntries.set(atMaxHeight, key, r) }
-        }
-
-      case key: MemCacheKey.Transaction =>
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.transactions.getHeight(key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.getTransactionHeight(key.id))
-              .tap { r => diskCaches.transactions.setHeight(key, r) }
-        }
-
-      case key: MemCacheKey.Alias =>
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.aliases.getAddress(key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.resolveAlias(key.alias))
-              .tap { r => diskCaches.aliases.setAddress(atMaxHeight, key, r) }
-        }
-
-      case key: MemCacheKey.Asset =>
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.assetDescriptions.get(atMaxHeight, key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.getAssetDescription(key.asset))
-              .map(toWeightedAssetDescription)
-              .tap { r => diskCaches.assetDescriptions.set(atMaxHeight, key, r) }
-        }
-
-      case key: MemCacheKey.AccountBalance =>
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.accountBalances.get(atMaxHeight, key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.getBalance(key.address, key.asset))
-              .tap { r => diskCaches.accountBalances.set(atMaxHeight, key, r) }
-        }
-
-      case key: MemCacheKey.AccountLeaseBalance =>
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.accountLeaseBalances.get(atMaxHeight, key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.getLeaseBalance(key.address))
-              .map(r => LeaseBalance(r.leaseIn, r.leaseOut))
-              .tap { r => diskCaches.accountLeaseBalances.set(atMaxHeight, key, r) }
-        }
-
-      case key: MemCacheKey.AccountScript =>
-        memCache.getOrLoad(key) { key =>
-          val cached = diskCaches.accountScripts.get(atMaxHeight, key)
-          if (cached.loaded) cached
-          else
-            RemoteData
-              .loaded(blockchainApi.getAccountScript(key.address))
-              .map(Function.tupled(toWeightedAccountScriptInfo))
-              .tap { r => diskCaches.accountScripts.set(atMaxHeight, key, r) }
-        }
-
-      case MemCacheKey.Height => RemoteData.loaded(Some(height)) // TODO remove this
+  def getAccountScript(address: Address): Option[AccountScriptInfo] = db
+    .directReadWrite { implicit ctx =>
+      val atMaxHeight = heightUntagged
+      memCache.getOrLoad(MemCacheKey.AccountScript(address)) { key =>
+        val cached = diskCaches.accountScripts.get(atMaxHeight, key)
+        if (cached.loaded) cached
+        else
+          RemoteData
+            .loaded(blockchainApi.getAccountScript(key.address))
+            .map(Function.tupled(toWeightedAccountScriptInfo))
+            .tap { r => diskCaches.accountScripts.set(atMaxHeight, key, r) }
+      }
     }
+    .mayBeValue
+    .map(_.accountScriptInfo)
 
-    // TODO types!
-    r.asInstanceOf[RemoteData[T#ValueT]].mayBeValue
-  }
+  def getAsset(asset: IssuedAsset): Option[AssetDescription] = db
+    .directReadWrite { implicit ctx =>
+      val atMaxHeight = heightUntagged
+      memCache.getOrLoad(MemCacheKey.Asset(asset)) { key =>
+        val cached = diskCaches.assetDescriptions.get(atMaxHeight, key)
+        if (cached.loaded) cached
+        else
+          RemoteData
+            .loaded(blockchainApi.getAssetDescription(key.asset))
+            .map(toWeightedAssetDescription)
+            .tap { r => diskCaches.assetDescriptions.set(atMaxHeight, key, r) }
+      }
+    }
+    .mayBeValue
+    .map(_.assetDescription)
+
+  def getLeaseBalance(address: Address): Option[LeaseBalance] = db.directReadWrite { implicit ctx =>
+    val atMaxHeight = heightUntagged
+    memCache.getOrLoad(MemCacheKey.AccountLeaseBalance(address)) { key =>
+      val cached = diskCaches.accountLeaseBalances.get(atMaxHeight, key)
+      if (cached.loaded) cached
+      else
+        RemoteData
+          .loaded(blockchainApi.getLeaseBalance(key.address))
+          .map(r => LeaseBalance(r.leaseIn, r.leaseOut))
+          .tap { r => diskCaches.accountLeaseBalances.set(atMaxHeight, key, r) }
+    }
+  }.mayBeValue
+
+  def getBalance(address: Address, asset: Asset): Option[Long] = db.directReadWrite { implicit ctx =>
+    val atMaxHeight = heightUntagged
+    memCache.getOrLoad(MemCacheKey.AccountBalance(address, asset)) { key =>
+      val cached = diskCaches.accountBalances.get(atMaxHeight, key)
+      if (cached.loaded) cached
+      else
+        RemoteData
+          .loaded(blockchainApi.getBalance(key.address, key.asset))
+          .tap { r => diskCaches.accountBalances.set(atMaxHeight, key, r) }
+    }
+  }.mayBeValue
+
+  def getTransactionHeight(id: TransactionId): Option[Height] = db.directReadWrite { implicit ctx =>
+    memCache.getOrLoad(MemCacheKey.Transaction(id)) { key =>
+      val cached = diskCaches.transactions.getHeight(key)
+      if (cached.loaded) cached
+      else
+        RemoteData
+          .loaded(blockchainApi.getTransactionHeight(key.id))
+          .tap { r => diskCaches.transactions.setHeight(key, r) }
+    }
+  }.mayBeValue
+
+  private def getAlias(a: Alias): Option[Address] = db.directReadWrite { implicit ctx =>
+    memCache.getOrLoad(MemCacheKey.Alias(a)) { key =>
+      val cached = diskCaches.aliases.getAddress(key)
+      if (cached.loaded) cached
+      else
+        RemoteData
+          .loaded(blockchainApi.resolveAlias(key.alias))
+          .tap { r => diskCaches.aliases.setAddress(heightUntagged, key, r) }
+    }
+  }.mayBeValue
 
   val blockchainSettings: BlockchainSettings = settings.blockchain
 
@@ -166,8 +174,7 @@ class SharedBlockchainStorage[TagT] private (
 
   def activatedFeatures = activatedFeatures_.get()
 
-  def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    getOrFetch(MemCacheKey.Alias(a)).toRight(AliasDoesNotExist(a): ValidationError)
+  def resolveAlias(a: Alias): Either[ValidationError, Address] = getAlias(a).toRight(AliasDoesNotExist(a))
 
   private def estimator: ScriptEstimator =
     EstimatorProvider.byActivatedFeatures(blockchainSettings.functionalitySettings, activatedFeatures, heightUntagged)
