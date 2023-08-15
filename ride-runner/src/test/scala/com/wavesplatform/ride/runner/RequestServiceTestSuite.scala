@@ -15,7 +15,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
-import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.caches.{CacheKeyTags, LazyBlockchain}
 import com.wavesplatform.ride.runner.db.HasTestDb
 import com.wavesplatform.ride.runner.db.HasTestDb.mkTestDb
 import com.wavesplatform.ride.runner.requests.*
@@ -216,9 +216,9 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
 
       val testDb  = use(mkTestDb())
       val allTags = new CacheKeyTags[RideScriptRunRequest]
-      val sharedBlockchain = testDb.access.directReadWrite { implicit ctx =>
-        SharedBlockchainStorage.load(
-          SharedBlockchainStorage.Settings(blockchainSettings),
+      val blockchain = testDb.access.directReadWrite { implicit ctx =>
+        LazyBlockchain.init(
+          LazyBlockchain.Settings(blockchainSettings),
           blockchainApi,
           testDb.access,
           DefaultDiskCaches(testDb.access),
@@ -227,9 +227,8 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         )
       }
 
-      val requestsService =
-        use(new DefaultRequestService(requestServiceSettings, sharedBlockchain, allTags, use(new TestJobScheduler()), testScheduler))
-      val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
+      val requestsService = use(new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler()), testScheduler))
+      val processor       = new BlockchainProcessor(blockchain, requestsService)
       val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
       val workingHeight = Height(1)
@@ -258,7 +257,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         TestDependencies(
           requestServiceSettings,
           requestsService,
-          new BlockchainProcessor(sharedBlockchain, requestsService),
+          new BlockchainProcessor(blockchain, requestsService),
           blockchainApi,
           testScheduler
         )

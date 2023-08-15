@@ -25,8 +25,8 @@ import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 
 import java.nio.charset.StandardCharsets
 
-class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with HasGrpc with HasTestAccounts {
-  "SharedBlockchainStorage" - {
+class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc with HasTestAccounts {
+  "LazyBlockchain" - {
     "process with" - {
       "append" - {
         "block" - {
@@ -49,8 +49,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
 
           "updates activated features" in withDb { db =>
             db.batchedReadWrite { implicit rw =>
-              val blockchain = SharedBlockchainStorage.load(
-                settings = SharedBlockchainStorage.Settings(DefaultBlockchainSettings),
+              val blockchain = LazyBlockchain.init(
+                settings = LazyBlockchain.Settings(DefaultBlockchainSettings),
                 blockchainApi = testBlockchainApi,
                 db = db,
                 diskCaches = DefaultDiskCaches(db),
@@ -515,8 +515,8 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
         val diskCaches = DefaultDiskCaches(db)
         val memCache   = new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20)))
 
-        val blockchain = SharedBlockchainStorage.load(
-          settings = SharedBlockchainStorage.Settings(DefaultBlockchainSettings),
+        val blockchain = LazyBlockchain.init(
+          settings = LazyBlockchain.Settings(DefaultBlockchainSettings),
           blockchainApi = testBlockchainApi,
           db = db,
           diskCaches = diskCaches,
@@ -533,7 +533,7 @@ class SharedBlockchainStorageTestSuite extends BaseTestSuite with HasTestDb with
     }
   }
 
-  private class Access(val blockchain: SharedBlockchainStorage[Tag], memCache: MemBlockchainDataCache, val affectedTags: AffectedTags[Tag]) {
+  private class Access(val blockchain: LazyBlockchain[Tag], memCache: MemBlockchainDataCache, val affectedTags: AffectedTags[Tag]) {
     def get[T <: MemCacheKey](key: T): RemoteData[T#ValueT] = memCache.get(key)
 
     def noTagsAffected(): this.type = withClue("affected tags (noTagsAreAffected)") {

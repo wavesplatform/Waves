@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.entrypoints.settings
 import com.typesafe.config.*
 import com.wavesplatform.api.DefaultBlockchainApi
 import com.wavesplatform.ride.runner.BlockchainState
-import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage
+import com.wavesplatform.ride.runner.caches.LazyBlockchain
 import com.wavesplatform.ride.runner.entrypoints.{Heights, WavesRideRunnerCompareService}
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
@@ -25,7 +25,7 @@ case class RideRunnerGlobalSettings(
 
   val heightsSettings = Heights.Settings(rideRunner.onEmptyStartFrom, blockchain.functionalitySettings)
 
-  val sharedBlockchain = SharedBlockchainStorage.Settings(blockchain)
+  val sharedBlockchain = LazyBlockchain.Settings(blockchain)
 
   def memBlockchainDataCache = rideRunner.memBlockchainDataCache
 

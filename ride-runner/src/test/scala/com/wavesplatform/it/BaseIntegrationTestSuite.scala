@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
-import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.caches.{CacheKeyTags, LazyBlockchain}
 import com.wavesplatform.ride.runner.db.HasTestDb.mkTestDb
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
@@ -64,9 +64,9 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val testDb  = use(mkTestDb())
     val allTags = new CacheKeyTags[RideScriptRunRequest]
-    val sharedBlockchain = testDb.access.batchedReadWrite { implicit ctx =>
-      SharedBlockchainStorage.load(
-        SharedBlockchainStorage.Settings(blockchainSettings),
+    val blockchain = testDb.access.batchedReadWrite { implicit ctx =>
+      LazyBlockchain.init(
+        LazyBlockchain.Settings(blockchainSettings),
         blockchainApi,
         testDb.access,
         DefaultDiskCaches(testDb.access),
@@ -88,7 +88,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     )
 
     val requestService = use(
-      new DefaultRequestService(requestServiceSettings, sharedBlockchain, allTags, use(new TestJobScheduler()), testScheduler) {
+      new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler()), testScheduler) {
         override def start(): Unit = {
           super.start()
           testScheduler.tick()
@@ -97,7 +97,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
         }
       }
     )
-    val processor = new BlockchainProcessor(sharedBlockchain, requestService)
+    val processor = new BlockchainProcessor(blockchain, requestService)
 
     def getScriptResult: JsObject = {
       val r = requestService.trackAndRun(request).runToFuture

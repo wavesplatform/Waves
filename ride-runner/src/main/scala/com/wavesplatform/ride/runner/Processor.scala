@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.ride.runner.caches.{AffectedTags, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.caches.{AffectedTags, LazyBlockchain}
 import com.wavesplatform.ride.runner.requests.{RequestService, RideScriptRunRequest}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.state.Height
@@ -34,10 +34,7 @@ trait Processor {
   def scheduleAffectedScripts(updateType: UpdateType): Unit
 }
 
-class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest], requestsService: RequestService)
-    extends Processor
-    with ScorexLogging {
-
+class BlockchainProcessor(blockchain: LazyBlockchain[RideScriptRunRequest], requestsService: RequestService) extends Processor with ScorexLogging {
   private val accumulatedChanges = new AtomicReference(new ProcessResult[RideScriptRunRequest]())
 
   /** A list of Append events (can't express this in types). The recent events in the front (head) of the list */
@@ -61,7 +58,7 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
       case Update.Empty => // Ignore
     }
 
-    val affected = sharedBlockchain.process(event)
+    val affected = blockchain.process(event)
     accumulatedChanges.accumulateAndGet(
       ProcessResult(height, affected),
       { (orig, update) => orig.combine(update) }
@@ -77,8 +74,7 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
     }
   }
 
-  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
-    sharedBlockchain.hasLocalBlockAt(height, id)
+  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchain.hasLocalBlockAt(height, id)
 
   /** Includes removeBlocksFrom
     */
@@ -93,15 +89,15 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[RideScriptRu
         val rollbackToHeight = Height(last.height - 1)
 
         // We have to do this for all liquid block events, because we can't receive all micro blocks after restart
-        val affected = sharedBlockchain.undo(lastLiquidBlockEvents)
-        if (!affected.isEmpty)
+        val affected = blockchain.undo(lastLiquidBlockEvents)
+        if (affected.nonEmpty)
           accumulatedChanges.getAndAccumulate(
             ProcessResult(rollbackToHeight, affected),
             (orig, update) => update.combine(orig)
           )
     }
 
-  override def removeAllFrom(height: Height): Unit = sharedBlockchain.removeAllFrom(height)
+  override def removeAllFrom(height: Height): Unit = blockchain.removeAllFrom(height)
 }
 
 case class ProcessResult[TagT](

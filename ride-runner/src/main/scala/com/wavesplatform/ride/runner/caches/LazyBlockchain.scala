@@ -19,7 +19,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.ride.runner.blockchain.{ActivatedFeatures, SupportedBlockchain}
-import com.wavesplatform.ride.runner.caches.SharedBlockchainStorage.Settings
+import com.wavesplatform.ride.runner.caches.LazyBlockchain.Settings
 import com.wavesplatform.ride.runner.caches.disk.DiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{GrpcCacheKeyConverters, MemBlockchainDataCache, MemCacheKey, MemCacheWeights}
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}
@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
 
-class SharedBlockchainStorage[TagT] private (
+class LazyBlockchain[TagT] private (
     sharedBlockchainStorageSettings: Settings,
     blockchainApi: BlockchainApi,
     db: RideDbAccess,
@@ -523,18 +523,18 @@ class SharedBlockchainStorage[TagT] private (
   }
 }
 
-object SharedBlockchainStorage {
-  def load[TagT](
+object LazyBlockchain {
+  def init[TagT](
       settings: Settings,
       blockchainApi: BlockchainApi,
       db: RideDbAccess,
       diskCaches: DiskCaches,
       memCache: MemBlockchainDataCache,
       allTags: CacheKeyTags[TagT]
-  )(implicit ctx: ReadOnly): SharedBlockchainStorage[TagT] = {
+  )(implicit ctx: ReadOnly): LazyBlockchain[TagT] = {
     val blockHeaders = new BlockHeaderStorage(blockchainApi, diskCaches.blockHeaders)
     blockHeaders.load()
-    new SharedBlockchainStorage[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, memCache, allTags)
+    new LazyBlockchain[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, memCache, allTags)
   }
 
   case class Settings(blockchain: BlockchainSettings)

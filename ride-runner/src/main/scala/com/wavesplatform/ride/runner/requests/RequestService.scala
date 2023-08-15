@@ -9,7 +9,7 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, Unknown}
 import com.wavesplatform.api.http.utils.{Evaluation, UtilsEvaluator}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.caches.mem.MemCacheWeights
-import com.wavesplatform.ride.runner.caches.{CacheKeyTags, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.caches.{CacheKeyTags, LazyBlockchain}
 import com.wavesplatform.ride.runner.environments.{DefaultDAppEnvironmentTracker, TrackedDAppEnvironment}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
@@ -35,7 +35,7 @@ trait RequestService extends AutoCloseable {
 
 class DefaultRequestService(
     settings: DefaultRequestService.Settings,
-    sharedBlockchain: SharedBlockchainStorage[RideScriptRunRequest],
+    blockchain: LazyBlockchain[RideScriptRunRequest],
     allTags: CacheKeyTags[RideScriptRunRequest],
     requestScheduler: JobScheduler[RideScriptRunRequest],
     runScriptScheduler: Scheduler
@@ -164,7 +164,7 @@ class DefaultRequestService(
         case Some(job) => Task.fromCancelablePromise(job.result)
         case None =>
           Task {
-            sharedBlockchain.accountScript(request.address)
+            blockchain.accountScript(request.address)
           }.flatMap {
             case None => Task.now(fail(CustomValidationError(s"Address ${request.address} is not dApp")))
             case _ =>
@@ -266,7 +266,7 @@ class DefaultRequestService(
         }
 
       case None =>
-        Evaluation.build(sharedBlockchain, request.address, request.requestBody) match {
+        Evaluation.build(blockchain, request.address, request.requestBody) match {
           case Right((evaluation, scriptInfo)) => (evaluation, scriptInfo).asRight
           case Left(e)                         => e.asLeft
         }
