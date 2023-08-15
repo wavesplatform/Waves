@@ -81,7 +81,7 @@ class BlockchainUpdaterImpl(
       ngState
         .flatMap(_.totalDiffOf(id))
         .map { case (_, diff, _, _, _) =>
-          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.status, info.spentComplexity), info.transaction))
         }
     )
 
@@ -148,7 +148,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def nextReward(): Option[Long] = {
+  def computeNextReward: Option[Long] = {
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
@@ -193,9 +193,10 @@ class BlockchainUpdaterImpl(
   override def processBlock(
       block: Block,
       hitSource: ByteStr,
+      challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge
   ): Either[ValidationError, Seq[Diff]] =
     writeLock {
       val height                             = rocksdb.height
@@ -213,12 +214,12 @@ class BlockchainUpdaterImpl(
               rocksdb.lastBlockId match {
                 case Some(uniqueId) if uniqueId != block.header.reference =>
                   val logDetails = s"The referenced block(${block.header.reference})" +
-                    s" ${if (rocksdb.contains(block.header.reference)) "exits, it's not last persisted" else "doesn't exist"}"
+                    s" ${if (rocksdb.contains(block.header.reference)) "exists, it's not last persisted" else "doesn't exist"}"
                   Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(rocksdb.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(rocksdb, height)
-                  val reward            = nextReward()
+                  val reward            = computeNextReward
 
                   val referencedBlockchain = CompositeBlockchain(rocksdb, reward)
                   BlockDiffer
@@ -228,6 +229,7 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
+                      challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
                       txSignParCheck = txSignParCheck,
@@ -242,7 +244,7 @@ class BlockchainUpdaterImpl(
               }
             case Some(ng) =>
               if (ng.base.header.reference == block.header.reference) {
-                if (block.blockScore() > ng.base.blockScore()) {
+                if (block.header.timestamp < ng.base.header.timestamp) {
                   val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
                   val miningConstraints = MiningConstraints(rocksdb, height)
 
@@ -256,6 +258,7 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
+                      challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
                       txSignParCheck = txSignParCheck,
@@ -263,7 +266,7 @@ class BlockchainUpdaterImpl(
                     )
                     .map { r =>
                       log.trace(
-                        s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
+                        s"Better liquid block(timestamp=${block.header.timestamp}) received and applied instead of existing(timestamp=${ng.base.header.timestamp})"
                       )
                       val (mbs, diffs) = ng.allDiffs.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
@@ -289,6 +292,7 @@ class BlockchainUpdaterImpl(
                         block,
                         miningConstraints.total,
                         hitSource,
+                        challengedHitSource,
                         rocksdb.loadCacheData,
                         verify,
                         txSignParCheck = txSignParCheck,
@@ -302,8 +306,7 @@ class BlockchainUpdaterImpl(
                 } else
                   Left(
                     BlockAppendError(
-                      s"Competitors liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base
-                        .blockScore()}))",
+                      s"Competitors liquid block $block(timestamp=${block.header.timestamp}) is not better than existing (ng.base ${ng.base}(timestamp=${ng.base.header.timestamp}))",
                       block
                     )
                   )
@@ -326,7 +329,7 @@ class BlockchainUpdaterImpl(
                       }
 
                       val prevReward = ng.reward
-                      val reward     = nextReward()
+                      val reward     = computeNextReward
 
                       val prevHitSource = ng.hitSource
 
@@ -347,6 +350,7 @@ class BlockchainUpdaterImpl(
                             block,
                             constraint,
                             hitSource,
+                            challengedHitSource,
                             rocksdb.loadCacheData,
                             verify,
                             txSignParCheck = txSignParCheck,
@@ -449,11 +453,6 @@ class BlockchainUpdaterImpl(
       case Some(ng) if ng.contains(blockId) =>
         log.trace("Resetting liquid block, no rollback necessary")
         Right(Seq.empty)
-      case Some(ng) if ng.base.id() == blockId =>
-        log.trace("Discarding liquid block, no rollback necessary")
-        blockchainUpdateTriggers.onMicroBlockRollback(this, blockId)
-        ngState = None
-        Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
       case maybeNg =>
         for {
           height <- rocksdb.heightOf(blockId).toRight(GenericError(s"No such block $blockId"))
@@ -489,6 +488,8 @@ class BlockchainUpdaterImpl(
           Left(MicroBlockAppendError("No base block exists", microBlock))
         case Some(ng) if ng.base.header.generator.toAddress != microBlock.sender.toAddress =>
           Left(MicroBlockAppendError("Base block has been generated by another account", microBlock))
+        case Some(ng) if ng.base.header.challengedHeader.nonEmpty =>
+          Left(MicroBlockAppendError("Base block has challenged header", microBlock))
         case Some(ng) =>
           ng.lastMicroBlock match {
             case None if ng.base.id() != microBlock.reference =>
@@ -735,6 +736,10 @@ class BlockchainUpdaterImpl(
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = readLock {
     compositeBlockchain.wavesBalances(addresses)
+  }
+
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {
+    compositeBlockchain.effectiveBalanceBanHeights(address)
   }
 
   override def leaseBalance(address: Address): LeaseBalance = readLock {

@@ -13,12 +13,24 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart.InvokeTransaction
-import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.assets.{
+  BurnTransaction,
+  IssueTransaction,
+  ReissueTransaction,
+  SetAssetScriptTransaction,
+  SponsorFeeTransaction,
+  UpdateAssetInfoTransaction
+}
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, EthereumTransaction, Transaction}
 
 import scala.collection.immutable.VectorMap
 import scala.util.chaining.*
@@ -130,7 +142,7 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean, spentComplexity: Long)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], status: Status, spentComplexity: Long)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
@@ -325,9 +337,76 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
-      val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
-      val maybeDApp = tx match {
+    def bindTransaction(blockchain: Blockchain, tx: Transaction): Diff = {
+      val calledScripts     = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
+      val maybeDApp         = extractDAppAddress(blockchain, tx)
+      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
+
+      d.copy(
+        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, TxMeta.Status.Succeeded, d.scriptsComplexity)),
+        transactionFilter = mkFilterForTransactions(tx)
+      )
+    }
+
+    def bindElidedTransaction(blockchain: Blockchain, tx: Transaction): Diff = {
+      val maybeDApp = extractDAppAddress(blockchain, tx)
+      val specificAffectedAddresses = tx match {
+        case t: BurnTransaction        => Set(t.sender.toAddress)
+        case t: CreateAliasTransaction => Set(t.sender.toAddress)
+        case t: DataTransaction        => Set(t.sender.toAddress)
+        case t: EthereumTransaction =>
+          Set(t.sender.toAddress) ++
+            (t.payload match {
+              case EthereumTransaction.Transfer(_, _, recipient) => Set(recipient)
+              case _                                             => Set.empty
+            })
+        case t: ExchangeTransaction     => Set(t.sender.toAddress, t.order1.sender.toAddress, t.order2.sender.toAddress)
+        case t: InvokeScriptTransaction => Set(t.sender.toAddress)
+        case t: IssueTransaction        => Set(t.sender.toAddress)
+        case t: LeaseCancelTransaction =>
+          Set(t.sender.toAddress) ++ blockchain
+            .leaseDetails(t.leaseId)
+            .flatMap(_.recipient match {
+              case alias: Alias     => blockchain.resolveAlias(alias).toOption
+              case address: Address => Some(address)
+            })
+            .toSet
+        case t: LeaseTransaction =>
+          Set(t.sender.toAddress) ++ (t.recipient match {
+            case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
+            case address: Address => Set(address)
+          })
+        case t: MassTransferTransaction =>
+          Set(t.sender.toAddress) ++ (t.transfers.flatMap {
+            _.address match {
+              case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
+              case address: Address => Set(address)
+            }
+          })
+        case t: ReissueTransaction         => Set(t.sender.toAddress)
+        case t: SetAssetScriptTransaction  => Set(t.sender.toAddress)
+        case t: SetScriptTransaction       => Set(t.sender.toAddress)
+        case t: SponsorFeeTransaction      => Set(t.sender.toAddress)
+        case t: UpdateAssetInfoTransaction => Set(t.sender.toAddress)
+        case t: TransferTransaction =>
+          Set(t.sender.toAddress) ++ (t.recipient match {
+            case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
+            case address: Address => Set(address)
+          })
+        case _ => Set.empty
+      }
+      val affectedAddresses = specificAffectedAddresses ++ maybeDApp
+
+      val txFilter = d.transactionFilter.getOrElse(mkFilter())
+      txFilter.put(tx.id().arr)
+      d.copy(
+        transactions = d.transactions :+ NewTransactionInfo(tx, affectedAddresses, TxMeta.Status.Elided, d.scriptsComplexity),
+        transactionFilter = Some(txFilter)
+      )
+    }
+
+    private def extractDAppAddress(blockchain: Blockchain, tx: Transaction): Option[Address] = {
+      tx match {
         case i: InvokeTransaction =>
           i.dApp match {
             case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
@@ -341,12 +420,6 @@ object Diff {
         case _ =>
           None
       }
-      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
-
-      d.copy(
-        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
-        transactionFilter = mkFilterForTransactions(tx)
-      )
     }
   }
 }

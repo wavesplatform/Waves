@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.{toBifunctorOps, toFoldableOps}
-import cats.syntax.either.catsSyntaxEitherId
+import cats.implicits.toFoldableOps
+import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, Authorized, BlockchainUpdater, GenesisTransaction, PaymentTransaction, Transaction}
 
 object BlockDiffer {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
@@ -36,8 +36,6 @@ object BlockDiffer {
     def apply(l: Long): Long = l / divider * dividend
   }
 
-  case object InvalidStateHash extends ValidationError
-
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   def fromBlock(
@@ -46,24 +44,59 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
+      challengedHitSource: Option[ByteStr] = None,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
       txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true
-  ): Either[ValidationError, Result] =
-    fromBlockTraced(
-      blockchain,
-      maybePrevBlock,
-      block,
-      constraint,
-      hitSource,
-      loadCacheData,
-      verify,
-      enableExecutionLog,
-      txSignParCheck,
-      checkStateHash
-    ).resultE
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge
+  ): Either[ValidationError, Result] = {
+    challengedHitSource match {
+      case Some(hs) =>
+        fromBlockTraced(
+          blockchain,
+          maybePrevBlock,
+          block.toOriginal,
+          constraint,
+          hs,
+          loadCacheData,
+          verify,
+          enableExecutionLog,
+          txSignParCheck,
+          checkStateHash
+        ).resultE match {
+          case Left(_: InvalidStateHash) =>
+            fromBlockTraced(
+              blockchain,
+              maybePrevBlock,
+              block,
+              constraint,
+              hitSource,
+              loadCacheData,
+              verify,
+              enableExecutionLog,
+              txSignParCheck,
+              checkStateHash
+            ).resultE
+          case Left(err) => Left(GenericError(s"Invalid block challenge: $err"))
+          case _         => Left(GenericError("Invalid block challenge"))
+        }
+      case _ =>
+        fromBlockTraced(
+          blockchain,
+          maybePrevBlock,
+          block,
+          constraint,
+          hitSource,
+          loadCacheData,
+          verify,
+          enableExecutionLog,
+          txSignParCheck,
+          checkStateHash
+        ).resultE
+
+    }
+  }
 
   def fromBlockTraced(
       blockchain: Blockchain,
@@ -75,7 +108,7 @@ object BlockDiffer {
       verify: Boolean,
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean,
-      enableStateHash: Boolean
+      enableStateHash: Boolean // TODO: remove after NODE-2568 merge
   ): TracedResult[ValidationError, Result] = {
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
@@ -144,21 +177,31 @@ object BlockDiffer {
     for {
       _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       resultDiff <- TracedResult(initDiffE.leftMap(GenericError(_)))
+      // TODO: correctly obtain previous state hash on feature activation height
+      prevStateHash = if (blockchain.height == 0) Some(TxStateSnapshotHashBuilder.InitStateHash) else maybePrevBlock.flatMap(_.header.stateHash)
       r <- apply(
         blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
-        // TODO: correctly obtain previous state hash on feature activation height
-        if (blockchain.height == 0) Some(TxStateSnapshotHashBuilder.InitStateHash) else maybePrevBlock.flatMap(_.header.stateHash),
+        prevStateHash,
         resultDiff,
         stateHeight >= ngHeight,
+        block.header.challengedHeader.isDefined,
         block.transactionData,
         loadCacheData,
         verify = verify,
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
-      _ <- if (enableStateHash) checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.stateHash) else TracedResult(Right(()))
+      _ <-
+        if (enableStateHash)
+          checkStateHash(
+            blockchainWithNewBlock,
+            block.header.stateHash,
+            r.stateHash,
+            block.header.challengedHeader.isDefined
+          )
+        else TracedResult(Right(()))
     } yield r
   }
 
@@ -172,7 +215,16 @@ object BlockDiffer {
       verify: Boolean = true,
       enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
-    fromMicroBlockTraced(blockchain, prevBlockTimestamp, prevStateHash, micro, constraint, loadCacheData, verify, enableExecutionLog).resultE
+    fromMicroBlockTraced(
+      blockchain,
+      prevBlockTimestamp,
+      prevStateHash,
+      micro,
+      constraint,
+      loadCacheData,
+      verify,
+      enableExecutionLog
+    ).resultE
 
   def fromMicroBlockTraced(
       blockchain: Blockchain,
@@ -202,13 +254,14 @@ object BlockDiffer {
         prevStateHash,
         Diff.empty,
         hasNg = true,
+        hasChallenge = false,
         micro.transactionData,
         loadCacheData,
         verify = verify,
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
-      _ <- checkStateHash(blockchain, micro.stateHash, r.stateHash)
+      _ <- checkStateHash(blockchain, micro.stateHash, r.stateHash, hasChallenge = false)
     } yield r
   }
 
@@ -220,20 +273,17 @@ object BlockDiffer {
     }
 
   def createInitialBlockDiff(
-      blockchain: Blockchain,
-      miner: Address,
-      heightWithNewBlock: Int,
-      blockReward: Option[Long] = None,
-      carry: Option[Long] = None
+      blockchain: BlockchainUpdater & Blockchain,
+      miner: Address
   ): Either[String, Diff] = {
-    val fullReward           = blockReward.orElse(blockchain.lastBlockReward).fold(Portfolio.empty)(Portfolio.waves)
-    val feeFromPreviousBlock = Portfolio(balance = carry.getOrElse(blockchain.carryFee))
+    val fullReward           = blockchain.computeNextReward.fold(Portfolio.empty)(Portfolio.waves)
+    val feeFromPreviousBlock = Portfolio.waves(blockchain.carryFee)
 
     val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
     val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
 
     val rewardShares = BlockRewardCalculator.getBlockRewardShares(
-      heightWithNewBlock,
+      blockchain.height + 1,
       fullReward.balance,
       daoAddress,
       xtnBuybackAddress,
@@ -259,6 +309,7 @@ object BlockDiffer {
       prevStateHash: Option[ByteStr],
       initDiff: Diff,
       hasNg: Boolean,
+      hasChallenge: Boolean,
       txs: Seq[Transaction],
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
@@ -296,14 +347,16 @@ object BlockDiffer {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (
               TracedResult(
-                Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHash)),
+                Right(
+                  result @ Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs), prevStateHash)
+                ),
                 _,
                 _
               ),
               tx
             ) =>
           val currBlockchain = CompositeBlockchain(blockchain, currDiff)
-          txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
+          val res = txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
             val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
@@ -338,6 +391,11 @@ object BlockDiffer {
               TracedResult(result.leftMap(GenericError(_)))
             }
           }
+
+          res.copy(resultE = res.resultE.recover {
+            case _ if hasChallenge =>
+              result.copy(diff = result.diff.bindElidedTransaction(blockchain, tx))
+          })
       }
   }
 
@@ -387,13 +445,16 @@ object BlockDiffer {
   private def checkStateHash(
       blockchain: Blockchain,
       blockStateHash: Option[ByteStr],
-      computedStateHash: Option[ByteStr]
+      computedStateHash: Option[ByteStr],
+      hasChallenge: Boolean
   ): TracedResult[ValidationError, Unit] =
     TracedResult(
       Either.cond(
         !blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) || computedStateHash.exists(blockStateHash.contains),
         (),
-        InvalidStateHash
+        if (hasChallenge) GenericError("Invalid block challenge")
+        else
+          InvalidStateHash(blockStateHash)
       )
     )
 }

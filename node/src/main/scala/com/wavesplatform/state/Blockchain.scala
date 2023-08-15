@@ -80,6 +80,8 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
+  def effectiveBalanceBanHeights(address: Address): Seq[Int]
+
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 }
 
@@ -121,7 +123,8 @@ object Blockchain {
       val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
       val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
-      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
+      val isBanned    = blockchain.effectiveBalanceBanHeights(address).exists(h => h >= bottomLimit && h <= blockHeight)
+      if (balances.isEmpty || isBanned) 0L else balances.view.map(_.effectiveBalance).min
     }
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
@@ -209,6 +212,9 @@ object Blockchain {
           case _                                    => false
         })
 
-    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
+    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.status == TxMeta.Status.Succeeded)
+
+    def hasBannedEffectiveBalance(address: Address, height: Int = blockchain.height): Boolean =
+      blockchain.effectiveBalanceBanHeights(address).contains(height)
   }
 }

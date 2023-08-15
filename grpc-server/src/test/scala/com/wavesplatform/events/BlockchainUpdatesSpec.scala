@@ -4,8 +4,10 @@ import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
@@ -36,6 +38,7 @@ import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
@@ -800,6 +803,104 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         def payment(address: Address) = Seq(Payment(ByteString.copyFrom(address.bytes), Some(Amount.of(ByteString.EMPTY, 1))))
         invokeResult.transfers shouldBe payment(TxHelpers.secondAddress)
         invokeResult.invokes.head.stateChanges.get.transfers shouldBe payment(TxHelpers.signer(2).toAddress)
+      }
+    }
+
+    "should return correct data for challenged block (NODE-921)" in {
+      val challengedMiner = TxHelpers.signer(2)
+      val sender          = TxHelpers.signer(3)
+      val recipient       = TxHelpers.signer(4)
+
+      withDomainAndRepo(settings = DomainPresets.TransactionStateSnapshot) { case (d, repo) =>
+        val challengingMiner = d.wallet.generateNewAccount().get
+
+        val initSenderBalance      = 100000.waves
+        val initChallengingBalance = 1000.waves
+        val initChallengedBalance  = 2000.waves
+
+        val genesis = d.appendBlock(
+          TxHelpers.genesis(challengingMiner.toAddress, initChallengingBalance),
+          TxHelpers.genesis(challengedMiner.toAddress, initChallengedBalance),
+          TxHelpers.genesis(sender.toAddress, initSenderBalance)
+        )
+
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        val txTimestamp      = genesis.header.timestamp + 1
+        val invalidStateHash = ByteStr.fill(DigestLength)(1)
+        val txs = Seq(
+          TxHelpers.transfer(sender, recipient.toAddress, 1.waves, timestamp = txTimestamp),
+          TxHelpers.transfer(sender, recipient.toAddress, 2.waves, timestamp = txTimestamp + 1)
+        )
+        val originalBlock = d.createBlock(
+          Block.ProtoBlockVersion,
+          txs,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash))
+        )
+        val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+
+        d.appendBlock(challengingBlock)
+        d.appendBlock()
+
+        val update = subscription.fetchAllEvents(d.blockchain)(1).getUpdate
+        update.id.toByteStr shouldBe challengingBlock.id()
+        update.height shouldBe 2
+
+        val append = update.update.append.get
+        PBBlocks.vanilla(append.body.block.get.block.get).get shouldBe challengingBlock
+        append.transactionIds.map(_.toByteStr).toSet shouldBe txs.map(_.id()).toSet
+
+        val daoAddress        = d.settings.blockchainSettings.functionalitySettings.daoAddressParsed.toOption.flatten
+        val xtnBuybackAddress = d.settings.blockchainSettings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+        val blockRewards = BlockRewardCalculator.getBlockRewardShares(
+          2,
+          d.settings.blockchainSettings.rewardsSettings.initial,
+          daoAddress,
+          xtnBuybackAddress,
+          d.blockchain
+        )
+        append.stateUpdate.get.balances shouldBe Seq(
+          protobuf.StateUpdate.BalanceUpdate(
+            challengingMiner.toAddress.toByteString,
+            Some(
+              Amount(amount = initChallengingBalance + blockRewards.miner + txs.map(tx => CurrentBlockFeePart(tx.fee.value)).sum)
+            ),
+            initChallengingBalance
+          )
+        ) ++
+          daoAddress.map { addr =>
+            protobuf.StateUpdate.BalanceUpdate(
+              addr.toByteString,
+              Some(
+                Amount(amount = blockRewards.daoAddress)
+              )
+            )
+          } ++
+          xtnBuybackAddress.map { addr =>
+            protobuf.StateUpdate.BalanceUpdate(
+              addr.toByteString,
+              Some(
+                Amount(amount = blockRewards.xtnBuybackAddress)
+              )
+            )
+          }
+        append.transactionStateUpdates.map(_.balances.toSet).toSet shouldBe Set(
+          Set(
+            protobuf.StateUpdate
+              .BalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = initSenderBalance - TestValues.fee - 1.waves)), initSenderBalance),
+            protobuf.StateUpdate.BalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves)))
+          ),
+          Set(
+            protobuf.StateUpdate
+              .BalanceUpdate(
+                sender.toAddress.toByteString,
+                Some(Amount(amount = initSenderBalance - 2 * TestValues.fee - 3.waves)),
+                initSenderBalance - TestValues.fee - 1.waves
+              ),
+            protobuf.StateUpdate.BalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves)
+          )
+        )
       }
     }
 

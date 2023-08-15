@@ -16,7 +16,7 @@ import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash, TxMeta}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
@@ -249,8 +249,8 @@ case class DebugApiRoute(
             val meta = tx match {
               case ist: InvokeScriptTransaction =>
                 val result = diff.scriptResults.get(ist.id())
-                TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
-              case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
+                TransactionMeta.Invoke(Height(blockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
+              case tx => TransactionMeta.Default(Height(blockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
             }
             serializer.transactionWithMetaJson(meta)
           }

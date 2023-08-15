@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -894,7 +895,7 @@ class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues wi
                 d.appendBlock(invoke)
                 val invokeTxMeta = d.transactionsApi.transactionById(invoke.id()).value
                 invokeTxMeta.spentComplexity shouldBe complexity
-                invokeTxMeta.succeeded shouldBe false
+                invokeTxMeta.status == Status.Succeeded shouldBe false
               }
             }
           }

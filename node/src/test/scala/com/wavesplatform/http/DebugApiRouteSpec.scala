@@ -31,6 +31,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash, TxMeta}
@@ -75,6 +76,7 @@ class DebugApiRouteSpec
   (blockchain.heightOf _).when(*).returns(None)
   (() => blockchain.height).when().returns(0)
   (blockchain.balanceSnapshots _).when(*, *, *).returns(Seq.empty)
+  (blockchain.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
 
   val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
     override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
@@ -1682,7 +1684,7 @@ class DebugApiRouteSpec
 
         (blockchain.transactionMeta _)
           .when(leaseCancelId)
-          .returns(Some(TxMeta(Height(1), true, 0L)))
+          .returns(Some(TxMeta(Height(1), Status.Succeeded, 0L)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)

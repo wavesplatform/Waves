@@ -329,6 +329,7 @@ object FPPoSSelectorTest {
           miner,
           Seq.empty,
           -1L,
+          None,
           None
         )
         .explicitGet()
@@ -380,6 +381,7 @@ object FPPoSSelectorTest {
         miner,
         Seq.empty,
         0.toByte,
+        None,
         None
       )
       .explicitGet()

@@ -89,7 +89,7 @@ object Dependencies {
 
   private[this] val dbDeps =
     Seq(
-      "org.rocksdb" % "rocksdbjni" % "8.0.0"
+      "org.rocksdb" % "rocksdbjni" % "8.3.2"
     )
 
   lazy val node = Def.setting(

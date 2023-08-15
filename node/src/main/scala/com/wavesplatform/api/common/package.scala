@@ -38,7 +38,7 @@ package object common {
       TransactionMeta.create(
         m.height,
         transaction,
-        m.succeeded,
+        m.status,
         m.spentComplexity,
         loadISR,
         loadETM
@@ -72,7 +72,9 @@ package object common {
     val disabledAliases = rdb.db.get(Keys.disabledAliases)
     addressTransactions(rdb, maybeDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
       .collect {
-        case TransactionMeta(height, cat: CreateAliasTransaction, true) if disabledAliases.isEmpty || !disabledAliases(cat.alias) => height -> cat
+        case TransactionMeta(height, cat: CreateAliasTransaction, TxMeta.Status.Succeeded)
+            if disabledAliases.isEmpty || !disabledAliases(cat.alias) =>
+          height -> cat
       }
   }
 
@@ -83,7 +85,7 @@ package object common {
     TransactionMeta.create(
       meta.height,
       transaction,
-      meta.succeeded,
+      meta.status,
       meta.spentComplexity,
       ist =>
         maybeDiff

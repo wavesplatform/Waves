@@ -4,7 +4,6 @@ import java.io.File
 import java.security.Security
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{TimeUnit, *}
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -32,7 +31,7 @@ import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
+import com.wavesplatform.mining.{BlockChallengerImpl, Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
@@ -157,13 +156,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       )
 
+    val blockChallenger = new BlockChallengerImpl(
+      blockchainUpdater,
+      allChannels,
+      wallet,
+      settings,
+      time,
+      pos,
+      minerScheduler,
+      appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)
+    )
     val processBlock =
-      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _
+      BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler) _
 
     val processFork =
       ExtensionAppender(blockchainUpdater, utxStorage, pos, time, knownInvalidBlocks, peerDatabase, appenderScheduler) _
     val processMicroBlock =
-      MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
+      MicroblockAppender(blockchainUpdater, utxStorage, allChannels, peerDatabase, blockChallenger, appenderScheduler) _
 
     import blockchainUpdater.lastBlockInfo
 
@@ -225,6 +234,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         rdb,
         blockchainUpdater,
         utxStorage,
+        blockChallenger,
         tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(rdb, blockchainUpdater)
       )

@@ -12,6 +12,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.test.PropSpec
@@ -78,7 +79,7 @@ class CustomJsonMarshallerSpec
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
       val height: Height = Height(1)
-      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = true, 0L))).twice()
+      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, Status.Succeeded, 0L))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
         .returning(Some(LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)))

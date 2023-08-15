@@ -28,7 +28,7 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createHashFromDiff(blockchain: Blockchain, txDiff: Diff): Result = {
+  def createHashFromDiff(blockchain: Blockchain, diff: Diff): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 
     def addEntry(keyType: KeyType.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -37,7 +37,7 @@ object TxStateSnapshotHashBuilder {
       changedKeys(solidKey) = solidValue
     }
 
-    val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(blockchain, txDiff)
+    val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(blockchain, diff)
 
     for {
       (address, assets) <- updatedBalances
@@ -52,15 +52,15 @@ object TxStateSnapshotHashBuilder {
     }
 
     for {
-      (address, data) <- txDiff.accountData
+      (address, data) <- diff.accountData
       entry           <- data.values
     } addEntry(KeyType.DataEntry, address.bytes, entry.key.getBytes(StandardCharsets.UTF_8))(entry.valueBytes)
 
-    txDiff.aliases.foreach { case (alias, address) =>
+    diff.aliases.foreach { case (alias, address) =>
       addEntry(KeyType.Alias, address.bytes, alias.name.getBytes(StandardCharsets.UTF_8))()
     }
 
-    txDiff.scripts.foreach { case (address, sv) =>
+    diff.scripts.foreach { case (address, sv) =>
       addEntry(KeyType.AccountScript, address.bytes)(
         sv.fold(Seq(Array.emptyByteArray))(scriptInfo =>
           Seq(scriptInfo.script.bytes().arr, scriptInfo.publicKey.arr, Longs.toByteArray(scriptInfo.verifierComplexity))
@@ -69,15 +69,15 @@ object TxStateSnapshotHashBuilder {
     }
 
     for {
-      (asset, sv) <- txDiff.assetScripts
+      (asset, sv) <- diff.assetScripts
       script = sv.map(_.script)
     } addEntry(KeyType.AssetScript, asset.id.arr)(script.fold(Array.emptyByteArray)(_.bytes().arr))
 
-    txDiff.leaseState.foreach { case (leaseId, details) =>
+    diff.leaseState.foreach { case (leaseId, details) =>
       addEntry(KeyType.LeaseStatus, leaseId.arr)(booleanToBytes(details.isActive))
     }
 
-    txDiff.sponsorship.foreach { case (asset, sponsorship) =>
+    diff.sponsorship.foreach { case (asset, sponsorship) =>
       val minSponsoredFee =
         sponsorship match {
           case SponsorshipValue(minFee) => minFee
@@ -87,12 +87,12 @@ object TxStateSnapshotHashBuilder {
       addEntry(KeyType.Sponsorship, asset.id.arr)(Longs.toByteArray(minSponsoredFee))
     }
 
-    txDiff.orderFills.foreach { case (orderId, fillInfo) =>
+    diff.orderFills.foreach { case (orderId, fillInfo) =>
       val filledVolumeAndFee = blockchain.filledVolumeAndFee(orderId).combine(fillInfo)
       addEntry(KeyType.VolumeAndFee, orderId.arr)(Longs.toByteArray(filledVolumeAndFee.volume), Longs.toByteArray(filledVolumeAndFee.fee))
     }
 
-    txDiff.issuedAssets.foreach { case (asset, assetInfo) =>
+    diff.issuedAssets.foreach { case (asset, assetInfo) =>
       addEntry(KeyType.StaticAssetInfo, asset.id.arr)(
         assetInfo.static.issuer.toAddress.bytes,
         Array(assetInfo.static.decimals.toByte),
@@ -100,9 +100,9 @@ object TxStateSnapshotHashBuilder {
       )
     }
 
-    val assetReissuabilities = txDiff.issuedAssets.map { case (asset, assetInfo) =>
+    val assetReissuabilities = diff.issuedAssets.map { case (asset, assetInfo) =>
       asset -> assetInfo.volume
-    } ++ txDiff.updatedAssets.collect {
+    } ++ diff.updatedAssets.collect {
       case (asset, Ior.Right(volume))   => asset -> volume
       case (asset, Ior.Both(_, volume)) => asset -> volume
     }
@@ -111,9 +111,9 @@ object TxStateSnapshotHashBuilder {
       addEntry(KeyType.AssetReissuability, asset.id.arr)(booleanToBytes(volume.isReissuable), volume.volume.toByteArray)
     }
 
-    val assetNameDescs = txDiff.issuedAssets.map { case (asset, assetInfo) =>
+    val assetNameDescs = diff.issuedAssets.map { case (asset, assetInfo) =>
       (asset, (assetInfo.dynamic.name.toByteArray, assetInfo.dynamic.description.toByteArray, assetInfo.dynamic.lastUpdatedAt.toInt))
-    } ++ txDiff.updatedAssets.collect {
+    } ++ diff.updatedAssets.collect {
       case (asset, Ior.Left(assetInfo)) =>
         (asset, (assetInfo.name.toByteArray, assetInfo.description.toByteArray, assetInfo.lastUpdatedAt.toInt))
       case (asset, Ior.Both(assetInfo, _)) =>

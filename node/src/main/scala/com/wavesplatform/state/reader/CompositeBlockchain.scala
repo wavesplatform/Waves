@@ -51,6 +51,14 @@ final class CompositeBlockchain private (
       address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))
     }
 
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
+    val maybeLastBlockBan = blockMeta.flatMap(_._1.header.challengedHeader).map(_.generator.toAddress) match {
+      case Some(generator) if address == generator => Seq(height)
+      case _                                       => Seq.empty
+    }
+    maybeLastBlockBan ++ inner.effectiveBalanceBanHeights(address)
+  }
+
   override def leaseBalance(address: Address): LeaseBalance =
     inner.leaseBalance(address).combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
 
@@ -82,7 +90,7 @@ final class CompositeBlockchain private (
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     diff
       .transaction(id)
-      .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
+      .collect { case NewTransactionInfo(tx: TransferTransaction, _, TxMeta.Status.Succeeded, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
@@ -90,14 +98,14 @@ final class CompositeBlockchain private (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
     diff
       .transaction(id)
-      .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+      .map(t => (TxMeta(Height(this.height), t.status, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = {
     inner.transactionInfos(ids).zip(ids).map { case (info, id) =>
       diff.transactions
         .find(_.transaction.id() == id)
-        .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+        .map(t => (TxMeta(Height(this.height), t.status, t.spentComplexity), t.transaction))
         .orElse(info)
     }
   }
@@ -105,7 +113,7 @@ final class CompositeBlockchain private (
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     diff
       .transaction(id)
-      .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
+      .map(t => TxMeta(Height(this.height), t.status, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
@@ -136,7 +144,7 @@ final class CompositeBlockchain private (
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease))
+      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, this.height))
       val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from < this.height
       if (inner.height > 0 && (from < this.height - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain

@@ -10,11 +10,13 @@ trait BlockchainUpdater {
   def processBlock(
       block: Block,
       hitSource: ByteStr,
+      challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true // TODO: NODE-2561 delete after NODE-2568 merge
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge
   ): Either[ValidationError, Seq[Diff]]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId]
+  def computeNextReward: Option[Long]
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
   def lastBlockInfo: Observable[LastBlockInfo]
   def isLastBlockId(id: ByteStr): Boolean

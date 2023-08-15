@@ -50,7 +50,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
       totalPortfolioDiff.balance shouldBe 0
-      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+      totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
       totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity.value - burn.quantity.value))
 
       val totalAssetVolume = issue.quantity.value + reissue.quantity.value - burn.quantity.value

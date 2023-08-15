@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.THROW
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -334,7 +335,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
@@ -407,7 +408,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         val matcherPortfolio =
@@ -521,7 +522,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         val matcherPortfolio =
@@ -653,7 +654,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
       totalPortfolioDiff.balance shouldBe 0
-      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+      totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
       totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
       val combinedPortfolio =
@@ -768,7 +769,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
@@ -1694,7 +1695,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             state.balance(exchange.sender.toAddress, asset) shouldBe balance
           }
 
-          state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
+          state.transactionInfo(exchange.id()).map(r => r._2 -> (r._1.status == Status.Succeeded)) shouldBe Some((exchange, false))
       }
     }
   }
@@ -2017,7 +2018,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       d.appendBlock(issue)
       d.appendBlockE(exchange()) should produce("Attachment field for orders is not supported yet")
       d.appendBlock()
-      d.appendBlockE(exchange()) should beRight
+      d.appendBlockENoCheck(exchange()) should beRight
     }
   }
 
