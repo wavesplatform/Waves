@@ -51,7 +51,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
           "updates activated features" in withDb { db =>
             db.batchedReadWrite { implicit rw =>
               val blockchain = LazyBlockchain.init(
-                settings = LazyBlockchain.Settings(DefaultBlockchainSettings),
+                settings = DefaultBlockchainSettings,
                 blockchainApi = testBlockchainApi,
                 db = db,
                 diskCaches = DefaultDiskCaches(db),
@@ -517,7 +517,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
         val memCache   = new MemBlockchainDataCache(MemBlockchainDataCache.Settings(ConfigMemorySize.ofBytes(1 << 20)))
 
         val blockchain = LazyBlockchain.init(
-          settings = LazyBlockchain.Settings(DefaultBlockchainSettings),
+          settings = DefaultBlockchainSettings,
           blockchainApi = testBlockchainApi,
           db = db,
           diskCaches = diskCaches,

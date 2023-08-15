@@ -113,7 +113,7 @@ object WavesRideRunnerWithBlockchainService extends ScorexLogging {
     val sharedBlockchain = rideDb.access.batchedReadOnly { implicit ro =>
       val dbCaches = DefaultDiskCaches(rideDb.access)
       LazyBlockchain.init(
-        settings.sharedBlockchain,
+        settings.blockchain,
         blockchainApi,
         rideDb.access,
         dbCaches,

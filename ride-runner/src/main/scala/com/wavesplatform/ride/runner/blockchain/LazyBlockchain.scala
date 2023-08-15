@@ -18,7 +18,6 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.ride.runner.blockchain.LazyBlockchain.Settings
 import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.ride.runner.caches.disk.DiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{GrpcCacheKeyConverters, MemBlockchainDataCache, MemCacheKey, MemCacheWeights}
@@ -48,7 +47,7 @@ import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
 
 class LazyBlockchain[TagT] private (
-    sharedBlockchainStorageSettings: Settings,
+    override val settings: BlockchainSettings,
     blockchainApi: BlockchainApi,
     db: RideDbAccess,
     diskCaches: DiskCaches,
@@ -57,8 +56,6 @@ class LazyBlockchain[TagT] private (
     allTags: CacheKeyTags[TagT]
 ) extends SupportedBlockchain
     with ScorexLogging {
-  override def settings: BlockchainSettings = sharedBlockchainStorageSettings.blockchain
-
   // Ride: get*Value (data), get* (data)
   override def accountData(address: Address, dataKey: String): Option[DataEntry[?]] = db.directReadWrite { implicit ctx =>
     val atMaxHeight = heightUntagged
@@ -525,7 +522,7 @@ class LazyBlockchain[TagT] private (
 
 object LazyBlockchain {
   def init[TagT](
-      settings: Settings,
+      settings: BlockchainSettings,
       blockchainApi: BlockchainApi,
       db: RideDbAccess,
       diskCaches: DiskCaches,
@@ -536,6 +533,4 @@ object LazyBlockchain {
     blockHeaders.load()
     new LazyBlockchain[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, memCache, allTags)
   }
-
-  case class Settings(blockchain: BlockchainSettings)
 }

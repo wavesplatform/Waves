@@ -219,7 +219,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
       val allTags = new CacheKeyTags[RideScriptRunRequest]
       val blockchain = testDb.access.directReadWrite { implicit ctx =>
         LazyBlockchain.init(
-          LazyBlockchain.Settings(blockchainSettings),
+          blockchainSettings,
           blockchainApi,
           testDb.access,
           DefaultDiskCaches(testDb.access),

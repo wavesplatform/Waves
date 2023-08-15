@@ -67,7 +67,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val allTags = new CacheKeyTags[RideScriptRunRequest]
     val blockchain = testDb.access.batchedReadWrite { implicit ctx =>
       LazyBlockchain.init(
-        LazyBlockchain.Settings(blockchainSettings),
+        blockchainSettings,
         blockchainApi,
         testDb.access,
         DefaultDiskCaches(testDb.access),
