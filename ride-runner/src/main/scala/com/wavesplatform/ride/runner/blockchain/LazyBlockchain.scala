@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches
+package com.wavesplatform.ride.runner.blockchain
 
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias, PublicKey}
@@ -18,8 +18,8 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.ride.runner.blockchain.{ActivatedFeatures, SupportedBlockchain}
-import com.wavesplatform.ride.runner.caches.LazyBlockchain.Settings
+import com.wavesplatform.ride.runner.blockchain.LazyBlockchain.Settings
+import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.ride.runner.caches.disk.DiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{GrpcCacheKeyConverters, MemBlockchainDataCache, MemCacheKey, MemCacheWeights}
 import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite, RideDbAccess}

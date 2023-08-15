@@ -11,9 +11,10 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.ScriptUtil
+import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
+import com.wavesplatform.ride.runner.caches.CacheKeyTags
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.MemBlockchainDataCache
-import com.wavesplatform.ride.runner.caches.{CacheKeyTags, LazyBlockchain}
 import com.wavesplatform.ride.runner.db.HasTestDb.mkTestDb
 import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RideScriptRunRequest, TestJobScheduler}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}

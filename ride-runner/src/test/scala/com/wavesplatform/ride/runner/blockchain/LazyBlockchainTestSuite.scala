@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.caches
+package com.wavesplatform.ride.runner.blockchain
 
 import cats.syntax.option.*
 import com.google.protobuf.UnsafeByteOperations
@@ -16,6 +16,7 @@ import com.wavesplatform.protobuf.block.{Block, MicroBlock, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toPBAssetId
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, SetScriptTransactionData, SignedTransaction, Transaction}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt}
+import com.wavesplatform.ride.runner.caches.*
 import com.wavesplatform.ride.runner.caches.disk.DefaultDiskCaches
 import com.wavesplatform.ride.runner.caches.mem.{MemBlockchainDataCache, MemCacheKey}
 import com.wavesplatform.ride.runner.db.HasTestDb

@@ -5,7 +5,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.ride.runner.caches.{AffectedTags, LazyBlockchain}
+import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
+import com.wavesplatform.ride.runner.caches.AffectedTags
 import com.wavesplatform.ride.runner.requests.{RequestService, RideScriptRunRequest}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.state.Height

@@ -4,7 +4,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.caches.{LazyBlockchain, WeighedAssetDescription}
+import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
+import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import com.wavesplatform.state.{AssetScriptInfo, BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
@@ -22,6 +23,7 @@ object MemCacheWeights {
     true,
     new SizeOfFilter {
       private val excludeClassNames = Set(classOf[LazyBlockchain[?]].getName)
+
       override def filterFields(klazz: Class[?], fields: util.Collection[Field]): util.Collection[Field] = fields
       override def filterClass(klazz: Class[?]): Boolean = {
         // Because we can't determine their sizes or they shared among all objects
