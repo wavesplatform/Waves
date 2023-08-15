@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.db
 import com.wavesplatform.database.DBEntry
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.disk.{AsBytes, KvPair}
+import com.wavesplatform.ride.runner.caches.disk.{AsBytes, KvHistoryPair, KvPair}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
 
@@ -74,25 +74,23 @@ trait ReadOnly {
 
   def getRemoteData[T](key: Key[T]): RemoteData[T] = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
 
-  def readHistoricalFromDbOpt[T](
-      historyKey: Key[Heights],
-      dataOnHeightKey: Height => Key[Option[T]],
+  def readHistoricalFromDbOpt[K, V](
+      k: K,
+      kvHistoryPair: KvHistoryPair[K, Option[V]],
       maxHeight: Height
-  ): RemoteData[T] = {
-    val height = getOpt(historyKey).getOrElse(Vector.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
-    height
-      .flatMap(height => getOpt(dataOnHeightKey(height)))
-      .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
-  }
+  ): RemoteData[V] = getOpt(kvHistoryPair.at(k)) // TODO Duplicate
+    .getOrElse(Vector.empty)
+    .find(_ <= maxHeight) // ordered from the newest to the oldest
+    .flatMap(h => getOpt(kvHistoryPair.kvPairAtHeight.at((h, k))))
+    .fold[RemoteData[V]](RemoteData.Unknown)(RemoteData.loaded)
 
-  def readHistoricalFromDb[T](
-      historyKey: Key[Heights],
-      dataOnHeightKey: Height => Key[T],
+  def readHistoricalFromDb[K, V](
+      k: K,
+      kvHistoryPair: KvHistoryPair[K, V],
       maxHeight: Height
-  ): RemoteData[T] = {
-    val height = getOpt(historyKey).getOrElse(Vector.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
-    height
-      .map(height => get(dataOnHeightKey(height)))
-      .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
-  }
+  ): RemoteData[V] = getOpt(kvHistoryPair.at(k)) // TODO Duplicate
+    .getOrElse(Vector.empty)
+    .find(_ <= maxHeight) // ordered from the newest to the oldest
+    .map(h => get(kvHistoryPair.kvPairAtHeight.at((h, k))))
+    .fold[RemoteData[V]](RemoteData.Unknown)(RemoteData.Cached(_))
 }

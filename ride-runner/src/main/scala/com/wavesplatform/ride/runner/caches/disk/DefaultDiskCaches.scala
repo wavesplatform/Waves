@@ -80,11 +80,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
         .cachedOrUnknown(addressIds.getAddressId(address))
         .flatMap { addressId =>
           val k = (addressId, dataKey)
-          ctx.readHistoricalFromDbOpt(
-            KvPairs.AccountDataEntriesHistory.at(k),
-            h => KvPairs.AccountDataEntries.at((h, k)),
-            maxHeight
-          )
+          ctx.readHistoricalFromDbOpt(k, KvPairs.AccountDataEntriesHistory, maxHeight)
         }
         .tap { r => log.trace(s"get($address, $dataKey, $maxHeight): ${r.toFoundStr("value", _.value)}") }
 
@@ -95,8 +91,8 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
       val addressId = addressIds.getOrMkAddressId(address)
       val k         = (addressId, dataKey)
       ctx.writeHistoricalToDbOpt(
-        KvPairs.AccountDataEntriesHistory.at(k),
-        h => KvPairs.AccountDataEntries.at((h, k)),
+        k,
+        KvPairs.AccountDataEntriesHistory,
         atHeight,
         data.flatMap {
           // HACK, see DataTxSerializer.serializeEntry because
@@ -124,7 +120,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
 
     override def removeAllFrom(fromHeight: Height)(implicit ctx: ReadWrite): List[(Address, String)] =
       ctx
-        .removeFrom(KvPairs.AccountDataEntriesHistory, KvPairs.AccountDataEntries, fromHeight)
+        .removeFrom(KvPairs.AccountDataEntriesHistory, fromHeight)
         .flatMap { case (addressId, dataKey) => addressIds.getAddress(addressId).map((_, dataKey)) }
   }
 
@@ -134,25 +130,14 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[WeighedAccountScriptInfo] =
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(key))
-        .flatMap { addressId =>
-          ctx.readHistoricalFromDbOpt(
-            KvPairs.AccountScriptsHistory.at(addressId),
-            h => KvPairs.AccountScripts.at((h, addressId)),
-            maxHeight
-          )
-        }
+        .flatMap(ctx.readHistoricalFromDbOpt(_, KvPairs.AccountScriptsHistory, maxHeight))
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("hash", _.hashCode())}") }
 
     override def set(atHeight: Height, key: Address, data: RemoteData[WeighedAccountScriptInfo])(implicit
         ctx: ReadWrite
     ): Unit = {
       val addressId = addressIds.getOrMkAddressId(key)
-      ctx.writeHistoricalToDbOpt(
-        KvPairs.AccountScriptsHistory.at(addressId),
-        h => KvPairs.AccountScripts.at((h, addressId)),
-        atHeight,
-        data
-      )
+      ctx.writeHistoricalToDbOpt(addressId, KvPairs.AccountScriptsHistory, atHeight, data)
       log.trace(s"set($key, $atHeight) = ${data.map(_.hashCode()).toFoundStr()}")
     }
 
@@ -169,7 +154,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
 
     override def removeAllFrom(fromHeight: Height)(implicit ctx: ReadWrite): List[Address] =
       ctx
-        .removeFrom(KvPairs.AccountScriptsHistory, KvPairs.AccountScripts, fromHeight)
+        .removeFrom(KvPairs.AccountScriptsHistory, fromHeight)
         .flatMap(addressIds.getAddress)
   }
 
@@ -178,20 +163,11 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
 
     override def get(maxHeight: Height, key: IssuedAsset)(implicit ctx: ReadOnly): RemoteData[WeighedAssetDescription] =
       ctx
-        .readHistoricalFromDbOpt(
-          KvPairs.AssetDescriptionsHistory.at(key),
-          h => KvPairs.AssetDescriptions.at((h, key)),
-          maxHeight
-        )
+        .readHistoricalFromDbOpt(key, KvPairs.AssetDescriptionsHistory, maxHeight)
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr(_.assetDescription.toString)}") }
 
     override def set(atHeight: Height, key: IssuedAsset, data: RemoteData[WeighedAssetDescription])(implicit ctx: ReadWrite): Unit = {
-      ctx.writeHistoricalToDbOpt(
-        KvPairs.AssetDescriptionsHistory.at(key),
-        h => KvPairs.AssetDescriptions.at((h, key)),
-        atHeight,
-        data
-      )
+      ctx.writeHistoricalToDbOpt(key, KvPairs.AssetDescriptionsHistory, atHeight, data)
       log.trace(s"set($key, $atHeight) = ${data.toFoundStr()}")
     }
 
@@ -206,7 +182,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     }
 
     override def removeAllFrom(fromHeight: Height)(implicit ctx: ReadWrite): List[IssuedAsset] =
-      ctx.removeFrom(KvPairs.AssetDescriptionsHistory, KvPairs.AssetDescriptions, fromHeight)
+      ctx.removeFrom(KvPairs.AssetDescriptionsHistory, fromHeight)
   }
 
   override val aliases: AliasDiskCache = new AliasDiskCache {
@@ -268,11 +244,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
         .cachedOrUnknown(addressIds.getAddressId(address))
         .flatMap { addressId =>
           val k = (addressId, asset)
-          ctx.readHistoricalFromDb(
-            KvPairs.AccountAssetsHistory.at(k),
-            h => KvPairs.AccountAssets.at((h, k)),
-            maxHeight
-          )
+          ctx.readHistoricalFromDb(k, KvPairs.AccountAssetsHistory, maxHeight)
         }
         .tap { r => log.trace(s"get($address, $asset): $r") }
     }
@@ -283,13 +255,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     private def set(atHeight: Height, address: Address, asset: Asset, data: RemoteData[Long])(implicit ctx: ReadWrite): Unit = {
       val addressId = addressIds.getOrMkAddressId(address)
       val k         = (addressId, asset)
-      ctx.writeHistoricalToDb(
-        KvPairs.AccountAssetsHistory.at(k),
-        h => KvPairs.AccountAssets.at((h, k)),
-        atHeight,
-        data,
-        0L
-      )
+      ctx.writeHistoricalToDb(k, KvPairs.AccountAssetsHistory, atHeight, data.getOrElse(0L))
       log.trace(s"set($address, $asset) = ${data.toFoundStr()}")
     }
 
@@ -300,17 +266,13 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
       val addressId = addressIds.getOrMkAddressId(address)
       val k         = (addressId, asset)
       ctx
-        .removeFromAndGetLatestExisted(
-          KvPairs.AccountAssetsHistory.at(k),
-          h => KvPairs.AccountAssets.at((h, k)),
-          fromHeight
-        )
+        .removeFromAndGetLatestExisted(k, KvPairs.AccountAssetsHistory, fromHeight)
         .tap { _ => log.trace(s"removeFrom($fromHeight, $address, $asset)") }
     }
 
     override def removeAllFrom(fromHeight: Height)(implicit ctx: ReadWrite): List[(Address, Asset)] =
       ctx
-        .removeFrom(KvPairs.AccountAssetsHistory, KvPairs.AccountAssets, fromHeight)
+        .removeFrom(KvPairs.AccountAssetsHistory, fromHeight)
         .flatMap { case (addressId, asset) => addressIds.getAddress(addressId).map((_, asset)) }
   }
 
@@ -321,41 +283,25 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
       override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[LeaseBalance] =
         RemoteData
           .cachedOrUnknown(addressIds.getAddressId(key))
-          .flatMap { addressId =>
-            ctx.readHistoricalFromDb(
-              KvPairs.AccountLeaseBalancesHistory.at(addressId),
-              h => KvPairs.AccountLeaseBalances.at((h, addressId)),
-              maxHeight
-            )
-          }
+          .flatMap(ctx.readHistoricalFromDb(_, KvPairs.AccountLeaseBalancesHistory, maxHeight))
           .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr()}") }
 
       override def set(atHeight: Height, key: Address, data: RemoteData[LeaseBalance])(implicit ctx: ReadWrite): Unit = {
         val addressId = addressIds.getOrMkAddressId(key)
-        ctx.writeHistoricalToDb(
-          KvPairs.AccountLeaseBalancesHistory.at(addressId),
-          h => KvPairs.AccountLeaseBalances.at((h, addressId)),
-          atHeight,
-          data,
-          LeaseBalance.empty
-        )
+        ctx.writeHistoricalToDb(addressId, KvPairs.AccountLeaseBalancesHistory, atHeight, data.getOrElse(LeaseBalance.empty))
         log.trace(s"set($key, $atHeight) = ${data.toFoundStr()}")
       }
 
       override def removeFrom(fromHeight: Height, key: Address)(implicit ctx: ReadWrite): RemoteData[LeaseBalance] = {
         val addressId = addressIds.getOrMkAddressId(key)
         ctx
-          .removeFromAndGetLatestExisted(
-            KvPairs.AccountLeaseBalancesHistory.at(addressId),
-            h => KvPairs.AccountLeaseBalances.at((h, addressId)),
-            fromHeight
-          )
+          .removeFromAndGetLatestExisted(addressId, KvPairs.AccountLeaseBalancesHistory, fromHeight)
           .tap { _ => log.trace(s"remove($key, $fromHeight)") }
       }
 
       override def removeAllFrom(fromHeight: Height)(implicit ctx: ReadWrite): List[Address] =
         ctx
-          .removeFrom(KvPairs.AccountLeaseBalancesHistory, KvPairs.AccountLeaseBalances, fromHeight)
+          .removeFrom(KvPairs.AccountLeaseBalancesHistory, fromHeight)
           .flatMap(addressIds.getAddress(_))
     }
 

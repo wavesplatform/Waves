@@ -9,7 +9,17 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
-import com.wavesplatform.database.rocksdb.{Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
+import com.wavesplatform.database.rocksdb.{
+  Key,
+  readAccountScriptInfo,
+  readAssetDetails,
+  readAssetScript,
+  readBlockMeta,
+  writeAccountScriptInfo,
+  writeAssetDetails,
+  writeAssetScript,
+  writeBlockMeta
+}
 import com.wavesplatform.database.{AddressId, toPbTransaction, toVanillaTransaction, protobuf as pb}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
@@ -52,7 +62,10 @@ object KvPair {
   val PrefixSize = Shorts.BYTES
 }
 
-sealed abstract class KvHistoryPair[KeyT](prefix: Short)(implicit keyAsBytes: AsBytes[KeyT])
+sealed abstract class KvHistoryPair[KeyT, ValueT](
+    prefix: Short,
+    val kvPairAtHeight: KvPair[(state.Height, KeyT), ValueT]
+)(implicit keyAsBytes: AsBytes[KeyT])
     extends KvPair[KeyT, Heights](prefix)(keyAsBytes, vecAsBytes.consumeAll)
 
 object KvPairs {
@@ -60,14 +73,16 @@ object KvPairs {
   object AddressToId   extends KvPair[Address, AddressId](1)
   object IdToAddress   extends KvPair[AddressId, Address](2)
 
-  object AccountDataEntriesHistory extends KvHistoryPair[(AddressId, String)](11)(tuple(implicitly, utf8StringAsBytes.consumeAll))
+  object AccountDataEntriesHistory
+      extends KvHistoryPair[(AddressId, String), Option[DataEntry[?]]](11, AccountDataEntries)(tuple(implicitly, utf8StringAsBytes.consumeAll))
+
   object AccountDataEntries
       extends KvPair[(state.Height, (AddressId, String)), Option[DataEntry[?]]](12)(
         tuple(implicitly, tuple(implicitly, utf8StringAsBytes.consumeAll)),
         implicitly
       )
 
-  object AccountScriptsHistory extends KvHistoryPair[AddressId](21)
+  object AccountScriptsHistory extends KvHistoryPair[AddressId, Option[WeighedAccountScriptInfo]](21, AccountScripts)
 
   val accountScriptInfoAsBytes: AsBytes[AccountScriptInfo] =
     AsBytes.byteArrayAsBytes.consumeAll.transform(readAccountScriptInfo, writeAccountScriptInfo)
@@ -112,7 +127,7 @@ object KvPairs {
 
   object ActivatedFeatures extends KvPair[Unit, Map[Short, state.Height]](60)(implicitly, mapAsBytes.consumeAll)
 
-  object AssetDescriptionsHistory extends KvHistoryPair[Asset.IssuedAsset](71)
+  object AssetDescriptionsHistory extends KvHistoryPair[Asset.IssuedAsset, Option[WeighedAssetDescription]](71, AssetDescriptions)
 
   val assetDescriptionAsBytes: AsBytes[AssetDescription] = new AsBytes[AssetDescription] {
     override def read(from: ByteBuffer): AssetDescription = {
@@ -178,10 +193,10 @@ object KvPairs {
   object AliasesByHeight extends KvPair[state.Height, List[Alias]](79)(implicitly, AsBytes.listAsBytes.consumeAll(aliasWithLenAsBytes))
   object Aliases         extends KvPair[Alias, (state.Height, Option[AddressId])](80)(aliasAsBytes, implicitly)
 
-  object AccountAssetsHistory extends KvHistoryPair[(AddressId, Asset)](91)
+  object AccountAssetsHistory extends KvHistoryPair[(AddressId, Asset), Long](91, AccountAssets)
   object AccountAssets        extends KvPair[(state.Height, (AddressId, Asset)), Long](92)
 
-  object AccountLeaseBalancesHistory extends KvHistoryPair[AddressId](101)
+  object AccountLeaseBalancesHistory extends KvHistoryPair[AddressId, LeaseBalance](101, AccountLeaseBalances)
   object AccountLeaseBalances        extends KvPair[(state.Height, AddressId), LeaseBalance](102)
 
   implicit val transactionIdAsBytes: AsBytes[TransactionId]       = AsBytes.byteArrayAsBytes.consumeAll.toByteStr.transform(TransactionId(_), x => x)

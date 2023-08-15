@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.db
 import com.google.common.primitives.Ints
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.disk.KvPair
+import com.wavesplatform.ride.runner.caches.disk.KvHistoryPair
 import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtRollback}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
@@ -21,12 +21,10 @@ trait ReadWrite extends ReadOnly {
     if (data.loaded) put(key, data.mayBeValue)
     else delete(key)
 
-  def writeHistoricalToDbOpt[T](
-      historyKey: Key[Heights],
-      dataOnHeightKey: Height => Key[Option[T]],
-      height: Height,
-      data: RemoteData[T]
-  ): Unit = {
+  def writeHistoricalToDbOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], height: Height, data: RemoteData[V]): Unit = {
+    def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
+    val historyKey                 = kvHistoryPair.at(k)
+
     // TODO duplicate
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
     removedHistory.foreach(h => delete(dataOnHeightKey(h)))
@@ -35,18 +33,16 @@ trait ReadWrite extends ReadOnly {
     put(dataOnHeightKey(height), data.mayBeValue)
   }
 
-  def writeHistoricalToDb[T](
-      historyKey: Key[Heights],
-      dataOnHeightKey: Height => Key[T],
-      height: Height,
-      data: RemoteData[T],
-      default: => T
-  ): Unit = {
+  def writeHistoricalToDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], height: Height, data: V): Unit = {
+    def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
+    val historyKey                 = kvHistoryPair.at(k)
+
+    // TODO duplicate
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
     removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
     put(historyKey, preservedHistory.prepended(height))
-    put(dataOnHeightKey(height), data.mayBeValue.getOrElse(default))
+    put(dataOnHeightKey(height), data)
   }
 
   def removeFromAndGetLatestExistedOpt[T](
@@ -72,12 +68,11 @@ trait ReadWrite extends ReadOnly {
     }
   }
 
-  // TODO duplicate
-  def removeFromAndGetLatestExisted[T](
-      historyKey: Key[Heights],
-      dataOnHeightKey: Height => Key[T],
-      fromHeight: Height
-  ): RemoteData[T] = {
+  def removeFromAndGetLatestExisted[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], fromHeight: Height): RemoteData[V] = {
+    def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
+    val historyKey                 = kvHistoryPair.at(k)
+
+    // TODO duplicate
     val history = getOpt(historyKey).getOrElse(Vector.empty)
     if (history.isEmpty) RemoteData.Unknown
     else {
@@ -96,12 +91,9 @@ trait ReadWrite extends ReadOnly {
     }
   }
 
-  def removeFrom[K, V](
-      historyKey: KvPair[K, Heights],
-      entriesKey: KvPair[(Height, K), V],
-      fromHeight: Height
-  ): List[K] = {
+  def removeFrom[K, V](historyKey: KvHistoryPair[K, V], fromHeight: Height): List[K] = {
     val affectedEntryKeys = mutable.Set.empty[K]
+    val entriesKey        = historyKey.kvPairAtHeight
 
     iterateOverPrefix(entriesKey.prefixBytes ++ Ints.toByteArray(fromHeight), entriesKey.columnFamilyHandle) { e =>
       val rawKey        = e.getKey

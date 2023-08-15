@@ -35,6 +35,7 @@ object RemoteData {
 
   implicit final class Ops[A](val self: RemoteData[A]) extends AnyVal {
     def orElse(x: => RemoteData[A]): RemoteData[A] = if (self.loaded) self else x
+    def getOrElse(x: => A): A                      = self.mayBeValue.getOrElse(x)
 
     def toFoundStr(f: A => Any = x => x): String =
       Ops.toFoundStr("", map(f))
