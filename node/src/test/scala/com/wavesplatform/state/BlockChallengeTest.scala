@@ -211,7 +211,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     val sender           = TxHelpers.signer(1)
     val challengedMiner  = TxHelpers.signer(2)
     val challengingMiner = TxHelpers.signer(3)
-    withDomain(DomainPresets.ConsensusImprovements, balances = AddrWithBalance.enoughBalances(sender, challengedMiner, challengingMiner)) { d =>
+    withDomain(DomainPresets.BlockRewardDistribution, balances = AddrWithBalance.enoughBalances(sender, challengedMiner, challengingMiner)) { d =>
       d.appendBlock()
       val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
       val challengedBlock =
@@ -1060,7 +1060,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
 
     withDomain(
-      DomainPresets.ConsensusImprovements
+      DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
         .setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 1008),
       balances = AddrWithBalance.enoughBalances(sender)
@@ -1812,7 +1812,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
+    val tx = TxHelpers.transfer(challengedMiner, amount = 10001.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
       Seq(tx),
