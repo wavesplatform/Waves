@@ -17,9 +17,6 @@ class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[Reques
     working.set(true)
     this.requestStream = requestStream
     requestStream.disableAutoRequestWithInitial(1)
-
-    // TODO #90 gRPC: invalid argument error
-
     // Works only for bidi-streams or unary calls, because it indicates when a client is ready to _send_ messages.
     // See https://grpc.github.io/grpc-java/javadoc/io/grpc/ClientCall.Listener.html#onReady--
     // requestStream.setOnReadyHandler(() => )

@@ -21,7 +21,6 @@ trait ReadWrite extends ReadOnly {
     if (data.loaded) put(key, data.mayBeValue)
     else delete(key)
 
-  // TODO #112 currentHeight, because height could >> currentHeight
   def writeHistoricalToDbOpt[T](
       historyKey: Key[Heights],
       dataOnHeightKey: Height => Key[Option[T]],
