@@ -19,20 +19,20 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
     height()
   }
 
-  // TODO A: this won't change
+  // We don't support this, see SupportedBlockchain.transactionInfo
   override def transactionById(id: Array[Byte]): Unit = {
-    val txId = mkTxCacheKey(id)
+    // val txId = mkTxCacheKey(id)
     // log.trace(s"[$tag] transactionById($txId)")
-    allTags.addDependent(txId, tag)
+    // allTags.addDependent(txId, tag)
   }
 
+  // We don't support this, see SupportedBlockchain.transferById
   override def transferTransactionById(id: Array[Byte]): Unit = {
-    val txId = mkTxCacheKey(id)
+    // val txId = mkTxCacheKey(id)
     // log.trace(s"[$tag] transferTransactionById($txId)")
-    allTags.addDependent(txId, tag)
+    // allTags.addDependent(txId, tag)
   }
 
-  // TODO A: this can change
   override def transactionHeightById(id: Array[Byte]): Unit = {
     val txId = mkTxCacheKey(id)
     // log.trace(s"[$tag] transactionHeightById($txId)")
@@ -47,15 +47,17 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
     allTags.addDependent(MemCacheKey.Asset(asset), tag)
   }
 
-  // TODO Two different cases for H, where H < currHeight - 100 and H >= currHeight - 100
   override def blockInfoByHeight(height: Int): Unit = {
     // log.trace(s"[$tag] blockInfoByHeight($height)")
-    // if (height < sharedBlockchain.height - 100)
-    // sharedBlockchain.blockHeaders.add(height, tag)
+    // HACK: we don't know, what is used in the script: blockInfoByHeight or lastBlock.
+    // So we will force update the scripts those use one (or both) of these functions.
+    // If this will be an issue, consider two different cases for H (height),
+    // where H < currHeight - 100 or H >= currHeight - 100.
+    allTags.addDependent(MemCacheKey.Height, tag)
   }
 
   override def data(address: Address, key: String): Unit = {
-    // log.trace(s"[$tag] data($addr, $key)")
+    // log.trace(s"[$tag] data($address, $key)")
     allTags.addDependent(MemCacheKey.AccountData(address, key), tag)
   }
 
@@ -69,23 +71,23 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
 
   override def accountBalanceOf(address: Address, assetId: Option[Array[Byte]]): Unit = {
     val asset = Asset.fromCompatId(assetId.map(ByteStr(_)))
-    // log.trace(s"[$tag] accountBalanceOf($addr, $asset)")
+    // log.trace(s"[$tag] accountBalanceOf($address, $asset)")
     allTags.addDependent(MemCacheKey.AccountBalance(address, asset), tag)
   }
 
   override def accountWavesBalanceOf(address: Address): Unit = {
-    // log.trace(s"[$tag] accountWavesBalanceOf($addr)")
+    // log.trace(s"[$tag] accountWavesBalanceOf($address)")
     allTags.addDependent(MemCacheKey.AccountBalance(address, Asset.Waves), tag)
     allTags.addDependent(MemCacheKey.AccountLeaseBalance(address), tag)
   }
 
   override def accountScript(address: Address): Unit = {
-    // log.trace(s"[$tag] accountScript($addr)")
+    // log.trace(s"[$tag] accountScript($address)")
     allTags.addDependent(MemCacheKey.AccountScript(address), tag)
   }
 
   override def callScript(dApp: Address): Unit = {
-    // log.trace(s"[$tag] callScript($addr)")
+    // log.trace(s"[$tag] callScript($address)")
     accountScript(dApp)
   }
 }

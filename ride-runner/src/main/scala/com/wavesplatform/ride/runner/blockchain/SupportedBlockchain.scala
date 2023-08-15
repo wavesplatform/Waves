@@ -60,7 +60,12 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   // override def transactionMeta(id: ByteStr): Option[TxMeta]
 
   // Ride: transferTransactionById
+  // We don't support this, because there is no demand.
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = kill("transferById")
+
+  // Ride: transactionById
+  // We don't support his, because 1) there is no demand 2) it works only for V1 and V2 scripts, see versionSpecificFuncs in WavesContext
+  override def transactionInfo(id: BlockId): Option[(TxMeta, Transaction)] = kill("transactionInfo")
 
   override def score: BigInt = kill("score")
 
@@ -78,8 +83,6 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = kill("leaseDetails")
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
-
-  override def transactionInfo(id: BlockId): Option[(TxMeta, Transaction)] = kill("transactionInfo")
 
   override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
 
