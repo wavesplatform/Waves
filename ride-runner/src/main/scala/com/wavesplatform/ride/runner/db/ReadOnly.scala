@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.db
 import com.wavesplatform.database.DBEntry
 import com.wavesplatform.database.rocksdb.Key
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.caches.disk.{AsBytes, KvHistoryPair, KvPair}
+import com.wavesplatform.ride.runner.caches.disk.{KvHistoryPair, KvPair}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
 
@@ -35,17 +35,6 @@ trait ReadOnly {
     r.result()
   }
 
-  def collectKeys[KeyT](kvPair: KvPair[KeyT, ?]): List[KeyT] = collectKeys(kvPair.prefixBytes, kvPair.columnFamilyHandle)(kvPair.prefixedKeyAsBytes)
-
-  def collectKeys[KeyT](prefixBytes: Array[Byte], cfh: Option[ColumnFamilyHandle])(implicit keyAsBytes: AsBytes[KeyT]): List[KeyT] = {
-    var r = List.empty[KeyT]
-    iterateOverPrefix(prefixBytes, cfh) { dbEntry =>
-      val key = keyAsBytes.read(dbEntry.getKey)
-      r = key :: r
-    }
-    r
-  }
-
   def iterateOverPrefix[KeyT, ValueT](
       kvPair: KvPair[KeyT, ValueT],
       seekKey: KeyT
@@ -71,27 +60,17 @@ trait ReadOnly {
       f(new DbPair(kvPair, p))
     }
 
-  def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = getOpt(key).fold(RemoteData.unknown[T])(RemoteData.loaded)
+  def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = RemoteData(getOpt(key))
 
-  def getRemoteData[T](key: Key[T]): RemoteData[T] = getOpt(key).fold(RemoteData.unknown[T])(RemoteData.Cached(_))
+  def readHistoricalFromDbOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], maxHeight: Height): RemoteData[V] =
+    readHistoricalFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.loaded)
 
-  def readHistoricalFromDbOpt[K, V](
-      k: K,
-      kvHistoryPair: KvHistoryPair[K, Option[V]],
-      maxHeight: Height
-  ): RemoteData[V] = getOpt(kvHistoryPair.at(k))
-    .getOrElse(Vector.empty)
-    .find(_ <= maxHeight) // the recent is in the front
-    .map(h => get(kvHistoryPair.kvPairAtHeight.at((h, k))))
-    .fold(RemoteData.unknown[V])(RemoteData.loaded)
+  def readHistoricalFromDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height): RemoteData[V] =
+    readHistoricalFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.Cached(_))
 
-  def readHistoricalFromDb[K, V](
-      k: K,
-      kvHistoryPair: KvHistoryPair[K, V],
-      maxHeight: Height
-  ): RemoteData[V] = getOpt(kvHistoryPair.at(k))
-    .getOrElse(Vector.empty)
-    .find(_ <= maxHeight) // the recent is in the front
-    .map(h => get(kvHistoryPair.kvPairAtHeight.at((h, k))))
-    .fold(RemoteData.unknown[V])(RemoteData.Cached(_))
+  private def readHistoricalFromDbRaw[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height): Option[V] =
+    getOpt(kvHistoryPair.at(k))
+      .getOrElse(Vector.empty)
+      .find(_ <= maxHeight) // the recent is in the front
+      .map(h => get(kvHistoryPair.kvPairAtHeight.at((h, k))))
 }

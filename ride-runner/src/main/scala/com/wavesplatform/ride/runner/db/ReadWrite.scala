@@ -21,23 +21,10 @@ trait ReadWrite extends ReadOnly {
     if (data.loaded) put(key, data.mayBeValue)
     else delete(key)
 
-  def writeHistoricalToDbOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], height: Height, data: RemoteData[V]): Unit = {
-    def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
-    val historyKey                 = kvHistoryPair.at(k)
-
-    // TODO duplicate
-    val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
-    removedHistory.foreach(h => delete(dataOnHeightKey(h)))
-
-    put(historyKey, preservedHistory.prepended(height))
-    put(dataOnHeightKey(height), data.mayBeValue)
-  }
-
   def writeHistoricalToDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], height: Height, data: V): Unit = {
     def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
     val historyKey                 = kvHistoryPair.at(k)
 
-    // TODO duplicate
     val (preservedHistory, removedHistory) = splitHeightsAtRollback(height, getOpt(historyKey).getOrElse(Vector.empty))
     removedHistory.foreach(h => delete(dataOnHeightKey(h)))
 
@@ -45,36 +32,18 @@ trait ReadWrite extends ReadOnly {
     put(dataOnHeightKey(height), data)
   }
 
-  def removeFromAndGetLatestExistedOpt[T](
-      historyKey: Key[Heights],
-      dataOnHeightKey: Height => Key[Option[T]],
-      fromHeight: Height
-  ): RemoteData[T] = {
-    val history = getOpt(historyKey).getOrElse(Vector.empty)
-    if (history.isEmpty) RemoteData.Unknown
-    else {
-      val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
-      removedHistory.foreach(h => delete(dataOnHeightKey(h)))
+  def removeFromAndGetLatestExistedOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], fromHeight: Height): RemoteData[V] =
+    RemoteData(removeFromAndGetLatestExistedBase(k, kvHistoryPair, fromHeight))
 
-      preservedHistory.headOption match {
-        case None =>
-          delete(historyKey)
-          RemoteData.Unknown
+  def removeFromAndGetLatestExisted[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], fromHeight: Height): RemoteData[V] =
+    RemoteData.cachedOrUnknown(removeFromAndGetLatestExistedBase(k, kvHistoryPair, fromHeight))
 
-        case Some(h) =>
-          put(historyKey, preservedHistory)
-          getRemoteDataOpt(dataOnHeightKey(h))
-      }
-    }
-  }
-
-  def removeFromAndGetLatestExisted[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], fromHeight: Height): RemoteData[V] = {
+  private def removeFromAndGetLatestExistedBase[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], fromHeight: Height): Option[V] = {
     def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
     val historyKey                 = kvHistoryPair.at(k)
 
-    // TODO duplicate
     val history = getOpt(historyKey).getOrElse(Vector.empty)
-    if (history.isEmpty) RemoteData.Unknown
+    if (history.isEmpty) None
     else {
       val (preservedHistory, removedHistory) = splitHeightsAt(fromHeight, history)
       removedHistory.foreach(h => delete(dataOnHeightKey(h)))
@@ -82,11 +51,11 @@ trait ReadWrite extends ReadOnly {
       preservedHistory.headOption match {
         case None =>
           delete(historyKey)
-          RemoteData.Unknown
+          None
 
         case Some(h) =>
           put(historyKey, preservedHistory)
-          getRemoteData(dataOnHeightKey(h))
+          Some(get(dataOnHeightKey(h))) // get, because we expect this data to be
       }
     }
   }

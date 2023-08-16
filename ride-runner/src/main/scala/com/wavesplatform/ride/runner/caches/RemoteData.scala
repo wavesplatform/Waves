@@ -21,6 +21,12 @@ object RemoteData {
     override val mayBeValue = None
   }
 
+  def apply[T](x: Option[Option[T]]): RemoteData[T] = x match {
+    case None          => RemoteData.Unknown
+    case Some(None)    => RemoteData.Absence
+    case Some(Some(x)) => RemoteData.Cached(x)
+  }
+
   def unknown[T]: RemoteData[T] = Unknown
 
   def loaded[T](x: T): RemoteData[T] = Cached(x)
