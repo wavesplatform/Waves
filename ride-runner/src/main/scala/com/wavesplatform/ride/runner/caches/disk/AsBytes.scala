@@ -146,7 +146,4 @@ object AsBytes {
   implicit final class ByteArrayAsBytesOps(private val self: AsBytes[Array[Byte]]) extends AnyVal {
     def toByteStr: AsBytes[ByteStr] = self.transform(ByteStr(_), _.arr)
   }
-
-//  def coerce[T, TaggedT <: TaggedType[T]#Type](implicit asBytes: AsBytes[T]): AsBytes[TaggedT] =
-//    asBytes.transform(TaggedT)
 }

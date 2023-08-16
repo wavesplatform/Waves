@@ -66,31 +66,32 @@ trait ReadOnly {
   def iterateOverPrefixContinue[KeyT, ValueT](
       kvPair: KvPair[KeyT, ValueT],
       seekKey: KeyT
-  )(f: DbPair[KeyT, ValueT] => Boolean): Unit = iterateOverPrefixContinue(kvPair.at(seekKey).keyBytes, kvPair.columnFamilyHandle) { p =>
-    f(new DbPair(kvPair, p))
-  }
+  )(f: DbPair[KeyT, ValueT] => Boolean): Unit =
+    iterateOverPrefixContinue(kvPair.at(seekKey).keyBytes, kvPair.columnFamilyHandle) { p =>
+      f(new DbPair(kvPair, p))
+    }
 
-  def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
+  def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = getOpt(key).fold(RemoteData.unknown[T])(RemoteData.loaded)
 
-  def getRemoteData[T](key: Key[T]): RemoteData[T] = getOpt(key).fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
+  def getRemoteData[T](key: Key[T]): RemoteData[T] = getOpt(key).fold(RemoteData.unknown[T])(RemoteData.Cached(_))
 
   def readHistoricalFromDbOpt[K, V](
       k: K,
       kvHistoryPair: KvHistoryPair[K, Option[V]],
       maxHeight: Height
-  ): RemoteData[V] = getOpt(kvHistoryPair.at(k)) // TODO Duplicate
+  ): RemoteData[V] = getOpt(kvHistoryPair.at(k))
     .getOrElse(Vector.empty)
-    .find(_ <= maxHeight) // ordered from the newest to the oldest
-    .flatMap(h => getOpt(kvHistoryPair.kvPairAtHeight.at((h, k))))
-    .fold[RemoteData[V]](RemoteData.Unknown)(RemoteData.loaded)
+    .find(_ <= maxHeight) // the recent is in the front
+    .map(h => get(kvHistoryPair.kvPairAtHeight.at((h, k))))
+    .fold(RemoteData.unknown[V])(RemoteData.loaded)
 
   def readHistoricalFromDb[K, V](
       k: K,
       kvHistoryPair: KvHistoryPair[K, V],
       maxHeight: Height
-  ): RemoteData[V] = getOpt(kvHistoryPair.at(k)) // TODO Duplicate
+  ): RemoteData[V] = getOpt(kvHistoryPair.at(k))
     .getOrElse(Vector.empty)
-    .find(_ <= maxHeight) // ordered from the newest to the oldest
+    .find(_ <= maxHeight) // the recent is in the front
     .map(h => get(kvHistoryPair.kvPairAtHeight.at((h, k))))
-    .fold[RemoteData[V]](RemoteData.Unknown)(RemoteData.Cached(_))
+    .fold(RemoteData.unknown[V])(RemoteData.Cached(_))
 }

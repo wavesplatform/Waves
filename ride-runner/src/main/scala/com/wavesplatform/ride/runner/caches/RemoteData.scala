@@ -39,14 +39,11 @@ object RemoteData {
     def orElse(x: => RemoteData[A]): RemoteData[A] = if (self.loaded) self else x
     def getOrElse(x: => A): A                      = self.mayBeValue.getOrElse(x)
 
-    def toFoundStr(f: A => Any = x => x): String =
-      Ops.toFoundStr("", map(f))
-
-    def toFoundStr(label: String, f: A => Any): String =
-      Ops.toFoundStr(s"$label=", map(f))
+    def toFoundStr(f: A => Any = x => x): String       = Ops.toFoundStr("", map(f))
+    def toFoundStr(label: String, f: A => Any): String = Ops.toFoundStr(s"$label=", map(f))
 
     def map[B](f: A => B): RemoteData[B] = self match {
-      case Cached(a) => RemoteData.Cached(f(a))
+      case Cached(a) => Cached(f(a))
       case Absence   => Absence
       case Unknown   => Unknown
     }
