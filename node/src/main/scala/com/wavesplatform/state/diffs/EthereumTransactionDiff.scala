@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.BlockRewardDistribution
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
@@ -20,7 +19,7 @@ object EthereumTransactionDiff {
       case et: EthereumTransaction.Transfer =>
         for {
           _         <- checkLeadingZeros(e, blockchain)
-          _         <- TracedResult { if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.check(e.underlying.getData) else Right(()) }
+          _         <- TracedResult(et.checkDataSize(blockchain, e.underlying.getData))
           asset     <- TracedResult(et.tryResolveAsset(blockchain))
           transfer  <- TracedResult(et.toTransferLike(e, blockchain))
           assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
@@ -44,7 +43,7 @@ object EthereumTransactionDiff {
     val resultEi = e.payload match {
       case et: EthereumTransaction.Transfer =>
         for {
-          _       <- if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.check(e.underlying.getData) else Right(())
+          _       <- et.checkDataSize(blockchain, e.underlying.getData)
           assetId <- et.tryResolveAsset(blockchain)
         } yield Diff(
           ethereumTransactionMeta = Map(

@@ -8,12 +8,14 @@ import cats.syntax.traverse.*
 import com.esaulpaugh.headlong.abi.{Function, Tuple}
 import com.esaulpaugh.headlong.util.FastHex
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures.BlockRewardDistribution
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.Types.TypeExt
 import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 import com.wavesplatform.lang.{Global, ValidationError}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.EthABIConverter.WavesByteRepr
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -32,7 +34,10 @@ final case class EthABIConverter(script: Script) {
 
   case class FunctionRef(name: String, args: Seq[FunctionArg]) {
 
-    def decodeArgs(data: String, check: Boolean): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] = {
+    def decodeArgs(
+        data: String,
+        blockchain: Blockchain
+    ): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] = {
       val arr   = FastHex.decode(data)
       val func  = new Function(ethSignature)
       val tuple = func.decodeCall(arr)
@@ -40,7 +45,7 @@ final case class EthABIConverter(script: Script) {
       tuple.asScala.toList
         .zip(args.map(_.rideType) :+ EthABIConverter.PaymentListType)
         .traverse { case (ethArg, rideT) => EthABIConverter.toRideValue(ethArg, rideT) }
-        .flatMap(checkLen(func, tuple, arr.length, check).as(_))
+        .flatMap(checkLen(func, tuple, arr.length, blockchain).as(_))
         .flatMap { alldecodedArgs =>
           (alldecodedArgs.last match {
             case Terms.ARR(xs) =>
@@ -75,12 +80,13 @@ final case class EthABIConverter(script: Script) {
 
     lazy val ethMethodId: String = EthABIConverter.buildMethodId(ethSignature)
 
-    def checkLen(func: Function, tuple: Tuple, len: Int, check: Boolean) = {
+    def checkLen(func: Function, tuple: Tuple, len: Int, blockchain: Blockchain): Either[GenericError, Unit] = {
       val cls    = Class.forName("com.esaulpaugh.headlong.abi.TupleType")
       val method = cls.getDeclaredMethod("byteLength", classOf[Tuple])
       method.setAccessible(true)
       Either.cond(
-        !check || method.invoke(func.getInputs, tuple).asInstanceOf[Int] == len - Function.SELECTOR_LEN,
+        !blockchain
+          .isFeatureActivated(BlockRewardDistribution) || method.invoke(func.getInputs, tuple).asInstanceOf[Int] == len - Function.SELECTOR_LEN,
         (),
         GenericError("unconsumed bytes remaining")
       )
@@ -129,11 +135,14 @@ final case class EthABIConverter(script: Script) {
       )
     })
 
-  def decodeFunctionCall(data: String, check: Boolean): Either[ValidationError, (FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] = {
+  def decodeFunctionCall(
+      data: String,
+      blockchain: Blockchain
+  ): Either[ValidationError, (FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] = {
     val methodId = data.substring(0, 8)
     for {
       function        <- funcByMethodId.get("0x" + methodId).toRight[ValidationError](GenericError(s"Function not defined: $methodId"))
-      argsAndPayments <- function.decodeArgs(data, check)
+      argsAndPayments <- function.decodeArgs(data, blockchain)
     } yield (FUNCTION_CALL(FunctionHeader.User(function.name), argsAndPayments._1), argsAndPayments._2)
   }
 }
