@@ -1,7 +1,6 @@
 package com.wavesplatform.ride.runner.blockchain
 
 import cats.syntax.option.*
-import com.google.protobuf.UnsafeByteOperations
 import com.typesafe.config.ConfigMemorySize
 import com.wavesplatform.account.Alias
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
@@ -22,9 +21,8 @@ import com.wavesplatform.ride.runner.caches.mem.{MemBlockchainDataCache, MemCach
 import com.wavesplatform.ride.runner.db.HasTestDb
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Height, IntegerDataEntry, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
-
-import java.nio.charset.StandardCharsets
 
 class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc with HasTestAccounts {
   "LazyBlockchain" - {
@@ -299,8 +297,8 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
   private val assetDescription = AssetDescription(
     originTransactionId = asset.id,
     issuer = alice.publicKey,
-    name = UnsafeByteOperations.unsafeWrap("name".getBytes(StandardCharsets.UTF_8)),
-    description = UnsafeByteOperations.unsafeWrap("description".getBytes(StandardCharsets.UTF_8)),
+    name = "name".toByteString,
+    description = "description".toByteString,
     decimals = 8,
     reissuable = false,
     totalVolume = 1000,
@@ -362,7 +360,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
       )
     )
 
-  private val pbTransactionIds = Seq(UnsafeByteOperations.unsafeWrap(transactionId.arr))
+  private val pbTransactionIds = Seq(transactionId.toByteString)
   private val pbTransactions = Seq(
     SignedTransaction.defaultInstance.withWavesTransaction(
       Transaction.defaultInstance

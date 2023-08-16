@@ -3,8 +3,8 @@ package com.wavesplatform.ride.runner.caches.disk
 import cats.syntax.option.*
 import com.fasterxml.jackson.databind.util.ByteBufferBackedInputStream
 import com.google.common.primitives.Shorts
-import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.grpc.*
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.SignedBlockHeaderWithVrf
 import com.wavesplatform.common.utils.EitherExt2
@@ -111,9 +111,9 @@ object KvPairs {
       x =>
         writeBlockMeta(
           PBBlockMeta(
-            header = Some(PBBlocks.protobuf(x.header.header)),
-            signature = UnsafeByteOperations.unsafeWrap(x.header.signature.arr),
-            vrf = UnsafeByteOperations.unsafeWrap(x.vrf.arr),
+            header = Some(x.header.header.toPBHeader),
+            signature = x.header.signature.toByteString,
+            vrf = x.vrf.toByteString,
             reward = x.blockReward
           )
         )

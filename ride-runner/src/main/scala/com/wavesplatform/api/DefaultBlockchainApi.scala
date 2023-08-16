@@ -2,7 +2,6 @@ package com.wavesplatform.api
 
 import cats.syntax.option.*
 import com.google.protobuf.empty.Empty
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.api.DefaultBlockchainApi.*
@@ -32,8 +31,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
+import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{ScorexLogging, StringBytes}
@@ -140,7 +140,7 @@ class DefaultBlockchainApi(
   override def getAccountDataEntries(address: Address): Seq[DataEntry[?]] = ClientCalls
     .blockingServerStreamingCall(
       grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-      DataRequest(toPb(address))
+      DataRequest(address.toByteString)
     )
     .asScala
     .flatMap(_.entry)
@@ -153,7 +153,7 @@ class DefaultBlockchainApi(
       ClientCalls
         .blockingServerStreamingCall(
           grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-          DataRequest(address = toPb(address), key = key)
+          DataRequest(address = address.toByteString, key = key)
         )
     )
       .map(x => toVanillaDataEntry(x.getEntry))
@@ -162,7 +162,7 @@ class DefaultBlockchainApi(
   override def getAccountScript(address: Address): Option[(PublicKey, Script)] = {
     val as = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
-      AccountRequest(toPb(address))
+      AccountRequest(address.toByteString)
     )
 
     toVanillaScript(as.scriptBytes)
@@ -195,7 +195,7 @@ class DefaultBlockchainApi(
         ClientCalls
           .blockingUnaryCall(
             grpcApiChannel.newCall(AssetsApiGrpc.METHOD_GET_INFO, CallOptions.DEFAULT),
-            AssetRequest(UnsafeByteOperations.unsafeWrap(asset.id.arr))
+            AssetRequest(asset.id.toByteString)
           )
           .some
       catch {
@@ -275,7 +275,7 @@ class DefaultBlockchainApi(
     firstOf(
       ClientCalls.blockingServerStreamingCall(
         grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
-        BalancesRequest(address = toPb(address), assets = Seq(toPb(asset)))
+        BalancesRequest(address = address.toByteString, assets = Seq(PBAmounts.toPBAssetId(asset)))
       )
     ).map(_.balance)
 
@@ -283,7 +283,7 @@ class DefaultBlockchainApi(
     val ths = firstOf(
       ClientCalls.blockingServerStreamingCall(
         grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_STATUSES, CallOptions.DEFAULT),
-        TransactionsByIdRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
+        TransactionsByIdRequest(transactionIds = Seq(id.toByteString))
       )
     )
 
@@ -302,9 +302,6 @@ object DefaultBlockchainApi {
 
   private case object ReplaceWithNewException           extends RuntimeException("Replace with a new observer") with NoStackTrace
   private case class StopException(description: String) extends RuntimeException(s"By a request: $description") with NoStackTrace
-
-  def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
-  def toPb(asset: Asset): ByteString     = asset.fold(ByteString.EMPTY)(x => UnsafeByteOperations.unsafeWrap(x.id.arr))
 
   def toVanilla(blockWithHeight: BlockWithHeight): Option[SignedBlockHeaderWithVrf] = for {
     b      <- blockWithHeight.block

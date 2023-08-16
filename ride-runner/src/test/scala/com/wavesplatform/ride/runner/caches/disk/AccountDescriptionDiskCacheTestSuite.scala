@@ -1,14 +1,12 @@
 package com.wavesplatform.ride.runner.caches.disk
 
-import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
 import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
 import com.wavesplatform.state.{AssetDescription, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
-
-import java.nio.charset.StandardCharsets
+import com.wavesplatform.utils.StringBytes
 
 class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[IssuedAsset, WeighedAssetDescription] {
   protected override val defaultKey = Asset.IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0)))
@@ -17,8 +15,8 @@ class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite
     assetDescription = AssetDescription(
       originTransactionId = defaultKey.id,
       issuer = alice.publicKey,
-      name = UnsafeByteOperations.unsafeWrap("name".getBytes(StandardCharsets.UTF_8)),
-      description = UnsafeByteOperations.unsafeWrap("description".getBytes(StandardCharsets.UTF_8)),
+      name = "name".toByteString,
+      description = "description".toByteString,
       decimals = 8,
       reissuable = false,
       totalVolume = 1000,

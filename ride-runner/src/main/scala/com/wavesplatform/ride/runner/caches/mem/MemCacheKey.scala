@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.caches.mem
 
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -12,9 +12,8 @@ import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, DataT
 import com.wavesplatform.ride.runner.caches.{WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{account, state, transaction}
-
-import java.nio.charset.StandardCharsets
 
 sealed trait MemCacheKey extends Product with Serializable {
   type ValueT
@@ -109,8 +108,8 @@ class GrpcCacheKeyConverters(chainId: Byte) {
   def assetValue(asset: IssuedAsset, update: StateUpdate.AssetDetails): AssetDescription = AssetDescription(
     originTransactionId = asset.id,
     issuer = update.issuer.toPublicKey,
-    name = UnsafeByteOperations.unsafeWrap(update.name.getBytes(StandardCharsets.UTF_8)),
-    description = UnsafeByteOperations.unsafeWrap(update.description.getBytes(StandardCharsets.UTF_8)),
+    name = update.name.toByteString,
+    description = update.description.toByteString,
     decimals = update.decimals,
     reissuable = update.reissuable,
     totalVolume = update.volume,

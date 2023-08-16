@@ -4,6 +4,7 @@ import com.google.common.primitives.Ints
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.protobuf.StateUpdate
+import com.wavesplatform.protobuf.AddressExt
 import com.wavesplatform.protobuf.transaction.DataTransactionData
 
 trait CommonGrpcConverters {
@@ -14,7 +15,7 @@ trait CommonGrpcConverters {
 
   def mkDataEntryUpdate(address: Address, key: String, valueBefore: Option[Long], valueAfter: Option[Long]): StateUpdate.DataEntryUpdate =
     StateUpdate.DataEntryUpdate(
-      address = DefaultBlockchainApi.toPb(address),
+      address = address.toByteString,
       dataEntryBefore = valueBefore.map { valueBefore =>
         DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueBefore))
       },
