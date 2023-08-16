@@ -13,12 +13,6 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
-  def getOpt[V](key: Key[V]): Option[V] = {
-    val bytes = db.get(key.keyBytes, readOptions)
-    LevelDBStats.read.recordTagged(key, bytes)
-    if (bytes == null) None else Some(key.parse(bytes))
-  }
-
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(key.keyBytes, readOptions)
     LevelDBStats.read.recordTagged(key, bytes)
@@ -29,14 +23,11 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = iterateFrom(prefix, prefix) { entry => f(entry); true }
-
-  def iterateFrom(prefix: Array[Byte], first: Array[Byte])(f: DBEntry => Boolean): Unit = {
+  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
     val iterator = db.iterator(readOptions)
     try {
-      iterator.seek(first)
-      // TODO peekNext is unnecessary?
-      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix) && f(iterator.next())) {}
+      iterator.seek(prefix)
+      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
     } finally iterator.close()
   }
 

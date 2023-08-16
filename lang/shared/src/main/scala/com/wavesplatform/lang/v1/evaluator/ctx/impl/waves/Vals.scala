@@ -68,10 +68,15 @@ object Vals {
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later {
-          (Bindings.senderObject(
-            env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))
-          ): EVALUATED)
-            .asRight[ExecutionError]
+          if (env.dAppAlias) {
+            (FAIL("Use alias is disabled"): EVALUATED)
+              .asRight[ExecutionError]
+          } else {
+            (Bindings.senderObject(
+              env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))
+            ): EVALUATED)
+              .asRight[ExecutionError]
+          }
         }
     }
 

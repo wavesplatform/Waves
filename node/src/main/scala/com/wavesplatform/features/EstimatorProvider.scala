@@ -4,7 +4,7 @@ import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
-import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Blockchain
 
 object EstimatorProvider {
@@ -35,20 +35,5 @@ object EstimatorProvider {
       else if (ws.featuresSettings.supported.contains(BlockV5.id)) ScriptEstimatorV3(fixOverflow = true, overhead = true)
       else if (ws.featuresSettings.supported.contains(BlockReward.id)) ScriptEstimatorV2
       else ScriptEstimatorV1
-  }
-
-  def byActivatedFeatures(functionalitySettings: FunctionalitySettings, activatedFeatures: Map[Short, Int], height: Int): ScriptEstimator = {
-    def isFeatureActivated(feature: BlockchainFeature): Boolean =
-      activatedFeatures.get(feature.id).exists(_ <= height)
-
-    def checkEstimatorSumOverflow: Boolean = height >= functionalitySettings.estimatorSumOverflowFixHeight
-
-    if (isFeatureActivated(BlockV5))
-      ScriptEstimatorV3(
-        fixOverflow = checkEstimatorSumOverflow,
-        overhead = !isFeatureActivated(RideV6)
-      )
-    else if (isFeatureActivated(BlockReward)) ScriptEstimatorV2
-    else ScriptEstimatorV1
   }
 }

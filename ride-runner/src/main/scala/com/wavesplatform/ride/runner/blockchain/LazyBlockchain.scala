@@ -10,10 +10,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.features.EstimatorProvider
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
@@ -224,8 +223,6 @@ class LazyBlockchain[TagT] private (
     currentActivatedFeatures.set(xs)
     diskCaches.setActivatedFeatures(xs)
   }
-
-  private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, heightUntagged)
 
   def removeAllFrom(height: Height): Unit = db.batchedReadWrite { implicit ctx =>
     removeAllFromCtx(height)
@@ -504,7 +501,7 @@ class LazyBlockchain[TagT] private (
     WeighedAssetDescription(x.script.fold(0)(MemCacheWeights.ofAssetScriptInfo), x)
 
   private def toWeightedAccountScriptInfo(pk: PublicKey, script: Script): WeighedAccountScriptInfo = {
-    val estimated = Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, script, isAsset = false))
+    val estimated = Map(this.estimator.version -> estimate(this, script, isAsset = false))
     WeighedAccountScriptInfo(
       scriptInfoWeight = MemCacheWeights.ofScript(script),
       accountScriptInfo = AccountScriptInfo(

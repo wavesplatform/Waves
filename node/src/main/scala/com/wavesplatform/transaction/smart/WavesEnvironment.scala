@@ -57,9 +57,9 @@ class WavesEnvironment(
     in: Coeval[Environment.InputEntity],
     h: Coeval[Int],
     blockchain: Blockchain,
-    val tthis: Environment.Tthis, // ??? RTW
-    ds: DirectiveSet,             // RTW
-    override val txId: ByteStr,   // callDApp
+    val tthis: Environment.Tthis,
+    ds: DirectiveSet,
+    override val txId: ByteStr,
     blockchainForRuntime: Blockchain
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment.*

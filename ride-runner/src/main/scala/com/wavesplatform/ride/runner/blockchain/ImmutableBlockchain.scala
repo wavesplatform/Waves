@@ -171,7 +171,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     else Some((this.height, balance(address, assetId)))
 
   private def complexityInfoOf(isAsset: Boolean, script: Script): ComplexityInfo =
-    estimate(height, activatedFeatures, this.estimator, script, isAsset = isAsset, withCombinedContext = true)
+    estimate(this, script, isAsset = isAsset, withCombinedContext = true)
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactions.get(id).map { tx =>

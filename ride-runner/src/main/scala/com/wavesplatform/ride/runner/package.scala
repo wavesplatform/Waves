@@ -1,27 +1,31 @@
 package com.wavesplatform.ride
 
-import com.wavesplatform.features.{BlockchainFeatures, ComplexityCheckPolicyProvider}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.ComplexityCheckPolicyProvider.VerifierComplexityCheckExt
+import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.ride.runner.blockchain.ActivatedFeatures
 import com.wavesplatform.state.Blockchain
 
 package object runner {
 
   // See DiffCommon.countVerifierComplexity
   def estimate(
-      height: Int,
-      activatedFeatures: ActivatedFeatures,
-      estimator: ScriptEstimator,
+      blockchain: Blockchain,
       script: Script,
       isAsset: Boolean,
       withCombinedContext: Boolean = false
   ): ComplexityInfo = {
-    val fixEstimateOfVerifier    = Blockchain.isFeatureActivated(activatedFeatures, BlockchainFeatures.RideV6, height)
-    val useContractVerifierLimit = !isAsset && ComplexityCheckPolicyProvider.useReducedVerifierComplexityLimit(activatedFeatures)
+    val fixEstimateOfVerifier    = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+    val useContractVerifierLimit = !isAsset && blockchain.useReducedVerifierComplexityLimit
 
-    Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit, withCombinedContext = withCombinedContext) match {
+    Script.complexityInfo(
+      script,
+      blockchain.estimator,
+      fixEstimateOfVerifier,
+      useContractVerifierLimit,
+      withCombinedContext = withCombinedContext
+    ) match {
       case Right(x) => x
       case Left(e)  => throw new RuntimeException(s"Can't get a complexity info of script: $e")
     }

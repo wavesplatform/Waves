@@ -40,6 +40,7 @@ trait Environment[F[_]] {
   def transferTransactionFromProto(b: Array[Byte]): F[Option[Tx.Transfer]]
   def addressFromString(address: String): Either[String, Address]
   def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]
+  def dAppAlias: Boolean = false
   def accountScript(addressOrAlias: Recipient): F[Option[Script]]
   def callScript(
       dApp: Address,

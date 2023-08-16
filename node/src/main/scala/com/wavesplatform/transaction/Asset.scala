@@ -33,7 +33,7 @@ object Asset {
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
     case JsString(str) => IssuedAsset.fromString(str, JsSuccess(_), JsError(_))
-    case _ => JsError("Expected base58-encoded assetId")
+    case _             => JsError("Expected base58-encoded assetId")
   }
   implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
     JsString(asset.id.toString)

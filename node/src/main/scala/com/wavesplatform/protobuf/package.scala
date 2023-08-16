@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -16,7 +16,7 @@ package object protobuf {
   }
 
   implicit final class PublicKeyExt(private val pk: PublicKey) extends AnyVal {
-    def toByteString: ByteString = UnsafeByteOperations.unsafeWrap(pk.arr)
+    def toByteString: ByteString = ByteString.copyFrom(pk.arr)
   }
 
   implicit final class ByteStringExt(private val bs: ByteString) extends AnyVal {

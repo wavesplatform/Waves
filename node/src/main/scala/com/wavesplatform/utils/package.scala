@@ -19,7 +19,7 @@ package object utils {
   private val BytesLog = math.log(BytesMaxValue)
   private val BaseLog  = math.log(Base58MaxValue)
 
-  def base64Length(byteArrayLength: Int): Int = math.ceil(byteArrayLength * 8 / 6.0).toInt
+  def base64Length(byteArrayLength: Int): Int = math.ceil(byteArrayLength * 4 / 3.0).toInt
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
@@ -75,8 +75,11 @@ package object utils {
   }
 
   implicit val byteStrFormat: Format[ByteStr] = new Format[ByteStr] {
-    override def writes(o: ByteStr): JsValue             = JsString(o.toString)
-    override def reads(json: JsValue): JsResult[ByteStr] = arrayReads.reads(json).map(ByteStr(_))
+    override def writes(o: ByteStr): JsValue = JsString(o.toString)
+    override def reads(json: JsValue): JsResult[ByteStr] = json match {
+      case JsString(v) => byteArrayFromString(v, xs => JsSuccess(ByteStr(xs)), JsError(_))
+      case _           => JsError("Expected JsString")
+    }
   }
 
   implicit class StringBytes(val s: String) extends AnyVal {

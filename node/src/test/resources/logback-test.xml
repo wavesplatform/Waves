@@ -6,20 +6,9 @@
         </encoder>
     </appender>
 
-    <!-- JRE -->
-    <logger name="sun.rmi" level="INFO"/>
-    <logger name="javax.management" level="INFO"/>
-
-    <!-- Netty -->
-    <logger name="io.grpc" level="WARN"/>
-    <logger name="io.netty" level="WARN"/>
-    <logger name="io.grpc.netty" level="ERROR"/>
-    <logger name="io.grpc.Context" level="INFO"/> <!-- To ignore "Storage override doesn't exist. Using default" -->
-    <logger name="org.reflections" level="WARN"/>
-
     <logger name="scorex.crypto.signatures.Curve25519$" level="INFO"/>
 
-    <root level="${logback.test.level:-TRACE}">
+    <root level="${logback.test.level:-OFF}">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>
