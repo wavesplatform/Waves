@@ -21,7 +21,7 @@ trait ReadWrite extends ReadOnly {
     if (data.loaded) put(key, data.mayBeValue)
     else delete(key)
 
-  def writeHistoricalToDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], height: Height, data: V): Unit = {
+  def writeToDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], height: Height, data: V): Unit = {
     def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
     val historyKey                 = kvHistoryPair.at(k)
 

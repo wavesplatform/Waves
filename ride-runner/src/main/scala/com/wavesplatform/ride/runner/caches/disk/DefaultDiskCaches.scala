@@ -79,7 +79,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
         .cachedOrUnknown(addressIds.getAddressId(address))
         .flatMap { addressId =>
           val k = (addressId, dataKey)
-          ctx.readHistoricalFromDbOpt(k, KvPairs.AccountDataEntriesHistory, maxHeight)
+          ctx.readFromDbOpt(k, KvPairs.AccountDataEntriesHistory, maxHeight)
         }
         .tap { r => log.trace(s"get($address, $dataKey, $maxHeight): ${r.toFoundStr("value", _.value)}") }
 
@@ -89,7 +89,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     private def set(atHeight: Height, address: Address, dataKey: String, data: RemoteData[DataEntry[?]])(implicit ctx: ReadWrite): Unit = {
       val addressId = addressIds.getOrMkAddressId(address)
       val k         = (addressId, dataKey)
-      ctx.writeHistoricalToDb(
+      ctx.writeToDb(
         k,
         KvPairs.AccountDataEntriesHistory,
         atHeight,
@@ -124,14 +124,14 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[WeighedAccountScriptInfo] =
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(key))
-        .flatMap(ctx.readHistoricalFromDbOpt(_, KvPairs.AccountScriptsHistory, maxHeight))
+        .flatMap(ctx.readFromDbOpt(_, KvPairs.AccountScriptsHistory, maxHeight))
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("hash", _.hashCode())}") }
 
     override def set(atHeight: Height, key: Address, data: RemoteData[WeighedAccountScriptInfo])(implicit
         ctx: ReadWrite
     ): Unit = {
       val addressId = addressIds.getOrMkAddressId(key)
-      ctx.writeHistoricalToDb(addressId, KvPairs.AccountScriptsHistory, atHeight, data.mayBeValue)
+      ctx.writeToDb(addressId, KvPairs.AccountScriptsHistory, atHeight, data.mayBeValue)
       log.trace(s"set($key, $atHeight) = ${data.map(_.hashCode()).toFoundStr()}")
     }
 
@@ -153,11 +153,11 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
 
     override def get(maxHeight: Height, key: IssuedAsset)(implicit ctx: ReadOnly): RemoteData[WeighedAssetDescription] =
       ctx
-        .readHistoricalFromDbOpt(key, KvPairs.AssetDescriptionsHistory, maxHeight)
+        .readFromDbOpt(key, KvPairs.AssetDescriptionsHistory, maxHeight)
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr(_.assetDescription.toString)}") }
 
     override def set(atHeight: Height, key: IssuedAsset, data: RemoteData[WeighedAssetDescription])(implicit ctx: ReadWrite): Unit = {
-      ctx.writeHistoricalToDb(key, KvPairs.AssetDescriptionsHistory, atHeight, data.mayBeValue)
+      ctx.writeToDb(key, KvPairs.AssetDescriptionsHistory, atHeight, data.mayBeValue)
       log.trace(s"set($key, $atHeight) = ${data.toFoundStr()}")
     }
 
@@ -229,7 +229,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
         .cachedOrUnknown(addressIds.getAddressId(address))
         .flatMap { addressId =>
           val k = (addressId, asset)
-          ctx.readHistoricalFromDb(k, KvPairs.AccountAssetsHistory, maxHeight)
+          ctx.readFromDb(k, KvPairs.AccountAssetsHistory, maxHeight)
         }
         .tap { r => log.trace(s"get($address, $asset): $r") }
     }
@@ -240,7 +240,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     private def set(atHeight: Height, address: Address, asset: Asset, data: RemoteData[Long])(implicit ctx: ReadWrite): Unit = {
       val addressId = addressIds.getOrMkAddressId(address)
       val k         = (addressId, asset)
-      ctx.writeHistoricalToDb(k, KvPairs.AccountAssetsHistory, atHeight, data.getOrElse(0L))
+      ctx.writeToDb(k, KvPairs.AccountAssetsHistory, atHeight, data.getOrElse(0L))
       log.trace(s"set($address, $asset) = ${data.toFoundStr()}")
     }
 
@@ -268,12 +268,12 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
       override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[LeaseBalance] =
         RemoteData
           .cachedOrUnknown(addressIds.getAddressId(key))
-          .flatMap(ctx.readHistoricalFromDb(_, KvPairs.AccountLeaseBalancesHistory, maxHeight))
+          .flatMap(ctx.readFromDb(_, KvPairs.AccountLeaseBalancesHistory, maxHeight))
           .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr()}") }
 
       override def set(atHeight: Height, key: Address, data: RemoteData[LeaseBalance])(implicit ctx: ReadWrite): Unit = {
         val addressId = addressIds.getOrMkAddressId(key)
-        ctx.writeHistoricalToDb(addressId, KvPairs.AccountLeaseBalancesHistory, atHeight, data.getOrElse(LeaseBalance.empty))
+        ctx.writeToDb(addressId, KvPairs.AccountLeaseBalancesHistory, atHeight, data.getOrElse(LeaseBalance.empty))
         log.trace(s"set($key, $atHeight) = ${data.toFoundStr()}")
       }
 

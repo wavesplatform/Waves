@@ -62,13 +62,13 @@ trait ReadOnly {
 
   def getRemoteDataOpt[T](key: Key[Option[T]]): RemoteData[T] = RemoteData(getOpt(key))
 
-  def readHistoricalFromDbOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], maxHeight: Height): RemoteData[V] =
-    readHistoricalFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.loaded)
+  def readFromDbOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], maxHeight: Height): RemoteData[V] =
+    readFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.loaded)
 
-  def readHistoricalFromDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height): RemoteData[V] =
-    readHistoricalFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.Cached(_))
+  def readFromDb[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height): RemoteData[V] =
+    readFromDbRaw(k, kvHistoryPair, maxHeight).fold(RemoteData.unknown[V])(RemoteData.Cached(_))
 
-  private def readHistoricalFromDbRaw[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height): Option[V] =
+  private def readFromDbRaw[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], maxHeight: Height): Option[V] =
     getOpt(kvHistoryPair.at(k))
       .getOrElse(Vector.empty)
       .find(_ <= maxHeight) // the recent is in the front
