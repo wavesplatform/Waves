@@ -11,7 +11,7 @@ object Dependencies {
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.1"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.3"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.2"
 
@@ -28,10 +28,10 @@ object Dependencies {
   val googleGuava        = "com.google.guava"    % "guava"             % "32.0.1-jre"
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.8" // 1.4.x and later is built for Java 11
-  val janino             = "org.codehaus.janino" % "janino"            % "3.1.9"
+  val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.11" // 1.4.x and later is built for Java 11
+  val janino             = "org.codehaus.janino" % "janino"            % "3.1.10"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
-  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.5-SNAPSHOT"
+  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.5"
   val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.94.Final"
 
   val catsCore  = catsModule("core", "2.9.0")
@@ -91,7 +91,7 @@ object Dependencies {
 
   lazy val qaseReportDeps = Seq(
     playJson,
-    ("io.qase" % "qase-api" % "3.0.4").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+    ("io.qase" % "qase-api" % "3.0.5").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -165,7 +165,7 @@ object Dependencies {
 
   lazy val rideRunner = Def.setting(
     Seq(
-      "com.wavesplatform"     % "rocksdbjni"     % "7.10.0",
+      "org.rocksdb"           % "rocksdbjni"     % "8.3.2",
       "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1",
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
