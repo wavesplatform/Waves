@@ -11,7 +11,7 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 import scala.concurrent.duration.FiniteDuration
 
 trait UtxForAppender {
-  def setPriorityDiffs(diffs: Seq[StateSnapshot]): Unit
+  def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit
 }
 
 trait UtxPool extends UtxForAppender with AutoCloseable {

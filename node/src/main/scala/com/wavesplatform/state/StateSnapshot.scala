@@ -15,7 +15,7 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
@@ -41,7 +41,7 @@ case class StateSnapshot(
 ) {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
-  def toProtobuf(txSucceeded: Boolean): TransactionStateSnapshot =
+  def toProtobuf(txStatus: TxMeta.Status): TransactionStateSnapshot =
     TransactionStateSnapshot(
       balances.map { case ((address, asset), balance) =>
         S.Balance(address.toByteString, Some(Amount(asset.fold(ByteString.EMPTY)(_.id.toByteString), balance)))
@@ -99,7 +99,11 @@ case class StateSnapshot(
       sponsorships.collect { case (asset, SponsorshipValue(minFee)) =>
         S.Sponsorship(asset.id.toByteString, minFee)
       }.toSeq,
-      transactionStatus = if (txSucceeded) TransactionStatus.SUCCEEDED else TransactionStatus.FAILED
+      txStatus match {
+        case TxMeta.Status.Failed    => TransactionStatus.FAILED
+        case TxMeta.Status.Succeeded => TransactionStatus.SUCCEEDED
+        case TxMeta.Status.Elided    => TransactionStatus.ELIDED
+      }
     )
 
   // ignores lease balances from portfolios
@@ -122,6 +126,11 @@ case class StateSnapshot(
 
   def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
     scriptResults.get(txId).flatMap(_.error)
+
+  def bindElidedTransaction(blockchain: Blockchain, tx: Transaction): StateSnapshot =
+    copy(
+      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, this, blockchain)),
+    )
 
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
     assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap

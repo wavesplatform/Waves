@@ -86,7 +86,7 @@ case class TransactionsApiRoute(
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status.*
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((tm, tx)) =>
+      case Some((tm, _)) =>
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> JsNumber(tm.height),
@@ -249,6 +249,7 @@ object TransactionsApiRoute {
   object ApplicationStatus {
     val Succeeded             = "succeeded"
     val ScriptExecutionFailed = "script_execution_failed"
+    val Elided                = "elided"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

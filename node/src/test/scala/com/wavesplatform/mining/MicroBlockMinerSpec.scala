@@ -92,6 +92,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           acc,
           Nil,
           0,
+          None,
           None
         )
         .explicitGet()
@@ -147,7 +148,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         override def transactionById(transactionId: ByteStr)           = inner.transactionById(transactionId)
         override def close(): Unit                                     = inner.close()
         override def scheduleCleanup(): Unit                           = inner.scheduleCleanup()
-        override def setPriorityDiffs(diffs: Seq[StateSnapshot]): Unit = inner.setPriorityDiffs(diffs)
+        override def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit = inner.setPrioritySnapshots(snapshots)
       }
 
       val miner    = Schedulers.singleThread("miner")

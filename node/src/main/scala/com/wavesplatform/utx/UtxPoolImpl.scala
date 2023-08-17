@@ -189,8 +189,8 @@ case class UtxPoolImpl(
     removeIds(ids)
   }
 
-  def setPriorityDiffs(discDiffs: Seq[StateSnapshot]): Unit = {
-    val txs = priorityPool.setPriorityDiffs(discDiffs)
+  def setPrioritySnapshots(discSnapshots: Seq[StateSnapshot]): Unit = {
+    val txs = priorityPool.setPriorityDiffs(discSnapshots)
     txs.foreach(addTransaction(_, verify = false, canLock = false))
   }
 
@@ -425,7 +425,7 @@ case class UtxPoolImpl(
                         r.validatedTransactions + tx.id(),
                         r.removedTransactions,
                         r.stateHash.map(prevStateHash =>
-                          TxStateSnapshotHashBuilder.createHashFromTxSnapshot(newSnapshot, succeeded = true).createHash(prevStateHash)
+                          TxStateSnapshotHashBuilder.createHashFromSnapshot(newSnapshot, None).createHash(prevStateHash)
                         )
                       )
                     }

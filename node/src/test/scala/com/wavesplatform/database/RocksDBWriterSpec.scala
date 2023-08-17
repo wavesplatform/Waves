@@ -9,6 +9,7 @@ import com.wavesplatform.lang.directives.values.{V2, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{GenesisTransactionSettings, WavesSettings}
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
@@ -94,7 +95,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
   "readTransaction" - {
     val invoker = TxHelpers.signer(1002)
-    val dapp    = TxHelpers.signer(1002)
+    val dapp    = TxHelpers.signer(1003)
     "reads correct failed transactions" in withDomain(
       DomainPresets.RideV5,
       Seq(AddrWithBalance(invoker.toAddress, 100.waves), AddrWithBalance(dapp.toAddress, 100.waves))
@@ -123,13 +124,13 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         failedInvoke
       )
 
-      d.blockchain.transactionMeta(successfulInvoke.id()).map(_.succeeded) shouldBe Some(true)
-      d.blockchain.transactionMeta(failedInvoke.id()).map(_.succeeded) shouldBe Some(false)
+      d.blockchain.transactionMeta(successfulInvoke.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      d.blockchain.transactionMeta(failedInvoke.id()).map(_.status == Status.Succeeded) shouldBe Some(false)
 
       d.appendBlock()
 
-      d.blockchain.transactionMeta(successfulInvoke.id()).map(_.succeeded) shouldBe Some(true)
-      d.blockchain.transactionMeta(failedInvoke.id()).map(_.succeeded) shouldBe Some(false)
+      d.blockchain.transactionMeta(successfulInvoke.id()).map(_.status == Status.Succeeded) shouldBe Some(true)
+      d.blockchain.transactionMeta(failedInvoke.id()).map(_.status == Status.Succeeded) shouldBe Some(false)
     }
   }
 

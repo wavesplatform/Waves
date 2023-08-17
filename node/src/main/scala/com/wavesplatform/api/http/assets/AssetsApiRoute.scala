@@ -24,7 +24,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -334,7 +334,7 @@ object AssetsApiRoute {
       blockchain.transactionInfos(ids).traverse { infoOpt =>
         for {
           (_, tx) <- infoOpt
-            .filter { case (tm, _) => tm.succeeded }
+            .filter { case (tm, _) => tm.status == TxMeta.Status.Succeeded }
             .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
           ts <- (tx match {
             case tx: IssueTransaction                             => Some(tx.timestamp)
@@ -385,7 +385,7 @@ object AssetsApiRoute {
       for {
         (_, tx) <- blockchain
           .transactionInfo(id)
-          .filter { case (tm, _) => tm.succeeded }
+          .filter { case (tm, _) => tm.status == TxMeta.Status.Succeeded }
           .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
         timestamp <- (tx match {
           case tx: IssueTransaction                             => Some(tx.timestamp)

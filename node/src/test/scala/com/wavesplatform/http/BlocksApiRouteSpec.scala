@@ -236,17 +236,17 @@ class BlocksApiRouteSpec
   routePath("/delay/{blockId}/{number}") in {
     val blocks = Vector(
       Block(
-        BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None),
+        BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None, None),
         ByteStr(Random.nextBytes(64)),
         Nil
       ),
       Block(
-        BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None),
+        BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None, None),
         ByteStr(Random.nextBytes(64)),
         Nil
       ),
       Block(
-        BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None),
+        BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None, None),
         ByteStr(Random.nextBytes(64)),
         Nil
       )

@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Height, TxMeta}
@@ -244,8 +245,8 @@ class LeaseRouteSpec
       withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
         d.appendBlock(setScript)
         d.appendBlock(invoke)
-        val invokeStatus = d.blockchain.transactionMeta(invoke.id()).get.succeeded
-        assert(invokeStatus, "Invoke has failed")
+        val invokeStatus = d.blockchain.transactionMeta(invoke.id()).get.status
+        assert(invokeStatus == Status.Succeeded, "Invoke has failed")
 
         val leaseId = d.blockchain
           .accountData(sender.toAddress, "leaseId")
@@ -529,7 +530,7 @@ class LeaseRouteSpec
 
     val lease       = TxHelpers.lease()
     val leaseCancel = TxHelpers.leaseCancel(lease.id())
-    (blockchain.transactionInfo _).when(lease.id()).returning(Some(TxMeta(Height(1), true, 0L) -> lease))
+    (blockchain.transactionInfo _).when(lease.id()).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L) -> lease))
     (commonApi.leaseInfo _)
       .when(lease.id())
       .returning(

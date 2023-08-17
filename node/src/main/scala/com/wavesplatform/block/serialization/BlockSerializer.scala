@@ -41,6 +41,23 @@ object BlockHeaderSerializer {
     }
 
   def toJson(blockHeader: BlockHeader): JsObject = {
+    def createFeaturesJson(featureVotes: Seq[Short]): JsObject =
+      if (blockHeader.version < NgBlockVersion) JsObject.empty
+      else Json.obj("features" -> JsArray(featureVotes.map(id => JsNumber(id.toInt))))
+
+    def createGeneratorJson(generator: PublicKey): JsObject =
+      Json.obj("generator" -> generator.toAddress.toString, "generatorPublicKey" -> generator)
+
+    def createRewardVoteJson(rewardVote: Long): JsObject =
+      if (blockHeader.version < RewardBlockVersion) JsObject.empty
+      else Json.obj("desiredReward" -> JsNumber(rewardVote))
+
+    def createStateHashJson(stateHash: Option[ByteStr]): JsObject =
+      stateHash match {
+        case Some(sh) => Json.obj("stateHash" -> sh.toString)
+        case None     => JsObject.empty
+      }
+
     val consensusJson =
       Json.obj(
         "nxt-consensus" -> Json.obj(
@@ -51,28 +68,29 @@ object BlockHeaderSerializer {
               Json.obj("transactionsRoot" -> blockHeader.transactionsRoot.toString, "id" -> Block.protoHeaderHash(blockHeader).toString)
             else Json.obj())
 
-    val featuresJson =
-      if (blockHeader.version < NgBlockVersion) JsObject.empty
-      else Json.obj("features" -> JsArray(blockHeader.featureVotes.map(id => JsNumber(id.toInt))))
+    val featuresJson  = createFeaturesJson(blockHeader.featureVotes)
+    val rewardJson    = createRewardVoteJson(blockHeader.rewardVote)
+    val generatorJson = createGeneratorJson(blockHeader.generator)
+    val stateHashJson = createStateHashJson(blockHeader.stateHash)
 
-    val rewardJson =
-      if (blockHeader.version < RewardBlockVersion) JsObject.empty
-      else Json.obj("desiredReward" -> JsNumber(blockHeader.rewardVote))
-
-    val generatorJson =
-      Json.obj("generator" -> blockHeader.generator.toAddress.toString, "generatorPublicKey" -> blockHeader.generator)
-
-    val stateHashJson =
-      blockHeader.stateHash match {
-        case Some(sh) => Json.obj("stateHash" -> sh.toString)
-        case None     => JsObject.empty
+    val challengedHeaderJson =
+      blockHeader.challengedHeader match {
+        case Some(ch) =>
+          Json.obj(
+            "challengedHeader" -> (Json.obj(
+              "headerSignature" -> ch.headerSignature.toString
+            ) ++ createFeaturesJson(ch.featureVotes) ++ createGeneratorJson(ch.generator) ++ createRewardVoteJson(
+              ch.rewardVote
+            ) ++ createStateHashJson(ch.stateHash))
+          )
+        case None => JsObject.empty
       }
 
     Json.obj(
       "version"   -> blockHeader.version,
       "timestamp" -> blockHeader.timestamp,
       "reference" -> blockHeader.reference.toString
-    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson ++ stateHashJson
+    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson ++ stateHashJson ++ challengedHeaderJson
   }
 
   def toJson(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
@@ -144,7 +162,7 @@ object BlockSerializer {
       val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(buf, version)
 
       val header =
-        BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, None)
+        BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot, None, None)
 
       Block(header, signature, transactionData)
     }

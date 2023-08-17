@@ -3,7 +3,7 @@ package com.wavesplatform.protobuf.block
 import scala.util.Try
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.{BlockHeader, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.ByteStrExt
@@ -24,7 +24,19 @@ object PBBlocks {
       header.featureVotes.map(_.toShort),
       header.rewardVote,
       header.transactionsRoot.toByteStr,
-      Option.unless(header.stateHash.isEmpty)(header.stateHash.toByteStr)
+      Option.unless(header.stateHash.isEmpty)(header.stateHash.toByteStr),
+      header.challengedHeader.map { ch =>
+        ChallengedHeader(
+          ch.timestamp,
+          ch.baseTarget,
+          ch.generationSignature.toByteStr,
+          ch.featureVotes.map(_.toShort),
+          ch.generator.toPublicKey,
+          ch.rewardVote,
+          Option.unless(ch.stateHash.isEmpty)(ch.stateHash.toByteStr),
+          ch.headerSignature.toByteStr
+        )
+      }
     )
 
   def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
@@ -43,7 +55,19 @@ object PBBlocks {
     ByteString.copyFrom(header.generator.arr),
     header.rewardVote,
     header.transactionsRoot.toByteString,
-    header.stateHash.getOrElse(ByteStr.empty).toByteString
+    header.stateHash.getOrElse(ByteStr.empty).toByteString,
+    header.challengedHeader.map { ch =>
+      PBBlock.Header.ChallengedHeader(
+        ch.baseTarget,
+        ch.generationSignature.toByteString,
+        ch.featureVotes.map(_.toInt),
+        ch.timestamp,
+        ch.generator.toByteString,
+        ch.rewardVote,
+        ch.stateHash.getOrElse(ByteStr.empty).toByteString,
+        ch.headerSignature.toByteString
+      )
+    }
   )
 
   def protobuf(block: VanillaBlock): PBBlock = {

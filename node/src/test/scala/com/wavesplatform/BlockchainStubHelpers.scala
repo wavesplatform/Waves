@@ -12,19 +12,9 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  Blockchain,
-  Diff,
-  Height,
-  LeaseBalance,
-  NG,
-  TxMeta,
-  VolumeAndFee
-}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -37,7 +27,7 @@ import org.scalamock.matchers.MockParameter
 import scala.concurrent.Future
 
 trait BlockchainStubHelpers { self: MockFactoryBase =>
-  def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain with NG = {
+  def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain & NG = {
     trait Blockchain1 extends Blockchain with NG
     val blockchain = stub[Blockchain1]
     f(blockchain) // Overrides
@@ -121,7 +111,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         .returns(
           Some(
             (
-              TxMeta(Height(1), true, 0), // height
+              TxMeta(Height(1), Status.Succeeded, 0), // height
               IssueTransaction
                 .selfSigned(2.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
                 .explicitGet()

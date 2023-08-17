@@ -97,7 +97,7 @@ class StateSnapshotProtoTest extends PropSpec {
         )
       )
     )
-    Seq(true, false)
+    Seq(TxMeta.Status.Succeeded, TxMeta.Status.Failed, TxMeta.Status.Elided)
       .foreach(txStatus => StateSnapshot.fromProtobuf(snapshot.toProtobuf(txStatus)) shouldBe (snapshot, txStatus))
   }
 }

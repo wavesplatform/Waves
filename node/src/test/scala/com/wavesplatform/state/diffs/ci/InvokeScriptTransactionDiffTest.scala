@@ -31,6 +31,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -1116,7 +1117,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .returning(
         Some(
           SignedBlockHeader(
-            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None),
+            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None, None),
             ByteStr.empty
           )
         )
@@ -1127,7 +1128,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .returning(
         Some(
           SignedBlockHeader(
-            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None),
+            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None, None),
             ByteStr.empty
           )
         )
@@ -1360,7 +1361,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(_ =>
           sponsorIssue.quantity.value
         ) - invoke.fee.value
-        state.transactionInfo(invoke.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((invoke, false))
+        state.transactionInfo(invoke.id()).map(r => r._2 -> (r._1.status == Status.Succeeded)) shouldBe Some((invoke, false))
       }
     }
   }

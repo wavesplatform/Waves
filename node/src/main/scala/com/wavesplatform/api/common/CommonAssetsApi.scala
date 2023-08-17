@@ -4,7 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{AddressId, KeyTags}
-import com.wavesplatform.state.{AssetDescription, Blockchain, StateSnapshot}
+import com.wavesplatform.state.{AssetDescription, Blockchain, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
@@ -35,7 +35,7 @@ object CommonAssetsApi {
         sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(assetInfo.issuer.toAddress).spendableBalance) else None
       } yield AssetInfo(
         assetInfo,
-        blockchain.transactionInfo(assetId.id).collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
+        blockchain.transactionInfo(assetId.id).collect { case (tm, it: IssueTransaction) if tm.status == TxMeta.Status.Succeeded => it },
         sponsorBalance
       )
 
@@ -48,7 +48,7 @@ object CommonAssetsApi {
           blockchain.assetDescription(assetId).map { desc =>
             AssetInfo(
               desc,
-              tx.collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
+              tx.collect { case (tm, it: IssueTransaction) if tm.status == TxMeta.Status.Succeeded => it },
               if (desc.sponsorship != 0) Some(blockchain.wavesPortfolio(desc.issuer.toAddress).spendableBalance) else None
             )
           }

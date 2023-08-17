@@ -40,6 +40,14 @@ case class SnapshotBlockchain(
         foundBalances + (address -> balance(address, Waves))
       }
 
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
+    val maybeLastBlockBan = blockMeta.flatMap(_._1.header.challengedHeader).map(_.generator.toAddress) match {
+      case Some(generator) if address == generator => Seq(height)
+      case _                                       => Seq.empty
+    }
+    maybeLastBlockBan ++ inner.effectiveBalanceBanHeights(address)
+  }
+
   override def leaseBalance(address: Address): LeaseBalance =
     snapshot.leaseBalances.getOrElse(address, inner.leaseBalance(address))
 
@@ -63,7 +71,7 @@ case class SnapshotBlockchain(
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     snapshot.transactions
       .get(id)
-      .collect { case NewTransactionInfo(tx: TransferTransaction, _, _, true, _) =>
+      .collect { case NewTransactionInfo(tx: TransferTransaction, _, _, TxMeta.Status.Succeeded, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
@@ -71,14 +79,14 @@ case class SnapshotBlockchain(
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
     snapshot.transactions
       .get(id)
-      .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+      .map(t => (TxMeta(Height(this.height), t.status, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = {
     inner.transactionInfos(ids).zip(ids).map { case (info, id) =>
       snapshot.transactions
         .get(id)
-        .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+        .map(t => (TxMeta(Height(this.height), t.status, t.spentComplexity), t.transaction))
         .orElse(info)
     }
   }
@@ -86,7 +94,7 @@ case class SnapshotBlockchain(
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     snapshot.transactions
       .get(id)
-      .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
+      .map(t => TxMeta(Height(this.height), t.status, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
@@ -113,14 +121,14 @@ case class SnapshotBlockchain(
     }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeSnapshot.isEmpty) {
+    if (maybeSnapshot.isEmpty || to.exists(!blockMeta.map(_._1.id()).contains(_))) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
-      val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
-      if (inner.height > 0 && (from < this.height || height2Fix))
+      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, this.height))
+      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from < this.height
+      if (inner.height > 0 && (from < this.height - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain
       else
         Seq(bs)

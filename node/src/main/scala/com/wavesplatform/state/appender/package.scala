@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -36,9 +37,9 @@ package object appender {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <-
         metrics.appendBlock
-          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
           .map { discardedDiffs =>
-            utx.setPriorityDiffs(discardedDiffs)
+            utx.setPrioritySnapshots(discardedDiffs)
             Some(blockchainUpdater.height)
           }
 
@@ -50,11 +51,47 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
+  )(block: Block): Either[ValidationError, Option[Int]] = {
+    if (block.header.challengedHeader.nonEmpty) {
+      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map(_._2)
+    } else {
+      for {
+        hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
+        _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
+      } yield Some(blockchainUpdater.height)
+    }
+  }
+
+  private[appender] def appendChallengeBlock(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      utx: UtxForAppender,
+      pos: PoSSelector,
+      time: Time,
+      verify: Boolean,
+      txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] =
+    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
+      utx.setPrioritySnapshots(discardedDiffs)
+      newHeight
+    }
+
+  private def processBlockWithChallenge(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      pos: PoSSelector,
+      time: Time,
+      verify: Boolean,
+      txSignParCheck: Boolean
+  )(block: Block): Either[ValidationError, (Seq[StateSnapshot], Option[Int])] = {
+    val challengedBlock = block.toOriginal
     for {
+      challengedHitSource <-
+        if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
-    } yield Some(blockchainUpdater.height)
+      discardedSnapshots <-
+        metrics.appendBlock
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, Some(challengedHitSource), verify, txSignParCheck))
+    } yield discardedSnapshots -> Some(blockchainUpdater.height)
+  }
 
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =
     for {
@@ -63,10 +100,11 @@ package object appender {
         val balance = blockchainUpdater.generatingBalance(block.sender.toAddress, Some(parent))
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
-          balance,
+          balance + block.header.challengedHeader.map(ch => blockchainUpdater.generatingBalance(ch.generator.toAddress, Some(parent))).getOrElse(0L),
           s"generator's effective balance $balance is less that required for generation"
         )
       }
+      _ <- validateChallengedHeader(block, blockchainUpdater)
     } yield hitSource
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
@@ -115,6 +153,20 @@ package object appender {
       GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
     )
   }
+
+  private def validateChallengedHeader(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+    for {
+      _ <- Either.cond(
+        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchain.height + 1),
+        (),
+        BlockAppendError("Challenged header is not supported yet", block)
+      )
+      _ <- Either.cond(
+        !block.header.challengedHeader.map(_.generator).contains(block.header.generator),
+        (),
+        BlockAppendError("Challenged block generator and challenging block generator should not be equal", block)
+      )
+    } yield ()
 
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()

@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship, StateSnapshot}
 import com.wavesplatform.transaction.*
@@ -227,7 +228,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .map(txSnapshot => initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, applied = true, txSnapshot, blockchain)))
+      .map(txSnapshot => initSnapshot |+| txSnapshot.withTransaction(NewTransactionInfo.create(tx, Status.Succeeded, txSnapshot, blockchain)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initSnapshot.scriptsComplexity)
         case ve                          => ve
@@ -322,7 +323,7 @@ object TransactionDiffer {
           scriptsComplexity = spentComplexity
         )
         .map(_ |+| ethereumMetaDiff)
-    } yield snapshot.withTransaction(NewTransactionInfo.create(tx, applied = false, snapshot, blockchain))
+    } yield snapshot.withTransaction(NewTransactionInfo.create(tx, Status.Failed, snapshot, blockchain))
 
   private object isFailedTransaction {
     def unapply(

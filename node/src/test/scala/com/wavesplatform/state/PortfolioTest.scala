@@ -72,6 +72,6 @@ class PortfolioTest extends FunSuite {
     Portfolio(
       Long.MaxValue - 2L,
       LeaseBalance(in = Long.MaxValue - 1L, out = 0)
-    ).effectiveBalance shouldBe Left("Effective balance sum overflow")
+    ).effectiveBalance(false) shouldBe Left("Effective balance sum overflow")
   }
 }

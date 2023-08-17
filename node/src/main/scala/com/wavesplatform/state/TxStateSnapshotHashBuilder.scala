@@ -4,6 +4,7 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.bouncycastle.crypto.digests.Blake2bDigest
@@ -24,7 +25,7 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createHashFromTxSnapshot(snapshot: StateSnapshot, succeeded: Boolean): Result = {
+  def createHashFromSnapshot(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo]): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 
     def addEntry(keyType: KeyType.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -100,8 +101,13 @@ object TxStateSnapshotHashBuilder {
       )
     }
 
-    if (!succeeded)
-      addEntry(KeyType.TransactionStatus)(Array(1: Byte))
+    txInfoOpt.foreach(txInfo =>
+      txInfo.status match {
+        case Status.Failed    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(1: Byte))
+        case Status.Elided    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(2: Byte))
+        case Status.Succeeded =>
+      }
+    )
 
     Result(createHash(changedKeys.toSeq.sortBy(_._1).flatMap { case (k, v) => Seq(k, ByteStr(v)) }))
   }

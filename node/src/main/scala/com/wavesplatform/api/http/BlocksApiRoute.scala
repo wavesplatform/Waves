@@ -160,7 +160,7 @@ object BlocksApiRoute {
   private def transactionField(blockVersion: Byte, transactions: Seq[(TxMeta, Transaction)]): JsObject = Json.obj(
     "fee" -> transactions.map(_._2.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
     "transactions" -> JsArray(transactions.map { case (tm, transaction) =>
-      transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, tm.succeeded)
+      transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, tm.status)
     })
   )
 }

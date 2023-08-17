@@ -30,7 +30,8 @@ object TestBlock {
         signer = signer,
         featureVotes = b.header.featureVotes,
         rewardVote = b.header.rewardVote,
-        stateHash = b.header.stateHash
+        stateHash = b.header.stateHash,
+        challengedHeader = b.header.challengedHeader
       )
 
     x.explicitGet()
@@ -60,7 +61,8 @@ object TestBlock {
       features: Seq[Short] = Seq.empty[Short],
       rewardVote: Long = -1L,
       stateHash: Option[ByteStr] = None,
-      baseTarget: Long = 2L
+      baseTarget: Long = 2L,
+      challengedHeader: Option[ChallengedHeader] = None
   ): Block =
     sign(
       signer,
@@ -76,7 +78,8 @@ object TestBlock {
         featureVotes = features,
         rewardVote = rewardVote,
         transactionData = txs,
-        stateHash = stateHash
+        stateHash = stateHash,
+        challengedHeader = challengedHeader
       )
     )
 
@@ -94,6 +97,7 @@ object TestBlock {
           Seq.empty,
           -1L,
           ByteStr.empty,
+          None,
           None
         ),
         ByteStr.empty,
@@ -114,6 +118,7 @@ object TestBlock {
         features,
         -1L,
         Seq.empty,
+        None,
         None
       )
     )

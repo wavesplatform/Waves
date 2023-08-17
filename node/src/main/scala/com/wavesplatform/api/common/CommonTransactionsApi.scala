@@ -8,6 +8,7 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RDB
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
 import com.wavesplatform.state.{Blockchain, Height, StateSnapshot, TxMeta}
@@ -49,6 +50,7 @@ object CommonTransactionsApi {
       rdb: RDB,
       blockchain: Blockchain,
       utx: UtxPool,
+      blockChallenger: BlockChallenger,
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
@@ -66,10 +68,10 @@ object CommonTransactionsApi {
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
       blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(rdb, maybeDiff))
 
-    override def unconfirmedTransactions: Seq[Transaction] = utx.all
+    override def unconfirmedTransactions: Seq[Transaction] = utx.all ++ blockChallenger.allProcessingTxs
 
     override def unconfirmedTransactionById(transactionId: ByteStr): Option[Transaction] =
-      utx.transactionById(transactionId)
+      utx.transactionById(transactionId).orElse(blockChallenger.getProcessingTx(transactionId))
 
     override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
       FeeValidation

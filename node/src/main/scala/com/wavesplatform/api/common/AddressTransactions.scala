@@ -112,7 +112,7 @@ object AddressTransactions {
       (height, snapshot) <- maybeSnapshot.toSeq
       nti                <- snapshot.transactions.values.toSeq.reverse
       if nti.affected(subject)
-    } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
+    } yield (TxMeta(height, nti.status, nti.spentComplexity), nti.transaction))
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
       .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
       .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }

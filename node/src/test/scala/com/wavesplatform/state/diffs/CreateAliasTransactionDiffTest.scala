@@ -64,7 +64,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
       assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx)), fs) { case (blockDiff, newState) =>
         val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
 
         val senderAcc = anotherAliasTx.sender.toAddress
         blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)

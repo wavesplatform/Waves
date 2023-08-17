@@ -171,7 +171,8 @@ class MicroBlockMinerImpl(
             signer = account,
             featureVotes = accumulatedBlock.header.featureVotes,
             rewardVote = accumulatedBlock.header.rewardVote,
-            stateHash = stateHash
+            stateHash = stateHash,
+            challengedHeader = None
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock

@@ -14,7 +14,7 @@ import scala.util.Try
 package object crypto {
   // Constants
   val SignatureLength: Int   = Curve25519.SignatureLength // 64
-  val KeyLength: Int         = Curve25519.KeyLength // 32
+  val KeyLength: Int         = Curve25519.KeyLength       // 32
   val DigestLength: Int      = 32
   val EthereumKeyLength: Int = 64
 

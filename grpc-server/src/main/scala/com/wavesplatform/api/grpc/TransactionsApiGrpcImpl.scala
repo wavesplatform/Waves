@@ -1,13 +1,13 @@
 package com.wavesplatform.api.grpc
 
 import scala.concurrent.Future
-
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl.applicationStatusFromTxStatus
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult as VISR}
+import com.wavesplatform.state.{Blockchain, TxMeta, InvokeScriptResult as VISR}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.grpc.{Status, StatusRuntimeException}
@@ -102,7 +102,8 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
           .orElse {
             commonApi.transactionById(txId.toByteStr).map { m =>
-              val status = if (m.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+              val status = applicationStatusFromTxStatus(m.status)
+
               TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, m.height, status)
             }
           }
@@ -128,7 +129,7 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 private object TransactionsApiGrpcImpl {
   def toTransactionResponse(meta: TransactionMeta): TransactionResponse = {
     val transactionId = meta.transaction.id().toByteString
-    val status        = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
+    val status        = applicationStatusFromTxStatus(meta.status)
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, _, r) => r.map(VISR.toPB(_, addressForTransfer = true))
       case _                                     => None
@@ -136,4 +137,11 @@ private object TransactionsApiGrpcImpl {
 
     TransactionResponse(transactionId, meta.height, Some(meta.transaction.toPB), status, invokeScriptResult)
   }
+
+  def applicationStatusFromTxStatus(status: TxMeta.Status): ApplicationStatus.Recognized =
+    status match {
+      case TxMeta.Status.Succeeded => ApplicationStatus.SUCCEEDED
+      case TxMeta.Status.Failed    => ApplicationStatus.SCRIPT_EXECUTION_FAILED
+      case TxMeta.Status.Elided    => ApplicationStatus.ELIDED
+    }
 }

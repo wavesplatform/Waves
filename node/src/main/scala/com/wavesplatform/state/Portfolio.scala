@@ -10,13 +10,16 @@ import scala.collection.immutable.VectorMap
 
 case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: VectorMap[IssuedAsset, Long] = VectorMap.empty) {
   import Portfolio.*
-  lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out)
-  lazy val spendableBalance: Long                 = balance - lease.out
+  private lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out)
+  lazy val spendableBalance: Long                         = balance - lease.out
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 
   @inline
   final def balanceOf(assetId: Asset): Long = if (assetId eq Waves) balance else assets.getOrElse(assetId.asInstanceOf[IssuedAsset], 0L)
+
+  def effectiveBalance(isBanned: Boolean): Either[String, Long] =
+    if (isBanned) Right(0L) else effectiveBalance
 
   def combine(that: Portfolio): Either[String, Portfolio] =
     for {

@@ -16,6 +16,7 @@ import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -138,13 +139,21 @@ class MinerImpl(
       )
       .leftMap(_.toString)
 
-  private def packTransactionsForKeyBlock(prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
+  private def packTransactionsForKeyBlock(miner: Address, prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
     val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, prevStateHash)
+    val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
+      // TODO: NODE-2594 get next block reward
+      BlockDiffer
+        .createInitialBlockSnapshot(blockchainUpdater, miner)
+        .toOption
+        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
+    }
+
+    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)
     else {
       val mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
       val (maybeUnconfirmed, updatedMdConstraint, stateHash) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, prevStateHash, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
+        utx.packUnconfirmed(mdConstraint, keyBlockStateHash, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
       )
       val unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
@@ -182,7 +191,7 @@ class MinerImpl(
       prevStateHash = lastBlockHeader.stateHash.filter(_ =>
         blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchainUpdater.height + 1)
       )
-      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(prevStateHash)
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, prevStateHash)
       block <- Block
         .buildAndSign(
           version,
@@ -194,7 +203,8 @@ class MinerImpl(
           account,
           blockFeatures(version),
           blockRewardVote(version),
-          stateHash
+          stateHash,
+          None
         )
         .leftMap(_.err)
     } yield (block, totalConstraint))
