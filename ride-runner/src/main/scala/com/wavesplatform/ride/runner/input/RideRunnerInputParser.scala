@@ -155,11 +155,11 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
   implicit val rideRunnerScriptInfoValueReader: ValueReader[RideRunnerScriptInfo] = ValueReader.relative[RideRunnerScriptInfo] { config =>
     val pk      = config.as[Option[PublicKey]]("publicKey")
     val script  = config.as[SrcOrCompiledScript]("script")
-    val imports = config.as[Map[String, String]]("imports")
+    val imports = config.as[Option[Map[String, String]]]("imports")
 
     val compiledScript = script match {
       case Right(x)  => x
-      case Left(src) => ScriptUtil.from(src, imports)
+      case Left(src) => ScriptUtil.from(src, imports.getOrElse(Map.empty))
     }
 
     RideRunnerScriptInfo(pk.getOrElse(EmptyPublicKey), compiledScript)
