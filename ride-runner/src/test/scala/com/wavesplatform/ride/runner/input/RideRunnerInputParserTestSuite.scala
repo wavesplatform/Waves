@@ -8,7 +8,6 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.TestScript
 import com.wavesplatform.ride.runner.input.RideRunnerInputParser.*
 import com.wavesplatform.ride.{DiffXInstances, ScriptUtil}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -258,10 +257,12 @@ let x = getIntegerValue(alice, "x")
               ).some,
               aliases = List(Alias.create("carl").explicitGet()),
               scriptInfo = RideRunnerScriptInfo(
-                script = TestScript.scriptFrom(s"""
+                script = ScriptUtil.from(
+                  src = s"""
 {-#STDLIB_VERSION 6 #-}
 {-#SCRIPT_TYPE ACCOUNT #-}
 {-#CONTENT_TYPE DAPP #-}
+{-# IMPORT libs/main.ride #-}
 
 @Callable(inv)
 func foo(x: Int) = {
@@ -290,13 +291,18 @@ func foo(x: Int) = {
   let y3 = size(inv.payments)
 
   ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 +  x6 + x7 + x8 + x9 + x10 + y1 + y2 + y3 + 9007199254740991)
-}
+}""",
+                  libraries = Map("libs/main.ride" -> s"""
+{-# STDLIB_VERSION 6 #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+{-# CONTENT_TYPE LIBRARY #-}
 
 @Callable(inv)
-func bar() = {
+func bar () = {
   let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
-  ([], x1)
+  (nil, x1)
 }""")
+                )
               ).some
             )
           ),

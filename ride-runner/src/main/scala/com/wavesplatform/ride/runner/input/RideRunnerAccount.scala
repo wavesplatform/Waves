@@ -1,8 +1,6 @@
 package com.wavesplatform.ride.runner.input
 
-import com.wavesplatform.account.PublicKeys.EmptyPublicKey
-import com.wavesplatform.account.{Alias, PublicKey}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.account.Alias
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, TxNonNegativeAmount}
 
@@ -20,8 +18,3 @@ case class RideRunnerAccount(
 ) {
   def balance(mayBeAssetId: Asset): Option[Long] = mayBeAssetId.fold(regularBalance)(assetBalances.get).map(_.value)
 }
-
-case class RideRunnerScriptInfo(
-    publicKey: PublicKey = EmptyPublicKey,
-    script: Script
-)

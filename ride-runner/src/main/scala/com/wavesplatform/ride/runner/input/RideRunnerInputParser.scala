@@ -1,9 +1,11 @@
 package com.wavesplatform.ride.runner.input
 
+import cats.syntax.either.*
 import cats.syntax.option.*
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.*
+import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
@@ -86,6 +88,12 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
     else ScriptUtil.from(x)
   }
 
+  type SrcOrCompiledScript = Either[String, Script]
+  implicit val srcOrCompiledScriptValueReader: ValueReader[SrcOrCompiledScript] = ValueReader[String].map { x =>
+    if (x.startsWith(Base64.Prefix)) ScriptReader.fromBytes(Base64.decode(x)).getOrFail.asRight
+    else x.asLeft
+  }
+
   implicit val addressValueReader: ValueReader[Address] = ValueReader[String].map(Address.fromString(_).getOrFail)
 
   implicit val aliasValueReader: ValueReader[Alias] = ValueReader[String].map { x =>
@@ -143,6 +151,19 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
         case x         => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
       }
     }
+
+  implicit val rideRunnerScriptInfoValueReader: ValueReader[RideRunnerScriptInfo] = ValueReader.relative[RideRunnerScriptInfo] { config =>
+    val pk      = config.as[Option[PublicKey]]("publicKey")
+    val script  = config.as[SrcOrCompiledScript]("script")
+    val imports = config.as[Map[String, String]]("imports")
+
+    val compiledScript = script match {
+      case Right(x)  => x
+      case Left(src) => ScriptUtil.from(src, imports)
+    }
+
+    RideRunnerScriptInfo(pk.getOrElse(EmptyPublicKey), compiledScript)
+  }
 
   private def byteArrayDefaultUtf8FromString(x: String): Array[Byte] = Try {
     if (x.startsWith(Base58Prefix)) Base58.decode(x.substring(7))
