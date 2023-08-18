@@ -153,10 +153,16 @@ object RideRunnerInputParser extends ArbitraryTypeReader {
   implicit val rideRunnerPostProcessingMethodValueReader: ValueReader[RideRunnerPostProcessingMethod] =
     ValueReader.relative[RideRunnerPostProcessingMethod] { config =>
       config.getString("type") match {
-        case "pick"    => PickRideRunnerPostProcessingMethod(config.getString("path"))
-        case "pickAll" => PickAllRideRunnerPostProcessingMethod(config.getStringList("paths").asScala.toList)
-        case "prune"   => PruneRideRunnerPostProcessingMethod(config.getStringList("paths").asScala.toList)
-        case x         => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
+        case "pick"    => RideRunnerPostProcessingMethod.Pick(config.getString("path"))
+        case "pickAll" => RideRunnerPostProcessingMethod.PickAll(config.getStringList("paths").asScala.toList)
+        case "prune"   => RideRunnerPostProcessingMethod.Prune(config.getStringList("paths").asScala.toList)
+        case "regex" =>
+          RideRunnerPostProcessingMethod.Regex(
+            path = config.getString("path"),
+            find = config.getString("find"),
+            replace = config.getString("replace")
+          )
+        case x => fail(s"Expected one of types: pick, pickAll, prune. Got $x")
       }
     }
 

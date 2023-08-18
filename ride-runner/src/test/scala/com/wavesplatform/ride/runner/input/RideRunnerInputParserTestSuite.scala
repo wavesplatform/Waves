@@ -191,21 +191,44 @@ let x = getIntegerValue(alice, "x")
     }
 
     "RideRunnerPostProcessingMethod" - {
-      def parse(tpe: String, valueKey: String, value: String) = parseAs[RideRunnerPostProcessingMethod](s"{ type = $tpe\n$valueKey = $value }")
+      def parseRaw(rawContent: String)                        = parseAs[RideRunnerPostProcessingMethod](rawContent)
+      def parse(tpe: String, valueKey: String, value: String) = parseRaw(s"{ type = $tpe\n$valueKey = $value }")
 
-      "PickRideRunnerPostProcessingMethod" in {
-        parse("pick", "path", "foo.bar") shouldBe PickRideRunnerPostProcessingMethod("foo.bar")
+      "Pick" in {
+        parse("pick", "path", "foo.bar") shouldBe RideRunnerPostProcessingMethod.Pick("foo.bar")
         Try(parse("pick", "xxx", "foo.bar")).isFailure shouldBe true
       }
 
-      "PickAllRideRunnerPostProcessingMethod" in {
-        parse("pickAll", "paths", """[ "foo.bar", "baz"] """) shouldBe PickAllRideRunnerPostProcessingMethod(List("foo.bar", "baz"))
+      "PickAll" in {
+        parse("pickAll", "paths", """[ "foo.bar", "baz"] """) shouldBe RideRunnerPostProcessingMethod.PickAll(List("foo.bar", "baz"))
         Try(parse("pickAll", "xxx", "foo.bar")).isFailure shouldBe true
       }
 
-      "PruneRideRunnerPostProcessingMethod" in {
-        parse("prune", "paths", """[ "foo.bar", "baz"] """) shouldBe PruneRideRunnerPostProcessingMethod(List("foo.bar", "baz"))
+      "Prune" in {
+        parse("prune", "paths", """[ "foo.bar", "baz"] """) shouldBe RideRunnerPostProcessingMethod.Prune(List("foo.bar", "baz"))
         Try(parse("pickAll", "xxx", "foo.bar")).isFailure shouldBe true
+      }
+
+      "Regex" in {
+        parseRaw(
+          """{ 
+            |  type = regex
+            |  path = "foo.bar"
+            |  find = "^.+(what).+$"
+            |  replace = "$1"
+            |}""".stripMargin
+        ) shouldBe RideRunnerPostProcessingMethod.Regex("foo.bar", "^.+(what).+$", "$1")
+
+        Try(
+          parseRaw(
+            """{ 
+              |  type = regex
+              |  xxx = "foo.bar"
+              |  find = "^.+(what).+$"
+              |  replace = "$1"
+              |}""".stripMargin
+          )
+        ).isFailure shouldBe true
       }
 
       "wrong type" in {
@@ -340,7 +363,7 @@ func bar () = {
             )
           )
         ),
-        postProcessing = List(PickRideRunnerPostProcessingMethod("result.value._2.value")),
+        postProcessing = List(RideRunnerPostProcessingMethod.Pick("result.value._2.value")),
         test = RideRunnerTest(expected = JsString("9007199361531057")).some
       )
 

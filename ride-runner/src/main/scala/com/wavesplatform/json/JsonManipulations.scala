@@ -1,10 +1,40 @@
 package com.wavesplatform.json
 
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import cats.syntax.either.*
+import play.api.libs.json.*
 
 import scala.annotation.tailrec
 
 object JsonManipulations {
+
+  /** @param path
+    *   dot-separated path, e.g.: "foo.bar.baz"
+    * @param find
+    *   a regular expression
+    * @param replace
+    *   replacement
+    * @return
+    *   An object with a replaced string at the given path.
+    */
+  def regexReplace(js: JsValue, path: String, find: String, replace: String): Either[String, JsValue] = for {
+    _ <- Either.cond(path.nonEmpty, "", "Expected a non-empty path")
+    js <- js match {
+      case js: JsObject => js.asRight
+      case _            => s"Can't find a value at path '$path': expected an object, but got ${js.getClass.getSimpleName}".asLeft
+    }
+    leaf <- pick(js, path) match {
+      case None              => JsNull.asRight
+      case Some(JsString(x)) => JsString(x.replaceAll(find, replace)).asRight
+      case Some(x)           => s"Expected a string at path '$path', but got ${x.getClass.getSimpleName}".asLeft[JsValue]
+    }
+  } yield
+    if (leaf == JsNull) js
+    else
+      mkTrunk(path, leaf) match {
+        case trunk: JsObject => js.deepMerge(trunk)
+        case _               => throw new IllegalStateException(s"Impossible: can't construct a trunk from $path and $leaf")
+      }
+
   def pruneAll(js: JsValue, paths: List[String]): JsObject =
     paths.foldLeft(JsObject.empty) { case (r, path) =>
       r.deepMerge(prune(js, path))
@@ -15,7 +45,7 @@ object JsonManipulations {
     * @return
     *   Removes all subtrees except a subtree with specified path
     */
-  def prune(js: JsValue, path: String): JsObject = prune(js, path.split('.').toList)
+  def prune(js: JsValue, path: String): JsObject = prune(js, splitPath(path))
 
   /** @return
     *   Removes all subtrees except a subtree with specified path

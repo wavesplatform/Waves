@@ -1,5 +1,6 @@
 package com.wavesplatform.json
 
+import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.BaseTestSuite
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -17,13 +18,61 @@ class JsonManipulationsTestSuite extends BaseTestSuite with TableDrivenPropertyC
       |      "baz": 10,
       |      "extra2": {}
       |    },
-      |    "extra2": {}
+      |    "extra2": "foo12bar"
       |  },
       |  "extra2": 1
       |}""".stripMargin
   )
 
   "JsonManipulations" - {
+    "regexReplace" - {
+      val regexExampleJson = Json.parse(
+        """{
+          |  "foo": {
+          |    "bar": " foo 12b ar",
+          |    "baz": 10
+          |  },
+          |  "bar": "111"
+          |}""".stripMargin
+      )
+
+      "on object" in {
+        val table = Table(
+          "path" -> "expectedJson",
+          "foo.bar" -> Json.parse(
+            """{
+              |  "foo": {
+              |    "bar": "12",
+              |    "baz": 10
+              |  },
+              |  "bar": "111"
+              |}""".stripMargin
+          ),
+          "bar.baz" -> regexExampleJson
+        )
+
+        forAll(table) { (path, expectedJson) =>
+          JsonManipulations.regexReplace(regexExampleJson, path, """^.+foo.+?(\d+).+$""", "$1") shouldBe expectedJson.asRight
+        }
+      }
+
+      "on value" in {
+        val table = Table(
+          ("json", "path", "expectedError"),
+          (ten, "foo.bar", "expected an object"),
+          (regexExampleJson, "foo.baz", "Expected a string at path"),
+          (regexExampleJson, "", "Expected a non-empty path")
+        )
+
+        forAll(table) { (json, path, expectedError) =>
+          JsonManipulations.regexReplace(json, path, ".+", "1") match {
+            case Right(x) => fail(s"Expected an error, but got success: $x")
+            case Left(e)  => e should include regex expectedError
+          }
+        }
+      }
+    }
+
     "pruneAll" in {
       val table = Table(
         "paths" -> "expectedJson",
