@@ -340,14 +340,11 @@ func bar () = {
             )
           )
         ),
-        postProcessing = RideRunnerPostProcessing(
-          enable = true,
-          method = PickRideRunnerPostProcessingMethod("result.value._2.value")
-        ),
-        test = RideRunnerTest(expected = JsString("9007199361531056")).some
+        postProcessing = List(PickRideRunnerPostProcessingMethod("result.value._2.value")),
+        test = RideRunnerTest(expected = JsString("9007199361531057")).some
       )
 
-      val actual = RideRunnerInputParser.from(ConfigFactory.parseResources("sample-input.conf").resolve())
+      val actual = RideRunnerInputParser.from(RideRunnerInputParser.prepare(ConfigFactory.parseResources("sample-input.conf")))
       actual shouldMatchTo expected
     }
   }

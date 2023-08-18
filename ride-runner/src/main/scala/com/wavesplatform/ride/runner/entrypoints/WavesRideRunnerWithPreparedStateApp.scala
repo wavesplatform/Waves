@@ -74,15 +74,14 @@ object WavesRideRunnerWithPreparedStateApp {
   private def run(runMode: RunMode, path: Path): RunResultStatus =
     if (path.getFileName.toString.endsWith(".conf")) {
       // toAbsolutePath is required, otherwise Lightbend Config incorrectly resolve relative paths
-      Try(ConfigFactory.parseFile(path.toAbsolutePath.toFile).resolve()) match {
-        case Failure(e) => RunResultStatus.Error(new RuntimeException("Can't parse HOCON file", e))
+      Try(RideRunnerInputParser.prepare(ConfigFactory.parseFile(path.toAbsolutePath.toFile))) match {
+        case Failure(e) => RunResultStatus.Error(new RuntimeException(s"Can't parse HOCON file: ${e.getMessage}", e))
         case Success(inputConfig) =>
           AppInitializer.setupChain(RideRunnerInputParser.getChainId(inputConfig)) // We must setup chain first to parse addresses
           val input = RideRunnerInputParser.from(inputConfig)
           lazy val actual = {
             val r = run(input)
-            if (input.postProcessing.enable) input.postProcessing.method.process(r)
-            else r
+            input.postProcessing.foldLeft[JsValue](r) { case (r, x) => x.process(r) }
           }
 
           runMode match {
@@ -221,6 +220,7 @@ object WavesRideRunnerWithPreparedStateApp {
     def writeReport(): Unit                  = {}
   }
 
+  // Information about a file format: https://github.com/testmoapp/junitxml
   private class FileJUnitReport(output: File) extends JUnitReport {
     private val colorizer = MonochromeColorizer
     private val testCases = new ConcurrentHashMap[Path, RunResult]

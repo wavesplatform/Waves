@@ -157,7 +157,10 @@ If you faced one of them, please issue a ticket on GitHub and tell us your use-c
 
 You need an input file, that contains a description of the blockchain state
 in [HOCON](https://github.com/lightbend/config/blob/main/HOCON.md).
-See the documented [example](./src/test/resources/sample-input.conf).
+
+See:
+* The documented [example](./src/test/resources/sample-input.conf).
+* Handy [variables](./src/main/resources/cli-default-options.conf) those included by default.
 
 How to run:
 

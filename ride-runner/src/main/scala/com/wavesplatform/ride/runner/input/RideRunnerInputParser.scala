@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.input
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.*
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.Block.BlockId
@@ -29,8 +29,16 @@ import scala.util.Try
 object RideRunnerInputParser extends ArbitraryTypeReader {
   val Base58Prefix = "base58:"
 
+  def prepare(config: Config): Config =
+    config
+      .withFallback(ConfigFactory.parseResources("cli-default-options.conf"))
+      .resolve()
+
+  /** Use after "prepare"
+    */
   def from(config: Config): RideRunnerInput = config.as[RideRunnerInput]
-  def getChainId(x: Config): Char           = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
+
+  def getChainId(x: Config): Char = x.getAs[Char]("chainId").getOrElse(fail("chainId is not specified or wrong"))
 
   implicit val shortMapKeyValueReader: MapKeyValueReader[Short] = { key =>
     key.toShortOption.getOrElse(fail(s"Expected an integer value between ${Short.MinValue} and ${Short.MaxValue}"))

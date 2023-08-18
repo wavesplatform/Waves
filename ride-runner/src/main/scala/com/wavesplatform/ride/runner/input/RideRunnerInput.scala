@@ -12,6 +12,6 @@ case class RideRunnerInput(
     evaluateScriptComplexityLimit: Int = Int.MaxValue,
     maxTxErrorLogSize: Int = 1024,
     state: RideRunnerBlockchainState,
-    postProcessing: RideRunnerPostProcessing = RideRunnerPostProcessing(),
+    postProcessing: List[RideRunnerPostProcessingMethod] = List.empty,
     test: Option[RideRunnerTest] = None
 )
