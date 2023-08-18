@@ -22,11 +22,14 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     case BlockForged(b)           => out.add(RawBytes.fromBlock(b))
 
     // With a spec
-    case GetPeers             => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
-    case k: KnownPeers        => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
-    case g: GetBlock          => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
-    case m: MicroBlockInv     => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
-    case m: MicroBlockRequest => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
+    case GetPeers                => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
+    case k: KnownPeers           => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
+    case g: GetBlock             => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
+    case m: MicroBlockInv        => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
+    case m: MicroBlockRequest    => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
+    case g: GetSnapshot          => out.add(RawBytes(GetSnapsnotSpec.messageCode, GetSnapsnotSpec.serializeData(g)))
+    case m: MicroSnapshotRequest => out.add(RawBytes(MicroSnapshotRequestSpec.messageCode, MicroSnapshotRequestSpec.serializeData(m)))
+    case s: Snapshots            => out.add(RawBytes(SnapshotsSpec.messageCode, SnapshotsSpec.serializeData(s)))
 
     // Version switch
     case gs: GetSignatures if isNewMsgsSupported(ctx) =>

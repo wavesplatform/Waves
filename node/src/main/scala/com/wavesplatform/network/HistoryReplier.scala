@@ -1,8 +1,9 @@
 package com.wavesplatform.network
 
+import com.wavesplatform
 import com.wavesplatform.block.Block
 import com.wavesplatform.history.History
-import com.wavesplatform.network.HistoryReplier._
+import com.wavesplatform.network.HistoryReplier.*
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
@@ -48,6 +49,24 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
         Future(history.loadMicroBlock(microBlockId)).map {
           case Some(microBlock) => RawBytes.fromMicroBlock(MicroBlockResponse(microBlock, microBlockId))
           case _                => throw new NoSuchElementException(s"Error loading microblock $microBlockId")
+        }
+      )
+
+    case GetSnapshot(id) =>
+      respondWith(
+        ctx,
+        Future(history.loadBlockSnapshots(id)).map {
+          case Some(snapshots) => Snapshots(id, snapshots)
+          case _               => throw new NoSuchElementException(s"Error loading snapshots for block $id")
+        }
+      )
+
+    case MicroSnapshotRequest(id) =>
+      respondWith(
+        ctx,
+        Future(history.loadMicroblockSnapshots(id)).map {
+          case Some(snapshots) => Snapshots(id, snapshots)
+          case _               => throw new NoSuchElementException(s"Error loading snapshots for microblock $id")
         }
       )
 

@@ -19,6 +19,7 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
   private val microblockInvs      = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
   private val microblockResponses = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
   private val transactions        = ConcurrentSubject.publish[(Channel, Transaction)]
+  private val snapshots           = ConcurrentSubject.publish[(Channel, Snapshots)]
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case b: Block               => blocks.onNext((ctx.channel(), b))
@@ -27,6 +28,7 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
     case mbInv: MicroBlockInv   => microblockInvs.onNext((ctx.channel(), mbInv))
     case mb: MicroBlockResponse => microblockResponses.onNext((ctx.channel(), mb))
     case tx: Transaction        => transactions.onNext((ctx.channel(), tx))
+    case sn: Snapshots          => snapshots.onNext((ctx.channel(), sn))
     case _                      => super.channelRead(ctx, msg)
 
   }
@@ -38,6 +40,7 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
     microblockInvs.onComplete()
     microblockResponses.onComplete()
     transactions.onComplete()
+    snapshots.onComplete()
   }
 }
 
@@ -48,11 +51,12 @@ object MessageObserver {
       ChannelObservable[BigInt],
       ChannelObservable[MicroBlockInv],
       ChannelObservable[MicroBlockResponse],
-      ChannelObservable[Transaction]
+      ChannelObservable[Transaction],
+      ChannelObservable[Snapshots]
   )
 
   def apply(): (MessageObserver, Messages) = {
     val mo = new MessageObserver()
-    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.microblockInvs, mo.microblockResponses, mo.transactions))
+    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.microblockInvs, mo.microblockResponses, mo.transactions, mo.snapshots))
   }
 }

@@ -134,8 +134,12 @@ object RxExtensionLoader extends ScorexLogging {
               } else {
                 log.trace(s"${id(ch)} Requesting ${unknown.size} blocks")
                 val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsyncLogErr
-                unknown.foreach(s => ch.write(GetBlock(s)))
+                unknown.foreach { s =>
+                  ch.write(GetBlock(s))
+                  ch.write(GetSnapshot(s))
+                }
                 ch.flush()
+                // TODO: NODE-2609 process snapshots
                 state.withLoaderState(LoaderState.ExpectingBlocks(c, unknown, unknown.toSet, Set.empty, blacklistingAsync))
               }
           }

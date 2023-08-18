@@ -270,7 +270,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
-    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
+    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions, snapshots) = networkServer.messages
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 

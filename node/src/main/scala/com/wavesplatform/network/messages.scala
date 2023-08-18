@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
 
@@ -80,3 +81,9 @@ object MicroBlockInv {
     new MicroBlockInv(sender.publicKey, totalBlockRef, prevBlockRef, signature)
   }
 }
+
+case class GetSnapshot(blockId: ByteStr) extends Message
+
+case class MicroSnapshotRequest(totalBlockId: ByteStr) extends Message
+
+case class Snapshots(id: ByteStr, snapshots: Seq[TransactionStateSnapshot]) extends Message

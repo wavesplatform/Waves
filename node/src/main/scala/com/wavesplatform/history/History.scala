@@ -4,12 +4,15 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.RDB
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.{Blockchain, Height}
 
 trait History {
   def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])]
   def loadMicroBlock(id: ByteStr): Option[MicroBlock]
   def blockIdsAfter(candidates: Seq[ByteStr], count: Int): Seq[ByteStr]
+  def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]]
+  def loadMicroblockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]]
 }
 
 object History {
@@ -30,5 +33,10 @@ object History {
         candidates.view.flatMap(blockchain.heightOf).headOption.fold[Seq[ByteStr]](Seq.empty) { firstCommonHeight =>
           (firstCommonHeight to firstCommonHeight + count).flatMap(blockchain.blockId)
         }
+
+      // TODO: NODE-2609 implement
+      override def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] = ???
+
+      override def loadMicroblockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] = ???
     }
 }
