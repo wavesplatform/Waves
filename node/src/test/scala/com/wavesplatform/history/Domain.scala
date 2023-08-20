@@ -563,11 +563,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
     txs
       .foldLeft(initStateHash -> initSnapshot) { case ((prevStateHash, accSnapshot), tx) =>
-        val compBlockchain = SnapshotBlockchain(blockchain, accSnapshot)
+        val accBlockchain  = SnapshotBlockchain(blockchain, accSnapshot)
         val minerPortfolio = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart))
-        txDiffer(compBlockchain, tx).resultE match {
+        txDiffer(accBlockchain, tx).resultE match {
           case Right(txSnapshot) =>
-            val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, compBlockchain).explicitGet()
+            val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
             val txInfo                 = txSnapshot.transactions.head._2
             val stateHash =
               TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
