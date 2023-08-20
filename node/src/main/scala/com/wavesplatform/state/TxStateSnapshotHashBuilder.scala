@@ -55,7 +55,9 @@ object TxStateSnapshotHashBuilder {
     }
 
     snapshot.accountScriptsByAddress.foreach { case (address, sv) =>
-      addEntry(KeyType.AccountScript, address.bytes)(sv.fold(Array.emptyByteArray)(_.script.bytes().arr))
+      addEntry(KeyType.AccountScript, address.bytes)(
+        sv.fold(Seq(Array.emptyByteArray))(s => Seq(s.script.bytes().arr, s.publicKey.arr, Longs.toByteArray(s.verifierComplexity)))*
+      )
     }
 
     for {
