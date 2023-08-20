@@ -129,7 +129,7 @@ case class StateSnapshot(
 
   def bindElidedTransaction(blockchain: Blockchain, tx: Transaction): StateSnapshot =
     copy(
-      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, this, blockchain)),
+      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, this, blockchain))
     )
 
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
@@ -143,7 +143,7 @@ case class StateSnapshot(
 }
 
 object StateSnapshot {
-  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, Boolean) = {
+  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, TxMeta.Status) = {
     val balances: VectorMap[(Address, Asset), Long] =
       VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
@@ -251,7 +251,11 @@ object StateSnapshot {
         accountScripts,
         accountData
       ),
-      pbSnapshot.transactionStatus.isSucceeded
+      pbSnapshot.transactionStatus match {
+        case TransactionStatus.FAILED    => TxMeta.Status.Failed
+        case TransactionStatus.SUCCEEDED => TxMeta.Status.Succeeded
+        case TransactionStatus.ELIDED    => TxMeta.Status.Elided
+      }
     )
   }
 
