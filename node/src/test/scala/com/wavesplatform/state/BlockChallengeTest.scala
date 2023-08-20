@@ -49,6 +49,7 @@ import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import java.util.concurrent.locks.ReentrantLock
+import scala.collection.immutable.VectorMap
 import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.DurationInt
 
@@ -463,13 +464,18 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.rollbackTo(validOriginalBlock.header.reference)
 
       d.appendBlockE(challengingBlock) should beRight
-      // block diff contains only txs and block reward
-      d.blockchain.bestLiquidSnapshot.get shouldBe
-          StateSnapshot.build(
-            d.blockchain,
-            Map(challengingMiner.toAddress -> Portfolio.waves(d.blockchain.settings.rewardsSettings.initial))
-          ).explicitGet().copy(transactions = d.blockchain.bestLiquidSnapshot.get.transactions)
-      d.blockchain.bestLiquidSnapshot.get.transactions.foreach(_._2.status shouldBe TxMeta.Status.Elided)
+
+      // block snapshot contains only txs and block reward
+      val blockSnapshot = d.blockchain.bestLiquidSnapshot.get
+      val expectedSnapshot = StateSnapshot
+        .build(
+          d.rocksDBWriter,
+          Map(challengingMiner.toAddress -> Portfolio.waves(d.blockchain.settings.rewardsSettings.initial)),
+          transactions = blockSnapshot.transactions
+        )
+        .explicitGet()
+      blockSnapshot shouldBe expectedSnapshot
+      blockSnapshot.transactions.foreach(_._2.status shouldBe TxMeta.Status.Elided)
       recipientTxs.foreach { tx =>
         d.transactionsApi.transactionById(tx.id()).map(_.status).contains(TxMeta.Status.Elided) shouldBe true
       }
