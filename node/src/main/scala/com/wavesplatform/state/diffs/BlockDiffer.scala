@@ -381,7 +381,7 @@ object BlockDiffer {
                   updatedConstraint,
                   DetailedSnapshot(newMinerSnapshot, newFeePortfolios),
                   prevStateHash
-                    .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(txInfo)).createHash(prevStateHash))
+                    .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(resultTxSnapshot, Some(txInfo)).createHash(prevStateHash))
                 )
               }
             }
