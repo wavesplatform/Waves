@@ -19,6 +19,7 @@ import monix.reactive.Observer
 
 import java.{lang, util}
 import scala.collection.immutable.VectorMap
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
@@ -217,9 +218,8 @@ abstract class Caches extends Blockchain with Storage {
   ): Unit
 
   override def append(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
-    val newHeight    = current.height + 1
-    val newAddresses = Set.newBuilder[Address]
-    val newScore     = block.blockScore() + current.score
+    val newHeight = current.height + 1
+    val newScore  = block.blockScore() + current.score
     val newMeta = PBBlockMeta(
       Some(PBBlocks.protobuf(block.header)),
       ByteString.copyFrom(block.signature.arr),
@@ -235,15 +235,16 @@ abstract class Caches extends Blockchain with Storage {
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
 
-    newAddresses ++=
-      (snapshot.balances.map(_._1._1) ++ snapshot.leaseBalances.keys)
-        .filter(addressIdCache.get(_).isEmpty)
+    val newAddresses =
+      mutable.Set[Address]() ++
+        (snapshot.balances.map(_._1._1) ++ snapshot.leaseBalances.keys)
+          .filter(addressIdCache.get(_).isEmpty)
 
     for (address <- snapshot.transactions.flatMap(_._2.affected) if addressIdCache.get(address).isEmpty)
       newAddresses += address
 
     val newAddressIds = (for {
-      (address, offset) <- newAddresses.result().zipWithIndex
+      (address, offset) <- newAddresses.zipWithIndex
     } yield address -> AddressId(lastAddressId + offset + 1)).toMap
 
     lastAddressId += newAddressIds.size
@@ -283,8 +284,8 @@ abstract class Caches extends Blockchain with Storage {
       (address, entries) <- snapshot.accountData
       (key, entry)       <- entries
     } yield {
-      val entryKey   = (address, key)
-      val prevData   = accountDataCache.get(entryKey)
+      val entryKey = (address, key)
+      val prevData = accountDataCache.get(entryKey)
       entryKey -> (
         CurrentData(entry, Height(height), prevData.height),
         DataNode(entry, prevData.height)
@@ -294,9 +295,9 @@ abstract class Caches extends Blockchain with Storage {
     val orderFillsWithNodes = for {
       (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills
     } yield {
-      val prevData   = volumeAndFeeCache.get(orderId)
-      val current    = CurrentVolumeAndFee(volume, fee, Height(height), prevData.height)
-      val node       = VolumeAndFeeNode(volume, fee, prevData.height)
+      val prevData = volumeAndFeeCache.get(orderId)
+      val current  = CurrentVolumeAndFee(volume, fee, Height(height), prevData.height)
+      val node     = VolumeAndFeeNode(volume, fee, prevData.height)
       orderId -> (current, node)
     }
 
