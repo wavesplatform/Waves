@@ -28,17 +28,29 @@ case class SnapshotBlockchain(
   override def balance(address: Address, assetId: Asset): Long =
     snapshot.balances.getOrElse((address, assetId), inner.balance(address, assetId))
 
-  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] =
-    req
-      .foldLeft(Map[(Address, Asset), Long]()) { case (foundBalances, key @ (address, assetId)) =>
-        foundBalances + (key -> balance(address, assetId))
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = {
+    val (innerBalances, snapshotBalances) = req
+      .foldLeft((Seq[(Address, Asset)](), Map[(Address, Asset), Long]())) { case ((innerBalances, snapshotBalances), key) =>
+        snapshot.balances
+          .get(key)
+          .fold(
+            (innerBalances :+ key, snapshotBalances)
+          )(balance => (innerBalances, snapshotBalances + (key -> balance)))
       }
+    inner.balances(innerBalances) ++ snapshotBalances
+  }
 
-  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
-    addresses
-      .foldLeft(Map[Address, Long]()) { case (foundBalances, address) =>
-        foundBalances + (address -> balance(address, Waves))
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = {
+    val (innerBalances, snapshotBalances) = addresses
+      .foldLeft((Seq[Address](), Map[Address, Long]())) { case ((innerBalances, snapshotBalances), address) =>
+        snapshot.balances
+          .get((address, Waves))
+          .fold(
+            (innerBalances :+ address, snapshotBalances)
+          )(balance => (innerBalances, snapshotBalances + (address -> balance)))
       }
+    inner.wavesBalances(innerBalances) ++ snapshotBalances
+  }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = {
     val maybeLastBlockBan = blockMeta.flatMap(_._1.header.challengedHeader).map(_.generator.toAddress) match {
@@ -51,11 +63,17 @@ case class SnapshotBlockchain(
   override def leaseBalance(address: Address): LeaseBalance =
     snapshot.leaseBalances.getOrElse(address, inner.leaseBalance(address))
 
-  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] =
-    addresses
-      .foldLeft(Map[Address, LeaseBalance]()) { case (foundBalances, address) =>
-        foundBalances + (address -> leaseBalance(address))
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = {
+    val (innerBalances, snapshotBalances) = addresses
+      .foldLeft((Seq[Address](), Map[Address, LeaseBalance]())) { case ((innerBalances, snapshotBalances), address) =>
+        snapshot.leaseBalances
+          .get(address)
+          .fold(
+            (innerBalances :+ address, snapshotBalances)
+          )(balance => (innerBalances, snapshotBalances + (address -> balance)))
       }
+    inner.leaseBalances(innerBalances) ++ snapshotBalances
+  }
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeSnapshot
