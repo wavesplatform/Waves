@@ -23,22 +23,17 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
 
   def combine(that: Portfolio): Either[String, Portfolio] =
     for {
-      balance  <- sum(this.balance, that.balance, "Waves balance sum overflow")
+      balance  <- safeSum(this.balance, that.balance, "Waves balance")
       assets   <- combineAssets(this.assets, that.assets)
-      leaseIn  <- sum(this.lease.in, that.lease.in, "Lease in sum overflow")
-      leaseOut <- sum(this.lease.out, that.lease.out, "Lease out sum overflow")
+      leaseIn  <- safeSum(this.lease.in, that.lease.in, "Lease in")
+      leaseOut <- safeSum(this.lease.out, that.lease.out, "Lease out")
     } yield Portfolio(balance, LeaseBalance(leaseIn, leaseOut), assets)
 
   override def toString: String = s"PF($balance,${assets.mkString("[", ",", "]")})"
 }
 
 object Portfolio {
-  @inline
-  final def sum(a: Long, b: Long, error: => String): Either[String, Long] =
-    try Right(Math.addExact(a, b))
-    catch { case _: ArithmeticException => Left(error) }
-
-  def combineAssets(a: VectorMap[IssuedAsset, Long], b: VectorMap[IssuedAsset, Long]): Either[String, VectorMap[IssuedAsset, Long]] = {
+  private def combineAssets(a: VectorMap[IssuedAsset, Long], b: VectorMap[IssuedAsset, Long]): Either[String, VectorMap[IssuedAsset, Long]] = {
     if (a.isEmpty) Right(b)
     else if (b.isEmpty) Right(a)
     else
@@ -48,7 +43,7 @@ object Portfolio {
             case None =>
               Right(seed.updated(asset, balance))
             case Some(oldBalance) =>
-              sum(oldBalance, balance, s"asset $asset overflow").map { newBalance =>
+              safeSum(oldBalance, balance, s"asset $asset overflow").map { newBalance =>
                 seed.updated(asset, newBalance)
               }
           }

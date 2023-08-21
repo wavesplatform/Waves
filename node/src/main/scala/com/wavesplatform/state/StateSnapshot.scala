@@ -276,28 +276,32 @@ object StateSnapshot {
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,
       transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap()
-  ): Either[ValidationError, StateSnapshot] =
-    for {
-      b  <- balances(portfolios, blockchain).leftMap(GenericError(_))
-      lb <- leaseBalances(portfolios, blockchain).leftMap(GenericError(_))
-    } yield StateSnapshot(
-      transactions,
-      b,
-      lb,
-      assetStatics(issuedAssets),
-      assetVolumes(blockchain, issuedAssets, updatedAssets),
-      assetNamesAndDescriptions(issuedAssets, updatedAssets),
-      assetScripts,
-      sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-      resolvedLeaseStates(blockchain, leaseStates, aliases),
-      aliases,
-      this.orderFills(orderFills, blockchain),
-      accountScripts,
-      accountData,
-      scriptResults,
-      ethereumTransactionMeta,
-      scriptsComplexity
-    )
+  ): Either[ValidationError, StateSnapshot] = {
+    val r =
+      for {
+        b  <- balances(portfolios, blockchain)
+        lb <- leaseBalances(portfolios, blockchain)
+        of <- this.orderFills(orderFills, blockchain)
+      } yield StateSnapshot(
+        transactions,
+        b,
+        lb,
+        assetStatics(issuedAssets),
+        assetVolumes(blockchain, issuedAssets, updatedAssets),
+        assetNamesAndDescriptions(issuedAssets, updatedAssets),
+        assetScripts,
+        sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
+        resolvedLeaseStates(blockchain, leaseStates, aliases),
+        aliases,
+        of,
+        accountScripts,
+        accountData,
+        scriptResults,
+        ethereumTransactionMeta,
+        scriptsComplexity
+      )
+    r.leftMap(GenericError(_))
+  }
 
   // ignores lease balances from portfolios
   private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
@@ -306,14 +310,13 @@ object StateSnapshot {
         case (_, 0) =>
           Right(VectorMap[(Address, Asset), Long]())
         case (assetId, balance) =>
-          Portfolio
-            .sum(blockchain.balance(address, assetId), balance, s"$address -> Asset balance sum overflow")
+          safeSum(blockchain.balance(address, assetId), balance, s"$address -> Asset balance")
             .map(newBalance => VectorMap((address, assetId: Asset) -> newBalance))
       }
       if (wavesAmount != 0)
         for {
           assetBalances   <- assetBalancesE
-          newWavesBalance <- Portfolio.sum(blockchain.balance(address), wavesAmount, s"$address -> Waves balance sum overflow")
+          newWavesBalance <- safeSum(blockchain.balance(address), wavesAmount, s"$address -> Waves balance")
         } yield assetBalances + ((address, Waves) -> newWavesBalance)
       else
         assetBalancesE
@@ -340,8 +343,8 @@ object StateSnapshot {
         case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
           val bLease = blockchain.leaseBalance(address)
           for {
-            newIn  <- Portfolio.sum(bLease.in, lease.in, s"$address -> Lease in overflow")
-            newOut <- Portfolio.sum(bLease.out, lease.out, s"$address -> Lease out overflow")
+            newIn  <- safeSum(bLease.in, lease.in, s"$address -> Lease")
+            newOut <- safeSum(bLease.out, lease.out, s"$address -> Lease")
           } yield Seq(address -> LeaseBalance(newIn, newOut))
         case _ =>
           Seq().asRight[String]
@@ -404,11 +407,12 @@ object StateSnapshot {
       )
       .toMap
 
-  private def orderFills(volumeAndFees: Map[ByteStr, VolumeAndFee], blockchain: Blockchain): Map[ByteStr, VolumeAndFee] =
-    volumeAndFees.map { case (orderId, value) =>
-      val newInfo = value |+| blockchain.filledVolumeAndFee(orderId)
-      orderId -> newInfo
-    }
+  private def orderFills(volumeAndFees: Map[ByteStr, VolumeAndFee], blockchain: Blockchain): Either[String, Map[ByteStr, VolumeAndFee]] =
+    volumeAndFees.toSeq
+      .traverse { case (orderId, value) =>
+        value.combineE(blockchain.filledVolumeAndFee(orderId)).map(orderId -> _)
+      }
+      .map(_.toMap)
 
   implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
     override val empty: StateSnapshot =

@@ -1,16 +1,13 @@
 package com.wavesplatform.state
 
-import cats.kernel.Monoid
-
-case class VolumeAndFee(volume: Long, fee: Long)
+case class VolumeAndFee(volume: Long, fee: Long) {
+  def combineE(that: VolumeAndFee): Either[String, VolumeAndFee] =
+    for {
+      volume <- safeSum(this.volume, that.volume, "Order volume")
+      fee    <- safeSum(this.fee, that.fee, "Order fee")
+    } yield VolumeAndFee(volume, fee)
+}
 
 object VolumeAndFee {
   val empty: VolumeAndFee = VolumeAndFee(0, 0)
-
-  implicit val m: Monoid[VolumeAndFee] = new Monoid[VolumeAndFee] {
-    override def empty: VolumeAndFee = VolumeAndFee.empty
-
-    override def combine(x: VolumeAndFee, y: VolumeAndFee): VolumeAndFee =
-      VolumeAndFee(x.volume + y.volume, x.fee + y.fee)
-  }
 }

@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits.catsSyntaxSemigroup
+import cats.implicits.{catsSyntaxSemigroup, toTraverseOps}
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -40,36 +40,43 @@ case class Diff(
     else None
 
   def combineF(newer: Diff): Either[String, Diff] =
-    Portfolio
-      .combine(portfolios, newer.portfolios)
-      .map { portfolios =>
-        val newTransactions = if (transactions.isEmpty) newer.transactions else transactions ++ newer.transactions
-        val newFilter = transactionFilter match {
-          case Some(bf) =>
-            newer.transactions.foreach(nti => bf.put(nti.transaction.id().arr))
-            Some(bf)
-          case None => newer.transactionFilter
-        }
-
-        Diff(
-          transactions = newTransactions,
-          portfolios = portfolios,
-          issuedAssets = issuedAssets ++ newer.issuedAssets,
-          updatedAssets = updatedAssets |+| newer.updatedAssets,
-          aliases = aliases ++ newer.aliases,
-          orderFills = orderFills.combine(newer.orderFills),
-          leaseState = leaseState ++ newer.leaseState,
-          scripts = scripts ++ newer.scripts,
-          assetScripts = assetScripts ++ newer.assetScripts,
-          accountData = Diff.combine(accountData, newer.accountData),
-          sponsorship = sponsorship.combine(newer.sponsorship),
-          scriptsRun = scriptsRun + newer.scriptsRun,
-          scriptResults = scriptResults.combine(newer.scriptResults),
-          scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
-          ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
-          transactionFilter = newFilter
-        )
+    for {
+      portfolios <- Portfolio.combine(portfolios, newer.portfolios)
+      orderFills <- {
+        val combinedOrders =
+          orderFills.toSeq
+            .traverse { case (orderId, value) =>
+              value.combineE(newer.orderFills(orderId)).map(orderId -> _)
+            }
+            .map(_.toMap)
+        combinedOrders.map(co => co ++ newer.orderFills.filterNot { case (id, _) => co.contains(id) })
       }
+      newTransactions = if (transactions.isEmpty) newer.transactions else transactions ++ newer.transactions
+      newFilter = transactionFilter match {
+        case Some(bf) =>
+          newer.transactions.foreach(nti => bf.put(nti.transaction.id().arr))
+          Some(bf)
+        case None =>
+          newer.transactionFilter
+      }
+    } yield Diff(
+      transactions = newTransactions,
+      portfolios = portfolios,
+      issuedAssets = issuedAssets ++ newer.issuedAssets,
+      updatedAssets = updatedAssets |+| newer.updatedAssets,
+      aliases = aliases ++ newer.aliases,
+      orderFills = orderFills,
+      leaseState = leaseState ++ newer.leaseState,
+      scripts = scripts ++ newer.scripts,
+      assetScripts = assetScripts ++ newer.assetScripts,
+      accountData = Diff.combine(accountData, newer.accountData),
+      sponsorship = sponsorship.combine(newer.sponsorship),
+      scriptsRun = scriptsRun + newer.scriptsRun,
+      scriptResults = scriptResults.combine(newer.scriptResults),
+      scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
+      ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
+      transactionFilter = newFilter
+    )
 }
 
 object Diff {
