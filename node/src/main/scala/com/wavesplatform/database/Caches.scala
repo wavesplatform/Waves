@@ -274,10 +274,9 @@ abstract class Caches extends Blockchain with Storage {
       ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
       prevBalance = balancesCache.get(key) if prevBalance.balance != amount
-      prevHeight  = if (prevBalance.height == height) prevBalance.prevHeight else prevBalance.height
     } yield key -> (
-      CurrentBalance(amount, Height(height), prevHeight),
-      BalanceNode(amount, prevHeight)
+      CurrentBalance(amount, Height(height), prevBalance.height),
+      BalanceNode(amount, prevBalance.height)
     )
 
     val updatedDataWithNodes = for {
@@ -286,10 +285,9 @@ abstract class Caches extends Blockchain with Storage {
     } yield {
       val entryKey   = (address, key)
       val prevData   = accountDataCache.get(entryKey)
-      val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
       entryKey -> (
-        CurrentData(entry, Height(height), prevHeight),
-        DataNode(entry, prevHeight)
+        CurrentData(entry, Height(height), prevData.height),
+        DataNode(entry, prevData.height)
       )
     }
 
@@ -297,9 +295,8 @@ abstract class Caches extends Blockchain with Storage {
       (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills
     } yield {
       val prevData   = volumeAndFeeCache.get(orderId)
-      val prevHeight = if (prevData.height == height) prevData.prevHeight else prevData.height
-      val current    = CurrentVolumeAndFee(volume, fee, Height(height), prevHeight)
-      val node       = VolumeAndFeeNode(volume, fee, prevHeight)
+      val current    = CurrentVolumeAndFee(volume, fee, Height(height), prevData.height)
+      val node       = VolumeAndFeeNode(volume, fee, prevData.height)
       orderId -> (current, node)
     }
 
