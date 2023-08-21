@@ -13,7 +13,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{StaticAssetInfo, Status as PBStatus, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta, Status as PBStatus}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -543,7 +543,7 @@ class RocksDBWriter(
       }
 
       for ((assetId, sponsorship) <- snapshot.sponsorships) {
-        rw.put(Keys.sponsorship(assetId)(height), SponsorshipValue(sponsorship.minFee))
+        rw.put(Keys.sponsorship(assetId)(height), sponsorship)
         expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(assetId), threshold, Keys.sponsorship(assetId))
       }
 

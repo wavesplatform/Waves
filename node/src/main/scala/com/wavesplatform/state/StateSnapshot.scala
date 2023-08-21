@@ -11,13 +11,13 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.{AssetStatic, TransactionStatus}
-import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.collection.immutable.VectorMap
 
@@ -44,7 +44,7 @@ case class StateSnapshot(
   def toProtobuf(txStatus: TxMeta.Status): TransactionStateSnapshot =
     TransactionStateSnapshot(
       balances.map { case ((address, asset), balance) =>
-        S.Balance(address.toByteString, Some(Amount(asset.fold(ByteString.EMPTY)(_.id.toByteString), balance)))
+        S.Balance(address.toByteString, Some(PBAmounts.fromAssetAndAmount(asset, balance)))
       }.toSeq,
       leaseBalances.map { case (address, balance) =>
         S.LeaseBalance(address.toByteString, balance.in, balance.out)
