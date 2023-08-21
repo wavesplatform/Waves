@@ -43,7 +43,7 @@ object Portfolio {
             case None =>
               Right(seed.updated(asset, balance))
             case Some(oldBalance) =>
-              safeSum(oldBalance, balance, s"asset $asset overflow").map { newBalance =>
+              safeSum(oldBalance, balance, s"asset $asset").map { newBalance =>
                 seed.updated(asset, newBalance)
               }
           }
