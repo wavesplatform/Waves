@@ -200,13 +200,13 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     )
   }
 
-//  private def assertNoFix(d: Domain): Unit = {
-//    val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5)
-//    d.appendBlock(genesisTxs*)
-//    d.appendBlock(setNoFix*)
-//    d.appendBlock(checkNoFix*)
-//    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
-//  }
+  private def assertNoFix(d: Domain): Unit = {
+    val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5)
+    d.appendBlock(genesisTxs*)
+    d.appendBlock(setNoFix*)
+    d.appendBlock(checkNoFix*)
+    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
+  }
 
   private def assertFix(d: Domain, lastVersion: StdLibVersion): Unit = {
     val (genesisTxs, setNoFix, setFix, checkNoFix, checkFix) = scenario(lastVersion)
@@ -223,7 +223,7 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   }
 
   property(s"string functions return correct results for unicode input after ${BlockchainFeatures.SynchronousCalls} activation") {
-    //withDomain(RideV4)(assertNoFix)
+    withDomain(RideV4)(assertNoFix)
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V5)
       .foreach(v => withDomain(settingsForRide(v).configure(_.copy(enforceTransferValidationAfter = 0)))(assertFix(_, v)))
