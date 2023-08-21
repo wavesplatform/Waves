@@ -152,7 +152,7 @@ object BlockDiffer {
     }
 
     val blockchainWithNewBlock = SnapshotBlockchain(blockchain, StateSnapshot.empty, block, hitSource, 0, blockchain.lastBlockReward)
-    val initSnapshotAndFeeE =
+    val initSnapshotE =
       for {
         feeFromPreviousBlock                             <- feeFromPreviousBlockE
         initialFeeFromThisBlock                          <- initialFeeFromThisBlockE
@@ -164,11 +164,11 @@ object BlockDiffer {
         totalRewardPortfolios    <- Portfolio.combine(totalMinerPortfolio, nonMinerRewardPortfolios)
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
         resultSnapshot <- patchesSnapshot.addBalances(totalRewardPortfolios, blockchainWithNewBlock)
-      } yield (resultSnapshot, totalFee)
+      } yield resultSnapshot
 
     for {
-      _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      (initSnapshot, totalFee) <- TracedResult(initSnapshotAndFeeE.leftMap(GenericError(_)))
+      _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
+      initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
       // TODO: correctly obtain previous state hash on feature activation height
       prevStateHash = if (blockchain.height == 0) Some(TxStateSnapshotHashBuilder.InitStateHash) else maybePrevBlock.flatMap(_.header.stateHash)
       r <- apply(
@@ -177,7 +177,6 @@ object BlockDiffer {
         maybePrevBlock.map(_.header.timestamp),
         prevStateHash,
         initSnapshot,
-        totalFee,
         stateHeight >= ngHeight,
         block.header.challengedHeader.isDefined,
         block.transactionData,
@@ -242,7 +241,6 @@ object BlockDiffer {
         prevBlockTimestamp,
         prevStateHash,
         StateSnapshot.empty,
-        Portfolio(),
         hasNg = true,
         hasChallenge = false,
         micro.transactionData,
@@ -299,7 +297,6 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       prevStateHash: Option[ByteStr],
       initSnapshot: StateSnapshot,
-      initFeePortfolio: Portfolio,
       hasNg: Boolean,
       hasChallenge: Boolean,
       txs: Seq[Transaction],
@@ -320,7 +317,7 @@ object BlockDiffer {
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
 
     prepareCaches(blockGenerator, txs, loadCacheData)
-    val initDetailedSnapshot = DetailedSnapshot(initSnapshot, Vector(Map(blockGenerator -> initFeePortfolio)))
+    val initDetailedSnapshot = DetailedSnapshot(initSnapshot, Vector())
 
     val initStateHash =
       if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {

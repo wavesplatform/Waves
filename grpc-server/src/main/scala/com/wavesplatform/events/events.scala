@@ -558,7 +558,7 @@ object StateUpdate {
 
     val (totalSnapshot, _, txsStateUpdates) =
       detailedSnapshot.parentSnapshot.transactions
-        .foldLeft((detailedSnapshot.parentSnapshot, detailedSnapshot.feePortfolios.drop(1), Seq.empty[StateUpdate])) {
+        .foldLeft((detailedSnapshot.parentSnapshot, detailedSnapshot.feePortfolios, Seq.empty[StateUpdate])) {
           case ((accSnapshot, feePortfolios, updates), (_, txInfo)) =>
             val relevantFeePortfolios =
               feePortfolios
