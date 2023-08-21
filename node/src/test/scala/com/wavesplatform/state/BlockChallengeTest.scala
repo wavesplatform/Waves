@@ -6,7 +6,7 @@ import akka.http.scaladsl.testkit.*
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, Status}
-import com.wavesplatform.api.http.{AddressApiRoute, ApiMarshallers, BlocksApiRoute, RouteTimeout, TransactionsApiRoute}
+import com.wavesplatform.api.http.*
 import com.wavesplatform.block.{Block, ChallengedHeader, MicroBlock}
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
@@ -32,11 +32,11 @@ import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.{JsonMatchers, Schedulers, SharedSchedulerMixin}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -49,9 +49,8 @@ import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import java.util.concurrent.locks.ReentrantLock
-import scala.collection.immutable.VectorMap
-import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Promise}
 
 class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers with SharedSchedulerMixin {
 
