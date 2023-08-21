@@ -1,11 +1,9 @@
 package com.wavesplatform.utx
 
-import cats.implicits.catsSyntaxSemigroup
-import cats.implicits.toTraverseOps
+import cats.implicits.{catsSyntaxSemigroup, toTraverseOps}
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
