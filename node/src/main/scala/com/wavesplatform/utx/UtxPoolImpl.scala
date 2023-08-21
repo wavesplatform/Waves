@@ -218,22 +218,22 @@ case class UtxPoolImpl(
   ): TracedResult[ValidationError, Boolean] = {
     val diffEi = {
       def calculateSnapshot(): TracedResult[ValidationError, StateSnapshot] = {
-          if (forceValidate)
-            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
-              priorityPool.compositeBlockchain,
-              tx
-            )
-          else
-            TransactionDiffer.limitedExecution(
-              blockchain.lastBlockTimestamp,
-              time.correctedTime(),
-              utxSettings.alwaysUnlimitedExecution,
-              verify,
-              enableExecutionLog = true
-            )(
-              priorityPool.compositeBlockchain,
-              tx
-            )
+        if (forceValidate)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+            priorityPool.compositeBlockchain,
+            tx
+          )
+        else
+          TransactionDiffer.limitedExecution(
+            blockchain.lastBlockTimestamp,
+            time.correctedTime(),
+            utxSettings.alwaysUnlimitedExecution,
+            verify,
+            enableExecutionLog = true
+          )(
+            priorityPool.compositeBlockchain,
+            tx
+          )
       }
 
       if (canLock) priorityPool.optimisticRead(calculateSnapshot())(_.resultE.isLeft)
@@ -416,16 +416,18 @@ case class UtxPoolImpl(
                         (r.totalSnapshot |+| newSnapshot)
                           .addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
 
-                      PackResult(
-                        Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                        resultSnapshot.explicitGet(),
-                        updatedConstraint,
-                        r.iterations + 1,
-                        newCheckedAddresses,
-                        r.validatedTransactions + tx.id(),
-                        r.removedTransactions,
-                        r.stateHash.map(prevStateHash =>
-                          TxStateSnapshotHashBuilder.createHashFromSnapshot(newSnapshot, None).createHash(prevStateHash)
+                      resultSnapshot.fold(
+                        error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                        PackResult(
+                          Some(r.transactions.fold(Seq(tx))(tx +: _)),
+                          _,
+                          updatedConstraint,
+                          r.iterations + 1,
+                          newCheckedAddresses,
+                          r.validatedTransactions + tx.id(),
+                          r.removedTransactions,
+                          r.stateHash
+                            .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(newSnapshot, None).createHash(prevStateHash))
                         )
                       )
                     }
