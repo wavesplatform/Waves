@@ -460,7 +460,10 @@ object InvokeDiffsCommon {
       remainingLimit: Int
   ): TracedResult[ValidationError, StateSnapshot] = {
     actions.foldM(initSnapshot) { (currentSnapshot, action) =>
-      val complexityLimit = remainingLimit
+      val complexityLimit =
+        if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
+        else remainingLimit
+
       val blockchain      = SnapshotBlockchain(sblockchain, currentSnapshot)
       val actionSender    = Recipient.Address(ByteStr(dAppAddress.bytes))
 
