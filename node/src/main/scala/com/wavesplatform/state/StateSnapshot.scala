@@ -255,6 +255,7 @@ object StateSnapshot {
         case TransactionStatus.FAILED    => TxMeta.Status.Failed
         case TransactionStatus.SUCCEEDED => TxMeta.Status.Succeeded
         case TransactionStatus.ELIDED    => TxMeta.Status.Elided
+        case status                      => throw new RuntimeException(s"unexpected TransactionStatus $status")
       }
     )
   }
