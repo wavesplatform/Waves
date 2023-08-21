@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits.{catsSyntaxSemigroup, toTraverseOps}
+import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toTraverseOps}
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -45,8 +45,8 @@ case class Diff(
       orderFills <- {
         val combinedOrders =
           orderFills.toSeq
-            .traverse { case (orderId, value) =>
-              value.combineE(newer.orderFills(orderId)).map(orderId -> _)
+            .traverse { case kv @ (orderId, value) =>
+              newer.orderFills.get(orderId).fold(kv.asRight[String])(value.combineE(_).map(orderId -> _))
             }
             .map(_.toMap)
         combinedOrders.map(co => co ++ newer.orderFills.filterNot { case (id, _) => co.contains(id) })
