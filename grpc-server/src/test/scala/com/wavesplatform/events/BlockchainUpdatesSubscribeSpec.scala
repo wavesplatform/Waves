@@ -12,7 +12,6 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
@@ -108,26 +107,26 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkTransfer(append.transactionIds(1), append.transactionAt(1), transferTx2, recipient.publicKeyHash)
         checkTransfer(append.transactionIds(2), append.transactionAt(2), transferTx3, recipient.publicKeyHash)
 
-        val recipientBalanceBefore = 6.waves + CurrentBlockFeePart(fee1 + fee2 + fee3)
+        val reward = 6.waves
         checkBalances(
           append.transactionStateUpdates(0).balances,
           Map(
             (senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - (fee1 + amount)),
-            (recipient, Waves)     -> (recipientBalanceBefore, recipientBalanceBefore + amount)
+            (recipient, Waves)     -> (reward, reward + amount + fee1 / 5 * 2)
           )
         )
         checkBalances(
           append.transactionStateUpdates(1).balances,
           Map(
             (senderAddress, Waves) -> (senderBalanceBefore - (fee1 + amount), senderBalanceBefore - (fee1 + fee2 + 2 * amount)),
-            (recipient, Waves)     -> (recipientBalanceBefore + amount, recipientBalanceBefore + 2 * amount)
+            (recipient, Waves)     -> (reward + amount + fee1 / 5 * 2, reward + 2 * amount + (fee1 + fee2) / 5 * 2)
           )
         )
         checkBalances(
           append.transactionStateUpdates(2).balances,
           Map(
             (senderAddress, Waves) -> (senderBalanceBefore - (fee1 + fee2 + 2 * amount), senderBalanceBefore - (fee1 + fee2 + fee3 + 3 * amount)),
-            (recipient, Waves)     -> (recipientBalanceBefore + 2 * amount, recipientBalanceBefore + 3 * amount)
+            (recipient, Waves)     -> (reward + 2 * amount + (fee1 + fee2) / 5 * 2, reward + 3 * amount + (fee1 + fee2 + fee3) / 5 * 2)
           )
         )
       }

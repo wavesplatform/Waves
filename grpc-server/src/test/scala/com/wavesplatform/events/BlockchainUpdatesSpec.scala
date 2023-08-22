@@ -11,15 +11,7 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{
-  AssetInfo,
-  AssetStateUpdate,
-  BalanceUpdate,
-  DataEntryUpdate,
-  LeaseUpdate,
-  LeasingBalanceUpdate,
-  ScriptUpdate
-}
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
@@ -38,13 +30,12 @@ import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.OrderType
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -853,11 +844,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         append.stateUpdate.get.balances shouldBe Seq(
           protobuf.StateUpdate.BalanceUpdate(
             challengingMiner.toAddress.toByteString,
-            Some(
-              Amount(amount =
-                initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial + txs.map(tx => CurrentBlockFeePart(tx.fee.value)).sum
-              )
-            ),
+            Some(Amount(amount = initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial)),
             initChallengingBalance
           )
         )

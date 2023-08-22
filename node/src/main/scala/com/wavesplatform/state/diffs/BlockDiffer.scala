@@ -362,11 +362,8 @@ object BlockDiffer {
               val txInfo = txSnapshot.transactions.head._2
               for {
                 resultTxSnapshot <- txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_))
-                newParentSnapshot <- detailedSnapshot.parentSnapshot
-                  .withTransaction(txInfo)
-                  .addBalances(minerPortfolioMap, currBlockchain)
-                  .leftMap(GenericError(_))
-                newFeePortfolios = detailedSnapshot.feePortfolios :+ minerPortfolioMap
+                newParentSnapshot = detailedSnapshot.parentSnapshot.withTransaction(txInfo)
+                newFeePortfolios  = detailedSnapshot.feePortfolios :+ minerPortfolioMap
               } yield {
                 val newSnapshot   = currSnapshot |+| resultTxSnapshot
                 val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)

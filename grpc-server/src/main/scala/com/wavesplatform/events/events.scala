@@ -19,7 +19,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -539,42 +539,29 @@ object StateUpdate {
 
   def container(
       blockchainBeforeWithReward: Blockchain,
-      detailedSnapshot: DetailedSnapshot,
-      minerAddress: Address
+      detailedSnapshot: DetailedSnapshot
   ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata], Seq[AssetInfo]) = {
-    val parentStateUpdate = atomic(blockchainBeforeWithReward, detailedSnapshot.parentSnapshot)
-
-    // miner reward is already in the blockchainBeforeWithReward
-    // if miner balance has been changed in parentSnapshot, it is already included in balance updates
-    // if it has not, it needs to be manually requested from the blockchain and added to balance updates
-    // TODO: remove
-    val parentStateUpdateWithMinerReward = parentStateUpdate.balances.find(_.address == minerAddress) match {
-      case Some(_) => parentStateUpdate
-      case None =>
-        val minerBalance = blockchainBeforeWithReward.balance(minerAddress, Waves)
-        val reward       = blockchainBeforeWithReward.blockReward(blockchainBeforeWithReward.height).getOrElse(0L)
-        parentStateUpdate.copy(balances = parentStateUpdate.balances :+ BalanceUpdate(minerAddress, Waves, minerBalance - reward, minerBalance))
-    }
-
     val (totalSnapshot, _, txsStateUpdates) =
       detailedSnapshot.parentSnapshot.transactions
         .foldLeft((detailedSnapshot.parentSnapshot, detailedSnapshot.feePortfolios, Seq.empty[StateUpdate])) {
           case ((accSnapshot, feePortfolios, updates), (_, txInfo)) =>
             val relevantFeePortfolios =
-              feePortfolios
-                .reduce(Portfolio.combine(_, _).explicitGet())
+              feePortfolios.headOption
+                .getOrElse(Map.empty)
                 .filter { case (address, _) => txInfo.affected.contains(address) }
-            val txSnapshot = txInfo.snapshot.addBalances(relevantFeePortfolios, blockchainBeforeWithReward).explicitGet()
+            val accBlockchain = SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot)
+            val txSnapshot    = txInfo.snapshot.addBalances(relevantFeePortfolios, accBlockchain).explicitGet()
             (
               accSnapshot |+| txSnapshot,
               feePortfolios.drop(1),
-              updates :+ atomic(SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot), txSnapshot)
+              updates :+ atomic(accBlockchain, txSnapshot)
             )
         }
-    val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
-    val metadata        = transactionsMetadata(blockchainAfter, totalSnapshot)
-    val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
-    (parentStateUpdateWithMinerReward, txsStateUpdates, metadata, refAssets)
+    val blockchainAfter   = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
+    val metadata          = transactionsMetadata(blockchainAfter, totalSnapshot)
+    val refAssets         = referencedAssets(blockchainAfter, txsStateUpdates)
+    val parentStateUpdate = atomic(blockchainBeforeWithReward, detailedSnapshot.parentSnapshot)
+    (parentStateUpdate, txsStateUpdates, metadata, refAssets)
   }
 }
 
@@ -632,7 +619,7 @@ object BlockAppended {
   ): BlockAppended = {
     val height = blockchainBeforeWithReward.height
     val (blockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
-      StateUpdate.container(blockchainBeforeWithReward, snapshot, block.sender.toAddress)
+      StateUpdate.container(blockchainBeforeWithReward, snapshot)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
     val wavesAmount        = blockchainBeforeWithReward.wavesAmount(height).toLong
@@ -686,7 +673,7 @@ object MicroBlockAppended {
       totalTransactionsRoot: ByteStr
   ): MicroBlockAppended = {
     val (microBlockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
-      StateUpdate.container(blockchainBeforeWithReward, snapshot, microBlock.sender.toAddress)
+      StateUpdate.container(blockchainBeforeWithReward, snapshot)
 
     MicroBlockAppended(
       totalBlockId,
