@@ -88,13 +88,13 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState {
         "with NG" - {
           val ngFs = TFS.Enabled.copy(preActivatedFeatures = TFS.Enabled.preActivatedFeatures + (BlockchainFeatures.NG.id -> 0))
 
-          "no history — only 40% from current block" in {
+          "no history — no reward" in {
             assertDetailedSnapshot(Seq.empty, block, ngFs) { case (_, DetailedSnapshot(parentSnapshot, _)) =>
-              parentSnapshot.balances((address1, Waves)) shouldBe ENOUGH_AMT + fee1 / 5 * 2 + fee2 / 5 * 2
+              parentSnapshot.balances shouldBe empty
             }
           }
 
-          "with history — 60% from last + 40% from current block" in {
+          "with history — 60% from last" in {
             val blocksNgMiner: (Seq[Block], Block, Address) = {
               val a1    = TxHelpers.signer(1)
               val a2    = TxHelpers.signer(2)
@@ -118,7 +118,7 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState {
 
             val (history, block, ngMiner) = blocksNgMiner
             assertDetailedSnapshot(history, block, ngFs) { case (_, DetailedSnapshot(parentSnapshot, _)) =>
-              parentSnapshot.balances((ngMiner, Waves)) shouldBe (fee1 - fee1 / 5 * 2) + fee2 / 5 * 2
+              parentSnapshot.balances((ngMiner, Waves)) shouldBe (fee1 - fee1 / 5 * 2)
             }
           }
         }
