@@ -362,7 +362,7 @@ object BlockDiffer {
               val txInfo = txSnapshot.transactions.head._2
               for {
                 resultTxSnapshot <- txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_))
-                newMinerSnapshot <- detailedSnapshot.parentSnapshot
+                newParentSnapshot <- detailedSnapshot.parentSnapshot
                   .withTransaction(txInfo)
                   .addBalances(minerPortfolioMap, currBlockchain)
                   .leftMap(GenericError(_))
@@ -376,7 +376,7 @@ object BlockDiffer {
                   carryFee + carry,
                   totalWavesFee,
                   updatedConstraint,
-                  DetailedSnapshot(newMinerSnapshot, newFeePortfolios),
+                  DetailedSnapshot(newParentSnapshot, newFeePortfolios),
                   prevStateHash
                     .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(resultTxSnapshot, Some(txInfo)).createHash(prevStateHash))
                 )
