@@ -13,8 +13,7 @@ import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.Block
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.repo.LiquidState
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
@@ -62,11 +61,11 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     })(_.keyBlock.height)
 
   override def onProcessBlock(
-    block: Block,
-    snapshot: DetailedSnapshot,
-    reward: Option[Long],
-    hitSource: ByteStr,
-    blockchainBeforeWithReward: Blockchain
+      block: Block,
+      snapshot: StateSnapshot,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      blockchainBeforeWithReward: Blockchain
   ): Unit = monitor.synchronized {
     require(
       liquidState.forall(_.totalBlockId == block.header.reference),
@@ -84,7 +83,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
-      snapshot: DetailedSnapshot,
+      snapshot: StateSnapshot,
       blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr

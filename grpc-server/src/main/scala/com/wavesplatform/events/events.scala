@@ -16,7 +16,6 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -539,29 +538,23 @@ object StateUpdate {
 
   def container(
       blockchainBeforeWithReward: Blockchain,
-      detailedSnapshot: DetailedSnapshot
+      keyBlockSnapshot: StateSnapshot
   ): (StateUpdate, Seq[StateUpdate], Seq[TransactionMetadata], Seq[AssetInfo]) = {
-    val (totalSnapshot, _, txsStateUpdates) =
-      detailedSnapshot.parentSnapshot.transactions
-        .foldLeft((detailedSnapshot.parentSnapshot, detailedSnapshot.feePortfolios, Seq.empty[StateUpdate])) {
-          case ((accSnapshot, feePortfolios, updates), (_, txInfo)) =>
-            val relevantFeePortfolios =
-              feePortfolios.headOption
-                .getOrElse(Map.empty)
-                .filter { case (address, _) => txInfo.affected.contains(address) }
-            val accBlockchain = SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot)
-            val txSnapshot    = txInfo.snapshot.addBalances(relevantFeePortfolios, accBlockchain).explicitGet()
-            (
-              accSnapshot |+| txSnapshot,
-              feePortfolios.drop(1),
-              updates :+ atomic(accBlockchain, txSnapshot)
-            )
+    val (totalSnapshot, txsStateUpdates) =
+      keyBlockSnapshot.transactions
+        .foldLeft((keyBlockSnapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), (_, txInfo)) =>
+          val accBlockchain = SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot)
+          val txSnapshot    = txInfo.snapshot.copy(balances = txInfo.snapshot.balances.filter { case ((a, _), _) => txInfo.affected.contains(a) })
+          (
+            accSnapshot |+| txSnapshot,
+            updates :+ atomic(accBlockchain, txSnapshot)
+          )
         }
-    val blockchainAfter   = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
-    val metadata          = transactionsMetadata(blockchainAfter, totalSnapshot)
-    val refAssets         = referencedAssets(blockchainAfter, txsStateUpdates)
-    val parentStateUpdate = atomic(blockchainBeforeWithReward, detailedSnapshot.parentSnapshot)
-    (parentStateUpdate, txsStateUpdates, metadata, refAssets)
+    val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
+    val metadata        = transactionsMetadata(blockchainAfter, totalSnapshot)
+    val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
+    val keyBlockUpdate  = atomic(blockchainBeforeWithReward, keyBlockSnapshot)
+    (keyBlockUpdate, txsStateUpdates, metadata, refAssets)
   }
 }
 
@@ -612,7 +605,7 @@ final case class BlockAppended(
 object BlockAppended {
   def from(
       block: Block,
-      snapshot: DetailedSnapshot,
+      snapshot: StateSnapshot,
       blockchainBeforeWithReward: Blockchain,
       reward: Option[Long],
       hitSource: ByteStr
@@ -667,7 +660,7 @@ final case class MicroBlockAppended(
 object MicroBlockAppended {
   def from(
       microBlock: MicroBlock,
-      snapshot: DetailedSnapshot,
+      snapshot: StateSnapshot,
       blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr

@@ -28,13 +28,8 @@ object BlockDiffer {
       carry: Long,
       totalFee: Long,
       constraint: MiningConstraint,
-      detailedSnapshot: DetailedSnapshot,
+      keyBlockSnapshot: StateSnapshot,
       stateHash: Option[ByteStr]
-  )
-
-  case class DetailedSnapshot(
-      parentSnapshot: StateSnapshot,
-      feePortfolios: Vector[Map[Address, Portfolio]]
   )
 
   case class Fraction(dividend: Int, divider: Int) {
@@ -317,7 +312,6 @@ object BlockDiffer {
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
 
     prepareCaches(blockGenerator, txs, loadCacheData)
-    val initDetailedSnapshot = DetailedSnapshot(initSnapshot, Vector())
 
     val initStateHash =
       if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
@@ -328,12 +322,12 @@ object BlockDiffer {
       } else None
 
     txs
-      .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initDetailedSnapshot, initStateHash).asRight[ValidationError])) {
+      .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initSnapshot, initStateHash).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
         case (
               TracedResult(
                 Right(
-                  result @ Result(currSnapshot, carryFee, currTotalFee, currConstraint, detailedSnapshot, prevStateHash)
+                  result @ Result(currSnapshot, carryFee, currTotalFee, currConstraint, keyBlockSnapshot, prevStateHash)
                 ),
                 _,
                 _
@@ -362,8 +356,7 @@ object BlockDiffer {
               val txInfo = txSnapshot.transactions.head._2
               for {
                 resultTxSnapshot <- txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_))
-                newParentSnapshot = detailedSnapshot.parentSnapshot.withTransaction(txInfo)
-                newFeePortfolios  = detailedSnapshot.feePortfolios :+ minerPortfolioMap
+                newKeyBlockSnapshot = keyBlockSnapshot.withTransaction(txInfo.copy(snapshot = resultTxSnapshot))
               } yield {
                 val newSnapshot   = currSnapshot |+| resultTxSnapshot
                 val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
@@ -373,7 +366,7 @@ object BlockDiffer {
                   carryFee + carry,
                   totalWavesFee,
                   updatedConstraint,
-                  DetailedSnapshot(newParentSnapshot, newFeePortfolios),
+                  newKeyBlockSnapshot,
                   prevStateHash
                     .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(resultTxSnapshot, Some(txInfo)).createHash(prevStateHash))
                 )

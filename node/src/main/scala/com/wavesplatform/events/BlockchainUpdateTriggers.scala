@@ -2,20 +2,19 @@ package com.wavesplatform.events
 
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedSnapshot
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 
 trait BlockchainUpdateTriggers {
   def onProcessBlock(
       block: Block,
-      snapshot: DetailedSnapshot,
+      snapshot: StateSnapshot,
       reward: Option[Long],
       hitSource: ByteStr,
       blockchainBeforeWithReward: Blockchain
   ): Unit
   def onProcessMicroBlock(
       microBlock: MicroBlock,
-      snapshot: DetailedSnapshot,
+      snapshot: StateSnapshot,
       blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
@@ -28,14 +27,14 @@ object BlockchainUpdateTriggers {
   def noop: BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
     override def onProcessBlock(
         block: Block,
-        snapshot: DetailedSnapshot,
+        snapshot: StateSnapshot,
         reward: Option[Long],
         hitSource: ByteStr,
         blockchainBeforeWithReward: Blockchain
     ): Unit = {}
     override def onProcessMicroBlock(
         microBlock: MicroBlock,
-        snapshot: DetailedSnapshot,
+        snapshot: StateSnapshot,
         blockchainBeforeWithReward: Blockchain,
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
@@ -47,7 +46,7 @@ object BlockchainUpdateTriggers {
   def combined(triggers: => Seq[BlockchainUpdateTriggers]): BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
     override def onProcessBlock(
         block: Block,
-        snapshot: DetailedSnapshot,
+        snapshot: StateSnapshot,
         reward: Option[Long],
         hitSource: ByteStr,
         blockchainBeforeWithReward: Blockchain
@@ -56,7 +55,7 @@ object BlockchainUpdateTriggers {
 
     override def onProcessMicroBlock(
         microBlock: MicroBlock,
-        snapshot: DetailedSnapshot,
+        snapshot: StateSnapshot,
         blockchainBeforeWithReward: Blockchain,
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
