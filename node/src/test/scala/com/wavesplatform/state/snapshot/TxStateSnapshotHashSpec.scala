@@ -107,7 +107,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
 
   def hash(bs: Seq[Array[Byte]]): ByteStr = ByteStr(com.wavesplatform.crypto.fastHash(bs.reduce(_ ++ _)))
 
-  property("correctly create transaction state snapshot hash from diff") {
+  property("correctly create transaction state snapshot hash from snapshot") {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
       val snapshot = SnapshotOps.fromDiff(diff, d.blockchain).explicitGet()
       TxStateSnapshotHashBuilder.createHashFromSnapshot(snapshot, None).txStateSnapshotHash shouldBe hash(
