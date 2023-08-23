@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.ByteStrExt
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
@@ -21,19 +22,23 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount}
 
 import scala.collection.immutable.VectorMap
+import scala.math.pow
 
 class StateSnapshotStorageTest extends PropSpec with WithDomain {
   property("transaction snapshot storage") {
     withDomain(RideV6.configure(_.copy(minAssetInfoUpdateInterval = 2))) { d =>
-      val sender          = secondSigner
-      val senderAddress   = secondAddress
-      val recipientSigner = TxHelpers.signer(2)
-      val recipient       = recipientSigner.toAddress
+      val sender           = secondSigner
+      val senderAddress    = secondAddress
+      val recipientSigner  = TxHelpers.signer(2)
+      val recipient        = recipientSigner.toAddress
+      val recipientSigner2 = TxHelpers.signer(3)
+      val recipient2       = recipientSigner2.toAddress
 
-      def assertSnapshot(tx: Transaction, expected: StateSnapshot): Unit = {
-        d.appendAndAssertSucceed(tx)
+      def assertSnapshot(tx: Transaction, expected: StateSnapshot, failed: Boolean = false): Unit = {
+        if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
-        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get)._1 shouldBe expected
+        val status = if (failed) Failed else Succeeded
+        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expected, status)
       }
 
       assertSnapshot(
@@ -47,7 +52,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         StateSnapshot(
           balances = VectorMap(
             (recipient, Waves)     -> 1.waves,
-            (senderAddress, Waves) -> (ENOUGH_AMT - 1.waves - fee)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves - fee)
           )
         )
       )
@@ -56,7 +61,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         StateSnapshot(
           balances = VectorMap(
             (recipient, Waves)     -> 2.waves,
-            (senderAddress, Waves) -> (ENOUGH_AMT - 2.waves - 2 * fee)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves - fee)
           )
         )
       )
@@ -68,7 +73,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         StateSnapshot(
           balances = VectorMap(
             (senderAddress, asset) -> issueTx.quantity.value,
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 2 * fee)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           assetStatics = Map(
             asset -> AssetStatic(asset.id.toByteString, issueTx.id().toByteString, sender.publicKey.toByteString, issueTx.decimals.value)
@@ -89,7 +94,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         StateSnapshot(
           balances = VectorMap(
             (senderAddress, asset) -> (issueTx.quantity.value + 1000),
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 3 * fee)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           assetVolumes = Map(
             asset -> AssetVolumeInfo(isReissuable = true, BigInt(issueTx.quantity.value + 1000))
@@ -101,21 +106,29 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         StateSnapshot(
           balances = VectorMap(
             (senderAddress, asset) -> (issueTx.quantity.value + 1000 - 1),
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 4 * fee)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           assetVolumes = Map(
             asset -> AssetVolumeInfo(isReissuable = true, BigInt(issueTx.quantity.value + 1000 - 1))
           )
         )
       )
-      val order1 = order(BUY, asset, Waves, matcher = sender, sender = recipientSigner, amount = 123, price = 456, fee = 777)
-      val order2 = order(SELL, asset, Waves, matcher = sender, sender = recipientSigner, amount = 123, price = 456, fee = 888)
+      d.appendBlock(
+        transfer(to = recipient2, amount = 1.waves),
+        transfer(from = sender, to = recipient2, amount = 1.waves, asset = asset, fee = fee)
+      )
+      val order1         = order(BUY, asset, Waves, matcher = sender, sender = recipientSigner, amount = 123, price = 40_000_000, fee = 777)
+      val order2         = order(SELL, asset, Waves, matcher = sender, sender = recipientSigner2, amount = 123, price = 40_000_000, fee = 888)
+      val priceAssetDiff = ((order1.amount.value * order1.price.value) / pow(10, 8)).toLong
       assertSnapshot(
-        exchange(order1, order2, sender, amount = 123, price = 456, buyMatcherFee = 777, sellMatcherFee = 888),
+        exchange(order1, order2, sender, amount = 123, price = 40_000_000, buyMatcherFee = 777, sellMatcherFee = 888),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 5 * fee + order1.matcherFee.value + order2.matcherFee.value),
-            (recipient, Waves)     -> (d.balance(recipient) - order1.matcherFee.value - order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee + order1.matcherFee.value + order2.matcherFee.value),
+            (recipient, asset)     -> (d.balance(recipient, asset) + order1.amount.value),
+            (recipient, Waves)     -> (d.balance(recipient) - order1.matcherFee.value - priceAssetDiff),
+            (recipient2, asset)    -> (d.balance(recipient2, asset) - order1.amount.value),
+            (recipient2, Waves)    -> (d.balance(recipient2) - order2.matcherFee.value + priceAssetDiff)
           ),
           orderFills = Map(
             order1.id() -> VolumeAndFee(order1.amount.value, order1.matcherFee.value),
@@ -128,7 +141,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         leaseTx,
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 6 * fee + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           leaseBalances = Map(
             senderAddress -> LeaseBalance(0, leaseTx.amount.value),
@@ -144,7 +157,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         leaseCancelTx,
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 7 * fee + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           leaseBalances = Map(
             senderAddress -> LeaseBalance(0, 0),
@@ -166,7 +179,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         createAlias("alias", sender),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 8 * fee + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           aliases = Map(Alias.create("alias").explicitGet() -> senderAddress)
         )
@@ -182,7 +195,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         ),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 9 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value),
+            (senderAddress, Waves)                 -> (d.balance(senderAddress) - fee - 123 - 456),
             (TxHelpers.signer(4).toAddress, Waves) -> 123,
             (TxHelpers.signer(5).toAddress, Waves) -> 456
           )
@@ -192,7 +205,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         dataSingle(sender, "key", "value"),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 10 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           accountData = Map(
             senderAddress -> Map(
@@ -205,7 +218,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         setScript(sender, script),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 3.waves - 11 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           accountScripts = Map(
             sender.publicKey -> Some(AccountScriptInfo(sender.publicKey, script, 0))
@@ -220,7 +233,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         sponsor(asset2, Some(sponsorFee), sender),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 5.waves - 11 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           sponsorships = Map(
             asset2 -> SponsorshipValue(sponsorFee)
@@ -231,7 +244,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         setAssetScript(sender, asset, script),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 6.waves - 11 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           assetScripts = Map(
             asset -> Some(AssetScriptInfo(script, 0))
@@ -241,10 +254,16 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
       val setDApp = setScript(
         recipientSigner,
         TestCompiler(V6).compileContract(
-          """
-            | @Callable(i)
-            | func default() = []
-          """.stripMargin
+          s"""
+             | @Callable(i)
+             | func default() = []
+             |
+             | @Callable(i)
+             | func fail() = {
+             |   strict c = ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+             |   if (true) then throw() else []
+             | }
+           """.stripMargin
         )
       )
       d.appendBlock(setDApp)
@@ -252,7 +271,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         invoke(invoker = sender, dApp = recipient, fee = fee),
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 6.waves - 12 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           )
         )
       )
@@ -261,7 +280,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         updateAssetTx,
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (ENOUGH_AMT - 6.waves - 13 * fee - 123 - 456 + order1.matcherFee.value + order2.matcherFee.value)
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           assetNamesAndDescriptions = Map(
             asset2 -> AssetInfo(updateAssetTx.name, updateAssetTx.description, Height(d.solidStateHeight + 2))
@@ -274,11 +293,30 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         ethTransfer,
         StateSnapshot(
           balances = VectorMap(
-            (ethTransfer.senderAddress(), Waves)  -> (1.waves - 100_000),
-            (ethTransfer.senderAddress(), asset2) -> (1.waves - 1),
+            (ethTransfer.senderAddress(), Waves)  -> (d.balance(ethTransfer.senderAddress()) - 100_000),
+            (ethTransfer.senderAddress(), asset2) -> (d.balance(ethTransfer.senderAddress(), asset2) - 1),
             (recipient, asset2)                   -> 1
           )
         )
+      )
+      val ethInvoke = EthTxGenerator.generateEthInvoke(defaultEthSigner, address = recipient, "default", Seq(), Seq())
+      d.appendBlock(transfer(sender, ethInvoke.senderAddress()))
+      assertSnapshot(
+        ethInvoke,
+        StateSnapshot(
+          balances = VectorMap(
+            (ethInvoke.senderAddress(), Waves) -> (d.balance(ethInvoke.senderAddress()) - 500_000)
+          )
+        )
+      )
+      assertSnapshot(
+        invoke(invoker = sender, func = Some("fail"), dApp = recipient, fee = fee),
+        StateSnapshot(
+          balances = VectorMap(
+            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
+          )
+        ),
+        failed = true
       )
     }
   }
