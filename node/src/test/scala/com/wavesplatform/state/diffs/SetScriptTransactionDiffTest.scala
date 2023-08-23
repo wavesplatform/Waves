@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import scala.util.Try
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
@@ -14,24 +13,26 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.Native
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 import monix.eval.Coeval
 import org.scalatest.Assertion
+
+import scala.util.Try
 
 class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
 
@@ -81,8 +82,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     val containsArray: Boolean           = false
   }
 
-  //TODO uses illegal bytes
-  ignore("limit 32kb/8kb before V6") {
+  property("limit 32kb/8kb before V6") {
     withDomain(DomainPresets.RideV5) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
@@ -99,8 +99,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO uses illegal bytes
-  ignore("limit 160kb/8kb after V6") {
+  property("limit 160kb/8kb after V6") {
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
@@ -148,8 +147,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     (V6, 160 * 1024, 0.16.waves)
   )
 
-  //TODO uses illegal bytes
-  ignore("lowered contract fee after V6") {
+  property("lowered contract fee after V6") {
     withDomain(DomainPresets.RideV6) { d =>
       forAll(scriptSizes) { case (ver, size, fee) =>
         val script = exactSizeContract(ver, size)
