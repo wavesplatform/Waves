@@ -11,10 +11,12 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status.*
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.KeyType
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers.invoke
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdLength, TxHelpers}
 
@@ -110,63 +112,71 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
   property("correctly create transaction state snapshot hash from snapshot") {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
       val snapshot = SnapshotOps.fromDiff(diff, d.blockchain).explicitGet()
-      TxStateSnapshotHashBuilder.createHashFromSnapshot(snapshot, None).txStateSnapshotHash shouldBe hash(
-        Seq(
-          Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),
-          Array(KeyType.AssetBalance.id.toByte) ++ address2.bytes ++ assetId1.id.arr ++ Longs.toByteArray(addr2PortfolioDiff.assets.head._2),
-          Array(KeyType.DataEntry.id.toByte) ++ address1.bytes ++ dataEntry.key.getBytes(StandardCharsets.UTF_8) ++ dataEntry.valueBytes,
-          Array(KeyType.AccountScript.id.toByte) ++ address2.bytes ++ accountScriptInfo.script.bytes().arr ++ accountScriptInfo.publicKey.arr ++ Longs
-            .toByteArray(accountScriptInfo.verifierComplexity),
-          Array(KeyType.AssetScript.id.toByte) ++ assetId1.id.arr ++ testScript.bytes().arr,
-          Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
-            addr1PortfolioDiff.lease.out
-          ),
-          Array(KeyType.LeaseStatus.id.toByte) ++ leaseId.arr ++ (if (leaseDetails.isActive) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.Sponsorship.id.toByte) ++ assetId1.id.arr ++ Longs.toByteArray(sponsorship.minFee),
-          Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias1.name.getBytes(StandardCharsets.UTF_8),
-          Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),
-          Array(KeyType.Alias.id.toByte) ++ address2.bytes ++ addr2Alias.name.getBytes(StandardCharsets.UTF_8),
-          Array(KeyType.VolumeAndFee.id.toByte) ++ orderId.arr ++ Longs.toByteArray(volumeAndFee.volume) ++ Longs.toByteArray(volumeAndFee.fee),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId1.id.arr ++ assetInfo1.static.issuer.arr ++
-            Array(assetInfo1.static.decimals.toByte) ++ (if (assetInfo1.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId2.id.arr ++ assetInfo2.static.issuer.arr ++
-            Array(assetInfo2.static.decimals.toByte) ++ (if (assetInfo2.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId3.id.arr ++ assetInfo3.static.issuer.arr ++
-            Array(assetInfo3.static.decimals.toByte) ++ (if (assetInfo3.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetStatic.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.arr ++
-            Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
-          Array(KeyType.AssetVolume.id.toByte) ++ assetId1.id.arr ++
-            (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId1).volume.toByteArray,
-          Array(KeyType.AssetVolume.id.toByte) ++ assetId2.id.arr ++
-            (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId2).volume.toByteArray,
-          Array(KeyType.AssetVolume.id.toByte) ++ assetId3.id.arr ++
-            (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId3).volume.toByteArray,
-          Array(KeyType.AssetVolume.id.toByte) ++ assetId4.id.arr ++
-            (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId4).volume.toByteArray,
-          Array(
-            KeyType.AssetNameDescription.id.toByte
-          ) ++ assetId1.id.arr ++ updatedAssetInfo1.name.toByteArray ++ updatedAssetInfo1.description.toByteArray ++ Ints.toByteArray(
-            updatedAssetInfo1.lastUpdatedAt
-          ),
-          Array(
-            KeyType.AssetNameDescription.id.toByte
-          ) ++ assetId2.id.arr ++ updatedAssetInfo2.name.toByteArray ++ updatedAssetInfo2.description.toByteArray ++ Ints.toByteArray(
-            updatedAssetInfo2.lastUpdatedAt
-          ),
-          Array(
-            KeyType.AssetNameDescription.id.toByte
-          ) ++ assetId3.id.arr ++ assetInfo3.dynamic.name.toByteArray ++ assetInfo3.dynamic.description.toByteArray ++ Ints.toByteArray(
-            assetInfo3.dynamic.lastUpdatedAt
-          ),
-          Array(
-            KeyType.AssetNameDescription.id.toByte
-          ) ++ assetId4.id.arr ++ assetInfo4.dynamic.name.toByteArray ++ assetInfo4.dynamic.description.toByteArray ++ Ints.toByteArray(
-            assetInfo4.dynamic.lastUpdatedAt
-          )
-        ).sorted((x: Array[Byte], y: Array[Byte]) => UnsignedBytes.lexicographicalComparator().compare(x, y))
-      )
+      val tx       = invoke()
+      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Succeeded, 123)), Array())
+      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Failed, 123)), tx.id().arr :+ 1)
+      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Elided, 123)), tx.id().arr :+ 2)
+      testHash(snapshot, None, Array())
     }
   }
+
+  private def testHash(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo], txStatusBytes: Array[Byte]) =
+    TxStateSnapshotHashBuilder.createHashFromSnapshot(snapshot, txInfoOpt).txStateSnapshotHash shouldBe hash(
+      Seq(
+        Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),
+        Array(KeyType.AssetBalance.id.toByte) ++ address2.bytes ++ assetId1.id.arr ++ Longs.toByteArray(addr2PortfolioDiff.assets.head._2),
+        Array(KeyType.DataEntry.id.toByte) ++ address1.bytes ++ dataEntry.key.getBytes(StandardCharsets.UTF_8) ++ dataEntry.valueBytes,
+        Array(KeyType.AccountScript.id.toByte) ++ address2.bytes ++ accountScriptInfo.script.bytes().arr ++ accountScriptInfo.publicKey.arr ++ Longs
+          .toByteArray(accountScriptInfo.verifierComplexity),
+        Array(KeyType.AssetScript.id.toByte) ++ assetId1.id.arr ++ testScript.bytes().arr,
+        Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
+          addr1PortfolioDiff.lease.out
+        ),
+        Array(KeyType.LeaseStatus.id.toByte) ++ leaseId.arr ++ (if (leaseDetails.isActive) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.Sponsorship.id.toByte) ++ assetId1.id.arr ++ Longs.toByteArray(sponsorship.minFee),
+        Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias1.name.getBytes(StandardCharsets.UTF_8),
+        Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),
+        Array(KeyType.Alias.id.toByte) ++ address2.bytes ++ addr2Alias.name.getBytes(StandardCharsets.UTF_8),
+        Array(KeyType.VolumeAndFee.id.toByte) ++ orderId.arr ++ Longs.toByteArray(volumeAndFee.volume) ++ Longs.toByteArray(volumeAndFee.fee),
+        Array(KeyType.AssetStatic.id.toByte) ++ assetId1.id.arr ++ assetInfo1.static.issuer.arr ++
+          Array(assetInfo1.static.decimals.toByte) ++ (if (assetInfo1.static.nft) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.AssetStatic.id.toByte) ++ assetId2.id.arr ++ assetInfo2.static.issuer.arr ++
+          Array(assetInfo2.static.decimals.toByte) ++ (if (assetInfo2.static.nft) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.AssetStatic.id.toByte) ++ assetId3.id.arr ++ assetInfo3.static.issuer.arr ++
+          Array(assetInfo3.static.decimals.toByte) ++ (if (assetInfo3.static.nft) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.AssetStatic.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.arr ++
+          Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.AssetVolume.id.toByte) ++ assetId1.id.arr ++
+          (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId1).volume.toByteArray,
+        Array(KeyType.AssetVolume.id.toByte) ++ assetId2.id.arr ++
+          (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId2).volume.toByteArray,
+        Array(KeyType.AssetVolume.id.toByte) ++ assetId3.id.arr ++
+          (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId3).volume.toByteArray,
+        Array(KeyType.AssetVolume.id.toByte) ++ assetId4.id.arr ++
+          (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId4).volume.toByteArray,
+        Array(
+          KeyType.AssetNameDescription.id.toByte
+        ) ++ assetId1.id.arr ++ updatedAssetInfo1.name.toByteArray ++ updatedAssetInfo1.description.toByteArray ++ Ints.toByteArray(
+          updatedAssetInfo1.lastUpdatedAt
+        ),
+        Array(
+          KeyType.AssetNameDescription.id.toByte
+        ) ++ assetId2.id.arr ++ updatedAssetInfo2.name.toByteArray ++ updatedAssetInfo2.description.toByteArray ++ Ints.toByteArray(
+          updatedAssetInfo2.lastUpdatedAt
+        ),
+        Array(
+          KeyType.AssetNameDescription.id.toByte
+        ) ++ assetId3.id.arr ++ assetInfo3.dynamic.name.toByteArray ++ assetInfo3.dynamic.description.toByteArray ++ Ints.toByteArray(
+          assetInfo3.dynamic.lastUpdatedAt
+        ),
+        Array(
+          KeyType.AssetNameDescription.id.toByte
+        ) ++ assetId4.id.arr ++ assetInfo4.dynamic.name.toByteArray ++ assetInfo4.dynamic.description.toByteArray ++ Ints.toByteArray(
+          assetInfo4.dynamic.lastUpdatedAt
+        ),
+        if (txStatusBytes.nonEmpty) Array(KeyType.TransactionStatus.id.toByte) ++ txStatusBytes else Array[Byte]()
+      ).sorted((x: Array[Byte], y: Array[Byte]) => UnsignedBytes.lexicographicalComparator().compare(x, y))
+    )
 
   property("correctly compute hash using previous value") {
     val txStateHash = TxStateSnapshotHashBuilder.Result(ByteStr.fill(DigestLength)(1))
