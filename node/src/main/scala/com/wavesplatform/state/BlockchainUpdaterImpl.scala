@@ -262,32 +262,8 @@ class BlockchainUpdaterImpl(
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
-                  if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
-                    log.trace(s"Existing liquid block is better than new one, discarding $block")
-                    Right(None)
-                  } else {
-                    log.trace(s"New liquid block is better version of existing, swapping")
-                    BlockStats.replaced(ng.bestLiquidBlock, block)
-                    val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
-                    val miningConstraints = MiningConstraints(leveldb, height)
-
-                    blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
-
-                    val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
-                    BlockDiffer
-                      .fromBlock(
-                        referencedBlockchain,
-                        leveldb.lastBlock,
-                        block,
-                        miningConstraints.total,
-                        hitSource,
-                        verify
-                      )
-                      .map { r =>
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
-                        Some((r, Nil, ng.reward, hitSource))
-                      }
-                  }
+                  // silently ignore
+                  Right(None)
                 } else
                   Left(
                     BlockAppendError(
