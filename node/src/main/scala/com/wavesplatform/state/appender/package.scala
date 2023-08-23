@@ -54,14 +54,14 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] = {
+  )(block: Block): Either[ValidationError, (BlockApplyResult, Int)] = {
     if (block.header.challengedHeader.nonEmpty) {
-      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map(_._2)
+      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block)
     } else {
       for {
-        hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-        _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
-      } yield Some(blockchainUpdater.height)
+        hitSource   <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
+        applyResult <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
+      } yield applyResult -> blockchainUpdater.height
     }
   }
 
@@ -72,10 +72,12 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] =
-    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
-      utx.setPriorityDiffs(discardedDiffs)
-      newHeight
+  )(block: Block): Either[ValidationError, BlockApplyResult] =
+    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map {
+      case (res @ Applied(discardedDiffs, _), newHeight) =>
+        utx.setPriorityDiffs(discardedDiffs)
+        res
+      case (res, _) => res
     }
 
   private def processBlockWithChallenge(
@@ -84,16 +86,16 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, (Seq[Diff], Option[Int])] = {
+  )(block: Block): Either[ValidationError, (BlockApplyResult, Int)] = {
     val challengedBlock = block.toOriginal
     for {
       challengedHitSource <-
         if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      discardedDiffs <-
+      applyResult <-
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, Some(challengedHitSource), verify, txSignParCheck))
-    } yield discardedDiffs -> Some(blockchainUpdater.height)
+    } yield applyResult -> blockchainUpdater.height
   }
 
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =

@@ -4,6 +4,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.{MessageCodec, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
 import com.wavesplatform.test.{FlatSpec, TestTime}
@@ -36,6 +37,7 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
         d.posSelector,
         channels,
         PeerDatabase.NoOp,
+        BlockChallenger.NoOp,
         appenderScheduler
       )(channel2, _)
 

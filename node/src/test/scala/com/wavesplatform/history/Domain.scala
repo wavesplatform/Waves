@@ -76,7 +76,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   lazy val testTime: TestTime = TestTime()
-  lazy val blockAppender: Block => Task[Either[ValidationError, Option[BigInt]]] =
+  lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
     BlockAppender(blockchain, testTime, utxPool, posSelector, Scheduler.singleThread("appender"))
   lazy val blockChallenger: BlockChallenger = new BlockChallengerImpl(
     blockchain,
@@ -382,9 +382,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
-      rewardVote: Long = -1L,
-      baseTarget: Option[Long] = None
-  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, baseTarget).explicitGet()
+      rewardVote: Long = -1L
+  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote).explicitGet()
 
   def createBlockE(
       version: Byte,
@@ -394,8 +393,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
-      rewardVote: Long = -1L,
-      baseTarget: Option[Long] = None
+      rewardVote: Long = -1L
   ): Either[ValidationError, Block] = {
     val reference = ref.getOrElse(randomSig)
 
@@ -424,12 +422,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
               timestamp
             )
         else Right(NxtLikeConsensusBlockData(60, generationSignature))
-      resultBt = baseTarget.getOrElse {
+      resultBt =
         if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
           consensus.baseTarget
         } else if (parentHeight % 2 != 0) parent.baseTarget
         else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
-      }
       blockWithoutStateHash <- Block
         .buildAndSign(
           version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,

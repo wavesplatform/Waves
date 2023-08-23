@@ -27,6 +27,7 @@ import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, MessageC
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockRewardCalculator.BlockRewardShares
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
@@ -1718,7 +1719,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     else fail("block should be defined")
   }
 
-  private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, Option[BigInt]]] =
+  private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, BlockApplyResult]] =
     BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, appenderScheduler)
 
   private def createMicroBlockAppender(d: Domain): (Channel, MicroBlock) => Task[Unit] = { (ch, mb) =>

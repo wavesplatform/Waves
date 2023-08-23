@@ -308,12 +308,15 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     withDomain(ConsensusImprovements, AddrWithBalance.enoughBalances(currentBlockSender, anotherBlockSender)) { d =>
       val parent = d.appendBlock()
 
-      val currentBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = currentBlockSender, baseTarget = Some(100), ref = Some(parent.id()))
       val betterBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, baseTarget = Some(99), ref = Some(parent.id()))
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, ref = Some(parent.id()))
+      val currentBlock =
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = currentBlockSender, ref = Some(parent.id()))
       val worseBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, baseTarget = Some(101), ref = Some(parent.id()))
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, generator = anotherBlockSender, ref = Some(parent.id()))
+
+      betterBlock.header.timestamp < currentBlock.header.timestamp shouldBe true
+      currentBlock.header.timestamp < worseBlock.header.timestamp shouldBe true
 
       d.appendBlockE(currentBlock) should beRight
 
@@ -321,8 +324,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
       appender(worseBlock).runSyncUnsafe(1.minute) shouldBe Left(
         BlockAppendError(
-          s"Competitors liquid block $worseBlock(score=${worseBlock.blockScore()}) is not better than existing (ng.base $currentBlock(score=${currentBlock
-            .blockScore()}))",
+          s"Competitors liquid block $worseBlock(timestamp=${worseBlock.header.timestamp}) is not better than existing (ng.base $currentBlock(timestamp=${currentBlock.header.timestamp}))",
           worseBlock
         )
       )
