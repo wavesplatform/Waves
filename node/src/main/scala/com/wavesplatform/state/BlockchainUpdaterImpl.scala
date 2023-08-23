@@ -276,36 +276,8 @@ class BlockchainUpdaterImpl(
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
-                  if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
-                    log.trace(s"Existing liquid block is better than new one, discarding $block")
-                    Right(None)
-                  } else {
-                    log.trace(s"New liquid block is better version of existing, swapping")
-                    BlockStats.replaced(ng.bestLiquidBlock, block)
-                    val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
-                    val miningConstraints = MiningConstraints(rocksdb, height)
-
-                    blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
-
-                    val referencedBlockchain = CompositeBlockchain(rocksdb, ng.reward)
-                    BlockDiffer
-                      .fromBlock(
-                        referencedBlockchain,
-                        rocksdb.lastBlock,
-                        block,
-                        miningConstraints.total,
-                        hitSource,
-                        challengedHitSource,
-                        rocksdb.loadCacheData,
-                        verify,
-                        txSignParCheck = txSignParCheck,
-                        checkStateHash = checkStateHash
-                      )
-                      .map { r =>
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
-                        Some((r, Nil, ng.reward, hitSource))
-                      }
-                  }
+                  // silently ignore
+                  Right(None)
                 } else
                   Left(
                     BlockAppendError(
