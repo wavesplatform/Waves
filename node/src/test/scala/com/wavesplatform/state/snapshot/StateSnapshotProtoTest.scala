@@ -54,7 +54,7 @@ class StateSnapshotProtoTest extends PropSpec {
       ),
       Map(
         IssuedAsset(ByteStr.fromBytes(1, 1, 1)) -> None,
-        IssuedAsset(ByteStr.fromBytes(2, 2, 2)) -> Some(AssetScriptInfo(TestCompiler(V6).compileAsset("this != this"), 999))
+        IssuedAsset(ByteStr.fromBytes(2, 2, 2)) -> Some(AssetScriptInfo(TestCompiler(V6).compileAsset("this != this"), 0))
       ),
       Map(
         IssuedAsset(ByteStr.fromBytes(1, 1, 1)) -> SponsorshipValue(99999),

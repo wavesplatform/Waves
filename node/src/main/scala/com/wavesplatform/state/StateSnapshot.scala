@@ -57,7 +57,7 @@ case class StateSnapshot(
         S.AssetNameAndDescription(asset.id.toByteString, info.name.toStringUtf8, info.description.toStringUtf8, info.lastUpdatedAt)
       }.toSeq,
       assetScripts.map { case (asset, script) =>
-        S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString), script.fold(0L)(_.complexity))
+        S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString))
       }.toSeq,
       aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.toSeq,
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
@@ -158,7 +158,7 @@ object StateSnapshot {
           if (s.script.isEmpty)
             None
           else
-            Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), s.complexity))
+            Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), 0))
         s.assetId.toIssuedAssetId -> info
       }.toMap
 
