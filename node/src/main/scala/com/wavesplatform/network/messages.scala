@@ -87,6 +87,7 @@ case class GetSnapshot(blockId: BlockId) extends Message
 
 case class MicroSnapshotRequest(totalBlockId: BlockId) extends Message
 
+// TODO: NODE-2609 remove state_snapshot.proto
 case class BlockSnapshot(blockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
   def toProtobuf: PBBlockSnapshot = PBBlockSnapshot(blockId.toByteString, snapshots)
 }
