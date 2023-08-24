@@ -75,7 +75,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, asset) -> issueTx.quantity.value,
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
-          assetStatics = Map(
+          assetStatics = VectorMap(
             asset -> AssetStatic(asset.id.toByteString, issueTx.id().toByteString, sender.publicKey.toByteString, issueTx.decimals.value)
           ),
           assetVolumes = Map(

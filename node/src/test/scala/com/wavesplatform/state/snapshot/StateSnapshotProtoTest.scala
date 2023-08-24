@@ -28,7 +28,7 @@ class StateSnapshotProtoTest extends PropSpec {
         defaultAddress -> LeaseBalance(999, 888),
         secondAddress  -> LeaseBalance.empty
       ),
-      Map(
+      VectorMap(
         IssuedAsset(ByteStr.fromBytes(1, 1, 1)) -> AssetStatic(
           ByteString.copyFrom(Array[Byte](1, 1, 1)),
           ByteString.copyFromUtf8("txId"),

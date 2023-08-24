@@ -25,7 +25,7 @@ case class StateSnapshot(
     transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
     balances: VectorMap[(Address, Asset), Long] = VectorMap(),
     leaseBalances: Map[Address, LeaseBalance] = Map(),
-    assetStatics: Map[IssuedAsset, AssetStatic] = Map(),
+    assetStatics: VectorMap[IssuedAsset, AssetStatic] = VectorMap(),
     assetVolumes: Map[IssuedAsset, AssetVolumeInfo] = Map(),
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map(),
@@ -162,8 +162,8 @@ object StateSnapshot {
         s.assetId.toIssuedAssetId -> info
       }.toMap
 
-    val assetStatics: Map[IssuedAsset, AssetStatic] =
-      pbSnapshot.assetStatics.map(info => info.assetId.toIssuedAssetId -> info).toMap
+    val assetStatics: VectorMap[IssuedAsset, AssetStatic] =
+      VectorMap() ++ pbSnapshot.assetStatics.map(info => info.assetId.toIssuedAssetId -> info)
 
     val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =
       pbSnapshot.assetVolumes
@@ -351,7 +351,7 @@ object StateSnapshot {
       }
       .map(_.toMap)
 
-  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): Map[IssuedAsset, AssetStatic] =
+  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStatic] =
     issuedAssets.map { case (asset, info) =>
       asset ->
         AssetStatic(
