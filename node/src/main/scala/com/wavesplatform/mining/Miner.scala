@@ -142,7 +142,6 @@ class MinerImpl(
   private def packTransactionsForKeyBlock(miner: Address, prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
     val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
-      // TODO: NODE-2594 get next block reward
       BlockDiffer
         .createInitialBlockDiff(blockchainUpdater, miner)
         .toOption

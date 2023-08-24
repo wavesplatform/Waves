@@ -3,7 +3,7 @@ package com.wavesplatform.metrics
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
+import com.wavesplatform.network.{BlockSnapshot, HandshakeHandler, MicroBlockInv, MicroBlockSnapshot}
 import io.netty.channel.Channel
 import org.influxdb.dto.Point
 
@@ -32,8 +32,10 @@ object BlockStats {
   private sealed abstract class Type extends Named
 
   private object Type {
-    case object Block extends Type
-    case object Micro extends Type
+    case object Block              extends Type
+    case object Micro              extends Type
+    case object BlockSnapshot      extends Type
+    case object MicroBlockSnapshot extends Type
   }
 
   sealed abstract class Source extends Named
@@ -47,6 +49,13 @@ object BlockStats {
     block(b, source)
       .addField("from", nodeName(ch))
       .addField("bt", b.header.baseTarget),
+    Event.Received,
+    Seq.empty
+  )
+
+  def received(s: BlockSnapshot, source: Source, ch: Channel): Unit = write(
+    blockSnapshot(s, source)
+      .addField("from", nodeName(ch)),
     Event.Received,
     Seq.empty
   )
@@ -89,6 +98,13 @@ object BlockStats {
       .tag("parent-id", id(m.reference))
       .addField("from", nodeName(ch)),
     Event.Inv,
+    Seq.empty
+  )
+
+  def received(m: MicroBlockSnapshot, ch: Channel, blockId: BlockId): Unit = write(
+    microBlockSnapshot(blockId)
+      .addField("from", nodeName(ch)),
+    Event.Received,
     Seq.empty
   )
 
@@ -140,6 +156,16 @@ object BlockStats {
       .tag("source", source.name)
       .tag("whitelist", isWhitelistMiner.toString)
   }
+
+  private def blockSnapshot(s: BlockSnapshot, source: Source): Point.Builder = {
+    measurement(Type.BlockSnapshot)
+      .tag("id", id(s.blockId))
+      .tag("source", source.name)
+  }
+
+  private def microBlockSnapshot(totalBlockId: BlockId): Point.Builder =
+    measurement(Type.MicroBlockSnapshot)
+      .tag("id", id(totalBlockId))
 
   private def micro(blockId: BlockId): Point.Builder =
     measurement(Type.Micro)

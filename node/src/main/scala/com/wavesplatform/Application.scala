@@ -270,7 +270,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
-    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions, snapshots) = networkServer.messages
+    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions, blockSnapshots, microblockSnapshots) =
+      networkServer.messages
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -284,21 +285,26 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject,
       scoreObserverScheduler
     )
-    val (microblockData, mbSyncCacheSizes) = MicroBlockSynchronizer(
+    val (microblockDataWithSnapshot, mbSyncCacheSizes) = MicroBlockSynchronizer(
       settings.synchronizationSettings.microBlockSynchronizer,
+      settings.enableLightMode,
       peerDatabase,
       lastBlockInfo.map(_.id),
       microblockInvs,
       microblockResponses,
+      microblockSnapshots,
       microblockSynchronizerScheduler
     )
-    val (newBlocks, extLoaderState, _) = RxExtensionLoader(
+    val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
+      settings.synchronizationSettings.processedBlocksCacheTimeout,
+      settings.enableLightMode,
       Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
       blocks,
       signatures,
+      blockSnapshots,
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
@@ -317,9 +323,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     Observable(
-      microblockData
+      microblockDataWithSnapshot
         .mapEval(processMicroBlock.tupled),
-      newBlocks
+      newBlocksWithSnapshot
         .mapEval(processBlock.tupled)
     ).merge
       .onErrorHandle(stopOnAppendError.reportFailure)

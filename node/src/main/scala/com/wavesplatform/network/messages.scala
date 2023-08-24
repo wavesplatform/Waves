@@ -5,7 +5,8 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
 
@@ -82,8 +83,22 @@ object MicroBlockInv {
   }
 }
 
-case class GetSnapshot(blockId: ByteStr) extends Message
+case class GetSnapshot(blockId: BlockId) extends Message
 
-case class MicroSnapshotRequest(totalBlockId: ByteStr) extends Message
+case class MicroSnapshotRequest(totalBlockId: BlockId) extends Message
 
-case class Snapshots(id: ByteStr, snapshots: Seq[TransactionStateSnapshot]) extends Message
+case class BlockSnapshot(blockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
+  def toProtobuf: PBBlockSnapshot = PBBlockSnapshot(blockId.toByteString, snapshots)
+}
+
+object BlockSnapshot {
+  def fromProtobuf(snapshot: PBBlockSnapshot): BlockSnapshot = BlockSnapshot(snapshot.blockId.toByteStr, snapshot.snapshots)
+}
+
+case class MicroBlockSnapshot(totalBlockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
+  def toProtobuf: PBMicroBlockSnapshot = PBMicroBlockSnapshot(totalBlockId.toByteString, snapshots)
+}
+
+object MicroBlockSnapshot {
+  def fromProtobuf(snapshot: PBMicroBlockSnapshot): MicroBlockSnapshot = MicroBlockSnapshot(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
+}

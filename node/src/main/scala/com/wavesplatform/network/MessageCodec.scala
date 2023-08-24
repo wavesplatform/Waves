@@ -29,7 +29,8 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     case m: MicroBlockRequest    => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
     case g: GetSnapshot          => out.add(RawBytes(GetSnapsnotSpec.messageCode, GetSnapsnotSpec.serializeData(g)))
     case m: MicroSnapshotRequest => out.add(RawBytes(MicroSnapshotRequestSpec.messageCode, MicroSnapshotRequestSpec.serializeData(m)))
-    case s: Snapshots            => out.add(RawBytes(SnapshotsSpec.messageCode, SnapshotsSpec.serializeData(s)))
+    case s: BlockSnapshot        => out.add(RawBytes(BlockSnapshotSpec.messageCode, BlockSnapshotSpec.serializeData(s)))
+    case s: MicroBlockSnapshot   => out.add(RawBytes(MicroBlockSnapshotSpec.messageCode, MicroBlockSnapshotSpec.serializeData(s)))
 
     // Version switch
     case gs: GetSignatures if isNewMsgsSupported(ctx) =>

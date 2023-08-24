@@ -51,7 +51,7 @@ object MicroblockAppender extends ScorexLogging {
       peerDatabase: PeerDatabase,
       blockChallenger: BlockChallenger,
       scheduler: Scheduler
-  )(ch: Channel, md: MicroblockData): Task[Unit] = {
+  )(ch: Channel, md: MicroblockData, snapshot: Option[(Channel, MicroBlockSnapshot)]): Task[Unit] = {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {

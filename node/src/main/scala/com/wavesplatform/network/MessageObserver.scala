@@ -19,7 +19,8 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
   private val microblockInvs      = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
   private val microblockResponses = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
   private val transactions        = ConcurrentSubject.publish[(Channel, Transaction)]
-  private val snapshots           = ConcurrentSubject.publish[(Channel, Snapshots)]
+  private val blockSnapshots      = ConcurrentSubject.publish[(Channel, BlockSnapshot)]
+  private val microblockSnapshots = ConcurrentSubject.publish[(Channel, MicroBlockSnapshot)]
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case b: Block               => blocks.onNext((ctx.channel(), b))
@@ -28,7 +29,8 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
     case mbInv: MicroBlockInv   => microblockInvs.onNext((ctx.channel(), mbInv))
     case mb: MicroBlockResponse => microblockResponses.onNext((ctx.channel(), mb))
     case tx: Transaction        => transactions.onNext((ctx.channel(), tx))
-    case sn: Snapshots          => snapshots.onNext((ctx.channel(), sn))
+    case sn: BlockSnapshot      => blockSnapshots.onNext((ctx.channel(), sn))
+    case sn: MicroBlockSnapshot => microblockSnapshots.onNext((ctx.channel(), sn))
     case _                      => super.channelRead(ctx, msg)
 
   }
@@ -40,7 +42,8 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
     microblockInvs.onComplete()
     microblockResponses.onComplete()
     transactions.onComplete()
-    snapshots.onComplete()
+    blockSnapshots.onComplete()
+    microblockSnapshots.onComplete()
   }
 }
 
@@ -52,11 +55,24 @@ object MessageObserver {
       ChannelObservable[MicroBlockInv],
       ChannelObservable[MicroBlockResponse],
       ChannelObservable[Transaction],
-      ChannelObservable[Snapshots]
+      ChannelObservable[BlockSnapshot],
+      ChannelObservable[MicroBlockSnapshot]
   )
 
   def apply(): (MessageObserver, Messages) = {
     val mo = new MessageObserver()
-    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.microblockInvs, mo.microblockResponses, mo.transactions, mo.snapshots))
+    (
+      mo,
+      (
+        mo.signatures,
+        mo.blocks,
+        mo.blockchainScores,
+        mo.microblockInvs,
+        mo.microblockResponses,
+        mo.transactions,
+        mo.blockSnapshots,
+        mo.microblockSnapshots
+      )
+    )
   }
 }

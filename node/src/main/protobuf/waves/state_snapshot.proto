@@ -1,0 +1,17 @@
+syntax = "proto3";
+package waves;
+option java_package = "com.wavesplatform.protobuf.snapshot";
+option csharp_namespace = "Waves";
+option go_package = "github.com/wavesplatform/gowaves/pkg/grpc/generated/waves";
+
+import "waves/transaction_state_snapshot.proto";
+
+message BlockSnapshot {
+  bytes block_id = 1;
+  repeated TransactionStateSnapshot snapshots = 2;
+}
+
+message MicroBlockSnapshot {
+  bytes total_block_id = 1;
+  repeated TransactionStateSnapshot snapshots = 2;
+}

@@ -1100,7 +1100,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         ExtensionAppender(d.blockchain, d.utxPool, d.posSelector, testTime, InvalidBlockStorage.NoOp, PeerDatabase.NoOp, appenderScheduler)(null, _)
 
       testTime.setTime(challengingBlock.header.timestamp)
-      extensionAppender(ExtensionBlocks(d.blockchain.score + challengingBlock.blockScore(), Seq(challengingBlock))).runSyncUnsafe().explicitGet()
+      extensionAppender(ExtensionBlocks(d.blockchain.score + challengingBlock.blockScore(), Seq(challengingBlock), Map.empty))
+        .runSyncUnsafe()
+        .explicitGet()
 
       d.blockchain.height shouldBe 1002
 
@@ -1570,7 +1572,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       ).route
 
       testTime.setTime(invalidBlock.header.timestamp)
-      val challengeResult = appender(new EmbeddedChannel(), invalidBlock).runToFuture
+      val challengeResult = appender(new EmbeddedChannel(), invalidBlock, None).runToFuture
 
       Await.ready(
         promise.future.map(_ => checkTxsStatus(txs, TransactionsApiRoute.Status.Confirmed, route))(monix.execution.Scheduler.Implicits.global),
@@ -1702,7 +1704,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       PeerDatabase.NoOp,
       createBlockChallenger(d, channels),
       appenderScheduler
-    )(channel2, _)
+    )(channel2, _, None)
 
     testTime.setTime(d.blockchain.lastBlockTimestamp.get + d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis * 2)
     appenderWithChallenger(block).runSyncUnsafe()
@@ -1719,7 +1721,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     MicroblockAppender(d.blockchain, d.utxPool, channels, PeerDatabase.NoOp, createBlockChallenger(d, channels), appenderScheduler)(
       ch,
-      MicroblockData(None, mb, Coeval.now(Set.empty))
+      MicroblockData(None, mb, Coeval.now(Set.empty)),
+      None
     )
   }
 

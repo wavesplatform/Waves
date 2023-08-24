@@ -15,9 +15,8 @@ import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.network.message.*
 import com.wavesplatform.network.message.Message.*
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock}
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
+import com.wavesplatform.protobuf.snapshot.{BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.transaction.{DataTransaction, EthereumTransaction, Transaction, TransactionParsers}
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {
@@ -326,30 +325,25 @@ object MicroSnapshotRequestSpec extends MessageSpec[MicroSnapshotRequest] {
   override val maxLength: Int = SignatureLength
 }
 
-object SnapshotsSpec extends MessageSpec[Snapshots] {
+object BlockSnapshotSpec extends MessageSpec[BlockSnapshot] {
   override val messageCode: MessageCode = 36: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[Snapshots] = Try {
-    require(bytes.length > 0, "Data is empty")
-    val idLength     = bytes.head
-    val id           = ByteStr(bytes.slice(1, idLength + 1))
-    val snapshotSize = Ints.fromByteArray(bytes.slice(idLength + 1, idLength + 1 + Ints.BYTES))
-    val (_, snapshots) = (1 to snapshotSize).foldLeft((idLength + 1 + Ints.BYTES, Seq.empty[TransactionStateSnapshot])) { case ((pos, acc), _) =>
-      val size    = Ints.fromByteArray(bytes.slice(pos, pos + Ints.BYTES))
-      val nextPos = pos + Ints.BYTES + size
-      val newAcc  = TransactionStateSnapshot.parseFrom(bytes.slice(pos + Ints.BYTES, pos + Ints.BYTES + size)) +: acc
-      nextPos -> newAcc
-    }
-    Snapshots(id, snapshots.reverse)
-  }
+  override def deserializeData(bytes: Array[Byte]): Try[BlockSnapshot] =
+    Try(BlockSnapshot.fromProtobuf(PBBlockSnapshot.parseFrom(bytes)))
 
-  override def serializeData(data: Snapshots): Array[Byte] = {
-    val prefix = Bytes.concat(Array(data.id.size.ensuring(_.isValidByte).toByte), data.id.arr, Ints.toByteArray(data.snapshots.size))
-    data.snapshots.foldLeft(prefix) { case (acc, snapshot) =>
-      val bytes = snapshot.toByteArray
-      Bytes.concat(acc, Ints.toByteArray(bytes.length), bytes)
-    }
-  }
+  override def serializeData(data: BlockSnapshot): Array[Byte] = data.toProtobuf.toByteArray
+
+  // TODO: NODE-2609 estimate
+  override def maxLength: Int = Int.MaxValue
+}
+
+object MicroBlockSnapshotSpec extends MessageSpec[MicroBlockSnapshot] {
+  override val messageCode: MessageCode = 37: Byte
+
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockSnapshot] =
+    Try(MicroBlockSnapshot.fromProtobuf(PBMicroBlockSnapshot.parseFrom(bytes)))
+
+  override def serializeData(data: MicroBlockSnapshot): Array[Byte] = data.toProtobuf.toByteArray
 
   // TODO: NODE-2609 estimate
   override def maxLength: Int = Int.MaxValue
@@ -382,7 +376,8 @@ object BasicMessagesRepo {
     BlockIdsSpec,
     GetSnapsnotSpec,
     MicroSnapshotRequestSpec,
-    SnapshotsSpec
+    BlockSnapshotSpec,
+    MicroBlockSnapshotSpec
   )
 
   val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode -> s).toMap

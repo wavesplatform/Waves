@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import com.wavesplatform
 import com.wavesplatform.block.Block
 import com.wavesplatform.history.History
 import com.wavesplatform.network.HistoryReplier.*
@@ -56,7 +55,7 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
       respondWith(
         ctx,
         Future(history.loadBlockSnapshots(id)).map {
-          case Some(snapshots) => Snapshots(id, snapshots)
+          case Some(snapshots) => BlockSnapshot(id, snapshots)
           case _               => throw new NoSuchElementException(s"Error loading snapshots for block $id")
         }
       )
@@ -65,7 +64,7 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
       respondWith(
         ctx,
         Future(history.loadMicroblockSnapshots(id)).map {
-          case Some(snapshots) => Snapshots(id, snapshots)
+          case Some(snapshots) => MicroBlockSnapshot(id, snapshots)
           case _               => throw new NoSuchElementException(s"Error loading snapshots for microblock $id")
         }
       )

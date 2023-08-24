@@ -56,13 +56,12 @@ object BlockAppender extends ScorexLogging {
       peerDatabase: PeerDatabase,
       blockChallenger: BlockChallenger,
       scheduler: Scheduler
-  )(ch: Channel, newBlock: Block): Task[Unit] = {
+  )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Unit] = {
     import metrics.*
     implicit val implicitTime: Time = time
 
     val span = createApplySpan(newBlock)
     span.markNtp("block.received")
-    BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
 
     val append =
       (for {
