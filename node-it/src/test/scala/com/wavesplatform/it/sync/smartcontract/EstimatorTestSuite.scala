@@ -4,14 +4,14 @@ import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.BinaryDataEntry
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val featureHeight = 8
@@ -20,12 +20,17 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.raw(s"""
-                              | waves.blockchain.custom.functionality {
-                              |   estimator-pre-check-height =  $featureHeight
-                              |   estimator-sum-overflow-fix-height = 999999
-                              |   pre-activated-features = {14 = 0, 15 = 999999}
-                              |}""".stripMargin))
+      .overrideBase(
+        _.raw(
+          s"""
+             | waves.blockchain.custom.functionality {
+             |   estimator-pre-check-height =  $featureHeight
+             |   estimator-sum-overflow-fix-height = 999999
+             |   pre-activated-features = {14 = 0, 15 = 999999}
+             | }
+           """.stripMargin
+        )
+      )
       .buildNonConflicting()
 
   private def smartAcc  = firstKeyPair
@@ -111,26 +116,28 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     )
   }
 
-  test("can still invoke account and asset scripts after estimator v1 precheck activation") {
+  test("can't invoke account and asset scripts with big complexity after snapshot implementation") {
     // after snapshot implementation only evaluated complexity is used for dApps
     // so this call fails
-    // sender.invokeScript(callerAcc, smartAcc.toAddress.toString, waitForTx = true)._1.id
+    assertBadRequestAndMessage(
+      sender.invokeScript(callerAcc, smartAcc.toAddress.toString, waitForTx = true)._1.id,
+      "Error while executing dApp: Invoke complexity limit = 52000 is exceeded"
+    )
     sender.transfer(smartAcc, callerAcc.toAddress.toString, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    Seq(smartAcc, callerAcc).foreach(
-      r =>
-        sender
-          .transfer(
-            sender.keyPair,
-            recipient = r.toAddress.toString,
-            assetId = None,
-            amount = 5.waves,
-            fee = minFee,
-            waitForTx = true
-          )
+    Seq(smartAcc, callerAcc).foreach(r =>
+      sender
+        .transfer(
+          sender.keyPair,
+          recipient = r.toAddress.toString,
+          assetId = None,
+          amount = 5.waves,
+          fee = minFee,
+          waitForTx = true
+        )
     )
 
     val value = ByteStr(("4djidnqe9lK09le4FvgRD0BTok55nHP8MKFotfUeQOWEfBkp6MV4skCceWgDGBnc" * 512).dropRight(1).getBytes)
