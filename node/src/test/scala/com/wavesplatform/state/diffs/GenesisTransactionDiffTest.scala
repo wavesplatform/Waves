@@ -8,9 +8,8 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, genesis}
-import org.scalamock.scalatest.PathMockFactory
 
-class GenesisTransactionDiffTest extends PropSpec with WithDomain with PathMockFactory {
+class GenesisTransactionDiffTest extends PropSpec with WithDomain {
   property("fails if height != 1") {
     withDomain(RideV6) { d =>
       d.appendAndAssertSucceed(genesis(defaultAddress))
