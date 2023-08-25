@@ -212,9 +212,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.appendBlock()
       val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
       val challengedBlock =
-        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner)
       val blockWithChallenge =
-        d.createChallengingBlock(challengingMiner, challengedBlock, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+        d.createChallengingBlock(challengingMiner, challengedBlock, strictTime = true)
 
       testTime.setTime(blockWithChallenge.header.timestamp.max(challengedBlock.header.timestamp))
       createBlockAppender(d)(blockWithChallenge).runSyncUnsafe() shouldBe Left(
@@ -991,8 +991,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.createBlock(
           Block.ProtoBlockVersion,
           Seq.empty,
-          strictTime = true,
-          stateHash = Some(Some(ByteStr.fill(DigestLength)(1))) // fake stateHash for block before activation
+          strictTime = true
         )
       )
 
@@ -1803,8 +1802,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.createBlock(
         Block.ProtoBlockVersion,
         Seq.empty,
-        strictTime = true,
-        stateHash = Some(Some(ByteStr.fill(DigestLength)(1))) // fake stateHash for block before activation
+        strictTime = true
       )
     )
 

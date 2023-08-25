@@ -94,8 +94,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, enableExecutionLog = enableExecutionLog)
 
     preconditions.foreach { precondition =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, precondition).explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) = differ(state, precondition).explicitGet()
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, computedStateHash, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.snapshot.toDiff(state)))
@@ -118,8 +118,9 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       )
 
     preconditions.foreach { precondition =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, precondition).resultE.explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
+        differ(state, precondition).resultE.explicitGet()
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, computedStateHash, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.snapshot.toDiff(state)))
@@ -132,18 +133,19 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-      val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, prevBlock, curBlock).explicitGet()
-      state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, curBlock)
+      val BlockDiffer.Result(diff, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, curBlock).explicitGet()
+      state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, computedStateHash, curBlock)
       Some(curBlock)
     }
 
-    val BlockDiffer.Result(snapshot, fees, totalFee, _, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val ngState = NgState(block, snapshot, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
-    val cb      = SnapshotBlockchain(state, ngState)
-    val diff    = snapshot.toDiff(state)
+    val BlockDiffer.Result(snapshot, fees, totalFee, _, _, computedStateHash) = differ(state, preconditions.lastOption, block).explicitGet()
+    val ngState =
+      NgState(block, snapshot, fees, totalFee, computedStateHash, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
+    val cb   = SnapshotBlockchain(state, ngState)
+    val diff = snapshot.toDiff(state)
     assertion(diff, cb)
 
-    state.append(snapshot, fees, totalFee, None, block.header.generationSignature, block)
+    state.append(snapshot, fees, totalFee, None, block.header.generationSignature, computedStateHash, block)
     assertion(diff, state)
   }
 
@@ -168,7 +170,15 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
         differ(state, block).map { result =>
           val snapshot = SnapshotOps.fromDiff(result.snapshot.toDiff(state), state).explicitGet()
-          state.append(snapshot, result.carry, result.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
+          state.append(
+            snapshot,
+            result.carry,
+            result.totalFee,
+            None,
+            block.header.generationSignature.take(Block.HitSourceLength),
+            result.computedStateHash,
+            block
+          )
         }
       })
     }

@@ -104,6 +104,7 @@ package object appender {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
+      _ <- validateStateHash(block, blockchainUpdater)
       _ <- validateChallengedHeader(block, blockchainUpdater)
     } yield hitSource
 
@@ -167,6 +168,13 @@ package object appender {
         BlockAppendError("Challenged block generator and challenging block generator should not be equal", block)
       )
     } yield ()
+
+  private def validateStateHash(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
+    Either.cond(
+      block.header.stateHash.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchain.height + 1),
+      (),
+      BlockAppendError("Block state hash is not supported yet", block)
+    )
 
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation").withoutTags()

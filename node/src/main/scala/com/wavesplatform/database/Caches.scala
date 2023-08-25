@@ -207,6 +207,7 @@ abstract class Caches extends Blockchain with Storage {
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
+      computedBlockStateHash: ByteStr,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -217,7 +218,15 @@ abstract class Caches extends Blockchain with Storage {
       stateHash: StateHashBuilder.Result
   ): Unit
 
-  override def append(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
+  override def append(
+      snapshot: StateSnapshot,
+      carryFee: Long,
+      totalFee: Long,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      computedBlockStateHash: ByteStr,
+      block: Block
+  ): Unit = {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
     val newMeta = PBBlockMeta(
@@ -318,6 +327,7 @@ abstract class Caches extends Blockchain with Storage {
       newMeta,
       snapshot,
       carryFee,
+      computedBlockStateHash,
       newAddressIds,
       VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },

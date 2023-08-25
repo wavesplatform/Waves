@@ -1,7 +1,6 @@
 package com.wavesplatform.state.appender
 
 import cats.data.EitherT
-import cats.syntax.traverse.*
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.lang.ValidationError
@@ -76,14 +75,7 @@ object MicroblockAppender extends ScorexLogging {
         peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish")
         md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
 
-        // TODO: get prev state hash (NODE-2568)
-        blockchainUpdater
-          .blockHeader(blockchainUpdater.height - 1)
-          .flatMap(_.header.stateHash)
-          .traverse { prevStateHash =>
-            blockChallenger.challengeMicroblock(md, ch, prevStateHash)
-          }
-          .void
+        blockChallenger.challengeMicroblock(md, ch)
 
       case Left(ve) =>
         Task {

@@ -20,7 +20,8 @@ case class SnapshotBlockchain(
     maybeSnapshot: Option[StateSnapshot] = None,
     blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
     carry: Long = 0,
-    reward: Option[Long] = None
+    reward: Option[Long] = None,
+    stateHash: Option[ByteStr] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
   lazy val snapshot: StateSnapshot          = maybeSnapshot.orEmpty
@@ -211,6 +212,9 @@ case class SnapshotBlockchain(
     inner
       .resolveERC20Address(address)
       .orElse(snapshot.assetStatics.keys.find(id => ERC20Address(id) == address))
+
+  override def lastBlockStateHash: BlockId =
+    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastBlockStateHash)
 }
 
 object SnapshotBlockchain {
@@ -220,7 +224,8 @@ object SnapshotBlockchain {
       Some(ngState.bestLiquidSnapshot),
       Some(SignedBlockHeader(ngState.bestLiquidBlock.header, ngState.bestLiquidBlock.signature) -> ngState.hitSource),
       ngState.carryFee,
-      ngState.reward
+      ngState.reward,
+      Some(ngState.bestLiquidComputedStateHash)
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =
@@ -235,9 +240,10 @@ object SnapshotBlockchain {
       newBlock: Block,
       hitSource: ByteStr,
       carry: Long,
-      reward: Option[Long]
+      reward: Option[Long],
+      stateHash: Option[ByteStr]
   ): SnapshotBlockchain =
-    new SnapshotBlockchain(inner, Some(snapshot), Some(SignedBlockHeader(newBlock.header, newBlock.signature) -> hitSource), carry, reward)
+    new SnapshotBlockchain(inner, Some(snapshot), Some(SignedBlockHeader(newBlock.header, newBlock.signature) -> hitSource), carry, reward, stateHash)
 
   private def assetDescription(
       asset: IssuedAsset,

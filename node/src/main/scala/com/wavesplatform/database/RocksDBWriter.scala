@@ -43,6 +43,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
 object RocksDBWriter extends ScorexLogging {
+
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
@@ -385,6 +386,7 @@ class RocksDBWriter(
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
+      computedBlockStateHash: ByteStr,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -576,6 +578,9 @@ class RocksDBWriter(
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
+      rw.put(Keys.blockStateHash(height), computedBlockStateHash)
+      expiredKeys += Keys.blockStateHash(threshold - 1).keyBytes
+
       if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactionsWithSize
           .get(TransactionId @@ txId)
@@ -759,6 +764,7 @@ class RocksDBWriter(
           rw.delete(Keys.heightOf(discardedMeta.id))
           blockHeightsToInvalidate.addOne(discardedMeta.id)
           rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.blockStateHash(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
 
@@ -1078,4 +1084,8 @@ class RocksDBWriter(
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
+
+  override def lastBlockStateHash: ByteStr = {
+    readOnly(_.get(Keys.blockStateHash(height)))
+  }
 }

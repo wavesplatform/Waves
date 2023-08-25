@@ -49,9 +49,17 @@ class CommonValidationTest extends PropSpec with WithState {
     val gen      = sponsorAndSetScript(sponsorship = true, smartToken = false, smartAccount = false, feeInAssets, feeAmount)
     forAll(gen) { case (genesisBlock, transferTx) =>
       withRocksDBWriter(settings) { blockchain =>
-        val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) =
+        val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
           BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-        blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
+        blockchain.append(
+          preconditionDiff,
+          preconditionFees,
+          totalFee,
+          None,
+          genesisBlock.header.generationSignature,
+          computedStateHash,
+          genesisBlock
+        )
 
         f(FeeValidation(blockchain, transferTx))
       }
@@ -70,9 +78,9 @@ class CommonValidationTest extends PropSpec with WithState {
     val settings                   = createSettings(BlockchainFeatures.SmartAccounts -> 0)
     val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
     withRocksDBWriter(settings) { blockchain =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) =
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
         BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
+      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, computedStateHash, genesisBlock)
 
       f(FeeValidation(blockchain, transferTx))
     }
@@ -145,9 +153,9 @@ class CommonValidationTest extends PropSpec with WithState {
     val settings                   = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)
     val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
     withRocksDBWriter(settings) { blockchain =>
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) =
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
         BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
-      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
+      blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, computedStateHash, genesisBlock)
 
       f(FeeValidation(blockchain, transferTx))
     }

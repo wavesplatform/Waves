@@ -2,7 +2,6 @@ package com.wavesplatform.state.appender
 
 import java.time.Instant
 import cats.data.EitherT
-import cats.syntax.traverse.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
@@ -93,13 +92,7 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        // TODO: get prev state hash (NODE-2568)
-        blockchainUpdater.lastBlockHeader
-          .flatMap(_.header.stateHash)
-          .traverse { prevStateHash =>
-            blockChallenger.challengeBlock(newBlock, ch, prevStateHash)
-          }
-          .void
+        blockChallenger.challengeBlock(newBlock, ch)
 
       case Left(ve) =>
         Task {

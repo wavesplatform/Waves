@@ -83,6 +83,8 @@ trait Blockchain {
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
+
+  def lastBlockStateHash: ByteStr
 }
 
 object Blockchain {

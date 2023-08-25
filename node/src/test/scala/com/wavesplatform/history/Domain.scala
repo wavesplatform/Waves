@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup}
+import cats.implicits.catsSyntaxOption
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
@@ -22,9 +22,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.InitStateHash
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.TestTime
@@ -305,12 +303,13 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
           Some(
             stateHash.getOrElse(
-              computeStateHash(
+              TxStateSnapshotHashBuilder.computeStateHash(
                 txs,
-                lastBlock.header.stateHash.get,
+                blockchain.lastBlockStateHash,
                 StateSnapshot.empty,
                 blockSigner,
-                lastBlock.header.timestamp,
+                rocksDBWriter.lastBlockTimestamp,
+                blockchain.lastBlockTimestamp.get,
                 isChallenging = false,
                 blockchain
               )
@@ -405,7 +404,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
-        rewardVote = -1L,
+        rewardVote = rewardVote,
         signer = generator,
         stateHash = None,
         challengedHeader = challengedHeader
@@ -414,17 +413,29 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
     val resultStateHash = stateHash.getOrElse {
       if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
-        val blockchain    = SnapshotBlockchain(this.blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, None)
-        val prevStateHash = this.blockchain.lastBlockHeader.flatMap(_.header.stateHash).getOrElse(InitStateHash)
+        val blockchainWithNewBlock =
+          SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, this.blockchain.computeNextReward, None)
+        val prevStateHash = blockchain.lastBlockStateHash
 
         val initSnapshot = BlockDiffer
-          .createInitialBlockSnapshot(this.blockchain, generator.toAddress)
+          .createInitialBlockSnapshot(blockchain, generator.toAddress)
           .explicitGet()
         val initStateHash =
           if (initSnapshot == StateSnapshot.empty) prevStateHash
           else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
 
-        Some(computeStateHash(txs, initStateHash, initSnapshot, generator, blockWithoutStateHash.header.timestamp, challengedHeader.nonEmpty, blockchain))
+        Some(
+          TxStateSnapshotHashBuilder.computeStateHash(
+            txs,
+            initStateHash,
+            initSnapshot,
+            generator,
+            blockchain.lastBlockTimestamp,
+            blockWithoutStateHash.header.timestamp,
+            challengedHeader.nonEmpty,
+            blockchainWithNewBlock
+          )
+        )
       } else None
     }
 
@@ -549,37 +560,6 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     rdb.db,
     blockchain
   )
-
-  def computeStateHash(
-      txs: Seq[Transaction],
-      initStateHash: ByteStr,
-      initSnapshot: StateSnapshot,
-      signer: KeyPair,
-      timestamp: Long,
-      isChallenging: Boolean,
-      blockchain: Blockchain
-  ): ByteStr = {
-    val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, timestamp) _
-
-    txs
-      .foldLeft(initStateHash -> initSnapshot) { case ((prevStateHash, accSnapshot), tx) =>
-        val accBlockchain  = SnapshotBlockchain(blockchain, accSnapshot)
-        val minerPortfolio = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart))
-        txDiffer(accBlockchain, tx).resultE match {
-          case Right(txSnapshot) =>
-            val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
-            val txInfo                 = txSnapshot.transactions.head._2
-            val stateHash =
-              TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
-            (stateHash, accSnapshot |+| txSnapshotWithBalances)
-          case Left(_) if isChallenging =>
-            (prevStateHash, accSnapshot)
-          case Left(err) =>
-            throw new RuntimeException(err.toString)
-        }
-      }
-      ._1
-  }
 }
 
 object Domain {
