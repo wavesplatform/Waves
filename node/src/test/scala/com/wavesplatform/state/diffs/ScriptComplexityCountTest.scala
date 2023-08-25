@@ -21,7 +21,7 @@ class ScriptComplexityCountTest extends PropSpec with WithDomain with Inside {
   val script = TestCompiler(V6).compileExpression("func f() = true\n f()")
   // complexity = 1 for both estimator and evaluator
 
-  property("check scripts run count") {
+  property("check scripts run complexity") {
     val (genesis, txs) = preconditions
 
     assertDiffAndState(
