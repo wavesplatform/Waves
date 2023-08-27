@@ -16,6 +16,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
@@ -53,7 +54,10 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceAfterTx))
+          Map(
+            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceAfterTx),
+            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
+          )
         )
       }
     }
@@ -80,7 +84,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           append.transactionStateUpdates.head.balances,
           Map(
             (senderAddress, Waves)    -> (senderBalanceBefore, transferSenderBalanceAfter),
-            (recipientAddress, Waves) -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter)
+            (recipientAddress, Waves) -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter),
+            (defaultAddress, Waves)   -> (6.waves, 6.waves + customFee * 2 / 5)
           )
         )
       }
@@ -153,7 +158,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           append.transactionStateUpdates.head.balances,
           Map(
             (senderAddress, Waves)       -> (senderBalanceBefore, senderBalanceBefore - customAssetIssueFee),
-            (senderAddress, issue.asset) -> (0, amount)
+            (senderAddress, issue.asset) -> (0, amount),
+            (defaultAddress, Waves)      -> (6.waves, 6.waves + customAssetIssueFee * 2 / 5)
           )
         )
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
@@ -191,7 +197,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
           append.transactionStateUpdates.head.balances,
           Map(
             (senderAddress, Waves)            -> (senderBalanceBefore, senderBalanceBefore - 0.001.waves),
-            (senderAddress, issueNftTx.asset) -> (0, 1)
+            (senderAddress, issueNftTx.asset) -> (0, 1),
+            (defaultAddress, Waves)           -> (6.waves, 6.waves + issueNftTx.fee.value * 2 / 5)
           )
         )
         checkAssetsStateUpdates(assetDetails.after, issueNftTx, isNft = true, issueNftTx.quantity.value)
@@ -214,15 +221,17 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         d.appendBlock(issue)
         d.appendMicroBlock(reissueTx)
       } { updates =>
-        val append       = updates(2).append
-        val assetDetails = append.transactionStateUpdates.head.assets.head
+        val append             = updates(2).append
+        val assetDetails       = append.transactionStateUpdates.head.assets.head
+        val minerBalanceBefore = 12.waves + issue.fee.value * 2 / 5
 
         checkReissue(append.transactionIds.head, append.transactionAt(0), reissueTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
             (senderAddress, Waves)           -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
-            (senderAddress, reissueTx.asset) -> (amount, quantityAfterReissue)
+            (senderAddress, reissueTx.asset) -> (amount, quantityAfterReissue),
+            (defaultAddress, Waves)          -> (minerBalanceBefore, minerBalanceBefore + reissueTx.fee.value * 2 / 5)
           )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
@@ -246,14 +255,16 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         d.appendBlock(issue)
         d.appendMicroBlock(burnTx)
       } { updates =>
-        val append       = updates(2).append
-        val assetDetails = append.transactionStateUpdates.head.assets.head
+        val append             = updates(2).append
+        val assetDetails       = append.transactionStateUpdates.head.assets.head
+        val minerBalanceBefore = 12.waves + issue.fee.value * 2 / 5
         checkBurn(append.transactionIds.head, append.transactionAt(0), burnTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
             (senderAddress, Waves)        -> (senderBalanceBeforeBurn, senderBalanceAfterBurn),
-            (senderAddress, burnTx.asset) -> (amount, amountAfterTx)
+            (senderAddress, burnTx.asset) -> (amount, amountAfterTx),
+            (defaultAddress, Waves)       -> (minerBalanceBefore, minerBalanceBefore + burnTx.fee.value * 2 / 5)
           )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
@@ -352,6 +363,7 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
       }
 
       def checkingSubscribeFields(append: Append, exchangeTx: ExchangeTransaction, exchangedAssets: Long, orderAmount: Long): Unit = {
+        val minerBalanceBefore = 18.waves + priceAsset.fee.value + amountAsset.fee.value * 2 / 5
         checkExchange(append.transactionIds.head, append.transactionAt(0), exchangeTx)
         checkBalances(
           append.transactionStateUpdates.head.balances,
@@ -361,7 +373,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
             (buyer.toAddress, amountAsset.asset)  -> (0, orderAmount),
             (seller.toAddress, Waves)             -> (sellerBalanceBeforeExchange, sellerBalanceBeforeExchange - customFee),
             (buyer.toAddress, priceAsset.asset)   -> (priceAssetQuantity, priceAssetQuantity - exchangedAssets),
-            (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount)
+            (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount),
+            (defaultAddress, Waves)               -> (minerBalanceBefore, minerBalanceBefore + exchangeTx.fee.value * 2 / 5)
           )
         )
       }
@@ -383,7 +396,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee)
+            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceBefore - customFee),
+            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
           )
         )
         checkLeasingForAddress(
@@ -419,12 +433,14 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         d.appendBlock(lease)
         d.appendMicroBlock(leaseCancel)
       } { updates =>
-        val append = updates(2).append
+        val append             = updates(2).append
+        val minerBalanceBefore = 12.waves + lease.fee.value * 2 / 5
         checkLeaseCancel(append.transactionIds.head, append.transactionAt(0), leaseCancel)
         checkBalances(
           append.transactionStateUpdates.head.balances,
           Map(
-            (senderAddress, Waves) -> (senderBalanceBeforeTx, senderBalanceAfterTx)
+            (senderAddress, Waves)  -> (senderBalanceBeforeTx, senderBalanceAfterTx),
+            (defaultAddress, Waves) -> (minerBalanceBefore, minerBalanceBefore + leaseCancel.fee.value * 2 / 5)
           )
         )
         checkLeasingForAddress(
@@ -498,7 +514,10 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkDataTransaction(append.transactionIds.head, append.transactionAt(0), dataTx)
         checkBalances(
           txUpdates.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
+          Map(
+            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceBefore - customFee),
+            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
+          )
         )
         checkDataEntriesStateUpdate(txUpdates.dataEntries, dataTx.data, senderAddress.bytes)
       }
@@ -516,7 +535,10 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkSetScriptTransaction(append.transactionIds.head, append.transactionAt(0), setScript)
         checkBalances(
           txUpdates.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - customFee))
+          Map(
+            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceBefore - customFee),
+            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
+          )
         )
         checkSetScriptStateUpdate(txUpdates.scripts.head, setScript)
       }
@@ -543,9 +565,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         val assetDetails = txUpdates.assets.head
 
         checkSponsorFeeTransaction(append.transactionIds.head, append.transactionAt(0), sponsorFee)
+        val minerBalanceBefore = 18.waves + issue.fee.value
         checkBalances(
           txUpdates.balances,
-          Map((senderAddress, Waves) -> (senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx))
+          Map(
+            (senderAddress, Waves)  -> (senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx),
+            (defaultAddress, Waves) -> (minerBalanceBefore, 18.waves + issue.fee.value + sponsorFee.fee.value * 2 / 5)
+          )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
@@ -564,9 +590,13 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         val assetDetails = txUpdates.assets.head
 
         checkSponsorFeeTransaction(append.transactionIds.head, append.transactionAt(0), sponsorFeeCancel)
+        val minerBalanceBefore = 18.waves + issue.fee.value + sponsorFee.fee.value * 2 / 5
         checkBalances(
           txUpdates.balances,
-          Map((senderAddress, Waves) -> (senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx))
+          Map(
+            (senderAddress, Waves)  -> (senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx),
+            (defaultAddress, Waves) -> (minerBalanceBefore, minerBalanceBefore + sponsorFeeCancel.fee.value * 2 / 5)
+          )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
         checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
@@ -589,14 +619,16 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         d.appendBlock(issue)
         d.appendMicroBlock(setAssetScript)
       } { updates =>
-        val append       = updates(2).append
-        val txUpdates    = append.transactionStateUpdates.head
-        val assetDetails = txUpdates.assets.head
+        val append             = updates(2).append
+        val txUpdates          = append.transactionStateUpdates.head
+        val assetDetails       = txUpdates.assets.head
+        val minerBalanceBefore = 12.waves + issue.fee.value * 2 / 5
         checkSetAssetScriptTransaction(append.transactionIds.head, append.transactionAt(0), setAssetScript)
         checkBalances(
           txUpdates.balances,
           Map(
-            (senderAddress, Waves) -> (senderBalanceBeforeSetAssetScriptTx, senderBalanceAfterSetAssetScriptTx)
+            (senderAddress, Waves)  -> (senderBalanceBeforeSetAssetScriptTx, senderBalanceAfterSetAssetScriptTx),
+            (defaultAddress, Waves) -> (minerBalanceBefore, minerBalanceBefore + setAssetScript.fee.value * 2 / 5)
           )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, quantity)
@@ -629,7 +661,8 @@ class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with Sca
         checkBalances(
           txUpdates.balances,
           Map(
-            (senderAddress, Waves) -> (senderBalanceBeforeUpdateAssetInfoTx, senderBalanceAfterUpdateAssetInfoTx)
+            (senderAddress, Waves)  -> (senderBalanceBeforeUpdateAssetInfoTx, senderBalanceAfterUpdateAssetInfoTx),
+            (defaultAddress, Waves) -> (18.waves + issue.fee.value, 18.waves + issue.fee.value + updateAssetInfo.fee * 2 / 5)
           )
         )
         checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)

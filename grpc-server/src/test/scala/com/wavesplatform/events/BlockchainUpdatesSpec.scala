@@ -15,6 +15,7 @@ import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, Balanc
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.events.protobuf.StateUpdate.BalanceUpdate as PBBalanceUpdate
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated, StateUpdate as PBStateUpdate}
 import com.wavesplatform.features.BlockchainFeatures
@@ -842,26 +843,34 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         PBBlocks.vanilla(append.body.block.get.block.get).get shouldBe challengingBlock
         append.transactionIds.map(_.toByteStr).toSet shouldBe txs.map(_.id()).toSet
         append.stateUpdate.get.balances shouldBe Seq(
-          protobuf.StateUpdate.BalanceUpdate(
+          PBBalanceUpdate(
             challengingMiner.toAddress.toByteString,
             Some(Amount(amount = initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial)),
             initChallengingBalance
           )
         )
-        append.transactionStateUpdates.map(_.balances.toSet).toSet shouldBe Set(
-          Set(
-            protobuf.StateUpdate
-              .BalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = initSenderBalance - TestValues.fee - 1.waves)), initSenderBalance),
-            protobuf.StateUpdate.BalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves)))
+        val challengingMinerAddress = challengingMiner.toAddress.toByteString
+        val challengingMinerBalance = initChallengingBalance + 6.waves
+        val balanceAfterTransfer1   = initSenderBalance - TestValues.fee - 1.waves
+        val balanceAfterTransfer2   = initSenderBalance - 2 * TestValues.fee - 3.waves
+        append.transactionStateUpdates.map(_.balances) shouldBe Seq(
+          Seq(
+            PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer1)), initSenderBalance),
+            PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves))),
+            PBBalanceUpdate(
+              challengingMinerAddress,
+              Some(Amount(amount = challengingMinerBalance + TestValues.fee * 2 / 5)),
+              challengingMinerBalance
+            )
           ),
-          Set(
-            protobuf.StateUpdate
-              .BalanceUpdate(
-                sender.toAddress.toByteString,
-                Some(Amount(amount = initSenderBalance - 2 * TestValues.fee - 3.waves)),
-                initSenderBalance - TestValues.fee - 1.waves
-              ),
-            protobuf.StateUpdate.BalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves)
+          Seq(
+            PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer2)), balanceAfterTransfer1),
+            PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves),
+            PBBalanceUpdate(
+              challengingMinerAddress,
+              Some(Amount(amount = challengingMinerBalance + TestValues.fee * 4 / 5)),
+              challengingMinerBalance + TestValues.fee * 2 / 5
+            )
           )
         )
       }

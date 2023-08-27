@@ -544,10 +544,9 @@ object StateUpdate {
       keyBlockSnapshot.transactions
         .foldLeft((keyBlockSnapshot, Seq.empty[StateUpdate])) { case ((accSnapshot, updates), (_, txInfo)) =>
           val accBlockchain = SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot)
-          val txSnapshot    = txInfo.snapshot.copy(balances = txInfo.snapshot.balances.filter { case ((a, _), _) => txInfo.affected.contains(a) })
           (
-            accSnapshot |+| txSnapshot,
-            updates :+ atomic(accBlockchain, txSnapshot)
+            accSnapshot |+| txInfo.snapshot,
+            updates :+ atomic(accBlockchain, txInfo.snapshot)
           )
         }
     val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
