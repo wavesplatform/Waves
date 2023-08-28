@@ -10,7 +10,7 @@ import com.wavesplatform.state.diffs.*
 import com.wavesplatform.state.{BalanceSnapshot, LeaseBalance}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, transfer}
+import com.wavesplatform.transaction.TxHelpers.*
 
 class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -115,8 +115,6 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
     assert(RideV5, fixed = false)
     assert(RideV6, fixed = true)
   }
-
-  import com.wavesplatform.transaction.TxHelpers.*
 
   property("correct balance snapshots") {
     val transferTx   = transfer(to = signer(1).toAddress, amount = 3.waves, fee = 0.1.waves)
