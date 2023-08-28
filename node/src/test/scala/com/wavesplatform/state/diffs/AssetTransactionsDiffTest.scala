@@ -156,7 +156,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val (_, _, genesis, issue, reissue) = setup
     assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(reissue)), fs) { ei =>
-      ei should produce("negative asset balance")
+      ei should produce("Asset balance sum overflow")
     }
   }
 

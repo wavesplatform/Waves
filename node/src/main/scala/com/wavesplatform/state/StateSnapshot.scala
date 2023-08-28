@@ -10,14 +10,14 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.{AssetStatic, TransactionStatus}
-import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.collection.immutable.VectorMap
 
@@ -25,7 +25,7 @@ case class StateSnapshot(
     transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
     balances: VectorMap[(Address, Asset), Long] = VectorMap(),
     leaseBalances: Map[Address, LeaseBalance] = Map(),
-    assetStatics: Map[IssuedAsset, AssetStatic] = Map(),
+    assetStatics: VectorMap[IssuedAsset, AssetStatic] = VectorMap(),
     assetVolumes: Map[IssuedAsset, AssetVolumeInfo] = Map(),
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map(),
@@ -41,10 +41,10 @@ case class StateSnapshot(
 ) {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
-  def toProtobuf(txSucceeded: Boolean): TransactionStateSnapshot =
+  def toProtobuf(txStatus: TxMeta.Status): TransactionStateSnapshot =
     TransactionStateSnapshot(
       balances.map { case ((address, asset), balance) =>
-        S.Balance(address.toByteString, Some(Amount(asset.fold(ByteString.EMPTY)(_.id.toByteString), balance)))
+        S.Balance(address.toByteString, Some(PBAmounts.fromAssetAndAmount(asset, balance)))
       }.toSeq,
       leaseBalances.map { case (address, balance) =>
         S.LeaseBalance(address.toByteString, balance.in, balance.out)
@@ -57,7 +57,7 @@ case class StateSnapshot(
         S.AssetNameAndDescription(asset.id.toByteString, info.name.toStringUtf8, info.description.toStringUtf8, info.lastUpdatedAt)
       }.toSeq,
       assetScripts.map { case (asset, script) =>
-        S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString), script.fold(0L)(_.complexity))
+        S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString))
       }.toSeq,
       aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.toSeq,
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
@@ -99,8 +99,14 @@ case class StateSnapshot(
       sponsorships.collect { case (asset, SponsorshipValue(minFee)) =>
         S.Sponsorship(asset.id.toByteString, minFee)
       }.toSeq,
-      transactionStatus = if (txSucceeded) TransactionStatus.SUCCEEDED else TransactionStatus.FAILED
+      txStatus.protobuf
     )
+
+  // ignores lease balances from portfolios
+  def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, StateSnapshot] =
+    StateSnapshot
+      .balances(portfolios, SnapshotBlockchain(blockchain, this))
+      .map(b => copy(balances = balances ++ b))
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
@@ -117,6 +123,11 @@ case class StateSnapshot(
   def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
     scriptResults.get(txId).flatMap(_.error)
 
+  def bindElidedTransaction(blockchain: Blockchain, tx: Transaction): StateSnapshot =
+    copy(
+      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, this, blockchain))
+    )
+
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
     assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap
 
@@ -128,7 +139,7 @@ case class StateSnapshot(
 }
 
 object StateSnapshot {
-  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, Boolean) = {
+  def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, TxMeta.Status) = {
     val balances: VectorMap[(Address, Asset), Long] =
       VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
@@ -143,12 +154,12 @@ object StateSnapshot {
           if (s.script.isEmpty)
             None
           else
-            Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), s.complexity))
+            Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), 0))
         s.assetId.toIssuedAssetId -> info
       }.toMap
 
-    val assetStatics: Map[IssuedAsset, AssetStatic] =
-      pbSnapshot.assetStatics.map(info => info.assetId.toIssuedAssetId -> info).toMap
+    val assetStatics: VectorMap[IssuedAsset, AssetStatic] =
+      VectorMap() ++ pbSnapshot.assetStatics.map(info => info.assetId.toIssuedAssetId -> info)
 
     val assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =
       pbSnapshot.assetVolumes
@@ -236,7 +247,7 @@ object StateSnapshot {
         accountScripts,
         accountData
       ),
-      pbSnapshot.transactionStatus.isSucceeded
+      TxMeta.Status.fromProtobuf(pbSnapshot.transactionStatus)
     )
   }
 
@@ -256,28 +267,32 @@ object StateSnapshot {
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
       scriptsComplexity: Long = 0,
       transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap()
-  ): Either[ValidationError, StateSnapshot] =
-    for {
-      b  <- balances(portfolios, blockchain).leftMap(GenericError(_))
-      lb <- leaseBalances(portfolios, blockchain).leftMap(GenericError(_))
-    } yield StateSnapshot(
-      transactions,
-      b,
-      lb,
-      assetStatics(issuedAssets),
-      assetVolumes(blockchain, issuedAssets, updatedAssets),
-      assetNamesAndDescriptions(issuedAssets, updatedAssets),
-      assetScripts,
-      sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-      resolvedLeaseStates(blockchain, leaseStates, aliases),
-      aliases,
-      this.orderFills(orderFills, blockchain),
-      accountScripts,
-      accountData,
-      scriptResults,
-      ethereumTransactionMeta,
-      scriptsComplexity
-    )
+  ): Either[ValidationError, StateSnapshot] = {
+    val r =
+      for {
+        b  <- balances(portfolios, blockchain)
+        lb <- leaseBalances(portfolios, blockchain)
+        of <- this.orderFills(orderFills, blockchain)
+      } yield StateSnapshot(
+        transactions,
+        b,
+        lb,
+        assetStatics(issuedAssets),
+        assetVolumes(blockchain, issuedAssets, updatedAssets),
+        assetNamesAndDescriptions(issuedAssets, updatedAssets),
+        assetScripts,
+        sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
+        resolvedLeaseStates(blockchain, leaseStates, aliases),
+        aliases,
+        of,
+        accountScripts,
+        accountData,
+        scriptResults,
+        ethereumTransactionMeta,
+        scriptsComplexity
+      )
+    r.leftMap(GenericError(_))
+  }
 
   // ignores lease balances from portfolios
   private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
@@ -286,14 +301,13 @@ object StateSnapshot {
         case (_, 0) =>
           Right(VectorMap[(Address, Asset), Long]())
         case (assetId, balance) =>
-          Portfolio
-            .sum(blockchain.balance(address, assetId), balance, s"$address -> Asset balance sum overflow")
+          safeSum(blockchain.balance(address, assetId), balance, s"$address -> Asset balance")
             .map(newBalance => VectorMap((address, assetId: Asset) -> newBalance))
       }
       if (wavesAmount != 0)
         for {
           assetBalances   <- assetBalancesE
-          newWavesBalance <- Portfolio.sum(blockchain.balance(address), wavesAmount, s"$address -> Waves balance sum overflow")
+          newWavesBalance <- safeSum(blockchain.balance(address), wavesAmount, s"$address -> Waves balance")
         } yield assetBalances + ((address, Waves) -> newWavesBalance)
       else
         assetBalancesE
@@ -320,15 +334,15 @@ object StateSnapshot {
         case (address, Portfolio(_, lease, _)) if lease.out != 0 || lease.in != 0 =>
           val bLease = blockchain.leaseBalance(address)
           for {
-            newIn  <- Portfolio.sum(bLease.in, lease.in, s"$address -> Lease in overflow")
-            newOut <- Portfolio.sum(bLease.out, lease.out, s"$address -> Lease out overflow")
+            newIn  <- safeSum(bLease.in, lease.in, s"$address -> Lease")
+            newOut <- safeSum(bLease.out, lease.out, s"$address -> Lease")
           } yield Seq(address -> LeaseBalance(newIn, newOut))
         case _ =>
           Seq().asRight[String]
       }
       .map(_.toMap)
 
-  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): Map[IssuedAsset, AssetStatic] =
+  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStatic] =
     issuedAssets.map { case (asset, info) =>
       asset ->
         AssetStatic(
@@ -384,11 +398,12 @@ object StateSnapshot {
       )
       .toMap
 
-  private def orderFills(volumeAndFees: Map[ByteStr, VolumeAndFee], blockchain: Blockchain): Map[ByteStr, VolumeAndFee] =
-    volumeAndFees.map { case (orderId, value) =>
-      val newInfo = value |+| blockchain.filledVolumeAndFee(orderId)
-      orderId -> newInfo
-    }
+  private def orderFills(volumeAndFees: Map[ByteStr, VolumeAndFee], blockchain: Blockchain): Either[String, Map[ByteStr, VolumeAndFee]] =
+    volumeAndFees.toSeq
+      .traverse { case (orderId, value) =>
+        value.combineE(blockchain.filledVolumeAndFee(orderId)).map(orderId -> _)
+      }
+      .map(_.toMap)
 
   implicit val monoid: Monoid[StateSnapshot] = new Monoid[StateSnapshot] {
     override val empty: StateSnapshot =

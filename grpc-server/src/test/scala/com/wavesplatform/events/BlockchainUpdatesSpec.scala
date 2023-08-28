@@ -11,18 +11,11 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{
-  AssetInfo,
-  AssetStateUpdate,
-  BalanceUpdate,
-  DataEntryUpdate,
-  LeaseUpdate,
-  LeasingBalanceUpdate,
-  ScriptUpdate
-}
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.events.protobuf.StateUpdate.BalanceUpdate as PBBalanceUpdate
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated, StateUpdate as PBStateUpdate}
 import com.wavesplatform.features.BlockchainFeatures
@@ -38,13 +31,12 @@ import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.OrderType
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -68,7 +60,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
   val lease: LeaseTransaction             = TxHelpers.lease(fee = TestValues.fee)
   val issue: IssueTransaction             = TxHelpers.issue(amount = 1000)
   val reissue: ReissueTransaction         = TxHelpers.reissue(issue.asset)
-  val data: DataTransaction               = TxHelpers.dataSingle()
+  val data: DataTransaction               = TxHelpers.dataSingle(fee = TestValues.fee * 3) // for compatibility with expected values
   val createAlias: CreateAliasTransaction = TxHelpers.createAlias("alias")
   val setScript1: SetScriptTransaction = TxHelpers.setScript(
     TxHelpers.defaultSigner,
@@ -851,30 +843,34 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         PBBlocks.vanilla(append.body.block.get.block.get).get shouldBe challengingBlock
         append.transactionIds.map(_.toByteStr).toSet shouldBe txs.map(_.id()).toSet
         append.stateUpdate.get.balances shouldBe Seq(
-          protobuf.StateUpdate.BalanceUpdate(
+          PBBalanceUpdate(
             challengingMiner.toAddress.toByteString,
-            Some(
-              Amount(amount =
-                initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial + txs.map(tx => CurrentBlockFeePart(tx.fee.value)).sum
-              )
-            ),
+            Some(Amount(amount = initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial)),
             initChallengingBalance
           )
         )
-        append.transactionStateUpdates.map(_.balances.toSet).toSet shouldBe Set(
-          Set(
-            protobuf.StateUpdate
-              .BalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = initSenderBalance - TestValues.fee - 1.waves)), initSenderBalance),
-            protobuf.StateUpdate.BalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves)))
+        val challengingMinerAddress = challengingMiner.toAddress.toByteString
+        val challengingMinerBalance = initChallengingBalance + 6.waves
+        val balanceAfterTransfer1   = initSenderBalance - TestValues.fee - 1.waves
+        val balanceAfterTransfer2   = initSenderBalance - 2 * TestValues.fee - 3.waves
+        append.transactionStateUpdates.map(_.balances) shouldBe Seq(
+          Seq(
+            PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer1)), initSenderBalance),
+            PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves))),
+            PBBalanceUpdate(
+              challengingMinerAddress,
+              Some(Amount(amount = challengingMinerBalance + TestValues.fee * 2 / 5)),
+              challengingMinerBalance
+            )
           ),
-          Set(
-            protobuf.StateUpdate
-              .BalanceUpdate(
-                sender.toAddress.toByteString,
-                Some(Amount(amount = initSenderBalance - 2 * TestValues.fee - 3.waves)),
-                initSenderBalance - TestValues.fee - 1.waves
-              ),
-            protobuf.StateUpdate.BalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves)
+          Seq(
+            PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer2)), balanceAfterTransfer1),
+            PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves),
+            PBBalanceUpdate(
+              challengingMinerAddress,
+              Some(Amount(amount = challengingMinerBalance + TestValues.fee * 4 / 5)),
+              challengingMinerBalance + TestValues.fee * 2 / 5
+            )
           )
         )
       }

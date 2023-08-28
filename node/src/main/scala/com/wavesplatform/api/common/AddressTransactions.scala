@@ -6,7 +6,7 @@ import com.wavesplatform.api.common.AddressTransactions.TxByAddressIterator.Batc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys, RDB, readTransactionHNSeqAndType}
-import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
+import com.wavesplatform.state.{Height, InvokeScriptResult, StateSnapshot, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -58,20 +58,20 @@ object AddressTransactions {
 
   def allAddressTransactions(
       rdb: RDB,
-      maybeDiff: Option[(Height, Diff)],
+      maybeSnapshot: Option[(Height, StateSnapshot)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
-    val diffTxs = transactionsFromDiff(maybeDiff, subject, sender, types, fromId)
+    val diffTxs = transactionsFromSnapshot(maybeSnapshot, subject, sender, types, fromId)
 
     val dbTxs = transactionsFromDB(
       rdb,
       subject,
       sender,
       types,
-      fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.containsTransaction(id) })
+      fromId.filter(id => maybeSnapshot.exists(s => !s._2.transactions.contains(id)))
     )
     Observable.fromIterable(diffTxs) ++ dbTxs.filterNot(diffTxs.contains)
   }
@@ -101,16 +101,16 @@ object AddressTransactions {
       }
   }
 
-  private def transactionsFromDiff(
-      maybeDiff: Option[(Height, Diff)],
+  private def transactionsFromSnapshot(
+      maybeSnapshot: Option[(Height, StateSnapshot)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Seq[(TxMeta, Transaction, Option[TxNum])] =
     (for {
-      (height, diff) <- maybeDiff.toSeq
-      nti            <- diff.transactions.toSeq.reverse
+      (height, snapshot) <- maybeSnapshot.toSeq
+      nti                <- snapshot.transactions.values.toSeq.reverse
       if nti.affected(subject)
     } yield (TxMeta(height, nti.status, nti.spentComplexity), nti.transaction))
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }

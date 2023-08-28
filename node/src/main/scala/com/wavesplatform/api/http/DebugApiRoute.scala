@@ -15,7 +15,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash, TxMeta}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -33,8 +33,8 @@ import play.api.libs.json.Json.JsValueWrapper
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-import scala.concurrent.duration.*
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -221,28 +221,28 @@ case class DebugApiRoute(
 
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
-      val tracedDiff = for {
+      val tracedSnapshot = for {
         tx   <- TracedResult(parsedTransaction)
         diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(blockchain, tx)
       } yield (tx, diff)
 
-      val error = tracedDiff.resultE match {
+      val error = tracedSnapshot.resultE match {
         case Right((tx, diff)) => diff.errorMessage(tx.id()).map(em => GenericError(em.text))
         case Left(err)         => Some(err)
       }
 
       val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
 
-      val serializer = tracedDiff.resultE
+      val serializer = tracedSnapshot.resultE
         .fold(
           _ => this.serializer,
-          { case (_, diff) =>
-            val compositeBlockchain = CompositeBlockchain(blockchain, diff)
-            this.serializer.copy(blockchain = compositeBlockchain)
+          { case (_, snapshot) =>
+            val snapshotBlockchain = SnapshotBlockchain(blockchain, snapshot)
+            this.serializer.copy(blockchain = snapshotBlockchain)
           }
         )
 
-      val extendedJson = tracedDiff.resultE
+      val extendedJson = tracedSnapshot.resultE
         .fold(
           _ => jsv,
           { case (tx, diff) =>
@@ -259,7 +259,7 @@ case class DebugApiRoute(
       val response = Json.obj(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
-        "trace" -> tracedDiff.trace.map {
+        "trace" -> tracedSnapshot.trace.map {
           case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },

@@ -59,6 +59,7 @@ object KeyTags extends Enumeration {
   SponsoredAssets,
   StateHash,
   EthereumTransactionMeta,
+  NthTransactionStateSnapshotAtHeight,
   MaliciousMinerBanHeights = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {

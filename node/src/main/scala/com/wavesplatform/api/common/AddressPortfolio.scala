@@ -1,6 +1,5 @@
 package com.wavesplatform.api.common
 
-import cats.syntax.semigroup.*
 import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
@@ -8,7 +7,8 @@ import com.wavesplatform.api.common.NFTIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, KeyTags, Keys, readCurrentBalance}
-import com.wavesplatform.state.{AssetDescription, Diff, Portfolio}
+import com.wavesplatform.state.{AssetDescription, StateSnapshot}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
@@ -71,10 +71,10 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
   override def computeNext(): Seq[(IssuedAsset, Long)] =
     resource.withSafePrefixIterator { dbIterator =>
       if (dbIterator.isValid) {
-        val assetId    = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
-        val curBalance = readCurrentBalance(dbIterator.value())
+        val assetId = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
+        val balance = readCurrentBalance(dbIterator.value()).balance
         dbIterator.next()
-        Seq(assetId -> curBalance.balance)
+        Seq((assetId, balance))
       } else endOfData()
     }(endOfData())
 }
@@ -97,16 +97,17 @@ class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends A
 }
 
 class BalanceIterator(
+    address: Address,
     underlying: Iterator[Seq[(IssuedAsset, Long)]],
     includeAsset: IssuedAsset => Boolean,
-    private var pendingOverrides: Map[IssuedAsset, Long]
+    private var pendingOverrides: Map[(Address, Asset), Long]
 ) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
 
   private def nextOverride(): Seq[(IssuedAsset, Long)] =
     if (pendingOverrides.isEmpty) endOfData()
     else {
       val balances = pendingOverrides.collect {
-        case (asset, balance) if includeAsset(asset) =>
+        case ((`address`, asset: IssuedAsset), balance) if includeAsset(asset) =>
           asset -> balance
       }.toSeq
       pendingOverrides = Map.empty
@@ -115,10 +116,11 @@ class BalanceIterator(
 
   override def computeNext(): Seq[(IssuedAsset, Long)] =
     if (underlying.hasNext) {
-      underlying.next().map { case (asset, balanceFromHistory) =>
-        val balanceFromDiff = pendingOverrides.getOrElse(asset, 0L)
-        pendingOverrides -= asset
-        asset -> (balanceFromDiff |+| balanceFromHistory)
+      underlying.next().map { case (asset, dbBalance) =>
+        val key     = (address, asset)
+        val balance = pendingOverrides.getOrElse(key, dbBalance)
+        pendingOverrides -= key
+        asset -> balance
       }
     } else nextOverride()
 }
@@ -127,16 +129,17 @@ object AddressPortfolio {
   def nftIterator(
       resource: DBResource,
       address: Address,
-      diff: Diff,
+      snapshot: StateSnapshot,
       maybeAfter: Option[IssuedAsset],
       loadAssetDescription: IssuedAsset => Option[AssetDescription]
   ): Iterator[Seq[(IssuedAsset, AssetDescription)]] =
     new BalanceIterator(
+      address,
       resource
         .get(Keys.addressId(address))
-        .fold[Iterator[Seq[(IssuedAsset, Long)]]](Iterator.empty)(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
+        .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
       asset => loadAssetDescription(asset).exists(_.nft),
-      diff.portfolios.getOrElse(address, Portfolio.empty).assets
+      snapshot.balances
     ).asScala
       .map(_.collect { case (asset, balance) if balance > 0 => asset }
         .flatMap(a => loadAssetDescription(a).map(a -> _)))
@@ -144,15 +147,16 @@ object AddressPortfolio {
   def assetBalanceIterator(
       resource: DBResource,
       address: Address,
-      diff: Diff,
+      snapshot: StateSnapshot,
       includeAsset: IssuedAsset => Boolean
   ): Iterator[Seq[(IssuedAsset, Long)]] =
     new BalanceIterator(
+      address,
       resource
         .get(Keys.addressId(address))
-        .fold[Iterator[Seq[(IssuedAsset, Long)]]](Iterator.empty)(addressId => new AssetBalanceIterator(addressId, resource).asScala),
+        .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new AssetBalanceIterator(addressId, resource).asScala),
       includeAsset,
-      diff.portfolios.getOrElse(address, Portfolio.empty).assets
+      snapshot.balances
     ).asScala
       .map(_.filter { case (asset, balance) =>
         includeAsset(asset) && balance > 0

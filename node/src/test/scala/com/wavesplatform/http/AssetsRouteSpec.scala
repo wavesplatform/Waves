@@ -61,7 +61,7 @@ class AssetsRouteSpec
             testWallet,
             DummyTransactionPublisher.accepting,
             d.blockchain,
-            () => d.blockchain.getCompositeBlockchain,
+            () => d.blockchain.snapshotBlockchain,
             TestTime(),
             d.accountsApi,
             d.assetsApi,

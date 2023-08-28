@@ -30,8 +30,11 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactor
       (() => blockchain.height).when().returning(1)
       (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.DataTransaction.id -> 0))
 
-      val txDiffer =
-        TransactionDiffer(Some(System.currentTimeMillis() - 1000), System.currentTimeMillis())(blockchain, _: Transaction).resultE.explicitGet()
+      val txDiffer = (tx: Transaction) => {
+        val time = System.currentTimeMillis()
+        TransactionDiffer(Some(time - 1000), time)(blockchain, tx).resultE
+          .explicitGet()
+      }
       (blockchain.balance _).when(*, *).returning(10000000)
       (blockchain.wavesBalances _).when(*).returning(Map(acc1.toAddress -> 10000000, acc2.toAddress -> 10000000))
       (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))

@@ -13,7 +13,7 @@ import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset
@@ -69,7 +69,7 @@ class CustomJsonMarshallerSpec
       transactionsApi,
       testWallet,
       blockchain,
-      mock[() => CompositeBlockchain],
+      mock[() => SnapshotBlockchain],
       () => utx.size,
       publisher,
       ntpTime,
@@ -118,7 +118,7 @@ class CustomJsonMarshallerSpec
     testWallet,
     publisher,
     blockchain,
-    mock[() => CompositeBlockchain],
+    mock[() => SnapshotBlockchain],
     ntpTime,
     accountsApi,
     assetsApi,

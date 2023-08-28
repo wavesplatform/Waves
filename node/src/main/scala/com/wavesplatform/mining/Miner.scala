@@ -143,9 +143,9 @@ class MinerImpl(
     val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
       BlockDiffer
-        .createInitialBlockDiff(blockchainUpdater, miner)
+        .createInitialBlockSnapshot(blockchainUpdater, miner)
         .toOption
-        .map(initDiff => TxStateSnapshotHashBuilder.createHashFromDiff(blockchainUpdater, initDiff).createHash(prevHash))
+        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
     }
 
     if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)
