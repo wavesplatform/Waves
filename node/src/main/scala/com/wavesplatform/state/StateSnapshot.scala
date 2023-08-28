@@ -10,7 +10,7 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.{AssetStatic, TransactionStatus}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
@@ -99,11 +99,7 @@ case class StateSnapshot(
       sponsorships.collect { case (asset, SponsorshipValue(minFee)) =>
         S.Sponsorship(asset.id.toByteString, minFee)
       }.toSeq,
-      txStatus match {
-        case TxMeta.Status.Failed    => TransactionStatus.FAILED
-        case TxMeta.Status.Succeeded => TransactionStatus.SUCCEEDED
-        case TxMeta.Status.Elided    => TransactionStatus.ELIDED
-      }
+      txStatus.protobuf
     )
 
   // ignores lease balances from portfolios
@@ -251,12 +247,7 @@ object StateSnapshot {
         accountScripts,
         accountData
       ),
-      pbSnapshot.transactionStatus match {
-        case TransactionStatus.FAILED    => TxMeta.Status.Failed
-        case TransactionStatus.SUCCEEDED => TxMeta.Status.Succeeded
-        case TransactionStatus.ELIDED    => TxMeta.Status.Elided
-        case status                      => throw new RuntimeException(s"unexpected TransactionStatus $status")
-      }
+      TxMeta.Status.fromProtobuf(pbSnapshot.transactionStatus)
     )
   }
 

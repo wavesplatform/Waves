@@ -13,11 +13,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta, Status as PBStatus}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
