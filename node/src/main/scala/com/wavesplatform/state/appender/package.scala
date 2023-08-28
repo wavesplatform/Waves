@@ -9,6 +9,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.Time
@@ -32,13 +33,14 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] =
+  )(block: Block, snapshot: Option[BlockSnapshot]): Either[ValidationError, Option[Int]] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <-
         metrics.appendBlock
-          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, snapshot, None, verify, txSignParCheck))
           .map { discardedDiffs =>
+            // TODO: NODE-2609 not needed for light node
             utx.setPrioritySnapshots(discardedDiffs)
             Some(blockchainUpdater.height)
           }
@@ -51,13 +53,13 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] = {
+  )(block: Block, snapshot: Option[BlockSnapshot]): Either[ValidationError, Option[Int]] = {
     if (block.header.challengedHeader.nonEmpty) {
-      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map(_._2)
+      processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot).map(_._2)
     } else {
       for {
         hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-        _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
+        _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, snapshot, None, verify, txSignParCheck))
       } yield Some(blockchainUpdater.height)
     }
   }
@@ -69,8 +71,8 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, Option[Int]] =
-    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
+  )(block: Block, snapshot: Option[BlockSnapshot]): Either[ValidationError, Option[Int]] =
+    processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot).map { case (discardedDiffs, newHeight) =>
       utx.setPrioritySnapshots(discardedDiffs)
       newHeight
     }
@@ -81,7 +83,7 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, (Seq[StateSnapshot], Option[Int])] = {
+  )(block: Block, snapshot: Option[BlockSnapshot]): Either[ValidationError, (Seq[StateSnapshot], Option[Int])] = {
     val challengedBlock = block.toOriginal
     for {
       challengedHitSource <-
@@ -89,7 +91,7 @@ package object appender {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       discardedSnapshots <-
         metrics.appendBlock
-          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, Some(challengedHitSource), verify, txSignParCheck))
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, snapshot, Some(challengedHitSource), verify, txSignParCheck))
     } yield discardedSnapshots -> Some(blockchainUpdater.height)
   }
 

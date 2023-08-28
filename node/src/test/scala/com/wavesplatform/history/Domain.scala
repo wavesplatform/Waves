@@ -74,7 +74,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   lazy val testTime: TestTime = TestTime()
   lazy val blockAppender: Block => Task[Either[ValidationError, Option[BigInt]]] =
-    BlockAppender(blockchain, testTime, utxPool, posSelector, Scheduler.singleThread("appender"))
+    BlockAppender(blockchain, testTime, utxPool, posSelector, Scheduler.singleThread("appender"))(_, None)
   lazy val blockChallenger: BlockChallenger = new BlockChallengerImpl(
     blockchain,
     new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
@@ -121,7 +121,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         rdb,
         blockchain,
         utxPool,
-        challenger,
+        Some(challenger),
         tx => Future.successful(utxPool.putIfNew(tx)),
         Application.loadBlockAt(rdb, blockchain)
       )
@@ -303,16 +303,18 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
           Some(
             stateHash.getOrElse(
-              TxStateSnapshotHashBuilder.computeStateHash(
-                txs,
-                blockchain.lastBlockStateHash,
-                StateSnapshot.empty,
-                blockSigner,
-                rocksDBWriter.lastBlockTimestamp,
-                blockchain.lastBlockTimestamp.get,
-                isChallenging = false,
-                blockchain
-              )
+              TxStateSnapshotHashBuilder
+                .computeStateHash(
+                  txs,
+                  blockchain.lastBlockStateHash,
+                  StateSnapshot.empty,
+                  blockSigner,
+                  rocksDBWriter.lastBlockTimestamp,
+                  blockchain.lastBlockTimestamp.get,
+                  isChallenging = false,
+                  blockchain
+                )
+                .explicitGet()
             )
           )
         } else None,
@@ -425,16 +427,18 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
 
         Some(
-          TxStateSnapshotHashBuilder.computeStateHash(
-            txs,
-            initStateHash,
-            initSnapshot,
-            generator,
-            blockchain.lastBlockTimestamp,
-            blockWithoutStateHash.header.timestamp,
-            challengedHeader.nonEmpty,
-            blockchainWithNewBlock
-          )
+          TxStateSnapshotHashBuilder
+            .computeStateHash(
+              txs,
+              initStateHash,
+              initSnapshot,
+              generator,
+              blockchain.lastBlockTimestamp,
+              blockWithoutStateHash.header.timestamp,
+              challengedHeader.nonEmpty,
+              blockchainWithNewBlock
+            )
+            .explicitGet()
         )
       } else None
     }
@@ -544,7 +548,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     rdb,
     blockchain,
     utxPool,
-    blockChallenger,
+    Some(blockChallenger),
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
   )
@@ -585,7 +589,7 @@ object Domain {
           } yield hs -> challengedHs
         }
 
-      hitSourcesE.flatMap { case (hitSource, challengedHitSource) => bcu.processBlock(block, hitSource, challengedHitSource) }
+      hitSourcesE.flatMap { case (hitSource, challengedHitSource) => bcu.processBlock(block, hitSource, None, challengedHitSource) }
     }
   }
 

@@ -2,6 +2,7 @@ package com.wavesplatform.state.appender
 
 import java.time.Instant
 import cats.data.EitherT
+import cats.syntax.traverse.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
@@ -29,16 +30,18 @@ object BlockAppender extends ScorexLogging {
       scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
-  )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
+  )(newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       if (
         blockchainUpdater
           .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
         if (newBlock.header.challengedHeader.isDefined) {
-          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
+          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot).map(_ =>
+            Some(blockchainUpdater.score)
+          )
         } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot).map(_ => Some(blockchainUpdater.score))
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
@@ -53,7 +56,7 @@ object BlockAppender extends ScorexLogging {
       pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
-      blockChallenger: BlockChallenger,
+      blockChallenger: Option[BlockChallenger],
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Unit] = {
     import metrics.*
@@ -66,7 +69,7 @@ object BlockAppender extends ScorexLogging {
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.markNtp("block.signatures-validated")
-        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
+        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock, snapshot))
       } yield validApplication).value
 
     val handle = append.asyncBoundary.flatMap {
@@ -92,7 +95,7 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        blockChallenger.challengeBlock(newBlock, ch)
+        blockChallenger.traverse(_.challengeBlock(newBlock, ch)).void
 
       case Left(ve) =>
         Task {

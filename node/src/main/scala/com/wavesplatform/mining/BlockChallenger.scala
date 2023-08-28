@@ -37,18 +37,6 @@ trait BlockChallenger {
   def allProcessingTxs: Seq[Transaction]
 }
 
-object BlockChallenger {
-  val NoOp: BlockChallenger = new BlockChallenger {
-    override def challengeBlock(block: Block, ch: Channel): Task[Unit]            = Task.unit
-    override def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = Task.unit
-    override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
-      Left(GenericError("There are no suitable accounts"))
-    override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] = Right(Seq.empty)
-    override def getProcessingTx(id: ByteStr): Option[Transaction]                                                   = None
-    override def allProcessingTxs: Seq[Transaction]                                                                  = Seq.empty
-  }
-}
-
 class BlockChallengerImpl(
     blockchainUpdater: BlockchainUpdater & Blockchain,
     allChannels: ChannelGroup,
@@ -194,6 +182,16 @@ class BlockChallengerImpl(
         blockchainUpdater.computeNextReward,
         None
       )
+      stateHash <- TxStateSnapshotHashBuilder.computeStateHash(
+        txs,
+        TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
+        initialBlockSnapshot,
+        acc,
+        Some(prevBlockHeader.timestamp),
+        blockTime,
+        isChallenging = true,
+        blockchainWithNewBlock
+      )
       challengingBlock <-
         Block.buildAndSign(
           challengedBlock.header.version,
@@ -205,18 +203,7 @@ class BlockChallengerImpl(
           acc,
           blockFeatures(blockchainUpdater, settings),
           blockRewardVote(settings),
-          Some(
-            TxStateSnapshotHashBuilder.computeStateHash(
-              txs,
-              TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
-              initialBlockSnapshot,
-              acc,
-              Some(prevBlockHeader.timestamp),
-              blockTime,
-              isChallenging = true,
-              blockchainWithNewBlock
-            )
-          ),
+          Some(stateHash),
           Some(
             ChallengedHeader(
               challengedBlock.header.timestamp,

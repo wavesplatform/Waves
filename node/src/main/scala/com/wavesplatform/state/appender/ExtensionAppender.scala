@@ -62,7 +62,10 @@ object ExtensionAppender extends ScorexLogging {
                   val forkApplicationResultEi = {
                     newBlocks.view
                       .map { b =>
-                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(b)
+                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(
+                          b,
+                          extension.snapshots.get(b.id())
+                        )
                           .map {
                             _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                           }
@@ -92,7 +95,7 @@ object ExtensionAppender extends ScorexLogging {
                   forkApplicationResultEi match {
                     case Left(e) =>
                       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
-                      droppedBlocks.foreach { case (b, gp) => blockchainUpdater.processBlock(b, gp).explicitGet() }
+                      droppedBlocks.foreach { case (b, gp, sn) => blockchainUpdater.processBlock(b, gp, sn).explicitGet() }
                       Left(e)
 
                     case Right(_) =>

@@ -18,7 +18,7 @@ package object wavesplatform {
     Logger(LoggerFactory.getLogger(getClass.getName))
   private def checkOrAppend(block: Block, blockchainUpdater: Blockchain & BlockchainUpdater, miner: Miner): Either[ValidationError, Unit] =
     if (blockchainUpdater.isEmpty) {
-      blockchainUpdater.processBlock(block, block.header.generationSignature).map { _ =>
+      blockchainUpdater.processBlock(block, block.header.generationSignature, None).map { _ =>
         val genesisHeader = blockchainUpdater.blockHeader(1).get
         logger.info(
           s"Genesis block ${genesisHeader.id()} (generated at ${Instant.ofEpochMilli(genesisHeader.header.timestamp)}) has been added to the state"

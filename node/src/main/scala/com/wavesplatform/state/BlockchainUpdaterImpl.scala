@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
+import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
@@ -194,6 +195,7 @@ class BlockchainUpdaterImpl(
   override def processBlock(
       block: Block,
       hitSource: ByteStr,
+      snapshot: Option[BlockSnapshot],
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
@@ -462,7 +464,7 @@ class BlockchainUpdaterImpl(
     snapshotsById.toMap
   }
 
-  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr, Option[BlockSnapshot])]] = writeLock {
     log.info(s"Trying rollback blockchain to $blockId")
 
     val prevNgState = ngState
@@ -483,7 +485,16 @@ class BlockchainUpdaterImpl(
           blocks <- rocksdb.rollbackTo(height).leftMap(GenericError(_))
         } yield {
           ngState = None
-          blocks ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
+          val liquidBlockData = {
+            maybeNg.map { ng =>
+              val block = ng.bestLiquidBlock
+              val snapshot = if (wavesSettings.enableLightMode && block.transactionData.nonEmpty) {
+                Some(BlockSnapshot(block.id(), ng.bestLiquidSnapshot.transactions.toSeq.map { case (_, txInfo) => (txInfo.snapshot, txInfo.status) }))
+              } else None
+              (block, ng.hitSource, snapshot)
+            }.toSeq
+          }
+          blocks ++ liquidBlockData
         }
     }
 

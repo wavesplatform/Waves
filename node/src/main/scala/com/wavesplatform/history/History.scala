@@ -4,15 +4,14 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.RDB
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot, TxMeta}
 
 trait History {
   def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])]
   def loadMicroBlock(id: ByteStr): Option[MicroBlock]
   def blockIdsAfter(candidates: Seq[ByteStr], count: Int): Seq[ByteStr]
-  def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]]
-  def loadMicroblockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]]
+  def loadBlockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]]
+  def loadMicroblockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]]
 }
 
 object History {
@@ -35,8 +34,8 @@ object History {
         }
 
       // TODO: NODE-2609 implement
-      override def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] = ???
+      override def loadBlockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]] = ???
 
-      override def loadMicroblockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] = ???
+      override def loadMicroblockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]] = ???
     }
 }

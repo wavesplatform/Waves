@@ -1,6 +1,7 @@
 package com.wavesplatform.state.appender
 
 import cats.data.EitherT
+import cats.syntax.traverse.*
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.lang.ValidationError
@@ -48,7 +49,7 @@ object MicroblockAppender extends ScorexLogging {
       utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
-      blockChallenger: BlockChallenger,
+      blockChallenger: Option[BlockChallenger],
       scheduler: Scheduler
   )(ch: Channel, md: MicroblockData, snapshot: Option[(Channel, MicroBlockSnapshot)]): Task[Unit] = {
     import md.microBlock
@@ -75,7 +76,7 @@ object MicroblockAppender extends ScorexLogging {
         peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish")
         md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
 
-        blockChallenger.challengeMicroblock(md, ch)
+        blockChallenger.traverse(_.challengeMicroblock(md, ch)).void
 
       case Left(ve) =>
         Task {

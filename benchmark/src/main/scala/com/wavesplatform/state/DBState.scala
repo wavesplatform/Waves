@@ -26,7 +26,8 @@ abstract class DBState extends ScorexLogging {
     new RocksDBWriter(
       rdb,
       settings.blockchainSettings,
-      settings.dbSettings.copy(maxCacheSize = 1)
+      settings.dbSettings.copy(maxCacheSize = 1),
+      settings.enableLightMode
     )
 
   AddressScheme.current = new AddressScheme { override val chainId: Byte = 'W' }

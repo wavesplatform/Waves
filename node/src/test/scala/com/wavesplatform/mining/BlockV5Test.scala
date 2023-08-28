@@ -136,7 +136,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "Miner" should "generate valid blocks" in forAll(genesis) { case (minerAcc1, minerAcc2, genesis) =>
     val disabledFeatures = new AtomicReference(Set[Short]())
     withBlockchain(disabledFeatures, testTime) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
       withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
         for (h <- 2 until BlockV5ActivationHeight) {
 
@@ -260,7 +260,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
   "Miner" should "generate valid blocks when feature pre-activated" in forAll(genesis) { case (minerAcc1, _, genesis) =>
     withBlockchain(new AtomicReference(Set()), testTime, preActivatedTestSettings) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
       withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
         for (h <- blockchain.height to 110) {
 
@@ -280,7 +280,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "Block version" should "be validated accordingly features activation" in forAll(genesis) { case (minerAcc, _, genesis) =>
     val disabledFeatures = new AtomicReference(Set.empty[Short])
     withBlockchain(disabledFeatures, testTime) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
       withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
         def forge(): Block = {
           val forge = miner.forgeBlock(minerAcc)
@@ -359,18 +359,18 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "BlockchainUpdater" should "accept valid key blocks and microblocks" in forAll(updaterScenario) {
     case (bs, (ngBlock, ngMicros), (rewardBlock, rewardMicros), (protoBlock, protoMicros), (afterProtoBlock, afterProtoMicros)) =>
       withBlockchain(new AtomicReference(Set())) { blockchain =>
-        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature) should beRight)
+        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature, None) should beRight)
 
-        blockchain.processBlock(ngBlock, ngBlock.header.generationSignature) should beRight
+        blockchain.processBlock(ngBlock, ngBlock.header.generationSignature, None) should beRight
         ngMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
 
-        blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature) should beRight
+        blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature, None) should beRight
         rewardMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
 
-        blockchain.processBlock(protoBlock, protoBlock.header.generationSignature) should beRight
+        blockchain.processBlock(protoBlock, protoBlock.header.generationSignature, None) should beRight
         protoMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
 
-        blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature) should beRight
+        blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature, None) should beRight
         afterProtoMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
       }
   }
@@ -471,7 +471,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
-    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
+    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler)(_, None)
     f(miner, blockAppender, appenderScheduler)
     appenderScheduler.shutdown()
     minerScheduler.shutdown()

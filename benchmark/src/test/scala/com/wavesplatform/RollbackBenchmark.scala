@@ -22,7 +22,7 @@ object RollbackBenchmark extends ScorexLogging {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val rdb           = RDB.open(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings)
+    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val issuer = KeyPair(new Array[Byte](32))
 

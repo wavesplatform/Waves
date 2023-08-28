@@ -98,7 +98,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           }
         })
 
-        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith[Any] {
+        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock, None).onErrorRecoverWith[Any] {
           case _: SecurityException =>
             Task.unit
         }
@@ -157,7 +157,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           .sample
           .get
 
-      bcu.processBlock(firstBlock, firstBlock.header.generationSignature).explicitGet()
+      bcu.processBlock(firstBlock, firstBlock.header.generationSignature, None).explicitGet()
 
       f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
     } finally {

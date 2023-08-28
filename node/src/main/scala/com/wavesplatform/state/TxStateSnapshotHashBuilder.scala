@@ -1,11 +1,13 @@
 package com.wavesplatform.state
 
 import cats.implicits.catsSyntaxSemigroup
+import cats.syntax.either.*
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, maybeApplySponsorship}
 import com.wavesplatform.state.diffs.TransactionDiffer
@@ -143,30 +145,30 @@ object TxStateSnapshotHashBuilder {
       currentBlockTimestamp: Long,
       isChallenging: Boolean,
       blockchain: Blockchain
-  ): ByteStr = {
+  ): Either[ValidationError, ByteStr] = {
     val txDiffer = TransactionDiffer(prevBlockTimestamp, currentBlockTimestamp) _
 
     txs
-      .foldLeft(initStateHash -> initSnapshot) { case ((prevStateHash, accSnapshot), tx) =>
-        val accBlockchain = SnapshotBlockchain(blockchain, accSnapshot)
-        txDiffer(accBlockchain, tx).resultE match {
-          case Right(txSnapshot) =>
-            val (feeAsset, feeAmount) =
-              maybeApplySponsorship(accBlockchain, accBlockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain), tx.assetFee)
-            val minerPortfolio = Map(signer.toAddress -> Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart))
+      .foldLeft[Either[ValidationError, (ByteStr, StateSnapshot)]](Right(initStateHash -> initSnapshot)) {
+        case (Right((prevStateHash, accSnapshot)), tx) =>
+          val accBlockchain = SnapshotBlockchain(blockchain, accSnapshot)
+          txDiffer(accBlockchain, tx).resultE match {
+            case Right(txSnapshot) =>
+              val (feeAsset, feeAmount) =
+                maybeApplySponsorship(accBlockchain, accBlockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain), tx.assetFee)
+              val minerPortfolio = Map(signer.toAddress -> Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart))
 
-            val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
-            val txInfo                 = txSnapshot.transactions.head._2
-            val stateHash =
-              TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
-            (stateHash, accSnapshot |+| txSnapshotWithBalances)
-          case Left(_) if isChallenging => (prevStateHash, accSnapshot)
-          case Left(err)                =>
-            // TODO: NODE-2609 remove exception
-            throw new RuntimeException(err.toString)
-        }
+              val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
+              val txInfo                 = txSnapshot.transactions.head._2
+              val stateHash =
+                TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
+              Right((stateHash, accSnapshot |+| txSnapshotWithBalances))
+            case Left(_) if isChallenging => Right((prevStateHash, accSnapshot))
+            case Left(err)                => err.asLeft[(ByteStr, StateSnapshot)]
+          }
+        case (err @ Left(_), _) => err
       }
-      ._1
+      .map(_._1)
   }
 
   private def booleanToBytes(flag: Boolean): Array[Byte] =

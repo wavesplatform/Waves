@@ -16,6 +16,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
@@ -108,6 +109,7 @@ class RocksDBWriter(
     rdb: RDB,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
+    isLightMode: Boolean,
     bfBlockInsertions: Int = 10000
 ) extends Caches {
   import rdb.db as writableDB
@@ -627,14 +629,14 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)] = {
+  override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr, Option[BlockSnapshot])] = {
     val targetBlockId = readOnly(_.get(Keys.blockMetaAt(Height @@ targetHeight)))
       .map(_.id)
       .getOrElse(throw new IllegalArgumentException(s"No block at height $targetHeight"))
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedBlocks: Seq[(Block, ByteStr)] =
+    val discardedBlocks: Seq[(Block, ByteStr, Option[BlockSnapshot])] =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
         val ordersToInvalidate       = Seq.newBuilder[ByteStr]
@@ -780,7 +782,11 @@ class RocksDBWriter(
             blockTxs.map(_._2)
           ).explicitGet()
 
-          (block, Caches.toHitSource(discardedMeta))
+          val snapshot = if (isLightMode) {
+            Some(BlockSnapshot(block.id(), loadTxStateSnapshots(currentHeight, rdb)))
+          } else None
+
+          (block, Caches.toHitSource(discardedMeta), snapshot)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)

@@ -135,16 +135,18 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             .createInitialBlockSnapshot(d.blockchain, signer.toAddress)
             .explicitGet()
           val initStateHash = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(genesis.header.stateHash.get)
-          val blockStateHash = TxStateSnapshotHashBuilder.computeStateHash(
-            txs,
-            initStateHash,
-            initSnapshot,
-            signer,
-            d.blockchain.lastBlockTimestamp,
-            blockTs,
-            isChallenging = false,
-            blockchain
-          )
+          val blockStateHash = TxStateSnapshotHashBuilder
+            .computeStateHash(
+              txs,
+              initStateHash,
+              initSnapshot,
+              signer,
+              d.blockchain.lastBlockTimestamp,
+              blockTs,
+              isChallenging = false,
+              blockchain
+            )
+            .explicitGet()
 
           val correctBlock =
             TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
@@ -165,16 +167,18 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           val correctMicroblock =
             d.createMicroBlock(
               Some(
-                TxStateSnapshotHashBuilder.computeStateHash(
-                  txs,
-                  genesis.header.stateHash.get,
-                  StateSnapshot.empty,
-                  signer,
-                  d.blockchain.lastBlockTimestamp,
-                  blockTs,
-                  isChallenging = false,
-                  blockchain
-                )
+                TxStateSnapshotHashBuilder
+                  .computeStateHash(
+                    txs,
+                    genesis.header.stateHash.get,
+                    StateSnapshot.empty,
+                    signer,
+                    d.blockchain.lastBlockTimestamp,
+                    blockTs,
+                    isChallenging = false,
+                    blockchain
+                  )
+                  .explicitGet()
               )
             )(
               txs*

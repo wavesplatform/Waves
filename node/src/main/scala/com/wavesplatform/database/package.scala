@@ -21,6 +21,7 @@ import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
@@ -659,6 +660,14 @@ package object database {
       transactions += readTransaction(height)(e.getValue)
     }
     transactions.result()
+  }
+
+  def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] = {
+    val txSnapshots = Seq.newBuilder[(StateSnapshot, TxMeta.Status)]
+    rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
+      txSnapshots += StateSnapshot.fromProtobuf(TransactionStateSnapshot.parseFrom(e.getValue))
+    }
+    txSnapshots.result()
   }
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =

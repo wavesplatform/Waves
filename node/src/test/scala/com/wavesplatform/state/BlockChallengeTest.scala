@@ -1558,7 +1558,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
           }
         }
       val appender =
-        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, blockChallenger, appenderScheduler) _
+        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, Some(blockChallenger), appenderScheduler) _
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
@@ -1696,16 +1696,17 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
     channels.add(channel1)
     channels.add(channel2)
-    val appenderWithChallenger = BlockAppender(
-      d.blockchain,
-      testTime,
-      d.utxPool,
-      d.posSelector,
-      channels,
-      PeerDatabase.NoOp,
-      createBlockChallenger(d, channels),
-      appenderScheduler
-    )(channel2, _, None)
+    val appenderWithChallenger: Block => Task[Unit] =
+      BlockAppender(
+        d.blockchain,
+        testTime,
+        d.utxPool,
+        d.posSelector,
+        channels,
+        PeerDatabase.NoOp,
+        Some(createBlockChallenger(d, channels)),
+        appenderScheduler
+      )(channel2, _, None)
 
     testTime.setTime(d.blockchain.lastBlockTimestamp.get + d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis * 2)
     appenderWithChallenger(block).runSyncUnsafe()
@@ -1715,12 +1716,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
   }
 
   private def createBlockAppender(d: Domain): Block => Task[Either[ValidationError, Option[BigInt]]] =
-    BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, appenderScheduler)
+    BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, appenderScheduler)(_, None)
 
   private def createMicroBlockAppender(d: Domain): (Channel, MicroBlock) => Task[Unit] = { (ch, mb) =>
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-    MicroblockAppender(d.blockchain, d.utxPool, channels, PeerDatabase.NoOp, createBlockChallenger(d, channels), appenderScheduler)(
+    MicroblockAppender(d.blockchain, d.utxPool, channels, PeerDatabase.NoOp, Some(createBlockChallenger(d, channels)), appenderScheduler)(
       ch,
       MicroblockData(None, mb, Coeval.now(Set.empty)),
       None

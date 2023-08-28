@@ -8,6 +8,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.BlockMeta as PBBlockMeta
+import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -356,9 +357,9 @@ abstract class Caches extends Blockchain with Storage {
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
-  protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
+  protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr, Option[BlockSnapshot])]
 
-  override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr)]] = {
+  override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr, Option[BlockSnapshot])]] = {
     for {
       _ <- Either
         .cond(

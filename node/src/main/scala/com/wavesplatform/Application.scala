@@ -140,7 +140,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
-    if (settings.minerSettings.enable)
+    if (settings.minerSettings.enable && !settings.enableLightMode)
       miner = new MinerImpl(
         allChannels,
         blockchainUpdater,
@@ -156,16 +156,22 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       )
 
-    val blockChallenger = new BlockChallengerImpl(
-      blockchainUpdater,
-      allChannels,
-      wallet,
-      settings,
-      time,
-      pos,
-      minerScheduler,
-      appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)
-    )
+    val blockChallenger =
+      if (!settings.enableLightMode) {
+        Some(
+          new BlockChallengerImpl(
+            blockchainUpdater,
+            allChannels,
+            wallet,
+            settings,
+            time,
+            pos,
+            minerScheduler,
+            appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)(_, None)
+          )
+        )
+      } else None
+
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler) _
 

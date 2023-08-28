@@ -242,7 +242,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength)) should beRight
+        bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength), None) should beRight
       }
 
       f(Env(pos, bcu, accounts, blocks))

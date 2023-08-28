@@ -3,6 +3,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.state.StateSnapshot
 import monix.reactive.Observable
 
@@ -10,7 +11,9 @@ trait BlockchainUpdater {
   def processBlock(
       block: Block,
       hitSource: ByteStr,
-     challengedHitSource: Option[ByteStr] = None, verify: Boolean = true,
+      snapshot: Option[BlockSnapshot],
+      challengedHitSource: Option[ByteStr] = None,
+      verify: Boolean = true,
       txSignParCheck: Boolean = true
   ): Either[ValidationError, Seq[StateSnapshot]]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId]

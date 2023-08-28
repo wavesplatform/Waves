@@ -15,7 +15,7 @@ import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.mining.{BlockChallenger, Miner}
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.ParSignatureChecker.sigverify
@@ -140,7 +140,7 @@ object Importer extends ScorexLogging {
               rdb,
               blockchainUpdater,
               utxPool,
-              BlockChallenger.NoOp,
+              None,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(rdb, blockchainUpdater)
             )
@@ -308,9 +308,10 @@ object Importer extends ScorexLogging {
     val rdb         = RDB.open(settings.dbSettings)
     val (blockchainUpdater, _) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
-    val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender = BlockAppender(blockchainUpdater, time, _ => (), pos, scheduler, importOptions.verify, txSignParCheck = false) _
+    val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+    val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+    val extAppender: Block => Task[Either[ValidationError, Option[BigInt]]] =
+      BlockAppender(blockchainUpdater, time, _ => (), pos, scheduler, importOptions.verify, txSignParCheck = false)(_, None)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
@@ -370,7 +371,7 @@ object Importer extends ScorexLogging {
             ByteStr.empty,
             Nil
           )
-          blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, verify = false)
+          blockchainUpdater.processBlock(pseudoBlock, ByteStr.empty, None, verify = false)
         }
 
         // Terminate appender
