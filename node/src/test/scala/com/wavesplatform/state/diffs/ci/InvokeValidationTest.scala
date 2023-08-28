@@ -37,7 +37,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
         """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, script))
-      d.appendBlockE(invoke(func = Some("g"))) should produce("Cannot find callable function `g`")
+      d.appendBlockE(invoke(func = Some("g"))) should produce("@Callable function 'g' doesn't exist in the script")
     }
   }
 

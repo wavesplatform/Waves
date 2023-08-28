@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.database.protobuf.Status as PBStatus
+import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.state.TxMeta.Status
 
 case class TxMeta(height: Height, status: Status, spentComplexity: Long)

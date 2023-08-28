@@ -1,8 +1,5 @@
 package com.wavesplatform.events
 
-import java.nio.{ByteBuffer, ByteOrder}
-import java.util.concurrent.ConcurrentHashMap
-
 import cats.syntax.semigroup.*
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -16,8 +13,7 @@ import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.Block
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.repo.LiquidState
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
@@ -26,6 +22,8 @@ import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
 import org.rocksdb.RocksDB
 
+import java.nio.{ByteBuffer, ByteOrder}
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.util.Using
 import scala.util.control.Exception
@@ -64,7 +62,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
 
   override def onProcessBlock(
       block: Block,
-      diff: BlockDiffer.DetailedDiff,
+      snapshot: StateSnapshot,
       reward: Option[Long],
       hitSource: ByteStr,
       blockchainBeforeWithReward: Blockchain
@@ -78,14 +76,14 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
       db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
-    val ba = BlockAppended.from(block, diff, blockchainBeforeWithReward, reward, hitSource)
+    val ba = BlockAppended.from(block, snapshot, blockchainBeforeWithReward, reward, hitSource)
     liquidState = Some(LiquidState(ba, Seq.empty))
     handlers.forEach(_.handleUpdate(ba))
   }
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
-      diff: BlockDiffer.DetailedDiff,
+      snapshot: StateSnapshot,
       blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
@@ -96,7 +94,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
       s"Microblock reference ${microBlock.reference} does not match last block id ${liquidState.get.totalBlockId}"
     )
 
-    val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
+    val mba = MicroBlockAppended.from(microBlock, snapshot, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
     liquidState = Some(ls.copy(microBlocks = ls.microBlocks :+ mba))
 
     handlers.forEach(_.handleUpdate(mba))

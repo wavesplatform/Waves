@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.directives.values.*
@@ -151,8 +151,8 @@ object TxHelpers {
   def dataEntry(account: KeyPair, value: DataEntry[?]): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
 
-  def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
-    data(account, Seq(StringDataEntry(key, value)))
+  def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test", fee: Long = TestValues.fee): DataTransaction =
+    data(account, Seq(StringDataEntry(key, value)), fee)
 
   def data(account: KeyPair, entries: Seq[DataEntry[?]], fee: Long = TestValues.fee * 3, version: TxVersion = TxVersion.V1): DataTransaction =
     DataTransaction.selfSigned(version, account, entries, fee, timestamp).explicitGet()
@@ -190,12 +190,9 @@ object TxHelpers {
   ): UpdateAssetInfoTransaction =
     UpdateAssetInfoTransaction.selfSigned(version, sender, assetId, name, desc, timestamp, fee, feeAsset, chainId).explicitGet()
 
-  def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
+  def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset = Waves): Order = {
     order(orderType, asset, Waves, feeAsset)
   }
-
-  def orderV3(orderType: OrderType, asset: Asset): Order =
-    orderV3(orderType, asset, Waves)
 
   def order(
       orderType: OrderType,
@@ -364,7 +361,7 @@ object TxHelpers {
       acc: KeyPair,
       asset: IssuedAsset,
       script: Script,
-      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit,
+      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit + ScriptExtraFee,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId

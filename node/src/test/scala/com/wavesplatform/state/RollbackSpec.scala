@@ -468,7 +468,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         )
 
       def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
-        val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
+        val sr = d.blockchainUpdater.bestLiquidSnapshot.get.scriptResults(txId)
         sr.error shouldBe empty
         IssuedAsset(sr.issues.head.id)
       }

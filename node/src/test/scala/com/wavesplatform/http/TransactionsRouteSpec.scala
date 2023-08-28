@@ -21,9 +21,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
@@ -69,19 +68,13 @@ class TransactionsRouteSpec
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime
-  private val getCompositeBlockchain =
-    () => {
-      (() => blockchain.carryFee).expects().returns(0)
-      (() => blockchain.settings).expects().returns(WavesSettings.default().blockchainSettings)
-      CompositeBlockchain(blockchain, None)
-    }
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
     addressTransactions,
     testWallet,
     blockchain,
-    getCompositeBlockchain,
+    () => blockchain,
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
@@ -139,7 +132,7 @@ class TransactionsRouteSpec
         d.commonApi.transactions,
         testWallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain.snapshotBlockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
@@ -399,7 +392,7 @@ class TransactionsRouteSpec
         d.appendBlock(tx)
         val route = seal(
           transactionsApiRoute
-            .copy(blockchain = d.blockchain, compositeBlockchain = () => d.blockchain.getCompositeBlockchain, commonApi = d.transactionsApi)
+            .copy(blockchain = d.blockchain, compositeBlockchain = () => d.blockchain.snapshotBlockchain, commonApi = d.transactionsApi)
             .route
         )
         Get(routePath(s"/address/$defaultAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {

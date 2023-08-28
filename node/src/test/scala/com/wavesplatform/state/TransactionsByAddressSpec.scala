@@ -119,7 +119,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
         d.appendMicroBlock(issue())
         startRead.lock()
         val txs = Future { d.addressTransactions(defaultAddress).map(_._2.tpe) }
-        d.blockchain.bestLiquidDiff.synchronized(d.appendKeyBlock())
+        d.blockchain.bestLiquidSnapshot.synchronized(d.appendKeyBlock())
         startRead.unlock()
         Await.result(txs, Inf).map(_.tpe) shouldBe List(TransactionType.Issue)
       }

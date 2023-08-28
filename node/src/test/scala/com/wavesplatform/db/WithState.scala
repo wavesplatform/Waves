@@ -1,9 +1,7 @@
 package com.wavesplatform.db
 
-import com.google.common.primitives.Shorts
-
-import java.nio.file.Files
 import cats.syntax.traverse.*
+import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{GenesisBlockVersion, GenesisGenerationSignature, GenesisGenerator, GenesisReference}
@@ -12,7 +10,8 @@ import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFacto
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
+import com.wavesplatform.history.{Domain, SnapshotOps}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -20,7 +19,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
@@ -31,6 +30,7 @@ import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
+import java.nio.file.Files
 import scala.concurrent.duration.*
 
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
@@ -98,7 +98,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
-    assertion(totalDiff1.map(_.diff))
+    assertion(totalDiff1.map(_.snapshot.toDiff(state)))
   }
 
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled, enableExecutionLog: Boolean = false)(
@@ -122,7 +122,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
-    assertion(totalDiff1.map(_.diff))
+    assertion(totalDiff1.map(_.snapshot.toDiff(state)))
   }
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
@@ -137,12 +137,13 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       Some(curBlock)
     }
 
-    val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val ngState = NgState(block, diff, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
-    val cb      = CompositeBlockchain(state, ngState)
+    val BlockDiffer.Result(snapshot, fees, totalFee, _, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
+    val ngState = NgState(block, snapshot, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
+    val cb      = SnapshotBlockchain(state, ngState)
+    val diff    = snapshot.toDiff(state)
     assertion(diff, cb)
 
-    state.append(diff, fees, totalFee, None, block.header.generationSignature, block)
+    state.append(snapshot, fees, totalFee, None, block.header.generationSignature, block)
     assertion(diff, state)
   }
 
@@ -165,9 +166,10 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val nextHeight = state.height + 1
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
-        differ(state, block).map(diff =>
-          state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
-        )
+        differ(state, block).map { result =>
+          val snapshot = SnapshotOps.fromDiff(result.snapshot.toDiff(state), state).explicitGet()
+          state.append(snapshot, result.carry, result.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
+        }
       })
     }
 
@@ -208,7 +210,7 @@ trait WithDomain extends WithState { _: Suite =>
       try {
         val wrappedDb = wrapDB(rdb.db)
         assert(wrappedDb.getNativeHandle == rdb.db.getNativeHandle, "wrap function should not create new database instance")
-        domain = Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, Seq.empty), bcu, blockchain, settings)
+        domain = Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, rdb.txSnapshotHandle, Seq.empty), bcu, blockchain, settings)
         val genesis = balances.map { case AddrWithBalance(address, amount) =>
           TxHelpers.genesis(address, amount)
         }

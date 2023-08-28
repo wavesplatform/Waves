@@ -6,7 +6,7 @@ import akka.http.scaladsl.testkit.*
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, Status}
-import com.wavesplatform.api.http.{AddressApiRoute, ApiMarshallers, BlocksApiRoute, RouteTimeout, TransactionsApiRoute}
+import com.wavesplatform.api.http.*
 import com.wavesplatform.block.{Block, ChallengedHeader, MicroBlock}
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
@@ -32,11 +32,11 @@ import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.{JsonMatchers, Schedulers, SharedSchedulerMixin}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -49,8 +49,8 @@ import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import java.util.concurrent.locks.ReentrantLock
-import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Promise}
 
 class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers with SharedSchedulerMixin {
 
@@ -463,16 +463,18 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.rollbackTo(validOriginalBlock.header.reference)
 
       d.appendBlockE(challengingBlock) should beRight
-      // block diff contains only txs and block reward
-      d.blockchain.bestLiquidDiff.get shouldBe Diff.empty
-        .combineE(
-          Diff.withTransactions(
-            d.blockchain.bestLiquidDiff.get.transactions,
-            Map(challengingMiner.toAddress -> Portfolio.waves(d.blockchain.settings.rewardsSettings.initial))
-          )
+
+      // block snapshot contains only txs and block reward
+      val blockSnapshot = d.blockchain.bestLiquidSnapshot.get
+      val expectedSnapshot = StateSnapshot
+        .build(
+          d.rocksDBWriter,
+          Map(challengingMiner.toAddress -> Portfolio.waves(d.blockchain.settings.rewardsSettings.initial)),
+          transactions = blockSnapshot.transactions
         )
         .explicitGet()
-      d.blockchain.bestLiquidDiff.get.transactions.foreach(_.status shouldBe TxMeta.Status.Elided)
+      blockSnapshot shouldBe expectedSnapshot
+      blockSnapshot.transactions.foreach(_._2.status shouldBe TxMeta.Status.Elided)
       recipientTxs.foreach { tx =>
         d.transactionsApi.transactionById(tx.id()).map(_.status).contains(TxMeta.Status.Elided) shouldBe true
       }
@@ -684,7 +686,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
@@ -1238,7 +1240,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
@@ -1286,7 +1288,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
@@ -1373,7 +1375,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
@@ -1562,7 +1564,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         d.commonApi.commonTransactionsApi(blockChallenger),
         d.wallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,

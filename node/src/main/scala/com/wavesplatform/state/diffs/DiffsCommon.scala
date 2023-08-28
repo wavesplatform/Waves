@@ -16,15 +16,11 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, Portfolio, SponsorshipValue, StateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object DiffsCommon {
-  def countScriptRuns(blockchain: Blockchain, tx: Transaction & Authorized): Int =
-    tx.smartAssets(blockchain).size + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
-
   def countVerifierComplexity(
       script: Option[Script],
       blockchain: Blockchain,
@@ -74,7 +70,7 @@ object DiffsCommon {
       blockTime: Long,
       fee: Long,
       reissue: Reissue
-  ): Either[ValidationError, Diff] = {
+  ): Either[ValidationError, StateSnapshot] = {
     val asset = IssuedAsset(reissue.assetId)
     validateAsset(blockchain, asset, sender, issuerOnly = true)
       .flatMap { _ =>
@@ -87,12 +83,10 @@ object DiffsCommon {
           } else {
             val volumeInfo = AssetVolumeInfo(reissue.isReissuable, BigInt(reissue.quantity))
             val portfolio  = Portfolio.build(-fee, asset, reissue.quantity)
-
-            Right(
-              Diff(
-                portfolios = Map(sender                          -> portfolio),
-                updatedAssets = Map(IssuedAsset(reissue.assetId) -> volumeInfo.rightIor)
-              )
+            StateSnapshot.build(
+              blockchain,
+              portfolios = Map(sender -> portfolio),
+              updatedAssets = Map(IssuedAsset(reissue.assetId) -> volumeInfo.rightIor)
             )
           }
         } else {
@@ -101,32 +95,35 @@ object DiffsCommon {
       }
   }
 
-  def processBurn(blockchain: Blockchain, sender: Address, fee: Long, burn: Burn): Either[ValidationError, Diff] = {
+  def processBurn(blockchain: Blockchain, sender: Address, fee: Long, burn: Burn): Either[ValidationError, StateSnapshot] = {
     val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens)
     val asset                = IssuedAsset(burn.assetId)
 
-    validateAsset(blockchain, asset, sender, !burnAnyTokensEnabled).map { _ =>
+    validateAsset(blockchain, asset, sender, !burnAnyTokensEnabled).flatMap { _ =>
       val volumeInfo = AssetVolumeInfo(isReissuable = true, volume = -burn.quantity)
       val portfolio  = Portfolio.build(-fee, asset, -burn.quantity)
-
-      Diff(
-        portfolios = Map(sender   -> portfolio),
+      StateSnapshot.build(
+        blockchain,
+        portfolios = Map(sender -> portfolio),
         updatedAssets = Map(asset -> volumeInfo.rightIor)
       )
     }
   }
 
-  def processSponsor(blockchain: Blockchain, sender: Address, fee: Long, sponsorFee: SponsorFee): Either[ValidationError, Diff] = {
+  def processSponsor(blockchain: Blockchain, sender: Address, fee: Long, sponsorFee: SponsorFee): Either[ValidationError, StateSnapshot] = {
     val asset = IssuedAsset(sponsorFee.assetId)
     validateAsset(blockchain, asset, sender, issuerOnly = true).flatMap { _ =>
-      Either.cond(
-        !blockchain.hasAssetScript(asset),
-        Diff(
-          portfolios = Map(sender -> Portfolio(balance = -fee)),
-          sponsorship = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0)))
-        ),
-        GenericError("Sponsorship smart assets is disabled.")
-      )
+      Either
+        .cond(
+          !blockchain.hasAssetScript(asset),
+          StateSnapshot.build(
+            blockchain,
+            portfolios = Map(sender -> Portfolio(balance = -fee)),
+            sponsorships = Map(asset -> SponsorshipValue(sponsorFee.minSponsoredAssetFee.getOrElse(0)))
+          ),
+          GenericError("Sponsorship smart assets is disabled.")
+        )
+        .flatten
     }
   }
 
@@ -138,7 +135,7 @@ object DiffsCommon {
       fee: Long,
       leaseId: ByteStr,
       txId: ByteStr
-  ): Either[ValidationError, Diff] = {
+  ): Either[ValidationError, StateSnapshot] = {
     val senderAddress = sender.toAddress
     for {
       recipientAddress <- blockchain.resolveAlias(recipient)
@@ -165,10 +162,12 @@ object DiffsCommon {
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
       details = LeaseDetails(sender, recipient, amount, LeaseDetails.Status.Active, txId, blockchain.height)
-    } yield Diff(
-      portfolios = portfolioDiff,
-      leaseState = Map((leaseId, details))
-    )
+      snapshot <- StateSnapshot.build(
+        blockchain,
+        portfolios = portfolioDiff,
+        leaseStates = Map(leaseId -> details)
+      )
+    } yield snapshot
   }
 
   def processLeaseCancel(
@@ -178,7 +177,7 @@ object DiffsCommon {
       time: Long,
       leaseId: ByteStr,
       cancelTxId: ByteStr
-  ): Either[ValidationError, Diff] = {
+  ): Either[ValidationError, StateSnapshot] = {
     val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
       lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
@@ -199,10 +198,12 @@ object DiffsCommon {
       senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
       actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
-      portfolios <- Diff.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
-    } yield Diff(
-      portfolios = portfolios,
-      leaseState = Map((leaseId, actionInfo))
-    )
+      portfolios <- Portfolio.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
+      snapshot <- StateSnapshot.build(
+        blockchain,
+        portfolios = portfolios,
+        leaseStates = Map(leaseId -> actionInfo)
+      )
+    } yield snapshot
   }
 }

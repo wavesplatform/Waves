@@ -39,7 +39,7 @@ package object appender {
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
           .map { discardedDiffs =>
-            utx.setPriorityDiffs(discardedDiffs)
+            utx.setPrioritySnapshots(discardedDiffs)
             Some(blockchainUpdater.height)
           }
 
@@ -71,7 +71,7 @@ package object appender {
       txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] =
     processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map { case (discardedDiffs, newHeight) =>
-      utx.setPriorityDiffs(discardedDiffs)
+      utx.setPrioritySnapshots(discardedDiffs)
       newHeight
     }
 
@@ -81,16 +81,16 @@ package object appender {
       time: Time,
       verify: Boolean,
       txSignParCheck: Boolean
-  )(block: Block): Either[ValidationError, (Seq[Diff], Option[Int])] = {
+  )(block: Block): Either[ValidationError, (Seq[StateSnapshot], Option[Int])] = {
     val challengedBlock = block.toOriginal
     for {
       challengedHitSource <-
         if (verify) validateBlock(blockchainUpdater, pos, time)(challengedBlock) else pos.validateGenerationSignature(challengedBlock)
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      discardedDiffs <-
+      discardedSnapshots <-
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, Some(challengedHitSource), verify, txSignParCheck))
-    } yield discardedDiffs -> Some(blockchainUpdater.height)
+    } yield discardedSnapshots -> Some(blockchainUpdater.height)
   }
 
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =
