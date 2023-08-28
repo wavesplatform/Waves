@@ -71,10 +71,13 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can set contract and invoke script before precheck activation") {
+    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
     // after snapshot implementation only evaluated complexity is used for dApps
     // so this call fails
-    // sender.invokeScript(callerAcc, smartAcc.toAddress.toString, waitForTx = true)._1.id
-    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    assertBadRequestAndMessage(
+      sender.invokeScript(callerAcc, smartAcc.toAddress.toString, waitForTx = true)._1.id,
+      "Error while executing dApp: Invoke complexity limit = 52000 is exceeded"
+    )
   }
 
   test(s"wait height from to $featureHeight for precheck activation") {
@@ -82,7 +85,6 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can't issue asset after estimator v1 precheck activation") {
-
     assertBadRequestAndMessage(
       sender.issue(
         smartAcc,
