@@ -5,6 +5,7 @@ import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -17,6 +18,8 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+
+import scala.math.max
 
 final class CompositeBlockchain private (
     inner: Blockchain,
@@ -105,19 +108,21 @@ final class CompositeBlockchain private (
       Some(bs)
     }
 
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    val fixedFrom = max(from, 1)
     if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
-      inner.balanceSnapshots(address, from, to)
+      inner.balanceSnapshots(address, fixedFrom, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
       val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
-      val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
-      if (inner.height > 0 && (from < this.height || height2Fix))
-        bs +: inner.balanceSnapshots(address, from, to)
+      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && fixedFrom < this.height + 1
+      if (inner.height > 0 && from <= inner.height && (fixedFrom < this.height - 1 || height2Fix))
+        bs +: inner.balanceSnapshots(address, fixedFrom, to)
       else
         Seq(bs)
     }
+  }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
     diff.scripts.get(address) match {
@@ -194,6 +199,12 @@ object CompositeBlockchain {
     inner match {
       case cb: CompositeBlockchain => cb.appendDiff(diff)
       case _                       => new CompositeBlockchain(inner, Some(diff))
+    }
+
+  def apply(inner: Blockchain, diff: Diff, blockMeta: Option[BlockMeta]): CompositeBlockchain =
+    inner match {
+      case cb: CompositeBlockchain => cb.appendDiff(diff)
+      case _                       => new CompositeBlockchain(inner, Some(diff), blockMeta.map(bm => (bm.toSignedHeader, bm.id)))
     }
 
   def apply(

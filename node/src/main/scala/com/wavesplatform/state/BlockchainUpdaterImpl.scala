@@ -683,7 +683,7 @@ class BlockchainUpdaterImpl(
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
     to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1))
-      .fold[Blockchain](leveldb)(CompositeBlockchain(leveldb, _))
+      .fold[Blockchain](leveldb)(CompositeBlockchain(leveldb, _, liquidBlockMeta))
       .balanceSnapshots(address, from, to)
   }
 
