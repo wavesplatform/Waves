@@ -5,7 +5,7 @@ import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -22,7 +22,7 @@ package object transaction {
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
   type DiscardedBlocks       = Seq[(Block, ByteStr)]
-  type DiscardedMicroBlocks  = Seq[(MicroBlock, Diff)]
+  type DiscardedMicroBlocks  = Seq[(MicroBlock, StateSnapshot)]
   type AuthorizedTransaction = Authorized & Transaction
 
   type TxType = Byte

@@ -17,22 +17,21 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsSerializer}
 import com.wavesplatform.api.http.requests.*
-import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, TxTimestamp, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, TxTimestamp, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -48,7 +47,7 @@ case class AssetsApiRoute(
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
-    compositeBlockchain: () => CompositeBlockchain,
+    compositeBlockchain: () => Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
     commonAssetsApi: CommonAssetsApi,

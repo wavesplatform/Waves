@@ -42,7 +42,7 @@ package object appender {
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, None, verify, txSignParCheck))
           .map {
             case res @ Applied(discardedDiffs, _) =>
-              utx.setPriorityDiffs(discardedDiffs)
+              utx.setPrioritySnapshots(discardedDiffs)
               res
             case res => res
           }
@@ -74,8 +74,8 @@ package object appender {
       txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, BlockApplyResult] =
     processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block).map {
-      case (res @ Applied(discardedDiffs, _), newHeight) =>
-        utx.setPriorityDiffs(discardedDiffs)
+      case (res @ Applied(discardedDiffs, _), _) =>
+        utx.setPrioritySnapshots(discardedDiffs)
         res
       case (res, _) => res
     }

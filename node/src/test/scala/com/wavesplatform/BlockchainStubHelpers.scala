@@ -1,39 +1,30 @@
 package com.wavesplatform
 
-import scala.concurrent.Future
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.history.SnapshotOps.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  Blockchain,
-  Diff,
-  Height,
-  LeaseBalance,
-  NG,
-  TxMeta,
-  VolumeAndFee
-}
+import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.utils.{SystemTime, Time}
 import io.netty.channel.Channel
-import com.wavesplatform.common.utils.*
-import com.wavesplatform.state.TxMeta.Status
 import org.scalamock.MockFactoryBase
 import org.scalamock.matchers.MockParameter
+
+import scala.concurrent.Future
 
 trait BlockchainStubHelpers { self: MockFactoryBase =>
   def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain & NG = {
@@ -157,13 +148,15 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         )
     }
 
-    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false): Transaction => TracedResult[ValidationError, Diff] = {
-      if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
-      else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
+    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Diff] = {
+      val snapshot =
+        if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
+        else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
+      snapshot.map(_.toDiff(blockchain))
     }
 
     def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {
-      val differ = transactionDiffer(time)
+      val differ = transactionDiffer(time) _
       Future.successful(differ(tx).map(_ => true))
     }
   }

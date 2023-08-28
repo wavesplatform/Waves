@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
@@ -21,7 +22,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -354,6 +355,7 @@ object DAppEnvironment {
   }
 }
 
+// todo move to separate class
 // Not thread safe
 class DAppEnvironment(
     nByte: Byte,
@@ -373,13 +375,13 @@ class DAppEnvironment(
     var remainingCalls: Int,
     var availableActions: ActionLimits,
     var availablePayments: Int,
-    var currentDiff: Diff,
+    var currentSnapshot: StateSnapshot,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
-  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+  private[this] var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
-  override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
+  override def currentBlockchain(): SnapshotBlockchain = this.mutableBlockchain
 
   override def callScript(
       dApp: Address,
@@ -419,7 +421,7 @@ class DAppEnvironment(
         InvokeScriptResult.empty
       )
       (
-        diff,
+        snapshot,
         evaluated,
         remainingActions,
         remainingPayments
@@ -438,20 +440,18 @@ class DAppEnvironment(
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
-      fixedDiff = diff
-        .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))
-        .withScriptRuns(diff.scriptsRun + 1)
-      newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
+      fixedSnapshot = snapshot
+        .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))
     } yield {
-      currentDiff = newCurrentDiff
-      mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+      currentSnapshot = (currentSnapshot: StateSnapshot) |+| fixedSnapshot
+      mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availablePayments = remainingPayments
       (
         evaluated,
-        diff.scriptsComplexity.toInt,
-        if (enableExecutionLog) DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity) else List.empty
+        snapshot.scriptsComplexity.toInt,
+        if (enableExecutionLog) DiffToLogConverter.convert(snapshot, tx.id(), func, availableComplexity) else List.empty
       )
     }
 

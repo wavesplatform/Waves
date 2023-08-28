@@ -1,8 +1,7 @@
 package com.wavesplatform
 
-import java.io.*
-import java.net.{MalformedURLException, URL}
 import akka.actor.ActorSystem
+import cats.implicits.catsSyntaxOption
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
@@ -20,7 +19,7 @@ import com.wavesplatform.mining.{BlockChallenger, Miner}
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, ParSignatureChecker}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -35,6 +34,8 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import scopt.OParser
 
+import java.io.*
+import java.net.{MalformedURLException, URL}
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -136,7 +137,7 @@ object Importer extends ScorexLogging {
           override def utxEvents: Observable[UtxEvent] = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
-              blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+              blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
               rdb,
               blockchainUpdater,
               utxPool,
@@ -151,9 +152,9 @@ object Importer extends ScorexLogging {
               Application.loadBlockInfoAt(rdb, blockchainUpdater)
             )
           override def accountsApi: CommonAccountsApi =
-            CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, rdb, blockchainUpdater)
+            CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
-            CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), rdb.db, blockchainUpdater)
+            CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
         }
       }
 
@@ -310,7 +311,7 @@ object Importer extends ScorexLogging {
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify, txSignParCheck = false) _
+    val extAppender = BlockAppender(blockchainUpdater, time, _ => (), pos, scheduler, importOptions.verify, txSignParCheck = false) _
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)

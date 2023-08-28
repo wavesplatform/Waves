@@ -13,16 +13,21 @@ import com.wavesplatform.transaction.{Asset, TxValidationError}
 import scala.util.control.NonFatal
 
 object TransferTransactionDiff {
-  def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, StateSnapshot] =
     TransferDiff(blockchain)(tx.sender.toAddress, tx.recipient, tx.amount.value, tx.assetId, tx.fee.value, tx.feeAssetId)
-      .map(_.withScriptRuns(DiffsCommon.countScriptRuns(blockchain, tx)))
-  }
 }
 
 object TransferDiff {
   def apply(
       blockchain: Blockchain
-  )(senderAddress: Address, recipient: AddressOrAlias, amount: Long, assetId: Asset, fee: Long, feeAssetId: Asset): Either[ValidationError, Diff] = {
+  )(
+      senderAddress: Address,
+      recipient: AddressOrAlias,
+      amount: Long,
+      assetId: Asset,
+      fee: Long,
+      feeAssetId: Asset
+  ): Either[ValidationError, StateSnapshot] = {
 
     val isSmartAsset = feeAssetId match {
       case Waves => false
@@ -40,14 +45,14 @@ object TransferDiff {
       _ <- validateOverflow(blockchain, blockchain.height, amount, fee)
       transferPf <- assetId match {
         case Waves =>
-          Diff
+          Portfolio
             .combine(
               Map(senderAddress -> Portfolio(-amount)),
               Map(recipient     -> Portfolio(amount))
             )
             .leftMap(GenericError(_))
         case asset @ IssuedAsset(_) =>
-          Diff
+          Portfolio
             .combine(
               Map(senderAddress -> Portfolio.build(asset -> -amount)),
               Map(recipient     -> Portfolio.build(asset -> amount))
@@ -67,10 +72,10 @@ object TransferDiff {
                   Map[Address, Portfolio](desc.issuer.toAddress -> Portfolio.build(-feeInWaves, asset, fee))
               }
               .getOrElse(Map.empty)
-            Diff.combine(senderPf, sponsorPf).leftMap(GenericError(_))
+            Portfolio.combine(senderPf, sponsorPf).leftMap(GenericError(_))
           } else Right(senderPf)
       }
-      portfolios <- Diff.combine(transferPf, feePf).leftMap(GenericError(_))
+      portfolios <- Portfolio.combine(transferPf, feePf).leftMap(GenericError(_))
       assetIssued    = assetId.fold(true)(blockchain.assetDescription(_).isDefined)
       feeAssetIssued = feeAssetId.fold(true)(blockchain.assetDescription(_).isDefined)
       _ <- Either.cond(
@@ -81,7 +86,8 @@ object TransferDiff {
           s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${blockchain.settings.functionalitySettings.allowUnissuedAssetsUntil}"
         )
       )
-    } yield Diff(portfolios = portfolios)
+      snapshot <- StateSnapshot.build(blockchain, portfolios = portfolios)
+    } yield snapshot
   }
 
   private def validateOverflow(blockchain: Blockchain, height: Int, amount: Long, fee: Long): Either[ValidationError, Unit] =

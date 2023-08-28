@@ -13,7 +13,7 @@ trait BlockchainUpdater {
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge (at NODE-2609)
   ): Either[ValidationError, BlockApplyResult]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId]
   def computeNextReward: Option[Long]

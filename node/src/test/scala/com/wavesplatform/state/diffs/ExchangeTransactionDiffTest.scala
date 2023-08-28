@@ -336,7 +336,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
-        totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+        totalPortfolioDiff.assets.values.toSet should (be (Set()) or be (Set(0)))
 
         blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
       }
@@ -1671,7 +1671,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       }
       assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
         case (diff, state) =>
-          diff.scriptsRun shouldBe 0
+          diff.scriptsComplexity shouldBe 1 // throw()
           diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee.value
           diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
           diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
@@ -1801,7 +1801,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val diff = BlockDiffer
           .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
           .explicitGet()
-        diff.diff.scriptsComplexity shouldBe complexity
+        diff.snapshot.scriptsComplexity shouldBe complexity
 
         val feeUnits = FeeValidation.getMinFee(d.blockchainUpdater, exchange).explicitGet().minFeeInWaves / FeeValidation.FeeUnit
         if (complexity > 0) feeUnits shouldBe 7

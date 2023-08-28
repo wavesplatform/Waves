@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.io.File
-import java.nio.ByteBuffer
-import java.util
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.google.common.math.StatsAccumulator
 import com.google.common.primitives.Longs
@@ -16,8 +13,8 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TransactionId}
+import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
@@ -25,6 +22,9 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.rocksdb.RocksDB
 import play.api.libs.json.Json
 
+import java.io.File
+import java.nio.ByteBuffer
+import java.util
 import scala.annotation.tailrec
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable
@@ -41,7 +41,7 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).flatten.to(VectorMap))
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, StateSnapshot.empty, _ => true).flatten.to(VectorMap))
     )
 
   def main(argsRaw: Array[String]): Unit = {
@@ -321,7 +321,7 @@ object Explorer extends ScorexLogging {
           val s = Scheduler.fixedPool("foo-bar", 8, executionModel = ExecutionModel.AlwaysAsyncExecution)
 
           def countEntries(): Future[Long] = {
-            CommonAccountsApi(() => CompositeBlockchain(reader, Diff.empty), rdb, reader)
+            CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.empty), rdb, reader)
               .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
               .countL
               .runToFuture(s)

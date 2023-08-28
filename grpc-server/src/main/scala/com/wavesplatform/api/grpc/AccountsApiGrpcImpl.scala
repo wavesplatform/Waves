@@ -63,8 +63,13 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
 
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
     commonApi.script(request.address.toAddress) match {
-      case Some(desc) => ScriptData(PBTransactions.toPBScript(Some(desc.script)), desc.script.expr.toString, desc.verifierComplexity)
-      case None => ScriptData()
+      case Some(desc) => ScriptData(
+          PBTransactions.toPBScript(Some(desc.script)),
+          desc.script.expr.toString,
+          desc.verifierComplexity
+        )
+      case None =>
+        ScriptData()
     }
   }
 

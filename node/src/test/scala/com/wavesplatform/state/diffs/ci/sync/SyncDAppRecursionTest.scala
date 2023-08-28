@@ -13,8 +13,9 @@ import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import org.scalatest.Inside
 
-class SyncDAppRecursionTest extends PropSpec with WithDomain {
+class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
   import DomainPresets.*
 
   private val fc = Some(FUNCTION_CALL(User("default"), (1 to 4).map(_ => CONST_BOOLEAN(false)).toList))
@@ -110,7 +111,14 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         features(invokeExpression)
       ) { case (diff, _) =>
         diff.errorMessage(invoke.id()) shouldBe None
-        diff.scriptsRun shouldBe 3
+        inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+          inside(call1.invokes) { case Seq(call2) =>
+            inside(call2.stateChanges.invokes) { case Seq(call3) =>
+              call3.stateChanges.error shouldBe empty
+              call3.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
       }
     }
   }
@@ -302,7 +310,16 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       features()
     ) { case (diff, _) =>
       diff.errorMessage(invoke.id.value()) shouldBe None
-      diff.scriptsRun shouldBe 4
+      inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              call4.stateChanges.error shouldBe empty
+              call4.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 
@@ -337,7 +354,16 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       features()
     ) { case (diff, _) =>
       diff.errorMessage(invoke.id.value()) shouldBe None
-      diff.scriptsRun shouldBe 4
+      inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              call4.stateChanges.error shouldBe empty
+              call4.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 
@@ -370,7 +396,16 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       features()
     ) { case (diff, _) =>
       diff.errorMessage(invoke.id.value()) shouldBe None
-      diff.scriptsRun shouldBe 4
+      inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              call4.stateChanges.error shouldBe empty
+              call4.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 
@@ -443,7 +478,20 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       features()
     ) { case (diff, _) =>
       diff.errorMessage(invoke.id.value()) shouldBe None
-      diff.scriptsRun shouldBe 6
+      inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              inside(call4.stateChanges.invokes) { case Seq(sync5) =>
+                inside(sync5.stateChanges.invokes) { case Seq(sync6) =>
+                  sync6.stateChanges.error shouldBe empty
+                  sync6.stateChanges.invokes shouldBe empty
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -519,7 +567,20 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       features()
     ) { case (diff, _) =>
       diff.errorMessage(invoke.id.value()) shouldBe None
-      diff.scriptsRun shouldBe 6
+      inside(diff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call21, call22) =>
+          inside(call21.stateChanges.invokes) { case Seq(call31) =>
+            call31.stateChanges.error shouldBe empty
+            call31.stateChanges.invokes shouldBe empty
+          }
+          inside(call22.stateChanges.invokes) { case Seq(call32) =>
+            inside(call32.stateChanges.invokes) { case Seq(call42) =>
+              call42.stateChanges.error shouldBe empty
+              call42.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 

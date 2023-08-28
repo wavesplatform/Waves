@@ -7,6 +7,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -17,7 +18,7 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -25,13 +26,13 @@ import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
-import monix.reactive.subjects.ReplaySubject
 import monix.reactive.Observable
+import monix.reactive.subjects.ReplaySubject
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
-    rocksdb: RocksDBWriter,
+    val rocksdb: RocksDBWriter,
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
@@ -75,29 +76,29 @@ class BlockchainUpdaterImpl(
 
   publishLastBlockInfo()
 
-  def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
+  def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._1)))
 
   def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] =
     readLock(
       ngState
-        .flatMap(_.totalDiffOf(id))
-        .map { case (_, diff, _, _, _) =>
-          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.status, info.spentComplexity), info.transaction))
+        .flatMap(_.snapshotOf(id))
+        .map { case (_, snapshot, _, _, _) =>
+          snapshot.transactions.toSeq.map { case (_, info) => (TxMeta(Height(height), info.status, info.spentComplexity), info.transaction) }
         }
     )
 
   def liquidBlockMeta: Option[BlockMeta] =
     readLock(ngState.map { ng =>
-      val (_, _, totalFee) = ng.bestLiquidDiffAndFees
+      val (_, _, totalFee) = ng.bestLiquidSnapshotAndFees
       val b                = ng.bestLiquidBlock
       val vrf              = if (b.header.version >= Block.ProtoBlockVersion) hitSource(height) else None
       BlockMeta.fromBlock(b, height, totalFee, ng.reward, vrf)
     })
 
   @noinline
-  def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
+  def bestLiquidSnapshot: Option[StateSnapshot] = readLock(ngState.map(_.bestLiquidSnapshot))
 
-  def bestLiquidDiffAndFees: Option[(Diff, Long, Long)] = readLock(ngState.map(_.bestLiquidDiffAndFees))
+  def bestLiquidSnapshotAndFees: Option[(StateSnapshot, Long, Long)] = readLock(ngState.map(_.bestLiquidSnapshotAndFees))
 
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
@@ -197,7 +198,7 @@ class BlockchainUpdaterImpl(
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge (at NODE-2609)
   ): Either[ValidationError, BlockApplyResult] =
     writeLock {
       val height                             = rocksdb.height
@@ -222,7 +223,7 @@ class BlockchainUpdaterImpl(
                   val miningConstraints = MiningConstraints(rocksdb, height)
                   val reward            = computeNextReward
 
-                  val referencedBlockchain = CompositeBlockchain(rocksdb, reward)
+                  val referencedBlockchain = SnapshotBlockchain(rocksdb, reward)
                   BlockDiffer
                     .fromBlock(
                       referencedBlockchain,
@@ -237,9 +238,9 @@ class BlockchainUpdaterImpl(
                       checkStateHash = checkStateHash
                     )
                     .map { r =>
-                      val updatedBlockchain = CompositeBlockchain(rocksdb, r.diff, block, hitSource, r.carry, reward)
+                      val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward)
                       miner.scheduleMining(Some(updatedBlockchain))
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, hitSource, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, reward, hitSource, referencedBlockchain)
                       Option((r, Nil, reward, hitSource))
                     }
               }
@@ -251,7 +252,7 @@ class BlockchainUpdaterImpl(
 
                   blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
 
-                  val referencedBlockchain = CompositeBlockchain(rocksdb, ng.reward)
+                  val referencedBlockchain = SnapshotBlockchain(rocksdb, ng.reward)
                   BlockDiffer
                     .fromBlock(
                       referencedBlockchain,
@@ -270,9 +271,9 @@ class BlockchainUpdaterImpl(
                         s"Better liquid block(timestamp=${block.header.timestamp}) received and applied instead of existing(timestamp=${ng.base.header.timestamp})"
                       )
                       BlockStats.replaced(ng.base, block)
-                      val (mbs, diffs) = ng.allDiffs.unzip
+                      val (mbs, diffs) = ng.allSnapshots.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
@@ -286,9 +287,9 @@ class BlockchainUpdaterImpl(
                     )
                   )
               } else
-                metrics.forgeBlockTimeStats.measureOptional(ng.totalDiffOf(block.header.reference)) match {
+                metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                  case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
+                  case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, discarded)) =>
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
@@ -306,18 +307,18 @@ class BlockchainUpdaterImpl(
                       val prevReward = ng.reward
                       val reward     = computeNextReward
 
-                      val prevHitSource = ng.hitSource
+                      val prevHitSource                     = ng.hitSource
+                      val liquidSnapshotWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidSnapshot)
+                      val referencedBlockchain = SnapshotBlockchain(
+                        rocksdb,
+                        liquidSnapshotWithCancelledLeases,
+                        referencedForgedBlock,
+                        ng.hitSource,
+                        carry,
+                        reward
+                      )
 
                       for {
-                        liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
-                        referencedBlockchain = CompositeBlockchain(
-                          rocksdb,
-                          liquidDiffWithCancelledLeases,
-                          referencedForgedBlock,
-                          ng.hitSource,
-                          carry,
-                          reward
-                        )
                         differResult <- BlockDiffer
                           .fromBlock(
                             referencedBlockchain,
@@ -332,9 +333,9 @@ class BlockchainUpdaterImpl(
                             checkStateHash = checkStateHash
                           )
                       } yield {
-                        val tempBlockchain = CompositeBlockchain(
+                        val tempBlockchain = SnapshotBlockchain(
                           referencedBlockchain,
-                          differResult.diff,
+                          differResult.snapshot,
                           block,
                           hitSource,
                           differResult.carry,
@@ -342,17 +343,24 @@ class BlockchainUpdaterImpl(
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.keyBlockSnapshot, reward, hitSource, this)
 
-                        rocksdb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
-                        BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
+                        rocksdb.append(
+                          liquidSnapshotWithCancelledLeases,
+                          carry,
+                          totalFee,
+                          prevReward,
+                          prevHitSource,
+                          referencedForgedBlock
+                        )
+                        BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
-                        val (discardedMbs, discardedDiffs) = discarded.unzip
+                        val (discardedMbs, discardedSnapshots) = discarded.unzip
                         if (discardedMbs.nonEmpty) {
                           log.trace(s"Discarded microblocks: $discardedMbs")
                         }
 
-                        Some((differResult, discardedDiffs, reward, hitSource))
+                        Some((differResult, discardedSnapshots, reward, hitSource))
                       }
                     } else {
                       val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -361,32 +369,39 @@ class BlockchainUpdaterImpl(
                     }
                 }
           }).map {
-            _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _, _), discDiffs, reward, hitSource) =>
-              val newHeight = rocksdb.height + 1
+            _ map {
+              case (
+                    BlockDiffer.Result(newBlockSnapshot, carry, totalFee, updatedTotalConstraint, _, _),
+                    discDiffs,
+                    reward,
+                    hitSource
+                  ) =>
+                val newHeight = rocksdb.height + 1
 
-              restTotalConstraint = updatedTotalConstraint
-              ngState = Some(
-                new NgState(
-                  block,
-                  newBlockDiff,
-                  carry,
-                  totalFee,
-                  featuresApprovedWithBlock(block),
-                  reward,
-                  hitSource,
-                  cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                restTotalConstraint = updatedTotalConstraint
+                ngState = Some(
+                  new NgState(
+                    block,
+                    newBlockSnapshot,
+                    carry,
+                    totalFee,
+                    featuresApprovedWithBlock(block),
+                    reward,
+                    hitSource,
+                    cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                  )
                 )
-              )
-              publishLastBlockInfo()
 
-              if (
-                (block.header.timestamp > time
-                  .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)
-              ) {
-                log.info(s"New height: $newHeight")
-              }
+                publishLastBlockInfo()
 
-              Applied(discDiffs, this.score)
+                if (
+                  (block.header.timestamp > time
+                    .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)
+                ) {
+                  log.info(s"New height: $newHeight")
+                }
+
+                Applied(discDiffs, this.score)
             } getOrElse Ignored
           }
         )
@@ -406,18 +421,23 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Seq.empty
 
-  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, Diff] =
-    (for {
-      lt        <- leaseTransactions
-      ltMeta    <- transactionMeta(lt.id()).toSeq
-      recipient <- rocksdb.resolveAlias(lt.recipient).toSeq
-    } yield lt.id() -> Diff(
-      portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
-      ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
-    )).toMap
+  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, StateSnapshot] = {
+    val snapshotsById =
+      for {
+        lt        <- leaseTransactions
+        ltMeta    <- transactionMeta(lt.id()).toSeq
+        recipient <- rocksdb.resolveAlias(lt.recipient).toSeq
+        portfolios = Map(
+          lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
+          recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
+        )
+        leaseStates = Map(
+          lt.id() -> LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)
+        )
+        snapshot = StateSnapshot.build(rocksdb, portfolios, leaseStates = leaseStates).explicitGet()
+      } yield lt.id() -> snapshot
+    snapshotsById.toMap
+  }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
     log.info(s"Trying rollback blockchain to $blockId")
@@ -456,74 +476,73 @@ class BlockchainUpdaterImpl(
     result
   }
 
-  override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] =
-    writeLock {
-      ngState match {
-        case None =>
-          Left(MicroBlockAppendError("No base block exists", microBlock))
-        case Some(ng) if ng.base.header.generator.toAddress != microBlock.sender.toAddress =>
-          Left(MicroBlockAppendError("Base block has been generated by another account", microBlock))
-        case Some(ng) if ng.base.header.challengedHeader.nonEmpty =>
-          Left(MicroBlockAppendError("Base block has challenged header", microBlock))
-        case Some(ng) =>
-          ng.lastMicroBlock match {
-            case None if ng.base.id() != microBlock.reference =>
-              metrics.blockMicroForkStats.increment()
-              Left(MicroBlockAppendError("It's first micro and it doesn't reference base block(which exists)", microBlock))
-            case Some(_) if ng.bestLiquidBlockId != microBlock.reference =>
-              metrics.microMicroForkStats.increment()
-              Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
-            case _ =>
-              for {
-                _ <- microBlock.signaturesValid()
-                (totalSignatureValid, prevStateHash) <- ng
-                  .totalDiffOf(microBlock.reference)
-                  .toRight(GenericError(s"No referenced block exists: $microBlock"))
-                  .map { case (accumulatedBlock, _, _, _, _) =>
-                    Block
-                      .create(
-                        accumulatedBlock,
-                        accumulatedBlock.transactionData ++ microBlock.transactionData,
-                        microBlock.totalResBlockSig,
-                        microBlock.stateHash
-                      )
-                      .signatureValid() -> accumulatedBlock.header.stateHash
-                  }
-                _ <- Either
-                  .cond(
-                    totalSignatureValid,
-                    (),
-                    MicroBlockAppendError("Invalid total block signature", microBlock)
-                  )
-                blockDifferResult <- {
-                  BlockDiffer.fromMicroBlock(
-                    this,
-                    rocksdb.lastBlockTimestamp,
-                    prevStateHash,
-                    microBlock,
-                    restTotalConstraint,
-                    rocksdb.loadCacheData,
-                    verify
-                  )
+  override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] = writeLock {
+    ngState match {
+      case None =>
+        Left(MicroBlockAppendError("No base block exists", microBlock))
+      case Some(ng) if ng.base.header.generator.toAddress != microBlock.sender.toAddress =>
+        Left(MicroBlockAppendError("Base block has been generated by another account", microBlock))
+      case Some(ng) if ng.base.header.challengedHeader.nonEmpty =>
+        Left(MicroBlockAppendError("Base block has challenged header", microBlock))
+      case Some(ng) =>
+        ng.lastMicroBlock match {
+          case None if ng.base.id() != microBlock.reference =>
+            metrics.blockMicroForkStats.increment()
+            Left(MicroBlockAppendError("It's first micro and it doesn't reference base block(which exists)", microBlock))
+          case Some(_) if ng.bestLiquidBlockId != microBlock.reference =>
+            metrics.microMicroForkStats.increment()
+            Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
+          case _ =>
+            for {
+              _ <- microBlock.signaturesValid()
+              (totalSignatureValid, prevStateHash) <- ng
+                .snapshotOf(microBlock.reference)
+                .toRight(GenericError(s"No referenced block exists: $microBlock"))
+                .map { case (accumulatedBlock, _, _, _, _) =>
+                  Block
+                    .create(
+                      accumulatedBlock,
+                      accumulatedBlock.transactionData ++ microBlock.transactionData,
+                      microBlock.totalResBlockSig,
+                      microBlock.stateHash
+                    )
+                    .signatureValid() -> accumulatedBlock.header.stateHash
                 }
-              } yield {
-                val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _) = blockDifferResult
-                restTotalConstraint = updatedMdConstraint
-                val blockId = ng.createBlockId(microBlock)
-
-                val transactionsRoot = ng.createTransactionsRoot(microBlock)
-                blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
-
-                this.ngState = Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
-
-                log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
-                internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
-
-                blockId
+              _ <- Either
+                .cond(
+                  totalSignatureValid,
+                  (),
+                  MicroBlockAppendError("Invalid total block signature", microBlock)
+                )
+              blockDifferResult <- {
+                BlockDiffer.fromMicroBlock(
+                  this,
+                  rocksdb.lastBlockTimestamp,
+                  prevStateHash,
+                  microBlock,
+                  restTotalConstraint,
+                  rocksdb.loadCacheData,
+                  verify
+                )
               }
-          }
-      }
+            } yield {
+              val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff, _) = blockDifferResult
+              restTotalConstraint = updatedMdConstraint
+              val blockId = ng.createBlockId(microBlock)
+
+              val transactionsRoot = ng.createTransactionsRoot(microBlock)
+              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId, transactionsRoot)
+
+              this.ngState = Some(ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId)))
+
+              log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
+              internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
+
+              blockId
+            }
+        }
     }
+  }
 
   def shutdown(): Unit = {
     internalLastBlockInfo.onComplete()
@@ -633,96 +652,96 @@ class BlockchainUpdaterImpl(
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {
-    compositeBlockchain.transferById(id)
+    snapshotBlockchain.transferById(id)
   }
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readLock {
-    compositeBlockchain.transactionInfo(id)
+    snapshotBlockchain.transactionInfo(id)
   }
 
   override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = readLock {
-    compositeBlockchain.transactionInfos(ids)
+    snapshotBlockchain.transactionInfos(ids)
   }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {
-    compositeBlockchain.containsTransaction(tx)
+    snapshotBlockchain.containsTransaction(tx)
   }
 
   override def assetDescription(id: IssuedAsset): Option[AssetDescription] = readLock {
-    compositeBlockchain.assetDescription(id)
+    snapshotBlockchain.assetDescription(id)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readLock {
-    compositeBlockchain.resolveAlias(alias)
+    snapshotBlockchain.resolveAlias(alias)
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readLock {
-    compositeBlockchain.leaseDetails(leaseId)
+    snapshotBlockchain.leaseDetails(leaseId)
   }
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = readLock {
-    compositeBlockchain.filledVolumeAndFee(orderId)
+    snapshotBlockchain.filledVolumeAndFee(orderId)
   }
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
-    compositeBlockchain.balanceAtHeight(address, h, assetId)
+    snapshotBlockchain.balanceAtHeight(address, h, assetId)
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
-    to.fold(ngState.flatMap(ng => ng.totalDiffOf(ng.bestLiquidBlockId))) { id =>
-      ngState.flatMap(_.totalDiffOf(id))
-    }.fold[Blockchain](rocksdb) { case (block, diff, _, _, _) =>
-      CompositeBlockchain(rocksdb, diff, block, ByteStr.empty, 0L, None)
-    }.balanceSnapshots(address, from, to)
+    to.fold(ngState.flatMap(ng => ng.snapshotOf(ng.bestLiquidBlockId)))(id => ngState.flatMap(_.snapshotOf(id)))
+      .fold[Blockchain](rocksdb) { case (block, diff, _, _, _) =>
+        SnapshotBlockchain(rocksdb, diff, block, ByteStr.empty, 0L, None)
+      }
+      .balanceSnapshots(address, from, to)
   }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = readLock {
-    compositeBlockchain.accountScript(address)
+    snapshotBlockchain.accountScript(address)
   }
 
   override def hasAccountScript(address: Address): Boolean = readLock {
-    compositeBlockchain.hasAccountScript(address)
+    snapshotBlockchain.hasAccountScript(address)
   }
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = readLock {
-    compositeBlockchain.assetScript(asset)
+    snapshotBlockchain.assetScript(asset)
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[?]] = readLock {
-    compositeBlockchain.accountData(acc, key)
+    snapshotBlockchain.accountData(acc, key)
   }
 
   override def hasData(acc: Address): Boolean = readLock {
-    compositeBlockchain.hasData(acc)
+    snapshotBlockchain.hasData(acc)
   }
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = readLock {
-    compositeBlockchain.transactionMeta(id)
+    snapshotBlockchain.transactionMeta(id)
   }
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = readLock {
-    compositeBlockchain.balance(address, mayBeAssetId)
+    snapshotBlockchain.balance(address, mayBeAssetId)
   }
 
   override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), TxTimestamp] = readLock {
-    compositeBlockchain.balances(req)
+    snapshotBlockchain.balances(req)
   }
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = readLock {
-    compositeBlockchain.wavesBalances(addresses)
+    snapshotBlockchain.wavesBalances(addresses)
   }
 
   override def effectiveBalanceBanHeights(address: Address): Seq[Int] = readLock {
-    compositeBlockchain.effectiveBalanceBanHeights(address)
+    snapshotBlockchain.effectiveBalanceBanHeights(address)
   }
 
   override def leaseBalance(address: Address): LeaseBalance = readLock {
-    compositeBlockchain.leaseBalance(address)
+    snapshotBlockchain.leaseBalance(address)
   }
 
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = readLock {
-    compositeBlockchain.leaseBalances(addresses)
+    snapshotBlockchain.leaseBalances(addresses)
   }
 
   override def hitSource(height: Int): Option[ByteStr] = readLock {
@@ -733,14 +752,11 @@ class BlockchainUpdaterImpl(
   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = readLock {
-    compositeBlockchain.resolveERC20Address(address)
+    snapshotBlockchain.resolveERC20Address(address)
   }
 
-  def getCompositeBlockchain: CompositeBlockchain =
-    ngState.fold(CompositeBlockchain(rocksdb, Diff.empty))(CompositeBlockchain(rocksdb, _))
-
-  private[this] def compositeBlockchain: Blockchain =
-    ngState.fold(rocksdb: Blockchain)(CompositeBlockchain(rocksdb, _))
+  def snapshotBlockchain: SnapshotBlockchain =
+    ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))
 
   // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
@@ -755,8 +771,8 @@ class BlockchainUpdaterImpl(
 object BlockchainUpdaterImpl {
   sealed trait BlockApplyResult
   object BlockApplyResult {
-    case object Ignored                                          extends BlockApplyResult
-    case class Applied(discardedDiffs: Seq[Diff], score: BigInt) extends BlockApplyResult
+    case object Ignored                                                   extends BlockApplyResult
+    case class Applied(discardedDiffs: Seq[StateSnapshot], score: BigInt) extends BlockApplyResult
   }
 
   private def displayFeatures(s: Set[Short]): String =

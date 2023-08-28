@@ -4,8 +4,8 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Keys, RDB}
-import com.wavesplatform.state.{Diff, Height, Portfolio, TxMeta}
-import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TransactionType}
+import com.wavesplatform.state.{Height, StateSnapshot, TxMeta}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksDB
@@ -18,7 +18,7 @@ package object common {
 
   def addressTransactions(
       rdb: RDB,
-      maybeDiff: Option[(Height, Diff)],
+      maybeDiff: Option[(Height, StateSnapshot)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
@@ -49,10 +49,10 @@ package object common {
       db: RocksDB,
       height: Int,
       after: Option[Address],
-      overrides: Map[Address, Portfolio],
+      overrides: Map[(Address, Asset), Long],
       globalPrefix: Array[Byte],
       addressId: Array[Byte] => AddressId,
-      balanceOf: Portfolio => Long
+      asset: Asset
   ): Observable[(Address, Long)] =
     db.resourceObservable
       .flatMap { resource =>
@@ -61,12 +61,12 @@ package object common {
             .flatMap(address => resource.get(Keys.addressId(address)))
             .fold(Array.emptyByteArray)(id => Longs.toByteArray(id.toLong + 1))
         )
-        Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
+        Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, asset, height, overrides).asScala.filter(_._2 > 0)))
       }
 
   def aliasesOfAddress(
       rdb: RDB,
-      maybeDiff: => Option[(Height, Diff)],
+      maybeDiff: => Option[(Height, StateSnapshot)],
       address: Address
   ): Observable[(Height, CreateAliasTransaction)] = {
     val disabledAliases = rdb.db.get(Keys.disabledAliases)
@@ -78,7 +78,7 @@ package object common {
       }
   }
 
-  def loadTransactionMeta(rdb: RDB, maybeDiff: => Option[(Int, Diff)])(
+  def loadTransactionMeta(rdb: RDB, maybeSnapshot: => Option[(Int, StateSnapshot)])(
       tuple: (TxMeta, Transaction)
   ): TransactionMeta = {
     val (meta, transaction) = tuple
@@ -88,12 +88,12 @@ package object common {
       meta.status,
       meta.spentComplexity,
       ist =>
-        maybeDiff
-          .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
+        maybeSnapshot
+          .flatMap { case (_, s) => s.scriptResults.get(ist.id()) }
           .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, ist.id())),
       et =>
-        maybeDiff
-          .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(et.id()) }
+        maybeSnapshot
+          .flatMap { case (_, s) => s.ethereumTransactionMeta.get(et.id()) }
           .orElse(loadEthereumMetadata(rdb.db, rdb.txMetaHandle, et.id()))
     )
   }

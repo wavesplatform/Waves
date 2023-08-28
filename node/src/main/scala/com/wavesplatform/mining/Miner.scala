@@ -145,9 +145,9 @@ class MinerImpl(
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
       // TODO: NODE-2594 get next block reward
       BlockDiffer
-        .createInitialBlockDiff(blockchainUpdater, miner)
+        .createInitialBlockSnapshot(blockchainUpdater, miner)
         .toOption
-        .map(initDiff => TxStateSnapshotHashBuilder.createHashFromDiff(blockchainUpdater, initDiff).createHash(prevHash))
+        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
     }
 
     if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)

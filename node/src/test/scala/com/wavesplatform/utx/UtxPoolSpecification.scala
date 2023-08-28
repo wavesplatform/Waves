@@ -14,7 +14,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
+import com.wavesplatform.history.{DefaultWavesSettings, SnapshotOps, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
@@ -660,7 +660,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(
-            OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber, "scriptRunNumber"),
+            OneDimensionalMiningConstraint(3, TxEstimators.scriptsComplexity, "KeyBlock"),
             OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one, "KeyBlock")
           )
         )
@@ -934,9 +934,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invokeTx)
         val event = events.head.asInstanceOf[UtxEvent.TxAdded]
         event.tx.id() shouldBe invokeTx.id()
-        event.diff.scriptsComplexity shouldBe 1011
-        event.diff.portfolios(secondAddress) shouldBe Portfolio.waves(-1)
-        event.diff.portfolios(recipient) shouldBe Portfolio.waves(1)
+        event.snapshot.scriptsComplexity shouldBe 1011
+        event.snapshot.balances((secondAddress, Waves)) shouldBe d.blockchainUpdater.balance(secondAddress, Waves) - 1
+        event.snapshot.balances((recipient, Waves)) shouldBe d.blockchainUpdater.balance(recipient, Waves) + 1
         utx.close()
       }
 
@@ -1024,7 +1024,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val transfer1 = TxHelpers.transfer(amount = 10.waves)
         val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
 
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.createDiff(transfer1)))
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(SnapshotOps.fromDiff(d.createDiff(transfer1), d.blockchain).explicitGet()))
         d.utxPool.addTransaction(transfer2, verify = false)
 
         d.utxPool.cleanUnconfirmed()

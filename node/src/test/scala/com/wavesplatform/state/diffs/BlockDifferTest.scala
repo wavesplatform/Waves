@@ -11,8 +11,8 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
@@ -129,15 +129,16 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           val txs = (1 to 10).map(idx => TxHelpers.transfer(TxHelpers.signer(idx), TxHelpers.address(idx + 1), (100 - idx).waves))
 
+          val blockTs    = txs.map(_.timestamp).max
           val signer     = TxHelpers.signer(2)
-          val blockchain = CompositeBlockchain(d.blockchain, Some(d.settings.blockchainSettings.rewardsSettings.initial))
-          val initDiff = BlockDiffer
-            .createInitialBlockDiff(d.blockchain, signer.toAddress)
+          val blockchain = SnapshotBlockchain(d.blockchain, Some(d.settings.blockchainSettings.rewardsSettings.initial))
+          val initSnapshot = BlockDiffer
+            .createInitialBlockSnapshot(d.blockchain, signer.toAddress)
             .explicitGet()
-          val initStateHash = TxStateSnapshotHashBuilder.createHashFromDiff(blockchain, initDiff).createHash(genesis.header.stateHash.get)
-          val blockTs       = txs.map(_.timestamp).max
+
+          val initStateHash = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(genesis.header.stateHash.get)
           val blockStateHash = WithState
-            .computeStateHash(txs, initStateHash, initDiff, signer.toAddress, blockTs, isChallenging = false, blockchain)
+            .computeStateHash(txs, initStateHash, initSnapshot, signer.toAddress, blockTs, isChallenging = false, blockchain)
             .resultE
             .explicitGet()
 
@@ -169,7 +170,15 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             d.createMicroBlock(
               Some(
                 WithState
-                  .computeStateHash(txs, genesis.header.stateHash.get, Diff.empty, signer.toAddress, blockTs, isChallenging = false, blockchain)
+                  .computeStateHash(
+                    txs,
+                    genesis.header.stateHash.get,
+                    StateSnapshot.empty,
+                    signer.toAddress,
+                    blockTs,
+                    isChallenging = false,
+                    blockchain
+                  )
                   .resultE
                   .explicitGet()
               )

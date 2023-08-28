@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 
 object MassTransferTransactionDiff {
 
-  def apply(blockchain: Blockchain, blockTime: Long)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: MassTransferTransaction): Either[ValidationError, StateSnapshot] = {
     def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- blockchain.resolveAlias(xfer.address)
@@ -30,10 +30,10 @@ object MassTransferTransactionDiff {
       val foldInit = (Map[Address, Portfolio](sender -> Portfolio(-tx.fee.value)), 0L)
       list
         .foldM(foldInit) { case ((totalPortfolios, totalTransferAmount), (portfolios, transferAmount)) =>
-          Diff.combine(totalPortfolios, portfolios).map((_, totalTransferAmount + transferAmount))
+          Portfolio.combine(totalPortfolios, portfolios).map((_, totalTransferAmount + transferAmount))
         }
         .flatMap { case (recipientPortfolios, totalAmount) =>
-          Diff.combine(
+          Portfolio.combine(
             recipientPortfolios,
             tx.assetId
               .fold(Map[Address, Portfolio](sender -> Portfolio(-totalAmount))) { asset =>
@@ -48,11 +48,13 @@ object MassTransferTransactionDiff {
               case Waves                  => true
               case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
             }
-          Either.cond(
-            assetIssued,
-            Diff(portfolios = completePortfolio, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)),
-            GenericError(s"Attempt to transfer a nonexistent asset")
-          )
+          Either
+            .cond(
+              assetIssued,
+              StateSnapshot.build(blockchain, portfolios = completePortfolio),
+              GenericError(s"Attempt to transfer a nonexistent asset")
+            )
+            .flatten
         }
     }
   }

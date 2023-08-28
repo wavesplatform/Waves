@@ -24,8 +24,9 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{EthABIConverter, Asset, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
+import org.scalatest.Inside
 
-class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
+class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with Inside {
   import DomainPresets.*
 
   private val time = new TestTime
@@ -156,7 +157,15 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
       val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
       d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio
       d.liquidDiff.portfolios(ethInvoke.senderAddress()) shouldBe Portfolio(-ethInvoke.underlying.getGasPrice.longValue()).minus(assetsPortfolio)
-      d.liquidDiff.scriptsRun shouldBe paymentCount + 1 + (if (syncCall) 1 else 0)
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        if (syncCall)
+          inside(call1.invokes) { case Seq(call2) =>
+            call2.stateChanges.error shouldBe empty
+            call2.stateChanges.invokes shouldBe empty
+          }
+        else
+          call1.invokes shouldBe empty
+      }
     }
   }
 

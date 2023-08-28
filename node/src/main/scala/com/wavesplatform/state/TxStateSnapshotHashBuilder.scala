@@ -1,24 +1,21 @@
 package com.wavesplatform.state
 
-import cats.data.Ior
-
-import java.nio.charset.StandardCharsets
-import cats.syntax.monoid.*
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
+import java.nio.charset.StandardCharsets
 import scala.collection.mutable
 
 object TxStateSnapshotHashBuilder {
   object KeyType extends Enumeration {
-    val WavesBalance, AssetBalance, DataEntry, AccountScript, AssetScript, LeaseBalance, LeaseStatus, Sponsorship, Alias, VolumeAndFee,
-        StaticAssetInfo, AssetReissuability, AssetNameDescription = Value
+    val WavesBalance, AssetBalance, DataEntry, AccountScript, AssetScript, LeaseBalance, LeaseStatus, Sponsorship, Alias, VolumeAndFee, AssetStatic,
+        AssetVolume, AssetNameDescription, TransactionStatus = Value
   }
 
   val InitStateHash: ByteStr = ByteStr(crypto.fastHash(""))
@@ -28,7 +25,7 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createHashFromDiff(blockchain: Blockchain, diff: Diff): Result = {
+  def createHashFromSnapshot(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo]): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 
     def addEntry(keyType: KeyType.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -37,92 +34,82 @@ object TxStateSnapshotHashBuilder {
       changedKeys(solidKey) = solidValue
     }
 
-    val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(blockchain, diff)
-
-    for {
-      (address, assets) <- updatedBalances
-      (asset, balance)  <- assets
-    } asset match {
-      case Waves              => addEntry(KeyType.WavesBalance, address.bytes)(Longs.toByteArray(balance))
-      case asset: IssuedAsset => addEntry(KeyType.AssetBalance, address.bytes, asset.id.arr)(Longs.toByteArray(balance))
+    snapshot.balances.foreach { case ((address, asset), balance) =>
+      asset match {
+        case Waves              => addEntry(KeyType.WavesBalance, address.bytes)(Longs.toByteArray(balance))
+        case asset: IssuedAsset => addEntry(KeyType.AssetBalance, address.bytes, asset.id.arr)(Longs.toByteArray(balance))
+      }
     }
 
-    updatedLeaseBalances foreach { case (address, balance) =>
+    snapshot.leaseBalances.foreach { case (address, balance) =>
       addEntry(KeyType.LeaseBalance, address.bytes)(Longs.toByteArray(balance.in), Longs.toByteArray(balance.out))
     }
 
     for {
-      (address, data) <- diff.accountData
+      (address, data) <- snapshot.accountData
       entry           <- data.values
     } addEntry(KeyType.DataEntry, address.bytes, entry.key.getBytes(StandardCharsets.UTF_8))(entry.valueBytes)
 
-    diff.aliases.foreach { case (alias, address) =>
+    snapshot.aliases.foreach { case (alias, address) =>
       addEntry(KeyType.Alias, address.bytes, alias.name.getBytes(StandardCharsets.UTF_8))()
     }
 
-    diff.scripts.foreach { case (address, sv) =>
+    snapshot.accountScriptsByAddress.foreach { case (address, sv) =>
       addEntry(KeyType.AccountScript, address.bytes)(
-        sv.fold(Seq(Array.emptyByteArray))(scriptInfo =>
-          Seq(scriptInfo.script.bytes().arr, scriptInfo.publicKey.arr, Longs.toByteArray(scriptInfo.verifierComplexity))
-        )*
+        sv.fold(Seq(Array.emptyByteArray))(s => Seq(s.script.bytes().arr, s.publicKey.arr, Longs.toByteArray(s.verifierComplexity)))*
       )
     }
 
     for {
-      (asset, sv) <- diff.assetScripts
+      (asset, sv) <- snapshot.assetScripts
       script = sv.map(_.script)
     } addEntry(KeyType.AssetScript, asset.id.arr)(script.fold(Array.emptyByteArray)(_.bytes().arr))
 
-    diff.leaseState.foreach { case (leaseId, details) =>
+    snapshot.leaseStates.foreach { case (leaseId, details) =>
       addEntry(KeyType.LeaseStatus, leaseId.arr)(booleanToBytes(details.isActive))
     }
 
-    diff.sponsorship.foreach { case (asset, sponsorship) =>
-      val minSponsoredFee =
-        sponsorship match {
-          case SponsorshipValue(minFee) => minFee
-          case SponsorshipNoInfo        => 0L
-        }
-
-      addEntry(KeyType.Sponsorship, asset.id.arr)(Longs.toByteArray(minSponsoredFee))
+    snapshot.sponsorships.foreach { case (asset, sponsorship) =>
+      addEntry(KeyType.Sponsorship, asset.id.arr)(Longs.toByteArray(sponsorship.minFee))
     }
 
-    diff.orderFills.foreach { case (orderId, fillInfo) =>
-      val filledVolumeAndFee = blockchain.filledVolumeAndFee(orderId).combine(fillInfo)
-      addEntry(KeyType.VolumeAndFee, orderId.arr)(Longs.toByteArray(filledVolumeAndFee.volume), Longs.toByteArray(filledVolumeAndFee.fee))
-    }
-
-    diff.issuedAssets.foreach { case (asset, assetInfo) =>
-      addEntry(KeyType.StaticAssetInfo, asset.id.arr)(
-        assetInfo.static.issuer.toAddress.bytes,
-        Array(assetInfo.static.decimals.toByte),
-        booleanToBytes(assetInfo.static.nft)
+    snapshot.orderFills.foreach { case (orderId, fillInfo) =>
+      addEntry(KeyType.VolumeAndFee, orderId.arr)(
+        Longs.toByteArray(fillInfo.volume),
+        Longs.toByteArray(fillInfo.fee)
       )
     }
 
-    val assetReissuabilities = diff.issuedAssets.map { case (asset, assetInfo) =>
-      asset -> assetInfo.volume
-    } ++ diff.updatedAssets.collect {
-      case (asset, Ior.Right(volume))   => asset -> volume
-      case (asset, Ior.Both(_, volume)) => asset -> volume
+    snapshot.assetStatics.foreach { case (asset, assetInfo) =>
+      addEntry(KeyType.AssetStatic, asset.id.arr)(
+        assetInfo.issuerPublicKey.toByteArray,
+        Array(assetInfo.decimals.toByte),
+        booleanToBytes(assetInfo.nft)
+      )
     }
 
-    assetReissuabilities.foreach { case (asset, volume) =>
-      addEntry(KeyType.AssetReissuability, asset.id.arr)(booleanToBytes(volume.isReissuable), volume.volume.toByteArray)
+    snapshot.assetVolumes.foreach { case (asset, volume) =>
+      addEntry(KeyType.AssetVolume, asset.id.arr)(
+        booleanToBytes(volume.isReissuable),
+        volume.volume.toByteArray
+      )
     }
 
-    val assetNameDescs = diff.issuedAssets.map { case (asset, assetInfo) =>
-      (asset, (assetInfo.dynamic.name.toByteArray, assetInfo.dynamic.description.toByteArray, assetInfo.dynamic.lastUpdatedAt.toInt))
-    } ++ diff.updatedAssets.collect {
-      case (asset, Ior.Left(assetInfo)) =>
-        (asset, (assetInfo.name.toByteArray, assetInfo.description.toByteArray, assetInfo.lastUpdatedAt.toInt))
-      case (asset, Ior.Both(assetInfo, _)) =>
-        (asset, (assetInfo.name.toByteArray, assetInfo.description.toByteArray, assetInfo.lastUpdatedAt.toInt))
+    snapshot.assetNamesAndDescriptions.foreach { case (asset, assetInfo) =>
+      addEntry(KeyType.AssetNameDescription, asset.id.arr)(
+        assetInfo.name.toByteArray,
+        assetInfo.description.toByteArray,
+        Ints.toByteArray(assetInfo.lastUpdatedAt.toInt)
+      )
     }
 
-    assetNameDescs.foreach { case (asset, (name, description, changeHeight)) =>
-      addEntry(KeyType.AssetNameDescription, asset.id.arr)(name, description, Ints.toByteArray(changeHeight))
-    }
+    txInfoOpt.foreach(txInfo =>
+      txInfo.status match {
+        case Status.Failed    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(1: Byte))
+        case Status.Elided    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(2: Byte))
+        case Status.Succeeded =>
+      }
+    )
 
     Result(createHash(changedKeys.toSeq.sortBy(_._1).flatMap { case (k, v) => Seq(k, ByteStr(v)) }))
   }

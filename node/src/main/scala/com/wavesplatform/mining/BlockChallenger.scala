@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import cats.syntax.either.*
+import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
 import com.wavesplatform.block.{Block, ChallengedHeader}
@@ -18,10 +18,10 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio, TxStateSnapshotHashBuilder}
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -181,7 +181,7 @@ class BlockChallengerImpl(
           blockTime
         )
 
-      initialBlockDiff <- BlockDiffer.createInitialBlockDiff(blockchainUpdater, acc.toAddress).leftMap(GenericError(_))
+      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, acc.toAddress)
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,
@@ -210,11 +210,11 @@ class BlockChallengerImpl(
           Some(
             computeStateHash(
               txs,
-              TxStateSnapshotHashBuilder.createHashFromDiff(blockchainUpdater, initialBlockDiff).createHash(prevStateHash),
-              initialBlockDiff,
+              TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
+              initialBlockSnapshot,
               acc,
               lastBlockHeader.timestamp,
-              CompositeBlockchain(blockchainUpdater, Diff.empty, blockWithoutChallengeAndStateHash, hitSource, 0, None)
+              SnapshotBlockchain(blockchainUpdater, StateSnapshot.empty, blockWithoutChallengeAndStateHash, hitSource, 0, None)
             )
           ),
           Some(
@@ -265,7 +265,7 @@ class BlockChallengerImpl(
   private def computeStateHash(
       txs: Seq[Transaction],
       initStateHash: ByteStr,
-      initDiff: Diff,
+      initSnapshot: StateSnapshot,
       signer: KeyPair,
       prevBlockTimestamp: Long,
       blockchain: Blockchain
@@ -273,15 +273,17 @@ class BlockChallengerImpl(
     val txDiffer = TransactionDiffer(Some(prevBlockTimestamp), blockchain.lastBlockTimestamp.get) _
 
     txs
-      .foldLeft(initStateHash -> initDiff) { case ((prevStateHash, accDiff), tx) =>
-        val compBlockchain = CompositeBlockchain(blockchain, accDiff)
-        val minerDiff      = Diff(portfolios = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart)))
-        txDiffer(compBlockchain, tx).resultE match {
-          case Right(txDiff) =>
+      .foldLeft(initStateHash -> initSnapshot) { case ((prevStateHash, accSnapshot), tx) =>
+        val accBlockchain = SnapshotBlockchain(blockchain, accSnapshot)
+        val minerPortfolio = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart))
+        txDiffer(accBlockchain, tx).resultE match {
+          case Right(txSnapshot) =>
+            val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
+            val txInfo                 = txSnapshot.transactions.head._2
             val stateHash =
-              TxStateSnapshotHashBuilder.createHashFromDiff(compBlockchain, txDiff.combineF(minerDiff).explicitGet()).createHash(prevStateHash)
-            (stateHash, accDiff.combineF(txDiff).flatMap(_.combineF(minerDiff)).explicitGet())
-          case Left(_) => (prevStateHash, accDiff)
+              TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
+            (stateHash, accSnapshot |+| txSnapshotWithBalances)
+          case Left(_) => (prevStateHash, accSnapshot)
         }
       }
       ._1

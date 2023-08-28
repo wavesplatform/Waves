@@ -1,5 +1,7 @@
 package com.wavesplatform.state
 
+import cats.implicits.toBifunctorOps
+import com.wavesplatform.account.Address
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.*
@@ -21,22 +23,17 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
 
   def combine(that: Portfolio): Either[String, Portfolio] =
     for {
-      balance  <- sum(this.balance, that.balance, "Waves balance sum overflow")
+      balance  <- safeSum(this.balance, that.balance, "Waves balance")
       assets   <- combineAssets(this.assets, that.assets)
-      leaseIn  <- sum(this.lease.in, that.lease.in, "Lease in sum overflow")
-      leaseOut <- sum(this.lease.out, that.lease.out, "Lease out sum overflow")
+      leaseIn  <- safeSum(this.lease.in, that.lease.in, "Lease in")
+      leaseOut <- safeSum(this.lease.out, that.lease.out, "Lease out")
     } yield Portfolio(balance, LeaseBalance(leaseIn, leaseOut), assets)
 
   override def toString: String = s"PF($balance,${assets.mkString("[", ",", "]")})"
 }
 
 object Portfolio {
-  @inline
-  final def sum(a: Long, b: Long, error: => String): Either[String, Long] =
-    try Right(Math.addExact(a, b))
-    catch { case _: ArithmeticException => Left(error) }
-
-  def combineAssets(a: VectorMap[IssuedAsset, Long], b: VectorMap[IssuedAsset, Long]): Either[String, VectorMap[IssuedAsset, Long]] = {
+  private def combineAssets(a: VectorMap[IssuedAsset, Long], b: VectorMap[IssuedAsset, Long]): Either[String, VectorMap[IssuedAsset, Long]] = {
     if (a.isEmpty) Right(b)
     else if (b.isEmpty) Right(a)
     else
@@ -46,7 +43,7 @@ object Portfolio {
             case None =>
               Right(seed.updated(asset, balance))
             case Some(oldBalance) =>
-              sum(oldBalance, balance, s"asset $asset overflow").map { newBalance =>
+              safeSum(oldBalance, balance, s"asset $asset").map { newBalance =>
                 seed.updated(asset, newBalance)
               }
           }
@@ -77,8 +74,6 @@ object Portfolio {
   val empty: Portfolio = Portfolio()
 
   implicit class PortfolioExt(val self: Portfolio) extends AnyVal {
-    def spendableBalanceOf(assetId: Asset): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))
-
     def pessimistic: Portfolio = Portfolio(
       balance = Math.min(self.balance, 0),
       lease = LeaseBalance(
@@ -94,8 +89,23 @@ object Portfolio {
     def minus(other: Portfolio): Portfolio =
       Portfolio(self.balance - other.balance, LeaseBalance.empty, unsafeCombineAssets(self.assets, other.assets.view.mapValues(-_).to(VectorMap)))
 
-    def negate: Portfolio = Portfolio.empty minus self
-
     def assetIds: Set[Asset] = self.assets.keySet ++ Set[Asset](Waves)
   }
+
+  def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
+    if (portfolios1.isEmpty) Right(portfolios2)
+    else if (portfolios2.isEmpty) Right(portfolios1)
+    else
+      portfolios2.foldLeft[Either[String, Map[Address, Portfolio]]](Right(portfolios1)) {
+        case (Right(seed), kv @ (address, pf)) =>
+          seed.get(address).fold[Either[String, Map[Address, Portfolio]]](Right(seed + kv)) { oldPf =>
+            oldPf
+              .combine(pf)
+              .bimap(
+                err => s"$address: " + err,
+                newPf => seed + (address -> newPf)
+              )
+          }
+        case (r, _) => r
+      }
 }

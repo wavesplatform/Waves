@@ -1,8 +1,6 @@
 package com.wavesplatform.state
 
 import com.google.common.primitives.Longs
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,7 +11,6 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
@@ -37,12 +34,9 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
   private val FEE_AMT = 1000000L
 
-  // default settings, no NG
-  private lazy val wavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-
   def baseTest(setup: Time => (KeyPair, Seq[Block]), enableNg: Boolean = false, triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop)(
       f: (BlockchainUpdaterImpl, KeyPair) => Unit
-  ): Unit = withDomain(if (enableNg) enableNG(wavesSettings) else wavesSettings) { d =>
+  ): Unit = withDomain(if (enableNg) NG else SettingsFromDefaultConfig) { d =>
     d.triggers = d.triggers :+ triggers
 
     val (account, blocks) = setup(ntpTime)
@@ -92,34 +86,34 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     (master, List(genesisBlock, b1, b2))
   }
 
-  "blockhain update events sending" - {
+  "blockchain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
         val triggersMock = mock[BlockchainUpdateTriggers]
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == 0 &&
-              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              snapshot.balances.isEmpty &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
-              val txDiff = diff.transactionDiffs.head
-              val tx     = txDiff.transactions.head.transaction.asInstanceOf[TransferTransaction]
+            .expects(where { (block, snapshot, _, _, bc) =>
+              val txInfo = snapshot.transactions.head
+              val tx     = txInfo._2.transaction.asInstanceOf[TransferTransaction]
 
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 &&
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 5 &&
               // first Tx updated balances
-              txDiff.portfolios(tx.recipient.asInstanceOf[Address]).balance == (ENOUGH_AMT / 5) &&
-              txDiff.portfolios(tx.sender.toAddress).balance == (-ENOUGH_AMT / 5 - FEE_AMT)
+              snapshot.transactions.head._2.snapshot.balances((tx.recipient.asInstanceOf[Address], Waves)) == (ENOUGH_AMT / 5) &&
+              snapshot.transactions.head._2.snapshot.balances((tx.sender.toAddress, Waves)) == ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT
             })
             .once()
 
@@ -136,34 +130,28 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
         inSequence {
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == 0 &&
-              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              snapshot.balances.isEmpty &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 1 &&
               block.transactionData.length == 5 &&
-              // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 * 0.4
+              snapshot.balances.isEmpty // no txs with fee in previous block
             })
             .once()
 
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 2 &&
               block.transactionData.length == 4 &&
-              // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == (
-                FEE_AMT * 5 * 0.6     // carry from prev block
-                  + FEE_AMT * 4 * 0.4 // current block reward
-              )
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 5 // all fee from previous block
             })
             .once()
         }
@@ -171,7 +159,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, triggersMock)((_, _) => ())
       }
 
-      "block, then 2 microblocks, then block referencing previous microblock" in withDomain(enableNG(wavesSettings)) { d =>
+      "block, then 2 microblocks, then block referencing previous microblock" in withDomain(NG) { d =>
         def preconditions(ts: Long): (Transaction, Seq[Transaction]) = {
           val master    = TxHelpers.signer(1)
           val recipient = TxHelpers.signer(2)
@@ -199,33 +187,29 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         inSequence {
           // genesis
           (triggersMock.onProcessBlock _)
-            .expects(where { (block, diff, _, _, bc) =>
+            .expects(where { (block, snapshot, _, _, bc) =>
               bc.height == 0 &&
               block.transactionData.length == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == 0 &&
-              diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              snapshot.balances.isEmpty &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
             })
             .once()
 
           // microblock 1
           (triggersMock.onProcessMicroBlock _)
-            .expects(where { (microBlock, diff, bc, _, _) =>
+            .expects(where { (microBlock, snapshot, bc, _, _) =>
               bc.height == 1 &&
               microBlock.transactionData.length == 2 &&
-              // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
+              snapshot.balances.isEmpty // no txs with fee in previous block
             })
             .once()
 
           // microblock 2
           (triggersMock.onProcessMicroBlock _)
-            .expects(where { (microBlock, diff, bc, _, _) =>
+            .expects(where { (microBlock, snapshot, bc, _, _) =>
               bc.height == 1 &&
               microBlock.transactionData.length == 1 &&
-              // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size == 1 &&
-              diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
+              snapshot.balances.isEmpty // no txs with fee in previous block
             })
             .once()
 

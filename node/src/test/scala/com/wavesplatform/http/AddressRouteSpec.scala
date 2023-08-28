@@ -89,7 +89,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       addressApiRoute
         .copy(
           blockchain = d.blockchainUpdater,
-          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
         )
         .route
     val address = TxHelpers.signer(1).toAddress
@@ -110,7 +110,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       addressApiRoute
         .copy(
           blockchain = d.blockchainUpdater,
-          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
         )
         .route
     val address       = TxHelpers.signer(1).toAddress
@@ -453,7 +453,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
         addressApiRoute
           .copy(
             blockchain = d.blockchainUpdater,
-            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
           )
           .route
 
@@ -504,7 +504,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
         addressApiRoute
           .copy(
             blockchain = d.blockchainUpdater,
-            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.getCompositeBlockchain, d.rdb, d.blockchainUpdater)
+            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
           )
           .route
 
