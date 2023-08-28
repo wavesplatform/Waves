@@ -1,11 +1,14 @@
 package com.wavesplatform.state.snapshot
 
+import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.TestValues.fee
-import com.wavesplatform.account.Alias
+import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.protobuf.ByteStrExt
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.state.*
@@ -41,12 +44,15 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expected, status)
       }
 
+      // Genesis
       assertSnapshot(
         genesis(senderAddress),
         StateSnapshot(
           balances = VectorMap((senderAddress, Waves) -> ENOUGH_AMT)
         )
       )
+
+      // Payment
       assertSnapshot(
         payment(sender, recipient),
         StateSnapshot(
@@ -56,6 +62,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Transfer
       assertSnapshot(
         transfer(sender, recipient),
         StateSnapshot(
@@ -65,6 +73,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Issue
       val script  = TestCompiler(V6).compileExpression("true")
       val issueTx = issue(sender, script = Some(script))
       val asset   = IssuedAsset(issueTx.id())
@@ -89,6 +99,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Reissue
       assertSnapshot(
         reissue(asset, sender),
         StateSnapshot(
@@ -101,6 +113,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Burn
       assertSnapshot(
         burn(asset, sender = sender),
         StateSnapshot(
@@ -113,6 +127,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Exchange
       d.appendBlock(
         transfer(to = recipient2, amount = 1.waves),
         transfer(from = sender, to = recipient2, amount = 1.waves, asset = asset, fee = fee)
@@ -136,6 +152,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Lease
       val leaseTx = lease(sender, recipient, fee = fee)
       assertSnapshot(
         leaseTx,
@@ -152,6 +170,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Lease cancel
       val leaseCancelTx = leaseCancel(leaseTx.id(), sender, fee = fee)
       assertSnapshot(
         leaseCancelTx,
@@ -175,6 +195,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Create alias
       assertSnapshot(
         createAlias("alias", sender),
         StateSnapshot(
@@ -184,6 +206,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           aliases = Map(Alias.create("alias").explicitGet() -> senderAddress)
         )
       )
+
+      // Mass transfer
       assertSnapshot(
         massTransfer(
           sender,
@@ -201,6 +225,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Data
       assertSnapshot(
         dataSingle(sender, "key", "value"),
         StateSnapshot(
@@ -214,6 +240,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Set script
       assertSnapshot(
         setScript(sender, script),
         StateSnapshot(
@@ -225,6 +253,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Sponsor
       val issue2     = issue(sender)
       val asset2     = IssuedAsset(issue2.id())
       val sponsorFee = 123456
@@ -240,6 +270,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Set asset script
       assertSnapshot(
         setAssetScript(sender, asset, script),
         StateSnapshot(
@@ -251,30 +283,67 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
-      val setDApp = setScript(
-        recipientSigner,
-        TestCompiler(V6).compileContract(
-          s"""
-             | @Callable(i)
-             | func default() = []
-             |
-             | @Callable(i)
-             | func fail() = {
-             |   strict c = ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-             |   if (true) then throw() else []
-             | }
-           """.stripMargin
-        )
+
+      // Invoke
+      val dApp = TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   Issue("name", "description", 1000, 4, true, unit, 0),
+           |   Lease(i.caller, 123),
+           |   StringEntry("key", "abc")
+           | ]
+           |
+           | @Callable(i)
+           | func fail() = {
+           |   strict c = ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+           |   if (true) then throw() else []
+           | }
+         """.stripMargin
       )
-      d.appendBlock(setDApp)
-      assertSnapshot(
-        invoke(invoker = sender, dApp = recipient, fee = fee),
+      d.appendBlock(setScript(recipientSigner, dApp))
+      val invokeTx = invoke(invoker = sender, dApp = recipient, fee = 1.005.waves)
+      def invokeNonTransferSnapshot(senderAddress: Address, dAppPk: PublicKey, invokeId: ByteStr, height: Int = d.blockchain.height + 1) = {
+        val dAppAssetId = IssuedAsset(Issue.calculateId(4, "description", true, "name", 1000, 0, invokeId))
+        val leaseId     = Lease.calculateId(Lease(Recipient.Address(ByteStr(senderAddress.bytes)), 123, 0), invokeId)
         StateSnapshot(
           balances = VectorMap(
-            (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
+            (dAppPk.toAddress, dAppAssetId) -> 1000
+          ),
+          leaseBalances = Map(
+            dAppPk.toAddress -> LeaseBalance(0, 123),
+            senderAddress    -> LeaseBalance(123, 0)
+          ),
+          assetStatics = VectorMap(
+            dAppAssetId -> AssetStatic(dAppAssetId.id.toByteString, invokeId.toByteString, dAppPk.toByteString, 4)
+          ),
+          assetVolumes = Map(
+            dAppAssetId -> AssetVolumeInfo(true, 1000)
+          ),
+          assetNamesAndDescriptions = Map(
+            dAppAssetId -> AssetInfo("name", "description", Height(height))
+          ),
+          assetScripts = Map(
+            dAppAssetId -> None
+          ),
+          leaseStates = Map(
+            leaseId -> LeaseDetails(dAppPk, senderAddress, 123, Active, invokeId, height)
+          ),
+          accountData = Map(
+            dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))
           )
         )
+      }
+      assertSnapshot(
+        invokeTx,
+        StateSnapshot(
+          balances = VectorMap(
+            (senderAddress, Waves) -> (d.balance(senderAddress) - 1.005.waves)
+          )
+        ) |+| invokeNonTransferSnapshot(senderAddress, recipientSigner.publicKey, invokeTx.id())
       )
+
+      // Update asset info
       val updateAssetTx = updateAssetInfo(asset2.id, sender = sender)
       assertSnapshot(
         updateAssetTx,
@@ -287,6 +356,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
+
+      // Ethereum transfer
       val ethTransfer = EthTxGenerator.generateEthTransfer(defaultEthSigner, recipient, 1, asset2)
       d.appendBlock(transfer(sender, ethTransfer.senderAddress()), transfer(sender, ethTransfer.senderAddress(), asset = asset2))
       assertSnapshot(
@@ -299,16 +370,21 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           )
         )
       )
-      val ethInvoke = EthTxGenerator.generateEthInvoke(defaultEthSigner, address = recipient, "default", Seq(), Seq())
+
+      // Ethereum invoke
+      val ethInvoke = EthTxGenerator.generateEthInvoke(defaultEthSigner, address = recipient2, "default", Seq(), Seq(), 1.005.waves)
       d.appendBlock(transfer(sender, ethInvoke.senderAddress()))
+      d.appendBlock(setScript(recipientSigner2, dApp))
       assertSnapshot(
         ethInvoke,
         StateSnapshot(
           balances = VectorMap(
-            (ethInvoke.senderAddress(), Waves) -> (d.balance(ethInvoke.senderAddress()) - 500_000)
+            (ethInvoke.senderAddress(), Waves) -> (d.balance(ethInvoke.senderAddress()) - 1.005.waves)
           )
-        )
+        ) |+| invokeNonTransferSnapshot(ethInvoke.senderAddress(), recipientSigner2.publicKey, ethInvoke.id())
       )
+
+      // Failed invoke
       assertSnapshot(
         invoke(invoker = sender, func = Some("fail"), dApp = recipient, fee = fee),
         StateSnapshot(
