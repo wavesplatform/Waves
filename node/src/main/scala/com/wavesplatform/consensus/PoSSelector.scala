@@ -36,17 +36,16 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
   ): Either[ValidationError, NxtLikeConsensusBlockData] = {
     val bt = posCalculator(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
 
-    checkBaseTargetLimit(bt, height).flatMap(
-      _ =>
-        if (vrfActivated(height + 1))
-          getHitSource(height)
-            .map(hs => NxtLikeConsensusBlockData(bt, crypto.signVRF(account.privateKey, hs.arr)))
-        else
-          blockchain
-            .blockHeader(height)
-            .map(_.header.generationSignature)
-            .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generationSignature(gs, account.publicKey))))
-            .toRight(GenericError("No blocks in blockchain"))
+    checkBaseTargetLimit(bt, height).flatMap(_ =>
+      if (vrfActivated(height + 1))
+        getHitSource(height)
+          .map(hs => NxtLikeConsensusBlockData(bt, crypto.signVRF(account.privateKey, hs.arr)))
+      else
+        blockchain
+          .blockHeader(height)
+          .map(_.header.generationSignature)
+          .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generationSignature(gs, account.publicKey))))
+          .toRight(GenericError("No blocks in blockchain"))
     )
   }
 
@@ -60,11 +59,14 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
   def validateBlockDelay(parentHeight: Int, header: BlockHeader, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
     for {
       parentHitSource <- getHitSource(parentHeight)
-      gs <- if (vrfActivated(parentHeight + 1)) {
-        crypto.verifyVRF(header.generationSignature, parentHitSource.arr, header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).map(_.arr)
-      } else {
-        generationSignature(parentHitSource, header.generator).asRight[ValidationError]
-      }
+      gs <-
+        if (vrfActivated(parentHeight + 1)) {
+          crypto
+            .verifyVRF(header.generationSignature, parentHitSource.arr, header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, parentHeight))
+            .map(_.arr)
+        } else {
+          generationSignature(parentHitSource, header.generator).asRight[ValidationError]
+        }
       ts = posCalculator(parentHeight).calculateDelay(hit(gs), parent.baseTarget, effectiveBalance) + parent.timestamp
       _ <- Either.cond(
         ts <= header.timestamp,
@@ -76,20 +78,23 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
 
   def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
     val blockGenSig = block.header.generationSignature
-    val height      = blockchain.height
 
-    if (vrfActivated(height + 1)) {
-      getHitSource(height).flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)))
-    } else {
-      blockchain.lastBlockHeader
-        .toRight(GenericError("No blocks in blockchain"))
-        .map(b => generationSignature(b.header.generationSignature, block.header.generator))
-        .ensureOr { expectedGenSig =>
-          GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(expectedGenSig)}; Found = $blockGenSig")
-        } { expectedGenSig =>
-          blockGenSig.arr sameElements expectedGenSig
-        }
-        .map(_ => block.header.generationSignature)
+    blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
+      if (vrfActivated(height + 1)) {
+        getHitSource(height)
+          .flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)))
+      } else {
+        blockchain
+          .blockHeader(height)
+          .toRight(GenericError("No blocks in blockchain"))
+          .map(b => generationSignature(b.header.generationSignature, block.header.generator))
+          .ensureOr { expectedGenSig =>
+            GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(expectedGenSig)}; Found = $blockGenSig")
+          } { expectedGenSig =>
+            blockGenSig.arr sameElements expectedGenSig
+          }
+          .map(_ => block.header.generationSignature)
+      }
     }
   }
 
@@ -145,12 +150,13 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
   private def getHit(height: Int, account: KeyPair): Either[ValidationError, BigInt] =
     for {
       hitSource <- getHitSource(height)
-      gs <- if (vrfActivated(height + 1)) {
-        val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).map(_.arr)
-      } else {
-        generationSignature(hitSource, account.publicKey).asRight[ValidationError]
-      }
+      gs <-
+        if (vrfActivated(height + 1)) {
+          val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
+          crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)).map(_.arr)
+        } else {
+          generationSignature(hitSource, account.publicKey).asRight[ValidationError]
+        }
     } yield hit(gs)
 
   private def fairPosActivated(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
