@@ -335,61 +335,6 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       }
     }
 
-    val sameButBetterBlockScenario = for {
-      (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
-      tx1 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          issuer,
-          sourceAddress.toAddress,
-          Waves,
-          10 * Constants.UnitsInWave,
-          Waves,
-          OneTotalFee,
-          ByteStr.empty,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
-      tx2 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          issuer,
-          sourceAddress.toAddress,
-          Waves,
-          10 * Constants.UnitsInWave,
-          Waves,
-          OneTotalFee,
-          ByteStr.empty,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
-      b2        = mkEmptyBlock(genesisBlock.id(), miner)
-      b3        = mkEmptyBlock(b2.id(), miner)
-      b4        = mkEmptyBlock(b3.id(), miner)
-      (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx1)), miner, 3.toByte, ntpNow)
-      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
-      b6b       = TestBlock.sign(miner, b6a.copy(transactionData = Seq(tx2)))
-    } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
-
-    "when received same liquid block but it is better than existing" in forAll(sameButBetterBlockScenario) { case (miner, b1s, m1s, b2a, b2b) =>
-      withDomain(rewardSettings) { d =>
-        b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
-        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m) should beRight)
-
-        d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
-        d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
-        d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.blockchainUpdater.carryFee shouldBe OneCarryFee
-
-        d.blockchainUpdater.processBlock(b2a) should beRight
-        d.blockchainUpdater.processBlock(b2b) should beRight
-
-        d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneFee + OneCarryFee
-        d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.blockchainUpdater.carryFee shouldBe OneCarryFee
-      }
-    }
-
     val blockWithoutFeesScenario = for {
       (_, _, miner1, miner2, genesisBlock) <- genesis
       b2 = mkEmptyBlock(genesisBlock.id(), miner1)

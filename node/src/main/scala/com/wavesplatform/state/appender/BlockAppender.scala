@@ -1,7 +1,6 @@
 package com.wavesplatform.state.appender
 
 import java.time.Instant
-
 import cats.data.EitherT
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
@@ -9,6 +8,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.network.*
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -28,14 +29,17 @@ object BlockAppender extends ScorexLogging {
       pos: PoSSelector,
       scheduler: Scheduler,
       verify: Boolean = true
-  )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
+  )(newBlock: Block): Task[Either[ValidationError, BlockApplyResult]] =
     Task {
-      if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+      if (
+        blockchainUpdater
+          .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
+      )
+        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock)
       else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
-        Right(None)
+        Right(Ignored)
       else
-        Left(BlockAppendError("Block is not a child of the last block", newBlock))
+        Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
     }.executeOn(scheduler)
 
   def apply(
@@ -62,8 +66,8 @@ object BlockAppender extends ScorexLogging {
       } yield validApplication).value
 
     val handle = append.asyncBoundary.map {
-      case Right(None) => // block already appended
-      case Right(Some(_)) =>
+      case Right(Ignored) => // block already appended
+      case Right(Applied(_, _)) =>
         log.debug(s"${id(ch)} Appended $newBlock")
 
         span.markNtp("block.applied")
