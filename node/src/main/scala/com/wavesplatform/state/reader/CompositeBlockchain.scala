@@ -195,13 +195,7 @@ object CompositeBlockchain {
   def apply(inner: Blockchain, reward: Option[Long]): CompositeBlockchain =
     new CompositeBlockchain(inner, carry = inner.carryFee, reward = reward)
 
-  def apply(inner: Blockchain, diff: Diff): CompositeBlockchain =
-    inner match {
-      case cb: CompositeBlockchain => cb.appendDiff(diff)
-      case _                       => new CompositeBlockchain(inner, Some(diff))
-    }
-
-  def apply(inner: Blockchain, diff: Diff, blockMeta: Option[BlockMeta]): CompositeBlockchain =
+  def apply(inner: Blockchain, diff: Diff, blockMeta: Option[BlockMeta] = None): CompositeBlockchain =
     inner match {
       case cb: CompositeBlockchain => cb.appendDiff(diff)
       case _                       => new CompositeBlockchain(inner, Some(diff), blockMeta.map(bm => (bm.toSignedHeader, bm.id)))
