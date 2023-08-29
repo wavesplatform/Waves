@@ -473,16 +473,13 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val expectedSnapshot = StateSnapshot
         .build(
           d.rocksDBWriter,
-          transactions = blockSnapshot.transactions
-        )
-        .explicitGet()
-        .addBalances(
           Map(challengingMiner.toAddress                                                        -> Portfolio.waves(blockRewards.miner)) ++
             d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten.map(_ -> Portfolio.waves(blockRewards.daoAddress)) ++
             d.blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
               .map(_ -> Portfolio.waves(blockRewards.xtnBuybackAddress)),
-          d.blockchain
+          transactions = blockSnapshot.transactions
         )
+        .explicitGet()
 
       blockSnapshot shouldBe expectedSnapshot
       blockSnapshot.transactions.foreach(_._2.status shouldBe TxMeta.Status.Elided)

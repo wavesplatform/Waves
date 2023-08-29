@@ -88,8 +88,17 @@ class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffM
       val issue      = TxHelpers.issue(issuer)
       val exchange =
         TxHelpers.exchangeFromOrders(
-          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, sender = buyer, matcher = matcher, attachment = Some(attachment)),
-          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer, matcher = matcher),
+          TxHelpers.order(
+            OrderType.BUY,
+            Waves,
+            issue.asset,
+            amount = 2,
+            version = Order.V4,
+            sender = buyer,
+            matcher = matcher,
+            attachment = Some(attachment)
+          ),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, amount = 2, version = Order.V4, sender = issuer, matcher = matcher),
           matcher = matcher,
           version = TxVersion.V3
         )

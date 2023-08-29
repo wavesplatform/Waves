@@ -1399,7 +1399,7 @@ class TransactionsRouteSpec
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain.snapshotBlockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         testTime,
