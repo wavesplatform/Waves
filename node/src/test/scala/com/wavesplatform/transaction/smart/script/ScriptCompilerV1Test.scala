@@ -26,8 +26,9 @@ class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
   }
 
   property("fails on unsupported version") {
-    val script = scriptWithVersion("9".some)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value 9 for key STDLIB_VERSION")
+    val unsupportedVersionStr = (StdLibVersion.VersionDic.all.max.id + 1).toString
+    val script                = scriptWithVersion(unsupportedVersionStr.some)
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left(s"Illegal directive value $unsupportedVersionStr for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {

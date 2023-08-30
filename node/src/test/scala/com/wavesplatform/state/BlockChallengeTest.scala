@@ -468,7 +468,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       d.appendBlockE(challengingBlock) should beRight
       val blockRewards = getLastBlockRewards(d)
-      // block diff contains only txs and block reward
+      // block snapshot contains only txs and block reward
       val blockSnapshot = d.blockchain.bestLiquidSnapshot.get
       val expectedSnapshot = StateSnapshot
         .build(
