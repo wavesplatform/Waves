@@ -140,7 +140,7 @@ class MinerImpl(
       .leftMap(_.toString)
 
   private def packTransactionsForKeyBlock(miner: Address, prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
-    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
+    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, settings.enableLightMode, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
       BlockDiffer
         .createInitialBlockSnapshot(blockchainUpdater, miner)

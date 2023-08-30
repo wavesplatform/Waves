@@ -182,9 +182,9 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
-  def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b).explicitGet()
+  def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b, None).explicitGet()
 
-  def appendMicroBlockE(b: MicroBlock): Either[ValidationError, BlockId] = blockchainUpdater.processMicroBlock(b)
+  def appendMicroBlockE(b: MicroBlock): Either[ValidationError, BlockId] = blockchainUpdater.processMicroBlock(b, None)
 
   def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.getOrElse(randomSig)
 
@@ -335,7 +335,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
     val mb = createMicroBlock()(txs*)
-    blockchainUpdater.processMicroBlock(mb).explicitGet()
+    blockchainUpdater.processMicroBlock(mb, None).explicitGet()
   }
 
   def rollbackTo(height: Int): Unit = {

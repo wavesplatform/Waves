@@ -8,8 +8,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
+import com.wavesplatform.network.{BlockSnapshot, MicroBlockSnapshot}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateSnapshot.monoid
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
 import com.wavesplatform.state.patch.*
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -42,6 +44,7 @@ object BlockDiffer {
       blockchain: Blockchain,
       maybePrevBlock: Option[Block],
       block: Block,
+      snapshot: Option[BlockSnapshot],
       constraint: MiningConstraint,
       hitSource: ByteStr,
       challengedHitSource: Option[ByteStr] = None,
@@ -51,11 +54,12 @@ object BlockDiffer {
       txSignParCheck: Boolean = true
   ): Either[ValidationError, Result] = {
     challengedHitSource match {
-      case Some(hs) =>
+      case Some(hs) if snapshot.isEmpty =>
         fromBlockTraced(
           blockchain,
           maybePrevBlock,
           block.toOriginal,
+          snapshot,
           constraint,
           hs,
           loadCacheData,
@@ -68,6 +72,7 @@ object BlockDiffer {
               blockchain,
               maybePrevBlock,
               block,
+              snapshot,
               constraint,
               hitSource,
               loadCacheData,
@@ -79,8 +84,18 @@ object BlockDiffer {
           case _         => Left(GenericError("Invalid block challenge"))
         }
       case _ =>
-        fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
-
+        fromBlockTraced(
+          blockchain,
+          maybePrevBlock,
+          block,
+          snapshot,
+          constraint,
+          hitSource,
+          loadCacheData,
+          verify,
+          enableExecutionLog,
+          txSignParCheck
+        ).resultE
     }
   }
 
@@ -88,6 +103,7 @@ object BlockDiffer {
       blockchain: Blockchain,
       maybePrevBlock: Option[Block],
       block: Block,
+      snapshot: Option[BlockSnapshot],
       constraint: MiningConstraint,
       hitSource: ByteStr,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
@@ -164,29 +180,32 @@ object BlockDiffer {
     for {
       _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
-      prevStateHash =
-        if (blockchain.height == 0) TxStateSnapshotHashBuilder.InitStateHash
-        else
-          maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.lastBlockStateHash)
-      r <- apply(
-        blockchainWithNewBlock,
-        constraint,
-        maybePrevBlock.map(_.header.timestamp),
-        prevStateHash,
-        initSnapshot,
-        stateHeight >= ngHeight,
-        block.header.challengedHeader.isDefined,
-        block.transactionData,
-        loadCacheData,
-        verify = verify,
-        enableExecutionLog = enableExecutionLog,
-        txSignParCheck = txSignParCheck
-      )
+      prevStateHash = maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.lastBlockStateHash)
+      r <- snapshot match {
+        case Some(BlockSnapshot(_, txSnapshots)) =>
+          TracedResult.wrapValue(
+            apply(blockchainWithNewBlock, prevStateHash, initSnapshot, stateHeight >= ngHeight, block.transactionData, txSnapshots)
+          )
+        case None =>
+          apply(
+            blockchainWithNewBlock,
+            constraint,
+            maybePrevBlock.map(_.header.timestamp),
+            prevStateHash,
+            initSnapshot,
+            stateHeight >= ngHeight,
+            block.header.challengedHeader.isDefined,
+            block.transactionData,
+            loadCacheData,
+            verify = verify,
+            enableExecutionLog = enableExecutionLog,
+            txSignParCheck = txSignParCheck
+          )
+      }
       _ <- checkStateHash(
         blockchainWithNewBlock,
         block.header.stateHash,
-        r.computedStateHash,
-        block.header.challengedHeader.isDefined
+        r.computedStateHash
       )
     } yield r
   }
@@ -196,6 +215,7 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       prevStateHash: ByteStr,
       micro: MicroBlock,
+      snapshot: Option[MicroBlockSnapshot],
       constraint: MiningConstraint,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
@@ -206,6 +226,7 @@ object BlockDiffer {
       prevBlockTimestamp,
       prevStateHash,
       micro,
+      snapshot,
       constraint,
       loadCacheData,
       verify,
@@ -217,6 +238,7 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       prevStateHash: ByteStr,
       micro: MicroBlock,
+      snapshot: Option[MicroBlockSnapshot],
       constraint: MiningConstraint,
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
@@ -232,21 +254,26 @@ object BlockDiffer {
         )
       )
       _ <- TracedResult(micro.signaturesValid())
-      r <- apply(
-        blockchain,
-        constraint,
-        prevBlockTimestamp,
-        prevStateHash,
-        StateSnapshot.empty,
-        hasNg = true,
-        hasChallenge = false,
-        micro.transactionData,
-        loadCacheData,
-        verify = verify,
-        enableExecutionLog = enableExecutionLog,
-        txSignParCheck = true
-      )
-      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash, hasChallenge = false)
+      r <- snapshot match {
+        case Some(MicroBlockSnapshot(_, txSnapshots)) =>
+          TracedResult.wrapValue(apply(blockchain, prevStateHash, StateSnapshot.empty, hasNg = true, micro.transactionData, txSnapshots))
+        case None =>
+          apply(
+            blockchain,
+            constraint,
+            prevBlockTimestamp,
+            prevStateHash,
+            StateSnapshot.empty,
+            hasNg = true,
+            hasChallenge = false,
+            micro.transactionData,
+            loadCacheData,
+            verify = verify,
+            enableExecutionLog = enableExecutionLog,
+            txSignParCheck = true
+          )
+      }
+      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash)
     } yield r
   }
 
@@ -367,7 +394,9 @@ object BlockDiffer {
                   totalWavesFee,
                   updatedConstraint,
                   newKeyBlockSnapshot,
-                  TxStateSnapshotHashBuilder.createHashFromSnapshot(resultTxSnapshot, Some(txInfo)).createHash(prevStateHash)
+                  TxStateSnapshotHashBuilder
+                    .createHashFromSnapshot(resultTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                    .createHash(prevStateHash)
                 )
               }
             }
@@ -375,9 +404,53 @@ object BlockDiffer {
 
           res.copy(resultE = res.resultE.recover {
             case _ if hasChallenge =>
-              result.copy(snapshot = result.snapshot.bindElidedTransaction(blockchain, tx))
+              result.copy(
+                snapshot = result.snapshot.bindElidedTransaction(currBlockchain, tx),
+                computedStateHash = TxStateSnapshotHashBuilder
+                  .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(tx.id(), TxMeta.Status.Elided)))
+                  .createHash(result.computedStateHash)
+              )
           })
       }
+  }
+
+  private[this] def apply(
+      blockchain: Blockchain,
+      prevStateHash: ByteStr,
+      initSnapshot: StateSnapshot,
+      hasNg: Boolean,
+      txs: Seq[Transaction],
+      txSnapshots: Seq[(StateSnapshot, TxMeta.Status)]
+  ): Result = {
+    val hasSponsorship = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+
+    val initStateHash =
+      if (initSnapshot == StateSnapshot.empty || blockchain.height == 1)
+        prevStateHash
+      else
+        TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+
+    txs.zip(txSnapshots).foldLeft(Result(initSnapshot, 0L, 0L, MiningConstraint.Unlimited, initSnapshot, initStateHash)) {
+      case (Result(currSnapshot, carryFee, currTotalFee, currConstraint, keyBlockSnapshot, prevStateHash), (tx, (txSnapshot, txStatus))) =>
+        val currBlockchain        = SnapshotBlockchain(blockchain, currSnapshot)
+        val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
+        val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+
+        // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
+        // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
+        val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
+
+        val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
+
+        Result(
+          currSnapshot |+| txSnapshot,
+          carryFee + carry,
+          totalWavesFee,
+          currConstraint,
+          keyBlockSnapshot.withTransaction(NewTransactionInfo.create(tx, txStatus, txSnapshot, currBlockchain)),
+          TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(TxStatusInfo(tx.id(), txStatus))).createHash(prevStateHash)
+        )
+    }
   }
 
   private def leasePatchesSnapshot(blockchain: Blockchain): StateSnapshot =
@@ -423,16 +496,13 @@ object BlockDiffer {
   private def checkStateHash(
       blockchain: Blockchain,
       blockStateHash: Option[ByteStr],
-      computedStateHash: ByteStr,
-      hasChallenge: Boolean
+      computedStateHash: ByteStr
   ): TracedResult[ValidationError, Unit] =
     TracedResult(
       Either.cond(
         !blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) || blockStateHash.contains(computedStateHash),
         (),
-        if (hasChallenge) GenericError("Invalid block challenge")
-        else
-          InvalidStateHash(blockStateHash)
+        InvalidStateHash(blockStateHash)
       )
     )
 }

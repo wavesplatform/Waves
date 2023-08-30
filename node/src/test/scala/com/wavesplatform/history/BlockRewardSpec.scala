@@ -261,7 +261,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result =
-      BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited: MiningConstraint, b.header.generationSignature).explicitGet()
+      BlockDiffer.fromBlock(blockchain, prevBlock, b, None, MiningConstraint.Unlimited: MiningConstraint, b.header.generationSignature).explicitGet()
 
     "when NG state is empty" in forAll(ngEmptyScenario) { case (miner1, miner2, b2s, b3, m3s) =>
       withDomain(rewardSettings) { d =>
@@ -281,7 +281,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
         d.blockchainUpdater.carryFee shouldBe 0L
 
-        m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb) should beRight)
+        m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb, None) should beRight)
 
         d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
         d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + OneCarryFee
@@ -319,7 +319,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     "when received better liquid block" in forAll(betterBlockScenario) { case (miner, b1s, m1s, b2a, b2b) =>
       withDomain(rewardSettings) { d =>
         b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
-        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m) should beRight)
+        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m, None) should beRight)
 
         d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
@@ -374,7 +374,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     "when received same liquid block but it is better than existing" in forAll(sameButBetterBlockScenario) { case (miner, b1s, m1s, b2a, b2b) =>
       withDomain(rewardSettings) { d =>
         b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
-        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m) should beRight)
+        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m, None) should beRight)
 
         d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee

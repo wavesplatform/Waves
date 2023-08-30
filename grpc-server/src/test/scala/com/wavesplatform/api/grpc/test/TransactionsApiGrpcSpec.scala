@@ -83,7 +83,7 @@ class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffM
 
       val invalidStateHash = ByteStr.fill(DigestLength)(1)
       val resenderTxs = Seq(TxHelpers.transfer(resender, recipient.toAddress, 1.waves), TxHelpers.transfer(resender, recipient.toAddress, 2.waves))
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, resender.toAddress, 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, resender.toAddress, 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         challengedBlockTx +: resenderTxs,

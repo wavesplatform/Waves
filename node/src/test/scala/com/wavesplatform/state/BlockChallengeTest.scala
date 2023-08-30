@@ -26,13 +26,14 @@ import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, MessageCodec, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.BlockRewardCalculator.BlockRewardShares
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidStateHash, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.EthConverters.*
@@ -72,8 +73,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val invalidHashChallengingBlock = d.createChallengingBlock(challengingMiner, challengedBlock, stateHash = Some(Some(invalidStateHash)))
       val missedHashChallengingBlock  = d.createChallengingBlock(challengingMiner, challengedBlock, stateHash = Some(None))
 
-      d.appendBlockE(invalidHashChallengingBlock) shouldBe Left(GenericError("Invalid block challenge"))
-      d.appendBlockE(missedHashChallengingBlock) shouldBe Left(GenericError("Invalid block challenge"))
+      d.appendBlockE(invalidHashChallengingBlock) shouldBe Left(InvalidStateHash(Some(invalidStateHash)))
+      d.appendBlockE(missedHashChallengingBlock) shouldBe Left(InvalidStateHash(None))
     }
   }
 
@@ -99,10 +100,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         challengingMiner.toAddress,
         Some(challengingBlock.header.reference)
       ) shouldBe challengingGenBalanceBefore + challengedGenBalanceBefore
+
+      val minerReward = getLastBlockMinerReward(d)
       d.blockchain.effectiveBalance(
         challengingMiner.toAddress,
         0
-      ) shouldBe challengingEffBalanceBefore + d.blockchain.settings.rewardsSettings.initial
+      ) shouldBe challengingEffBalanceBefore + minerReward
 
       d.blockchain.generatingBalance(challengingMiner.toAddress, Some(challengingBlock.id())) shouldBe challengingGenBalanceBefore
     }
@@ -208,7 +211,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     val sender           = TxHelpers.signer(1)
     val challengedMiner  = TxHelpers.signer(2)
     val challengingMiner = TxHelpers.signer(3)
-    withDomain(DomainPresets.ConsensusImprovements, balances = AddrWithBalance.enoughBalances(sender, challengedMiner, challengingMiner)) { d =>
+    withDomain(DomainPresets.BlockRewardDistribution, balances = AddrWithBalance.enoughBalances(sender, challengedMiner, challengingMiner)) { d =>
       d.appendBlock()
       val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
       val challengedBlock =
@@ -378,7 +381,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.balance(originalBlock.header.generator.toAddress) shouldBe originalMinerBalance
       d.balance(
         challengingMiner.toAddress
-      ) shouldBe challengingMinerBalance + d.settings.blockchainSettings.rewardsSettings.initial +
+      ) shouldBe challengingMinerBalance + getLastBlockMinerReward(d) +
         (prevBlockTx.fee.value - BlockDiffer.CurrentBlockFeePart(prevBlockTx.fee.value)) +
         challengedBlockTxs.map(tx => BlockDiffer.CurrentBlockFeePart(tx.fee.value)).sum
     }
@@ -414,7 +417,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val issue             = TxHelpers.issue(recipient)
       val issueSmart        = TxHelpers.issue(recipient, name = "smart", script = Some(assetScript))
       val lease             = TxHelpers.lease(recipient)
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, recipient.toAddress, 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, recipient.toAddress, 1001.waves)
       val recipientTxs = Seq(
         issue,
         issueSmart,
@@ -464,12 +467,16 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       d.appendBlockE(challengingBlock) should beRight
 
+      val blockRewards = getLastBlockRewards(d)
       // block snapshot contains only txs and block reward
       val blockSnapshot = d.blockchain.bestLiquidSnapshot.get
       val expectedSnapshot = StateSnapshot
         .build(
           d.rocksDBWriter,
-          Map(challengingMiner.toAddress -> Portfolio.waves(d.blockchain.settings.rewardsSettings.initial)),
+          Map(challengingMiner.toAddress                                                        -> Portfolio.waves(blockRewards.miner)) ++
+            d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten.map(_ -> Portfolio.waves(blockRewards.daoAddress)) ++
+            d.blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+              .map(_ -> Portfolio.waves(blockRewards.xtnBuybackAddress)),
           transactions = blockSnapshot.transactions
         )
         .explicitGet()
@@ -604,7 +611,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -636,7 +643,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 10001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -668,7 +675,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -740,7 +747,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -754,7 +761,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.transactionsApi.transactionById(challengedBlockTx.id()).map(_.status).contains(TxMeta.Status.Elided) shouldBe true
 
       d.appendBlock(TxHelpers.invoke(dApp.toAddress, Some("foo"), Seq(CONST_BYTESTR(challengedBlockTx.id()).explicitGet()), invoker = sender))
-      d.blockchain.accountData(dApp.toAddress, "check") shouldBe Some(BooleanDataEntry("check", true))
+      d.blockchain.accountData(dApp.toAddress, "check") shouldBe Some(BooleanDataEntry("check", value = true))
     }
   }
 
@@ -850,7 +857,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.blockchain.accountData(dApp.toAddress, challengingRegularKey) shouldBe Some(
         IntegerDataEntry(
           challengingRegularKey,
-          initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial + (challengedBlockTx.fee.value - CurrentBlockFeePart(
+          initChallengingBalance + getLastBlockMinerReward(d) + (challengedBlockTx.fee.value - CurrentBlockFeePart(
             challengedBlockTx.fee.value
           ))
         )
@@ -858,7 +865,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.blockchain.accountData(dApp.toAddress, challengingEffectiveKey) shouldBe Some(
         IntegerDataEntry(
           challengingEffectiveKey,
-          initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial + (challengedBlockTx.fee.value - CurrentBlockFeePart(
+          initChallengingBalance + getLastBlockMinerReward(d) + (challengedBlockTx.fee.value - CurrentBlockFeePart(
             challengedBlockTx.fee.value
           ))
         )
@@ -877,7 +884,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.blockchain.accountData(dApp.toAddress, challengingRegularKey) shouldBe Some(
         IntegerDataEntry(
           challengingRegularKey,
-          initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial + (challengedBlockTx.fee.value - CurrentBlockFeePart(
+          initChallengingBalance + getLastBlockMinerReward(d) + (challengedBlockTx.fee.value - CurrentBlockFeePart(
             challengedBlockTx.fee.value
           )) + CurrentBlockFeePart(challengedBlockTx.fee.value)
         )
@@ -885,7 +892,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.blockchain.accountData(dApp.toAddress, challengingEffectiveKey) shouldBe Some(
         IntegerDataEntry(
           challengingEffectiveKey,
-          initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial + (challengedBlockTx.fee.value - CurrentBlockFeePart(
+          initChallengingBalance + getLastBlockMinerReward(d) + (challengedBlockTx.fee.value - CurrentBlockFeePart(
             challengedBlockTx.fee.value
           )) + CurrentBlockFeePart(challengedBlockTx.fee.value)
         )
@@ -927,9 +934,13 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
              |func foo(h: Int) = {
              |   let blockInfo = value(blockInfoByHeight(h))
              |
-             |   [BooleanEntry("check", blockInfo.timestamp == ${challengingBlock.header.timestamp} && blockInfo.baseTarget == ${challengingBlock.header.baseTarget} &&
-             |   blockInfo.generationSignature == base58'${challengingBlock.header.generationSignature}' && blockInfo.height == 1002 && blockInfo.generator == Address(base58'${challengingBlock.header.generator.toAddress}') &&
-             |   blockInfo.generatorPublicKey == base58'${challengingBlock.header.generator}' && blockInfo.vrf == base58'$vrf')]
+             |   [BooleanEntry("check", blockInfo.timestamp == ${challengingBlock.header.timestamp} &&
+             |   blockInfo.baseTarget == ${challengingBlock.header.baseTarget} &&
+             |   blockInfo.generationSignature == base58'${challengingBlock.header.generationSignature}' &&
+             |   blockInfo.height == 1002 &&
+             |   blockInfo.generator == Address(base58'${challengingBlock.header.generator.toAddress}') &&
+             |   blockInfo.generatorPublicKey == base58'${challengingBlock.header.generator}' &&
+             |   blockInfo.vrf == base58'$vrf')]
              |}
              |
              |""".stripMargin
@@ -938,7 +949,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.appendBlock(TxHelpers.setScript(dApp, script))
       d.appendBlock(TxHelpers.invoke(dApp.toAddress, Some("foo"), Seq(CONST_LONG(1002)), invoker = sender))
 
-      d.blockchain.accountData(dApp.toAddress, "check") shouldBe Some(BooleanDataEntry("check", true))
+      d.blockchain.accountData(dApp.toAddress, "check") shouldBe Some(BooleanDataEntry("check", value = true))
     }
   }
 
@@ -978,7 +989,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
   property(s"NODE-910. Block at ${BlockchainFeatures.TransactionStateSnapshot} activation height can be challenged") {
     withDomain(
-      DomainPresets.ConsensusImprovements
+      DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
         .setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 1003),
       balances = AddrWithBalance.enoughBalances(defaultSigner)
@@ -1033,28 +1044,29 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       (1 to 999).foreach(_ => d.appendBlock())
       val rollbackTarget = d.blockchain.lastBlockId.get
 
-      rollbackMiddleScenario(d, challengedMiner)
+      val txs = Seq(TxHelpers.transfer(challengedMiner, amount = 10001.waves))
+      rollbackMiddleScenario(d, challengedMiner, txs)
       val middleScenarioStateHash = d.lastBlock.header.stateHash
       middleScenarioStateHash shouldBe defined
       d.rollbackTo(rollbackTarget)
-      rollbackMiddleScenario(d, challengedMiner)
+      rollbackMiddleScenario(d, challengedMiner, txs)
 
       d.lastBlock.header.stateHash shouldBe middleScenarioStateHash
 
       d.rollbackTo(rollbackTarget)
 
-      rollbackLastScenario(d, challengedMiner)
+      rollbackLastScenario(d, challengedMiner, txs)
       val lastScenarioStateHash = d.lastBlock.header.stateHash
       lastScenarioStateHash shouldBe defined
       d.rollbackTo(rollbackTarget)
 
-      rollbackLastScenario(d, challengedMiner)
+      rollbackLastScenario(d, challengedMiner, txs)
 
       d.lastBlock.header.stateHash shouldBe lastScenarioStateHash
     }
 
     withDomain(
-      DomainPresets.ConsensusImprovements
+      DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
         .setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 1008),
       balances = AddrWithBalance.enoughBalances(sender)
@@ -1069,11 +1081,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val rollbackTarget = d.blockchain.lastBlockId.get
 
-      rollbackActivationHeightScenario(d, challengedMiner)
+      val txs = Seq(TxHelpers.transfer(challengedMiner, amount = 10001.waves))
+      rollbackActivationHeightScenario(d, challengedMiner, txs)
       val stateHash = d.lastBlock.header.stateHash
       stateHash shouldBe defined
       d.rollbackTo(rollbackTarget)
-      rollbackActivationHeightScenario(d, challengedMiner)
+      rollbackActivationHeightScenario(d, challengedMiner, txs)
 
       d.lastBlock.header.stateHash shouldBe stateHash
     }
@@ -1223,7 +1236,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -1271,7 +1284,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -1358,7 +1371,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       (1 to 999).foreach(_ => d.appendBlock())
 
-      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1005.waves)
+      val challengedBlockTx = TxHelpers.transfer(challengedMiner, amount = 1001.waves)
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
         Seq(challengedBlockTx),
@@ -1475,8 +1488,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       checkBalances(
         challengingMiner.toAddress,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
         initChallengingBalance,
         1002,
         route
@@ -1487,8 +1500,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       checkBalances(
         challengingMiner.toAddress,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
         initChallengingBalance,
         1003,
         route
@@ -1763,13 +1776,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     (blockJson \ "challengedHeader" \ "stateHash").as[String] shouldBe chHeader.stateHash.get.toString
   }
 
-  private def rollbackMiddleScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
+  private def rollbackMiddleScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
-      Seq(tx),
+      txs,
       strictTime = true,
       generator = challengedMiner,
       stateHash = Some(Some(invalidStateHash))
@@ -1780,13 +1792,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     d.blockchain.height shouldBe 1017
   }
 
-  private def rollbackLastScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
+  private def rollbackLastScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
-      Seq(tx),
+      txs,
       strictTime = true,
       generator = challengedMiner,
       stateHash = Some(Some(invalidStateHash))
@@ -1797,22 +1808,14 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     d.blockchain.height shouldBe 1007
   }
 
-  private def rollbackActivationHeightScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
-    (1 to 5).foreach(_ => d.appendBlock())
-    d.appendBlock(
-      d.createBlock(
-        Block.ProtoBlockVersion,
-        Seq.empty,
-        strictTime = true
-      )
-    )
+  private def rollbackActivationHeightScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
+    (1 to 6).foreach(_ => d.appendBlock())
 
     d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10005.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
-      Seq(tx),
+      txs,
       strictTime = true,
       generator = challengedMiner,
       stateHash = Some(Some(invalidStateHash))
@@ -1822,4 +1825,17 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     d.blockchain.height shouldBe 1008
   }
+
+  private def getLastBlockMinerReward(d: Domain): Long =
+    getLastBlockRewards(d).miner
+
+  private def getLastBlockRewards(d: Domain): BlockRewardShares =
+    BlockRewardCalculator
+      .getBlockRewardShares(
+        d.blockchain.height,
+        d.blockchain.settings.rewardsSettings.initial,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain
+      )
 }

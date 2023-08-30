@@ -91,7 +91,15 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
     def differ(blockchain: Blockchain, b: Block) =
-      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, enableExecutionLog = enableExecutionLog)
+      BlockDiffer.fromBlock(
+        blockchain,
+        None,
+        b,
+        None,
+        MiningConstraint.Unlimited,
+        b.header.generationSignature,
+        enableExecutionLog = enableExecutionLog
+      )
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) = differ(state, precondition).explicitGet()
@@ -109,6 +117,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         blockchain,
         None,
         b,
+        None,
         MiningConstraint.Unlimited,
         b.header.generationSignature,
         (_, _) => (),
@@ -130,7 +139,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       assertion: (Diff, Blockchain) => Unit
   ): Unit = withRocksDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
-      BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+      BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, None, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val BlockDiffer.Result(diff, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, curBlock).explicitGet()
@@ -162,7 +171,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withRocksDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, b: Block) =
-        BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+        BlockDiffer.fromBlock(blockchain, None, b, None, MiningConstraint.Unlimited, b.header.generationSignature)
 
       test(txs => {
         val nextHeight = state.height + 1

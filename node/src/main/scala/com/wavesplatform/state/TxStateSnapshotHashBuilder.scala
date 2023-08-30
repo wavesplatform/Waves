@@ -32,7 +32,9 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createHashFromSnapshot(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo]): Result = {
+  case class TxStatusInfo(id: ByteStr, status: TxMeta.Status)
+
+  def createHashFromSnapshot(snapshot: StateSnapshot, txStatusOpt: Option[TxStatusInfo]): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 
     def addEntry(keyType: KeyType.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -110,10 +112,10 @@ object TxStateSnapshotHashBuilder {
       )
     }
 
-    txInfoOpt.foreach(txInfo =>
+    txStatusOpt.foreach(txInfo =>
       txInfo.status match {
-        case Status.Failed    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(1: Byte))
-        case Status.Elided    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(2: Byte))
+        case Status.Failed    => addEntry(KeyType.TransactionStatus, txInfo.id.arr)(Array(1: Byte))
+        case Status.Elided    => addEntry(KeyType.TransactionStatus, txInfo.id.arr)(Array(2: Byte))
         case Status.Succeeded =>
       }
     )
@@ -161,10 +163,20 @@ object TxStateSnapshotHashBuilder {
               val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
               val txInfo                 = txSnapshot.transactions.head._2
               val stateHash =
-                TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
+                TxStateSnapshotHashBuilder
+                  .createHashFromSnapshot(txSnapshotWithBalances, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                  .createHash(prevStateHash)
               Right((stateHash, accSnapshot |+| txSnapshotWithBalances))
-            case Left(_) if isChallenging => Right((prevStateHash, accSnapshot))
-            case Left(err)                => err.asLeft[(ByteStr, StateSnapshot)]
+            case Left(_) if isChallenging =>
+              Right(
+                (
+                  TxStateSnapshotHashBuilder
+                    .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(tx.id(), TxMeta.Status.Elided)))
+                    .createHash(prevStateHash),
+                  accSnapshot.bindElidedTransaction(accBlockchain, tx)
+                )
+              )
+            case Left(err) => err.asLeft[(ByteStr, StateSnapshot)]
           }
         case (err @ Left(_), _) => err
       }

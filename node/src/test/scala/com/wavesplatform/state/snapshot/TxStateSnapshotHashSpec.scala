@@ -12,7 +12,7 @@ import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.*
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.KeyType
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.{KeyType, TxStatusInfo}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -113,14 +113,14 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
       val snapshot = SnapshotOps.fromDiff(diff, d.blockchain).explicitGet()
       val tx       = invoke()
-      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Succeeded, 123)), Array())
-      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Failed, 123)), tx.id().arr :+ 1)
-      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Elided, 123)), tx.id().arr :+ 2)
+      testHash(snapshot, Some(TxStatusInfo(tx.id(), Succeeded)), Array())
+      testHash(snapshot, Some(TxStatusInfo(tx.id(), Failed)), tx.id().arr :+ 1)
+      testHash(snapshot, Some(TxStatusInfo(tx.id(), Elided)), tx.id().arr :+ 2)
       testHash(snapshot, None, Array())
     }
   }
 
-  private def testHash(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo], txStatusBytes: Array[Byte]) =
+  private def testHash(snapshot: StateSnapshot, txInfoOpt: Option[TxStatusInfo], txStatusBytes: Array[Byte]) =
     TxStateSnapshotHashBuilder.createHashFromSnapshot(snapshot, txInfoOpt).txStateSnapshotHash shouldBe hash(
       Seq(
         Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),

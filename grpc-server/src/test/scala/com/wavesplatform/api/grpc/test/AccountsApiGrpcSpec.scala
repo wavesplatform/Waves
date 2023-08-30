@@ -20,7 +20,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{DataTransactionData, Recipient}
-import com.wavesplatform.state.{EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
@@ -200,8 +200,8 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       checkBalances(
         challengingMiner.toAddress,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
         initChallengingBalance,
         grpcApi
       )
@@ -211,8 +211,8 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       checkBalances(
         challengingMiner.toAddress,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
-        initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
         initChallengingBalance,
         grpcApi
       )
@@ -223,4 +223,15 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
   private def getGrpcApi(d: Domain) =
     new AccountsApiGrpcImpl(d.accountsApi)
+
+  private def getLastBlockMinerReward(d: Domain): Long =
+    BlockRewardCalculator
+      .getBlockRewardShares(
+        d.blockchain.height,
+        d.blockchain.settings.rewardsSettings.initial,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain
+      )
+      .miner
 }

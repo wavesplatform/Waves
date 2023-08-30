@@ -362,16 +362,16 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature, None) should beRight)
 
         blockchain.processBlock(ngBlock, ngBlock.header.generationSignature, None) should beRight
-        ngMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        ngMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
         blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature, None) should beRight
-        rewardMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        rewardMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
         blockchain.processBlock(protoBlock, protoBlock.header.generationSignature, None) should beRight
-        protoMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        protoMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
         blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature, None) should beRight
-        afterProtoMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        afterProtoMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
       }
   }
 
@@ -420,7 +420,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
           val keyBlock = d.appendKeyBlock()
           val mb1      = d.createMicroBlock()(TxHelpers.transfer())
-          d.blockchain.processMicroBlock(mb1)
+          d.blockchain.processMicroBlock(mb1, None)
           d.appendMicroBlock(TxHelpers.transfer())
 
           mb1.totalResBlockSig should have length crypto.SignatureLength

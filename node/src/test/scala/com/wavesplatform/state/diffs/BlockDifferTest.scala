@@ -109,7 +109,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           block.header.stateHash shouldBe defined
           BlockDiffer
-            .fromBlock(d.blockchain, None, block, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
+            .fromBlock(d.blockchain, None, block, None, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
         }
 
         withDomain(DomainPresets.RideV6) { d =>
@@ -117,7 +117,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           block.header.stateHash shouldBe None
           BlockDiffer
-            .fromBlock(d.blockchain, None, block, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
+            .fromBlock(d.blockchain, None, block, None, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
         }
       }
 
@@ -151,7 +151,14 @@ class BlockDifferTest extends FreeSpec with WithDomain {
           val correctBlock =
             TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
           BlockDiffer
-            .fromBlock(blockchain, Some(genesis), correctBlock, MiningConstraint.Unlimited, correctBlock.header.generationSignature) should beRight
+            .fromBlock(
+              blockchain,
+              Some(genesis),
+              correctBlock,
+              None,
+              MiningConstraint.Unlimited,
+              correctBlock.header.generationSignature
+            ) should beRight
 
           val incorrectBlock =
             TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(ByteStr.fill(DigestLength)(1)))
@@ -159,6 +166,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             blockchain,
             Some(genesis),
             incorrectBlock,
+            None,
             MiningConstraint.Unlimited,
             incorrectBlock.header.generationSignature
           ) shouldBe an[Left[InvalidStateHash, Result]]
@@ -188,6 +196,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             blockchain.lastBlockTimestamp,
             genesis.header.stateHash.get,
             correctMicroblock,
+            None,
             MiningConstraint.Unlimited
           ) should beRight
 
@@ -197,6 +206,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             blockchain.lastBlockTimestamp,
             genesis.header.stateHash.get,
             incorrectMicroblock,
+            None,
             MiningConstraint.Unlimited
           ) shouldBe an[Left[InvalidStateHash, Result]]
         }

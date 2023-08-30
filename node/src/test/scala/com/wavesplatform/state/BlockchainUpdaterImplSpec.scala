@@ -144,7 +144,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
               bc.height == 2 &&
               block.transactionData.length == 4 &&
               snapshot.balances.size == 1 &&
-              snapshot.balances.head._2 == FEE_AMT * 5  // all fee from previous block
+              snapshot.balances.head._2 == FEE_AMT * 5 // all fee from previous block
             })
             .once()
         }
@@ -230,10 +230,10 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         }
 
         d.blockchainUpdater.processBlock(block1) should beRight
-        d.blockchainUpdater.processMicroBlock(microBlocks1And2.head) should beRight
-        d.blockchainUpdater.processMicroBlock(microBlocks1And2.last) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlocks1And2.head, None) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlocks1And2.last, None) should beRight
         d.blockchainUpdater.processBlock(block2) should beRight // this should remove previous microblock
-        d.blockchainUpdater.processMicroBlock(microBlock3.head) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlock3.head, None) should beRight
         d.blockchainUpdater.shutdown()
       }
     }

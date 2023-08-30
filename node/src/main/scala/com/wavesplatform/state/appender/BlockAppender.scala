@@ -95,7 +95,9 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        blockChallenger.traverse(_.challengeBlock(newBlock, ch)).void
+        if (newBlock.header.challengedHeader.isEmpty) {
+          blockChallenger.traverse(_.challengeBlock(newBlock, ch)).void
+        } else Task.unit
 
       case Left(ve) =>
         Task {

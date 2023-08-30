@@ -11,7 +11,15 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
+import com.wavesplatform.events.StateUpdate.{
+  AssetInfo,
+  AssetStateUpdate,
+  BalanceUpdate,
+  DataEntryUpdate,
+  LeaseUpdate,
+  LeasingBalanceUpdate,
+  ScriptUpdate
+}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
@@ -842,19 +850,46 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         val append = update.update.append.get
         PBBlocks.vanilla(append.body.block.get.block.get).get shouldBe challengingBlock
         append.transactionIds.map(_.toByteStr).toSet shouldBe txs.map(_.id()).toSet
+
+        val daoAddress        = d.settings.blockchainSettings.functionalitySettings.daoAddressParsed.toOption.flatten
+        val xtnBuybackAddress = d.settings.blockchainSettings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+        val blockRewards = BlockRewardCalculator.getBlockRewardShares(
+          2,
+          d.settings.blockchainSettings.rewardsSettings.initial,
+          daoAddress,
+          xtnBuybackAddress,
+          d.blockchain
+        )
+
         append.stateUpdate.get.balances shouldBe Seq(
           PBBalanceUpdate(
             challengingMiner.toAddress.toByteString,
-            Some(Amount(amount = initChallengingBalance + d.settings.blockchainSettings.rewardsSettings.initial)),
+            Some(Amount(amount = initChallengingBalance + blockRewards.miner)),
             initChallengingBalance
           )
-        )
+        ) ++
+          daoAddress.map { addr =>
+            protobuf.StateUpdate.BalanceUpdate(
+              addr.toByteString,
+              Some(
+                Amount(amount = blockRewards.daoAddress)
+              )
+            )
+          } ++
+          xtnBuybackAddress.map { addr =>
+            protobuf.StateUpdate.BalanceUpdate(
+              addr.toByteString,
+              Some(
+                Amount(amount = blockRewards.xtnBuybackAddress)
+              )
+            )
+          }
         val challengingMinerAddress = challengingMiner.toAddress.toByteString
-        val challengingMinerBalance = initChallengingBalance + 6.waves
+        val challengingMinerBalance = initChallengingBalance + blockRewards.miner
         val balanceAfterTransfer1   = initSenderBalance - TestValues.fee - 1.waves
         val balanceAfterTransfer2   = initSenderBalance - 2 * TestValues.fee - 3.waves
-        append.transactionStateUpdates.map(_.balances) shouldBe Seq(
-          Seq(
+        append.transactionStateUpdates.map(_.balances.toSet) shouldBe Seq(
+          Set(
             PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer1)), initSenderBalance),
             PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves))),
             PBBalanceUpdate(
@@ -863,7 +898,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
               challengingMinerBalance
             )
           ),
-          Seq(
+          Set(
             PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer2)), balanceAfterTransfer1),
             PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves),
             PBBalanceUpdate(

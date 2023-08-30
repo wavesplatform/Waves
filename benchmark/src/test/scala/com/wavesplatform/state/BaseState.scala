@@ -73,7 +73,7 @@ trait BaseState {
   private def append(prev: Option[Block], next: Block): Unit = {
     val differResult =
       BlockDiffer
-        .fromBlock(state, prev, next, MiningConstraint.Unlimited, next.header.generationSignature)
+        .fromBlock(state, prev, next, None, MiningConstraint.Unlimited, next.header.generationSignature)
         .explicitGet()
 
     state.append(differResult.snapshot, 0, 0, None, next.header.generationSignature, differResult.computedStateHash, next)

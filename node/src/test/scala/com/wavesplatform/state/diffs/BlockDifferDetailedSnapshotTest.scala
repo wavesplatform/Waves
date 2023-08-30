@@ -22,7 +22,7 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
     withDomain(ws) { d =>
       val BlockDiffer.Result(snapshot, _, _, _, detailedSnapshot, _) =
         BlockDiffer
-          .fromBlock(d.blockchain, Some(d.lastBlock), block, MiningConstraint.Unlimited, block.header.generationSignature)
+          .fromBlock(d.blockchain, Some(d.lastBlock), block, None, MiningConstraint.Unlimited, block.header.generationSignature)
           .explicitGet()
       assertion(snapshot, detailedSnapshot)
     }
@@ -88,8 +88,8 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
           }
 
           "with history — all fee from last" in {
-            val a1    = TxHelpers.signer(1)
-            val a2    = TxHelpers.signer(2)
+            val a1 = TxHelpers.signer(1)
+            val a2 = TxHelpers.signer(2)
 
             val amount1 = 2.waves
             val amount2 = 1.waves
@@ -104,7 +104,7 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
               val block = TestBlock.create(defaultSigner, Seq(transfer2))
               val BlockDiffer.Result(_, _, _, _, detailedSnapshot, _) =
                 BlockDiffer
-                  .fromBlock(d.blockchain, Some(d.lastBlock), block, MiningConstraint.Unlimited, block.header.generationSignature)
+                  .fromBlock(d.blockchain, Some(d.lastBlock), block, None, MiningConstraint.Unlimited, block.header.generationSignature)
                   .explicitGet()
               detailedSnapshot.balances((defaultAddress, Waves)) shouldBe fee1
             }

@@ -50,7 +50,9 @@ class CommonValidationTest extends PropSpec with WithState {
     forAll(gen) { case (genesisBlock, transferTx) =>
       withRocksDBWriter(settings) { blockchain =>
         val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
-          BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
+          BlockDiffer
+            .fromBlock(blockchain, None, genesisBlock, None, MiningConstraint.Unlimited, genesisBlock.header.generationSignature)
+            .explicitGet()
         blockchain.append(
           preconditionDiff,
           preconditionFees,
@@ -79,7 +81,7 @@ class CommonValidationTest extends PropSpec with WithState {
     val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
     withRocksDBWriter(settings) { blockchain =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
-        BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
+        BlockDiffer.fromBlock(blockchain, None, genesisBlock, None, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
       blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, computedStateHash, genesisBlock)
 
       f(FeeValidation(blockchain, transferTx))
@@ -154,7 +156,7 @@ class CommonValidationTest extends PropSpec with WithState {
     val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
     withRocksDBWriter(settings) { blockchain =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
-        BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
+        BlockDiffer.fromBlock(blockchain, None, genesisBlock, None, MiningConstraint.Unlimited, genesisBlock.header.generationSignature).explicitGet()
       blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, computedStateHash, genesisBlock)
 
       f(FeeValidation(blockchain, transferTx))
