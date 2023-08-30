@@ -44,6 +44,7 @@ object NewTransactionInfo {
         elidedAffectedAddresses(tx, blockchain) ++ maybeDApp
       else
         snapshot.balances.keySet.map(_._1) ++
+          snapshot.zeroBalanceAffected ++
           snapshot.leaseBalances.keySet ++
           snapshot.accountData.keySet ++
           calledScripts ++
