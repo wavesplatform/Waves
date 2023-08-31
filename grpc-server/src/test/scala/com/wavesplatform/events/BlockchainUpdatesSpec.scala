@@ -282,7 +282,6 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     }
 
-    //TODO Add case
     "should survive rollback to key block" in withDomainAndRepo(currentSettings) { (d, repo) =>
       d.appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress))
       val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
@@ -355,7 +354,6 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         }
       }
 
-      //TODO Add case
       "on rollbacks" in {
         withDomainAndRepo(currentSettings) { case (d, repo) =>
           d.appendBlock()

@@ -140,7 +140,6 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
     }
   }
 
-  //TODO Find or write case
   property(
     s"Balance and asset action limits is determined by current invoke version before ${BlockchainFeatures.BlockRewardDistribution.description} activation"
   ) {
@@ -197,7 +196,6 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
     )
   }
 
-  //TODO Find or write case
   property(
     s"Balance and asset action limits is determined by root invoke version after ${BlockchainFeatures.BlockRewardDistribution.description} activation"
   ) {

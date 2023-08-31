@@ -67,7 +67,6 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Find case
   property("negative balance rejects or fails tx") {
     for {
       bigComplexityDApp1 <- Seq(false, true)

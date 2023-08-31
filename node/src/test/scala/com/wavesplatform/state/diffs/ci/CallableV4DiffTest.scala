@@ -61,7 +61,6 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     )(_.explicitGet())
   }
 
-  //TODO Find case
   property("action state changes affects subsequent actions") {
     val (genesis, setScript, invoke, issue, master, invoker, reissueAmount, burnAmount, transferAmount) =
       multiActionPreconditions(invokeFee = 0.029.waves, withScriptError = false)

@@ -271,7 +271,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Find case
   property(s"Lease action with active lease from dApp") {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: _, _) =>
@@ -389,7 +388,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Find case
   property(s"Lease action with active lease from invoker-recipient and cancelled lease from dApp") {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxFromDAppCancel) =>
@@ -810,7 +808,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Find case
   property("LeaseCancel foreign leaseId") {
     val leaseTx                               = TxHelpers.lease(TxHelpers.signer(2))
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(singleLeaseCancelDApp(leaseTx.id())))
@@ -941,7 +938,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Write case
   property("trying to spend lease IN balance in Lease action") {
     withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
       val dApp = TestCompiler(V5).compileContract(
@@ -959,7 +955,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Write case
   property("trying to spend lease OUT balance in Lease action") {
     withDomain(
       RideV5,

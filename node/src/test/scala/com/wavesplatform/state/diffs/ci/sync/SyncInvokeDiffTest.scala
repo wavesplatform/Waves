@@ -33,7 +33,6 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
   private val dAppAddress    = dApp.toAddress
   private val thirdAddress   = thirdAcc.toAddress
 
-  //TODO Find case
   property("Crosscontract call (same account)") {
     val script =
       TestCompiler(V5).compileContract(
@@ -199,7 +198,6 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  //TODO Find case
   property("originCaller and originCallerPublicKey fields") {
     val script = TestCompiler(V5).compileContract(
       s"""
@@ -1081,7 +1079,6 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  //TODO Find case
   property("Crosscontract call - internal invoke state update") {
     val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)
@@ -1152,7 +1149,6 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
-  //TODO Find case
   property("Crosscontract call - same contract internal invoke - state update") {
     val (invokeEntry1Key, invokeEntry1Val)    = ("entry1", 42)
     val (invokeEntry2Key, invokeEntry2NewVal) = ("entry2", 100500)

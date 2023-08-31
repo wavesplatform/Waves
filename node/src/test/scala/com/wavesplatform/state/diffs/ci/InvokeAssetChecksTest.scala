@@ -110,7 +110,6 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  //TODO Find case
   property("attached invoke payment asset checks") {
     val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}"""
     def dApp(complex: Boolean) = TestCompiler(V5).compileContract(

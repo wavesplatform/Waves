@@ -369,7 +369,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     (List(genesis, genesis2), setContract, invokes(0), invokes(1), aliasTx)
   }
 
-  //TODO Search for case
   property("doesn't validate intermediate action balance before V6")(withDomain(DomainPresets.RideV5) { d =>
     val dApp = TxHelpers.defaultSigner
 
@@ -398,7 +397,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 100L
   })
 
-  //TODO Search for case
   property("validates intermediate action balance after V6")(
     withDomain(DomainPresets.RideV6.configure(fs => fs.copy(enforceTransferValidationAfter = 0))) { d =>
       val dApp = TxHelpers.defaultSigner
@@ -450,7 +448,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   )
 
-  //TODO Search for case
   property("nested script failure") {
     val firstDApp  = TxHelpers.defaultSigner
     val secondDApp = TxHelpers.secondSigner
@@ -503,7 +500,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  //TODO Search for case
   property("can't more than 5kb of data") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(dataContract(bigData = true))
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), from = V5) {
@@ -853,7 +849,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  //TODO Search for case
   property("invoking contract with sponsored fee") {
     val sponsorIssue             = TxHelpers.issue(dApp, amount = ENOUGH_AMT)
     val sponsorAsset             = IssuedAsset(sponsorIssue.id())
@@ -1324,7 +1319,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     TestCompiler(V4).compileContract(script)
   }
 
-  //TODO Find case
   property(s"accepts failed transactions after ${BlockchainFeatures.BlockV5} activation") {
     val sponsorIssue = TxHelpers.issue(thirdAcc, ENOUGH_AMT)
     val sponsorAsset = IssuedAsset(sponsorIssue.id())
@@ -1370,7 +1364,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  //TODO Find case
   property(
     s"rejects withdrawal of fee from the funds received as a result of the script call execution after ${BlockchainFeatures.BlockV5} activation"
   ) {

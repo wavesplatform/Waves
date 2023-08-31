@@ -102,7 +102,6 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Write case
   property("can't transfer asset that will be issued later from the same dApp") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp = TestCompiler(V5).compileContract(

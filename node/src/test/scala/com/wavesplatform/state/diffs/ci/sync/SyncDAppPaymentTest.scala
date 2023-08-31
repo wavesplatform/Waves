@@ -48,7 +48,6 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Find case
   property("negative sync dApp payments are forbidden before and after RideV6 activation") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
@@ -139,7 +138,6 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  //TODO Find case
   property("negative balance rejects or fails") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
