@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.compiler
 
 import cats.instances.vector.*
 import cats.syntax.traverse.*
-import com.google.common.escape.Escapers
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.directives.values.StdLibVersion
