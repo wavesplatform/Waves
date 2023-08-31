@@ -1118,18 +1118,12 @@ class DecompilerTest extends PropSpec {
   }
 
   property("escaping characters in string") {
-    assertDecompile(
+    val script =
       s"""
          |let a = "aaa\\"qqq\\"aaa"
          |let b = "aaa\\\\qqq\\\\aaa"
          |true
-       """,
-      s"""
-         |let a = "aaa\\"qqq\\"aaa"
-         |let b = "aaa\\\\qqq\\\\aaa"
-         |true
-       """,
-      V6
-    )
+       """
+    assertDecompile(script, script, V6)
   }
 }
