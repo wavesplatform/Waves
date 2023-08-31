@@ -3,7 +3,7 @@ package com.wavesplatform.state.appender
 import cats.data.EitherT
 import cats.syntax.traverse.*
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.block.{MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.BlockChallenger

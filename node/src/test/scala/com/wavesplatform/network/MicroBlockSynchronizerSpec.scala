@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.block.MicroBlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.test.FreeSpec

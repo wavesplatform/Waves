@@ -55,7 +55,7 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
       respondWith(
         ctx,
         Future(history.loadBlockSnapshots(id)).map {
-          case Some(snapshots) => BlockSnapshot(id, snapshots)
+          case Some(snapshots) => BlockSnapshotResponse(id, snapshots)
           case _               => throw new NoSuchElementException(s"Error loading snapshots for block $id")
         }
       )
@@ -63,8 +63,8 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
     case MicroSnapshotRequest(id) =>
       respondWith(
         ctx,
-        Future(history.loadMicroblockSnapshots(id)).map {
-          case Some(snapshots) => MicroBlockSnapshot(id, snapshots)
+        Future(history.loadMicroBlockSnapshots(id)).map {
+          case Some(snapshots) => MicroBlockSnapshotResponse(id, snapshots)
           case _               => throw new NoSuchElementException(s"Error loading snapshots for microblock $id")
         }
       )

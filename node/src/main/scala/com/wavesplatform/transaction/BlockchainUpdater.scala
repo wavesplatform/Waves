@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.{BlockSnapshot, MicroBlockSnapshot}
 import com.wavesplatform.state.StateSnapshot
 import monix.reactive.Observable
 

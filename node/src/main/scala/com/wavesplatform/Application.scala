@@ -193,7 +193,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, rdb)
+    val history = History(
+      blockchainUpdater,
+      blockchainUpdater.liquidBlock,
+      blockchainUpdater.microBlock,
+      blockchainUpdater.liquidBlockSnapshot,
+      blockchainUpdater.microBlockSnapshot,
+      rdb
+    )
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 

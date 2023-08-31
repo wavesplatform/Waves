@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.syntax.either.*
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -9,7 +9,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.Time

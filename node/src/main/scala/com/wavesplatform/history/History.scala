@@ -4,20 +4,28 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.RDB
-import com.wavesplatform.state.{Blockchain, Height, StateSnapshot, TxMeta}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot}
 
 trait History {
   def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])]
   def loadMicroBlock(id: ByteStr): Option[MicroBlock]
   def blockIdsAfter(candidates: Seq[ByteStr], count: Int): Seq[ByteStr]
-  def loadBlockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]]
-  def loadMicroblockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]]
+  def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]]
+  def loadMicroBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]]
 }
 
 object History {
   private def versionedBytes(block: Block): (Byte, Array[Byte]) = block.header.version -> block.bytes()
 
-  def apply(blockchain: Blockchain, liquidBlock: ByteStr => Option[Block], microBlock: ByteStr => Option[MicroBlock], rdb: RDB): History =
+  def apply(
+      blockchain: Blockchain,
+      liquidBlock: ByteStr => Option[Block],
+      microBlock: ByteStr => Option[MicroBlock],
+      liquidBlockSnapshot: ByteStr => Option[StateSnapshot],
+      microBlockSnapshot: ByteStr => Option[StateSnapshot],
+      rdb: RDB
+  ): History =
     new History {
       override def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])] =
         liquidBlock(id)
@@ -33,9 +41,17 @@ object History {
           (firstCommonHeight to firstCommonHeight + count).flatMap(blockchain.blockId)
         }
 
-      // TODO: NODE-2609 implement
-      override def loadBlockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]] = ???
+      override def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] =
+        liquidBlockSnapshot(id)
+          .map(_.transactions.values.toSeq.map(txInfo => txInfo.snapshot.toProtobuf(txInfo.status)))
+          .orElse(blockchain.heightOf(id).map { h =>
+            database.loadTxStateSnapshots(Height(h), rdb)
+          })
 
-      override def loadMicroblockSnapshots(id: ByteStr): Option[Seq[(StateSnapshot, TxMeta.Status)]] = ???
+      override def loadMicroBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] =
+        microBlockSnapshot(id)
+          .map(_.transactions.values.toSeq.map { txInfo =>
+            txInfo.snapshot.toProtobuf(txInfo.status)
+          })
     }
 }

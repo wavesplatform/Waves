@@ -4,7 +4,7 @@ import com.google.common.cache.{Cache, CacheBuilder}
 
 import java.util.concurrent.TimeUnit
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.block.{MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings

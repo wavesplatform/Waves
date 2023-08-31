@@ -662,13 +662,16 @@ package object database {
     transactions.result()
   }
 
-  def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] = {
-    val txSnapshots = Seq.newBuilder[(StateSnapshot, TxMeta.Status)]
+  def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[TransactionStateSnapshot] = {
+    val txSnapshots = Seq.newBuilder[TransactionStateSnapshot]
     rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
-      txSnapshots += StateSnapshot.fromProtobuf(TransactionStateSnapshot.parseFrom(e.getValue))
+      txSnapshots += TransactionStateSnapshot.parseFrom(e.getValue)
     }
     txSnapshots.result()
   }
+
+  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] =
+    loadTxStateSnapshots(height, rdb).map(StateSnapshot.fromProtobuf)
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {

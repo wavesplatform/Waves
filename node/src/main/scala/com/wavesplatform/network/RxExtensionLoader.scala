@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.{Cache, CacheBuilder}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError

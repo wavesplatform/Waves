@@ -2,10 +2,9 @@ package com.wavesplatform
 
 import cats.data.ValidatedNel
 import com.wavesplatform.account.PrivateKey
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction

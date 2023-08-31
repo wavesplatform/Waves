@@ -3,12 +3,11 @@ package com.wavesplatform.state.diffs
 import cats.implicits.{catsSyntaxOption, catsSyntaxSemigroup, toFoldableOps}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.network.{BlockSnapshot, MicroBlockSnapshot}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
@@ -442,12 +441,14 @@ object BlockDiffer {
 
         val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
 
+        val nti = NewTransactionInfo.create(tx, txStatus, txSnapshot, currBlockchain)
+
         Result(
-          currSnapshot |+| txSnapshot,
+          currSnapshot |+| txSnapshot.withTransaction(nti),
           carryFee + carry,
           totalWavesFee,
           currConstraint,
-          keyBlockSnapshot.withTransaction(NewTransactionInfo.create(tx, txStatus, txSnapshot, currBlockchain)),
+          keyBlockSnapshot.withTransaction(nti),
           TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(TxStatusInfo(tx.id(), txStatus))).createHash(prevStateHash)
         )
     }

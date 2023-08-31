@@ -7,7 +7,7 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,7 +16,6 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
@@ -783,7 +782,7 @@ class RocksDBWriter(
           ).explicitGet()
 
           val snapshot = if (isLightMode) {
-            Some(BlockSnapshot(block.id(), loadTxStateSnapshots(currentHeight, rdb)))
+            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb)))
           } else None
 
           (block, Caches.toHitSource(discardedMeta), snapshot)

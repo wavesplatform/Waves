@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.RxScoreObserver.ChannelClosedAndSyncWith

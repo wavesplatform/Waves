@@ -5,7 +5,7 @@ import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.RocksDBWriter
@@ -15,7 +15,6 @@ import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
-import com.wavesplatform.network.{BlockSnapshot, MicroBlockSnapshot}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
@@ -77,6 +76,10 @@ class BlockchainUpdaterImpl(
   publishLastBlockInfo()
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._1)))
+
+  def liquidBlockSnapshot(id: ByteStr): Option[StateSnapshot] = readLock(ngState.flatMap(_.snapshotOf(id).map(_._2)))
+
+  def microBlockSnapshot(totalBlockId: ByteStr): Option[StateSnapshot] = readLock(ngState.flatMap(_.microSnapshots.get(totalBlockId).map(_.snapshot)))
 
   def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] =
     readLock(

@@ -1,8 +1,7 @@
 package com.wavesplatform.database
 
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.network.BlockSnapshot
 import com.wavesplatform.state.StateSnapshot
 
 trait Storage {

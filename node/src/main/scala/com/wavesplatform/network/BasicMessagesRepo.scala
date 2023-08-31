@@ -325,25 +325,25 @@ object MicroSnapshotRequestSpec extends MessageSpec[MicroSnapshotRequest] {
   override val maxLength: Int = SignatureLength
 }
 
-object BlockSnapshotSpec extends MessageSpec[BlockSnapshot] {
+object BlockSnapshotResponseSpec extends MessageSpec[BlockSnapshotResponse] {
   override val messageCode: MessageCode = 36: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[BlockSnapshot] =
-    Try(BlockSnapshot.fromProtobuf(PBBlockSnapshot.parseFrom(bytes)))
+  override def deserializeData(bytes: Array[Byte]): Try[BlockSnapshotResponse] =
+    Try(BlockSnapshotResponse.fromProtobuf(PBBlockSnapshot.parseFrom(bytes)))
 
-  override def serializeData(data: BlockSnapshot): Array[Byte] = data.toProtobuf.toByteArray
+  override def serializeData(data: BlockSnapshotResponse): Array[Byte] = data.toProtobuf.toByteArray
 
   // TODO: NODE-2609 estimate
   override def maxLength: Int = Int.MaxValue
 }
 
-object MicroBlockSnapshotSpec extends MessageSpec[MicroBlockSnapshot] {
+object MicroBlockSnapshotResponseSpec extends MessageSpec[MicroBlockSnapshotResponse] {
   override val messageCode: MessageCode = 37: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockSnapshot] =
-    Try(MicroBlockSnapshot.fromProtobuf(PBMicroBlockSnapshot.parseFrom(bytes)))
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockSnapshotResponse] =
+    Try(MicroBlockSnapshotResponse.fromProtobuf(PBMicroBlockSnapshot.parseFrom(bytes)))
 
-  override def serializeData(data: MicroBlockSnapshot): Array[Byte] = data.toProtobuf.toByteArray
+  override def serializeData(data: MicroBlockSnapshotResponse): Array[Byte] = data.toProtobuf.toByteArray
 
   // TODO: NODE-2609 estimate
   override def maxLength: Int = Int.MaxValue
@@ -376,8 +376,8 @@ object BasicMessagesRepo {
     BlockIdsSpec,
     GetSnapsnotSpec,
     MicroSnapshotRequestSpec,
-    BlockSnapshotSpec,
-    MicroBlockSnapshotSpec
+    BlockSnapshotResponseSpec,
+    MicroBlockSnapshotResponseSpec
   )
 
   val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode -> s).toMap

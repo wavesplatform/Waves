@@ -3,7 +3,7 @@ package com.wavesplatform.state.appender
 import java.time.Instant
 import cats.data.EitherT
 import cats.syntax.traverse.*
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*

@@ -1,9 +1,9 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.network.{BlockSnapshot, HandshakeHandler, MicroBlockInv, MicroBlockSnapshot}
+import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import io.netty.channel.Channel
 import org.influxdb.dto.Point
 

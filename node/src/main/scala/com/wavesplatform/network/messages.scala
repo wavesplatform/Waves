@@ -6,8 +6,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
-import com.wavesplatform.protobuf.snapshot.{BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
-import com.wavesplatform.state.{StateSnapshot, TxMeta}
+import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.transaction.{Signed, Transaction}
 import monix.eval.Coeval
 
@@ -88,22 +87,21 @@ case class GetSnapshot(blockId: BlockId) extends Message
 
 case class MicroSnapshotRequest(totalBlockId: BlockId) extends Message
 
-// TODO: NODE-2609 maybe move
-case class BlockSnapshot(blockId: BlockId, snapshots: Seq[(StateSnapshot, TxMeta.Status)]) extends Message {
-  def toProtobuf: PBBlockSnapshot = PBBlockSnapshot(blockId.toByteString, snapshots.map { case (sn, txStatus) => sn.toProtobuf(txStatus) })
+case class BlockSnapshotResponse(blockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
+  def toProtobuf: PBBlockSnapshot = PBBlockSnapshot(blockId.toByteString, snapshots)
 }
 
-object BlockSnapshot {
-  def fromProtobuf(snapshot: PBBlockSnapshot): BlockSnapshot =
-    BlockSnapshot(snapshot.blockId.toByteStr, snapshot.snapshots.map(StateSnapshot.fromProtobuf))
+object BlockSnapshotResponse {
+  def fromProtobuf(snapshot: PBBlockSnapshot): BlockSnapshotResponse =
+    BlockSnapshotResponse(snapshot.blockId.toByteStr, snapshot.snapshots)
 }
 
-case class MicroBlockSnapshot(totalBlockId: BlockId, snapshots: Seq[(StateSnapshot, TxMeta.Status)]) extends Message {
+case class MicroBlockSnapshotResponse(totalBlockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
   def toProtobuf: PBMicroBlockSnapshot =
-    PBMicroBlockSnapshot(totalBlockId.toByteString, snapshots.map { case (sn, txStatus) => sn.toProtobuf(txStatus) })
+    PBMicroBlockSnapshot(totalBlockId.toByteString, snapshots)
 }
 
-object MicroBlockSnapshot {
-  def fromProtobuf(snapshot: PBMicroBlockSnapshot): MicroBlockSnapshot =
-    MicroBlockSnapshot(snapshot.totalBlockId.toByteStr, snapshot.snapshots.map(StateSnapshot.fromProtobuf))
+object MicroBlockSnapshotResponse {
+  def fromProtobuf(snapshot: PBMicroBlockSnapshot): MicroBlockSnapshotResponse =
+    MicroBlockSnapshotResponse(snapshot.totalBlockId.toByteStr, snapshot.snapshots)
 }
