@@ -1042,22 +1042,23 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       (1 to 999).foreach(_ => d.appendBlock())
       val rollbackTarget = d.blockchain.lastBlockId.get
 
-      rollbackMiddleScenario(d, challengedMiner)
+      val txs = Seq(TxHelpers.transfer(challengedMiner, amount = 10001.waves))
+      rollbackMiddleScenario(d, challengedMiner, txs)
       val middleScenarioStateHash = d.lastBlock.header.stateHash
       middleScenarioStateHash shouldBe defined
       d.rollbackTo(rollbackTarget)
-      rollbackMiddleScenario(d, challengedMiner)
+      rollbackMiddleScenario(d, challengedMiner, txs)
 
       d.lastBlock.header.stateHash shouldBe middleScenarioStateHash
 
       d.rollbackTo(rollbackTarget)
 
-      rollbackLastScenario(d, challengedMiner)
+      rollbackLastScenario(d, challengedMiner, txs)
       val lastScenarioStateHash = d.lastBlock.header.stateHash
       lastScenarioStateHash shouldBe defined
       d.rollbackTo(rollbackTarget)
 
-      rollbackLastScenario(d, challengedMiner)
+      rollbackLastScenario(d, challengedMiner, txs)
 
       d.lastBlock.header.stateHash shouldBe lastScenarioStateHash
     }
@@ -1078,11 +1079,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val rollbackTarget = d.blockchain.lastBlockId.get
 
-      rollbackActivationHeightScenario(d, challengedMiner)
+      val txs = Seq(TxHelpers.transfer(challengedMiner, amount = 10001.waves))
+      rollbackActivationHeightScenario(d, challengedMiner, txs)
       val stateHash = d.lastBlock.header.stateHash
       stateHash shouldBe defined
       d.rollbackTo(rollbackTarget)
-      rollbackActivationHeightScenario(d, challengedMiner)
+      rollbackActivationHeightScenario(d, challengedMiner, txs)
 
       d.lastBlock.header.stateHash shouldBe stateHash
     }
@@ -1768,13 +1770,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     (blockJson \ "challengedHeader" \ "stateHash").as[String] shouldBe chHeader.stateHash.get.toString
   }
 
-  private def rollbackMiddleScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
+  private def rollbackMiddleScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10001.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
-      Seq(tx),
+      txs,
       strictTime = true,
       generator = challengedMiner,
       stateHash = Some(Some(invalidStateHash))
@@ -1785,13 +1786,12 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     d.blockchain.height shouldBe 1017
   }
 
-  private def rollbackLastScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
+  private def rollbackLastScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10001.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
-      Seq(tx),
+      txs,
       strictTime = true,
       generator = challengedMiner,
       stateHash = Some(Some(invalidStateHash))
@@ -1802,7 +1802,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     d.blockchain.height shouldBe 1007
   }
 
-  private def rollbackActivationHeightScenario(d: Domain, challengedMiner: KeyPair): Assertion = {
+  private def rollbackActivationHeightScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
     (1 to 5).foreach(_ => d.appendBlock())
     d.appendBlock(
       d.createBlock(
@@ -1815,10 +1815,9 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
     d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
 
-    val tx = TxHelpers.transfer(challengedMiner, amount = 10001.waves)
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
-      Seq(tx),
+      txs,
       strictTime = true,
       generator = challengedMiner,
       stateHash = Some(Some(invalidStateHash))
