@@ -34,7 +34,7 @@ class DecompilerTest extends PropSpec {
   val decompilerContextV4 = getTestContext(V4).decompilerContext
 
   private def assertDecompile(script: String, decompiled: String, version: StdLibVersion): Assertion = {
-    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
+    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr
     val result = Decompiler(expr, getDecompilerContext(version, Expression))
     result shouldBe decompiled.stripMargin.trim
   }
@@ -1115,5 +1115,21 @@ class DecompilerTest extends PropSpec {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V6)
       .foreach(assertDecompile(script, decompiledV6, _))
+  }
+
+  property("escaping characters in string") {
+    assertDecompile(
+      s"""
+         |let a = "aaa\\"qqq\\"aaa"
+         |let b = "aaa\\\\qqq\\\\aaa"
+         |true
+       """,
+      s"""
+         |let a = "aaa\\"qqq\\"aaa"
+         |let b = "aaa\\\\qqq\\\\aaa"
+         |true
+       """,
+      V6
+    )
   }
 }
