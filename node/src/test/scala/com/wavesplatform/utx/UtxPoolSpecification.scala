@@ -383,7 +383,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       """.stripMargin
     )
     val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000L, ts + 1).explicitGet()
-    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
+    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)).block)
   }
 
   "UTX Pool" - {
@@ -462,12 +462,14 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       withStateWithThreeAccounts { case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = TestTime()
 
-        val precondition = TestBlock.create(
-          time.getTimestamp(),
-          bcu.lastBlockId.get,
-          Seq(dAppSetScript(sender3, time)),
-          sender1
-        )
+        val precondition = TestBlock
+          .create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(dAppSetScript(sender3, time)),
+            sender1
+          )
+          .block
         bcu.processBlock(precondition).explicitGet()
 
         val whiteListGen = Gen.oneOf(
@@ -536,12 +538,14 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = TestTime()
 
-        val precondition = TestBlock.create(
-          time.getTimestamp(),
-          bcu.lastBlockId.get,
-          Seq(dAppSetScript(sender3, time)),
-          sender1
-        )
+        val precondition = TestBlock
+          .create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(dAppSetScript(sender3, time)),
+            sender1
+          )
+          .block
         bcu.processBlock(precondition).explicitGet()
 
         val whiteListGen = Gen.listOfN(
@@ -1060,7 +1064,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             utx.removeAll(rest)
             None
           }
-          val tb = TestBlock.create(Nil)
+          val tb = TestBlock.create(Nil).block
           (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 
           utx.putIfNew(tx1).resultE should beRight
@@ -1104,7 +1108,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         forAll(preconditions) { case (genesis, validTransfer, invalidTransfer) =>
           withDomain() { d =>
-            d.appendBlock(TestBlock.create(Seq(genesis)))
+            d.appendBlock(TestBlock.create(Seq(genesis)).block)
             val time   = TestTime()
             val events = new ListBuffer[UtxEvent]
             val utxPool =

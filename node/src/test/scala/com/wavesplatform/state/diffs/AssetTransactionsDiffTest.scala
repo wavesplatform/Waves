@@ -331,7 +331,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val (gen, issues, _, update1) = genesisIssueUpdateWithSecondAsset
     withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
       val blockchain   = d.blockchainUpdater
-      val genesisBlock = TestBlock.create(gen ++ issues)
+      val genesisBlock = TestBlock.create(gen ++ issues).block
       d.appendBlock(genesisBlock)
 
       d.appendBlock()

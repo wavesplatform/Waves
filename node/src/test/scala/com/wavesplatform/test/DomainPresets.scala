@@ -100,7 +100,7 @@ object DomainPresets {
       featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-  val TransactionStateSnapshot: WavesSettings = ConsensusImprovements.addFeatures(BlockchainFeatures.TransactionStateSnapshot)
+  val TransactionStateSnapshot: WavesSettings = BlockRewardDistribution.addFeatures(BlockchainFeatures.TransactionStateSnapshot)
 
   def settingsForRide(version: StdLibVersion): WavesSettings =
     version match {
@@ -111,6 +111,7 @@ object DomainPresets {
       case V5 => RideV5
       case V6 => RideV6
       case V7 => BlockRewardDistribution
+      case V8 => TransactionStateSnapshot
     }
 
   def mostRecent: WavesSettings = RideV6

@@ -20,7 +20,7 @@ object EthereumTransactionDiff {
     val resultEi = tx.payload match {
       case et: EthereumTransaction.Transfer =>
         for {
-          _       <- if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.check(tx.underlying.getData) else Right(())
+          _       <- if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.checkAsset(tx.underlying.getData) else Right(())
           assetId <- et.tryResolveAsset(blockchain)
         } yield StateSnapshot(
           ethereumTransactionMeta = Map(
@@ -61,7 +61,7 @@ object EthereumTransactionDiff {
       case et: EthereumTransaction.Transfer =>
         for {
           _        <- checkLeadingZeros(tx, blockchain)
-          _         <- TracedResult { if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.check(tx.underlying.getData) else Right(()) }
+          _        <- TracedResult { if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.checkAsset(tx.underlying.getData) else Right(()) }
           asset    <- TracedResult(et.tryResolveAsset(blockchain))
           transfer <- TracedResult(et.toTransferLike(tx, blockchain))
           assetSnapshot <- TransactionDiffer.assetsVerifierDiff(

@@ -25,10 +25,11 @@ import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.RideV6
+import com.wavesplatform.test.DomainPresets.{RideV6, TransactionStateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -43,7 +44,7 @@ import monix.reactive.Observable
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.OptionValues
+import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
@@ -1368,6 +1369,62 @@ class TransactionsRouteSpec
           routePath("/merkleProof"),
           HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> JsArray.empty).toString())
         ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+      }
+    }
+  }
+
+  "NODE-969. Transactions API should return correct data for orders with attachment" in {
+    def checkOrderAttachment(txInfo: JsObject, expectedAttachment: ByteStr): Assertion = {
+      implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
+      (txInfo \ "order1" \ "attachment").asOpt[ByteStr] shouldBe Some(expectedAttachment)
+    }
+
+    val sender = TxHelpers.signer(1)
+    val issuer = TxHelpers.signer(2)
+    withDomain(TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, issuer)) { d =>
+      val attachment = ByteStr.fill(32)(1)
+      val issue      = TxHelpers.issue(issuer)
+      val exchange =
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(attachment)),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer),
+          version = TxVersion.V3
+        )
+
+      d.appendBlock(issue)
+      d.appendBlock(exchange)
+
+      val route = new TransactionsApiRoute(
+        d.settings.restAPISettings,
+        d.commonApi.transactions,
+        d.wallet,
+        d.blockchain,
+        () => d.blockchain.snapshotBlockchain,
+        () => 0,
+        (t, _) => d.commonApi.transactions.broadcastTransaction(t),
+        testTime,
+        new RouteTimeout(60.seconds)(sharedScheduler)
+      ).route
+
+      d.liquidAndSolidAssert { () =>
+        Get(s"/transactions/info/${exchange.id()}") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsObject], attachment)
+        }
+
+        Post("/transactions/info", FormData("id" -> exchange.id().toString)) ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+        }
+
+        Post(
+          "/transactions/info",
+          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(exchange.id().toString)).toString())
+        ) ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+        }
+
+        Get(s"/transactions/address/${exchange.sender.toAddress}/limit/10") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsArray].value.head.as[JsObject], attachment)
+        }
       }
     }
   }
