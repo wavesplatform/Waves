@@ -113,7 +113,7 @@ object Decompiler {
   }
 
   private val MatchRef        = """(\$match\d*)""".r
-  private val EscapingSymbols = "[\\\\\"!]".r
+  private val EscapingSymbols = "[\\\\\"]".r
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
     def checkBrackets(expr: EXPR) = expr match {
