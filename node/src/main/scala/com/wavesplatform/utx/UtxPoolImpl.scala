@@ -64,6 +64,8 @@ case class UtxPoolImpl(
   val priorityPool               = new UtxPriorityPool(blockchain)
   private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
+  override def getPriorityPool: Option[UtxPriorityPool] = Some(priorityPool)
+
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
     else putNewTx(tx, forceValidate)

@@ -20,6 +20,7 @@ trait UtxPool extends UtxForAppender with AutoCloseable {
   def all: Seq[Transaction]
   def size: Int
   def transactionById(transactionId: ByteStr): Option[Transaction]
+  def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit
   def scheduleCleanup(): Unit
   def packUnconfirmed(
       rest: MultiDimensionalMiningConstraint,
@@ -27,10 +28,12 @@ trait UtxPool extends UtxForAppender with AutoCloseable {
       strategy: PackStrategy = PackStrategy.Unlimited,
       cancelled: () => Boolean = () => false
   ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr])
+  def resetPriorityPool(): Unit
+  def cleanUnconfirmed(): Unit
+  def getPriorityPool: Option[UtxPriorityPool]
 }
 
 object UtxPool {
-  // TODO: NODE-2609 use
   val NoOp: UtxPool = new UtxPool {
     override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = TracedResult.wrapValue(false)
     override def removeAll(txs: Iterable[Transaction]): Unit                                               = ()
@@ -44,8 +47,12 @@ object UtxPool {
         strategy: PackStrategy,
         cancelled: () => Boolean
     ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr]) = (None, MiningConstraint.Unlimited, None)
-    override def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit = ()
-    override def close(): Unit                                             = ()
+    override def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit        = ()
+    override def close(): Unit                                                    = ()
+    override def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit = ()
+    override def resetPriorityPool(): Unit                                        = ()
+    override def cleanUnconfirmed(): Unit                                         = ()
+    override def getPriorityPool: Option[UtxPriorityPool]                         = None
   }
 
   sealed trait PackStrategy

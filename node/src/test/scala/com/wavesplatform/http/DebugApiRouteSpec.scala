@@ -116,7 +116,7 @@ class DebugApiRouteSpec
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain,
+      () => Some(blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler),
       sharedScheduler
     )
@@ -1705,7 +1705,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Some(blockchain)
         )
         .route
 
@@ -2187,7 +2187,7 @@ class DebugApiRouteSpec
         d.appendBlock(leaseTx)
         d.appendBlock(setScript(dApp1Kp, dApp1), setScript(dApp2Kp, dApp2))
 
-        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => d.blockchain).route
+        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => Some(d.blockchain)).route
         val invoke  = TxHelpers.invoke(dApp1Kp.toAddress)
         val leaseId = Lease.calculateId(Lease(Address(ByteStr(leaseAddress.bytes)), amount, 0), invoke.id())
 
@@ -2832,7 +2832,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Some(blockchain)
         )
         .route
 
@@ -3516,13 +3516,13 @@ class DebugApiRouteSpec
   }
 
   private def routeWithBlockchain(blockchain: Blockchain & NG) =
-    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => Some(blockchain)).route
 
   private def routeWithBlockchain(d: Domain) =
     debugApiRoute
       .copy(
         blockchain = d.blockchain,
-        priorityPoolBlockchain = () => d.blockchain,
+        priorityPoolBlockchain = () => Some(d.blockchain),
         loadBalanceHistory = d.rocksDBWriter.loadBalanceHistory,
         loadStateHash = d.rocksDBWriter.loadStateHash
       )

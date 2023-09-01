@@ -11,7 +11,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -23,7 +23,7 @@ object ExtensionAppender extends ScorexLogging {
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxPool,
       pos: PoSSelector,
       time: Time,
       invalidBlocks: InvalidBlockStorage,

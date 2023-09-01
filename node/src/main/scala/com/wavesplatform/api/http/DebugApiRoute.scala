@@ -58,7 +58,7 @@ case class DebugApiRoute(
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () => Blockchain,
+    priorityPoolBlockchain: () => Option[Blockchain],
     routeTimeout: RouteTimeout,
     heavyRequestScheduler: Scheduler
 ) extends ApiRoute
@@ -216,14 +216,14 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val blockchain = priorityPoolBlockchain()
-      val startTime  = System.nanoTime()
+      val resBlockchain = priorityPoolBlockchain().getOrElse(blockchain)
+      val startTime     = System.nanoTime()
 
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedSnapshot = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(blockchain, tx)
+        diff <- TransactionDiffer.forceValidate(resBlockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(resBlockchain, tx)
       } yield (tx, diff)
 
       val error = tracedSnapshot.resultE match {
@@ -237,7 +237,7 @@ case class DebugApiRoute(
         .fold(
           _ => this.serializer,
           { case (_, snapshot) =>
-            val snapshotBlockchain = SnapshotBlockchain(blockchain, snapshot)
+            val snapshotBlockchain = SnapshotBlockchain(resBlockchain, snapshot)
             this.serializer.copy(blockchain = snapshotBlockchain)
           }
         )
@@ -249,8 +249,8 @@ case class DebugApiRoute(
             val meta = tx match {
               case ist: InvokeScriptTransaction =>
                 val result = diff.scriptResults.get(ist.id())
-                TransactionMeta.Invoke(Height(blockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
-              case tx => TransactionMeta.Default(Height(blockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
+                TransactionMeta.Invoke(Height(resBlockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
+              case tx => TransactionMeta.Default(Height(resBlockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
             }
             serializer.transactionWithMetaJson(meta)
           }
@@ -263,7 +263,7 @@ case class DebugApiRoute(
           case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },
-        "height" -> blockchain.height
+        "height" -> resBlockchain.height
       )
 
       error.fold(response ++ extendedJson)(err =>

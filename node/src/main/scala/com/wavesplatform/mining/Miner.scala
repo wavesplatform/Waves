@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -55,7 +55,7 @@ class MinerImpl(
     blockchainUpdater: Blockchain & BlockchainUpdater & NG,
     settings: WavesSettings,
     timeService: Time,
-    utx: UtxPoolImpl,
+    utx: UtxPool,
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
@@ -84,7 +84,7 @@ class MinerImpl(
     minerScheduler,
     appenderScheduler,
     transactionAdded,
-    utx.priorityPool.nextMicroBlockSize
+    utx.getPriorityPool.map(p => p.nextMicroBlockSize(_)).getOrElse(identity)
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
@@ -157,7 +157,7 @@ class MinerImpl(
       )
       val unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      (unconfirmed, updatedMdConstraint.constraints.head, stateHash)
+      (unconfirmed, updatedMdConstraint.head, stateHash)
     }
   }
 

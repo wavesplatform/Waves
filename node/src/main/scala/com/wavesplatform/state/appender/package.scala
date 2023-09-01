@@ -42,7 +42,6 @@ package object appender {
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, snapshot, None, verify, txSignParCheck))
           .map {
             case res @ Applied(discardedDiffs, _) =>
-              // TODO: NODE-2609 not needed for light node
               utx.setPrioritySnapshots(discardedDiffs)
               res
             case res => res

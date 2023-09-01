@@ -73,7 +73,7 @@ object MicroblockAppender extends ScorexLogging {
           peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
         }
       case Left(ish: InvalidStateHash) =>
-        // TODO: NODE-2609 blacklist snapshot source channel
+        // TODO: NODE-2609 blacklist snapshot source channel or get snapshot from the same channel as micro block
         val idOpt = md.invOpt.map(_.totalBlockId)
         peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ish")
         md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
