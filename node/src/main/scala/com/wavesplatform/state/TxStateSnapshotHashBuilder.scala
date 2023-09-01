@@ -13,6 +13,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, maybeAppl
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
@@ -147,14 +148,15 @@ object TxStateSnapshotHashBuilder {
       currentBlockTimestamp: Long,
       isChallenging: Boolean,
       blockchain: Blockchain
-  ): Either[ValidationError, ByteStr] = {
+  ): TracedResult[ValidationError, ByteStr] = {
     val txDiffer = TransactionDiffer(prevBlockTimestamp, currentBlockTimestamp) _
 
     txs
-      .foldLeft[Either[ValidationError, (ByteStr, StateSnapshot)]](Right(initStateHash -> initSnapshot)) {
-        case (Right((prevStateHash, accSnapshot)), tx) =>
-          val accBlockchain = SnapshotBlockchain(blockchain, accSnapshot)
-          txDiffer(accBlockchain, tx).resultE match {
+      .foldLeft[TracedResult[ValidationError, (ByteStr, StateSnapshot)]](TracedResult.wrapValue(initStateHash -> initSnapshot)) {
+        case (acc @ TracedResult(Right((prevStateHash, accSnapshot)), _, _), tx) =>
+          val accBlockchain  = SnapshotBlockchain(blockchain, accSnapshot)
+          val txDifferResult = txDiffer(accBlockchain, tx)
+          txDifferResult.resultE match {
             case Right(txSnapshot) =>
               val (feeAsset, feeAmount) =
                 maybeApplySponsorship(accBlockchain, accBlockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain), tx.assetFee)
@@ -166,19 +168,23 @@ object TxStateSnapshotHashBuilder {
                 TxStateSnapshotHashBuilder
                   .createHashFromSnapshot(txSnapshotWithBalances, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
                   .createHash(prevStateHash)
-              Right((stateHash, accSnapshot |+| txSnapshotWithBalances))
+
+              txDifferResult.copy(resultE = Right((stateHash, accSnapshot |+| txSnapshotWithBalances)))
             case Left(_) if isChallenging =>
-              Right(
-                (
-                  TxStateSnapshotHashBuilder
-                    .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(tx.id(), TxMeta.Status.Elided)))
-                    .createHash(prevStateHash),
-                  accSnapshot.bindElidedTransaction(accBlockchain, tx)
+              txDifferResult.copy(resultE =
+                Right(
+                  (
+                    TxStateSnapshotHashBuilder
+                      .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(tx.id(), TxMeta.Status.Elided)))
+                      .createHash(prevStateHash),
+                    accSnapshot.bindElidedTransaction(accBlockchain, tx)
+                  )
                 )
               )
-            case Left(err) => err.asLeft[(ByteStr, StateSnapshot)]
+
+            case Left(err) => txDifferResult.copy(resultE = err.asLeft[(ByteStr, StateSnapshot)])
           }
-        case (err @ Left(_), _) => err
+        case (err @ TracedResult(Left(_), _, _), _) => err
       }
       .map(_._1)
   }

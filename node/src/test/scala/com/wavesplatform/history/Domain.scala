@@ -12,7 +12,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
-import com.wavesplatform.db.WithState
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, TransactionStateSnapshot}
@@ -181,9 +180,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def appendBlock(b: Block): BlockApplyResult = blockchainUpdater.processBlock(b).explicitGet()
 
-  // TODO: remove checkStateHash after NODE-2568 merge (at NODE-2609)
-  def appendBlockE(b: Block, checkStateHash: Boolean = true): Either[ValidationError, BlockApplyResult] =
-    blockchainUpdater.processBlock(b, checkStateHash)
+  def appendBlockE(b: Block): Either[ValidationError, BlockApplyResult] = blockchainUpdater.processBlock(b)
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -264,10 +261,6 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def appendBlockE(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
     createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_))
 
-  // TODO: remove after NODE-2568 merge (at NODE-2609)
-  def appendBlockENoCheck(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
-    createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_, checkStateHash = false))
-
   def appendBlock(version: Byte, txs: Transaction*): Block = {
     val block = createBlock(version, txs)
     appendBlock(block)
@@ -306,13 +299,14 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       stateHash
         .map(Right(_))
         .getOrElse(
-          WithState
+          TxStateSnapshotHashBuilder
             .computeStateHash(
               txs,
               lastBlock.header.stateHash.get,
               StateSnapshot.empty,
-              blockSigner.toAddress,
-              lastBlock.header.timestamp,
+              blockSigner,
+              rocksDBWriter.lastBlockTimestamp,
+              blockchain.lastBlockTimestamp.get,
               isChallenging = false,
               blockchain
             )
@@ -443,26 +437,27 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
         if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
-          val blockchain =
-            SnapshotBlockchain(this.blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, this.blockchain.computeNextReward, None)
+          val blockchainWithNewBlock =
+            SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
           val prevStateHash = blockchain.lastBlockStateHash
 
           BlockDiffer
-            .createInitialBlockSnapshot(this.blockchain, generator.toAddress)
+            .createInitialBlockSnapshot(blockchain, generator.toAddress)
             .flatMap { initSnapshot =>
               val initStateHash =
                 if (initSnapshot == StateSnapshot.empty) prevStateHash
                 else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
 
-              WithState
+              TxStateSnapshotHashBuilder
                 .computeStateHash(
                   txs,
                   initStateHash,
                   initSnapshot,
-                  generator.toAddress,
+                  generator,
+                  blockchain.lastBlockTimestamp,
                   blockWithoutStateHash.header.timestamp,
-                  challengedHeader.isDefined,
-                  blockchain
+                  challengedHeader.nonEmpty,
+                  blockchainWithNewBlock
                 )
                 .resultE
                 .map(Some(_))
@@ -594,8 +589,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
-    // TODO: delete checkStateHash after NODE-2568 merge (at NODE-2609)
-    def processBlock(block: Block, checkStateHash: Boolean = true): Either[ValidationError, BlockApplyResult] = {
+    def processBlock(block: Block): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           Right(block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature))
@@ -617,7 +611,7 @@ object Domain {
         }
 
       hitSourcesE.flatMap { case (hitSource, challengedHitSource) =>
-        bcu.processBlock(block, hitSource, None, challengedHitSource, checkStateHash = checkStateHash)
+        bcu.processBlock(block, hitSource, None, challengedHitSource)
       }
     }
   }

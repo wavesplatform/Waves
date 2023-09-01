@@ -190,16 +190,18 @@ class BlockChallengerImpl(
         blockchainUpdater.computeNextReward,
         None
       )
-      stateHash <- TxStateSnapshotHashBuilder.computeStateHash(
-        txs,
-        TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
-        initialBlockSnapshot,
-        acc,
-        Some(prevBlockHeader.timestamp),
-        blockTime,
-        isChallenging = true,
-        blockchainWithNewBlock
-      )
+      stateHash <- TxStateSnapshotHashBuilder
+        .computeStateHash(
+          txs,
+          TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
+          initialBlockSnapshot,
+          acc,
+          Some(prevBlockHeader.timestamp),
+          blockTime,
+          isChallenging = true,
+          blockchainWithNewBlock
+        )
+        .resultE
       challengingBlock <-
         Block.buildAndSign(
           challengedBlock.header.version,

@@ -1,7 +1,5 @@
 package com.wavesplatform.db
 
-import cats.syntax.either.*
-import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, KeyPair}
@@ -23,14 +21,11 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.{InitStateHash, TxStatusInfo}
-import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, maybeApplySponsorship}
-import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, TransactionDiffer}
+import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
@@ -168,7 +163,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       assertion: TracedResult[ValidationError, Diff] => Unit
   ): Unit = withTestState(fs) { (bcu, state) =>
     def getCompBlockchain(blockchain: Blockchain) = {
-      val reward = if (blockchain.height > 0) Some(blockchain.settings.rewardsSettings.initial) else None
+      val reward = if (blockchain.height > 0) bcu.computeNextReward else None
       SnapshotBlockchain(blockchain, reward)
     }
 
@@ -183,8 +178,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         (_, _) => (),
         verify = true,
         enableExecutionLog = enableExecutionLog,
-        txSignParCheck = true,
-        enableStateHash = false
+        txSignParCheck = true
       )
 
     preconditions.foreach { precondition =>
@@ -216,7 +210,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   ): Unit = withTestState(fs) { (bcu, state) =>
     def getCompBlockchain(blockchain: Blockchain) =
       if (withNg && fs.preActivatedFeatures.get(BlockchainFeatures.BlockReward.id).exists(_ <= blockchain.height)) {
-        val reward = if (blockchain.height > 0) Some(blockchain.settings.rewardsSettings.initial) else None
+        val reward = if (blockchain.height > 0) bcu.computeNextReward else None
         SnapshotBlockchain(blockchain, reward)
       } else blockchain
 
@@ -227,8 +221,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         b,
         None,
         MiningConstraint.Unlimited,
-        b.header.generationSignature,
-        checkStateHash = false
+        b.header.generationSignature
       )
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
@@ -274,7 +267,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withTestState(fs) { (bcu, state) =>
       def getCompBlockchain(blockchain: Blockchain) = {
-        val reward = if (blockchain.height > 0) Some(blockchain.settings.rewardsSettings.initial) else None
+        val reward = if (blockchain.height > 0) bcu.computeNextReward else None
         SnapshotBlockchain(blockchain, reward)
       }
 
@@ -285,8 +278,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           b,
           None,
           MiningConstraint.Unlimited,
-          b.header.generationSignature,
-          checkStateHash = false
+          b.header.generationSignature
         )
 
       test(txs => {
@@ -326,9 +318,9 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       blockchain: BlockchainUpdater & Blockchain
   ): TracedResult[ValidationError, Block] = {
     (if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
-       val compBlockchain = SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, None, None)
-       val prevStateHash  = blockchain.lastBlockHeader.flatMap(_.header.stateHash).getOrElse(InitStateHash)
-
+       val compBlockchain =
+         SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
+       val prevStateHash = blockchain.lastBlockStateHash
        TracedResult(
          BlockDiffer
            .createInitialBlockSnapshot(
@@ -341,12 +333,13 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
              if (initSnapshot == StateSnapshot.empty) prevStateHash
              else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
 
-           WithState
+           TxStateSnapshotHashBuilder
              .computeStateHash(
                blockWithoutStateHash.transactionData,
                initStateHash,
                initSnapshot,
-               blockWithoutStateHash.header.generator.toAddress,
+               signer,
+               blockchain.lastBlockTimestamp,
                blockWithoutStateHash.header.timestamp,
                blockWithoutStateHash.header.challengedHeader.isDefined,
                compBlockchain
@@ -480,45 +473,5 @@ object WithState {
       accs.map(acc => AddrWithBalance(acc.toAddress))
 
     implicit def toAddrWithBalance(v: (KeyPair, Long)): AddrWithBalance = AddrWithBalance(v._1.toAddress, v._2)
-  }
-
-  // TODO: NODE-2609 use common function from hash builder
-  def computeStateHash(
-      txs: Seq[Transaction],
-      initStateHash: ByteStr,
-      initDiff: StateSnapshot,
-      signerAddr: Address,
-      timestamp: Long,
-      isChallenging: Boolean,
-      blockchain: Blockchain
-  ): TracedResult[ValidationError, ByteStr] = {
-    val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, timestamp) _
-
-    txs
-      .foldLeft[TracedResult[ValidationError, (ByteStr, StateSnapshot)]](TracedResult(Right(initStateHash -> initDiff))) {
-        case (acc @ TracedResult(Right((prevStateHash, accDiff)), _, _), tx) =>
-          val compBlockchain  = SnapshotBlockchain(blockchain, accDiff)
-          val (_, feeInWaves) = maybeApplySponsorship(compBlockchain, compBlockchain.isSponsorshipActive, tx.assetFee)
-          val minerPortfolio  = Map(signerAddr -> Portfolio.waves(feeInWaves).multiply(CurrentBlockFeePart))
-          val txDifferResult  = txDiffer(compBlockchain, tx)
-          txDifferResult.resultE match {
-            case Right(txSnapshot) =>
-              val txInfo = txSnapshot.transactions.head._2
-              val stateHash =
-                TxStateSnapshotHashBuilder
-                  .createHashFromSnapshot(
-                    txSnapshot.addBalances(minerPortfolio, compBlockchain).explicitGet(),
-                    Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status))
-                  )
-                  .createHash(prevStateHash)
-
-              txDifferResult
-                .copy(resultE = (accDiff |+| txSnapshot).addBalances(minerPortfolio, compBlockchain).map(stateHash -> _).leftMap(GenericError(_)))
-            case Left(_) if isChallenging => acc
-            case Left(err)                => txDifferResult.copy(resultE = err.asLeft[(ByteStr, StateSnapshot)])
-          }
-        case (err @ TracedResult(Left(_), _, _), _) => err
-      }
-      .map(_._1)
   }
 }

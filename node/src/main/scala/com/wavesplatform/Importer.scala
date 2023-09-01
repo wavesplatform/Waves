@@ -311,7 +311,7 @@ object Importer extends ScorexLogging {
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender: Block => Task[Either[ValidationError, Option[BigInt]]] =
+    val extAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
       BlockAppender(blockchainUpdater, time, _ => (), pos, scheduler, importOptions.verify, txSignParCheck = false)(_, None)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)

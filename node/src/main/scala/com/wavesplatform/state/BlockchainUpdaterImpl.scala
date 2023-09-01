@@ -202,8 +202,7 @@ class BlockchainUpdaterImpl(
       snapshot: Option[BlockSnapshot],
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
-      txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge (at NODE-2609)
+      txSignParCheck: Boolean = true
   ): Either[ValidationError, BlockApplyResult] =
     writeLock {
       val height                             = rocksdb.height
@@ -240,8 +239,7 @@ class BlockchainUpdaterImpl(
                       challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
-                      txSignParCheck = txSignParCheck,
-                      checkStateHash = checkStateHash
+                      txSignParCheck = txSignParCheck
                     )
                     .map { r =>
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward, Some(r.computedStateHash))
@@ -270,8 +268,7 @@ class BlockchainUpdaterImpl(
                       challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
-                      txSignParCheck = txSignParCheck,
-                      checkStateHash = checkStateHash
+                      txSignParCheck = txSignParCheck
                     )
                     .map { r =>
                       log.trace(
@@ -338,8 +335,7 @@ class BlockchainUpdaterImpl(
                             challengedHitSource,
                             rocksdb.loadCacheData,
                             verify,
-                            txSignParCheck = txSignParCheck,
-                            checkStateHash = checkStateHash
+                            txSignParCheck = txSignParCheck
                           )
                       } yield {
                         val tempBlockchain = SnapshotBlockchain(

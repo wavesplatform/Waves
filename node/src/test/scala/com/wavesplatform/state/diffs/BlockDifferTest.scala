@@ -5,7 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
-import com.wavesplatform.db.{WithDomain, WithState}
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.MiningConstraint
@@ -147,6 +147,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
               isChallenging = false,
               blockchain
             )
+            .resultE
             .explicitGet()
 
           val correctBlock =
@@ -189,6 +190,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
                     isChallenging = false,
                     blockchain
                   )
+                  .resultE
                   .explicitGet()
               )
             )(

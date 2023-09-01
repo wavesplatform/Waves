@@ -664,9 +664,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       d.appendBlock(genesis*)
       d.appendBlock(issue, setScript)
       d.appendBlock(ci)
-      inside(d.liquidDiff.scriptResults.toSeq) {
-        case Seq((_, i: InvokeScriptResult)) =>
-          i.transfers.size shouldBe 1
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, i: InvokeScriptResult)) =>
+        i.transfers.size shouldBe 1
       }
       d.blockchain.balance(thirdAddress, Waves) shouldBe amount
       d.blockchain.balance(invokerAddress, asset) shouldBe (issue.quantity.value - 1)

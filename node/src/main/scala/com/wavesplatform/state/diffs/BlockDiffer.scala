@@ -50,8 +50,7 @@ object BlockDiffer {
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
-      txSignParCheck: Boolean = true,
-      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge (at NODE-2609)
+      txSignParCheck: Boolean = true
   ): Either[ValidationError, Result] = {
     challengedHitSource match {
       case Some(hs) if snapshot.isEmpty =>
@@ -65,8 +64,7 @@ object BlockDiffer {
           loadCacheData,
           verify,
           enableExecutionLog,
-          txSignParCheck,
-          checkStateHash
+          txSignParCheck
         ).resultE match {
           case Left(_: InvalidStateHash) =>
             fromBlockTraced(
@@ -79,8 +77,7 @@ object BlockDiffer {
               loadCacheData,
               verify,
               enableExecutionLog,
-              txSignParCheck,
-              checkStateHash
+              txSignParCheck
             ).resultE
           case Left(err) => Left(GenericError(s"Invalid block challenge: $err"))
           case _         => Left(GenericError("Invalid block challenge"))
@@ -96,8 +93,7 @@ object BlockDiffer {
           loadCacheData,
           verify,
           enableExecutionLog,
-          txSignParCheck,
-          checkStateHash
+          txSignParCheck
         ).resultE
     }
   }
@@ -112,8 +108,7 @@ object BlockDiffer {
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
-      txSignParCheck: Boolean,
-      enableStateHash: Boolean // TODO: remove after NODE-2568 merge (at NODE-2609)
+      txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
@@ -206,14 +201,7 @@ object BlockDiffer {
             txSignParCheck = txSignParCheck
           )
       }
-      _ <-
-        if (enableStateHash)
-          checkStateHash(
-            blockchainWithNewBlock,
-            block.header.stateHash,
-            r.computedStateHash
-          )
-        else TracedResult(Right(()))
+      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash)
     } yield r
   }
 

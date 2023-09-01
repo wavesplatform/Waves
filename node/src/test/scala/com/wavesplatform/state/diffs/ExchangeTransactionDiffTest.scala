@@ -2018,7 +2018,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       d.appendBlock(issue)
       d.appendBlockE(exchange()) should produce("Attachment field for orders is not supported yet")
       d.appendBlock()
-      d.appendBlockENoCheck(exchange()) should beRight
+      d.appendBlockE(exchange()) should beRight
     }
   }
 
