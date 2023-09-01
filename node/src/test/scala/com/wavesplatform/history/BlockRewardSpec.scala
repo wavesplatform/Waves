@@ -50,16 +50,16 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     )
   )
 
-  private def mkEmptyBlock(ref: ByteStr, signer: KeyPair): Block = TestBlock.create(ntpNow, ref, Seq.empty, signer)
+  private def mkEmptyBlock(ref: ByteStr, signer: KeyPair): Block = TestBlock.create(ntpNow, ref, Seq.empty, signer).block
 
   private def mkEmptyBlockIncReward(ref: ByteStr, signer: KeyPair): Block =
-    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = InitialReward + 1 * Constants.UnitsInWave, version = Block.RewardBlockVersion)
+    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = InitialReward + 1 * Constants.UnitsInWave, version = Block.RewardBlockVersion).block
 
   private def mkEmptyBlockDecReward(ref: ByteStr, signer: KeyPair): Block =
-    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = InitialReward - 1 * Constants.UnitsInWave, version = Block.RewardBlockVersion)
+    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = InitialReward - 1 * Constants.UnitsInWave, version = Block.RewardBlockVersion).block
 
   private def mkEmptyBlockReward(ref: ByteStr, signer: KeyPair, vote: Long): Block =
-    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = vote, version = Block.RewardBlockVersion)
+    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = vote, version = Block.RewardBlockVersion).block
 
   private val InitialMinerBalance = 10000 * Constants.UnitsInWave
   private val OneTotalFee         = 100000
@@ -71,17 +71,19 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     issuer        <- accountGen
     miner1        <- accountGen
     miner2        <- accountGen
-    genesisBlock = TestBlock.create(
-      ntpTime.getTimestamp(),
-      Seq(
-        GenesisTransaction
-          .create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp())
-          .explicitGet(),
-        GenesisTransaction.create(issuer.toAddress, 40000 * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(miner1.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(miner2.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet()
+    genesisBlock = TestBlock
+      .create(
+        ntpTime.getTimestamp(),
+        Seq(
+          GenesisTransaction
+            .create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp())
+            .explicitGet(),
+          GenesisTransaction.create(issuer.toAddress, 40000 * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+          GenesisTransaction.create(miner1.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet(),
+          GenesisTransaction.create(miner2.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet()
+        )
       )
-    )
+      .block
 
   } yield (sourceAddress, issuer, miner1, miner2, genesisBlock)
 
@@ -89,7 +91,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     (sourceAddress, _, miner, _, genesisBlock) <- genesis
     recipient                                  <- accountGen
     transfers <- Gen.listOfN(10, transferGeneratorP(ntpNow, sourceAddress, recipient.toAddress, 1000 * Constants.UnitsInWave))
-    b2              = TestBlock.create(ntpNow, genesisBlock.id(), transfers, miner)
+    b2              = TestBlock.create(ntpNow, genesisBlock.id(), transfers, miner).block
     b3              = mkEmptyBlock(b2.id(), miner)
     b4              = mkEmptyBlock(b3.id(), miner)
     b5              = mkEmptyBlock(b4.id(), miner)
@@ -256,7 +258,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner1)
       b3        = mkEmptyBlock(b2.id(), miner1)
-      b4        = TestBlock.create(ntpNow, b3.id(), Seq(tx1), miner1)
+      b4        = TestBlock.create(ntpNow, b3.id(), Seq(tx1), miner1).block
       (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx2)), miner2, 3.toByte, ntpNow)
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
@@ -309,11 +311,13 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       b3        = mkEmptyBlock(b2.id(), miner)
       b4        = mkEmptyBlock(b3.id(), miner)
       (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx)), miner, 3.toByte, ntpNow)
-      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
-      b6b = TestBlock.sign(
-        miner,
-        b6a.copy(header = b6a.header.copy(timestamp = b6a.header.timestamp - 1L))
-      )
+      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner).block
+      b6b = TestBlock
+        .sign(
+          miner,
+          b6a.copy(header = b6a.header.copy(timestamp = b6a.header.timestamp - 1L))
+        )
+        .block
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
 
     "when received better liquid block" in forAll(betterBlockScenario) { case (miner, b1s, m1s, b2a, b2b) =>
@@ -332,61 +336,6 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneCarryFee
         d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
         d.blockchainUpdater.carryFee shouldBe 0L
-      }
-    }
-
-    val sameButBetterBlockScenario = for {
-      (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
-      tx1 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          issuer,
-          sourceAddress.toAddress,
-          Waves,
-          10 * Constants.UnitsInWave,
-          Waves,
-          OneTotalFee,
-          ByteStr.empty,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
-      tx2 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          issuer,
-          sourceAddress.toAddress,
-          Waves,
-          10 * Constants.UnitsInWave,
-          Waves,
-          OneTotalFee,
-          ByteStr.empty,
-          ntpTime.getTimestamp()
-        )
-        .explicitGet()
-      b2        = mkEmptyBlock(genesisBlock.id(), miner)
-      b3        = mkEmptyBlock(b2.id(), miner)
-      b4        = mkEmptyBlock(b3.id(), miner)
-      (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx1)), miner, 3.toByte, ntpNow)
-      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
-      b6b       = TestBlock.sign(miner, b6a.copy(transactionData = Seq(tx2)))
-    } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
-
-    "when received same liquid block but it is better than existing" in forAll(sameButBetterBlockScenario) { case (miner, b1s, m1s, b2a, b2b) =>
-      withDomain(rewardSettings) { d =>
-        b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
-        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m, None) should beRight)
-
-        d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
-        d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
-        d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.blockchainUpdater.carryFee shouldBe OneCarryFee
-
-        d.blockchainUpdater.processBlock(b2a) should beRight
-        d.blockchainUpdater.processBlock(b2b) should beRight
-
-        d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneFee + OneCarryFee
-        d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.blockchainUpdater.carryFee shouldBe OneCarryFee
       }
     }
 

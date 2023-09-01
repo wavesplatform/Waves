@@ -31,7 +31,7 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
     "works in case of one genesis transaction" in {
       val genesisBlock: (Address, Block) = {
         val master       = TxHelpers.signer(1)
-        val genesisBlock = TestBlock.create(System.currentTimeMillis(), Seq(TxHelpers.genesis(master.toAddress)))
+        val genesisBlock = TestBlock.create(System.currentTimeMillis(), Seq(TxHelpers.genesis(master.toAddress))).block
         (master.toAddress, genesisBlock)
       }
 
@@ -63,7 +63,7 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
       val address2  = a2.toAddress
 
       "transaction snapshots are correct" in {
-        assertDetailedSnapshot(block, RideV6) { case (_, keyBlockSnapshot) =>
+        assertDetailedSnapshot(block.block, RideV6) { case (_, keyBlockSnapshot) =>
           val transactionSnapshots = keyBlockSnapshot.transactions.map(_._2.snapshot).toSeq
           transactionSnapshots(0).balances((address1, Waves)) shouldBe gAmount
           transactionSnapshots(1).balances((address1, Waves)) shouldBe gAmount - amount1 - fee1 + fee1 / 5 * 2
@@ -75,14 +75,14 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
 
       "miner reward is correct" - {
         "without NG" in {
-          assertDetailedSnapshot(block, SettingsFromDefaultConfig) { case (_, keyBlockSnapshot) =>
+          assertDetailedSnapshot(block.block, SettingsFromDefaultConfig) { case (_, keyBlockSnapshot) =>
             keyBlockSnapshot.balances((address1, Waves)) shouldBe fee1 + fee2
           }
         }
 
         "with NG" - {
           "no history — no reward" in {
-            assertDetailedSnapshot(block, NG) { case (_, keyBlockSnapshot) =>
+            assertDetailedSnapshot(block.block, NG) { case (_, keyBlockSnapshot) =>
               keyBlockSnapshot.balances shouldBe empty
             }
           }
@@ -101,7 +101,7 @@ class BlockDifferDetailedSnapshotTest extends FreeSpec with WithState with WithD
             withDomain(NG) { d =>
               d.appendBlock(genesis)
               d.appendBlock(transfer1)
-              val block = TestBlock.create(defaultSigner, Seq(transfer2))
+              val block = TestBlock.create(defaultSigner, Seq(transfer2)).block
               val BlockDiffer.Result(_, _, _, _, detailedSnapshot, _) =
                 BlockDiffer
                   .fromBlock(d.blockchain, Some(d.lastBlock), block, None, MiningConstraint.Unlimited, block.header.generationSignature)

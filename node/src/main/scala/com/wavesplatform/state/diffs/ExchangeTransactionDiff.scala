@@ -71,6 +71,8 @@ object ExchangeTransactionDiff {
       _          <- smartFeaturesChecks()
       _          <- enoughVolume(tx, blockchain)
       _          <- checkOrderPriceModes(tx, blockchain)
+      _          <- checkAttachment(tx.order1, blockchain)
+      _          <- checkAttachment(tx.order2, blockchain)
       portfolios <- getPortfolios(blockchain, tx)
       orderFills = Map(
         tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee),
@@ -288,4 +290,13 @@ object ExchangeTransactionDiff {
       case _ => Right(())
     }
   }
+
+  private def checkAttachment(order: Order, blockchain: Blockchain): Either[GenericError, Unit] =
+    for {
+      _ <- Either.cond(
+        order.attachment.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot),
+        (),
+        GenericError("Attachment field for orders is not supported yet")
+      )
+    } yield ()
 }

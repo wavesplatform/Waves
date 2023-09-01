@@ -48,7 +48,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     (blockchain.leaseBalance _).when(*).returns(LeaseBalance.empty)
     (() => blockchain.height).when().returns(1)
     (blockchain.blockHeader _).when(*).returns {
-      val block = TestBlock.create(System.currentTimeMillis(), Nil)
+      val block = TestBlock.create(System.currentTimeMillis(), Nil).block
       Some(SignedBlockHeader(block.header, block.signature))
     }
     (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)

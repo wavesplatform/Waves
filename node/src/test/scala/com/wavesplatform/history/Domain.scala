@@ -12,6 +12,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, TransactionStateSnapshot}
@@ -23,6 +24,8 @@ import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.TestTime
@@ -73,7 +76,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   lazy val testTime: TestTime = TestTime()
-  lazy val blockAppender: Block => Task[Either[ValidationError, Option[BigInt]]] =
+  lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
     BlockAppender(blockchain, testTime, utxPool, posSelector, Scheduler.singleThread("appender"))(_, None)
   lazy val blockChallenger: BlockChallenger = new BlockChallengerImpl(
     blockchain,
@@ -166,7 +169,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     blockchainUpdater.lastBlockId
       .flatMap(blockchainUpdater.liquidBlock)
       .orElse(rocksDBWriter.lastBlock)
-      .getOrElse(TestBlock.create(Nil))
+      .getOrElse(TestBlock.create(Nil).block)
   }
 
   def liquidDiff: Diff =
@@ -176,9 +179,11 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block): Seq[StateSnapshot] = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): BlockApplyResult = blockchainUpdater.processBlock(b).explicitGet()
 
-  def appendBlockE(b: Block): Either[ValidationError, Seq[StateSnapshot]] = blockchainUpdater.processBlock(b)
+  // TODO: remove checkStateHash after NODE-2568 merge (at NODE-2609)
+  def appendBlockE(b: Block, checkStateHash: Boolean = true): Either[ValidationError, BlockApplyResult] =
+    blockchainUpdater.processBlock(b, checkStateHash)
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -256,8 +261,12 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     lastBlock
   }
 
-  def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[StateSnapshot]] =
-    appendBlockE(createBlock(Block.PlainBlockVersion, txs))
+  def appendBlockE(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
+    createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_))
+
+  // TODO: remove after NODE-2568 merge (at NODE-2609)
+  def appendBlockENoCheck(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
+    createBlockE(Block.PlainBlockVersion, txs).flatMap(appendBlockE(_, checkStateHash = false))
 
   def appendBlock(version: Byte, txs: Transaction*): Block = {
     val block = createBlock(version, txs)
@@ -275,63 +284,75 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       ref.orElse(Some(lastBlockId)),
       generator = signer
     )
-    val discardedDiffs = appendBlock(block)
-    utxPool.setPrioritySnapshots(discardedDiffs)
-    utxPool.cleanUnconfirmed()
+    appendBlock(block) match {
+      case Applied(discardedSnapshots, _) =>
+        utxPool.setPrioritySnapshots(discardedSnapshots)
+        utxPool.cleanUnconfirmed()
+      case Ignored => ()
+    }
+
     lastBlock
   }
 
   def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
     Try(appendMicroBlock(txs*)).toEither
 
-  def createMicroBlock(stateHash: Option[ByteStr] = None, signer: Option[KeyPair] = None, ref: Option[ByteStr] = None)(
+  def createMicroBlockE(stateHash: Option[ByteStr] = None, signer: Option[KeyPair] = None, ref: Option[ByteStr] = None)(
       txs: Transaction*
-  ): MicroBlock = {
+  ): Either[ValidationError, MicroBlock] = {
     val lastBlock   = this.lastBlock
     val blockSigner = signer.getOrElse(defaultSigner)
-    val block = Block
-      .buildAndSign(
-        lastBlock.header.version,
-        lastBlock.header.timestamp,
-        lastBlock.header.reference,
-        lastBlock.header.baseTarget,
-        lastBlock.header.generationSignature,
-        lastBlock.transactionData ++ txs,
-        blockSigner,
-        lastBlock.header.featureVotes,
-        lastBlock.header.rewardVote,
-        if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
-          Some(
-            stateHash.getOrElse(
-              TxStateSnapshotHashBuilder
-                .computeStateHash(
-                  txs,
-                  blockchain.lastBlockStateHash,
-                  StateSnapshot.empty,
-                  blockSigner,
-                  rocksDBWriter.lastBlockTimestamp,
-                  blockchain.lastBlockTimestamp.get,
-                  isChallenging = false,
-                  blockchain
-                )
-                .explicitGet()
+    val stateHashE = if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
+      stateHash
+        .map(Right(_))
+        .getOrElse(
+          WithState
+            .computeStateHash(
+              txs,
+              lastBlock.header.stateHash.get,
+              StateSnapshot.empty,
+              blockSigner.toAddress,
+              lastBlock.header.timestamp,
+              isChallenging = false,
+              blockchain
             )
-          )
-        } else None,
-        None
-      )
-      .explicitGet()
-    MicroBlock
-      .buildAndSign(
-        lastBlock.header.version,
-        signer.getOrElse(defaultSigner),
-        txs,
-        ref.getOrElse(blockchainUpdater.lastBlockId.get),
-        block.signature,
-        block.header.stateHash
-      )
-      .explicitGet()
+            .resultE
+        )
+        .map(Some(_))
+    } else Right(None)
+
+    for {
+      sh <- stateHashE
+      block <- Block
+        .buildAndSign(
+          lastBlock.header.version,
+          lastBlock.header.timestamp,
+          lastBlock.header.reference,
+          lastBlock.header.baseTarget,
+          lastBlock.header.generationSignature,
+          lastBlock.transactionData ++ txs,
+          blockSigner,
+          lastBlock.header.featureVotes,
+          lastBlock.header.rewardVote,
+          sh,
+          None
+        )
+      microblock <- MicroBlock
+        .buildAndSign(
+          lastBlock.header.version,
+          blockSigner,
+          txs,
+          ref.getOrElse(blockchainUpdater.lastBlockId.get),
+          block.signature,
+          block.header.stateHash
+        )
+    } yield microblock
   }
+
+  def createMicroBlock(stateHash: Option[ByteStr] = None, signer: Option[KeyPair] = None, ref: Option[ByteStr] = None)(
+      txs: Transaction*
+  ): MicroBlock =
+    createMicroBlockE(stateHash, signer, ref)(txs*).explicitGet()
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
     val mb = createMicroBlock()(txs*)
@@ -362,102 +383,107 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
       rewardVote: Long = -1L
-  ): Block = {
-    val reference        = ref.getOrElse(randomSig)
+  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote).explicitGet()
+
+  def createBlockE(
+      version: Byte,
+      txs: Seq[Transaction],
+      ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
+      strictTime: Boolean = false,
+      generator: KeyPair = defaultSigner,
+      stateHash: Option[Option[ByteStr]] = None,
+      challengedHeader: Option[ChallengedHeader] = None,
+      rewardVote: Long = -1L
+  ): Either[ValidationError, Block] = {
+    val reference = ref.getOrElse(randomSig)
+
     val parentHeight     = ref.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
     val parent           = blockchain.blockHeader(parentHeight).map(_.header).getOrElse(lastBlock.header)
     val greatGrandParent = blockchain.blockHeader(parentHeight - 2).map(_.header)
 
-    val timestamp =
-      if (blockchain.height > 0)
-        parent.timestamp + posSelector
-          .getValidBlockDelay(parentHeight, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
-          .explicitGet()
-      else
-        System.currentTimeMillis() - (1 hour).toMillis
-
-    val consensus =
-      if (blockchain.height > 0)
-        posSelector
-          .consensusData(
-            generator,
-            parentHeight,
-            settings.blockchainSettings.genesisSettings.averageBlockDelay,
-            parent.baseTarget,
-            parent.timestamp,
-            greatGrandParent.map(_.timestamp),
-            timestamp
-          )
-          .explicitGet()
-      else NxtLikeConsensusBlockData(60, generationSignature)
-
-    val resultBt =
-      if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
-        consensus.baseTarget
-      } else if (parentHeight % 2 != 0) parent.baseTarget
-      else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
-
-    val blockWithoutStateHash = Block
-      .buildAndSign(
-        version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-        timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
-        reference = reference,
-        baseTarget = resultBt,
-        generationSignature = consensus.generationSignature,
-        txs = txs,
-        featureVotes = Nil,
-        rewardVote = rewardVote,
-        signer = generator,
-        stateHash = None,
-        challengedHeader = challengedHeader
-      )
-      .explicitGet()
-
-    val resultStateHash = stateHash.getOrElse {
-      if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
-        val blockchainWithNewBlock =
-          SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, this.blockchain.computeNextReward, None)
-        val prevStateHash = blockchain.lastBlockStateHash
-
-        val initSnapshot = BlockDiffer
-          .createInitialBlockSnapshot(blockchain, generator.toAddress)
-          .explicitGet()
-        val initStateHash =
-          if (initSnapshot == StateSnapshot.empty) prevStateHash
-          else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
-
-        Some(
-          TxStateSnapshotHashBuilder
-            .computeStateHash(
-              txs,
-              initStateHash,
-              initSnapshot,
+    for {
+      timestamp <-
+        if (blockchain.height > 0)
+          posSelector
+            .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e12.toLong)
+            .map(_ + parent.timestamp)
+        else
+          Right(System.currentTimeMillis() - (1 hour).toMillis)
+      consensus <-
+        if (blockchain.height > 0)
+          posSelector
+            .consensusData(
               generator,
-              blockchain.lastBlockTimestamp,
-              blockWithoutStateHash.header.timestamp,
-              challengedHeader.nonEmpty,
-              blockchainWithNewBlock
+              parentHeight,
+              settings.blockchainSettings.genesisSettings.averageBlockDelay,
+              parent.baseTarget,
+              parent.timestamp,
+              greatGrandParent.map(_.timestamp),
+              timestamp
             )
-            .explicitGet()
+        else Right(NxtLikeConsensusBlockData(60, generationSignature))
+      resultBt =
+        if (blockchain.isFeatureActivated(BlockchainFeatures.FairPoS, parentHeight)) {
+          consensus.baseTarget
+        } else if (parentHeight % 2 != 0) parent.baseTarget
+        else consensus.baseTarget.max(PoSCalculator.MinBaseTarget)
+      blockWithoutStateHash <- Block
+        .buildAndSign(
+          version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
+          timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
+          reference = reference,
+          baseTarget = resultBt,
+          generationSignature = consensus.generationSignature,
+          txs = txs,
+          featureVotes = Nil,
+          rewardVote = rewardVote,
+          signer = generator,
+          stateHash = None,
+          challengedHeader = challengedHeader
         )
-      } else None
-    }
+      resultStateHash <- stateHash.map(Right(_)).getOrElse {
+        if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
+          val blockchain =
+            SnapshotBlockchain(this.blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, this.blockchain.computeNextReward, None)
+          val prevStateHash = blockchain.lastBlockStateHash
 
-    Block
-      .buildAndSign(
-        version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-        timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
-        reference = reference,
-        baseTarget = resultBt,
-        generationSignature = consensus.generationSignature,
-        txs = txs,
-        featureVotes = Nil,
-        rewardVote = rewardVote,
-        signer = generator,
-        stateHash = resultStateHash,
-        challengedHeader = challengedHeader
-      )
-      .explicitGet()
+          BlockDiffer
+            .createInitialBlockSnapshot(this.blockchain, generator.toAddress)
+            .flatMap { initSnapshot =>
+              val initStateHash =
+                if (initSnapshot == StateSnapshot.empty) prevStateHash
+                else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+
+              WithState
+                .computeStateHash(
+                  txs,
+                  initStateHash,
+                  initSnapshot,
+                  generator.toAddress,
+                  blockWithoutStateHash.header.timestamp,
+                  challengedHeader.isDefined,
+                  blockchain
+                )
+                .resultE
+                .map(Some(_))
+            }
+        } else Right(None)
+      }
+      resultBlock <- Block
+        .buildAndSign(
+          version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
+          timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
+          reference = reference,
+          baseTarget = resultBt,
+          generationSignature = consensus.generationSignature,
+          txs = txs,
+          featureVotes = Nil,
+          rewardVote = rewardVote,
+          signer = generator,
+          stateHash = resultStateHash,
+          challengedHeader = challengedHeader
+        )
+    } yield resultBlock
   }
 
   def createChallengingBlock(
@@ -568,7 +594,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Seq[StateSnapshot]] = {
+    // TODO: delete checkStateHash after NODE-2568 merge (at NODE-2609)
+    def processBlock(block: Block, checkStateHash: Boolean = true): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           Right(block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature))
@@ -589,7 +616,9 @@ object Domain {
           } yield hs -> challengedHs
         }
 
-      hitSourcesE.flatMap { case (hitSource, challengedHitSource) => bcu.processBlock(block, hitSource, None, challengedHitSource) }
+      hitSourcesE.flatMap { case (hitSource, challengedHitSource) =>
+        bcu.processBlock(block, hitSource, None, challengedHitSource, checkStateHash = checkStateHash)
+      }
     }
   }
 

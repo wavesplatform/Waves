@@ -26,6 +26,7 @@ import DomainPresets.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
 import monix.eval.Task
 
@@ -33,7 +34,7 @@ import scala.concurrent.duration.*
 
 class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
-  type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
+  type Appender = Block => Task[Either[ValidationError, BlockApplyResult]]
 
   val time: TestTime            = TestTime()
   val minerAcc: SeedKeyPair     = TxHelpers.signer(1)

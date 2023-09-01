@@ -16,6 +16,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.*
@@ -201,8 +202,9 @@ class BlockchainUpdaterImpl(
       snapshot: Option[BlockSnapshot],
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
-      txSignParCheck: Boolean = true
-  ): Either[ValidationError, Seq[StateSnapshot]] =
+      txSignParCheck: Boolean = true,
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge (at NODE-2609)
+  ): Either[ValidationError, BlockApplyResult] =
     writeLock {
       val height                             = rocksdb.height
       val notImplementedFeatures: Set[Short] = rocksdb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -213,7 +215,7 @@ class BlockchainUpdaterImpl(
           (),
           GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
         )
-        .flatMap[ValidationError, Seq[StateSnapshot]](_ =>
+        .flatMap[ValidationError, BlockApplyResult](_ =>
           (ngState match {
             case None =>
               rocksdb.lastBlockId match {
@@ -238,7 +240,8 @@ class BlockchainUpdaterImpl(
                       challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
-                      txSignParCheck = txSignParCheck
+                      txSignParCheck = txSignParCheck,
+                      checkStateHash = checkStateHash
                     )
                     .map { r =>
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward, Some(r.computedStateHash))
@@ -267,47 +270,22 @@ class BlockchainUpdaterImpl(
                       challengedHitSource,
                       rocksdb.loadCacheData,
                       verify,
-                      txSignParCheck = txSignParCheck
+                      txSignParCheck = txSignParCheck,
+                      checkStateHash = checkStateHash
                     )
                     .map { r =>
                       log.trace(
                         s"Better liquid block(timestamp=${block.header.timestamp}) received and applied instead of existing(timestamp=${ng.base.header.timestamp})"
                       )
+                      BlockStats.replaced(ng.base, block)
                       val (mbs, diffs) = ng.allSnapshots.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
-                  if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
-                    log.trace(s"Existing liquid block is better than new one, discarding $block")
-                    Right(None)
-                  } else {
-                    log.trace(s"New liquid block is better version of existing, swapping")
-                    val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
-                    val miningConstraints = MiningConstraints(rocksdb, height, wavesSettings.enableLightMode)
-
-                    blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
-
-                    val referencedBlockchain = SnapshotBlockchain(rocksdb, ng.reward)
-                    BlockDiffer
-                      .fromBlock(
-                        referencedBlockchain,
-                        rocksdb.lastBlock,
-                        block,
-                        snapshot,
-                        miningConstraints.total,
-                        hitSource,
-                        challengedHitSource,
-                        rocksdb.loadCacheData,
-                        verify,
-                        txSignParCheck = txSignParCheck
-                      )
-                      .map { r =>
-                        blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
-                        Some((r, Nil, ng.reward, hitSource))
-                      }
-                  }
+                  // silently ignore
+                  Right(None)
                 } else
                   Left(
                     BlockAppendError(
@@ -360,7 +338,8 @@ class BlockchainUpdaterImpl(
                             challengedHitSource,
                             rocksdb.loadCacheData,
                             verify,
-                            txSignParCheck = txSignParCheck
+                            txSignParCheck = txSignParCheck,
+                            checkStateHash = checkStateHash
                           )
                       } yield {
                         val tempBlockchain = SnapshotBlockchain(
@@ -424,6 +403,7 @@ class BlockchainUpdaterImpl(
                     cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                   )
                 )
+
                 publishLastBlockInfo()
 
                 if (
@@ -433,8 +413,8 @@ class BlockchainUpdaterImpl(
                   log.info(s"New height: $newHeight")
                 }
 
-                discDiffs
-            } getOrElse Nil
+                Applied(discDiffs, this.score)
+            } getOrElse Ignored
           }
         )
     }
@@ -817,6 +797,12 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
+  sealed trait BlockApplyResult
+  object BlockApplyResult {
+    case object Ignored                                                   extends BlockApplyResult
+    case class Applied(discardedDiffs: Seq[StateSnapshot], score: BigInt) extends BlockApplyResult
+  }
+
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 

@@ -22,12 +22,14 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
     val (issuer, b1) = genesis
     val issue        = TxHelpers.issue(issuer, version = TxVersion.V1)
     reissueTx(issuer, issue.asset, BeforeActivationFee).map { reissue =>
-      val b2 = TestBlock.create(
-        ntpNow,
-        b1.id(),
-        Seq(issue),
-        issuer
-      )
+      val b2 = TestBlock
+        .create(
+          ntpNow,
+          b1.id(),
+          Seq(issue),
+          issuer
+        )
+        .block
 
       (Seq(b1, b2), reissue)
     }
@@ -49,18 +51,22 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
     val issue2       = TxHelpers.issue(issuer, name = "asset2", version = TxVersion.V1)
 
     reissueTx(issuer, issue1.asset, AfterActivationFee).map { reissue =>
-      val b2 = TestBlock.create(
-        ntpNow,
-        b1.id(),
-        Seq(issue1),
-        issuer
-      )
-      val b3 = TestBlock.create(
-        ntpNow,
-        b2.id(),
-        Seq(issue2),
-        issuer
-      )
+      val b2 = TestBlock
+        .create(
+          ntpNow,
+          b1.id(),
+          Seq(issue1),
+          issuer
+        )
+        .block
+      val b3 = TestBlock
+        .create(
+          ntpNow,
+          b2.id(),
+          Seq(issue2),
+          issuer
+        )
+        .block
 
       (Seq(b1, b2, b3), reissue)
     }
@@ -90,10 +96,12 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
 
   private def genesis: (KeyPair, Block) = {
     val issuer = TxHelpers.signer(1)
-    val block = TestBlock.create(
-      ntpNow,
-      Seq(GenesisTransaction.create(issuer.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet())
-    )
+    val block = TestBlock
+      .create(
+        ntpNow,
+        Seq(GenesisTransaction.create(issuer.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet())
+      )
+      .block
 
     (issuer, block)
   }

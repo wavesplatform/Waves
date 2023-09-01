@@ -23,6 +23,7 @@ object BlockStats {
   private object Event {
     case object Inv      extends Event
     case object Received extends Event
+    case object Replaced extends Event
     case object Applied  extends Event
     case object Appended extends Event
     case object Declined extends Event
@@ -57,6 +58,14 @@ object BlockStats {
     blockSnapshot(s, source)
       .addField("from", nodeName(ch)),
     Event.Received,
+    Seq.empty
+  )
+
+  def replaced(b: Block, betterBlock: Block): Unit = write(
+    measurement(Type.Block)
+      .tag("id", id(b.id()))
+      .tag("better-id", id(betterBlock.id())),
+    Event.Replaced,
     Seq.empty
   )
 

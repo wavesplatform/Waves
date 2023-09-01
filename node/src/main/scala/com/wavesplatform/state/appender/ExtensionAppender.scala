@@ -7,6 +7,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -67,7 +68,8 @@ object ExtensionAppender extends ScorexLogging {
                           extension.snapshots.get(b.id())
                         )
                           .map {
-                            _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+                            case (Applied(_, _), height) => BlockStats.applied(b, BlockStats.Source.Ext, height)
+                            case _                       =>
                           }
                       }
                       .zipWithIndex

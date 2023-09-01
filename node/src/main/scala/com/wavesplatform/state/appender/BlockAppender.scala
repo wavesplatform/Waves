@@ -10,6 +10,8 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -30,21 +32,19 @@ object BlockAppender extends ScorexLogging {
       scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
-  )(newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Either[ValidationError, Option[BigInt]]] =
+  )(newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Either[ValidationError, BlockApplyResult]] =
     Task {
       if (
         blockchainUpdater
           .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
         if (newBlock.header.challengedHeader.isDefined) {
-          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot).map(_ =>
-            Some(blockchainUpdater.score)
-          )
+          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot)
         } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot).map(_ => Some(blockchainUpdater.score))
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot)
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
-        Right(None)
+        Right(Ignored)
       else
         Left(BlockAppendError("Block is not a child of the last block or its parent", newBlock))
     }.executeOn(scheduler)
@@ -73,8 +73,8 @@ object BlockAppender extends ScorexLogging {
       } yield validApplication).value
 
     val handle = append.asyncBoundary.flatMap {
-      case Right(None) => Task.unit // block already appended
-      case Right(Some(_)) =>
+      case Right(Ignored) => Task.unit // block already appended
+      case Right(Applied(_, _)) =>
         Task {
           log.debug(s"${id(ch)} Appended $newBlock")
 

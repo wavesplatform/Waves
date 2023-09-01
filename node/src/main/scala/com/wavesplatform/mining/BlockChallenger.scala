@@ -11,6 +11,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.SnapshotBlockchain
@@ -45,7 +47,7 @@ class BlockChallengerImpl(
     timeService: Time,
     pos: PoSSelector,
     minerScheduler: Scheduler,
-    appendBlock: Block => Task[Either[ValidationError, Option[BigInt]]]
+    appendBlock: Block => Task[Either[ValidationError, BlockApplyResult]]
 ) extends BlockChallenger
     with ScorexLogging {
 
@@ -65,13 +67,14 @@ class BlockChallengerImpl(
             blockchainUpdater.lastBlockStateHash
           )
         )
-        _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
-      } yield challengingBlock).value
+        applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+      } yield applyResult -> challengingBlock).value
     }.map {
-      case Right(challengingBlock) =>
+      case Right((Applied(_, _), challengingBlock)) =>
         log.debug(s"Successfully challenged $block with $challengingBlock")
         allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
-      case Left(err) => log.debug(s"Could not challenge $block: $err")
+      case Right((_, challengingBlock)) => log.debug(s"Ignored challenging block $challengingBlock")
+      case Left(err)                    => log.debug(s"Could not challenge $block: $err")
     }
   }
 
@@ -83,7 +86,7 @@ class BlockChallengerImpl(
       discarded <- EitherT(Task(blockchainUpdater.removeAfter(blockchainUpdater.lastBlockHeader.get.header.reference)))
       block     <- EitherT(Task(discarded.headOption.map(_._1).toRight(GenericError("Liquid block wasn't discarded"))))
       txs = block.transactionData ++ md.microBlock.transactionData
-      challengingBlock <- EitherT(withProcessingTxs(txs) {
+      (applyResult, challengingBlock) <- EitherT(withProcessingTxs(txs) {
         (for {
           challengingBlock <- EitherT(
             createChallengingBlock(
@@ -94,12 +97,17 @@ class BlockChallengerImpl(
               blockchainUpdater.lastBlockStateHash
             )
           )
-          _ <- EitherT(appendBlock(challengingBlock).asyncBoundary)
-        } yield challengingBlock).value
+          applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+        } yield applyResult -> challengingBlock).value
       })
     } yield {
-      log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
-      allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+      applyResult match {
+        case Applied(_, _) =>
+          log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
+          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+        case _ =>
+          log.debug(s"Ignored challenging block $challengingBlock")
+      }
     }).fold(
       err => log.debug(s"Could not challenge microblock $idStr: $err"),
       identity

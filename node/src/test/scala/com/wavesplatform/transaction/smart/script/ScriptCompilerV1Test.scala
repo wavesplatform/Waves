@@ -1,15 +1,15 @@
 package com.wavesplatform.transaction.smart.script
 
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.{EitherValues, Inside}
 
 class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
@@ -26,8 +26,9 @@ class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
   }
 
   property("fails on unsupported version") {
-    val script = scriptWithVersion("8".some)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value 8 for key STDLIB_VERSION")
+    val unsupportedVersionStr = (StdLibVersion.VersionDic.all.max.id + 1).toString
+    val script                = scriptWithVersion(unsupportedVersionStr.some)
+    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left(s"Illegal directive value $unsupportedVersionStr for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {
@@ -193,9 +194,9 @@ class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
         scriptType: ScriptType
     ): String =
       s"""
-       | {-# STDLIB_VERSION ${version.value}     #-}
-       | {-# CONTENT_TYPE   ${contentType.value} #-}
-       | {-# SCRIPT_TYPE    ${scriptType.value}  #-}
+         | {-# STDLIB_VERSION ${version.value}     #-}
+         | {-# CONTENT_TYPE   ${contentType.value} #-}
+         | {-# SCRIPT_TYPE    ${scriptType.value}  #-}
      """.stripMargin
 
     def buildScript(
@@ -258,20 +259,20 @@ class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
     def transactionByIdComplexity(version: Int): Long = {
       val scriptWithoutTransactionById =
         s"""
-          | {-# STDLIB_VERSION $version #-}
-          |
-          | let a = base64''
-          | a == a
-          |
+           | {-# STDLIB_VERSION $version #-}
+           |
+           | let a = base64''
+           | a == a
+           |
       """.stripMargin
 
       val scriptWithTransactionById =
         s"""
-          | {-# STDLIB_VERSION $version #-}
-          |
-          | let a = transactionById(base64'')
-          | a == a
-          |
+           | {-# STDLIB_VERSION $version #-}
+           |
+           | let a = transactionById(base64'')
+           | a == a
+           |
       """.stripMargin
 
       val c1 = ScriptCompiler.compile(scriptWithoutTransactionById, estimator).explicitGet()._2

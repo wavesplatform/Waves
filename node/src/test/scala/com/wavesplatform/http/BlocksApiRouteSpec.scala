@@ -12,15 +12,19 @@ import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import scala.concurrent.duration.*
@@ -38,8 +42,8 @@ class BlocksApiRouteSpec
     BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler))
   private val route = blocksApiRoute.route
 
-  private val testBlock1 = TestBlock.create(Nil)
-  private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
+  private val testBlock1 = TestBlock.create(Nil).block
+  private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion).block
 
   private val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
   private val testBlock2Json = testBlock2.json() ++ Json.obj(
@@ -310,7 +314,7 @@ class BlocksApiRouteSpec
     }
 
     "ideal blocks" in {
-      val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil))
+      val blocks = (1 to 10).map(i => TestBlock.create(i * 10, Nil).block)
       val route  = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
       Get(routePath(s"/heightByTimestamp/10")) ~> route ~> check {
@@ -349,7 +353,7 @@ class BlocksApiRouteSpec
 
     "random blocks" in {
       val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) { case ((ts, blocks), _) =>
-        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
+        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil).block
         (newBlock.header.timestamp, blocks :+ newBlock)
       }
 
@@ -359,6 +363,58 @@ class BlocksApiRouteSpec
         Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
           val result = (responseAs[JsObject] \ "height").as[Int]
           result shouldBe (index + 1)
+        }
+      }
+    }
+  }
+
+  "NODE-968. Blocks API should return correct data for orders with attachment" in {
+    def checkOrderAttachment(blockInfo: JsObject, expectedAttachment: ByteStr): Assertion = {
+      implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
+      ((blockInfo \ "transactions").as[JsArray].value.head.as[JsObject] \ "order1" \ "attachment").asOpt[ByteStr] shouldBe Some(expectedAttachment)
+    }
+
+    val sender = TxHelpers.signer(1)
+    val issuer = TxHelpers.signer(2)
+    withDomain(TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, issuer)) { d =>
+      val attachment = ByteStr.fill(32)(1)
+      val issue      = TxHelpers.issue(issuer)
+      val exchange =
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(attachment)),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer),
+          version = TxVersion.V3
+        )
+
+      d.appendBlock(issue)
+      val exchangeBlock = d.appendBlock(exchange)
+
+      val route = new BlocksApiRoute(
+        d.settings.restAPISettings,
+        d.blocksApi,
+        SystemTime,
+        new RouteTimeout(60.seconds)(sharedScheduler)
+      ).route
+
+      Get("/blocks/last") ~> route ~> check {
+        checkOrderAttachment(responseAs[JsObject], attachment)
+      }
+
+      d.liquidAndSolidAssert { () =>
+        Get(s"/blocks/at/3") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsObject], attachment)
+        }
+
+        Get(s"/blocks/seq/3/3") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+        }
+
+        Get(s"/blocks/address/${exchangeBlock.sender.toAddress}/3/3") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsArray].value.head.as[JsObject], attachment)
+        }
+
+        Get(s"/blocks/${exchangeBlock.id()}") ~> route ~> check {
+          checkOrderAttachment(responseAs[JsObject], attachment)
         }
       }
     }
