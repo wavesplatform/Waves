@@ -23,6 +23,8 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, Authorized, BlockchainUpdater, GenesisTransaction, PaymentTransaction, Transaction}
 
+import scala.collection.immutable.VectorMap
+
 object BlockDiffer {
   final case class Result(
       snapshot: StateSnapshot,
@@ -376,12 +378,11 @@ object BlockDiffer {
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
               txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_)).map { resultTxSnapshot =>
-                val (txId, txInfo)      = txSnapshot.transactions.head
-                val txInfoWithFee       = txInfo.copy(snapshot = resultTxSnapshot)
+                val (_, txInfo)         = txSnapshot.transactions.head
+                val txInfoWithFee       = txInfo.copy(snapshot = resultTxSnapshot.copy(transactions = VectorMap.empty))
                 val newKeyBlockSnapshot = keyBlockSnapshot.withTransaction(txInfoWithFee)
-                val txsWithFee          = resultTxSnapshot.transactions.updated(txId, txInfoWithFee)
 
-                val newSnapshot   = currSnapshot |+| resultTxSnapshot.copy(transactions = txsWithFee)
+                val newSnapshot   = currSnapshot |+| resultTxSnapshot.withTransaction(txInfoWithFee)
                 val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
 
                 Result(

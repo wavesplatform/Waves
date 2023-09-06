@@ -13,6 +13,7 @@ import com.wavesplatform.protobuf.ByteStrExt
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
@@ -36,12 +37,20 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
       val recipient        = recipientSigner.toAddress
       val recipientSigner2 = TxHelpers.signer(3)
       val recipient2       = recipientSigner2.toAddress
+      val reward           = d.blockchain.settings.rewardsSettings.initial
 
       def assertSnapshot(tx: Transaction, expected: StateSnapshot, failed: Boolean = false): Unit = {
+        val expectedSnapshotWithMiner =
+          expected
+            .addBalances(
+              Map(defaultAddress -> Portfolio.waves(CurrentBlockFeePart(tx.fee) + reward + d.carryFee)).filter(_ => tx.fee != 0),
+              d.blockchain
+            )
+            .explicitGet()
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expected, status)
+        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
