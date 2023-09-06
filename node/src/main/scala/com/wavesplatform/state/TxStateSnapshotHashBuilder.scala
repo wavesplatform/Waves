@@ -153,7 +153,7 @@ object TxStateSnapshotHashBuilder {
 
     txs
       .foldLeft[TracedResult[ValidationError, (ByteStr, StateSnapshot)]](TracedResult.wrapValue(initStateHash -> initSnapshot)) {
-        case (acc @ TracedResult(Right((prevStateHash, accSnapshot)), _, _), tx) =>
+        case (TracedResult(Right((prevStateHash, accSnapshot)), _, _), tx) =>
           val accBlockchain  = SnapshotBlockchain(blockchain, accSnapshot)
           val txDifferResult = txDiffer(accBlockchain, tx)
           txDifferResult.resultE match {

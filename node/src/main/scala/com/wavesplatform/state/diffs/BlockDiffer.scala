@@ -375,12 +375,13 @@ object BlockDiffer {
               // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
-              val txInfo = txSnapshot.transactions.head._2
-              for {
-                resultTxSnapshot <- txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_))
-                newKeyBlockSnapshot = keyBlockSnapshot.withTransaction(txInfo.copy(snapshot = resultTxSnapshot))
-              } yield {
-                val newSnapshot   = currSnapshot |+| resultTxSnapshot
+              txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_)).map { resultTxSnapshot =>
+                val (txId, txInfo)      = txSnapshot.transactions.head
+                val txInfoWithFee       = txInfo.copy(snapshot = resultTxSnapshot)
+                val newKeyBlockSnapshot = keyBlockSnapshot.withTransaction(txInfoWithFee)
+                val txsWithFee          = resultTxSnapshot.transactions.updated(txId, txInfoWithFee)
+
+                val newSnapshot   = currSnapshot |+| resultTxSnapshot.copy(transactions = txsWithFee)
                 val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
 
                 Result(

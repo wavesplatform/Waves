@@ -89,6 +89,8 @@ case class MicroSnapshotRequest(totalBlockId: BlockId) extends Message
 
 case class BlockSnapshotResponse(blockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
   def toProtobuf: PBBlockSnapshot = PBBlockSnapshot(blockId.toByteString, snapshots)
+
+  override def toString: String = s"BlockSnapshotResponse($blockId, ${snapshots.size} snapshots)"
 }
 
 object BlockSnapshotResponse {
@@ -99,6 +101,8 @@ object BlockSnapshotResponse {
 case class MicroBlockSnapshotResponse(totalBlockId: BlockId, snapshots: Seq[TransactionStateSnapshot]) extends Message {
   def toProtobuf: PBMicroBlockSnapshot =
     PBMicroBlockSnapshot(totalBlockId.toByteString, snapshots)
+
+  override def toString: String = s"MicroBlockSnapshotResponse($totalBlockId, ${snapshots.size} snapshots)"
 }
 
 object MicroBlockSnapshotResponse {

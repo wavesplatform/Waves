@@ -6,7 +6,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, ChallengedHeader, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, ChallengedHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -77,16 +77,21 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   lazy val testTime: TestTime = TestTime()
   lazy val blockAppender: Block => Task[Either[ValidationError, BlockApplyResult]] =
     BlockAppender(blockchain, testTime, utxPool, posSelector, Scheduler.singleThread("appender"))(_, None)
-  lazy val blockChallenger: BlockChallenger = new BlockChallengerImpl(
-    blockchain,
-    new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-    wallet,
-    settings,
-    testTime,
-    posSelector,
-    Schedulers.singleThread("miner"),
-    blockAppender
-  )
+  lazy val blockChallenger: Option[BlockChallenger] =
+    if (!settings.enableLightMode)
+      Some(
+        new BlockChallengerImpl(
+          blockchain,
+          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+          wallet,
+          settings,
+          testTime,
+          posSelector,
+          Schedulers.singleThread("miner"),
+          blockAppender
+        )
+      )
+    else None
 
   object commonApi {
 
@@ -117,13 +122,13 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     def addressTransactions(address: Address): Seq[TransactionMeta] =
       transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
 
-    def commonTransactionsApi(challenger: BlockChallenger): CommonTransactionsApi =
+    def commonTransactionsApi(challenger: Option[BlockChallenger]): CommonTransactionsApi =
       CommonTransactionsApi(
         blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
         rdb,
         blockchain,
         utxPool,
-        Some(challenger),
+        challenger,
         tx => Future.successful(utxPool.putIfNew(tx)),
         Application.loadBlockAt(rdb, blockchain)
       )
@@ -180,7 +185,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def appendBlock(b: Block): BlockApplyResult = blockchainUpdater.processBlock(b).explicitGet()
 
-  def appendBlockE(b: Block): Either[ValidationError, BlockApplyResult] = blockchainUpdater.processBlock(b)
+  def appendBlockE(b: Block, snapshot: Option[BlockSnapshot] = None): Either[ValidationError, BlockApplyResult] =
+    blockchainUpdater.processBlock(b, snapshot)
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -569,7 +575,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     rdb,
     blockchain,
     utxPool,
-    Some(blockChallenger),
+    blockChallenger,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
   )
@@ -589,7 +595,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, BlockApplyResult] = {
+    def processBlock(block: Block, snapshot: Option[BlockSnapshot] = None): Either[ValidationError, BlockApplyResult] = {
       val hitSourcesE =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           Right(block.header.generationSignature -> block.header.challengedHeader.map(_.generationSignature))
@@ -611,7 +617,7 @@ object Domain {
         }
 
       hitSourcesE.flatMap { case (hitSource, challengedHitSource) =>
-        bcu.processBlock(block, hitSource, None, challengedHitSource)
+        bcu.processBlock(block, hitSource, snapshot, challengedHitSource)
       }
     }
   }

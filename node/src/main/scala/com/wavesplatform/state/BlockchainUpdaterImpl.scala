@@ -30,6 +30,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ReplaySubject
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
+import scala.collection.immutable.VectorMap
 
 class BlockchainUpdaterImpl(
     val rocksdb: RocksDBWriter,
@@ -472,7 +473,14 @@ class BlockchainUpdaterImpl(
             maybeNg.map { ng =>
               val block = ng.bestLiquidBlock
               val snapshot = if (wavesSettings.enableLightMode && block.transactionData.nonEmpty) {
-                Some(BlockSnapshot(block.id(), ng.bestLiquidSnapshot.transactions.toSeq.map { case (_, txInfo) => (txInfo.snapshot, txInfo.status) }))
+                Some(
+                  BlockSnapshot(
+                    block.id(),
+                    ng.bestLiquidSnapshot.transactions.toSeq.map { case (_, txInfo) =>
+                      (txInfo.snapshot.copy(transactions = VectorMap.empty), txInfo.status)
+                    }
+                  )
+                )
               } else None
               (block, ng.hitSource, snapshot)
             }.toSeq

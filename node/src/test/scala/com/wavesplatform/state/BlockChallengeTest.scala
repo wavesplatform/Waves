@@ -1553,27 +1553,29 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val invalidBlock =
         d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
 
-      val blockChallenger: BlockChallenger =
-        new BlockChallengerImpl(
-          d.blockchain,
-          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-          d.wallet,
-          d.settings,
-          testTime,
-          d.posSelector,
-          Schedulers.singleThread("miner"),
-          createBlockAppender(d)
-        ) {
-          override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
-            promise.success(())
-            lockChallenge.lock()
-            val best = super.pickBestAccount(accounts)
-            testTime.setTime(invalidBlock.header.timestamp.max(best.explicitGet()._2 + d.lastBlock.header.timestamp))
-            best
+      val blockChallenger: Option[BlockChallenger] =
+        Some(
+          new BlockChallengerImpl(
+            d.blockchain,
+            new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+            d.wallet,
+            d.settings,
+            testTime,
+            d.posSelector,
+            Schedulers.singleThread("miner"),
+            createBlockAppender(d)
+          ) {
+            override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
+              promise.success(())
+              lockChallenge.lock()
+              val best = super.pickBestAccount(accounts)
+              testTime.setTime(invalidBlock.header.timestamp.max(best.explicitGet()._2 + d.lastBlock.header.timestamp))
+              best
+            }
           }
-        }
+        )
       val appender =
-        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, Some(blockChallenger), appenderScheduler) _
+        BlockAppender(d.blockchain, testTime, d.utxPool, d.posSelector, channels, PeerDatabase.NoOp, blockChallenger, appenderScheduler) _
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,

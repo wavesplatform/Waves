@@ -284,7 +284,8 @@ class RocksDBWriter(
     else settings.genesisSettings.initialBalance
 
   override def blockReward(height: Int): Option[Long] =
-    if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
+    if (this.isFeatureActivated(BlockchainFeatures.ConsensusImprovements, height) && height == 1) None
+    else if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
     else None
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[?]): Seq[Array[Byte]] =
