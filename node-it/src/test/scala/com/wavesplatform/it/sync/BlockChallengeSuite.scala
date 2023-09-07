@@ -53,6 +53,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
       ).signWith(challenger.keyPair.privateKey)
     }
     val invalidBlock = createBlockWithInvalidStateHash(lastBlock, height, malicious.keyPair, txs)
+    waitForBlockTime(invalidBlock)
     Await.ready(challenger.sendByNetwork(RawBytes.fromBlock(invalidBlock)), 2.minutes)
 
     txs.foreach { tx =>
@@ -88,7 +89,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
     val hitSource =
       crypto.verifyVRF(genSig, lastBlockVrfOrGenSig, signer.publicKey).explicitGet()
 
-    val posCalculator = FairPoSCalculator.V2
+    val posCalculator = FairPoSCalculator.V1
     val version       = 5.toByte
 
     val validBlockDelay: Long = posCalculator
@@ -126,4 +127,10 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
   }
 
   private def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(8).reverse)
+
+  private def waitForBlockTime(block: Block): Unit = {
+    val timeout = block.header.timestamp - System.currentTimeMillis()
+
+    if (timeout > 0) Thread.sleep(timeout)
+  }
 }
