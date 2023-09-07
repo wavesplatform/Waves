@@ -23,10 +23,9 @@ import scala.concurrent.duration.*
 class BlockChallengeSuite extends BaseFunSuite with TransferSending {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
-      .overrideBase(_.quorum(3))
+      .overrideBase(_.quorum(4))
       .overrideBase(_.preactivatedFeatures(BlockchainFeatures.TransactionStateSnapshot.id.toInt -> 0))
-      .withDefault(0)
-      .withSpecial(1, _.raw("waves.miner.no-quorum-mining-delay = 20s"))
+      .withDefault(1)
       .withSpecial(1, _.lightNode)
       .withSpecial(2, _.nonMiner)
       .buildNonConflicting()
@@ -59,7 +58,6 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
     txs.foreach { tx =>
       nodes.waitForTransaction(tx.id().toString)
     }
-    nodes.waitForHeightArise()
 
     val challengingIds = nodes.map { node =>
       val challengingBlock = node.blockAt(height + 1)
