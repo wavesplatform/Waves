@@ -333,8 +333,7 @@ object BlockSnapshotResponseSpec extends MessageSpec[BlockSnapshotResponse] {
 
   override def serializeData(data: BlockSnapshotResponse): Array[Byte] = data.toProtobuf.toByteArray
 
-  // TODO: NODE-2609 estimate
-  override def maxLength: Int = Int.MaxValue
+  override val maxLength: Int = NetworkServer.MaxFrameLength
 }
 
 object MicroBlockSnapshotResponseSpec extends MessageSpec[MicroBlockSnapshotResponse] {
@@ -345,8 +344,7 @@ object MicroBlockSnapshotResponseSpec extends MessageSpec[MicroBlockSnapshotResp
 
   override def serializeData(data: MicroBlockSnapshotResponse): Array[Byte] = data.toProtobuf.toByteArray
 
-  // TODO: NODE-2609 estimate
-  override def maxLength: Int = Int.MaxValue
+  override val maxLength: Int = NetworkServer.MaxFrameLength
 }
 
 // Virtual, only for logs

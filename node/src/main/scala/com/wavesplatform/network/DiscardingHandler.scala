@@ -14,8 +14,13 @@ class DiscardingHandler(blockchainReadiness: Observable[Boolean], isLightMode: B
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case RawBytes(code @ (TransactionSpec.messageCode | PBTransactionSpec.messageCode), _) if !lastReadiness().contains(true) || isLightMode =>
-      log.trace(s"${id(ctx)} Discarding incoming message $code")
+      logDiscarding(ctx, code)
+    case RawBytes(code @ (BlockSnapshotResponseSpec.messageCode | MicroBlockSnapshotResponseSpec.messageCode), _) if !isLightMode =>
+      logDiscarding(ctx, code)
 
     case _ => super.channelRead(ctx, msg)
   }
+
+  private def logDiscarding(ctx: ChannelHandlerContext, code: Byte): Unit =
+    log.trace(s"${id(ctx)} Discarding incoming message $code")
 }
