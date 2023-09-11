@@ -251,14 +251,14 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       val asset = issueValidated(acc, simpleReissuableAsset)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       val height1 = nodes.waitForHeightArise()
-      sender.assetDistributionAtHeight(asset, height1, 10).items.map { case (a, v) => a.toString -> v } shouldBe Map(
+      sender.assetDistributionAtHeight(asset, height1 - 1, 10).items.map { case (a, v) => a.toString -> v } shouldBe Map(
         miner.address          -> 100L,
         acc.toAddress.toString -> (simpleReissuableAsset.quantity - 200)
       )
       reissue(acc, CallableMethod, asset, 400, reissuable = false)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       val height2 = nodes.waitForHeightArise()
-      sender.assetDistributionAtHeight(asset, height2, 10).items.map { case (a, v) => a.toString -> v } shouldBe Map(
+      sender.assetDistributionAtHeight(asset, height2 - 1, 10).items.map { case (a, v) => a.toString -> v } shouldBe Map(
         miner.address          -> 200L,
         acc.toAddress.toString -> simpleReissuableAsset.quantity
       )
