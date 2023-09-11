@@ -250,15 +250,15 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       val acc   = createDapp(script(simpleReissuableAsset))
       val asset = issueValidated(acc, simpleReissuableAsset)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
-      nodes.waitForHeightArise()
-      sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
+      val height1 = nodes.waitForHeightArise()
+      sender.assetDistributionAtHeight(asset, height1, 10).items.map { case (a, v) => a.toString -> v } shouldBe Map(
         miner.address          -> 100L,
         acc.toAddress.toString -> (simpleReissuableAsset.quantity - 200)
       )
       reissue(acc, CallableMethod, asset, 400, reissuable = false)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
-      nodes.waitForHeightArise()
-      sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
+      val height2 = nodes.waitForHeightArise()
+      sender.assetDistributionAtHeight(asset, height2, 10).items.map { case (a, v) => a.toString -> v } shouldBe Map(
         miner.address          -> 200L,
         acc.toAddress.toString -> simpleReissuableAsset.quantity
       )
@@ -269,7 +269,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       val addressStr = acc.toAddress.toString
       val assetA     = issueValidated(acc, simpleReissuableAsset)
 
-      sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
+      sender.transactionsByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
 
@@ -291,7 +291,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
       nodes.rollback(height, returnToUTX = false)
 
-      sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
+      sender.transactionsByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
       assertApiError(sender.stateChanges(txId), TransactionDoesNotExist)
@@ -381,7 +381,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
     f(stateChanges(tx))
     f(stateChangesStrings(tx))
 
-    val result      = sender.debugStateChangesByAddress(tx.sender.get, 100)
+    val result      = sender.transactionsByAddress(tx.sender.get, 100)
     val stateChange = result.find(_.id == tx.id)
     stateChange shouldBe defined
     f(stateChange.get.stateChanges.get)

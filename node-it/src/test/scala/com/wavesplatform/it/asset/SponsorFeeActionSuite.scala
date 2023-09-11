@@ -61,7 +61,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       val stateChanges = miner.stateChanges(invokeTx._1.id).stateChanges.toSeq
       stateChanges should matchDebugResult
-      miner.debugStateChangesByAddress(globalDAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+      miner.transactionsByAddress(globalDAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
 
       sponsoredAssetId = stateChanges.head.sponsorFees.head.assetId
       miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
@@ -167,7 +167,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
         .head
 
       miner
-        .debugStateChangesByAddress(dAppAddress, limit = 100)
+        .transactionsByAddress(dAppAddress, limit = 100)
         .flatMap(_.stateChanges)
         .find(_.sponsorFees == Seq(SponsorFeeResponse(`cancelledAssetId`, None)))
         .head
@@ -228,7 +228,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
             ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
       txStateChanges should matchDebugResult
-      miner.debugStateChangesByAddress(dAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+      miner.transactionsByAddress(dAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
 
@@ -276,7 +276,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
             ) =>
       }
       txStateChanges should matchDebugResult
-      miner.debugStateChangesByAddress(dAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+      miner.transactionsByAddress(dAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
 
       miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
 

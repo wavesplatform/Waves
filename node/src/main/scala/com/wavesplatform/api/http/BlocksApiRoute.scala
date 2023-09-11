@@ -22,8 +22,6 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
   override lazy val route: Route = (pathPrefix("blocks") & get) {
     path("at" / IntNumber) { height =>
       at(height, includeTransactions = true)
-    } ~ path("first") {
-      at(1, includeTransactions = true)
     } ~ path("seq" / IntNumber / IntNumber) { (start, end) =>
       seq(start, end, includeTransactions = true)
     } ~ path("last") {
@@ -45,8 +43,6 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> meta.height))
-    } ~ path("signature" / BlockId) { signature => // TODO: Delete
-      complete(commonApi.block(signature).map(toJson).toRight(BlockDoesNotExist))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < settings.blocksRequestLimit) {
         routeTimeout.executeToFuture {
