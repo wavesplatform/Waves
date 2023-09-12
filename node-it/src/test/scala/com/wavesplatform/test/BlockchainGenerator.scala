@@ -101,7 +101,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         generateBlockchain(
           genBlocks,
           settings.dbSettings.copy(directory = dbDirPath.toString),
-          block => IO.exportBlockToBinary(bos, Some(block), legacy = true)
+          block => IO.exportBlock(bos, Some(block), legacy = true)
         )
         log.info(s"Finished exporting $targetHeight blocks")
         FileUtils.deleteDirectory(dbDirPath.toFile)
