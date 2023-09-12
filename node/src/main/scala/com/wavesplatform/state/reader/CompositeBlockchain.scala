@@ -109,16 +109,16 @@ final class CompositeBlockchain private (
     }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
-    val fixedFrom = max(from, 1)
+    val from1 = max(from, 1)
     if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
-      inner.balanceSnapshots(address, fixedFrom, to)
+      inner.balanceSnapshots(address, from1, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
       val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
-      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && fixedFrom < this.height + 1
-      if (inner.height > 0 && from <= inner.height && (fixedFrom < this.height - 1 || height2Fix))
-        bs +: inner.balanceSnapshots(address, fixedFrom, to)
+      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from1 < 2
+      if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
+        bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
     }
