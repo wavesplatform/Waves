@@ -116,7 +116,7 @@ final class CompositeBlockchain private (
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
       val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
-      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from1 < 2
+      val height2Fix = this.height == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
       if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from1, to)
       else
