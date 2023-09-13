@@ -412,23 +412,25 @@ case class UtxPoolImpl(
                           log.trace(s"Packing transaction ${tx.id()}")
                       }
 
-                      val resultSnapshot =
-                        (r.totalSnapshot |+| newSnapshot)
+                      (for {
+                        resultSnapshot <- (r.totalSnapshot |+| newSnapshot)
                           .addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
-
-                      resultSnapshot.fold(
-                        error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                        fullTxSnapshot <- newSnapshot.addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
+                      } yield {
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                          _,
+                          resultSnapshot,
                           updatedConstraint,
                           r.iterations + 1,
                           newCheckedAddresses,
                           r.validatedTransactions + tx.id(),
                           r.removedTransactions,
                           r.stateHash
-                            .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(newSnapshot, None).createHash(prevStateHash))
+                            .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(fullTxSnapshot, None).createHash(prevStateHash))
                         )
+                      }).fold(
+                        error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                        identity
                       )
                     }
 
