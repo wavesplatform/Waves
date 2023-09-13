@@ -1,11 +1,13 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.MiningConstraint
@@ -215,6 +217,49 @@ class BlockDifferTest extends FreeSpec with WithDomain {
             MiningConstraint.Unlimited
           ) shouldBe an[Left[InvalidStateHash, Result]]
         }
+    }
+
+    "result of txs validation should be equal the result of snapshot apply" in {
+      val sender = TxHelpers.signer(1)
+      withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
+        (1 to 5).map { idx =>
+          val (refBlock, refSnapshot, carry, _, refStateHash, _) = d.liquidState.get.snapshotOf(d.lastBlock.id()).get
+          val refBlockchain = SnapshotBlockchain(
+            d.rocksDBWriter,
+            refSnapshot,
+            refBlock,
+            d.liquidState.get.hitSource,
+            carry,
+            d.blockchain.computeNextReward,
+            Some(refStateHash)
+          )
+
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq(TxHelpers.transfer(sender, amount = idx.waves, fee = TestValues.fee * idx)))
+          val hs    = d.posSelector.validateGenerationSignature(block).explicitGet()
+          val txValidationResult = BlockDiffer.fromBlock(refBlockchain, Some(refBlock), block, None, MiningConstraint.Unlimited, hs)
+
+          val txInfo        = txValidationResult.explicitGet().snapshot.transactions.head._2
+          val blockSnapshot = BlockSnapshot(block.id(), Seq(txInfo.snapshot -> txInfo.status))
+
+          val snapshotApplyResult = BlockDiffer.fromBlock(refBlockchain, Some(refBlock), block, Some(blockSnapshot), MiningConstraint.Unlimited, hs)
+
+          // TODO: remove after NODE-2610 fix
+          def clearAffected(r: Result): Result = {
+            r.copy(
+              snapshot = r.snapshot.copy(transactions = r.snapshot.transactions.map { case (id, info) => id -> info.copy(affected = Set.empty) }),
+              keyBlockSnapshot = r.keyBlockSnapshot.copy(transactions = r.keyBlockSnapshot.transactions.map { case (id, info) =>
+                id -> info.copy(affected = Set.empty)
+              })
+            )
+
+          }
+
+          val snapshotApplyResultWithoutAffected = snapshotApplyResult.map(clearAffected)
+          val txValidationResultWithoutAffected  = txValidationResult.map(clearAffected)
+
+          snapshotApplyResultWithoutAffected shouldBe txValidationResultWithoutAffected
+        }
+      }
     }
   }
 
