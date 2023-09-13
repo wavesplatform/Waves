@@ -73,7 +73,10 @@ class BlockChallengerImpl(
     }.map {
       case Right((Applied(_, _), challengingBlock)) =>
         log.debug(s"Successfully challenged $block with $challengingBlock")
-        allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+        BlockStats.challenged(challengingBlock, blockchainUpdater.height)
+        if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
+          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+        }
       case Right((_, challengingBlock)) => log.debug(s"Ignored challenging block $challengingBlock")
       case Left(err)                    => log.debug(s"Could not challenge $block: $err")
     }
