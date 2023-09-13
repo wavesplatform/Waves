@@ -81,7 +81,7 @@ object MicroblockAppender extends ScorexLogging {
         )
         md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
 
-        blockChallenger.traverse(_.challengeMicroblock(md, channelToBlacklist)).void
+        blockChallenger.traverse(_.challengeMicroblock(md, channelToBlacklist).executeOn(scheduler)).void
 
       case Left(ve) =>
         Task {

@@ -692,6 +692,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
+        isLightMode = false,
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
@@ -1253,6 +1254,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
+        isLightMode = false,
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
@@ -1301,6 +1303,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
+        isLightMode = false,
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
@@ -1388,6 +1391,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
+        isLightMode = false,
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,
@@ -1579,6 +1583,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
+        isLightMode = false,
         d.commonApi.commonTransactionsApi(blockChallenger),
         d.wallet,
         d.blockchain,

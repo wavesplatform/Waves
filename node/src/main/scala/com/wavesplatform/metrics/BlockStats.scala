@@ -21,22 +21,23 @@ object BlockStats {
   private sealed abstract class Event extends Named
 
   private object Event {
-    case object Inv      extends Event
-    case object Received extends Event
-    case object Replaced extends Event
-    case object Applied  extends Event
-    case object Appended extends Event
-    case object Declined extends Event
-    case object Mined    extends Event
+    case object Inv        extends Event
+    case object Received   extends Event
+    case object Replaced   extends Event
+    case object Applied    extends Event
+    case object Appended   extends Event
+    case object Declined   extends Event
+    case object Mined      extends Event
+    case object Challenged extends Event
   }
 
   private sealed abstract class Type extends Named
 
   private object Type {
-    case object Block              extends Type
-    case object Micro              extends Type
-    case object BlockSnapshot      extends Type
-    case object MicroBlockSnapshot extends Type
+    case object Block         extends Type
+    case object Micro         extends Type
+    case object BlockSnapshot extends Type
+    case object MicroSnapshot extends Type
   }
 
   sealed abstract class Source extends Named
@@ -83,15 +84,11 @@ object BlockStats {
     Seq.empty
   )
 
-  def mined(b: Block, baseHeight: Int): Unit = write(
-    block(b, Source.Broadcast)
-      .tag("parent-id", id(b.header.reference))
-      .addField("txs", b.transactionData.size)
-      .addField("bt", b.header.baseTarget)
-      .addField("height", baseHeight),
-    Event.Mined,
-    Seq.empty
-  )
+  def mined(b: Block, baseHeight: Int): Unit =
+    blockForged(b, baseHeight, Event.Mined)
+
+  def challenged(b: Block, baseHeight: Int): Unit =
+    blockForged(b, baseHeight, Event.Challenged)
 
   def appended(b: Block, complexity: Long): Unit = write(
     measurement(Type.Block)
@@ -146,6 +143,16 @@ object BlockStats {
     Seq.empty
   )
 
+  private def blockForged(b: Block, baseHeight: Int, event: Event): Unit = write(
+    block(b, Source.Broadcast)
+      .tag("parent-id", id(b.header.reference))
+      .addField("txs", b.transactionData.size)
+      .addField("bt", b.header.baseTarget)
+      .addField("height", baseHeight),
+    event,
+    Seq.empty
+  )
+
   private def block(b: Block, source: Source): Point.Builder = {
     val isWhitelistMiner = {
       val whitelistAddrs = Set(
@@ -173,7 +180,7 @@ object BlockStats {
   }
 
   private def microBlockSnapshot(totalBlockId: BlockId): Point.Builder =
-    measurement(Type.MicroBlockSnapshot)
+    measurement(Type.MicroSnapshot)
       .tag("id", id(totalBlockId))
 
   private def micro(blockId: BlockId): Point.Builder =

@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import cats.instances.either.*
 import cats.instances.list.*
@@ -28,6 +29,7 @@ import play.api.libs.json.*
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
+    isLightMode: Boolean,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
@@ -172,9 +174,13 @@ case class TransactionsApiRoute(
     jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
   }
 
-  def signedBroadcast: Route = path("broadcast")(
-    broadcast[JsValue](TransactionFactory.fromSignedRequest)
-  )
+  def signedBroadcast: Route = path("broadcast") {
+    if (isLightMode) {
+      complete(StatusCodes.NotImplemented, CustomValidationError("Transaction broadcast in not supported for light node").json)
+    } else {
+      broadcast[JsValue](TransactionFactory.fromSignedRequest)
+    }
+  }
 
   def merkleProof: Route = path("merkleProof") {
     anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>

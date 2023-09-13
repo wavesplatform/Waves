@@ -39,6 +39,8 @@ object BlockDiffer {
     def apply(l: Long): Long = l / divider * dividend
   }
 
+  case class TxFeeInfo(feeAsset: Asset, feeAmount: Long, carry: Long, wavesFee: Long)
+
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   def fromBlock(
@@ -312,6 +314,13 @@ object BlockDiffer {
       }
   }
 
+  def computeInitialStateHash(blockchain: Blockchain, initSnapshot: StateSnapshot, prevStateHash: ByteStr): ByteStr = {
+    if (initSnapshot == StateSnapshot.empty || blockchain.height == 1)
+      prevStateHash
+    else
+      TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+  }
+
   private[this] def apply(
       blockchain: Blockchain,
       initConstraint: MiningConstraint,
@@ -326,24 +335,18 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
-    val currentBlockHeight = blockchain.height
-    val timestamp          = blockchain.lastBlockTimestamp.get
-    val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
-    val rideV6Activated    = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+    val timestamp       = blockchain.lastBlockTimestamp.get
+    val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
+    val rideV6Activated = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
-    val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    val txDiffer = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
 
     if (verify && txSignParCheck)
       ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
 
     prepareCaches(blockGenerator, txs, loadCacheData)
 
-    val initStateHash =
-      if (initSnapshot == StateSnapshot.empty || blockchain.height == 1)
-        prevStateHash
-      else
-        TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+    val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
 
     txs
       .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initSnapshot, initStateHash).asRight[ValidationError])) {
@@ -364,31 +367,26 @@ object BlockDiffer {
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
             else {
-              val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
-              val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+              val txFeeInfo = computeTxFeeInfo(currBlockchain, tx, hasNg)
 
               // unless NG is activated, miner has already received all the fee from this block by the time the first
               // transaction is processed (see abode), so there's no need to include tx fee into portfolio.
               // if NG is activated, just give them their 40%
-              val minerPortfolio    = if (!hasNg) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
+              val minerPortfolio =
+                if (!hasNg) Portfolio.empty else Portfolio.build(txFeeInfo.feeAsset, txFeeInfo.feeAmount).multiply(CurrentBlockFeePart)
               val minerPortfolioMap = Map(blockGenerator -> minerPortfolio)
-
-              // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
-              // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
-              val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
               txSnapshot.addBalances(minerPortfolioMap, currBlockchain).leftMap(GenericError(_)).map { resultTxSnapshot =>
                 val (_, txInfo)         = txSnapshot.transactions.head
                 val txInfoWithFee       = txInfo.copy(snapshot = resultTxSnapshot.copy(transactions = VectorMap.empty))
                 val newKeyBlockSnapshot = keyBlockSnapshot.withTransaction(txInfoWithFee)
 
-                val newSnapshot   = currSnapshot |+| resultTxSnapshot.withTransaction(txInfoWithFee)
-                val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
+                val newSnapshot = currSnapshot |+| resultTxSnapshot.withTransaction(txInfoWithFee)
 
                 Result(
                   newSnapshot,
-                  carryFee + carry,
-                  totalWavesFee,
+                  carryFee + txFeeInfo.carry,
+                  currTotalFee + txFeeInfo.wavesFee,
                   updatedConstraint,
                   newKeyBlockSnapshot,
                   TxStateSnapshotHashBuilder
@@ -419,37 +417,37 @@ object BlockDiffer {
       txs: Seq[Transaction],
       txSnapshots: Seq[(StateSnapshot, TxMeta.Status)]
   ): Result = {
-    val hasSponsorship = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
-
-    val initStateHash =
-      if (initSnapshot == StateSnapshot.empty || blockchain.height == 1)
-        prevStateHash
-      else
-        TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+    val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
 
     txs.zip(txSnapshots).foldLeft(Result(initSnapshot, 0L, 0L, MiningConstraint.Unlimited, initSnapshot, initStateHash)) {
       case (Result(currSnapshot, carryFee, currTotalFee, currConstraint, keyBlockSnapshot, prevStateHash), (tx, (txSnapshot, txStatus))) =>
-        val currBlockchain        = SnapshotBlockchain(blockchain, currSnapshot)
-        val (feeAsset, feeAmount) = maybeApplySponsorship(currBlockchain, hasSponsorship, tx.assetFee)
-        val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+        val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
 
-        // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
-        // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
-        val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
-
-        val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-
-        val nti = NewTransactionInfo.create(tx, txStatus, txSnapshot, currBlockchain)
+        val txFeeInfo = computeTxFeeInfo(currBlockchain, tx, hasNg)
+        val nti       = NewTransactionInfo.create(tx, txStatus, txSnapshot, currBlockchain)
 
         Result(
           currSnapshot |+| txSnapshot.withTransaction(nti),
-          carryFee + carry,
-          totalWavesFee,
+          carryFee + txFeeInfo.carry,
+          currTotalFee + txFeeInfo.wavesFee,
           currConstraint,
           keyBlockSnapshot.withTransaction(nti),
           TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(TxStatusInfo(tx.id(), txStatus))).createHash(prevStateHash)
         )
     }
+  }
+
+  private def computeTxFeeInfo(blockchain: Blockchain, tx: Transaction, hasNg: Boolean): TxFeeInfo = {
+    val hasSponsorship        = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    val (feeAsset, feeAmount) = maybeApplySponsorship(blockchain, hasSponsorship, tx.assetFee)
+    val currentBlockFee       = CurrentBlockFeePart(feeAmount)
+
+    // carry is 60% of waves fees the next miner will get. obviously carry fee only makes sense when both
+    // NG and sponsorship is active. also if sponsorship is active, feeAsset can only be Waves
+    val carry    = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
+    val wavesFee = if (feeAsset == Waves) feeAmount else 0L
+
+    TxFeeInfo(feeAsset, feeAmount, carry, wavesFee)
   }
 
   private def leasePatchesSnapshot(blockchain: Blockchain): StateSnapshot =

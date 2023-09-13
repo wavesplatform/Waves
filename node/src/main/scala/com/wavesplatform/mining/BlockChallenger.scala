@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
@@ -104,7 +105,10 @@ class BlockChallengerImpl(
       applyResult match {
         case Applied(_, _) =>
           log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
-          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+          BlockStats.challenged(challengingBlock, blockchainUpdater.height)
+          if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
+            allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+          }
         case _ =>
           log.debug(s"Ignored challenging block $challengingBlock")
       }

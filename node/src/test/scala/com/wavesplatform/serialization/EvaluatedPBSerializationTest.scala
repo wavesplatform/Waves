@@ -113,6 +113,7 @@ class EvaluatedPBSerializationTest
 
   private def transactionsApiRoute(d: Domain) = new TransactionsApiRoute(
     restAPISettings,
+    isLightMode = false,
     d.transactionsApi,
     d.wallet,
     d.blockchain,

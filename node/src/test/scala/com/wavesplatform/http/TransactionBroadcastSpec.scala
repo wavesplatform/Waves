@@ -39,6 +39,7 @@ class TransactionBroadcastSpec
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
+    isLightMode = false,
     stub[CommonTransactionsApi],
     stub[Wallet],
     blockchain,

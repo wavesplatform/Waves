@@ -390,6 +390,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time, routeTimeout),
         TransactionsApiRoute(
           settings.restAPISettings,
+          settings.enableLightMode,
           extensionContext.transactionsApi,
           wallet,
           blockchainUpdater,
@@ -652,8 +653,9 @@ object Application extends ScorexLogging {
     import com.wavesplatform.settings.Constants
     val settings = loadApplicationConfig(configFile.map(new File(_)))
 
-    val log = LoggerFacade(LoggerFactory.getLogger(getClass))
-    log.info("Starting...")
+    val log      = LoggerFacade(LoggerFactory.getLogger(getClass))
+    val modeInfo = if (settings.enableLightMode) "in light mode" else "in full mode"
+    log.info(s"Starting $modeInfo...")
     sys.addShutdownHook {
       SystemInformationReporter.report(settings.config)
     }

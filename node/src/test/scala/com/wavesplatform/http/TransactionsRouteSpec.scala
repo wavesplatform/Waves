@@ -72,6 +72,7 @@ class TransactionsRouteSpec
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
+    isLightMode = false,
     addressTransactions,
     testWallet,
     blockchain,
@@ -130,6 +131,7 @@ class TransactionsRouteSpec
     seal(
       new TransactionsApiRoute(
         restAPISettings,
+        isLightMode = false,
         d.commonApi.transactions,
         testWallet,
         d.blockchain,
@@ -1396,6 +1398,7 @@ class TransactionsRouteSpec
 
       val route = new TransactionsApiRoute(
         d.settings.restAPISettings,
+        isLightMode = false,
         d.commonApi.transactions,
         d.wallet,
         d.blockchain,

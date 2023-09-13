@@ -450,9 +450,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           BlockDiffer
             .createInitialBlockSnapshot(blockchain, generator.toAddress)
             .flatMap { initSnapshot =>
-              val initStateHash =
-                if (initSnapshot == StateSnapshot.empty) prevStateHash
-                else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+              val initStateHash = BlockDiffer.computeInitialStateHash(blockchainWithNewBlock, initSnapshot, prevStateHash)
 
               TxStateSnapshotHashBuilder
                 .computeStateHash(

@@ -66,6 +66,7 @@ class CustomJsonMarshallerSpec
   private val transactionsRoute =
     TransactionsApiRoute(
       restAPISettings,
+      isLightMode = false,
       transactionsApi,
       testWallet,
       blockchain,

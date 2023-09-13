@@ -81,7 +81,7 @@ object BlockAppender extends ScorexLogging {
           span.markNtp("block.applied")
           span.finishNtp()
           BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-          if (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined) {
+          if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)) {
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
           }
         }
@@ -96,7 +96,7 @@ object BlockAppender extends ScorexLogging {
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
         if (newBlock.header.challengedHeader.isEmpty) {
-          blockChallenger.traverse(_.challengeBlock(newBlock, ch)).void
+          blockChallenger.traverse(_.challengeBlock(newBlock, ch).executeOn(scheduler)).void
         } else Task.unit
 
       case Left(ve) =>

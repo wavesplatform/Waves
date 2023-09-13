@@ -329,9 +329,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
            )
        )
          .flatMap { initSnapshot =>
-           val initStateHash =
-             if (initSnapshot == StateSnapshot.empty) prevStateHash
-             else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+           val initStateHash = BlockDiffer.computeInitialStateHash(compBlockchain, initSnapshot, prevStateHash)
 
            TxStateSnapshotHashBuilder
              .computeStateHash(
