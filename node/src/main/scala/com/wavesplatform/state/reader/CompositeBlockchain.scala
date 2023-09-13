@@ -24,13 +24,13 @@ import scala.math.max
 final class CompositeBlockchain private (
     inner: Blockchain,
     maybeDiff: Option[Diff] = None,
-    blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
+    val blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
     carry: Long = 0,
     reward: Option[Long] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
-  private[CompositeBlockchain] def appendDiff(newDiff: Diff) =
+  private[CompositeBlockchain] def appendDiff(newDiff: Diff, blockMeta: Option[(SignedBlockHeader, ByteStr)] = this.blockMeta) =
     new CompositeBlockchain(inner, Some(this.maybeDiff.fold(newDiff)(_.combineF(newDiff).explicitGet())), blockMeta, carry, reward)
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
@@ -195,10 +195,11 @@ object CompositeBlockchain {
   def apply(inner: Blockchain, reward: Option[Long]): CompositeBlockchain =
     new CompositeBlockchain(inner, carry = inner.carryFee, reward = reward)
 
-  def apply(inner: Blockchain, diff: Diff, blockMeta: Option[BlockMeta] = None): CompositeBlockchain =
+  def apply(inner: Blockchain, diff: Diff, bMeta: Option[BlockMeta] = None): CompositeBlockchain =
     inner match {
-      case cb: CompositeBlockchain => cb.appendDiff(diff)
-      case _                       => new CompositeBlockchain(inner, Some(diff), blockMeta.map(bm => (bm.toSignedHeader, bm.id)))
+      case cb: CompositeBlockchain if bMeta.isEmpty        => cb.appendDiff(diff)
+      case cb: CompositeBlockchain if cb.blockMeta.isEmpty => cb.appendDiff(diff, bMeta.map(bm => (bm.toSignedHeader, bm.id)))
+      case _                                               => new CompositeBlockchain(inner, Some(diff), bMeta.map(bm => (bm.toSignedHeader, bm.id)))
     }
 
   def apply(
