@@ -279,8 +279,11 @@ class MinerImpl(
             case Right(Applied(_, score)) =>
               log.debug(s"Forged and applied $block with cumulative score $score")
               BlockStats.mined(block, blockchainUpdater.height)
-              allChannels.broadcast(BlockForged(block))
-              if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+
+              if (blockchainUpdater.isLastBlockId(block.id())) {
+                allChannels.broadcast(BlockForged(block))
+                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+              }
               Task.unit
 
             case Right(Ignored) =>
