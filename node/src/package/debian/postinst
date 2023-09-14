@@ -18,11 +18,13 @@ if [ "$1" = configure ]; then
         adduser $quiet ${{app_name}} ${{app_name}}
     fi
 
-    if [[ $(systemctl is-active ${{app_name}}) == inactive ]]; then
+    if [ ! -d /var/lib/${{app_name}} ] ; then
         # ensure home directory ownership
         mkdir -p /var/lib/${{app_name}}
         chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
+    fi
 
+    if [ ! -d /var/log/${{app_name}} ] ; then
         # nicer log directory permissions
         mkdir -p /var/log/${{app_name}}
         chmod 770 /var/log/${{app_name}}
