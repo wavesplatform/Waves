@@ -5,6 +5,7 @@ import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -18,16 +19,18 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Alias
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
+import scala.math.max
+
 final class CompositeBlockchain private (
     inner: Blockchain,
     maybeDiff: Option[Diff] = None,
-    blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
+    val blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
     carry: Long = 0,
     reward: Option[Long] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
-  private[CompositeBlockchain] def appendDiff(newDiff: Diff) =
+  private[CompositeBlockchain] def appendDiff(newDiff: Diff, blockMeta: Option[(SignedBlockHeader, ByteStr)] = this.blockMeta) =
     new CompositeBlockchain(inner, Some(this.maybeDiff.fold(newDiff)(_.combineF(newDiff).explicitGet())), blockMeta, carry, reward)
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
@@ -105,19 +108,21 @@ final class CompositeBlockchain private (
       Some(bs)
     }
 
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    val from1 = max(from, 1)
     if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
-      inner.balanceSnapshots(address, from, to)
+      inner.balanceSnapshots(address, from1, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
       val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
-      val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
-      if (inner.height > 0 && (from < this.height || height2Fix))
-        bs +: inner.balanceSnapshots(address, from, to)
+      val height2Fix = this.height == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
+      if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
+        bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
     }
+  }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
     diff.scripts.get(address) match {
@@ -190,10 +195,11 @@ object CompositeBlockchain {
   def apply(inner: Blockchain, reward: Option[Long]): CompositeBlockchain =
     new CompositeBlockchain(inner, carry = inner.carryFee, reward = reward)
 
-  def apply(inner: Blockchain, diff: Diff): CompositeBlockchain =
+  def apply(inner: Blockchain, diff: Diff, bMeta: Option[BlockMeta] = None): CompositeBlockchain =
     inner match {
-      case cb: CompositeBlockchain => cb.appendDiff(diff)
-      case _                       => new CompositeBlockchain(inner, Some(diff))
+      case cb: CompositeBlockchain if bMeta.isEmpty        => cb.appendDiff(diff)
+      case cb: CompositeBlockchain if cb.blockMeta.isEmpty => cb.appendDiff(diff, bMeta.map(bm => (bm.toSignedHeader, bm.id)))
+      case _                                               => new CompositeBlockchain(inner, Some(diff), bMeta.map(bm => (bm.toSignedHeader, bm.id)))
     }
 
   def apply(
