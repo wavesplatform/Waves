@@ -108,7 +108,7 @@ object Explorer extends ScorexLogging {
             actualTotalReward += Longs.fromByteArray(e.getValue)
           }
 
-          val actualTotalBalance   = balances.values.sum + reader.carryFee
+          val actualTotalBalance   = balances.values.sum + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
           val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 

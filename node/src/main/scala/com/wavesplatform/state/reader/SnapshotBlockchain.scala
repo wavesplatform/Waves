@@ -177,7 +177,7 @@ case class SnapshotBlockchain(
     snapshot.accountData.contains(acc) || inner.hasData(acc)
   }
 
-  override def carryFee: Long = carry
+  override def carryFee(refId: Option[ByteStr]): Long = carry
 
   override def score: BigInt = blockMeta.fold(BigInt(0))(_._1.header.score()) + inner.score
 
@@ -213,8 +213,8 @@ case class SnapshotBlockchain(
       .resolveERC20Address(address)
       .orElse(snapshot.assetStatics.keys.find(id => ERC20Address(id) == address))
 
-  override def lastBlockStateHash: BlockId =
-    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastBlockStateHash)
+  override def prevStateHash(refId: Option[ByteStr]): BlockId =
+    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.prevStateHash(refId))
 }
 
 object SnapshotBlockchain {
@@ -229,7 +229,7 @@ object SnapshotBlockchain {
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =
-    new SnapshotBlockchain(inner, carry = inner.carryFee, reward = reward)
+    new SnapshotBlockchain(inner, carry = inner.carryFee(None), reward = reward)
 
   def apply(inner: Blockchain, snapshot: StateSnapshot): SnapshotBlockchain =
     new SnapshotBlockchain(inner, Some(snapshot))

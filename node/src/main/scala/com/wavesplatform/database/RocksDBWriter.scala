@@ -162,7 +162,7 @@ class RocksDBWriter(
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
-  override def carryFee: Long = writableDB.get(Keys.carryFee(height))
+  override def carryFee(refId: Option[ByteStr]): Long = writableDB.get(Keys.carryFee(height))
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
     writableDB.get(Keys.data(address, key))
@@ -1091,7 +1091,7 @@ class RocksDBWriter(
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
 
-  override def lastBlockStateHash: ByteStr = {
+  override def prevStateHash(refId: Option[ByteStr]): ByteStr = {
     readOnly(_.get(Keys.blockStateHash(height)))
   }
 }

@@ -1031,31 +1031,31 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         def carry(fee: Long): Long = fee - fee / 5 * 2
 
-        d.carryFee shouldBe carry(0)
+        d.carryFee(None) shouldBe carry(0)
 
         val issueBlockId = appendBlock(issue)
-        d.carryFee shouldBe carry(issue.fee.value)
+        d.carryFee(None) shouldBe carry(issue.fee.value)
 
         val sponsorBlockId = appendBlock(sponsor1)
-        d.carryFee shouldBe carry(sponsor1.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor1.fee.value)
 
         appendBlock(transfer)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
 
         d.rollbackTo(sponsorBlockId)
-        d.carryFee shouldBe carry(sponsor1.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor1.fee.value)
 
         d.rollbackTo(issueBlockId)
-        d.carryFee shouldBe carry(issue.fee.value)
+        d.carryFee(None) shouldBe carry(issue.fee.value)
 
         val transferBlockId = appendBlock(transfer)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
 
         appendBlock(sponsor2)
-        d.carryFee shouldBe carry(sponsor2.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor2.fee.value)
 
         d.rollbackTo(transferBlockId)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
       }
     }
 

@@ -123,7 +123,7 @@ object BlockDiffer {
 
     val feeFromPreviousBlockE =
       if (stateHeight >= sponsorshipHeight) {
-        Right(Portfolio(balance = blockchain.carryFee))
+        Right(Portfolio(balance = blockchain.carryFee(None)))
       } else if (stateHeight > ngHeight) maybePrevBlock.fold(Portfolio.empty.asRight[String]) { pb =>
         // it's important to combine tx fee fractions (instead of getting a fraction of the combined tx fee)
         // so that we end up with the same value as when computing per-transaction fee part
@@ -183,7 +183,7 @@ object BlockDiffer {
     for {
       _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
-      prevStateHash = maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.lastBlockStateHash)
+      prevStateHash = maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.prevStateHash(None))
       r <- snapshot match {
         case Some(BlockSnapshot(_, txSnapshots)) =>
           TracedResult.wrapValue(
@@ -285,10 +285,11 @@ object BlockDiffer {
 
   def createInitialBlockSnapshot(
       blockchain: BlockchainUpdater & Blockchain,
+      reference: ByteStr,
       miner: Address
   ): Either[ValidationError, StateSnapshot] = {
     val fullReward           = blockchain.computeNextReward.fold(Portfolio.empty)(Portfolio.waves)
-    val feeFromPreviousBlock = Portfolio.waves(blockchain.carryFee)
+    val feeFromPreviousBlock = Portfolio.waves(blockchain.carryFee(Some(reference)))
 
     val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
     val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten

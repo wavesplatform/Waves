@@ -43,7 +43,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         val expectedSnapshotWithMiner =
           expected
             .addBalances(
-              Map(defaultAddress -> Portfolio.waves(CurrentBlockFeePart(tx.fee) + reward + d.carryFee)).filter(_ => tx.fee != 0),
+              Map(defaultAddress -> Portfolio.waves(CurrentBlockFeePart(tx.fee) + reward + d.carryFee(None))).filter(_ => tx.fee != 0),
               d.blockchain
             )
             .explicitGet()

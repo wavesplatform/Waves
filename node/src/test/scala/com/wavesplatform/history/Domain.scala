@@ -196,7 +196,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.getOrElse(randomSig)
 
-  def carryFee: Long = blockchainUpdater.carryFee
+  def carryFee(refId: Option[ByteStr]): Long = blockchainUpdater.carryFee(refId)
 
   def balance(address: Address): Long               = blockchainUpdater.balance(address)
   def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
@@ -445,10 +445,10 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
           val blockchainWithNewBlock =
             SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
-          val prevStateHash = blockchain.lastBlockStateHash
+          val prevStateHash = blockchain.prevStateHash(Some(blockWithoutStateHash.header.reference))
 
           BlockDiffer
-            .createInitialBlockSnapshot(blockchain, generator.toAddress)
+            .createInitialBlockSnapshot(blockchain, blockWithoutStateHash.header.reference, generator.toAddress)
             .flatMap { initSnapshot =>
               val initStateHash = BlockDiffer.computeInitialStateHash(blockchainWithNewBlock, initSnapshot, prevStateHash)
 

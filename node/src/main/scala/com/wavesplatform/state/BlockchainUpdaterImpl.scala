@@ -670,8 +670,12 @@ class BlockchainUpdaterImpl(
     rocksdb.score + ngState.fold(BigInt(0))(_.bestLiquidBlock.blockScore())
   }
 
-  override def carryFee: Long = readLock {
-    ngState.fold(rocksdb.carryFee)(_.carryFee)
+  override def carryFee(refId: Option[ByteStr]): Long = readLock {
+    ngState
+      .map { ng =>
+        refId.filter(ng.contains).fold(ng.carryFee)(id => ng.snapshotFor(id)._2)
+      }
+      .getOrElse(rocksdb.carryFee(None))
   }
 
   override def blockHeader(height: Int): Option[SignedBlockHeader] = readLock {
@@ -785,7 +789,12 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.resolveERC20Address(address)
   }
 
-  override def lastBlockStateHash: BlockId = snapshotBlockchain.lastBlockStateHash
+  override def prevStateHash(refId: Option[ByteStr]): ByteStr =
+    ngState
+      .map { ng =>
+        refId.filter(ng.contains).fold(ng.bestLiquidComputedStateHash)(id => ng.snapshotFor(id)._4)
+      }
+      .getOrElse(rocksdb.prevStateHash(None))
 
   def snapshotBlockchain: SnapshotBlockchain =
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))

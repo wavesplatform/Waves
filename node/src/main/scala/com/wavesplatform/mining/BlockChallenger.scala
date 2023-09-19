@@ -65,7 +65,7 @@ class BlockChallengerImpl(
             block.header.stateHash,
             block.signature,
             block.transactionData,
-            blockchainUpdater.lastBlockStateHash
+            blockchainUpdater.prevStateHash(Some(block.header.reference))
           )
         )
         applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
@@ -98,7 +98,7 @@ class BlockChallengerImpl(
               md.microBlock.stateHash,
               md.microBlock.totalResBlockSig,
               txs,
-              blockchainUpdater.lastBlockStateHash
+              blockchainUpdater.prevStateHash(Some(block.header.reference))
             )
           )
           applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
@@ -173,7 +173,7 @@ class BlockChallengerImpl(
           blockTime
         )
 
-      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, acc.toAddress)
+      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, acc.toAddress)
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,

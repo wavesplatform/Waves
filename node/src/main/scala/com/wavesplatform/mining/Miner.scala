@@ -140,11 +140,15 @@ class MinerImpl(
       )
       .leftMap(_.toString)
 
-  private def packTransactionsForKeyBlock(miner: Address, prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
+  private def packTransactionsForKeyBlock(
+      miner: Address,
+      reference: ByteStr,
+      prevStateHash: Option[ByteStr]
+  ): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
     val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, settings.enableLightMode, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
       BlockDiffer
-        .createInitialBlockSnapshot(blockchainUpdater, miner)
+        .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
         .toOption
         .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
     }
@@ -189,9 +193,9 @@ class MinerImpl(
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
       prevStateHash =
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchainUpdater.height + 1))
-          Some(blockchainUpdater.lastBlockStateHash)
+          Some(blockchainUpdater.prevStateHash(Some(reference)))
         else None
-      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, prevStateHash)
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
       block <- Block
         .buildAndSign(
           version,
