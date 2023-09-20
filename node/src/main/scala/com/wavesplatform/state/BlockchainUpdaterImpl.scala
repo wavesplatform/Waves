@@ -255,8 +255,6 @@ class BlockchainUpdaterImpl(
                   val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
                   val miningConstraints = MiningConstraints(rocksdb, height, wavesSettings.enableLightMode)
 
-                  blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
-
                   val referencedBlockchain = SnapshotBlockchain(rocksdb, ng.reward)
                   BlockDiffer
                     .fromBlock(
@@ -278,6 +276,7 @@ class BlockchainUpdaterImpl(
                       BlockStats.replaced(ng.base, block)
                       val (mbs, diffs) = ng.allSnapshots.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+                      blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
@@ -297,12 +296,6 @@ class BlockchainUpdaterImpl(
                   case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, referencedComputedStateHash, discarded)) =>
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
-
-                      if (discarded.nonEmpty) {
-                        blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
-                        metrics.microBlockForkStats.increment()
-                        metrics.microBlockForkHeightStats.record(discarded.size)
-                      }
 
                       val constraint: MiningConstraint = {
                         val miningConstraints = MiningConstraints(rocksdb, height, wavesSettings.enableLightMode)
@@ -350,6 +343,11 @@ class BlockchainUpdaterImpl(
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
+                        if (discarded.nonEmpty) {
+                          blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
+                          metrics.microBlockForkStats.increment()
+                          metrics.microBlockForkHeightStats.record(discarded.size)
+                        }
                         blockchainUpdateTriggers.onProcessBlock(block, differResult.keyBlockSnapshot, reward, hitSource, this)
 
                         rocksdb.append(
