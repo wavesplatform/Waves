@@ -74,29 +74,30 @@ object Common {
 
   def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] =
     new Environment[Id] {
-      override def height: Long  = h
-      override def chainId: Byte = nByte
-      override def inputEntity   = in()
+      def height: Long  = h
+      def chainId: Byte = nByte
+      def inputEntity   = in()
 
-      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-      override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
-      override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
-      override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
-      override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
-      override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-      override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = None
-      override def hasData(recipient: Recipient): Boolean                                                          = false
-      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-      override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
-      override def tthis: Environment.Tthis                                                                        = Coproduct(Address(ByteStr.empty))
-      override def multiPaymentAllowed: Boolean                                                                    = true
-      override def txId: ByteStr                                                                                   = ???
-      override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
-      override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
-      override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
-      def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
-      override def callScript(
+      def transactionById(id: Array[Byte]): Option[Tx]                                    = ???
+      def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                   = ???
+      def transactionHeightById(id: Array[Byte]): Option[Long]                            = ???
+      def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                         = ???
+      def lastBlockOpt(): Option[BlockInfo]                                               = ???
+      def blockInfoByHeight(height: Int): Option[BlockInfo]                               = ???
+      def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]        = None
+      def hasData(recipient: Recipient): Boolean                                          = false
+      def resolveAlias(name: String): Either[String, Recipient.Address]                   = ???
+      def accountBalanceOf(a: Recipient, b: Option[Array[Byte]]): Either[String, Long]    = ???
+      def accountWavesBalanceOf(a: Recipient): Either[String, Environment.BalanceDetails] = ???
+      def tthis: Environment.Tthis                                                        = Coproduct(Address(ByteStr.empty))
+      def multiPaymentAllowed: Boolean                                                    = true
+      def txId: ByteStr                                                                   = ???
+      def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]               = ???
+      def addressFromString(address: String): Either[String, Recipient.Address]           = ???
+      def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]               = ???
+      def accountScript(addressOrAlias: Recipient): Option[Script]                        = ???
+      def calculateDelay(hs: ByteStr, bt: Long, gt: ByteStr, b: Long): Long               = ???
+      def callScript(
           dApp: Address,
           func: String,
           args: List[EVALUATED],
