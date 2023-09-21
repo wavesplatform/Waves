@@ -15,42 +15,45 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
 
   import BasicMessagesRepo.specsByCodes
 
-  override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]): Unit = msg match {
-    // Have no spec
-    case r: RawBytes              => out.add(r)
-    case LocalScoreChanged(score) => out.add(RawBytes(ScoreSpec.messageCode, ScoreSpec.serializeData(score)))
-    case BlockForged(b)           => out.add(RawBytes.fromBlock(b))
+  override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]): Unit = {
+    val encodedMsg = msg match {
+      // Have no spec
+      case r: RawBytes              => r
+      case LocalScoreChanged(score) => RawBytes.from(ScoreSpec, score)
+      case BlockForged(b)           => RawBytes.fromBlock(b)
 
-    // With a spec
-    case GetPeers                 => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
-    case k: KnownPeers            => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
-    case g: GetBlock              => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
-    case m: MicroBlockInv         => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
-    case m: MicroBlockRequest     => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
-    case g: GetSnapshot           => out.add(RawBytes(GetSnapsnotSpec.messageCode, GetSnapsnotSpec.serializeData(g)))
-    case m: MicroSnapshotRequest  => out.add(RawBytes(MicroSnapshotRequestSpec.messageCode, MicroSnapshotRequestSpec.serializeData(m)))
-    case s: BlockSnapshotResponse => out.add(RawBytes(BlockSnapshotResponseSpec.messageCode, BlockSnapshotResponseSpec.serializeData(s)))
-    case s: MicroBlockSnapshotResponse =>
-      out.add(RawBytes(MicroBlockSnapshotResponseSpec.messageCode, MicroBlockSnapshotResponseSpec.serializeData(s)))
+      // With a spec
+      case GetPeers                      => RawBytes.from(GetPeersSpec, GetPeers)
+      case k: KnownPeers                 => RawBytes.from(PeersSpec, k)
+      case g: GetBlock                   => RawBytes.from(GetBlockSpec, g)
+      case m: MicroBlockInv              => RawBytes.from(MicroBlockInvSpec, m)
+      case m: MicroBlockRequest          => RawBytes.from(MicroBlockRequestSpec, m)
+      case g: GetSnapshot                => RawBytes.from(GetSnapsnotSpec, g)
+      case m: MicroSnapshotRequest       => RawBytes.from(MicroSnapshotRequestSpec, m)
+      case s: BlockSnapshotResponse      => RawBytes.from(BlockSnapshotResponseSpec, s)
+      case s: MicroBlockSnapshotResponse => RawBytes.from(MicroBlockSnapshotResponseSpec, s)
 
-    // Version switch
-    case gs: GetSignatures if isNewMsgsSupported(ctx) =>
-      out.add(RawBytes(GetBlockIdsSpec.messageCode, GetBlockIdsSpec.serializeData(gs)))
-    case gs: GetSignatures if GetSignaturesSpec.isSupported(gs.signatures) =>
-      out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
+      // Version switch
+      case gs: GetSignatures if isNewMsgsSupported(ctx) =>
+        RawBytes.from(GetBlockIdsSpec, gs)
+      case gs: GetSignatures if GetSignaturesSpec.isSupported(gs.signatures) =>
+        RawBytes.from(GetSignaturesSpec, gs)
 
-    case s: Signatures =>
-      if (isNewMsgsSupported(ctx)) {
-        out.add(RawBytes(BlockIdsSpec.messageCode, BlockIdsSpec.serializeData(s)))
-      } else {
-        val supported = s.signatures
-          .dropWhile(_.arr.length != crypto.SignatureLength)
-          .takeWhile(_.arr.length == crypto.SignatureLength)
-        out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s.copy(signatures = supported))))
-      }
+      case s: Signatures =>
+        if (isNewMsgsSupported(ctx)) {
+          RawBytes.from(BlockIdsSpec, s)
+        } else {
+          val supported = s.signatures
+            .dropWhile(_.arr.length != crypto.SignatureLength)
+            .takeWhile(_.arr.length == crypto.SignatureLength)
+          RawBytes.from(SignaturesSpec, s.copy(signatures = supported))
+        }
 
-    case _ =>
-      throw new IllegalArgumentException(s"Can't send message $msg to $ctx (unsupported)")
+      case _ =>
+        throw new IllegalArgumentException(s"Can't send message $msg to $ctx (unsupported)")
+    }
+
+    out.add(encodedMsg)
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {

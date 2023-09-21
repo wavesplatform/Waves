@@ -34,27 +34,6 @@ trait UtxPool extends UtxForAppender with AutoCloseable {
 }
 
 object UtxPool {
-  val NoOp: UtxPool = new UtxPool {
-    override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = TracedResult.wrapValue(false)
-    override def removeAll(txs: Iterable[Transaction]): Unit                                               = ()
-    override def all: Seq[Transaction]                                                                     = Seq.empty
-    override def size: Int                                                                                 = 0
-    override def transactionById(transactionId: ByteStr): Option[Transaction]                              = None
-    override def scheduleCleanup(): Unit                                                                   = ()
-    override def packUnconfirmed(
-        rest: MultiDimensionalMiningConstraint,
-        prevStateHash: Option[ByteStr],
-        strategy: PackStrategy,
-        cancelled: () => Boolean
-    ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr]) = (None, MiningConstraint.Unlimited, None)
-    override def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit        = ()
-    override def close(): Unit                                                    = ()
-    override def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit = ()
-    override def resetPriorityPool(): Unit                                        = ()
-    override def cleanUnconfirmed(): Unit                                         = ()
-    override def getPriorityPool: Option[UtxPriorityPool]                         = None
-  }
-
   sealed trait PackStrategy
   object PackStrategy {
     case class Limit(time: FiniteDuration)    extends PackStrategy

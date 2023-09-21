@@ -70,7 +70,6 @@ class SpentComplexitySpec
     seal(
       TransactionsApiRoute(
         restAPISettings,
-        isLightMode = false,
         d.transactionsApi,
         testWallet,
         d.blockchain,

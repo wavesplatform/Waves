@@ -88,7 +88,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
 
-  override def prevStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 }
 
 object EmptyBlockchain extends EmptyBlockchain

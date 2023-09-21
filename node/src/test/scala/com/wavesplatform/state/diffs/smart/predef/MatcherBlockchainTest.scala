@@ -61,7 +61,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def wavesBalances(addresses: Seq[Address]): Map[Address, Long]                               = ???
       override def effectiveBalanceBanHeights(address: Address): Seq[Int]                                   = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
-      override def prevStateHash(refId: Option[ByteStr]): BlockId                                           = ???
+      override def lastStateHash(refId: Option[ByteStr]): BlockId                                           = ???
     }
 
     val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)

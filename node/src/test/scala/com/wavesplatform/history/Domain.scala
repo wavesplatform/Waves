@@ -445,7 +445,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
           val blockchainWithNewBlock =
             SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
-          val prevStateHash = blockchain.prevStateHash(Some(blockWithoutStateHash.header.reference))
+          val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
 
           BlockDiffer
             .createInitialBlockSnapshot(blockchain, blockWithoutStateHash.header.reference, generator.toAddress)

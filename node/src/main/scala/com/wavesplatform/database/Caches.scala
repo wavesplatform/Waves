@@ -4,7 +4,7 @@ import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, BlockSnapshot, SignedBlockHeader}
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.BlockMeta as PBBlockMeta
@@ -13,7 +13,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
@@ -356,9 +356,9 @@ abstract class Caches extends Blockchain with Storage {
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
-  protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr, Option[BlockSnapshot])]
+  protected def doRollback(targetHeight: Int): DiscardedBlocks
 
-  override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr, Option[BlockSnapshot])]] = {
+  override def rollbackTo(height: Int): Either[String, DiscardedBlocks] = {
     for {
       _ <- Either
         .cond(

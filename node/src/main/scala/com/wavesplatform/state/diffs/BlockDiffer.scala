@@ -183,7 +183,7 @@ object BlockDiffer {
     for {
       _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
-      prevStateHash = maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.prevStateHash(None))
+      prevStateHash = maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.lastStateHash(None))
       r <- snapshot match {
         case Some(BlockSnapshot(_, txSnapshots)) =>
           TracedResult.wrapValue(

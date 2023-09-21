@@ -446,7 +446,7 @@ class BlockchainUpdaterImpl(
     snapshotsById.toMap
   }
 
-  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr, Option[BlockSnapshot])]] = writeLock {
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = writeLock {
     log.info(s"Trying rollback blockchain to $blockId")
 
     val prevNgState = ngState
@@ -787,12 +787,12 @@ class BlockchainUpdaterImpl(
     snapshotBlockchain.resolveERC20Address(address)
   }
 
-  override def prevStateHash(refId: Option[ByteStr]): ByteStr =
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr =
     ngState
       .map { ng =>
         refId.filter(ng.contains).fold(ng.bestLiquidComputedStateHash)(id => ng.snapshotFor(id)._4)
       }
-      .getOrElse(rocksdb.prevStateHash(None))
+      .getOrElse(rocksdb.lastStateHash(None))
 
   def snapshotBlockchain: SnapshotBlockchain =
     ngState.fold[SnapshotBlockchain](SnapshotBlockchain(rocksdb, StateSnapshot.empty))(SnapshotBlockchain(rocksdb, _))

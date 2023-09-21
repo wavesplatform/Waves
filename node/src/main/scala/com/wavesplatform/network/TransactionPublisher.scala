@@ -20,8 +20,6 @@ object TransactionPublisher extends ScorexLogging {
 
   import Scheduler.Implicits.global
 
-  val NoOp: TransactionPublisher = { (_, _) => Future(TracedResult.wrapValue(true)) }
-
   def timeBounded(
       putIfNew: (Transaction, Boolean) => TracedResult[ValidationError, Boolean],
       broadcast: (Transaction, Option[Channel]) => Unit,

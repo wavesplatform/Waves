@@ -13,7 +13,7 @@ class DiscardingHandler(blockchainReadiness: Observable[Boolean], isLightMode: B
   private val lastReadiness                        = lastObserved(blockchainReadiness)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case RawBytes(code @ (TransactionSpec.messageCode | PBTransactionSpec.messageCode), _) if !lastReadiness().contains(true) || isLightMode =>
+    case RawBytes(code @ (TransactionSpec.messageCode | PBTransactionSpec.messageCode), _) if !lastReadiness().contains(true) =>
       logDiscarding(ctx, code)
     case RawBytes(code @ (BlockSnapshotResponseSpec.messageCode | MicroBlockSnapshotResponseSpec.messageCode), _) if !isLightMode =>
       logDiscarding(ctx, code)

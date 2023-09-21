@@ -213,8 +213,8 @@ case class SnapshotBlockchain(
       .resolveERC20Address(address)
       .orElse(snapshot.assetStatics.keys.find(id => ERC20Address(id) == address))
 
-  override def prevStateHash(refId: Option[ByteStr]): BlockId =
-    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.prevStateHash(refId))
+  override def lastStateHash(refId: Option[ByteStr]): BlockId =
+    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 }
 
 object SnapshotBlockchain {

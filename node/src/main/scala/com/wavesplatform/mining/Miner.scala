@@ -193,7 +193,7 @@ class MinerImpl(
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
       prevStateHash =
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchainUpdater.height + 1))
-          Some(blockchainUpdater.prevStateHash(Some(reference)))
+          Some(blockchainUpdater.lastStateHash(Some(reference)))
         else None
       (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
       block <- Block

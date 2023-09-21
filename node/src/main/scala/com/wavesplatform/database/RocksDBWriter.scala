@@ -7,7 +7,7 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
-import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -629,14 +629,14 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr, Option[BlockSnapshot])] = {
+  override protected def doRollback(targetHeight: Int): DiscardedBlocks = {
     val targetBlockId = readOnly(_.get(Keys.blockMetaAt(Height @@ targetHeight)))
       .map(_.id)
       .getOrElse(throw new IllegalArgumentException(s"No block at height $targetHeight"))
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedBlocks: Seq[(Block, ByteStr, Option[BlockSnapshot])] =
+    val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
         val ordersToInvalidate       = Seq.newBuilder[ByteStr]
@@ -1091,7 +1091,7 @@ class RocksDBWriter(
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
 
-  override def prevStateHash(refId: Option[ByteStr]): ByteStr = {
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = {
     readOnly(_.get(Keys.blockStateHash(height)))
   }
 }

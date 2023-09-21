@@ -320,7 +320,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
     (if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
        val compBlockchain =
          SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
-       val prevStateHash = blockchain.prevStateHash(Some(blockWithoutStateHash.header.reference))
+       val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
        TracedResult(
          BlockDiffer
            .createInitialBlockSnapshot(

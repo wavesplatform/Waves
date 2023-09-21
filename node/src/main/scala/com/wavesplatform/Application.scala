@@ -121,10 +121,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage = if (!settings.enableLightMode) {
+    val utxStorage =
       new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, utxEvents.onNext)
-    } else UtxPool.NoOp
     maybeUtx = Some(utxStorage)
+
+    val timer                 = new HashedWheelTimer()
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionPublisher]))
+    val timedTxValidator =
+      Schedulers.timeBoundedFixedPool(
+        timer,
+        5.seconds,
+        settings.synchronizationSettings.utxSynchronizer.maxThreads,
+        "utx-time-bounded-tx-validator",
+        reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
+      )
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
 
@@ -194,18 +204,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
-    val timer = new HashedWheelTimer()
-    val transactionPublisher = if (!settings.enableLightMode) {
-      val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionPublisher]))
-      val timedTxValidator =
-        Schedulers.timeBoundedFixedPool(
-          timer,
-          5.seconds,
-          settings.synchronizationSettings.utxSynchronizer.maxThreads,
-          "utx-time-bounded-tx-validator",
-          reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
-        )
-
+    val transactionPublisher =
       TransactionPublisher.timeBounded(
         utxStorage.putIfNew,
         allChannels.broadcast,
@@ -215,7 +214,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           if (allChannels.size >= settings.restAPISettings.minimumPeers) Right(())
           else Left(GenericError(s"There are not enough connections with peers (${allChannels.size}) to accept transaction"))
       )
-    } else TransactionPublisher.NoOp
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
       Task {
@@ -330,14 +328,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       }
     }
 
-    if (!settings.enableLightMode) {
-      TransactionSynchronizer(
-        settings.synchronizationSettings.utxSynchronizer,
-        lastBlockInfo.map(_.id).distinctUntilChanged(Eq.fromUniversalEquals),
-        transactions,
-        transactionPublisher
-      )
-    }
+    TransactionSynchronizer(
+      settings.synchronizationSettings.utxSynchronizer,
+      lastBlockInfo.map(_.id).distinctUntilChanged(Eq.fromUniversalEquals),
+      transactions,
+      transactionPublisher
+    )
 
     Observable(
       microblockDataWithSnapshot
@@ -390,7 +386,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time, routeTimeout),
         TransactionsApiRoute(
           settings.restAPISettings,
-          settings.enableLightMode,
           extensionContext.transactionsApi,
           wallet,
           blockchainUpdater,

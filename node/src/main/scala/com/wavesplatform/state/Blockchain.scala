@@ -84,7 +84,7 @@ trait Blockchain {
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
-  def prevStateHash(refId: Option[ByteStr]): ByteStr
+  def lastStateHash(refId: Option[ByteStr]): ByteStr
 }
 
 object Blockchain {

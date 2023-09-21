@@ -58,7 +58,6 @@ class ProtoVersionTransactionsSpec
   private val route: Route =
     TransactionsApiRoute(
       restAPISettings,
-      isLightMode = false,
       transactionsApi,
       testWallet,
       blockchain,
