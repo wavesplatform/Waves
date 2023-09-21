@@ -10,6 +10,8 @@ import com.wavesplatform.transaction.Transaction
 import scala.util.{Random, Try}
 
 object TestBlock {
+  case class BlockWithSigner(block: Block, signer: KeyPair)
+
   val defaultSigner: KeyPair = KeyPair(ByteStr(new Array[Byte](KeyLength)))
 
   val random: Random = new Random()
@@ -18,7 +20,7 @@ object TestBlock {
 
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
-  def sign(signer: KeyPair, b: Block): Block = {
+  def sign(signer: KeyPair, b: Block): BlockWithSigner = {
     val x = Block
       .buildAndSign(
         version = b.header.version,
@@ -34,23 +36,23 @@ object TestBlock {
         challengedHeader = b.header.challengedHeader
       )
 
-    x.explicitGet()
+    BlockWithSigner(x.explicitGet(), signer)
   }
 
-  def create(txs: Seq[Transaction]): Block = create(defaultSigner, txs)
+  def create(txs: Seq[Transaction]): BlockWithSigner = create(defaultSigner, txs)
 
-  def create(txs: Seq[Transaction], version: Byte): Block =
+  def create(txs: Seq[Transaction], version: Byte): BlockWithSigner =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, version = version)
 
-  def create(signer: KeyPair, txs: Seq[Transaction]): Block =
+  def create(signer: KeyPair, txs: Seq[Transaction]): BlockWithSigner =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer)
 
-  def create(signer: KeyPair, txs: Seq[Transaction], features: Seq[Short]): Block =
+  def create(signer: KeyPair, txs: Seq[Transaction], features: Seq[Short]): BlockWithSigner =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
 
-  def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
+  def create(time: Long, txs: Seq[Transaction]): BlockWithSigner = create(time, randomSignature(), txs, defaultSigner)
 
-  def create(time: Long, txs: Seq[Transaction], signer: KeyPair): Block = create(time, randomSignature(), txs, signer)
+  def create(time: Long, txs: Seq[Transaction], signer: KeyPair): BlockWithSigner = create(time, randomSignature(), txs, signer)
 
   def create(
       time: Long,
@@ -63,7 +65,7 @@ object TestBlock {
       stateHash: Option[ByteStr] = None,
       baseTarget: Long = 2L,
       challengedHeader: Option[ChallengedHeader] = None
-  ): Block =
+  ): BlockWithSigner =
     sign(
       signer,
       Block.create(
@@ -83,7 +85,7 @@ object TestBlock {
       )
     )
 
-  def withReference(ref: ByteStr): Block =
+  def withReference(ref: ByteStr): BlockWithSigner =
     sign(
       defaultSigner,
       Block(
@@ -105,7 +107,7 @@ object TestBlock {
       )
     )
 
-  def withReferenceAndFeatures(ref: ByteStr, features: Seq[Short]): Block =
+  def withReferenceAndFeatures(ref: ByteStr, features: Seq[Short]): BlockWithSigner =
     sign(
       defaultSigner,
       Block.create(

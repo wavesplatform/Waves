@@ -48,7 +48,8 @@ object BlockDiffer {
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
-      txSignParCheck: Boolean = true
+      txSignParCheck: Boolean = true,
+      checkStateHash: Boolean = true // TODO: remove after NODE-2568 merge (at NODE-2609)
   ): Either[ValidationError, Result] = {
     challengedHitSource match {
       case Some(hs) =>
@@ -61,7 +62,8 @@ object BlockDiffer {
           loadCacheData,
           verify,
           enableExecutionLog,
-          txSignParCheck
+          txSignParCheck,
+          checkStateHash
         ).resultE match {
           case Left(_: InvalidStateHash) =>
             fromBlockTraced(
@@ -73,13 +75,25 @@ object BlockDiffer {
               loadCacheData,
               verify,
               enableExecutionLog,
-              txSignParCheck
+              txSignParCheck,
+              checkStateHash
             ).resultE
           case Left(err) => Left(GenericError(s"Invalid block challenge: $err"))
           case _         => Left(GenericError("Invalid block challenge"))
         }
       case _ =>
-        fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
+        fromBlockTraced(
+          blockchain,
+          maybePrevBlock,
+          block,
+          constraint,
+          hitSource,
+          loadCacheData,
+          verify,
+          enableExecutionLog,
+          txSignParCheck,
+          checkStateHash
+        ).resultE
 
     }
   }
@@ -93,7 +107,8 @@ object BlockDiffer {
       loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
-      txSignParCheck: Boolean
+      txSignParCheck: Boolean,
+      enableStateHash: Boolean // TODO: remove after NODE-2568 merge (at NODE-2609)
   ): TracedResult[ValidationError, Result] = {
     val stateHeight        = blockchain.height
     val heightWithNewBlock = stateHeight + 1
@@ -180,12 +195,15 @@ object BlockDiffer {
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
       )
-      _ <- checkStateHash(
-        blockchainWithNewBlock,
-        block.header.stateHash,
-        r.stateHash,
-        block.header.challengedHeader.isDefined
-      )
+      _ <-
+        if (enableStateHash)
+          checkStateHash(
+            blockchainWithNewBlock,
+            block.header.stateHash,
+            r.stateHash,
+            block.header.challengedHeader.isDefined
+          )
+        else TracedResult(Right(()))
     } yield r
   }
 

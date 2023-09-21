@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V8}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
@@ -143,7 +143,10 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
 
   private def assert(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean = false) = {
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
-    withDomain(BlockRewardDistribution) { d =>
+    val settings =
+      if (dAppVersion >= V8 || assetScriptVersion >= V8) TransactionStateSnapshot else BlockRewardDistribution
+
+    withDomain(settings) { d =>
       d.appendBlock(preparingTxs*)
       d.appendBlock(ethInvoke)
 

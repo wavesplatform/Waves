@@ -60,7 +60,8 @@ object RealTransactionWrapper {
       matcherFee = o.matcherFee.value,
       bodyBytes = ByteStr(o.bodyBytes()),
       proofs = o.proofs.proofs.map(a => ByteStr(a.arr)).toIndexedSeq,
-      matcherFeeAssetId = o.matcherFeeAssetId.compatId
+      matcherFeeAssetId = o.matcherFeeAssetId.compatId,
+      attachment = o.attachment
     )
 
   def apply(
@@ -74,15 +75,14 @@ object RealTransactionWrapper {
       case t: TransferTransactionLike => mapTransferTx(t).asRight
       case i: IssueTransaction =>
         Tx.Issue(
-            proven(i),
-            i.quantity.value,
-            i.name.toByteStr,
-            i.description.toByteStr,
-            i.reissuable,
-            i.decimals.value,
-            i.script.map(_.bytes())
-          )
-          .asRight
+          proven(i),
+          i.quantity.value,
+          i.name.toByteStr,
+          i.description.toByteStr,
+          i.reissuable,
+          i.decimals.value,
+          i.script.map(_.bytes())
+        ).asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity.value, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity.value, b.asset.id).asRight
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount.value, toRide(b.recipient)).asRight
@@ -90,14 +90,13 @@ object RealTransactionWrapper {
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name).asRight
       case ms: MassTransferTransaction =>
         Tx.MassTransfer(
-            proven(ms),
-            assetId = ms.assetId.compatId,
-            transferCount = ms.transfers.length,
-            totalAmount = ms.transfers.map(_.amount.value).sum,
-            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(toRide(r.address), r.amount.value)).toIndexedSeq,
-            attachment = ms.attachment
-          )
-          .asRight
+          proven(ms),
+          assetId = ms.assetId.compatId,
+          transferCount = ms.transfers.length,
+          totalAmount = ms.transfers.map(_.amount.value).sum,
+          transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(toRide(r.address), r.amount.value)).toIndexedSeq,
+          attachment = ms.attachment
+        ).asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
       case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount.value, toRide(p.recipient)).asRight
@@ -106,16 +105,15 @@ object RealTransactionWrapper {
       case s: SponsorFeeTransaction => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee.map(_.value)).asRight
       case d: DataTransaction =>
         Tx.Data(
-            proven(d),
-            d.data.collect {
-              case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
-              case StringDataEntry(key, value)  => DataItem.Str(key, value)
-              case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
-              case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
-              case EmptyDataEntry(key)          => DataItem.Delete(key)
-            }.toIndexedSeq
-          )
-          .asRight
+          proven(d),
+          d.data.collect {
+            case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
+            case StringDataEntry(key, value)  => DataItem.Str(key, value)
+            case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
+            case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
+            case EmptyDataEntry(key)          => DataItem.Delete(key)
+          }.toIndexedSeq
+        ).asRight
 
       case ie: InvokeExpressionTransaction =>
         Tx.InvokeExpression(proven(ie), ie.expressionBytes, ie.feeAssetId.compatId).asRight

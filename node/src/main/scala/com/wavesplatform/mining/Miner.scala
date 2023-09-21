@@ -15,6 +15,7 @@ import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
@@ -291,14 +292,14 @@ class MinerImpl(
             case Left(err) =>
               Task.raiseError(new RuntimeException(err.toString))
 
-            case Right(Some(score)) =>
+            case Right(Applied(_, score)) =>
               log.debug(s"Forged and applied $block with cumulative score $score")
               BlockStats.mined(block, blockchainUpdater.height)
               allChannels.broadcast(BlockForged(block))
               if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
               Task.unit
 
-            case Right(None) =>
+            case Right(Ignored) =>
               Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
           }.uncancelable
 

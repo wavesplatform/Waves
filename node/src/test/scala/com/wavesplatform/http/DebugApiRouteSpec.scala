@@ -84,7 +84,7 @@ class DebugApiRouteSpec
     override def state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 
-  val block: Block = TestBlock.create(Nil)
+  val block: Block = TestBlock.create(Nil).block
   val testStateHash: StateHash = {
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
@@ -177,7 +177,7 @@ class DebugApiRouteSpec
       )
 
       "at nonexistent height" in withDomain(settingsWithStateHashes) { d =>
-        d.appendBlock(TestBlock.create(Nil))
+        d.appendBlock(TestBlock.create(Nil).block)
         Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.NotFound
         }
@@ -187,12 +187,12 @@ class DebugApiRouteSpec
       "last" in expectStateHashAt2("last")
 
       def expectStateHashAt2(suffix: String): Assertion = withDomain(settingsWithStateHashes) { d =>
-        val genesisBlock = TestBlock.create(Nil)
+        val genesisBlock = TestBlock.create(Nil).block
         d.appendBlock(genesisBlock)
 
-        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil)
+        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil).block
         d.appendBlock(blockAt2)
-        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
+        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil).block)
 
         val stateHashAt2 = d.rocksDBWriter.loadStateHash(2).value
         Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {

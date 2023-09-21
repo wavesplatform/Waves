@@ -207,7 +207,8 @@ object TxHelpers {
       matcher: KeyPair = defaultSigner,
       timestamp: TxTimestamp = timestamp,
       expiration: TxTimestamp = timestamp + 100000,
-      version: TxVersion = Order.V3
+      version: TxVersion = Order.V3,
+      attachment: Option[ByteStr] = None
   ): Order = {
     Order
       .selfSigned(
@@ -222,7 +223,8 @@ object TxHelpers {
         expiration,
         fee,
         feeAsset,
-        priceMode
+        priceMode,
+        attachment
       )
       .explicitGet()
   }

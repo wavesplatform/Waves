@@ -18,9 +18,10 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{BlockChallenger, Miner}
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -43,7 +44,7 @@ import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
 
-  type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
+  type AppendBlock = Block => Task[Either[ValidationError, BlockApplyResult]]
 
   final case class ImportOptions(
       configFile: Option[File] = None,

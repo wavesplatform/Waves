@@ -158,7 +158,7 @@ object ScriptRunner {
                     tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))
                   ),
               _.eliminate(
-                t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)),
+                t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true, bindingsVersion)),
                 _ => ???
               )
             )

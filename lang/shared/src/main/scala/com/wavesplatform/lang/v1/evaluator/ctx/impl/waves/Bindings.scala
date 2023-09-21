@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V7}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V7, V8}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.{DataEntrySize, NoLimit}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -95,7 +95,7 @@ object Bindings {
 
   def orderObject(ord: Ord, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
     CaseObj(
-      buildOrderType(proofsEnabled),
+      buildOrderType(proofsEnabled, version),
       combine(
         Map(
           "id"                -> ord.id,
@@ -112,7 +112,8 @@ object Bindings {
           "bodyBytes"         -> ord.bodyBytes,
           "matcherFeeAssetId" -> ord.matcherFeeAssetId
         ),
-        if (proofsEnabled || version != V3) Map(proofsPart(ord.proofs)) else Map.empty
+        if (proofsEnabled || version != V3) Map(proofsPart(ord.proofs)) else Map.empty,
+        if (version >= V8) Map("attachment" -> ord.attachment) else Map.empty
       )
     )
 
@@ -332,7 +333,7 @@ object Bindings {
         )
       case Exchange(p, amount, price, buyMatcherFee, sellMatcherFee, buyOrder, sellOrder) =>
         CaseObj(
-          buildExchangeTransactionType(proofsEnabled),
+          buildExchangeTransactionType(proofsEnabled, version),
           combine(
             Map(
               "buyOrder"       -> orderObject(buyOrder, proofsEnabled, version),

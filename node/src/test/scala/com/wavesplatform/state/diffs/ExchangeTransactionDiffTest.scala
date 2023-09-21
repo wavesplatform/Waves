@@ -2001,6 +2001,29 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
+  property(s"NODE-970. Non-empty attachment field is allowed only after ${BlockchainFeatures.TransactionStateSnapshot.description} activation") {
+    val matcher = TxHelpers.defaultSigner
+    val issuer  = TxHelpers.secondSigner
+
+    withDomain(
+      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 4),
+      AddrWithBalance.enoughBalances(matcher, issuer)
+    ) { d =>
+      val issue = TxHelpers.issue(issuer)
+      val exchange = () =>
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(ByteStr.fill(1)(1))),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = TxHelpers.secondSigner),
+          version = TxVersion.V3
+        )
+
+      d.appendBlock(issue)
+      d.appendBlockE(exchange()) should produce("Attachment field for orders is not supported yet")
+      d.appendBlock()
+      d.appendBlockENoCheck(exchange()) should beRight
+    }
+  }
+
   property("tx belongs to matcher on zero balance diff") {
     val matcher = signer(2)
     withDomain(RideV6, Seq(AddrWithBalance(matcher.toAddress))) { d =>
