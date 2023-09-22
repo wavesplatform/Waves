@@ -466,13 +466,13 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val reward        = 600000000
       val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
       val genesis       = results.head.getAppend.transactionStateUpdates.head.balances.head
-      genesis.address.toAddress shouldBe TxHelpers.defaultAddress
+      genesis.address.toAddress() shouldBe TxHelpers.defaultAddress
       genesis.getAmountAfter.amount shouldBe genesisAmount
       genesis.amountBefore shouldBe reward
       genesis.getAmountAfter.assetId shouldBe empty
 
       val payment = results.last.getAppend.transactionStateUpdates.last.balances.find { bu =>
-        bu.address.toAddress == TxHelpers.secondAddress
+        bu.address.toAddress() == TxHelpers.secondAddress
       }.get
 
       payment.getAmountAfter.amount shouldBe 100
