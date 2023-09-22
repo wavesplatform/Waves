@@ -444,8 +444,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
         if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
-          val hitSource     = posSelector.validateGenerationSignature(blockWithoutStateHash).explicitGet()
-          val blockchain    = SnapshotBlockchain(this.blockchain, StateSnapshot.empty, blockWithoutStateHash, hitSource, 0, None)
+          val hitSource  = posSelector.validateGenerationSignature(blockWithoutStateHash).getOrElse(blockWithoutStateHash.header.generationSignature)
+          val blockchain = SnapshotBlockchain(this.blockchain, StateSnapshot.empty, blockWithoutStateHash, hitSource, 0, None)
           val prevStateHash = this.blockchain.lastBlockHeader.flatMap(_.header.stateHash).getOrElse(InitStateHash)
 
           BlockDiffer
