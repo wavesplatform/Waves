@@ -27,7 +27,7 @@ class TestCompiler(version: StdLibVersion) {
     (baseCompilerContext |+|
       WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)).compilerContext
 
-  lazy val expressionContext: CTX[Environment] =
+  private lazy val expressionContext: CTX[Environment] =
     WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet(), fixBigScriptField = true)
 
   private lazy val expressionCompilerContext =

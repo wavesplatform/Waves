@@ -15,9 +15,7 @@ import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils.*
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -60,15 +58,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       scriptWithV1PureFunctions(dataTx, transfer),
       scriptWithV1WavesFunctions(dataTx, transfer),
       scriptWithCryptoFunctions
-    ).map(x => Parser.parseExpr(x).get.value)
-      .map { untypedScript =>
-        val typedScript = {
-          val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
-          ExprScript(compilerScript).explicitGet()
-        }
-
-        TxHelpers.setScript(recipient, typedScript)
-      }
+    ).map(scriptText => TxHelpers.setScript(recipient, TestCompiler(V2).compileExpression(scriptText)))
 
     (master, recipient, genesis, setScripts, dataTx, transfer, transfer2)
   }
@@ -284,15 +274,14 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .foreach { version =>
         val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
         for {
-          setScriptTransaction <- setScriptTransactions
-          v4Activation         <- if (version >= V4) Seq(true) else Seq(false, true)
-          v5Activation         <- if (version >= V5) Seq(true) else Seq(false, true)
+          v4Activation <- if (version >= V4) Seq(true) else Seq(false, true)
+          v5Activation <- if (version >= V5) Seq(true) else Seq(false, true)
         } yield {
           val fs = settingsForRide(version).blockchainSettings.functionalitySettings
 
           assertDiffAndState(fs) { append =>
             append(genesis).explicitGet()
-            append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+            append(Seq(dataTransaction)).explicitGet()
 
             val quantity    = 100000000L
             val decimals    = 6.toByte
@@ -402,8 +391,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .foreach { version =>
         val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
         for {
-          setScriptTransaction <- setScriptTransactions
-          withVrf              <- Seq(version >= V4, true).distinct
+          withVrf <- Seq(version >= V4, true).distinct
         } yield {
           val generationSignature =
             if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
@@ -421,7 +409,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
 
           assertDiffAndState(settings) { append =>
             append(genesis).explicitGet()
-            append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+            append(Seq(dataTransaction)).explicitGet()
             append(Seq(transferTx)).explicitGet()
 
             val script = ScriptCompiler

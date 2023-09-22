@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V8}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -68,7 +68,7 @@ class OverdraftTest extends PropSpec with WithDomain {
   }
 
   property("overdraft with payment V3") {
-    dAppVersionWithSettings.foreach {
+    dAppVersionWithSettings.filter(_._1 < V8).foreach {
       case (_, settings) =>
         val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
 
@@ -89,7 +89,7 @@ class OverdraftTest extends PropSpec with WithDomain {
   }
 
   property("attach unexisting tokens using multiple payment") {
-    dAppVersions.foreach { version =>
+    dAppVersions.filter(_ > V3).foreach { version =>
       val master  = TxHelpers.signer(0)
       val invoker = TxHelpers.signer(1)
 
