@@ -199,7 +199,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxStorage.resetPriorityPool()
         blockchainUpdater.removeAfter(blockId)
       }.executeOn(appenderScheduler)
-        .asyncBoundary
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))

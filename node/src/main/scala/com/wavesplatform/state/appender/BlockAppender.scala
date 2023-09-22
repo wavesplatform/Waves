@@ -65,7 +65,7 @@ object BlockAppender extends ScorexLogging {
         validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
       } yield validApplication).value
 
-    val handle = append.asyncBoundary.map {
+    val handle = append.map {
       case Right(Ignored) => // block already appended
       case Right(Applied(_, _)) =>
         log.debug(s"${id(ch)} Appended $newBlock")
