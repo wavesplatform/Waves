@@ -16,12 +16,13 @@ class CalculateDelayTest extends PropSpec with WithDomain {
       s"""
          | @Callable(i)
          | func default() = {
-         |   let address1 = i.caller
-         |   let address2 = Address(base58'${signer(2).toAddress}')
-         |   let address3 = Address(base58'${signer(3).toAddress}')
-         |   let lowest   = calculateDelay(lastBlock.generationSignature, lastBlock.baseTarget, address1, 10 * 1000 * 1000)
-         |   let medium   = calculateDelay(lastBlock.generationSignature, lastBlock.baseTarget, address2, 30 * 1000 * 1000)
-         |   let largest  = calculateDelay(lastBlock.generationSignature, lastBlock.baseTarget, address3, 90 * 1000 * 1000)
+         |   let hitSource = if (height % 2 == 0) then lastBlock.generationSignature else lastBlock.vrf.value()
+         |   let address1  = i.caller
+         |   let address2  = Address(base58'${signer(2).toAddress}')
+         |   let address3  = Address(base58'${signer(3).toAddress}')
+         |   let lowest    = calculateDelay(hitSource, lastBlock.baseTarget, address1, 10 * 1000 * 1000)
+         |   let medium    = calculateDelay(hitSource, lastBlock.baseTarget, address2, 30 * 1000 * 1000)
+         |   let largest   = calculateDelay(hitSource, lastBlock.baseTarget, address3, 90 * 1000 * 1000)
          |   [
          |     IntegerEntry("lowest", lowest),
          |     IntegerEntry("medium", medium),
