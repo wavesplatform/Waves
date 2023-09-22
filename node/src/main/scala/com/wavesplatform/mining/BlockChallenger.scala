@@ -68,7 +68,7 @@ class BlockChallengerImpl(
             blockchainUpdater.lastStateHash(Some(block.header.reference))
           )
         )
-        applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+        applyResult <- EitherT(appendBlock(challengingBlock))
       } yield applyResult -> challengingBlock).value
     }.map {
       case Right((Applied(_, _), challengingBlock)) =>
@@ -101,7 +101,7 @@ class BlockChallengerImpl(
               blockchainUpdater.lastStateHash(Some(block.header.reference))
             )
           )
-          applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+          applyResult <- EitherT(appendBlock(challengingBlock))
         } yield applyResult -> challengingBlock).value
       })
     } yield {

@@ -172,48 +172,27 @@ object RxExtensionLoader extends ScorexLogging {
       state.loaderState match {
         case LoaderState.ExpectingBlocksWithSnapshots(c, requested, expectedBlocks, receivedBlocks, expectedSnapshots, receivedSnapshots, _)
             if c.channel == ch && expectedBlocks.contains(block.id()) =>
+          val updatedExpectedBlocks = expectedBlocks - block.id()
+
           BlockStats.received(block, BlockStats.Source.Ext, ch)
           ParSignatureChecker.checkBlockSignature(block)
-          if (expectedBlocks == Set(block.id()) && expectedSnapshots.isEmpty) {
+
+          if (updatedExpectedBlocks.isEmpty && expectedSnapshots.isEmpty) {
             val blockById = (receivedBlocks + block).map(b => b.id() -> b).toMap
             val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots)
             log.debug(s"${id(ch)} $ext successfully received")
             extensionLoadingFinished(state.withIdleLoader, ext, ch)
-          } else if (expectedBlocks == Set(block.id())) {
-            val blacklistAsync = scheduleBlacklist(
-              ch,
-              s"Timeout loading one of requested block snapshots, non-received: ${if (expectedSnapshots.size == 1) s"one=${requested.last.trim}"
-              else s"total=${expectedSnapshots.size}"}"
-            ).runAsyncLogErr
-            state.withLoaderState(
-              LoaderState.ExpectingBlocksWithSnapshots(
-                c,
-                requested,
-                expectedBlocks - block.id(),
-                receivedBlocks + block,
-                expectedSnapshots,
-                receivedSnapshots,
-                blacklistAsync
-              )
-            )
           } else {
-            val snapshotsInfo =
-              if (isLightMode)
-                s", non-received snapshots: ${if (expectedSnapshots.size == 1) s"one=${requested.last.trim}" else s"total=${expectedSnapshots.size}"}"
-              else ""
             val blacklistAsync = scheduleBlacklist(
               ch,
-              s"Timeout loading one of requested blocks or snapshots, non-received blocks: ${
-                val totalLeft = expectedBlocks.size - 1
-                if (totalLeft == 1) "one=" + requested.last.trim
-                else "total=" + totalLeft.toString
-              }$snapshotsInfo"
+              timeoutMsg(isLightMode, updatedExpectedBlocks.size, expectedSnapshots.size, requested)
             ).runAsyncLogErr
+
             state.withLoaderState(
               LoaderState.ExpectingBlocksWithSnapshots(
                 c,
                 requested,
-                expectedBlocks - block.id(),
+                updatedExpectedBlocks,
                 receivedBlocks + block,
                 expectedSnapshots,
                 receivedSnapshots,
@@ -241,37 +220,19 @@ object RxExtensionLoader extends ScorexLogging {
         state.loaderState match {
           case LoaderState.ExpectingBlocksWithSnapshots(c, requested, expectedBlocks, receivedBlocks, expectedSnapshots, receivedSnapshots, _)
               if c.channel == ch && expectedSnapshots.contains(snapshot.blockId) =>
+            val updatedExpectedSnapshots = expectedSnapshots - snapshot.blockId
+
             BlockStats.received(snapshot, BlockStats.Source.Ext, ch)
-            if (expectedSnapshots == Set(snapshot.blockId) && expectedBlocks.isEmpty) {
+
+            if (updatedExpectedSnapshots.isEmpty && expectedBlocks.isEmpty) {
               val blockById = receivedBlocks.map(b => b.id() -> b).toMap
               val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots.updated(snapshot.blockId, snapshot))
               log.debug(s"${id(ch)} $ext successfully received")
               extensionLoadingFinished(state.withIdleLoader, ext, ch)
-            } else if (expectedSnapshots == Set(snapshot.blockId)) {
-              val blacklistAsync = scheduleBlacklist(
-                ch,
-                s"Timeout loading one of requested blocks, non-received: ${if (expectedBlocks.size == 1) s"one=${requested.last.trim}"
-                else s"total=${expectedBlocks.size}"}"
-              ).runAsyncLogErr
-              state.withLoaderState(
-                LoaderState.ExpectingBlocksWithSnapshots(
-                  c,
-                  requested,
-                  expectedBlocks,
-                  receivedBlocks,
-                  expectedSnapshots - snapshot.blockId,
-                  receivedSnapshots.updated(snapshot.blockId, snapshot),
-                  blacklistAsync
-                )
-              )
             } else {
               val blacklistAsync = scheduleBlacklist(
                 ch,
-                s"Timeout loading one of requested blocks or snapshots, non-received blocks: ${if (expectedBlocks.size == 1) s"one=${requested.last.trim}"
-                else s"total=${expectedBlocks.size}"}, non-received snapshots: ${
-                  val totalLeft = expectedSnapshots.size - 1
-                  if (totalLeft == 1) s"one=${requested.last.trim}" else s"total=$totalLeft"
-                }"
+                timeoutMsg(isLightMode, expectedBlocks.size, updatedExpectedSnapshots.size, requested)
               ).runAsyncLogErr
               state.withLoaderState(
                 LoaderState.ExpectingBlocksWithSnapshots(
@@ -279,7 +240,7 @@ object RxExtensionLoader extends ScorexLogging {
                   requested,
                   expectedBlocks,
                   receivedBlocks,
-                  expectedSnapshots - snapshot.blockId,
+                  updatedExpectedSnapshots,
                   receivedSnapshots.updated(snapshot.blockId, snapshot),
                   blacklistAsync
                 )
@@ -378,6 +339,16 @@ object RxExtensionLoader extends ScorexLogging {
       .subscribe()
 
     (simpleBlocksWithSnapshot, Coeval.eval(stateValue), RxExtensionLoaderShutdownHook(extensions, simpleBlocksWithSnapshot))
+  }
+
+  private def timeoutMsg(isLightMode: Boolean, totalLeftBlocks: Int, totalLeftSnapshots: Int, requested: Seq[BlockId]): String = {
+    val snapshotShortMsg = if (isLightMode) " or snapshots" else ""
+    val snapshotsInfo =
+      if (isLightMode)
+        s", non-received snapshots: ${if (totalLeftSnapshots == 1) s"one=${requested.last.trim}" else s"total=$totalLeftSnapshots"}"
+      else ""
+    s"Timeout loading one of requested blocks$snapshotShortMsg, non-received blocks: ${if (totalLeftBlocks == 1) s"one=${requested.last.trim}"
+    else s"total=$totalLeftBlocks"}$snapshotsInfo"
   }
 
   private def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
