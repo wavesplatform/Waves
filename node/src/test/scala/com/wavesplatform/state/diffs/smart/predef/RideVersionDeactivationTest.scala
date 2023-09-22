@@ -10,7 +10,7 @@ import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 
-class RideDeactivationTest extends PropSpec with WithDomain {
+class RideVersionDeactivationTest extends PropSpec with WithDomain {
   private def dApp =
     TestCompiler(V3).compileContract(
       """
