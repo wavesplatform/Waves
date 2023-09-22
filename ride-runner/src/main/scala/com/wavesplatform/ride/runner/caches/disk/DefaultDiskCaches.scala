@@ -79,7 +79,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
         .cachedOrUnknown(addressIds.getAddressId(address))
         .flatMap { addressId =>
           val k = (addressId, dataKey)
-          ctx.readFromDbOpt(k, KvPairs.AccountDataEntriesHistory, maxHeight)
+          ctx.readFromDb(k, KvPairs.AccountDataEntriesHistory, maxHeight)
         }
         .tap { r => log.trace(s"get($address, $dataKey, $maxHeight): ${r.toFoundStr("value", _.value)}") }
 
@@ -108,7 +108,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
       addressIds.getAddressId(address).fold(RemoteData.unknown[DataEntry[?]]) { addressId =>
         val k = (addressId, dataKey)
         ctx
-          .removeFromAndGetLatestExistedOpt(k, KvPairs.AccountDataEntriesHistory, fromHeight)
+          .removeFromAndGetLatestExisted(k, KvPairs.AccountDataEntriesHistory, fromHeight)
           .tap { _ => log.trace(s"remove($address, $dataKey, $fromHeight)") }
       }
 
@@ -124,7 +124,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     override def get(maxHeight: Height, key: Address)(implicit ctx: ReadOnly): RemoteData[WeighedAccountScriptInfo] =
       RemoteData
         .cachedOrUnknown(addressIds.getAddressId(key))
-        .flatMap(ctx.readFromDbOpt(_, KvPairs.AccountScriptsHistory, maxHeight))
+        .flatMap(ctx.readFromDb(_, KvPairs.AccountScriptsHistory, maxHeight))
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("hash", _.hashCode())}") }
 
     override def set(atHeight: Height, key: Address, data: RemoteData[WeighedAccountScriptInfo])(implicit
@@ -138,7 +138,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
     override def removeFrom(fromHeight: Height, key: Address)(implicit ctx: ReadWrite): RemoteData[WeighedAccountScriptInfo] =
       addressIds.getAddressId(key).fold(RemoteData.unknown[WeighedAccountScriptInfo]) { addressId =>
         ctx
-          .removeFromAndGetLatestExistedOpt(addressId, KvPairs.AccountScriptsHistory, fromHeight)
+          .removeFromAndGetLatestExisted(addressId, KvPairs.AccountScriptsHistory, fromHeight)
           .tap { _ => log.trace(s"remove($key, $fromHeight)") }
       }
 
@@ -153,7 +153,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
 
     override def get(maxHeight: Height, key: IssuedAsset)(implicit ctx: ReadOnly): RemoteData[WeighedAssetDescription] =
       ctx
-        .readFromDbOpt(key, KvPairs.AssetDescriptionsHistory, maxHeight)
+        .readFromDb(key, KvPairs.AssetDescriptionsHistory, maxHeight)
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr(_.assetDescription.toString)}") }
 
     override def set(atHeight: Height, key: IssuedAsset, data: RemoteData[WeighedAssetDescription])(implicit ctx: ReadWrite): Unit = {
@@ -163,7 +163,7 @@ class DefaultDiskCaches private (storage: RideDbAccess, initialBlockHeadersLastH
 
     override def removeFrom(fromHeight: Height, key: IssuedAsset)(implicit ctx: ReadWrite): RemoteData[WeighedAssetDescription] = {
       ctx
-        .removeFromAndGetLatestExistedOpt(key, KvPairs.AssetDescriptionsHistory, fromHeight)
+        .removeFromAndGetLatestExisted(key, KvPairs.AssetDescriptionsHistory, fromHeight)
         .tap { _ => log.trace(s"remove($key, $fromHeight)") }
     }
 

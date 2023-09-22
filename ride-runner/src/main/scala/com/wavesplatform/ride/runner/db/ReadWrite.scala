@@ -7,7 +7,9 @@ import com.wavesplatform.ride.runner.caches.disk.KvHistoryPair
 import com.wavesplatform.ride.runner.db.Heights.{splitHeightsAt, splitHeightsAtRollback}
 import com.wavesplatform.state.Height
 import org.rocksdb.ColumnFamilyHandle
+import shapeless.=:!=
 
+import scala.annotation.unused
 import scala.collection.mutable
 
 trait ReadWrite extends ReadOnly {
@@ -32,11 +34,15 @@ trait ReadWrite extends ReadOnly {
     put(dataOnHeightKey(height), data)
   }
 
-  def removeFromAndGetLatestExistedOpt[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], fromHeight: Height): RemoteData[V] =
-    RemoteData(removeFromAndGetLatestExistedBase(k, kvHistoryPair, fromHeight))
-
-  def removeFromAndGetLatestExisted[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], fromHeight: Height): RemoteData[V] =
+  def removeFromAndGetLatestExisted[K, V](
+      k: K,
+      kvHistoryPair: KvHistoryPair[K, V],
+      fromHeight: Height
+  )(implicit @unused ev: V =:!= Option[?]): RemoteData[V] =
     RemoteData.cachedOrUnknown(removeFromAndGetLatestExistedBase(k, kvHistoryPair, fromHeight))
+
+  def removeFromAndGetLatestExisted[K, V](k: K, kvHistoryPair: KvHistoryPair[K, Option[V]], fromHeight: Height): RemoteData[V] =
+    RemoteData(removeFromAndGetLatestExistedBase(k, kvHistoryPair, fromHeight))
 
   private def removeFromAndGetLatestExistedBase[K, V](k: K, kvHistoryPair: KvHistoryPair[K, V], fromHeight: Height): Option[V] = {
     def dataOnHeightKey(h: Height) = kvHistoryPair.kvPairAtHeight.at((h, k))
