@@ -4,7 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.AddressId
 import com.wavesplatform.ride.runner.caches.RemoteData
-import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite, RideDbAccess}
+import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}
 import com.wavesplatform.state.Height
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
@@ -22,42 +22,32 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
     def getHistory(implicit ctx: ReadOnly): Heights = ctx.getOpt(KvPairs.AccountAssetsHistory.at((AddressId(0L), asset))).getOrElse(Vector.empty)
 
     "history" - {
-      "empty" in test { (db, _) =>
-        db.directReadOnly { implicit ctx =>
-          getHistory shouldBe empty
-        }
+      "empty" in test { _ => implicit ctx =>
+        getHistory shouldBe empty
       }
 
-      "after set" in test { (db, cache) =>
-        db.directReadWrite { implicit ctx =>
-          cache.set(Height(9), defaultKey, RemoteData.Absence)
-          getHistory shouldBe Vector(9)
-        }
+      "after set" in test { cache => implicit ctx =>
+        cache.set(Height(9), defaultKey, RemoteData.Absence)
+        getHistory shouldBe Vector(9)
       }
 
       def removeTests(removeF: (ReadWrite, DiskCache[(Address, Asset), Long], Height) => Unit): Unit = {
-        "lesser height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, RemoteData.Absence)
-            removeF(ctx, cache, Height(8))
-            getHistory shouldBe empty
-          }
+        "lesser height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, RemoteData.Absence)
+          removeF(ctx, cache, Height(8))
+          getHistory shouldBe empty
         }
 
-        "same height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, RemoteData.Absence)
-            removeF(ctx, cache, Height(9))
-            getHistory shouldBe empty
-          }
+        "same height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, RemoteData.Absence)
+          removeF(ctx, cache, Height(9))
+          getHistory shouldBe empty
         }
 
-        "greater height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, RemoteData.Absence)
-            removeF(ctx, cache, Height(10))
-            getHistory shouldBe Vector(9)
-          }
+        "greater height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, RemoteData.Absence)
+          removeF(ctx, cache, Height(10))
+          getHistory shouldBe Vector(9)
         }
       }
 
@@ -69,149 +59,120 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
         cache.removeAllFrom(h)(ctx)
       }
 
-      "keeps a number of records limited by a maximum possible rollback" in test { (db, cache) =>
-        db.directReadWrite { implicit ctx =>
-          (2 to 104 by 2).foreach { h =>
-            cache.set(Height(h), defaultKey, RemoteData.Cached(h))
-          }
-
-          (2 to 3).foreach { h =>
-            cache.get(Height(h), defaultKey) shouldBe RemoteData.Unknown
-          }
-
-          cache.get(Height(4), defaultKey) shouldBe RemoteData.Cached(4)
+      "keeps a number of records limited by a maximum possible rollback" in test { cache => implicit ctx =>
+        (2 to 104 by 2).foreach { h =>
+          cache.set(Height(h), defaultKey, RemoteData.Cached(h))
         }
+
+        (2 to 3).foreach { h =>
+          cache.get(Height(h), defaultKey) shouldBe RemoteData.Unknown
+        }
+
+        cache.get(Height(4), defaultKey) shouldBe RemoteData.Cached(4)
       }
     }
 
     "set and get" - {
       "cached" - {
-        "on the first height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(8), defaultKey, defaultCachedValue)
-            cache.set(Height(11), defaultKey, RemoteData.Absence)
-            cache.get(Height(8), defaultKey) shouldBe defaultCachedValue
-          }
+        "on the first height" in test { cache => implicit ctx =>
+          cache.set(Height(8), defaultKey, defaultCachedValue)
+          cache.set(Height(11), defaultKey, RemoteData.Absence)
+          cache.get(Height(8), defaultKey) shouldBe defaultCachedValue
         }
 
-        "before the max height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(8), defaultKey, defaultCachedValue)
-            cache.set(Height(11), defaultKey, RemoteData.Absence)
-            cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
-          }
+        "before the max height" in test { cache => implicit ctx =>
+          cache.set(Height(8), defaultKey, defaultCachedValue)
+          cache.set(Height(11), defaultKey, RemoteData.Absence)
+          cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
         }
 
-        "on the max height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, RemoteData.Absence)
-            cache.set(Height(10), defaultKey, defaultCachedValue)
-            cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
-          }
+        "on the max height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, RemoteData.Absence)
+          cache.set(Height(10), defaultKey, defaultCachedValue)
+          cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
         }
 
-        "after the max height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(10), defaultKey, defaultCachedValue)
-            cache.get(Height(11), defaultKey) shouldBe defaultCachedValue
-          }
+        "after the max height" in test { cache => implicit ctx =>
+          cache.set(Height(10), defaultKey, defaultCachedValue)
+          cache.get(Height(11), defaultKey) shouldBe defaultCachedValue
         }
       }
 
       "absence" - {
-        "before the max height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(8), defaultKey, RemoteData.Absence)
-            cache.set(Height(11), defaultKey, defaultCachedValue)
-            cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
-          }
+        "before the max height" in test { cache => implicit ctx =>
+          cache.set(Height(8), defaultKey, RemoteData.Absence)
+          cache.set(Height(11), defaultKey, defaultCachedValue)
+          cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
         }
 
-        "on the max height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, defaultCachedValue)
-            cache.set(Height(10), defaultKey, RemoteData.Absence)
-            cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
-          }
+        "on the max height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, defaultCachedValue)
+          cache.set(Height(10), defaultKey, RemoteData.Absence)
+          cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
         }
 
-        "after the max height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, defaultCachedValue)
-            cache.set(Height(10), defaultKey, RemoteData.Absence)
-            cache.get(Height(11), defaultKey) shouldBe defaultCacheValue
-          }
+        "after the max height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, defaultCachedValue)
+          cache.set(Height(10), defaultKey, RemoteData.Absence)
+          cache.get(Height(11), defaultKey) shouldBe defaultCacheValue
         }
       }
 
       "unknown" - {
-        "on empty" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
-          }
+        "on empty" in test { cache => implicit ctx =>
+          cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
         }
 
-        "before the first known height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(11), defaultKey, RemoteData.Absence)
-            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
-          }
+        "before the first known height" in test { cache => implicit ctx =>
+          cache.set(Height(11), defaultKey, RemoteData.Absence)
+          cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
         }
       }
     }
 
     "remove" - {
       "the data is not available for 'get' after deletion" - {
-        "on removed height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, RemoteData.Absence)
-            cache.removeFrom(Height(9), defaultKey)
-            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
-          }
+        "on removed height" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, RemoteData.Absence)
+          cache.removeFrom(Height(9), defaultKey)
+          cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
         }
 
-        "on next height" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(11), defaultKey, RemoteData.Absence)
-            cache.removeFrom(Height(1), defaultKey)
-            cache.get(Height(11), defaultKey) shouldBe RemoteData.Unknown
-          }
+        "on next height" in test { cache => implicit ctx =>
+          cache.set(Height(11), defaultKey, RemoteData.Absence)
+          cache.removeFrom(Height(1), defaultKey)
+          cache.get(Height(11), defaultKey) shouldBe RemoteData.Unknown
         }
       }
 
       "returns the last known value before deleted heights" - {
-        "cached" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, defaultCachedValue)
-            cache.set(Height(11), defaultKey, RemoteData.Absence)
-            cache.removeFrom(Height(10), defaultKey)
-            cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
-          }
+        "cached" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, defaultCachedValue)
+          cache.set(Height(11), defaultKey, RemoteData.Absence)
+          cache.removeFrom(Height(10), defaultKey)
+          cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
         }
 
-        "absence" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(9), defaultKey, RemoteData.Absence)
-            cache.set(Height(11), defaultKey, defaultCachedValue)
-            cache.removeFrom(Height(10), defaultKey)
-            cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
-          }
+        "absence" in test { cache => implicit ctx =>
+          cache.set(Height(9), defaultKey, RemoteData.Absence)
+          cache.set(Height(11), defaultKey, defaultCachedValue)
+          cache.removeFrom(Height(10), defaultKey)
+          cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
         }
 
-        "unknown if empty" in test { (db, cache) =>
-          db.directReadWrite { implicit ctx =>
-            cache.set(Height(10), defaultKey, RemoteData.Absence)
-            cache.set(Height(11), defaultKey, defaultCachedValue)
-            cache.removeFrom(Height(10), defaultKey)
-            cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
-          }
+        "unknown if empty" in test { cache => implicit ctx =>
+          cache.set(Height(10), defaultKey, RemoteData.Absence)
+          cache.set(Height(11), defaultKey, defaultCachedValue)
+          cache.removeFrom(Height(10), defaultKey)
+          cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
         }
       }
     }
   }
 
-  private def test(f: (RideDbAccess, DiskCache[(Address, Asset), Long]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadWrite(DefaultDiskCaches(db)(_))
-    f(db, caches.accountBalances)
+  private def test(f: DiskCache[(Address, Asset), Long] => ReadWrite => Unit): Unit = withDb { db =>
+    db.directReadWrite { implicit ctx =>
+      f(DefaultDiskCaches(db).accountBalances)(ctx)
+    }
   }
 }

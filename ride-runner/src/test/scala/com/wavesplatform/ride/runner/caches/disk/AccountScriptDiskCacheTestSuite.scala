@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.AddressId
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.runner.caches.WeighedAccountScriptInfo
-import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
+import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}
 import com.wavesplatform.state.AccountScriptInfo
 
 class AccountScriptDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[Address, WeighedAccountScriptInfo] {
@@ -20,9 +20,10 @@ class AccountScriptDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite[Addr
     )
   )
 
-  protected override def test(f: (RideDbAccess, DiskCache[Address, WeighedAccountScriptInfo]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
-    f(db, caches.accountScripts)
+  protected override def test(f: DiskCache[Address, WeighedAccountScriptInfo] => ReadWrite => Unit): Unit = withDb { db =>
+    db.directReadWrite { implicit ctx =>
+      f(DefaultDiskCaches(db).accountScripts)(ctx)
+    }
   }
 
   override protected def getHistory(implicit ctx: ReadOnly): Heights =

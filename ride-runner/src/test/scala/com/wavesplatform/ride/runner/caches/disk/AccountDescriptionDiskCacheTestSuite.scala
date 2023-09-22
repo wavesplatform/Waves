@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.caches.disk
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
-import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, RideDbAccess}
+import com.wavesplatform.ride.runner.db.{Heights, ReadOnly, ReadWrite}
 import com.wavesplatform.state.{AssetDescription, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
@@ -29,9 +29,10 @@ class AccountDescriptionDiskCacheTestSuite extends DiskCacheWithHistoryTestSuite
     )
   )
 
-  protected override def test(f: (RideDbAccess, DiskCache[IssuedAsset, WeighedAssetDescription]) => Unit): Unit = withDb { db =>
-    val caches = db.batchedReadOnly(DefaultDiskCaches(db)(_))
-    f(db, caches.assetDescriptions)
+  protected override def test(f: DiskCache[IssuedAsset, WeighedAssetDescription] => ReadWrite => Unit): Unit = withDb { db =>
+    db.directReadWrite { implicit ctx =>
+      f(DefaultDiskCaches(db).assetDescriptions)(ctx)
+    }
   }
 
   override protected def getHistory(implicit ctx: ReadOnly): Heights =
