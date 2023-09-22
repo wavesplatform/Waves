@@ -37,10 +37,7 @@ import monix.eval.Coeval
 import play.api.libs.json.*
 import shapeless.*
 
-import scala.util.control.NoStackTrace
-
 object UtilsEvaluator {
-  object NoRequestStructure                 extends ValidationError
   object ConflictingRequestStructure        extends ValidationError
   case class ParseJsonError(error: JsError) extends ValidationError
 
@@ -87,13 +84,7 @@ object UtilsEvaluator {
   }
 
   def validationErrorToJson(e: ValidationError, maxTxErrorLogSize: Int): JsObject = e match {
-    case e: InvokeRejectError => Json.obj("error" -> ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
-    case NoRequestStructure =>
-      ApiError
-        .WrongJson(cause = Some(new IllegalArgumentException() with NoStackTrace {
-          override def toString: String = "Either expression or invocation structure is required in request"
-        }))
-        .json
+    case e: InvokeRejectError        => Json.obj("error" -> ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
     case ConflictingRequestStructure => ApiError.ConflictingRequestStructure.json
     case e: ParseJsonError           => ApiError.WrongJson(None, e.error.errors).json
     case e                           => ApiError.fromValidationError(e).json
