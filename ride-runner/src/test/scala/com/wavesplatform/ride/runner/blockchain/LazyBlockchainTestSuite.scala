@@ -47,7 +47,7 @@ class LazyBlockchainTestSuite extends BaseTestSuite with HasTestDb with HasGrpc 
           }.runTest()
 
           "updates activated features" in withDb { db =>
-            db.batchedReadWrite { implicit rw =>
+            db.directReadWrite { implicit rw =>
               val blockchain = LazyBlockchain.init(
                 settings = DefaultBlockchainSettings,
                 blockchainApi = testBlockchainApi,

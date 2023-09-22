@@ -8,60 +8,39 @@ abstract class DiskCacheWithHistoryTestSuite[KeyT, ValueT] extends DiskCacheTest
   testedClassName - {
     "history" - {
       "empty" in test { (db, _) =>
-        db.batchedReadOnly { implicit ctx =>
+        db.directReadOnly { implicit ctx =>
           getHistory shouldBe empty
         }
       }
 
       "after set" in test { (db, cache) =>
-        db.batchedReadWrite { implicit ctx =>
+        db.directReadWrite { implicit ctx =>
           cache.set(Height(9), defaultKey, RemoteData.Absence)
-        }
-
-        db.batchedReadOnly { implicit ctx =>
           getHistory shouldBe Vector(9)
         }
       }
 
       def removeTests(removeF: (ReadWrite, DiskCache[KeyT, ValueT], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(8))
-          }
-
-          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe empty
           }
         }
 
         "same height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(9))
-          }
-
-          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe empty
           }
         }
 
         "greater height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(10))
-          }
-
-          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe Vector(9)
           }
         }
@@ -76,13 +55,11 @@ abstract class DiskCacheWithHistoryTestSuite[KeyT, ValueT] extends DiskCacheTest
       }
 
       "keeps a number of records limited by a maximum possible rollback" in test { (db, cache) =>
-        (2 to 104 by 2).foreach { h =>
-          db.batchedReadWrite { implicit ctx =>
+        db.directReadWrite { implicit ctx =>
+          (2 to 104 by 2).foreach { h =>
             cache.set(Height(h), defaultKey, RemoteData.Cached(defaultValue))
           }
-        }
 
-        db.batchedReadWrite { implicit ctx =>
           (2 to 3).foreach { h =>
             cache.get(Height(h), defaultKey) shouldBe RemoteData.Unknown
           }

@@ -23,60 +23,39 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
 
     "history" - {
       "empty" in test { (db, _) =>
-        db.batchedReadOnly { implicit ctx =>
+        db.directReadOnly { implicit ctx =>
           getHistory shouldBe empty
         }
       }
 
       "after set" in test { (db, cache) =>
-        db.batchedReadWrite { implicit ctx =>
+        db.directReadWrite { implicit ctx =>
           cache.set(Height(9), defaultKey, RemoteData.Absence)
-        }
-
-        db.batchedReadOnly { implicit ctx =>
           getHistory shouldBe Vector(9)
         }
       }
 
       def removeTests(removeF: (ReadWrite, DiskCache[(Address, Asset), Long], Height) => Unit): Unit = {
         "lesser height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(8))
-          }
-
-          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe empty
           }
         }
 
         "same height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(9))
-          }
-
-          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe empty
           }
         }
 
         "greater height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             removeF(ctx, cache, Height(10))
-          }
-
-          db.batchedReadOnly { implicit ctx =>
             getHistory shouldBe Vector(9)
           }
         }
@@ -91,13 +70,11 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
       }
 
       "keeps a number of records limited by a maximum possible rollback" in test { (db, cache) =>
-        (2 to 104 by 2).foreach { h =>
-          db.batchedReadWrite { implicit ctx =>
+        db.directReadWrite { implicit ctx =>
+          (2 to 104 by 2).foreach { h =>
             cache.set(Height(h), defaultKey, RemoteData.Cached(h))
           }
-        }
 
-        db.batchedReadWrite { implicit ctx =>
           (2 to 3).foreach { h =>
             cache.get(Height(h), defaultKey) shouldBe RemoteData.Unknown
           }
@@ -110,53 +87,32 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
     "set and get" - {
       "cached" - {
         "on the first height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(8), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(8), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "before the max height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(8), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "on the max height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "after the max height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(11), defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -164,43 +120,25 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
 
       "absence" - {
         "before the max height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(8), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
           }
         }
 
         "on the max height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
           }
         }
 
         "after the max height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(11), defaultKey) shouldBe defaultCacheValue
           }
         }
@@ -208,17 +146,14 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
 
       "unknown" - {
         "on empty" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
 
         "before the first known height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -228,29 +163,17 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
     "remove" - {
       "the data is not available for 'get' after deletion" - {
         "on removed height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(9), defaultKey)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
 
         "on next height" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(1), defaultKey)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(11), defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -258,55 +181,28 @@ class AccountBalanceDiskCacheTestSuite extends DiskTestSuite {
 
       "returns the last known value before deleted heights" - {
         "cached" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(10), defaultKey)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCachedValue
           }
         }
 
         "absence" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(9), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(10), defaultKey)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe defaultCacheValue
           }
         }
 
         "unknown if empty" in test { (db, cache) =>
-          db.batchedReadWrite { implicit ctx =>
+          db.directReadWrite { implicit ctx =>
             cache.set(Height(10), defaultKey, RemoteData.Absence)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.set(Height(11), defaultKey, defaultCachedValue)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.removeFrom(Height(10), defaultKey)
-          }
-
-          db.batchedReadWrite { implicit ctx =>
             cache.get(Height(10), defaultKey) shouldBe RemoteData.Unknown
           }
         }
