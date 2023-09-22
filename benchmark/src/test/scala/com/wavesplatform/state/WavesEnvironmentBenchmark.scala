@@ -1,8 +1,5 @@
 package com.wavesplatform.state
 
-import java.io.File
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import cats.Id
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
@@ -13,15 +10,17 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.WavesEnvironmentBenchmark._
+import com.wavesplatform.state.WavesEnvironmentBenchmark.*
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import org.iq80.leveldb.{DB, Options}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import scodec.bits.BitVector
 
+import java.io.File
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.io.Codec
 
 /**
@@ -141,7 +140,7 @@ object WavesEnvironmentBenchmark {
 
     val environment: Environment[Id] = {
       val state = LevelDBWriter.readOnly(db, wavesSettings)
-      new WavesEnvironment(
+      WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
         Coeval(state.height),
