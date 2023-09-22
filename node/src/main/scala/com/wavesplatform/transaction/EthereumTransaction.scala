@@ -108,7 +108,7 @@ object EthereumTransaction {
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] = {
       for {
-        callAndPayments <- decodeFuncCall(blockchain, blockchain.isFeatureActivated(BlockRewardDistribution))
+        callAndPayments <- decodeFuncCall(blockchain)
         invocation = new InvokeScriptTransactionLike {
           override def funcCall: Terms.FUNCTION_CALL                  = callAndPayments._1
           override def payments: Seq[InvokeScriptTransaction.Payment] = callAndPayments._2
@@ -126,12 +126,12 @@ object EthereumTransaction {
       } yield invocation
     }
 
-    def decodeFuncCall(blockchain: Blockchain, check: Boolean): Either[ValidationError, (Terms.FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] =
+    def decodeFuncCall(blockchain: Blockchain): Either[ValidationError, (Terms.FUNCTION_CALL, Seq[InvokeScriptTransaction.Payment])] =
       for {
         scriptInfo      <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
-        callAndPayments <- EthABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData, check)
+        callAndPayments <- EthABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData, blockchain)
         _ <- Either.cond(
-          !check || PBTransactions
+          !blockchain.isFeatureActivated(BlockRewardDistribution) || PBTransactions
             .toPBInvokeScriptData(dApp, Some(callAndPayments._1), callAndPayments._2)
             .toByteArray
             .length <= ContractLimits.MaxInvokeScriptSizeInBytes,
@@ -160,9 +160,12 @@ object EthereumTransaction {
         amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
       } yield tx.toTransferLike(amount, recipient, asset)
 
-    def check(data: String) = {
-      Either.cond(tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == 136, (), GenericError("unconsumed bytes remaining"))
-    }
+    def checkDataSize(blockchain: Blockchain, data: String): Either[GenericError, Unit] =
+      Either.cond(
+        !blockchain.isFeatureActivated(BlockRewardDistribution) || tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == AssetDataLength,
+        (),
+        GenericError("Invalid Ethereum transaction data size")
+      )
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {
@@ -190,6 +193,7 @@ object EthereumTransaction {
   val GasPrice: BigInteger = Convert.toWei("10", Convert.Unit.GWEI).toBigInteger
 
   val AmountMultiplier = 10000000000L
+  val AssetDataLength  = 136
 
   private val decodeMethod = {
     val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[?]])

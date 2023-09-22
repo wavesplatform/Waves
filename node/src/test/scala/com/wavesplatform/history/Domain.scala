@@ -17,6 +17,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -142,9 +144,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block): Seq[Diff] = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): BlockApplyResult = blockchainUpdater.processBlock(b).explicitGet()
 
-  def appendBlockE(b: Block): Either[ValidationError, Seq[Diff]] = blockchainUpdater.processBlock(b)
+  def appendBlockE(b: Block): Either[ValidationError, BlockApplyResult] = blockchainUpdater.processBlock(b)
 
   def rollbackTo(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
@@ -218,7 +220,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
-  def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
+  def appendBlockE(txs: Transaction*): Either[ValidationError, BlockApplyResult] =
     appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
   def appendBlock(version: Byte, txs: Transaction*): Block = {
@@ -228,13 +230,17 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendBlock(txs: Transaction*): Block =
-    appendBlock(Block.PlainBlockVersion, txs: _*)
+    appendBlock(Block.PlainBlockVersion, txs*)
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
-    val discardedDiffs = appendBlock(block)
-    utxPool.setPriorityDiffs(discardedDiffs)
-    utxPool.cleanUnconfirmed()
+    val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+    appendBlock(block) match {
+      case Applied(discardedDiffs, _) =>
+        utxPool.setPriorityDiffs(discardedDiffs)
+        utxPool.cleanUnconfirmed()
+      case Ignored => ()
+    }
+
     lastBlock
   }
 
@@ -260,7 +266,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
-    val mb = createMicroBlock(txs: _*)
+    val mb = createMicroBlock(txs*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 
@@ -285,7 +291,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
       strictTime: Boolean = false,
       generator: KeyPair = defaultSigner,
-      rewardVote: Long = -1L
+      rewardVote: Long = -1L,
+      baseTarget: Option[Long] = None
   ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
@@ -328,7 +335,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
         timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
         reference = reference,
-        baseTarget = consensus.baseTarget.max(PoSCalculator.MinBaseTarget),
+        baseTarget = baseTarget.getOrElse(consensus.baseTarget.max(PoSCalculator.MinBaseTarget)),
         generationSignature = consensus.generationSignature,
         txs = txs,
         featureVotes = Nil,
@@ -411,8 +418,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 }
 
 object Domain {
-  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater with Blockchain](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
+  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
+    def processBlock(block: Block): Either[ValidationError, BlockApplyResult] = {
       val hitSource =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           block.header.generationSignature
