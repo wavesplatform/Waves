@@ -77,7 +77,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   private def testDiffAndState(
       preconditions: Seq[BlockWithSigner],
       block: BlockWithSigner,
-      from: StdLibVersion = V3,
+      from: StdLibVersion = V4,
       to: StdLibVersion = lastVersion
   )(
       assertion: (Diff, Blockchain) => Unit
@@ -445,7 +445,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("invoking contract results contract's state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(dataContract())
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), from = V4) {
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
       case (blockDiff, newState) =>
         blockDiff.scriptsComplexity should be > 0L
         newState.accountData(dAppAddress, "sender").get.value shouldBe ByteStr(ci.sender.toAddress.bytes)
@@ -483,24 +483,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("invoking ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers())
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), from = V4) {
-      case (blockDiff, _) =>
-        blockDiff.scriptsComplexity should be > 0L
-        blockDiff.portfolios(thirdAddress).balance shouldBe amount
-        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-        blockDiff.transaction(ci.id()) shouldBe defined
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) { case (blockDiff, _) =>
+      blockDiff.scriptsComplexity should be > 0L
+      blockDiff.portfolios(thirdAddress).balance shouldBe amount
+      blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
+      blockDiff.transaction(ci.id()) shouldBe defined
     }
   }
 
   property("invoking default func ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(defaultTransferContract(thirdAddress), isCIDefaultFunc = true)
 
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), from = V4) {
-      case (blockDiff, _) =>
-        blockDiff.scriptsComplexity should be > 0L
-        blockDiff.portfolios(thirdAddress).balance shouldBe amount
-        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-        blockDiff.transaction(ci.id()) shouldBe defined
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) { case (blockDiff, _) =>
+      blockDiff.scriptsComplexity should be > 0L
+      blockDiff.portfolios(thirdAddress).balance shouldBe amount
+      blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
+      blockDiff.transaction(ci.id()) shouldBe defined
     }
   }
 
@@ -511,8 +509,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
     testDiffAndState(
       Seq(TestBlock.create(genesis ++ Seq(TxHelpers.genesis(thirdAddress), setScript, createAlias))),
-      TestBlock.create(Seq(ci), Block.ProtoBlockVersion),
-      from = V4
+      TestBlock.create(Seq(ci), Block.ProtoBlockVersion)
     ) { case (blockDiff, _) =>
       blockDiff.scriptsComplexity should be > 0L
       blockDiff.portfolios(thirdAddress) shouldBe Portfolio.waves(amount)
@@ -567,7 +564,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("invoke script by alias") {
     val (genesis, setScript, ci, fakeCi, createAlias) = preconditionsAndSetContractWithAlias(dAppWithTransfers())
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript, createAlias))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), from = V4) {
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript, createAlias))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
       case (blockDiff, newState) =>
         blockDiff.scriptsComplexity should be > 0L
         newState.balance(thirdAddress, Waves) shouldBe amount
@@ -685,7 +682,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       fee = TestValues.invokeFee(1)
     )
 
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion), from = V4) {
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion)) {
       case (blockDiff, newState) =>
         blockDiff.scriptsComplexity should be > 0L
         newState.balance(dAppAddress, asset) shouldBe (issue.quantity.value - amount)
@@ -738,7 +735,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("trace not contains attached asset script invocation result when transferring asset script produce error") {
     val attachedAsset     = TxHelpers.issue()
-    val transferringAsset = TxHelpers.issue(dApp, name = "test2", script = Some(throwingAsset(V4)))
+    val transferringAsset = TxHelpers.issue(dApp, name = "test2", script = Some(throwingAsset()))
 
     val (genesis, setScript, ci) = preconditionsAndSetContract(
       dAppWithTransfers(assets = List(IssuedAsset(transferringAsset.id()))),
@@ -819,8 +816,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
     testDiffAndState(
       Seq(TestBlock.create(genesis ++ Seq(sponsorIssue, t, sponsor, setScript))),
-      TestBlock.create(Seq(ci), Block.ProtoBlockVersion),
-      from = V4
+      TestBlock.create(Seq(ci), Block.ProtoBlockVersion)
     ) { case (blockDiff, newState) =>
       blockDiff.scriptsComplexity should be > 0L
       blockDiff.errorMessage(ci.id()) shouldBe None
@@ -1023,7 +1019,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val contract                 = dAppWithTransfers(assets = List(IssuedAsset(issue.id())))
     val (genesis, setScript, ci) = preconditionsAndSetContract(contract, fee = TestValues.invokeFee(1))
 
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion), from = V4) {
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion)) {
       case (blockDiff, newState) =>
         blockDiff.scriptsComplexity should be > 0L
         newState.balance(dAppAddress, IssuedAsset(issue.id())) shouldBe (issue.quantity.value - amount)
@@ -1287,7 +1283,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val sponsorAsset = IssuedAsset(sponsorIssue.id())
     val sponsorTx    = TxHelpers.sponsor(sponsorAsset, sender = thirdAcc)
 
-    val issueTx = TxHelpers.issue(dApp, script = Some(throwingAsset(V4)))
+    val issueTx = TxHelpers.issue(dApp, script = Some(throwingAsset()))
 
     val feeInWaves = FeeConstants(TransactionType.InvokeScript) * FeeValidation.FeeUnit
     val feeInAsset = Sponsorship.fromWaves(feeInWaves, sponsorTx.minSponsoredAssetFee.get.value)
@@ -1314,7 +1310,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       testDiffAndState(
         Seq(TestBlock.create(Seq(g1Tx, g2Tx, g3Tx, sponsorIssue, issueTx, sponsorTx, tTx, ssTx))),
         TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
-        from = V4,
         to = V5
       ) { case (diff, state) =>
         diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
@@ -1392,7 +1387,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     Seq("throw", "insufficient fee", "negative amount", "overflow amount", "self payment", "max actions", "invalid data entries", "ok")
       .foreach { arg =>
         val invoke = TxHelpers.invoke(dAppAddress, Some("sameComplexity"), args = List(CONST_STRING(arg).explicitGet()))
-        testDiffAndState(Seq(TestBlock.create(Seq(gTx1, gTx2, ssTx, iTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V4) {
+        testDiffAndState(Seq(TestBlock.create(Seq(gTx1, gTx2, ssTx, iTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion)) {
           case (diff, _) =>
             if (arg == "ok")
               diff.errorMessage(invoke.id()) shouldBe empty
@@ -1445,10 +1440,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         val invoke   = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments, fee = 0.017.waves)
 
         val genesisTxs = Seq(gTx1, gTx2) ++ invokerScriptTx ++ iTxs ++ tTxs ++ saTxs :+ ssTx
-        testDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V4, to = V5) {
-          case (diff, _) =>
-            diff.errorMessage(invoke.id()) shouldBe defined
-            diff.scriptsComplexity should be > 0L
+        testDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), to = V5) { case (diff, _) =>
+          diff.errorMessage(invoke.id()) shouldBe defined
+          diff.scriptsComplexity should be > 0L
         }
         testDiff(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V6) {
           _ should produce("Transaction is not allowed by script of the asset")
