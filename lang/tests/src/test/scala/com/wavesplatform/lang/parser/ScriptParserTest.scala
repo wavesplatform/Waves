@@ -323,32 +323,10 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     )
   }
 
-  property("reserved keywords are invalid variable names in block: if") {
-    val script =
-      s"""let if = 1
-         |true""".stripMargin
-    parse(script) shouldBe BLOCK(
-      AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: if"), CONST_LONG(AnyPos, 1)),
-      TRUE(AnyPos)
-    )
-  }
-
-  property("reserved keywords are invalid variable names in block: let") {
-    val script =
-      s"""let let = 1
-         |true""".stripMargin
-    parse(script) shouldBe BLOCK(
-      AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: let"), CONST_LONG(AnyPos, 1)),
-      TRUE(AnyPos)
-    )
-  }
-
-  List("then", "else", "true").foreach { keyword =>
+  Parser.keywords.foreach { keyword =>
     property(s"reserved keywords are invalid variable names in block: $keyword") {
       val script =
-        s"""let ${keyword.padTo(4, ' ').mkString} = 1
+        s"""let $keyword = 1
            |true""".stripMargin
       parse(script) shouldBe BLOCK(
         AnyPos,
@@ -358,20 +336,11 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     }
   }
 
-  property("reserved keywords are invalid variable names in block: false") {
-    val script =
-      s"""let false = 1
-         |true""".stripMargin
-    parse(script) shouldBe BLOCK(
-      AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "keywords are restricted: false"), CONST_LONG(AnyPos, 1)),
-      TRUE(AnyPos)
-    )
-  }
-
-  property("reserved keywords are invalid variable names in expr: let") {
-    val script = "let + 1"
-    parseE(script) should produce("Expected variable name")
+  Seq("let", "strict").foreach { keyword =>
+    property(s"reserved keywords are invalid variable names in expr: $keyword") {
+      val script = s"$keyword + 1"
+      parseE(script) should produce("Expected variable name")
+    }
   }
 
   property("reserved keywords are invalid variable names in expr: if") {
@@ -384,12 +353,20 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     )
   }
 
-  property("reserved keywords are invalid variable names in expr: then") {
-    parse("then + 1") shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
+  Seq("base16", "base58", "base64", "then", "else", "case", "FOLD").foreach { keyword =>
+    property(s"reserved keywords are invalid variable names in expr: $keyword") {
+      parse(s"$keyword + 1") shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
+    }
   }
 
-  property("reserved keywords are invalid variable names in expr: else") {
-    parse("else + 1") shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
+  property("reserved keywords are invalid variable names in expr: match") {
+    val script = "match + 1"
+    parseE(script) shouldBe Left("Expected expression to match:1:7, found \"+ 1\"")
+  }
+
+  property("reserved keywords are invalid variable names in expr: func") {
+    val script = "func + 1"
+    parseE(script) shouldBe Left("Expected function name:1:5, found \" + 1\"")
   }
 
   property("multisig sample") {

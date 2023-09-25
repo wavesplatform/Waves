@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.parser.error
 
+import com.wavesplatform.lang.v1.parser.Parser
+
 class FuncDefParseErrorTest extends ParseErrorTest {
   property("missing opening brace of function arguments definition") {
     assert(
@@ -259,5 +261,17 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       13,
       "@ll()"
     )
+  }
+
+  Parser.keywords.foreach { keyword =>
+    property(s"keyword $keyword as function name is restricted") {
+      assert(
+        s"func $keyword(a: Int) = []",
+        s"Compilation failed: keywords are restricted: $keyword",
+        5,
+        keyword.length + 5,
+        keyword
+      )
+    }
   }
 }

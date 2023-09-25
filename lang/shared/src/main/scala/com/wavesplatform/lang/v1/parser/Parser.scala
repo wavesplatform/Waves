@@ -26,7 +26,6 @@ class Parser(implicit offset: LibrariesOffset) {
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  val keywords       = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   val excludeInError = Set('(', ')', ':', ']', '[', '=', ',', ';')
 
   def lowerChar[A: P]            = CharIn("a-z")
@@ -101,11 +100,6 @@ class Parser(implicit offset: LibrariesOffset) {
         (Pos(start, end), r)
       }
       .map(posAndVal => CONST_STRING(posAndVal._1, posAndVal._2))
-
-  def correctVarName[A: P]: P[PART[String]] =
-    (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
-      .filter { case (_, x, _) => !keywords.contains(x) }
-      .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
   def declNameP[A: P](check: Boolean = false): P[Unit] = {
     def symbolsForError   = CharPred(c => !c.isWhitespace && !excludeInError.contains(c))
@@ -361,7 +355,12 @@ class Parser(implicit offset: LibrariesOffset) {
   }
 
   def matchP[A: P]: P[EXPR] =
-    P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(0, comment) ~ comment ~ "}" ~~ Index)
+    P(
+      Index ~~ "match" ~~ &(border) ~/ baseExpr.opaque("expression to match") ~ "{" ~ comment ~ matchCaseP.rep(
+        0,
+        comment
+      ) ~ comment ~ "}" ~~ Index
+    )
       .map {
         case (start, _, Nil, end)   => INVALID(Pos(start, end), "pattern matching requires case branches")
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
@@ -741,7 +740,7 @@ object Parser {
     val KnownMethods: Set[String] = Set(ExactAs, As)
   }
 
-  val keywords = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val keywords = Set("let", "strict", "base16", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func", "FOLD")
 
   sealed trait LibrariesOffset {
     def shiftStart(idx: Int): Int = idx
