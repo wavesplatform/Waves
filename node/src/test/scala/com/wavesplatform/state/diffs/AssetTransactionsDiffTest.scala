@@ -13,21 +13,25 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.*
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
+import com.wavesplatform.lang.v1.ContractLimits.MaxExprSizeInBytes
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import fastparse.Parsed
+import monix.eval.Coeval
 
 class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers with WithDomain {
 
@@ -548,6 +552,56 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       d.appendBlock()
       d.appendBlockE(updateAssetInfo()) should produceRejectOrFailedDiff("only Waves can be used to pay fees for UpdateAssetInfoTransaction")
       d.appendAndAssertSucceed(TxHelpers.updateAssetInfo(updatedIssue.assetId, sender = updatedIssuer))
+    }
+  }
+
+  property(
+    s"Asset script size should be less than $MaxExprSizeInBytes after ${BlockchainFeatures.BlockRewardDistribution} activation"
+  ) {
+    def scriptWithSize(size: Int): Script = new ExprScript {
+      val stdLibVersion: StdLibVersion     = V6
+      val isFreeCall: Boolean              = false
+      val expr: EXPR                       = TxHelpers.exprScript(V6)("true").expr
+      val bytes: Coeval[ByteStr]           = Coeval(ByteStr(new Array[Byte](size)))
+      val containsBlockV2: Coeval[Boolean] = Coeval(false)
+      val containsArray: Boolean           = false
+    }
+
+    val issuer = TxHelpers.signer(1)
+
+    withDomain(
+      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 5),
+      AddrWithBalance.enoughBalances(issuer)
+    ) { d =>
+      val issue = TxHelpers.issue(issuer, name = "asset1", script = Some(TestCompiler(V6).compileAsset("true")))
+
+      val issueWithBigScript: String => IssueTransaction =
+        name => TxHelpers.issue(issuer, name = name, script = Some(scriptWithSize(MaxExprSizeInBytes + 1)))
+      val updateWithBigScript = () => TxHelpers.setAssetScript(issuer, issue.asset, scriptWithSize(MaxExprSizeInBytes + 1))
+
+      d.appendBlock(issue)
+      d.appendAndAssertSucceed(issueWithBigScript("asset2"))
+      d.appendAndAssertSucceed(updateWithBigScript())
+
+      d.blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution, d.blockchain.height + 1) shouldBe true
+
+      val errorMsg = s"Script is too large: ${MaxExprSizeInBytes + 1} bytes > $MaxExprSizeInBytes bytes"
+
+      // activation height
+      val invalidIssue = issueWithBigScript("asset3")
+      d.appendAndCatchError(invalidIssue) shouldBe TransactionValidationError(
+        GenericError(errorMsg),
+        invalidIssue
+      )
+      val invalidSetAssetScript = updateWithBigScript()
+      d.appendAndCatchError(invalidSetAssetScript) shouldBe TransactionValidationError(
+        GenericError(errorMsg),
+        invalidSetAssetScript
+      )
+      d.appendAndAssertSucceed(
+        TxHelpers.issue(issuer, name = "asset3", script = Some(scriptWithSize(MaxExprSizeInBytes))),
+        TxHelpers.setAssetScript(issuer, issue.asset, scriptWithSize(MaxExprSizeInBytes))
+      )
     }
   }
 
