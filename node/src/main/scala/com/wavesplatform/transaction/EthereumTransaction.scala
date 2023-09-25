@@ -164,7 +164,7 @@ object EthereumTransaction {
       Either.cond(
         tokenAddress.isEmpty || EthEncoding.cleanHexPrefix(data).length == AssetDataLength,
         (),
-        GenericError("unconsumed bytes remaining")
+        GenericError("Invalid asset data size for Ethereum Transfer")
       )
     }
   }
