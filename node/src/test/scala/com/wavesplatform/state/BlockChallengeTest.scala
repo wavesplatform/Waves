@@ -1725,7 +1725,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         appenderScheduler
       )(channel2, _, None)
 
-    testTime.setTime(d.blockchain.lastBlockTimestamp.get + d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis * 2)
+    testTime.setTime(Long.MaxValue)
     appenderWithChallenger(block).runSyncUnsafe()
     if (!channel1.outboundMessages().isEmpty)
       check(PBBlockSpec.deserializeData(channel1.readOutbound[RawBytes]().data).get)
