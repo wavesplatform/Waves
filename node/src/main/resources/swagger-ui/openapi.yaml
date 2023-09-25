@@ -334,6 +334,54 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DataEntryLSF'
+    post:
+      tags:
+        - addresses
+      summary: Data by keys
+      description: >-
+        Read account data entries by given keys.
+        Limited by `rest-api.data-keys-request-limit`, 1000 by default.
+      operationId: getDataByMultipleKeysViaPost
+      parameters:
+        - $ref: '#/components/parameters/address'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                keys:
+                  type: array
+                  description: Exact keys to query
+                  items:
+                    type: string
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: array
+                  description: Exact keys to query
+                  items:
+                    type: string
+            encoding:
+              key:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
+            application/json;large-significand-format=string:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntryLSF'
+      x-codegen-request-body-name: keys
   '/addresses/validate/{address}':
     get:
       tags:
