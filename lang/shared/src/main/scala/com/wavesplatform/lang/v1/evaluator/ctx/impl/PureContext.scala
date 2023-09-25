@@ -1452,7 +1452,7 @@ object PureContext {
   lazy val listRemoveByIndex: BaseFunction[NoContext] =
     NativeFunction(
       "removeByIndex",
-      7,
+      Map(V4 -> 7L, V5 -> 7L, V6 -> 7L, V7 -> 7L, V8 -> 5L),
       REMOVE_BY_INDEX_OF_LIST,
       PARAMETERIZEDLIST(TYPEPARAM('T')),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
