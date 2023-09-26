@@ -1474,7 +1474,7 @@ object PureContext {
   private val listReplaceByIndex: BaseFunction[NoContext] =
     NativeFunction(
       "replaceByIndex",
-      5,
+      4,
       REPLACE_BY_INDEX_OF_LIST,
       PARAMETERIZEDLIST(TYPEPARAM('T')),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
@@ -1489,7 +1489,7 @@ object PureContext {
         else if (index >= list.size)
           Left(s"Index of the replacing element should be lower than list size = ${list.length}, but $index was passed")
         else
-          ARR(list.take(index.toInt) ++: element +: list.drop(index.toInt + 1), limited = true)
+          ARR(list.updated(index.toInt, element), limited = true)
       case xs =>
         notImplemented[Id, EVALUATED]("replaceByIndex(list: List[T], index: Int, element: T)", xs)
     }

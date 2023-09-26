@@ -26,5 +26,6 @@ class ListReplaceByIndexTest extends EvaluatorSpec {
     eval("[].replaceByIndex(0, 1)") should produce("Can't replace an element in empty list")
     eval("[1, 2, 3].replaceByIndex(-1, 1)") should produce("Index of the replacing element should be positive, but -1 was passed")
     eval("[1, 2, 3].replaceByIndex(3, 1)") should produce("Index of the replacing element should be lower than list size = 3, but 3 was passed")
+    eval("[1, 2, 3].replaceByIndex(2, true)") should produce("Compilation failed: [Can't match inferred types of T over Int, Boolean in 0-33]")
   }
 }

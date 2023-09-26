@@ -117,7 +117,7 @@
       params: [ "List[T]", "Int", "T" ]
       doc: "Replaces the element at given index in the list and returns new list."
       paramsDoc: [ "The list.", "The index.", "New element." ]
-      complexity: 5
+      complexity: 4
     }
   ]
 }
