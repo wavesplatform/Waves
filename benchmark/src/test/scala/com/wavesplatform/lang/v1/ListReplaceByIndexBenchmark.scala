@@ -22,15 +22,15 @@ import scala.concurrent.duration.{MICROSECONDS, SECONDS}
 class ListReplaceByIndexBenchmark {
   @Benchmark
   def listReplaceFirstByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =
-    bh.consume(eval(st.ctx, st.replaceFirst, V8))
+    bh.consume(eval(st.ctx, st.replaceFirst))
 
   @Benchmark
   def listReplaceMiddleByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =
-    bh.consume(eval(st.ctx, st.replaceMiddle, V8))
+    bh.consume(eval(st.ctx, st.replaceMiddle))
 
   @Benchmark
   def listReplaceLastByIndex(st: ListReplaceByIndexSt, bh: Blackhole): Unit =
-    bh.consume(eval(st.ctx, st.replaceLast, V8))
+    bh.consume(eval(st.ctx, st.replaceLast))
 }
 
 @State(Scope.Benchmark)
