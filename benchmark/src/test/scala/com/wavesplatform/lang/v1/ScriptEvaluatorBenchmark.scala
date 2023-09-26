@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto.Curve25519
-import com.wavesplatform.lang.directives.values.V8
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.*
@@ -22,8 +22,9 @@ import scala.concurrent.duration.SECONDS
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
+  val lastVersion = StdLibVersion.VersionDic.all.max
   val context =
-    (PureContext.build(V8, useNewPowPrecision = true) |+| CryptoContext.build(Global, V8))
+    (PureContext.build(lastVersion, useNewPowPrecision = true) |+| CryptoContext.build(Global, lastVersion))
       .withEnvironment[Environment]
       .evaluationContext(Common.emptyBlockchainEnvironment())
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
-import com.wavesplatform.lang.directives.values.V8
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.REPLACE_BY_INDEX_OF_LIST
@@ -35,7 +35,11 @@ class ListReplaceByIndexBenchmark {
 
 @State(Scope.Benchmark)
 class ListReplaceByIndexSt {
-  val ctx = PureContext.build(V8, useNewPowPrecision = true).withEnvironment[Environment].evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx =
+    PureContext
+      .build(StdLibVersion.VersionDic.all.max, useNewPowPrecision = true)
+      .withEnvironment[Environment]
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 
   val list = ARR(Vector.fill(1000)(CONST_LONG(Long.MaxValue)), limited = true).explicitGet()
 
