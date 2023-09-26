@@ -110,7 +110,7 @@
       params: [ "List[T]", "Int" ]
       doc: "Removes the element at given index from the list and returns new list."
       paramsDoc: [ "The list.", "The index." ]
-      complexity: 5
+      complexity: 4
     }
 	{
       name: "replaceByIndex"
