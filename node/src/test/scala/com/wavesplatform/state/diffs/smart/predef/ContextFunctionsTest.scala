@@ -272,76 +272,71 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
       .foreach { version =>
-        val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
-        for {
-          v4Activation <- if (version >= V4) Seq(true) else Seq(false, true)
-          v5Activation <- if (version >= V5) Seq(true) else Seq(false, true)
-        } yield {
-          val fs = settingsForRide(version).blockchainSettings.functionalitySettings
+        val (masterAcc, _, genesis, _, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+        val fs                                                                 = settingsForRide(version).blockchainSettings.functionalitySettings
 
-          assertDiffAndState(fs) { append =>
-            append(genesis).explicitGet()
-            append(Seq(dataTransaction)).explicitGet()
+        assertDiffAndState(fs) { append =>
+          append(genesis).explicitGet()
+          append(Seq(dataTransaction)).explicitGet()
 
-            val quantity    = 100000000L
-            val decimals    = 6.toByte
-            val reissuable  = true
-            val assetScript = None
+          val quantity    = 100000000L
+          val decimals    = 6.toByte
+          val reissuable  = true
+          val assetScript = None
 
-            val issueTx = TxHelpers.issue(masterAcc, quantity, decimals)
+          val issueTx = TxHelpers.issue(masterAcc, quantity, decimals)
 
-            val sponsoredFee = 100
-            val sponsorTx    = TxHelpers.sponsor(issueTx.asset, Some(sponsoredFee), masterAcc)
+          val sponsoredFee = 100
+          val sponsorTx    = TxHelpers.sponsor(issueTx.asset, Some(sponsoredFee), masterAcc)
 
-            append(Seq(transferTx, issueTx)).explicitGet()
+          append(Seq(transferTx, issueTx)).explicitGet()
 
-            val assetId = issueTx.assetId
+          val assetId = issueTx.assetId
 
-            val sponsored =
-              if (version >= V4)
-                s"let sponsored = aInfo.minSponsoredFee == $sponsoredFee"
-              else
-                s"let sponsored = aInfo.sponsored == true"
+          val sponsored =
+            if (version >= V4)
+              s"let sponsored = aInfo.minSponsoredFee == $sponsoredFee"
+            else
+              s"let sponsored = aInfo.sponsored == true"
 
-            val script = ScriptCompiler
-              .compile(
-                s"""
-                   | {-# STDLIB_VERSION ${version.id} #-}
-                   | {-# CONTENT_TYPE EXPRESSION #-}
-                   | {-# SCRIPT_TYPE ACCOUNT #-}
-                   |
-                   | let aInfoOpt        = assetInfo(base58'$assetId')
-                   | let aInfo           = aInfoOpt.value()
-                   | let id              = aInfo.id == base58'$assetId'
-                   | let quantity        = aInfo.quantity == $quantity
-                   | let decimals        = aInfo.decimals == $decimals
-                   | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress}'
-                   | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
-                   | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
-                   | let reissuable      = aInfo.reissuable == $reissuable
-                   | $sponsored
-                   |
-                   | id              &&
-                   | quantity        &&
-                   | decimals        &&
-                   | issuer          &&
-                   | issuerPublicKey &&
-                   | scripted        &&
-                   | reissuable      &&
-                   | sponsored
-                   |
+          val script = ScriptCompiler
+            .compile(
+              s"""
+                 | {-# STDLIB_VERSION ${version.id} #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let aInfoOpt        = assetInfo(base58'$assetId')
+                 | let aInfo           = aInfoOpt.value()
+                 | let id              = aInfo.id == base58'$assetId'
+                 | let quantity        = aInfo.quantity == $quantity
+                 | let decimals        = aInfo.decimals == $decimals
+                 | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress}'
+                 | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
+                 | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
+                 | let reissuable      = aInfo.reissuable == $reissuable
+                 | $sponsored
+                 |
+                 | id              &&
+                 | quantity        &&
+                 | decimals        &&
+                 | issuer          &&
+                 | issuerPublicKey &&
+                 | scripted        &&
+                 | reissuable      &&
+                 | sponsored
+                 |
             """.stripMargin,
-                estimator
-              )
-              .explicitGet()
-              ._1
+              estimator
+            )
+            .explicitGet()
+            ._1
 
-            val setScriptTx = TxHelpers.setScript(masterAcc, script)
+          val setScriptTx = TxHelpers.setScript(masterAcc, script)
 
-            append(Seq(sponsorTx)).explicitGet()
-            append(Seq(setScriptTx)).explicitGet()
-            append(Seq(transfer2)).explicitGet()
-          }
+          append(Seq(sponsorTx)).explicitGet()
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
         }
       }
   }
