@@ -235,6 +235,7 @@ class BlockChallengerImpl(
           )
         )
     } yield {
+      log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
     }
   }.executeOn(minerScheduler).flatMap {
