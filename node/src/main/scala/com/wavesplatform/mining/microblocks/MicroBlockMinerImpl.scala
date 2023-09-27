@@ -114,7 +114,7 @@ class MicroBlockMinerImpl(
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
           _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash)
+          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash.map(_ => ByteStr.fill(32)(1)))
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
@@ -146,7 +146,7 @@ class MicroBlockMinerImpl(
     Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock, None)
+    MicroblockAppender(blockchainUpdater, utx, appenderScheduler, checkSH = false)(microBlock, None)
       .flatMap {
         case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
         case Right(v)  => Task.now(v)

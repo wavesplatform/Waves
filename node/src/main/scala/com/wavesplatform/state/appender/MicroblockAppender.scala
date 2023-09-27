@@ -25,13 +25,19 @@ import scala.util.{Left, Right}
 object MicroblockAppender extends ScorexLogging {
   private val microblockProcessingTimeStats = Kamon.timer("microblock-appender.processing-time").withoutTags()
 
-  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(
+      blockchainUpdater: BlockchainUpdater & Blockchain,
+      utxStorage: UtxPool,
+      scheduler: Scheduler,
+      checkSH: Boolean = true,
+      verify: Boolean = true
+  )(
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot]
   ): Task[Either[ValidationError, BlockId]] =
     Task(microblockProcessingTimeStats.measureSuccessful {
       blockchainUpdater
-        .processMicroBlock(microBlock, snapshot, verify)
+        .processMicroBlock(microBlock, snapshot, checkSH, verify)
         .map { totalBlockId =>
           if (microBlock.transactionData.nonEmpty) {
             utxStorage.removeAll(microBlock.transactionData)
