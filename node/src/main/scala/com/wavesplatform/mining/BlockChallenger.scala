@@ -34,8 +34,8 @@ import scala.jdk.CollectionConverters.*
 trait BlockChallenger {
   def challengeBlock(block: Block, ch: Channel): Task[Unit]
   def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit]
-  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)]
-  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
+  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long, Long)]): Either[GenericError, (SeedKeyPair, Long, Long)]
+  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
   def allProcessingTxs: Seq[Transaction]
 }
@@ -121,24 +121,25 @@ class BlockChallengerImpl(
     )
   }
 
-  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
+  def pickBestAccount(accounts: Seq[(SeedKeyPair, Long, Long)]): Either[GenericError, (SeedKeyPair, Long, Long)] =
     accounts.minByOption(_._2).toRight(GenericError("No suitable account in wallet"))
 
-  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] =
+  def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long, Long)]] =
     wallet.privateKeyAccounts
       .map { pk =>
         pk -> blockchainUpdater.generatingBalance(pk.toAddress)
       }
       .filter { case (_, balance) => blockchainUpdater.isMiningAllowed(blockchainUpdater.height, balance) }
       .traverse { case (acc, initGenBalance) =>
+        val resultBalance = initGenBalance + blockchainUpdater.generatingBalance(challengedMiner)
         pos
           .getValidBlockDelay(
             blockchainUpdater.height,
             acc,
             blockchainUpdater.lastBlockHeader.get.header.baseTarget,
-            initGenBalance + blockchainUpdater.generatingBalance(challengedMiner)
+            resultBalance
           )
-          .map((acc, _))
+          .map((acc, _, resultBalance))
       }
 
   def getProcessingTx(id: ByteStr): Option[Transaction] = Option(processingTxs.get(id))
@@ -163,8 +164,9 @@ class BlockChallengerImpl(
       .getOrElse(blockchainUpdater.lastBlockHeader.get.header)
 
     for {
-      allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
-      (acc, delay) <- pickBestAccount(allAccounts)
+      allAccounts           <- getChallengingAccounts(challengedBlock.sender.toAddress)
+      (acc, delay, balance) <- pickBestAccount(allAccounts)
+      _         = log.debug(s"Picked account ${acc.toAddress} with balance $balance and block delay $delay for challenging")
       blockTime = prevBlockHeader.timestamp + delay
       consensusData <-
         pos.consensusData(
