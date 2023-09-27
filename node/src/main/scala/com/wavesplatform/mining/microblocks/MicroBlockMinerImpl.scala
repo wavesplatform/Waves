@@ -14,6 +14,7 @@ import com.wavesplatform.network.{MicroBlockInv, *}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.MicroblockAppender
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
@@ -114,7 +115,16 @@ class MicroBlockMinerImpl(
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
           _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash.map(_ => ByteStr.fill(32)(1)))
+          blocks <- forgeBlocks(
+            account,
+            accumulatedBlock,
+            unconfirmed,
+            stateHash.map { sh =>
+              if (unconfirmed.exists(_.isInstanceOf[TransferTransaction]))
+                ByteStr.fill(32)(1)
+              else sh
+            }
+          )
             .leftWiden[Throwable]
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
