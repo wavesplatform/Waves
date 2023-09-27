@@ -14,18 +14,20 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{GenesisTransaction, TransactionType, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{GenesisTransaction, TransactionType, TxHelpers, TxVersion}
+
+import scala.math.Ordering.Implicits.infixOrderingOps
 
 class OverdraftTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
-  private val InvokeFee = FeeConstants(TransactionType.InvokeScript) * FeeValidation.FeeUnit
+  private val InvokeFee    = FeeConstants(TransactionType.InvokeScript) * FeeValidation.FeeUnit
   private val SetScriptFee = FeeConstants(TransactionType.SetScript) * FeeValidation.FeeUnit
-  private val IssueFee  = FeeConstants(TransactionType.Issue) * FeeValidation.FeeUnit
+  private val IssueFee     = FeeConstants(TransactionType.Issue) * FeeValidation.FeeUnit
 
   private val dAppVersions: List[StdLibVersion] =
     DirectiveDictionary[StdLibVersion].all
@@ -41,40 +43,37 @@ class OverdraftTest extends PropSpec with WithDomain {
     settingsForRide(DirectiveDictionary[StdLibVersion].all.last).blockchainSettings.functionalitySettings
 
   property("insufficient fee") {
-    dAppVersionWithSettings.foreach {
-      case (version, settings) =>
-        val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
+    dAppVersionWithSettings.foreach { case (version, settings) =>
+      val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
 
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-            r should produce(
-            s"Fee for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
-          )
+      assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
+        r should produce(
+          s"Fee for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
+        )
       }
     }
   }
 
   property("overdraft") {
-    dAppVersionWithSettings.foreach {
-      case (version, settings) =>
-        val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = true, withPayment = false, payingDApp(version))
+    dAppVersionWithSettings.foreach { case (version, settings) =>
+      val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = true, withPayment = false, payingDApp(version))
 
-        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-          if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
-            r should produce("AccountBalanceError")
-          else
-            r.explicitGet()
-        }
+      assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
+        if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
+          r should produce("AccountBalanceError")
+        else
+          r.explicitGet()
+      }
     }
   }
 
   property("overdraft with payment V3") {
-    dAppVersionWithSettings.filter(_._1 < V8).foreach {
-      case (_, settings) =>
-        val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
+    dAppVersionWithSettings.filter(_._1 < V8).foreach { case (_, settings) =>
+      val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
 
-        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), settings) {
-          _ should produce("leads to negative waves balance to (at least) temporary negative state")
-        }
+      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), settings) {
+        _ should produce("leads to negative waves balance to (at least) temporary negative state")
+      }
     }
   }
 
@@ -89,7 +88,7 @@ class OverdraftTest extends PropSpec with WithDomain {
   }
 
   property("attach unexisting tokens using multiple payment") {
-    dAppVersions.filter(_ > V3).foreach { version =>
+    dAppVersions.foreach { version =>
       val master  = TxHelpers.signer(0)
       val invoker = TxHelpers.signer(1)
 
@@ -104,7 +103,8 @@ class OverdraftTest extends PropSpec with WithDomain {
       val payments = (1 to count).map(_ => Payment(issue.quantity.value / count + 1, IssuedAsset(issue.id())))
       val invoke   = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, payments = payments)
 
-      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(invoke)), allActivatedSettings) {
+      val settings = settingsForRide(version.max(V4)).blockchainSettings.functionalitySettings
+      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(invoke)), settings) {
         _ should produce("Attempt to transfer unavailable funds: Transaction application leads to negative asset")
       }
     }
@@ -155,12 +155,12 @@ class OverdraftTest extends PropSpec with WithDomain {
   }
 
   private def dApp(body: String, version: StdLibVersion): Script = TestCompiler(version).compileContract(s"""
-    | {-# STDLIB_VERSION $version #-}
-    | {-# CONTENT_TYPE   DAPP     #-}
-    | {-# SCRIPT_TYPE    ACCOUNT  #-}
-    |
-    | @Callable(i)
-    | func default() = $body
-    |
-    |""".stripMargin)
+                                                                                                            | {-# STDLIB_VERSION $version #-}
+                                                                                                            | {-# CONTENT_TYPE   DAPP     #-}
+                                                                                                            | {-# SCRIPT_TYPE    ACCOUNT  #-}
+                                                                                                            |
+                                                                                                            | @Callable(i)
+                                                                                                            | func default() = $body
+                                                                                                            |
+                                                                                                            |""".stripMargin)
 }

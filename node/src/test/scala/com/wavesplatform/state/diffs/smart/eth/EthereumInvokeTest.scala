@@ -180,5 +180,6 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
       assert(dAppVersion = lastVersion, assetScriptVersion = v, v.maxPayments)
       assert(dAppVersion = lastVersion, assetScriptVersion = v, 0)
     }
+    assert(V3, V3, V3.maxPayments)
   }
 }
