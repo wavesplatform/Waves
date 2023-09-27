@@ -156,7 +156,11 @@ class BlockChallengerImpl(
       txs: Seq[Transaction],
       prevStateHash: ByteStr
   ): Task[Either[ValidationError, Block]] = Task {
-    val prevBlockHeader = blockchainUpdater.lastBlockHeader.get.header
+    val prevBlockHeader = blockchainUpdater
+      .heightOf(challengedBlock.header.reference)
+      .flatMap(blockchainUpdater.blockHeader)
+      .map(_.header)
+      .getOrElse(blockchainUpdater.lastBlockHeader.get.header)
 
     for {
       allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
