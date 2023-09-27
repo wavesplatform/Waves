@@ -569,7 +569,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | func f(a: Any) = a._1 == a._2
         | true
       """.stripMargin
-    ExpressionCompiler.compile(script, NoLibraries, compilerContext) should produce(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContext, StdLibVersion.VersionDic.all.last) should produce(
       "Compilation failed: [" +
         "Undefined field `_1` of variable of type `Any` in 19-23; " +
         "Undefined field `_2` of variable of type `Any` in 27-31" +
@@ -585,7 +585,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |t._2[ind] == 3
         |""".stripMargin
 
-    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4) shouldBe Right(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4, StdLibVersion.VersionDic.all.last) shouldBe Right(
       (
         LET_BLOCK(
           LET(
@@ -623,7 +623,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |t.some[ind] == 3
         |""".stripMargin
 
-    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4) should produce(
+    ExpressionCompiler.compile(script, NoLibraries, compilerContextV4, StdLibVersion.VersionDic.all.last) should produce(
       "Compilation failed: [Non-matching types: expected: List[T], actual: Nothing in 39-50; Undefined field `some` of variable of type `(Int, List[Int], Int)` in 39-45]"
     )
   }

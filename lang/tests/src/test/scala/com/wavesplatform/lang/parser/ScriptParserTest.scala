@@ -2,6 +2,7 @@ package com.wavesplatform.lang.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V8}
 import com.wavesplatform.lang.hacks.Global.MaxLiteralLength
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
@@ -18,15 +19,16 @@ import org.scalatest.exceptions.TestFailedException
 class ScriptParserTest extends PropSpec with ScriptGenParser {
   implicit val offset: LibrariesOffset = NoLibraries
 
-  private def parse(x: String): EXPR = Parser.parseExpr(x) match {
+  private def parse(x: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): EXPR = Parser.parseExpr(x, version) match {
     case Success(r, _) => r
     case f: Failure    => throw new TestFailedException(f.msg, 0)
   }
 
-  private def parseE(x: String): Either[String, EXPR] = Parser.parseExpr(x) match {
-    case Success(r, _) => Right(r)
-    case f: Failure    => Left(f.msg)
-  }
+  private def parseE(x: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Either[String, EXPR] =
+    Parser.parseExpr(x, version) match {
+      case Success(r, _) => Right(r)
+      case f: Failure    => Left(f.msg)
+    }
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value)) // , types = l.types.map(cleanOffsets(_))
@@ -323,50 +325,86 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     )
   }
 
-  Parser.keywords.foreach { keyword =>
-    property(s"reserved keywords are invalid variable names in block: $keyword") {
-      val script =
-        s"""let $keyword = 1
-           |true""".stripMargin
-      parse(script) shouldBe BLOCK(
+  StdLibVersion.VersionDic.all.foreach { version =>
+    def expectedError(keyword: String): BLOCK = BLOCK(
+      AnyPos,
+      LET(AnyPos, PART.INVALID(AnyPos, s"keywords are restricted: $keyword"), CONST_LONG(AnyPos, 1)),
+      TRUE(AnyPos)
+    )
+
+    Parser.keywordsBeforeV8.foreach { keyword =>
+      property(s"reserved keywords are invalid variable names in block: $keyword (V${version.id})") {
+        val script =
+          s"""let $keyword = 1
+             |true""".stripMargin
+        parse(script, version) shouldBe expectedError(keyword)
+      }
+    }
+
+    Parser.additionalV8Keywords.foreach { keyword =>
+      property(s"$keyword is invalid variable name only for version >= V8 (V${version.id})") {
+        val script =
+          s"""let $keyword = 1
+             |true""".stripMargin
+
+        val expectedResult =
+          if (version >= V8) expectedError(keyword)
+          else {
+            BLOCK(
+              AnyPos,
+              LET(AnyPos, PART.VALID(AnyPos, keyword), CONST_LONG(AnyPos, 1)),
+              TRUE(AnyPos)
+            )
+          }
+
+        parse(script, version) shouldBe expectedResult
+      }
+    }
+  }
+
+  StdLibVersion.VersionDic.all.foreach { version =>
+    Seq("let", "strict").foreach { keyword =>
+      property(s"reserved keywords are invalid variable names in expr: $keyword (V${version.id})") {
+        val script = s"$keyword + 1"
+        parseE(script, version) should produce("Expected variable name")
+      }
+    }
+
+    property(s"reserved keywords are invalid variable names in expr: if (V${version.id})") {
+      val script = "if + 1"
+      parse(script, version) shouldBe BINARY_OP(
         AnyPos,
-        LET(AnyPos, PART.INVALID(AnyPos, s"keywords are restricted: $keyword"), CONST_LONG(AnyPos, 1)),
-        TRUE(AnyPos)
+        IF(AnyPos, INVALID(AnyPos, "expected a condition"), INVALID(AnyPos, "expected a true branch"), INVALID(AnyPos, "expected a false branch")),
+        BinaryOperation.SUM_OP,
+        CONST_LONG(AnyPos, 1)
       )
     }
-  }
 
-  Seq("let", "strict").foreach { keyword =>
-    property(s"reserved keywords are invalid variable names in expr: $keyword") {
-      val script = s"$keyword + 1"
-      parseE(script) should produce("Expected variable name")
+    Seq("base58", "base64", "then", "else", "case").foreach { keyword =>
+      property(s"reserved keywords are invalid variable names in expr: $keyword (V${version.id})") {
+        parse(s"$keyword + 1", version) shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
+      }
     }
-  }
 
-  property("reserved keywords are invalid variable names in expr: if") {
-    val script = "if + 1"
-    parse(script) shouldBe BINARY_OP(
-      AnyPos,
-      IF(AnyPos, INVALID(AnyPos, "expected a condition"), INVALID(AnyPos, "expected a true branch"), INVALID(AnyPos, "expected a false branch")),
-      BinaryOperation.SUM_OP,
-      CONST_LONG(AnyPos, 1)
-    )
-  }
-
-  Seq("base16", "base58", "base64", "then", "else", "case", "FOLD").foreach { keyword =>
-    property(s"reserved keywords are invalid variable names in expr: $keyword") {
-      parse(s"$keyword + 1") shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
+    property(s"reserved keywords are invalid variable names in expr: match (V${version.id})") {
+      val script = "match + 1"
+      parseE(script, version) shouldBe Left("Expected expression to match:1:7, found \"+ 1\"")
     }
-  }
 
-  property("reserved keywords are invalid variable names in expr: match") {
-    val script = "match + 1"
-    parseE(script) shouldBe Left("Expected expression to match:1:7, found \"+ 1\"")
-  }
+    property(s"reserved keywords are invalid variable names in expr: func (V${version.id})") {
+      val script = "func + 1"
+      parseE(script, version) shouldBe Left("Expected function name:1:5, found \" + 1\"")
+    }
 
-  property("reserved keywords are invalid variable names in expr: func") {
-    val script = "func + 1"
-    parseE(script) shouldBe Left("Expected function name:1:5, found \" + 1\"")
+    Seq("base16", "FOLD").foreach { keyword =>
+      property(s"$keyword is invalid variable name in expr only for version >= V8 (V${version.id})") {
+        val expectedResult =
+          if (version >= V8) INVALID(AnyPos, "can't parse the expression", None, None)
+          else BINARY_OP(AnyPos, REF(AnyPos, PART.VALID(AnyPos, keyword)), SUM_OP, CONST_LONG(AnyPos, 1))
+        parse(s"$keyword + 1", version) shouldBe expectedResult
+      }
+    }
+
   }
 
   property("multisig sample") {
