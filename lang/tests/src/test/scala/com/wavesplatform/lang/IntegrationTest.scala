@@ -89,7 +89,7 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val compiled = ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext)
+    val compiled = ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext, StdLibVersion.VersionDic.all.last)
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
       EvaluatorV2
@@ -287,7 +287,7 @@ class IntegrationTest extends PropSpec with Inside {
   }
 
   def compile(script: String): Either[String, Terms.EXPR] =
-    ExpressionCompiler.compileBoolean(script, NoLibraries, CTX.empty.compilerContext)
+    ExpressionCompiler.compileBoolean(script, NoLibraries, CTX.empty.compilerContext, StdLibVersion.VersionDic.all.last)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")
