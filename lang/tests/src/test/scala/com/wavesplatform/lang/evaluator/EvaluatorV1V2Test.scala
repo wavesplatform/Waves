@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*
-import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.directives.values.{StdLibVersion, *}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -776,7 +776,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
 
     val expr = ExpressionCompiler
-      .compileUntyped(script, NoLibraries, context.compilerContext)
+      .compileUntyped(script, NoLibraries, context.compilerContext, StdLibVersion.VersionDic.all.last)
       .explicitGet()
 
     evalPure[EVALUATED](
@@ -909,7 +909,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, NoLibraries, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext, StdLibVersion.VersionDic.all.last)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -1045,7 +1045,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, NoLibraries, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext, StdLibVersion.VersionDic.all.last)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)

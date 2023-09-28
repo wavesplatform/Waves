@@ -1,5 +1,12 @@
 package com.wavesplatform.lang.parser.error
 
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V8}
+import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, FUNC, REF, TRUE}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.parser.Parser
+import org.scalatest.Assertion
+
 class FuncDefParseErrorTest extends ParseErrorTest {
   property("missing opening brace of function arguments definition") {
     assert(
@@ -259,5 +266,43 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       13,
       "@ll()"
     )
+  }
+
+  StdLibVersion.VersionDic.all.filter(_ >= V3).foreach { version =>
+    def script(keyword: String, isDApp: Boolean = true): String = {
+      val exprSuffix = if (isDApp) "" else "true"
+      s"""func $keyword(a: Int) = []
+         |$exprSuffix
+         |""".stripMargin
+    }
+
+    def assertError(keyword: String, v: StdLibVersion): Assertion =
+      assert(
+        script(keyword),
+        s"Compilation failed: keywords are restricted: $keyword",
+        5,
+        keyword.length + 5,
+        keyword,
+        v
+      )
+
+    Parser.keywordsBeforeV8.foreach { keyword =>
+      property(s"keyword $keyword as function name is restricted (V${version.id})") {
+        assertError(keyword, version)
+      }
+    }
+
+    Parser.additionalV8Keywords.foreach { keyword =>
+      property(s"keyword $keyword as function name is restricted only for version >= V8 (V${version.id})") {
+        if (version >= V8) {
+          assertError(keyword, version)
+        } else {
+          TestCompiler(version).compile(script(keyword)).map(_.decs) shouldBe Right(List(FUNC(keyword, List("a"), REF("nil"))))
+          TestCompiler(version).compileExpressionE(script(keyword, isDApp = false)) shouldBe Right(
+            ExprScriptImpl(version, false, BLOCK(FUNC(keyword, List("a"), REF("nil")), TRUE))
+          )
+        }
+      }
+    }
   }
 }

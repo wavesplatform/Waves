@@ -146,6 +146,9 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
     client.get[F, A](url).map(_.map(ev))
 
   override def accountScript(addressOrAlias: Recipient): Future[Option[Script]] = ???
+
+  override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = ???
+
   override def callScript(
       dApp: Address,
       func: String,

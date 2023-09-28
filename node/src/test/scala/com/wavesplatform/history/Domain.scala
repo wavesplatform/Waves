@@ -22,7 +22,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
@@ -443,8 +442,9 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
         if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
+          val hitSource  = posSelector.validateGenerationSignature(blockWithoutStateHash).getOrElse(blockWithoutStateHash.header.generationSignature)
           val blockchainWithNewBlock =
-            SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
+            SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, hitSource, 0, blockchain.computeNextReward, None)
           val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
 
           BlockDiffer
