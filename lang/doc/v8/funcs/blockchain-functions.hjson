@@ -70,5 +70,12 @@
       paramsDoc: [ "dApp", "function name", "arguments", "Attached payments" ]
       complexity: 75
     }
+    {
+      name: "calculateDelay"
+      params: [ "ByteVector", "Int", "Address", "Int" ]
+      doc: "Calculates mining delay using Fair PoS calculator."
+      paramsDoc: [ "hit source", "base target", "generator address", "generator balance" ]
+      complexity: 1
+    }
   ]
 }
