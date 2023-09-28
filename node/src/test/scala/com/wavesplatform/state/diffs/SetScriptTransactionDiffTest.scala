@@ -651,7 +651,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
            |""".stripMargin
 
       ExpressionCompiler
-        .compileBoolean(expr, NoLibraries, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+        .compileBoolean(expr, NoLibraries, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()), V5)
         .flatMap(ExprScript(V5, _))
         .explicitGet()
     }

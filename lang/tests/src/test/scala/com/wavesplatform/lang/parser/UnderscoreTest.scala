@@ -12,7 +12,7 @@ import com.wavesplatform.test.{PropSpec, *}
 
 class UnderscoreTest extends PropSpec {
   private def compile(script: String): Either[String, EXPR] =
-    ExpressionCompiler.compile(script, NoLibraries, compilerContext(V5, Expression, false)).map(_._1)
+    ExpressionCompiler.compile(script, NoLibraries, compilerContext(V5, Expression, false), V5).map(_._1)
 
   private def assert(a: String, f: String, x: String): Either[String, EXPR] = {
     val script =
