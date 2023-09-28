@@ -424,13 +424,13 @@ object BlockDiffer {
       case (Result(currSnapshot, carryFee, currTotalFee, currConstraint, keyBlockSnapshot, prevStateHash), (tx, (txSnapshot, txStatus))) =>
         val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
 
-        val txFeeInfo = computeTxFeeInfo(currBlockchain, tx, hasNg)
+        val txFeeInfo = if (txStatus == TxMeta.Status.Elided) None else Some(computeTxFeeInfo(currBlockchain, tx, hasNg))
         val nti       = NewTransactionInfo.create(tx, txStatus, txSnapshot, currBlockchain)
 
         Result(
           currSnapshot |+| txSnapshot.withTransaction(nti),
-          carryFee + txFeeInfo.carry,
-          currTotalFee + txFeeInfo.wavesFee,
+          carryFee + txFeeInfo.map(_.carry).getOrElse(0L),
+          currTotalFee + txFeeInfo.map(_.wavesFee).getOrElse(0L),
           currConstraint,
           keyBlockSnapshot.withTransaction(nti),
           TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(TxStatusInfo(tx.id(), txStatus))).createHash(prevStateHash)
