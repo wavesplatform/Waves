@@ -59,9 +59,10 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
         case _: FAILED_EXPR              => zero
       }
 
-  private def evalHoldingFuncs(expr: EXPR): EvalM[Long] =
+  private def evalHoldingFuncs(expr: EXPR, ctxFuncsOpt: Option[Map[FunctionHeader, (Coeval[Long], Set[String])]] = None): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
+      _        <- ctxFuncsOpt.fold(doNothing.void)(ctxFuncs => update(funcs.set(_)(ctxFuncs)))
       cost     <- evalExpr(expr)
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cost
@@ -71,7 +72,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
       startCtx <- get[Id, EstimatorContext, EstimationError]
       overlap = startCtx.usedRefs.contains(let.name)
       _ <- update(usedRefs.modify(_)(_ - let.name))
-      letEval = evalHoldingFuncs(let.value)
+      letEval = evalHoldingFuncs(let.value, Some(startCtx.funcs))
       _        <- if (globalDeclarationsMode) saveGlobalLetCost(let) else doNothing
       nextCost <- evalExpr(inner, globalDeclarationsMode)
       ctx      <- get[Id, EstimatorContext, EstimationError]
@@ -87,7 +88,14 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
         bodyCost    <- evalExpr(let.value)
         bodyEvalCtx <- get[Id, EstimatorContext, EstimationError]
         usedRefs = bodyEvalCtx.usedRefs diff startCtx.usedRefs
-        letCosts <- usedRefs.toSeq.traverse(bodyEvalCtx.globalLetEvals.getOrElse(_, zero))
+        letCosts <- usedRefs.toSeq.traverse { ref =>
+          local {
+            for {
+              _    <- set[Id, EstimatorContext, EstimationError](startCtx)
+              cost <- bodyEvalCtx.globalLetEvals.getOrElse(ref, zero)
+            } yield cost
+          }
+        }
       } yield bodyCost + letCosts.sum
     for {
       cost <- local(costEvaluation)
@@ -168,7 +176,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
           )
         }
       )
-      argsCosts    <- args.traverse(evalHoldingFuncs)
+      argsCosts    <- args.traverse(evalHoldingFuncs(_))
       argsCostsSum <- argsCosts.foldM(0L)(sum)
       bodyCostV         = bodyCost.value()
       correctedBodyCost = if (!overhead && bodyCostV == 0) 1 else bodyCostV
