@@ -7,9 +7,13 @@ import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.transaction.TransactionType.Transfer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utils.EthEncoding
-import org.web3j.abi.FunctionEncoder
+import org.web3j.abi.FunctionEncoder.{buildMethodId, buildMethodSignature}
 import org.web3j.abi.datatypes.{AbiTypes, StructType}
+import org.web3j.abi.{DefaultFunctionEncoder, FunctionEncoder, TypeEncoder}
 import org.web3j.crypto.*
+
+import java.math.BigInteger
+import java.util
 
 object EthTxGenerator {
   sealed trait Arg
@@ -64,7 +68,8 @@ object EthTxGenerator {
       recipient: Address,
       amount: Long,
       asset: Asset,
-      fee: Long = FeeConstants(Transfer) * FeeUnit
+      fee: Long = FeeConstants(Transfer) * FeeUnit,
+      withRedundantBytes: Boolean = false
   ): EthereumTransaction = asset match {
     case Asset.Waves =>
       signRawTransaction(keyPair, recipient.chainId)(
@@ -89,13 +94,15 @@ object EthTxGenerator {
         Nil.asJava
       )
 
+      val additionalData = if (withRedundantBytes) "aa" else ""
+
       signRawTransaction(keyPair, recipient.chainId)(
         RawTransaction.createTransaction(
           BigInt(System.currentTimeMillis()).bigInteger, // nonce
           EthereumTransaction.GasPrice,
-          BigInt(fee).bigInteger,                        // fee
-          EthEncoding.toHexString(assetId.arr.take(20)), // to (asset erc20 "contract" address)
-          FunctionEncoder.encode(function)               // data
+          BigInt(fee).bigInteger,                           // fee
+          EthEncoding.toHexString(assetId.arr.take(20)),    // to (asset erc20 "contract" address)
+          FunctionEncoder.encode(function) + additionalData // data
         )
       )
   }
@@ -106,7 +113,8 @@ object EthTxGenerator {
       funcName: String,
       args: Seq[Arg],
       payments: Seq[Payment],
-      fee: Long = 500000
+      fee: Long = 500000,
+      withRedundantBytes: Boolean = false
   ): EthereumTransaction = {
     import scala.jdk.CollectionConverters.*
     val paymentsArg = {
@@ -129,14 +137,67 @@ object EthTxGenerator {
       Nil.asJava
     )
 
+    val encodedFunction = if (withRedundantBytes) {
+      redundantBytesFunctionEncoder.encodeFunction(function)
+    } else {
+      FunctionEncoder.encode(function)
+    }
+
     signRawTransaction(keyPair, address.chainId)(
       RawTransaction.createTransaction(
         BigInt(System.currentTimeMillis()).bigInteger,
         EthereumTransaction.GasPrice,
         BigInt(fee).bigInteger,
         EthEncoding.toHexString(address.publicKeyHash),
-        FunctionEncoder.encode(function)
+        encodedFunction
       )
     )
+  }
+
+  private def redundantBytesFunctionEncoder: DefaultFunctionEncoder = new DefaultFunctionEncoder {
+    import org.web3j.abi.datatypes as ethTypes
+
+    override def encodeFunction(function: ethTypes.Function): String = {
+      val parameters = function.getInputParameters
+
+      val methodSignature = buildMethodSignature(function.getName, parameters)
+      val methodId        = buildMethodId(methodSignature)
+
+      val result = new StringBuilder(methodId)
+
+      encodeParameters(parameters, result)
+    }
+
+    private def isDynamic(parameter: ethTypes.Type[?]) =
+      parameter.isInstanceOf[ethTypes.DynamicBytes] || parameter.isInstanceOf[ethTypes.Utf8String] || parameter
+        .isInstanceOf[ethTypes.DynamicArray[?]] || (parameter
+        .isInstanceOf[ethTypes.StaticArray[?]] && classOf[ethTypes.DynamicStruct].isAssignableFrom(
+        parameter.asInstanceOf[ethTypes.StaticArray[?]].getComponentType
+      ))
+
+    private def encodeParameters(parameters: util.List[ethTypes.Type[?]], result: StringBuilder): String = {
+      var dynamicDataOffset = getLength(parameters) * ethTypes.Type.MAX_BYTE_LENGTH + 1
+      val dynamicData       = new StringBuilder
+      import scala.jdk.CollectionConverters.*
+      for (parameter <- parameters.asScala) {
+        val encodedValue = TypeEncoder.encode(parameter)
+        if (isDynamic(parameter)) {
+          val encodedDataOffset = TypeEncoder.encode(new ethTypes.Uint(BigInteger.valueOf(dynamicDataOffset)))
+          result.append(encodedDataOffset)
+          dynamicData.append(encodedValue)
+          dynamicDataOffset += encodedValue.length >> 1
+        } else result.append(encodedValue)
+      }
+      result.append("aa")
+      result.append(dynamicData)
+      result.toString
+    }
+
+    private def getLength(parameters: util.List[ethTypes.Type[?]]) = {
+      val cls    = Class.forName("org.web3j.abi.DefaultFunctionEncoder")
+      val method = cls.getDeclaredMethod("getLength", classOf[util.List[ethTypes.Type[?]]])
+      method.setAccessible(true)
+      method.invoke(this, parameters).asInstanceOf[Int]
+    }
   }
 }

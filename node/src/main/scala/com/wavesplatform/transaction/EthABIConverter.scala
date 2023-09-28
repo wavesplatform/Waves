@@ -75,14 +75,14 @@ final case class EthABIConverter(script: Script) {
 
     lazy val ethMethodId: String = EthABIConverter.buildMethodId(ethSignature)
 
-    def checkLen(func: Function, tuple: Tuple, len: Int, check: Boolean) = {
+    def checkLen(func: Function, tuple: Tuple, len: Int, check: Boolean): Either[GenericError, Unit] = {
       val cls    = Class.forName("com.esaulpaugh.headlong.abi.TupleType")
       val method = cls.getDeclaredMethod("byteLength", classOf[Tuple])
       method.setAccessible(true)
       Either.cond(
         !check || method.invoke(func.getInputs, tuple).asInstanceOf[Int] == len - Function.SELECTOR_LEN,
         (),
-        GenericError("unconsumed bytes remaining")
+        GenericError("Redundant bytes were found in Ethereum Invoke")
       )
     }
   }
