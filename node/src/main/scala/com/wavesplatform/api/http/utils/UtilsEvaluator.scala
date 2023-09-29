@@ -40,7 +40,7 @@ import shapeless.Coproduct
 object UtilsEvaluator {
   def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
     ExpressionCompiler
-      .compileUntyped(str, NoLibraries, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true))
+      .compileUntyped(str, NoLibraries, utils.compilerContext(version, Expression, isAssetScript = false).copy(arbitraryDeclarations = true), version)
       .leftMap(GenericError(_))
 
   def toInvokeScriptLike(invocation: Invocation, dAppAddress: Address) =
@@ -138,7 +138,8 @@ object UtilsEvaluator {
             InvokeDiffsCommon
               .processActions(
                 StructuredCallableActions(r.actions, blockchain),
-                ds.stdLibVersion,script.stdLibVersion,
+                ds.stdLibVersion,
+                script.stdLibVersion,
                 dAppAddress,
                 dAppPk,
                 usedComplexity,

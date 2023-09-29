@@ -4,6 +4,7 @@ import cats.implicits.*
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.CommonError
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.*
 import com.wavesplatform.lang.v1.compiler.CompilerContext.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -52,23 +53,29 @@ object ExpressionCompiler {
       errors: Iterable[CompilationError] = Iterable.empty
   )
 
-  def compile(input: String, offset: LibrariesOffset, ctx: CompilerContext, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] = {
-    val parser = new Parser()(offset)
+  def compile(
+      input: String,
+      offset: LibrariesOffset,
+      ctx: CompilerContext,
+      version: StdLibVersion,
+      allowIllFormedStrings: Boolean = false
+  ): Either[String, (EXPR, FINAL)] = {
+    val parser = new Parser(version)(offset)
     parser.parseExpr(input) match {
       case fastparse.Parsed.Success(xs, _) => ExpressionCompiler(ctx, xs, allowIllFormedStrings)
       case f: fastparse.Parsed.Failure     => Left(parser.toString(input, f))
     }
   }
 
-  def compileBoolean(input: String, offset: LibrariesOffset, ctx: CompilerContext): Either[String, EXPR] = {
-    compile(input, offset, ctx).flatMap {
+  def compileBoolean(input: String, offset: LibrariesOffset, ctx: CompilerContext, version: StdLibVersion): Either[String, EXPR] = {
+    compile(input, offset, ctx, version).flatMap {
       case (expr, BOOLEAN) => Right(expr)
       case _               => Left("Script should return boolean")
     }
   }
 
-  def compileUntyped(input: String, offset: LibrariesOffset, ctx: CompilerContext): Either[String, EXPR] = {
-    compile(input, offset, ctx)
+  def compileUntyped(input: String, offset: LibrariesOffset, ctx: CompilerContext, version: StdLibVersion): Either[String, EXPR] = {
+    compile(input, offset, ctx, version)
       .map { case (expr, _) => expr }
   }
 
@@ -76,9 +83,10 @@ object ExpressionCompiler {
       input: String,
       offset: LibrariesOffset,
       ctx: CompilerContext,
+      version: StdLibVersion,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] =
-    new Parser()(offset)
+    new Parser(version)(offset)
       .parseExpressionWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
         compileExprWithCtx(parseResult.expr, saveExprContext, allowIllFormedStrings = false)
@@ -104,9 +112,9 @@ object ExpressionCompiler {
           .leftMap(e => (s"Compilation failed: ${Show[CompilationError].show(e)}", e.start, e.end))
       }
 
-  def compileDecls(input: String, offset: LibrariesOffset, ctx: CompilerContext): Either[String, EXPR] = {
+  def compileDecls(input: String, offset: LibrariesOffset, ctx: CompilerContext, version: StdLibVersion): Either[String, EXPR] = {
     val adjustedDecls = s"$input\n${GlobalValNames.Unit}"
-    compileUntyped(adjustedDecls, offset, ctx)
+    compileUntyped(adjustedDecls, offset, ctx, version)
   }
 
   private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR, Iterable[CompilationError])] =

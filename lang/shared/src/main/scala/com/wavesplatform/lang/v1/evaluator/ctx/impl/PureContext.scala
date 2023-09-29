@@ -1452,7 +1452,7 @@ object PureContext {
   lazy val listRemoveByIndex: BaseFunction[NoContext] =
     NativeFunction(
       "removeByIndex",
-      7,
+      Map(V4 -> 7L, V5 -> 7L, V6 -> 7L, V7 -> 7L, V8 -> 4L),
       REMOVE_BY_INDEX_OF_LIST,
       PARAMETERIZEDLIST(TYPEPARAM('T')),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
@@ -1469,6 +1469,29 @@ object PureContext {
           ARR(list.take(index.toInt) ++ list.drop(index.toInt + 1), limited = true)
       case xs =>
         notImplemented[Id, EVALUATED]("removeByIndex(list: List[T], index: Int)", xs)
+    }
+
+  private val listReplaceByIndex: BaseFunction[NoContext] =
+    NativeFunction(
+      "replaceByIndex",
+      4,
+      REPLACE_BY_INDEX_OF_LIST,
+      PARAMETERIZEDLIST(TYPEPARAM('T')),
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("index", LONG),
+      ("element", TYPEPARAM('T'))
+    ) {
+      case ARR(list) :: CONST_LONG(index) :: element :: Nil =>
+        if (list.isEmpty)
+          Left("Can't replace an element in empty list")
+        else if (index < 0)
+          Left(s"Index of the replacing element should be positive, but $index was passed")
+        else if (index >= list.size)
+          Left(s"Index of the replacing element should be lower than list size = ${list.length}, but $index was passed")
+        else
+          ARR(list.updated(index.toInt, element), limited = true)
+      case xs =>
+        notImplemented[Id, EVALUATED]("replaceByIndex(list: List[T], index: Int, element: T)", xs)
     }
 
   @VisibleForTesting
@@ -2041,12 +2064,20 @@ object PureContext {
       v6Functions
     )
 
+  private[this] val v8Ctx =
+    CTX[NoContext](
+      v5Types,
+      v5Vars,
+      v6Functions :+ listReplaceByIndex
+    )
+
   def build(version: StdLibVersion, useNewPowPrecision: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 => v1V2Ctx(useNewPowPrecision)
       case V3      => v3Ctx(useNewPowPrecision)
       case V4      => v4Ctx(useNewPowPrecision)
       case V5      => v5Ctx(useNewPowPrecision)
-      case _       => v6Ctx
+      case V6 | V7 => v6Ctx
+      case V8      => v8Ctx
     }
 }
