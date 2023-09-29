@@ -1707,6 +1707,48 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
+  property("NODE-1176. Generating balance of challenged miner should be restored after 1000 blocks") {
+    def tryToAppendBlock(
+        d: Domain,
+        generator: KeyPair,
+        appender: Block => Task[Either[ValidationError, BlockApplyResult]]
+    ): Either[ValidationError, BlockApplyResult] = {
+      val block = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = generator)
+      testTime.setTime(block.header.timestamp)
+      appender(block).runSyncUnsafe()
+    }
+
+    val challengedMiner = TxHelpers.signer(1)
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
+      val challengingMiner       = d.wallet.generateNewAccount().get
+      val challengedMinerBalance = 2000.waves
+      d.appendBlock(
+        TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves),
+        TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, challengedMinerBalance)
+      )
+      (1 to 999).foreach(_ => d.appendBlock())
+      val originalBlock =
+        d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+
+      val appender = createBlockAppender(d)
+
+      val genBalanceError = "generator's effective balance 0 is less that required for generation"
+
+      d.appendBlockE(challengingBlock) should beRight
+      d.accountsApi.balanceDetails(challengedMiner.toAddress).explicitGet().generating shouldBe 0L
+      tryToAppendBlock(d, challengedMiner, appender) should produce(genBalanceError)
+      (1 to 999).foreach { _ =>
+        d.appendBlock()
+        d.accountsApi.balanceDetails(challengedMiner.toAddress).explicitGet().generating shouldBe 0L
+        tryToAppendBlock(d, challengedMiner, appender) should produce(genBalanceError)
+      }
+      d.appendBlock()
+      d.accountsApi.balanceDetails(challengedMiner.toAddress).explicitGet().generating shouldBe challengedMinerBalance
+      tryToAppendBlock(d, challengedMiner, appender) should beRight
+    }
+  }
+
   private def appendAndCheck(block: Block, d: Domain)(check: Block => Unit): Unit = {
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))

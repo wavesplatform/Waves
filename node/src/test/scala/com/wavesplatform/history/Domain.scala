@@ -405,7 +405,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       timestamp <-
         if (blockchain.height > 0)
           posSelector
-            .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e12.toLong)
+            .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
             .map(_ + parent.timestamp)
         else
           Right(System.currentTimeMillis() - (1 hour).toMillis)
