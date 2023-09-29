@@ -1,100 +1,97 @@
 package com.wavesplatform.lang.v1
 
-import java.util.concurrent.TimeUnit
-
-import cats.Id
-import cats.kernel.Monoid
+import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto.Curve25519
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values.{V1, V4}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
+import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FROMBASE58, SIGVERIFY, TOBASE58}
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, FunctionIds}
+import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.{Common, Global}
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.SECONDS
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
-  val version = V1
-  val pureEvalContext: EvaluationContext[NoContext, Id] =
-    PureContext.build(V1, useNewPowPrecision = true).evaluationContext
-  val evaluatorV1: EvaluatorV1[Id, NoContext] = new EvaluatorV1[Id, NoContext]()
+  val lastVersion = StdLibVersion.VersionDic.all.max
+  val context =
+    (PureContext.build(lastVersion, useNewPowPrecision = true) |+| CryptoContext.build(Global, lastVersion))
+      .withEnvironment[Environment]
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 }
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 10)
-@Measurement(iterations = 10)
+@Warmup(iterations = 10, time = 1, timeUnit = SECONDS)
+@Measurement(iterations = 10, time = 1, timeUnit = SECONDS)
 class ScriptEvaluatorBenchmark {
   @Benchmark
-  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](pureEvalContext, st.expr))
+  def bigSum(st: BigSum, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
 
   @Benchmark
-  def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+  def nestedBlocks(st: NestedBlocks, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
 
   @Benchmark
-  def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+  def signatures(st: Signatures, bh: Blackhole): Unit = bh.consume(eval(context, st.expr))
 
   @Benchmark
-  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.encode))
+  def base58encode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(eval(context, st.encode))
 
   @Benchmark
-  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.decode))
+  def base58decode(st: Base58Perf, bh: Blackhole): Unit = bh.consume(eval(context, st.decode))
 
   @Benchmark
-  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.strings))
+  def stringConcat(st: Concat, bh: Blackhole): Unit = bh.consume(eval(context, st.strings))
 
   @Benchmark
-  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.bytes))
+  def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(eval(context, st.bytes))
 
   @Benchmark
   def listMedianRandomElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.randomElements(Random.nextInt(10000))))
+    bh.consume(eval(context, st.randomElements(Random.nextInt(10000))))
 
   @Benchmark
   def listMedianSortedElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.sortedElements))
+    bh.consume(eval(context, st.sortedElements))
 
   @Benchmark
   def listMedianSortedReverseElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.sortedReverseElements))
+    bh.consume(eval(context, st.sortedReverseElements))
 
   @Benchmark
   def listMedianEqualElements(st: Median, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.equalElements))
+    bh.consume(eval(context, st.equalElements))
 
   @Benchmark
   def listRemoveFirstByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeFirst))
+    bh.consume(eval(context, st.removeFirst))
 
   @Benchmark
   def listRemoveMiddleByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeMiddle))
+    bh.consume(eval(context, st.removeMiddle))
 
   @Benchmark
   def listRemoveLastByIndex(st: ListRemoveByIndex, bh: Blackhole): Unit =
-    bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.removeLast))
+    bh.consume(eval(context, st.removeLast))
 
   @Benchmark
-  def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
+  def sigVerify32Kb(st: SigVerify32Kb, bh: Blackhole): Unit =
+    bh.consume(eval(context, st.expr))
 }
 
 @State(Scope.Benchmark)
 class NestedBlocks {
-  val context: EvaluationContext[NoContext, Id] = pureEvalContext
-
   val expr: EXPR = {
     val blockCount = 300
     val cond       = FUNCTION_CALL(PureContext.eq, List(REF(s"v$blockCount"), CONST_LONG(0)))
@@ -107,9 +104,6 @@ class NestedBlocks {
 
 @State(Scope.Benchmark)
 class Base58Perf {
-  val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(pureEvalContext, CryptoContext.build(Global, version).evaluationContext)
-
   val encode: EXPR = {
     val base58Count = 120
     val sum = (1 to base58Count).foldRight[EXPR](CONST_LONG(0)) { case (i, e) =>
@@ -150,9 +144,6 @@ class Base58Perf {
 
 @State(Scope.Benchmark)
 class Signatures {
-  val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(pureEvalContext, CryptoContext.build(Global, version).evaluationContext)
-
   val expr: EXPR = {
     val sigCount = 20
     val sum = (1 to sigCount).foldRight[EXPR](CONST_LONG(0)) { case (i, e) =>
@@ -191,8 +182,6 @@ class Signatures {
 
 @State(Scope.Benchmark)
 class Concat {
-  val context: EvaluationContext[NoContext, Id] = pureEvalContext
-
   private val Steps = 180
 
   private def expr(init: EXPR, func: FunctionHeader, operand: EXPR, count: Int) =
@@ -218,8 +207,6 @@ class Concat {
 
 @State(Scope.Benchmark)
 class Median {
-  val context: EvaluationContext[NoContext, Id] = PureContext.build(V4, useNewPowPrecision = true).evaluationContext
-
   val randomElements: Array[EXPR] =
     (1 to 10000).map { _ =>
       val listOfLong = (1 to 1000).map(_ => CONST_LONG(Random.nextLong()))
@@ -260,9 +247,6 @@ class Median {
 
 @State(Scope.Benchmark)
 class SigVerify32Kb {
-  val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(PureContext.build(V4, useNewPowPrecision = true).evaluationContext, CryptoContext.build(Global, V4).evaluationContext)
-
   val expr: EXPR = {
     val (privateKey, publicKey) = curve25519.generateKeypair
     val message                 = randomBytes(32 * 1024 - 1)
@@ -281,12 +265,6 @@ class SigVerify32Kb {
 
 @State(Scope.Benchmark)
 class ListRemoveByIndex {
-  val context: EvaluationContext[NoContext, Id] =
-    Monoid.combine(
-      PureContext.build(V4, useNewPowPrecision = true).evaluationContext,
-      CryptoContext.build(Global, V4).evaluationContext
-    )
-
   val list: ARR = ARR(Vector.fill(1000)(CONST_LONG(Long.MaxValue)), limited = true).explicitGet()
 
   val removeFirst: EXPR =
@@ -312,7 +290,7 @@ class ListRemoveByIndex {
       Native(FunctionIds.REMOVE_BY_INDEX_OF_LIST),
       List(
         list,
-        CONST_LONG(1000)
+        CONST_LONG(999)
       )
     )
 }

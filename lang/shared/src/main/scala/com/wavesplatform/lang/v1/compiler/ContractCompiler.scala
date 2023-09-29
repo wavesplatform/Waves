@@ -372,7 +372,7 @@ object ContractCompiler {
       removeUnusedCode: Boolean = false,
       allowIllFormedStrings: Boolean = false
   ): Either[String, DApp] = {
-    val parser = new Parser()(offset)
+    val parser = new Parser(version)(offset)
     parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
         ContractCompiler(ctx, xs, version, source, needCompaction, removeUnusedCode, allowIllFormedStrings) match {
@@ -393,7 +393,7 @@ object ContractCompiler {
       removeUnusedCode: Boolean = false,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] =
-    new Parser()(offset)
+    new Parser(version)(offset)
       .parseDAPPWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
         compileContract(parseResult, version, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
@@ -425,7 +425,7 @@ object ContractCompiler {
       ctx: CompilerContext,
       version: StdLibVersion
   ): Either[String, EXPR] = {
-    val parser = new Parser()(offset)
+    val parser = new Parser(version)(offset)
     parser.parseExpr(input) match {
       case fastparse.Parsed.Success(expr, _) =>
         val p          = AnyPos
