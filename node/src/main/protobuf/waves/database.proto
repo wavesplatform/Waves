@@ -118,3 +118,8 @@ message LeaseDetails {
     Expired expired = 12;
   }
 }
+
+message LeaseIdsAndDetailsSeq {
+  repeated bytes ids = 1;
+  repeated LeaseDetails details = 2;
+}

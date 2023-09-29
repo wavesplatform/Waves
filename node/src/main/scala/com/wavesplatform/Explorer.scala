@@ -321,7 +321,7 @@ object Explorer extends ScorexLogging {
           val s = Scheduler.fixedPool("foo-bar", 8, executionModel = ExecutionModel.AlwaysAsyncExecution)
 
           def countEntries(): Future[Long] = {
-            CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.empty), rdb, reader)
+            CommonAccountsApi(() => SnapshotBlockchain(reader, StateSnapshot.empty), rdb, reader, settings.dbSettings.storeLeaseStatesByAddress)
               .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
               .countL
               .runToFuture(s)

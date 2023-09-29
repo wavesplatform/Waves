@@ -4,19 +4,15 @@ import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
-import com.wavesplatform.api.common.TransactionMeta.Ethereum
+import com.wavesplatform.api.common.lease.{AddressLeaseInfo, OldAddressLeaseInfo}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 
@@ -57,7 +53,8 @@ object CommonAccountsApi {
   def apply(
       compositeBlockchain: () => SnapshotBlockchain,
       rdb: RDB,
-      blockchain: Blockchain
+      blockchain: Blockchain,
+      leaseStatesAreStoredByAddress: Boolean
   ): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =
@@ -127,60 +124,16 @@ object CommonAccountsApi {
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
     override def activeLeases(address: Address): Observable[LeaseInfo] =
-      addressTransactions(
-        rdb,
-        Some(Height(blockchain.height) -> compositeBlockchain().snapshot),
-        address,
-        None,
-        Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),
-        None
-      ).flatMapIterable {
-        case TransactionMeta(leaseHeight, lt: LeaseTransaction, TxMeta.Status.Succeeded) if leaseIsActive(lt.id()) =>
-          Seq(
-            LeaseInfo(
-              lt.id(),
-              lt.id(),
-              lt.sender.toAddress,
-              blockchain.resolveAlias(lt.recipient).explicitGet(),
-              lt.amount.value,
-              leaseHeight,
-              LeaseInfo.Status.Active
-            )
-          )
-        case TransactionMeta.Invoke(invokeHeight, originTransaction, TxMeta.Status.Succeeded, _, Some(scriptResult)) =>
-          extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
-        case Ethereum(height, tx @ EthereumTransaction(_: Invocation, _, _, _), TxMeta.Status.Succeeded, _, _, Some(scriptResult)) =>
-          extractLeases(address, scriptResult, tx.id(), height)
-        case _ => Seq()
-      }
-
-    private def extractLeases(subject: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
-      (for {
-        lease   <- result.leases
-        details <- blockchain.leaseDetails(lease.id) if details.isActive
-        sender = details.sender.toAddress
-        recipient <- blockchain.resolveAlias(lease.recipient).toOption if subject == sender || subject == recipient
-      } yield LeaseInfo(
-        lease.id,
-        txId,
-        sender,
-        recipient,
-        lease.amount,
-        height,
-        LeaseInfo.Status.Active
-      )) ++ {
-        result.invokes.flatMap(i => extractLeases(subject, i.stateChanges, txId, height))
-      }
-    }
+      if (leaseStatesAreStoredByAddress)
+        AddressLeaseInfo.activeLeases(rdb, compositeBlockchain().snapshot, blockchain, address)
+      else
+        OldAddressLeaseInfo.activeLeases(rdb, compositeBlockchain().snapshot, blockchain, address)
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] =
       blockchain.leaseDetails(leaseId).map(LeaseInfo.fromLeaseDetails(leaseId, _, blockchain))
-
-    private[this] def leaseIsActive(id: ByteStr): Boolean =
-      blockchain.leaseDetails(id).exists(_.isActive)
   }
 
-  class AddressDataIterator(
+  private class AddressDataIterator(
       db: DBResource,
       address: Address,
       entriesFromDiff: Array[DataEntry[?]],

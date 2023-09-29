@@ -43,6 +43,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
 object RocksDBWriter extends ScorexLogging {
+
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
@@ -534,6 +535,23 @@ class RocksDBWriter(
             }.toSeq
             rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
             rw.put(txSeqNrKey, nextSeqNr)
+          }
+      }
+
+      if (dbSettings.storeLeaseStatesByAddress) {
+        val addressIdWithLeases =
+          for {
+            (leaseId, details) <- snapshot.leaseStates.toSeq
+            address            <- resolveAlias(details.recipient).toSeq :+ details.sender.toAddress
+            addressId = this.addressIdWithFallback(address, newAddresses)
+          } yield (addressId, (leaseId, details))
+        val leasesByAddressId = addressIdWithLeases.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
+        rw.multiGetInts(leasesByAddressId.keys.map(_._2).toSeq)
+          .zip(leasesByAddressId)
+          .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIdsAndDetails)) =>
+            val nextSeqNr = prevSeqNr.getOrElse(0) + 1
+            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr), Some(leaseIdsAndDetails))
+            rw.put(leaseSeqKey, nextSeqNr)
           }
       }
 

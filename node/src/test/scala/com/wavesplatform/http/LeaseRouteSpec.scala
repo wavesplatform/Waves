@@ -23,12 +23,12 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Height, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, signer}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
@@ -50,48 +50,51 @@ class LeaseRouteSpec
     with TestWallet
     with PathMockFactory
     with SharedSchedulerMixin {
-  private def route(domain: Domain) =
+  private def route(d: Domain, leaseStatesAreStoredByAddress: Boolean) =
     LeaseApiRoute(
       restAPISettings,
       testWallet,
-      domain.blockchain,
+      d.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.snapshotBlockchain, domain.rdb, domain.blockchain),
+      CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchain, leaseStatesAreStoredByAddress),
       new RouteTimeout(60.seconds)(sharedScheduler)
     )
 
-  private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
-    withDomain(settings = settings, balances = balances) { d =>
-      f(d, route(d).route)
+  private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(check: (Domain, Route) => Unit): Unit = {
+    withDomain(settings, balances) { d =>
+      check(d, route(d, leaseStatesAreStoredByAddress = false).route)
     }
+    withDomain(settings, balances) { d =>
+      check(d, route(d, leaseStatesAreStoredByAddress = true).route)
+    }
+  }
 
   private def setScriptTransaction(sender: KeyPair) =
     SetScriptTransaction
       .selfSigned(
         TxVersion.V2,
         sender,
-        Some(TestCompiler(V5).compileContract("""
-                                                |{-# STDLIB_VERSION 4 #-}
-                                                |{-# CONTENT_TYPE DAPP #-}
-                                                |{-# SCRIPT_TYPE ACCOUNT #-}
-                                                |
-                                                |@Callable(inv)
-                                                |func leaseTo(recipient: ByteVector, amount: Int) = {
-                                                |  let lease = Lease(Address(recipient), amount)
-                                                |  [
-                                                |    lease,
-                                                |    BinaryEntry("leaseId", lease.calculateLeaseId())
-                                                |  ]
-                                                |}
-                                                |
-                                                |@Callable(inv)
-                                                |func cancelLease(id: ByteVector) = {
-                                                |  [
-                                                |    LeaseCancel(id)
-                                                |  ]
-                                                |}
-                                                |""".stripMargin)),
+        Some(
+          TestCompiler(V5).compileContract(
+            """
+              |@Callable(inv)
+              |func leaseTo(recipient: ByteVector, amount: Int) = {
+              |  let lease = Lease(Address(recipient), amount)
+              |  [
+              |    lease,
+              |    BinaryEntry("leaseId", lease.calculateLeaseId())
+              |  ]
+              |}
+              |
+              |@Callable(inv)
+              |func cancelLease(id: ByteVector) =
+              |  [
+              |    LeaseCancel(id)
+              |  ]
+            """.stripMargin
+          )
+        ),
         0.01.waves,
         ntpTime.getTimestamp()
       )
@@ -366,17 +369,17 @@ class LeaseRouteSpec
             .selfSigned(
               TxVersion.V2,
               proxy,
-              Some(TestCompiler(V5).compileContract("""
-                                                      |{-# STDLIB_VERSION 4 #-}
-                                                      |{-# CONTENT_TYPE DAPP #-}
-                                                      |{-# SCRIPT_TYPE ACCOUNT #-}
-                                                      |
-                                                      |@Callable(inv)
-                                                      |func callProxy(targetDapp: ByteVector, recipient: ByteVector, amount: Int) = {
-                                                      |  strict result = invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
-                                                      |  []
-                                                      |}
-                                                      |""".stripMargin)),
+              Some(
+                TestCompiler(V5).compileContract(
+                  """
+                    |@Callable(inv)
+                    |func callProxy(targetDapp: ByteVector, recipient: ByteVector, amount: Int) = {
+                    |  strict result = invoke(Address(targetDapp), "leaseTo", [recipient, amount], [])
+                    |  []
+                    |}
+                  """.stripMargin
+                )
+              ),
               0.01.waves,
               ntpTime.getTimestamp()
             )
@@ -439,31 +442,27 @@ class LeaseRouteSpec
     val leaseAmount2 = 2
 
     val dAppScript1 = TestCompiler(V5)
-      .compileContract(s"""
-                          |{-# STDLIB_VERSION 5 #-}
-                          |{-# CONTENT_TYPE DAPP #-}
-                          |{-# SCRIPT_TYPE ACCOUNT #-}
-                          |
-                          |@Callable(i)
-                          |func foo() = {
-                          |  strict inv = invoke(Address(base58'${dApp2.toAddress}'), "bar", [], [])
-                          |  let lease = Lease(Address(base58'${leaseRecipient1.toAddress}'), 1)
-                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
-                          |}
-                          |""".stripMargin)
+      .compileContract(
+        s"""
+           |@Callable(i)
+           |func foo() = {
+           |  strict inv = invoke(Address(base58'${dApp2.toAddress}'), "bar", [], [])
+           |  let lease = Lease(Address(base58'${leaseRecipient1.toAddress}'), 1)
+           |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+           |}
+         """.stripMargin
+      )
 
     val dAppScript2 = TestCompiler(V5)
-      .compileContract(s"""
-                          |{-# STDLIB_VERSION 5 #-}
-                          |{-# CONTENT_TYPE DAPP #-}
-                          |{-# SCRIPT_TYPE ACCOUNT #-}
-                          |
-                          |@Callable(i)
-                          |func bar() = {
-                          |  let lease = Lease(Address(base58'${leaseRecipient2.toAddress}'), 2)
-                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
-                          |}
-                          |""".stripMargin)
+      .compileContract(
+        s"""
+           |@Callable(i)
+           |func bar() = {
+           |  let lease = Lease(Address(base58'${leaseRecipient2.toAddress}'), 2)
+           |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+           |}
+         """.stripMargin
+      )
 
     def checkForInvoke(invokeTx: Transaction & Authorized): Unit =
       withRoute(AddrWithBalance.enoughBalances(dApp1, dApp2) :+ AddrWithBalance(invokeTx.sender.toAddress)) { case (d, r) =>

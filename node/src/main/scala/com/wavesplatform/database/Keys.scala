@@ -56,13 +56,7 @@ object DataNode {
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{
-    AddressId as AddressIdTag,
-    EthereumTransactionMeta as EthereumTransactionMetaTag,
-    InvokeScriptResult as InvokeScriptResultTag,
-    LeaseDetails as LeaseDetailsTag,
-    *
-  }
+  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
   val version: Key[Int] = intKey(Version, default = 1)
   val height: Key[Height] =
@@ -189,6 +183,17 @@ object Keys {
       hBytes(addressId.toByteArray, seqNr),
       readTransactionHNSeqAndType,
       writeTransactionHNSeqAndType
+    )
+
+  def addressLeaseSeqNr(addressId: AddressId): Key[Int] =
+    bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray)
+
+  def addressLeaseSeq(addressId: AddressId, seqNr: Int): Key[Option[Seq[(ByteStr, LeaseDetails)]]] =
+    Key.opt(
+      AddressLeaseInfoSeq,
+      hBytes(addressId.toByteArray, seqNr),
+      readLeaseSeq,
+      writeLeaseSeq
     )
 
   def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =
