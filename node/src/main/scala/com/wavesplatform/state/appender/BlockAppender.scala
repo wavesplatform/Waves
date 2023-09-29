@@ -15,7 +15,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, 
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxForAppender
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -27,7 +27,7 @@ object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxForAppender,
+      utxStorage: UtxPool,
       pos: PoSSelector,
       scheduler: Scheduler,
       verify: Boolean = true,
@@ -39,7 +39,7 @@ object BlockAppender extends ScorexLogging {
           .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
         if (newBlock.header.challengedHeader.isDefined) {
-          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot)
+          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
           appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock, snapshot)
         }
@@ -52,7 +52,7 @@ object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxForAppender,
+      utxStorage: UtxPool,
       pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,

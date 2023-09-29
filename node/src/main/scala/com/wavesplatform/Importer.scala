@@ -352,7 +352,7 @@ object Importer extends ScorexLogging {
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender: (Block, Option[BlockSnapshot]) => Task[Either[ValidationError, BlockApplyResult]] =
-      BlockAppender(blockchainUpdater, time, _ => (), pos, scheduler, importOptions.verify, txSignParCheck = false)
+      BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify, txSignParCheck = false)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)

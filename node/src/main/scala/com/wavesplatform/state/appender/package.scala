@@ -13,8 +13,8 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
-import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxForAppender
+import com.wavesplatform.utils.{LoggerFacade, Time}
+import com.wavesplatform.utx.{UtxForAppender, UtxPool}
 import kamon.Kamon
 
 package object appender {
@@ -67,15 +67,23 @@ package object appender {
 
   private[appender] def appendChallengeBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utx: UtxForAppender,
+      utx: UtxPool,
       pos: PoSSelector,
       time: Time,
+      log: LoggerFacade,
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshot]): Either[ValidationError, BlockApplyResult] =
     processBlockWithChallenge(blockchainUpdater, pos, time, verify, txSignParCheck)(block, snapshot).map {
       case (res @ Applied(discardedDiffs, _), _) =>
+        if (block.transactionData.nonEmpty) {
+          utx.removeAll(block.transactionData)
+          log.trace(
+            s"Removing txs of ${block.id()} ${block.transactionData.map(_.id()).mkString("(", ", ", ")")} from UTX pool"
+          )
+        }
         utx.setPrioritySnapshots(discardedDiffs)
+        utx.scheduleCleanup()
         res
       case (res, _) => res
     }
