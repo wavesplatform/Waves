@@ -24,15 +24,7 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{
-  EthereumTransaction,
-  GenesisTransaction,
-  PBSince,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers,
-  TxValidationError
-}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -280,8 +272,7 @@ package object database {
   }
 
   def writeLeaseSeq(seq: Seq[(ByteStr, LeaseDetails)]): Array[Byte] = {
-    val (ids, details) = seq.unzip
-    pb.LeaseIdsAndDetailsSeq(ids.map(_.toByteString), details.map(_.toProtobuf)).toByteArray
+    pb.LeaseIdsAndDetailsSeq(seq.map(_._1.toByteString), seq.map(_._2.toProtobuf)).toByteArray
   }
 
   def readStateHash(bs: Array[Byte]): StateHash = {

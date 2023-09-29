@@ -50,8 +50,7 @@ object LeaseDetails {
 case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, amount: Long, status: LeaseDetails.Status, sourceId: ByteStr, height: Int) {
   def isActive: Boolean = status == Status.Active
 
-  def toProtobuf: pb.LeaseDetails = {
-    import ByteString.*
+  def toProtobuf: pb.LeaseDetails =
     pb.LeaseDetails(
       ByteString.copyFrom(sender.arr),
       Some(PBRecipients.create(recipient)),
@@ -60,9 +59,8 @@ case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, amount: Lo
       height,
       status match {
         case Status.Active                        => Active(com.google.protobuf.empty.Empty())
-        case Status.Cancelled(height, cancelTxId) => Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(EMPTY)(_.toByteString)))
+        case Status.Cancelled(height, cancelTxId) => Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(_.toByteString)))
         case Status.Expired(height)               => Expired(pb.LeaseDetails.Expired(height))
       }
     )
-  }
 }
