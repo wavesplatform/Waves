@@ -1707,6 +1707,29 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
+  property("NODE-1173. Txs from applied challenging block should be removed from UTX") {
+    val challengedMiner = TxHelpers.signer(1)
+    val sender          = TxHelpers.signer(2)
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+      val challengingMiner = d.wallet.generateNewAccount().get
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, 1000.waves),
+        TxHelpers.transfer(sender, challengedMiner.toAddress, 2000.waves)
+      )
+      (1 to 999).foreach(_ => d.appendBlock())
+      val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
+      val originalBlock =
+        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+
+      txs.foreach(d.utxPool.putIfNew(_))
+      d.utxPool.size shouldBe txs.size
+
+      appendAndCheck(originalBlock, d) { _ =>
+        d.utxPool.size shouldBe 0
+      }
+    }
+  }
+
   property("NODE-1176. Generating balance of challenged miner should be restored after 1000 blocks") {
     def tryToAppendBlock(
         d: Domain,
