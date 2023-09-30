@@ -61,7 +61,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
       withDomain(settings) { d =>
         d.appendBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          BalanceSnapshot(1, 600000000, 0, 0, false)
+          BalanceSnapshot(1, 600000000, 0, 0)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
@@ -69,45 +69,45 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe (
           if (fixed)
             List(
-              BalanceSnapshot(2, 1199999999, 0, 0, false),
-              BalanceSnapshot(1, 599399999, 0, 0, false)
+              BalanceSnapshot(2, 1199999999, 0, 0),
+              BalanceSnapshot(1, 599399999, 0, 0)
             )
           else
-            List(BalanceSnapshot(2, 1199999999, 0, 0, false))
+            List(BalanceSnapshot(2, 1199999999, 0, 0))
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          BalanceSnapshot(2, 1199999999, 0, 0, false)
+          BalanceSnapshot(2, 1199999999, 0, 0)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
         d.appendKeyBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          BalanceSnapshot(3, 1799999998, 0, 0, false),
-          BalanceSnapshot(2, 1199399998, 0, 0, false),
-          BalanceSnapshot(1, 599399999, 0, 0, false)
+          BalanceSnapshot(3, 1799999998, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0),
+          BalanceSnapshot(1, 599399999, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          BalanceSnapshot(3, 1799999998, 0, 0, false)
+          BalanceSnapshot(3, 1799999998, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
-          BalanceSnapshot(3, 1799999998, 0, 0, false)
+          BalanceSnapshot(3, 1799999998, 0, 0)
         )
 
         d.appendMicroBlock(transfer(amount = 1))
         d.appendKeyBlock()
         d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
-          BalanceSnapshot(4, 2399999997L, 0, 0, false),
-          BalanceSnapshot(3, 1799399997, 0, 0, false),
-          BalanceSnapshot(2, 1199399998, 0, 0, false),
-          BalanceSnapshot(1, 599399999, 0, 0, false)
+          BalanceSnapshot(4, 2399999997L, 0, 0),
+          BalanceSnapshot(3, 1799399997, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0),
+          BalanceSnapshot(1, 599399999, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
-          BalanceSnapshot(4, 2399999997L, 0, 0, false),
-          BalanceSnapshot(3, 1799399997, 0, 0, false),
-          BalanceSnapshot(2, 1199399998, 0, 0, false)
+          BalanceSnapshot(4, 2399999997L, 0, 0),
+          BalanceSnapshot(3, 1799399997, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0)
         )
         d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
-          BalanceSnapshot(4, 2399999997L, 0, 0, false)
+          BalanceSnapshot(4, 2399999997L, 0, 0)
         )
       }
 
