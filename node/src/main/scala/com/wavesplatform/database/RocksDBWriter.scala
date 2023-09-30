@@ -1000,10 +1000,8 @@ class RocksDBWriter(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
-    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, isBanned = false))) { addressId =>
+    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
-
-      val banHeights = effectiveBalanceBanHeights(address).toSet
 
       val lastBalance      = balancesCache.get((address, Asset.Waves))
       val lastLeaseBalance = leaseBalanceCache.get(address)
@@ -1035,9 +1033,8 @@ class RocksDBWriter(
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
       } yield {
-        val height   = wh.max(lh)
-        val isBanned = banHeights.contains(height)
-        BalanceSnapshot(height, wb.balance, lb.in, lb.out, isBanned)
+        val height = wh.max(lh)
+        BalanceSnapshot(height, wb.balance, lb.in, lb.out)
       }
     }
   }

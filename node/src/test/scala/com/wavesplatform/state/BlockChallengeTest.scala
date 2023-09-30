@@ -1742,16 +1742,19 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
 
     val challengedMiner = TxHelpers.signer(1)
-    withDomain(settings, balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
+    val sender          = TxHelpers.signer(2)
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(sender)) { d =>
       val challengingMiner       = d.wallet.generateNewAccount().get
       val challengedMinerBalance = 2000.waves
       d.appendBlock(
-        TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves),
-        TxHelpers.transfer(TxHelpers.defaultSigner, challengedMiner.toAddress, challengedMinerBalance)
+        TxHelpers.transfer(sender, challengingMiner.toAddress, 1000.waves),
+        TxHelpers.transfer(sender, challengedMiner.toAddress, challengedMinerBalance)
       )
       (1 to 999).foreach(_ => d.appendBlock())
+      val transferAmount = 1.waves
+      val txs            = Seq(TxHelpers.transfer(sender, challengedMiner.toAddress, transferAmount))
       val originalBlock =
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
 
       val appender = createBlockAppender(d)
@@ -1767,7 +1770,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         tryToAppendBlock(d, challengedMiner, appender) should produce(genBalanceError)
       }
       d.appendBlock()
-      d.accountsApi.balanceDetails(challengedMiner.toAddress).explicitGet().generating shouldBe challengedMinerBalance
+      d.accountsApi.balanceDetails(challengedMiner.toAddress).explicitGet().generating shouldBe challengedMinerBalance + transferAmount
       tryToAppendBlock(d, challengedMiner, appender) should beRight
     }
   }

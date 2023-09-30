@@ -145,7 +145,7 @@ case class SnapshotBlockchain(
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, this.height))
+      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease))
       val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from < this.height
       if (inner.height > 0 && (from < this.height - 1 || height2Fix))
         bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain
