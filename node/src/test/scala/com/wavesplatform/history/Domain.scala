@@ -31,7 +31,7 @@ import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
-import com.wavesplatform.utils.{EthEncoding, Schedulers, SystemTime}
+import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, crypto}
@@ -87,7 +87,6 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           settings,
           testTime,
           posSelector,
-          Schedulers.singleThread("miner"),
           blockAppender
         )
       )

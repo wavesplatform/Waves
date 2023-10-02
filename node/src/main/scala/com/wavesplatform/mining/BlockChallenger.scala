@@ -25,7 +25,6 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import monix.execution.Scheduler
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
@@ -47,7 +46,6 @@ class BlockChallengerImpl(
     settings: WavesSettings,
     timeService: Time,
     pos: PoSSelector,
-    minerScheduler: Scheduler,
     appendBlock: Block => Task[Either[ValidationError, BlockApplyResult]]
 ) extends BlockChallenger
     with ScorexLogging {
@@ -247,7 +245,7 @@ class BlockChallengerImpl(
       log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
     }
-  }.executeOn(minerScheduler).flatMap {
+  }.flatMap {
     case res @ Right(block) => waitForTimeAlign(block.header.timestamp).map(_ => res)
     case err @ Left(_)      => Task(err)
   }
