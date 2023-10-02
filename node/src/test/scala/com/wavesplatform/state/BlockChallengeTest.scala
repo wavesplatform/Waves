@@ -1562,7 +1562,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
             d.settings,
             testTime,
             d.posSelector,
-            Schedulers.singleThread("miner"),
             createBlockAppender(d)
           ) {
             override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = {
@@ -1821,7 +1820,6 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.settings,
       testTime,
       d.posSelector,
-      Schedulers.singleThread("miner"),
       createBlockAppender(d)
     )
 
