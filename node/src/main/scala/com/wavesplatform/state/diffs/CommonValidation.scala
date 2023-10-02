@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.features.BlockchainFeatures.TransactionStateSnapshot
 import com.wavesplatform.features.OverdraftValidationProvider.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
 import com.wavesplatform.lang.ValidationError
@@ -163,10 +164,13 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) && blockchain.isFeatureActivated(TransactionStateSnapshot) =>
+        Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
+
       case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !TransactionParsers.all.contains((v.tpe.id.toByte, v.version)) =>
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>
