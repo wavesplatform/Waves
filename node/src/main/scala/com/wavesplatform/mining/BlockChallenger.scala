@@ -166,6 +166,11 @@ class BlockChallengerImpl(
       allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
       (acc, delay) <- pickBestAccount(allAccounts)
       blockTime = prevBlockHeader.timestamp + delay
+      _ <- Either.cond(
+        blockTime < challengedBlock.header.timestamp,
+        (),
+        GenericError(s"Challenging block timestamp ($blockTime) is not better than challenged block timestamp (${challengedBlock.header.timestamp})")
+      )
       consensusData <-
         pos.consensusData(
           acc,
