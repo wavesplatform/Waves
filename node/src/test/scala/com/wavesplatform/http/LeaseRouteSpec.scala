@@ -50,25 +50,21 @@ class LeaseRouteSpec
     with TestWallet
     with PathMockFactory
     with SharedSchedulerMixin {
-  private def route(d: Domain, leaseStatesAreStoredByAddress: Boolean) =
+  private def route(d: Domain) =
     LeaseApiRoute(
       restAPISettings,
       testWallet,
       d.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchain, leaseStatesAreStoredByAddress),
+      CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchain, d.settings.dbSettings.storeLeaseStatesByAddress),
       new RouteTimeout(60.seconds)(sharedScheduler)
     )
 
-  private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(check: (Domain, Route) => Unit): Unit = {
+  private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(check: (Domain, Route) => Unit): Unit =
     withDomain(settings, balances) { d =>
-      check(d, route(d, leaseStatesAreStoredByAddress = false).route)
+      check(d, route(d).route)
     }
-    withDomain(settings, balances) { d =>
-      check(d, route(d, leaseStatesAreStoredByAddress = true).route)
-    }
-  }
 
   private def setScriptTransaction(sender: KeyPair) =
     SetScriptTransaction

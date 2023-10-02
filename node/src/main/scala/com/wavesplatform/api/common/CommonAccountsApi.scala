@@ -4,7 +4,7 @@ import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
-import com.wavesplatform.api.common.lease.{AddressLeaseInfo, OldAddressLeaseInfo}
+import com.wavesplatform.api.common.lease.AddressLeaseInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
@@ -124,10 +124,7 @@ object CommonAccountsApi {
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
     override def activeLeases(address: Address): Observable[LeaseInfo] =
-      if (leaseStatesAreStoredByAddress)
-        AddressLeaseInfo.activeLeases(rdb, compositeBlockchain().snapshot, blockchain, address)
-      else
-        OldAddressLeaseInfo.activeLeases(rdb, compositeBlockchain().snapshot, blockchain, address)
+      AddressLeaseInfo.activeLeases(rdb, compositeBlockchain().snapshot, blockchain, address)
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] =
       blockchain.leaseDetails(leaseId).map(LeaseInfo.fromLeaseDetails(leaseId, _, blockchain))
