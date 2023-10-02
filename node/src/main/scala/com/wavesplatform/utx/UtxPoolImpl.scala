@@ -11,6 +11,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.SetScriptTransactionDiff.*
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -417,6 +418,7 @@ case class UtxPoolImpl(
                           .addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
                         fullTxSnapshot <- newSnapshot.addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
                       } yield {
+                        val txInfo = newSnapshot.transactions.head._2
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
                           resultSnapshot,
@@ -426,7 +428,11 @@ case class UtxPoolImpl(
                           r.validatedTransactions + tx.id(),
                           r.removedTransactions,
                           r.stateHash
-                            .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(fullTxSnapshot, None).createHash(prevStateHash))
+                            .map(prevStateHash =>
+                              TxStateSnapshotHashBuilder
+                                .createHashFromSnapshot(fullTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                                .createHash(prevStateHash)
+                            )
                         )
                       }).fold(
                         error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
