@@ -276,6 +276,10 @@ class BlockchainUpdaterImpl(
                       BlockStats.replaced(ng.base, block)
                       val (mbs, diffs) = ng.allSnapshots.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+
+                      val updatedBlockchain = SnapshotBlockchain(referencedBlockchain, r.snapshot, block, hitSource, r.carry, None, None)
+                      miner.scheduleMining(Some(updatedBlockchain))
+
                       blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
