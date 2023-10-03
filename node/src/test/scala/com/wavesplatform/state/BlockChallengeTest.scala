@@ -117,7 +117,16 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      appendAndCheck(d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash))), d) { block =>
+      appendAndCheck(
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          Seq.empty,
+          strictTime = true,
+          stateHash = Some(Some(invalidStateHash)),
+          timestamp = Some(Long.MaxValue)
+        ),
+        d
+      ) { block =>
         block.header.challengedHeader shouldBe defined
         val challengedHeader = block.header.challengedHeader.get
 
@@ -142,7 +151,14 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       (1 to 999).foreach(_ => d.appendBlock())
 
       appendAndCheck(
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash))),
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          Seq.empty,
+          strictTime = true,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash)),
+          timestamp = Some(Long.MaxValue)
+        ),
         d
       ) { block =>
         block.header.challengedHeader shouldBe defined
@@ -153,7 +169,14 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       (1 to 999).foreach(_ => d.appendBlock())
 
       appendAndCheck(
-        d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash))),
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          Seq.empty,
+          strictTime = true,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash)),
+          timestamp = Some(Long.MaxValue)
+        ),
         d
       ) { block =>
         block.header.challengedHeader shouldBe defined
@@ -189,7 +212,13 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq.empty,
+        strictTime = true,
+        stateHash = Some(Some(invalidStateHash)),
+        timestamp = Some(Long.MaxValue)
+      )
       appendAndCheck(originalBlock, d) { block =>
         block.header.challengedHeader shouldBe defined
         val challengedHeader = block.header.challengedHeader.get
@@ -232,7 +261,13 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq.empty,
+        strictTime = true,
+        stateHash = Some(Some(invalidStateHash)),
+        timestamp = Some(Long.MaxValue)
+      )
       appendAndCheck(originalBlock, d) { block =>
         block.transactionData shouldBe originalBlock.transactionData
       }
@@ -269,7 +304,13 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
       d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 999).foreach(_ => d.appendBlock())
-      val originalBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(invalidStateHash)))
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq.empty,
+        strictTime = true,
+        stateHash = Some(Some(invalidStateHash)),
+        timestamp = Some(Long.MaxValue)
+      )
       appendAndCheck(originalBlock, d) { block =>
         block.header.reference shouldBe originalBlock.header.reference
       }
@@ -651,7 +692,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         Seq(challengedBlockTx),
         strictTime = true,
         generator = challengedMiner,
-        stateHash = Some(Some(invalidStateHash))
+        stateHash = Some(Some(invalidStateHash)),
+        timestamp = Some(Long.MaxValue)
       )
 
       appendAndCheck(originalBlock, d) { block =>
@@ -970,7 +1012,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         Block.ProtoBlockVersion,
         Seq.empty,
         strictTime = true,
-        stateHash = Some(Some(invalidStateHash))
+        stateHash = Some(Some(invalidStateHash)),
+        timestamp = Some(Long.MaxValue)
       )
 
       appendAndCheck(originalBlock, d) { block =>
@@ -999,14 +1042,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       val challengingMiner = d.wallet.generateNewAccount().get
 
       d.appendBlock(TxHelpers.transfer(defaultSigner, challengingMiner.toAddress, 1000.waves))
-      (1 to 999).foreach(_ => d.appendBlock())
-      d.appendBlock(
-        d.createBlock(
-          Block.ProtoBlockVersion,
-          Seq.empty,
-          strictTime = true
-        )
-      )
+      (1 to 1000).foreach(_ => d.appendBlock())
 
       d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
 
@@ -1014,7 +1050,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
         Block.ProtoBlockVersion,
         Seq.empty,
         strictTime = true,
-        stateHash = Some(Some(invalidStateHash))
+        stateHash = Some(Some(invalidStateHash)),
+        timestamp = Some(Long.MaxValue)
       )
 
       appendAndCheck(originalBlock, d) { block =>
@@ -1551,7 +1588,14 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
 
       val txs = Seq(TxHelpers.transfer(amount = 1.waves), TxHelpers.transfer(amount = 2.waves))
       val invalidBlock =
-        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          txs,
+          strictTime = true,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash)),
+          timestamp = Some(Long.MaxValue)
+        )
 
       val blockChallenger: Option[BlockChallenger] =
         Some(
@@ -1718,7 +1762,14 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       (1 to 999).foreach(_ => d.appendBlock())
       val txs = Seq(TxHelpers.transfer(sender, amount = 1), TxHelpers.transfer(sender, amount = 2))
       val originalBlock =
-        d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, generator = challengedMiner, stateHash = Some(Some(invalidStateHash)))
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          txs,
+          strictTime = true,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash)),
+          timestamp = Some(Long.MaxValue)
+        )
 
       txs.foreach(d.utxPool.putIfNew(_))
       d.utxPool.size shouldBe txs.size
@@ -1854,7 +1905,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       txs,
       strictTime = true,
       generator = challengedMiner,
-      stateHash = Some(Some(invalidStateHash))
+      stateHash = Some(Some(invalidStateHash)),
+      timestamp = Some(Long.MaxValue)
     )
 
     appendAndCheck(originalBlock, d)(_ => (1 to 10).foreach(_ => d.appendBlock()))
@@ -1870,7 +1922,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       txs,
       strictTime = true,
       generator = challengedMiner,
-      stateHash = Some(Some(invalidStateHash))
+      stateHash = Some(Some(invalidStateHash)),
+      timestamp = Some(Long.MaxValue)
     )
 
     appendAndCheck(originalBlock, d)(_ => ())
@@ -1888,7 +1941,8 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       txs,
       strictTime = true,
       generator = challengedMiner,
-      stateHash = Some(Some(invalidStateHash))
+      stateHash = Some(Some(invalidStateHash)),
+      timestamp = Some(Long.MaxValue)
     )
 
     appendAndCheck(originalBlock, d)(_ => ())

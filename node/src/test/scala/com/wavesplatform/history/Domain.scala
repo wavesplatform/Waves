@@ -381,8 +381,9 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
-      rewardVote: Long = -1L
-  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote).explicitGet()
+      rewardVote: Long = -1L,
+      timestamp: Option[Long] = None
+  ): Block = createBlockE(version, txs, ref, strictTime, generator, stateHash, challengedHeader, rewardVote, timestamp).explicitGet()
 
   def createBlockE(
       version: Byte,
@@ -392,7 +393,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       generator: KeyPair = defaultSigner,
       stateHash: Option[Option[ByteStr]] = None,
       challengedHeader: Option[ChallengedHeader] = None,
-      rewardVote: Long = -1L
+      rewardVote: Long = -1L,
+      timestamp: Option[Long] = None
   ): Either[ValidationError, Block] = {
     val reference = ref.getOrElse(randomSig)
 
@@ -401,12 +403,16 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     val greatGrandParent = blockchain.blockHeader(parentHeight - 2).map(_.header)
 
     for {
-      timestamp <-
-        if (blockchain.height > 0)
-          posSelector
-            .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
-            .map(_ + parent.timestamp)
-        else
+      resultTimestamp <-
+        if (blockchain.height > 0) {
+          timestamp
+            .map(Right(_))
+            .getOrElse(
+              posSelector
+                .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e11.toLong)
+                .map(_ + parent.timestamp)
+            )
+        } else
           Right(System.currentTimeMillis() - (1 hour).toMillis)
       consensus <-
         if (blockchain.height > 0)
@@ -418,7 +424,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
               parent.baseTarget,
               parent.timestamp,
               greatGrandParent.map(_.timestamp),
-              timestamp
+              resultTimestamp
             )
         else Right(NxtLikeConsensusBlockData(60, generationSignature))
       resultBt =
@@ -429,7 +435,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       blockWithoutStateHash <- Block
         .buildAndSign(
           version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-          timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
+          timestamp = if (strictTime) resultTimestamp else SystemTime.getTimestamp(),
           reference = reference,
           baseTarget = resultBt,
           generationSignature = consensus.generationSignature,
@@ -471,7 +477,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       resultBlock <- Block
         .buildAndSign(
           version = if (consensus.generationSignature.size == 96) Block.ProtoBlockVersion else version,
-          timestamp = if (strictTime) timestamp else SystemTime.getTimestamp(),
+          timestamp = if (strictTime) resultTimestamp else SystemTime.getTimestamp(),
           reference = reference,
           baseTarget = resultBt,
           generationSignature = consensus.generationSignature,
