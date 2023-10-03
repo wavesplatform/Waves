@@ -13,19 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.{
-  BINARY_OP,
-  CompositePattern,
-  ConstsPat,
-  MATCH_CASE,
-  ObjPat,
-  PART,
-  Pos,
-  Single,
-  TuplePat,
-  Type,
-  TypedVar
-}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
@@ -755,11 +743,6 @@ object ExpressionCompiler {
     }
   }
 
-  def mkIf(p: Pos, cond: EXPR, ifTrue: (EXPR, FINAL), ifFalse: (EXPR, FINAL)): Either[CompilationError, (EXPR, FINAL)] = {
-    val t = TypeInferrer.findCommonType(ifTrue._2, ifFalse._2)
-    (IF(cond, ifTrue._1, ifFalse._1), t).asRight
-  }
-
   def mkIfCases(
       cases: List[MATCH_CASE],
       caseTypes: List[FINAL],
@@ -856,7 +839,7 @@ object ExpressionCompiler {
 
           case (p: CompositePattern, _) =>
             val pos        = p.position
-            val newRef     = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
+            val newRef     = p.caseType.fold(refTmp)(_ => refTmp.copy(resultType = Some(caseType)))
             val conditions = makeConditionsFromCompositePattern(p, newRef)
             val cond = if (conditions.isEmpty) {
               Expressions.TRUE(pos): Expressions.EXPR
@@ -1072,7 +1055,8 @@ object ExpressionCompiler {
         types.toList
           .traverse(handleCompositeType(pos, _, expectedType, varName))
           .map(types => TUPLE(types))
-      case Expressions.AnyType(pos) => (ANY: FINAL).pure[CompileM]
+      case _: Expressions.AnyType =>
+        (ANY: FINAL).pure[CompileM]
     }
 
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
