@@ -491,7 +491,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       stateHash: Option[Option[ByteStr]] = None,
       ref: Option[ByteStr] = None,
       txs: Option[Seq[Transaction]] = None,
-      challengedHeader: Option[ChallengedHeader] = None
+      challengedHeader: Option[ChallengedHeader] = None,
+      timestamp: Option[Long] = None
   ): Block = {
     createBlock(
       Block.ProtoBlockVersion,
@@ -513,7 +514,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
             challengedBlock.signature
           )
         )
-      )
+      ),
+      timestamp = timestamp
     )
   }
 

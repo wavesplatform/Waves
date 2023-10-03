@@ -274,15 +274,16 @@ class BlockchainUpdaterImpl(
                         s"Better liquid block(timestamp=${block.header.timestamp}) received and applied instead of existing(timestamp=${ng.base.header.timestamp})"
                       )
                       BlockStats.replaced(ng.base, block)
-                      val (mbs, diffs) = ng.allSnapshots.unzip
-                      log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+                      val (mbs, mbSnapshots) = ng.allSnapshots.unzip
+                      val allSnapshots       = ng.baseBlockSnapshot +: mbSnapshots
+                      log.trace(s"Discarded microblocks = $mbs, snapshots = ${allSnapshots.map(_.hashString)}")
 
                       val updatedBlockchain = SnapshotBlockchain(referencedBlockchain, r.snapshot, block, hitSource, r.carry, None, None)
                       miner.scheduleMining(Some(updatedBlockchain))
 
                       blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, rocksdb.height)
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, ng.reward, hitSource, referencedBlockchain)
-                      Some((r, diffs, ng.reward, hitSource))
+                      Some((r, allSnapshots, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
                   // silently ignore
