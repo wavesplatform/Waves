@@ -1825,6 +1825,47 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
+  property("NODE-1177. Transactions should return to UTX after replacing current liquid block by better block") {
+    val challengedMiner    = TxHelpers.signer(1)
+    val sender             = TxHelpers.signer(2)
+    val currentBlockSender = TxHelpers.signer(3)
+    val betterBlockSender  = TxHelpers.signer(4)
+    withDomain(settings, balances = AddrWithBalance.enoughBalances(sender, currentBlockSender, betterBlockSender)) { d =>
+      val challengingMiner = d.wallet.generateNewAccount().get
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, 1000.waves),
+        TxHelpers.transfer(sender, challengedMiner.toAddress, 2000.waves)
+      )
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val txs = Seq(
+        TxHelpers.transfer(sender, TxHelpers.defaultAddress, amount = 1.waves),
+        TxHelpers.transfer(sender, TxHelpers.defaultAddress, amount = 2.waves)
+      )
+      val betterBlock = d.createBlock(Block.ProtoBlockVersion, Seq.empty, strictTime = true, generator = betterBlockSender)
+      val originalBlock =
+        d.createBlock(
+          Block.ProtoBlockVersion,
+          txs,
+          strictTime = true,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash))
+        )
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock, strictTime = true, timestamp = Some(Long.MaxValue))
+
+      d.appendBlockE(challengingBlock) should beRight
+      d.lastBlock shouldBe challengingBlock
+      d.utxPool.size shouldBe 0
+
+      val appender = createBlockAppender(d)
+      testTime.setTime(betterBlock.header.timestamp)
+      appender(betterBlock).runSyncUnsafe() should beRight
+      d.lastBlock shouldBe betterBlock
+      d.utxPool.priorityPool.priorityTransactions.size shouldBe txs.size
+      d.utxPool.priorityPool.priorityTransactions.toSet shouldBe txs.toSet
+    }
+  }
+
   private def appendAndCheck(block: Block, d: Domain)(check: Block => Unit): Unit = {
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
