@@ -13,7 +13,19 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
+import com.wavesplatform.lang.v1.parser.Expressions.{
+  BINARY_OP,
+  CompositePattern,
+  ConstsPat,
+  MATCH_CASE,
+  ObjPat,
+  PART,
+  Pos,
+  Single,
+  TuplePat,
+  Type,
+  TypedVar
+}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
@@ -825,7 +837,8 @@ object ExpressionCompiler {
                   val typeIf =
                     tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
                   Right(makeIfCase(typeIf, blockWithNewVar, further))
-                case Nil => ???
+                case Nil =>
+                  ???
               }
             } yield cases
           case (_: TypedVar, t) =>
@@ -834,51 +847,49 @@ object ExpressionCompiler {
           case (ConstsPat(consts, _), _) =>
             val cond = consts
               .map(c => BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, refTmp))
-              .reduceRight((c, r) => BINARY_OP(mc.position, c, BinaryOperation.OR_OP, r))
+              .reduceRight(BINARY_OP(mc.position, _, BinaryOperation.OR_OP, _))
             Right(makeIfCase(cond, blockWithNewVar, further))
 
           case (p: CompositePattern, _) =>
-            val pos        = p.position
-            val newRef     = p.caseType.fold(refTmp)(_ => refTmp.copy(resultType = Some(caseType)))
-            val conditions = makeConditionsFromCompositePattern(p, newRef)
-            val cond = if (conditions.isEmpty) {
-              Expressions.TRUE(pos): Expressions.EXPR
-            } else {
-              conditions.reduceRight { (c, r) =>
-                BINARY_OP(pos, c, BinaryOperation.AND_OP, r): Expressions.EXPR
+            val pos    = p.position
+            val newRef = p.caseType.fold(refTmp)(_ => refTmp.copy(resultType = Some(caseType)))
+            makeConditionsFromCompositePattern(ctx, p, newRef)
+              .map { conditions =>
+                val cond =
+                  if (conditions.isEmpty)
+                    Expressions.TRUE(pos)
+                  else
+                    conditions.reduceRight(BINARY_OP(pos, _, BinaryOperation.AND_OP, _))
+                val checkingCond =
+                  if (p.isInstanceOf[TuplePat]) {
+                    val (resolvedTypes, size) = resolveTypesFromCompositePattern(p)
+                    if (p.patternsWithFields.size == size) {
+                      val typeChecks =
+                        resolvedTypes
+                          .map(t => Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t))))
+                          .reduceLeft[Expressions.EXPR] { case (c, r) => BINARY_OP(pos, c, BinaryOperation.OR_OP, r) }
+                      BINARY_OP(pos, cond, BinaryOperation.AND_OP, typeChecks)
+                    } else {
+                      val size        = Expressions.CONST_LONG(pos, p.patternsWithFields.size)
+                      val getSize     = Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "size"), List(refTmp))
+                      val compareSize = BINARY_OP(pos, getSize, BinaryOperation.EQ_OP, size)
+                      BINARY_OP(pos, cond, BinaryOperation.AND_OP, compareSize)
+                    }
+                  } else
+                    cond
+                makeIfCase(
+                  p.caseType.fold(checkingCond)(t =>
+                    BINARY_OP(
+                      pos,
+                      Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
+                      BinaryOperation.AND_OP,
+                      Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), checkingCond)
+                    )
+                  ),
+                  blockWithNewVar,
+                  further
+                )
               }
-            }
-            val checkingCond =
-              if (p.isInstanceOf[TuplePat]) {
-                val (resolvedTypes, size) = resolveTypesFromCompositePattern(p)
-                if (p.patternsWithFields.size == size) {
-                  val typeChecks =
-                    resolvedTypes
-                      .map(t => Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t))))
-                      .reduceLeft[Expressions.EXPR] { case (c, r) => BINARY_OP(pos, c, BinaryOperation.OR_OP, r) }
-                  BINARY_OP(pos, cond, BinaryOperation.AND_OP, typeChecks)
-                } else {
-                  val size        = Expressions.CONST_LONG(pos, p.patternsWithFields.size)
-                  val getSize     = Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "size"), List(refTmp))
-                  val compareSize = BINARY_OP(pos, getSize, BinaryOperation.EQ_OP, size)
-                  BINARY_OP(pos, cond, BinaryOperation.AND_OP, compareSize)
-                }
-              } else
-                cond
-            Right(
-              makeIfCase(
-                p.caseType.fold(checkingCond)(t =>
-                  BINARY_OP(
-                    pos,
-                    Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
-                    BinaryOperation.AND_OP,
-                    Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), checkingCond)
-                  )
-                ),
-                blockWithNewVar,
-                further
-              )
-            )
         }
       }
     }
@@ -908,47 +919,54 @@ object ExpressionCompiler {
       Expressions.GETTER(pos, exp, field, checkObjectType = false)
     }
 
-  private def makeConditionsFromCompositePattern(p: CompositePattern, newRef: Expressions.REF): Seq[Expressions.EXPR] =
-    p.subpatterns collect {
+  private def makeConditionsFromCompositePattern(
+      ctx: CompilerContext,
+      p: CompositePattern,
+      newRef: Expressions.REF
+  ): Either[Generic, Seq[Expressions.EXPR]] =
+    p.subpatterns.traverse {
       case (pat @ TypedVar(_, Expressions.Union(types)), path) if types.nonEmpty =>
         val pos = pat.position
         val v   = mkGet(path, newRef, pos)
-        types
-          .map {
+        val r = types
+          .collect {
             case Expressions.Single(t, None) =>
-              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
+              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t)))
             case Expressions.Single(PART.VALID(pos, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
               val t = PART.VALID(pos, "List[Any]")
-              Expressions.FUNCTION_CALL(
-                pos,
-                PART.VALID(pos, IsInstanceOf),
-                List(v, Expressions.CONST_STRING(pos, t))
-              ): Expressions.EXPR
-            case _ => ???
+              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t)))
           }
-          .reduceRight[Expressions.EXPR] { (c, r) =>
-            BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
-          }
+          .reduceRight[Expressions.EXPR](BINARY_OP(pos, _, BinaryOperation.OR_OP, _))
+        Right(r)
       case (pat @ TypedVar(_, Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.AnyType(_))))), path) =>
         val pos = pat.position
         val v   = mkGet(path, newRef, pos)
         val t   = PART.VALID(pos, "List[Any]")
-        Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
+        val r   = Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t)))
+        Right(r)
       case (pat @ TypedVar(_, Expressions.Single(t, None)), path) =>
         val pos = pat.position
         val v   = mkGet(path, newRef, pos)
-        Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
-      case (TypedVar(_, Expressions.Single(_, _)), _) => ???
+        val r   = Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t)))
+        Right(r)
       case (pat @ ConstsPat(consts, _), path) =>
         val pos = pat.position
         val v   = mkGet(path, newRef, pos)
         consts
-          .map { c =>
-            BINARY_OP(pos, c, BinaryOperation.EQ_OP, v)
+          .traverse {
+            case const @ (
+                  _: Expressions.CONST_LONG | _: Expressions.CONST_STRING | _: Expressions.CONST_BYTESTR | _: Expressions.TRUE |
+                  _: Expressions.FALSE | _: Expressions.REF
+                ) =>
+              Right(BINARY_OP(pos, const, BinaryOperation.EQ_OP, v))
+            case func @ Expressions.FUNCTION_CALL(pos, PART.VALID(_, name), _, _, _) if ctx.predefTypes.contains(name) =>
+              Right(BINARY_OP(pos, func, BinaryOperation.EQ_OP, v))
+            case expr =>
+              Left(Generic(expr.position.start, expr.position.end, "Only constant value could be matched with object field"))
           }
-          .reduceRight[BINARY_OP] { (c, r) =>
-            BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
-          }
+          .map(_.reduceRight(BINARY_OP(pos, _, BinaryOperation.OR_OP, _)))
+      case _ =>
+        Right(Expressions.TRUE(newRef.position))
     }
 
   private def resolveTypesFromCompositePattern(p: CompositePattern): (Seq[PART[String]], Int) = {
