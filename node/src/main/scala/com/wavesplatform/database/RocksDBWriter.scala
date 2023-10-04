@@ -493,7 +493,7 @@ class RocksDBWriter(
 
       for ((asset, script) <- snapshot.assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-        if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
+        rw.put(Keys.assetScript(asset)(height), Some(script))
       }
 
       if (height % BlockStep == 1) {

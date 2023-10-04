@@ -95,7 +95,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             asset -> AssetInfo(issueTx.name, issueTx.description, Height(d.solidStateHeight + 2))
           ),
           assetScripts = Map(
-            asset -> Some(AssetScriptInfo(script, 0))
+            asset -> AssetScriptInfo(script, 0)
           )
         )
       )
@@ -279,7 +279,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           assetScripts = Map(
-            asset -> Some(AssetScriptInfo(script, 0))
+            asset -> AssetScriptInfo(script, 0)
           )
         )
       )
@@ -322,9 +322,6 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           ),
           assetNamesAndDescriptions = Map(
             dAppAssetId -> AssetInfo("name", "description", Height(height))
-          ),
-          assetScripts = Map(
-            dAppAssetId -> None
           ),
           leaseStates = Map(
             leaseId -> LeaseDetails(dAppPk, senderAddress, 123, Active, invokeId, height)

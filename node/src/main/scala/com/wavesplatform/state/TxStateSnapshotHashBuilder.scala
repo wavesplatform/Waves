@@ -61,9 +61,8 @@ object TxStateSnapshotHashBuilder {
     }
 
     for {
-      (asset, sv) <- snapshot.assetScripts
-      script = sv.map(_.script)
-    } addEntry(KeyType.AssetScript, asset.id.arr)(script.fold(Array.emptyByteArray)(_.bytes().arr))
+      (asset, scriptInfo) <- snapshot.assetScripts
+    } addEntry(KeyType.AssetScript, asset.id.arr)(scriptInfo.script.bytes().arr)
 
     snapshot.leaseStates.foreach { case (leaseId, details) =>
       addEntry(KeyType.LeaseStatus, leaseId.arr)(booleanToBytes(details.isActive))

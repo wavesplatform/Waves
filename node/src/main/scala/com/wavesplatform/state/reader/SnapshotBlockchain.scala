@@ -78,7 +78,7 @@ case class SnapshotBlockchain(
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeSnapshot
       .flatMap(_.assetScripts.get(asset))
-      .getOrElse(inner.assetScript(asset))
+      .orElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
     SnapshotBlockchain.assetDescription(asset, snapshot, height, inner)
@@ -261,7 +261,7 @@ object SnapshotBlockchain {
           volume.get.isReissuable,
           volume.get.volume,
           info.get.lastUpdatedAt,
-          script.flatten,
+          script,
           sponsorship.getOrElse(0),
           static.nft,
           assetNum,
@@ -279,7 +279,7 @@ object SnapshotBlockchain {
               description = info.map(_.description).getOrElse(d.description),
               lastUpdatedAt = info.map(_.lastUpdatedAt).getOrElse(d.lastUpdatedAt),
               sponsorship = sponsorship.getOrElse(d.sponsorship),
-              script = script.getOrElse(d.script)
+              script = script.orElse(d.script)
             )
           )
       )

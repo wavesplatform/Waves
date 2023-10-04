@@ -309,7 +309,8 @@ abstract class Caches extends Blockchain with Storage {
     for (((address, _), (entry, _)) <- updatedDataWithNodes) stateHash.addDataEntry(address, entry.entry)
     for ((address, lease)           <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
     for ((address, script)          <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
-    for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, script.map(_.script))
+    for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, Some(script.script))
+    for ((asset, _)                 <- snapshot.assetStatics) if (!snapshot.assetScripts.contains(asset)) stateHash.addAssetScript(asset, None)
     for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
     for ((assetId, sponsorship)     <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address)           <- snapshot.aliases) stateHash.addAlias(address, alias.name)
@@ -342,7 +343,7 @@ abstract class Caches extends Blockchain with Storage {
     for ((alias, address)                    <- snapshot.aliases) aliasCache.put(Alias.create(alias.name).explicitGet(), Some(address))
     leaseBalanceCache.putAll(leaseBalances.asJava)
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
-    assetScriptCache.putAll(snapshot.assetScripts.asJava)
+    assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
