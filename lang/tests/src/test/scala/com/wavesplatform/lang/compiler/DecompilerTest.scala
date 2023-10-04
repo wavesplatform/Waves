@@ -561,7 +561,7 @@ class DecompilerTest extends PropSpec {
 
   def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, untyped)
+    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, v, untyped)
     typed
   }
 

@@ -67,7 +67,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
   private def compile(script: String): EXPR = {
     val parsed = Parser.parseExpr(script).get.value
-    ExpressionCompiler(ctx.compilerContext, parsed).explicitGet()._1
+    ExpressionCompiler(ctx.compilerContext, version, parsed).explicitGet()._1
   }
 
   property("multiple lets by step") {

@@ -15,7 +15,19 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
+import com.wavesplatform.lang.v1.parser.Expressions.{
+  BINARY_OP,
+  CompositePattern,
+  ConstsPat,
+  MATCH_CASE,
+  ObjPat,
+  PART,
+  Pos,
+  Single,
+  TuplePat,
+  Type,
+  TypedVar
+}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
@@ -989,8 +1001,8 @@ object ExpressionCompiler {
   ): Either[String, (EXPR, FINAL)] = {
     val parser = new Parser(version)(offset)
     parser.parseExpr(input) match {
-      case fastparse.Parsed.Success(xs, _) => apply(ctx, xs, version, allowIllFormedStrings)
-      case f: fastparse.Parsed.Failure     => Left(parser.toString(input, f))
+      case fastparse.Parsed.Success(expr, _) => apply(ctx, version, expr, allowIllFormedStrings)
+      case f: fastparse.Parsed.Failure       => Left(parser.toString(input, f))
     }
   }
 
@@ -1011,13 +1023,18 @@ object ExpressionCompiler {
     compileUntyped(adjustedDecls, offset, ctx, version)
   }
 
-  def apply(c: CompilerContext, expr: Expressions.EXPR, version: StdLibVersion, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] =
-    applyWithCtx(c, expr, version, allowIllFormedStrings).map(r => (r._2, r._3))
+  def apply(
+      c: CompilerContext,
+      version: StdLibVersion,
+      expr: Expressions.EXPR,
+      allowIllFormedStrings: Boolean = false
+  ): Either[String, (EXPR, FINAL)] =
+    applyWithCtx(c, version, expr, allowIllFormedStrings).map(r => (r._2, r._3))
 
   def applyWithCtx(
       c: CompilerContext,
-      expr: Expressions.EXPR,
       version: StdLibVersion,
+      expr: Expressions.EXPR,
       allowIllFormedStrings: Boolean = false
   ): Either[String, (CompilerContext, EXPR, FINAL)] =
     new ExpressionCompiler(version)

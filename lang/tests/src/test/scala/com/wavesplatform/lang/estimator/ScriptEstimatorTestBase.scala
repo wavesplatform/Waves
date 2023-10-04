@@ -57,7 +57,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
 
   protected def compile(code: String)(implicit version: StdLibVersion): EXPR = {
     val untyped = Parser.parseExpr(code).get.value
-    ExpressionCompiler(ctx.compilerContext, untyped).map(_._1).explicitGet()
+    ExpressionCompiler(ctx.compilerContext, version, untyped).map(_._1).explicitGet()
   }
 
   protected def estimate(
