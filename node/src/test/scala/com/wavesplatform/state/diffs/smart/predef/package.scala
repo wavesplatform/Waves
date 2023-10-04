@@ -27,7 +27,7 @@ package object predef {
   def runScript[T <: EVALUATED](script: String, version: StdLibVersion, t: In, blockchain: Blockchain, chainId: Byte): Either[String, T] = {
     val expr = Parser.parseExpr(script).get.value
     for {
-      compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
+      compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), version, expr)
       (typedExpr, _) = compileResult
       directives     = DirectiveSet(version, Account, Expression).explicitGet()
       evalContext <- BlockchainContext.build(

@@ -881,7 +881,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       ByteStr.empty
     )
     for {
-      compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
+      compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, V3, expr)
       (typedExpr, _) = compileResult
       r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr).leftMap(_.message)
     } yield r
@@ -913,7 +913,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     )
 
     for {
-      compileResult <- ExpressionCompiler(ctx.compilerContext, expr)
+      compileResult <- ExpressionCompiler(ctx.compilerContext, V2, expr)
       (typedExpr, _) = compileResult
       r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr).leftMap(_.message)
     } yield r

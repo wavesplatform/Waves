@@ -205,7 +205,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
   private def createScript(code: String, version: StdLibVersion) = {
     val Parsed.Success(expr, _) = Parser.parseExpr(code).get
-    ExprScript(version, ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
+    ExprScript(version, ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), version, expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(

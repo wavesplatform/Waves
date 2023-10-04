@@ -24,7 +24,7 @@ class TransactionFieldAccessTest extends PropSpec with WithState {
 
     val genesis   = TxHelpers.genesis(master.toAddress)
     val untyped   = Parser.parseExpr(code).get.value
-    val typed     = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
+    val typed     = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untyped).explicitGet()._1
     val setScript = TxHelpers.setScript(master, ExprScript(typed).explicitGet())
     val transfer  = TxHelpers.transfer(master, recipient.toAddress, ENOUGH_AMT / 2)
     val lease     = TxHelpers.lease(master, recipient.toAddress, ENOUGH_AMT / 2)

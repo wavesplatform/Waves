@@ -63,7 +63,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     ).map(x => Parser.parseExpr(x).get.value)
       .map { untypedScript =>
         val typedScript = {
-          val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+          val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1
           ExprScript(compilerScript).explicitGet()
         }
 

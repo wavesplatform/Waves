@@ -32,7 +32,7 @@ class OnlyTransferIsAllowedTest extends PropSpec with WithState {
          | }
       """.stripMargin
     val untyped         = Parser.parseExpr(scriptText).get.value
-    val transferAllowed = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
+    val transferAllowed = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untyped).explicitGet()._1
 
     val (genesis, script, lease, transfer) = preconditions(transferAllowed)
     assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), smartEnabledFS) { case _ => () }
