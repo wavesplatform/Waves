@@ -160,5 +160,25 @@ class NestedPatternsTest extends EvaluatorSpec {
        """.stripMargin
     eval(script3)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
     eval(script3)(V8) should produce("Only constant value could be matched with object field in 80-83")
+
+    val script4 =
+      s"""
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = {1 + 2}) => true
+         |   case _                      => false
+         | }
+       """.stripMargin
+    eval(script4)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script4)(V8) should produce("Only constant value could be matched with object field in 64-69")
+
+    val script5 =
+      s"""
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = {if (true) then 2 else 1}) => true
+         |   case _                                        => false
+         | }
+       """.stripMargin
+    eval(script5)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script5)(V8) should produce("Only constant value could be matched with object field in 64-87")
   }
 }

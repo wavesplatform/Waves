@@ -4,7 +4,7 @@ import cats.implicits.*
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.CommonError
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V8}
 import com.wavesplatform.lang.hacks.Global
 import com.wavesplatform.lang.v1.compiler.CompilationError.*
 import com.wavesplatform.lang.v1.compiler.CompilerContext.*
@@ -15,19 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
-import com.wavesplatform.lang.v1.parser.Expressions.{
-  BINARY_OP,
-  CompositePattern,
-  ConstsPat,
-  MATCH_CASE,
-  ObjPat,
-  PART,
-  Pos,
-  Single,
-  TuplePat,
-  Type,
-  TypedVar
-}
+import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, Single, TuplePat, Type, TypedVar}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
@@ -831,6 +819,8 @@ class ExpressionCompiler(val version: StdLibVersion) {
               Right(BINARY_OP(pos, const, BinaryOperation.EQ_OP, v))
             case func @ Expressions.FUNCTION_CALL(pos, PART.VALID(_, name), _, _, _) if ctx.predefTypes.contains(name) =>
               Right(BINARY_OP(pos, func, BinaryOperation.EQ_OP, v))
+            case expr if version < V8 =>
+              Right(BINARY_OP(pos, expr, BinaryOperation.EQ_OP, v))
             case expr =>
               Left(Generic(expr.position.start, expr.position.end, "Only constant value could be matched with object field"))
           }
