@@ -14,7 +14,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.{LoggerFacade, Time}
-import com.wavesplatform.utx.{UtxForAppender, UtxPool}
+import com.wavesplatform.utx.UtxPool
 import kamon.Kamon
 
 package object appender {
@@ -43,6 +43,7 @@ package object appender {
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, snapshot, None, verify, txSignParCheck))
           .map {
             case res @ Applied(discardedDiffs, _) =>
+              // TODO: move UTX cleanup from appender
               if (block.transactionData.nonEmpty) {
                 utx.removeAll(block.transactionData)
                 log.trace(
