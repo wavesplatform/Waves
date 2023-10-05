@@ -29,9 +29,10 @@ package object appender {
 
   private[appender] def appendKeyBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utx: UtxForAppender,
+      utx: UtxPool,
       pos: PoSSelector,
       time: Time,
+      log: LoggerFacade,
       verify: Boolean,
       txSignParCheck: Boolean
   )(block: Block, snapshot: Option[BlockSnapshot]): Either[ValidationError, BlockApplyResult] =
@@ -42,7 +43,14 @@ package object appender {
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, snapshot, None, verify, txSignParCheck))
           .map {
             case res @ Applied(discardedDiffs, _) =>
+              if (block.transactionData.nonEmpty) {
+                utx.removeAll(block.transactionData)
+                log.trace(
+                  s"Removing txs of ${block.id()} ${block.transactionData.map(_.id()).mkString("(", ", ", ")")} from UTX pool"
+                )
+              }
               utx.setPrioritySnapshots(discardedDiffs)
+              utx.scheduleCleanup()
               res
             case res => res
           }
