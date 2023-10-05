@@ -194,7 +194,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
   def issueSerializer(numbersAsString: Boolean): JsonSerializer[Issue] =
     (issue: Issue, gen: JsonGenerator, serializers: SerializerProvider) => {
       gen.writeStartObject()
-      gen.writeStringField("id", issue.id.toString)
+      gen.writeStringField("assetId", issue.id.toString)
       issue.compiledScript.foreach(sc => gen.writeStringField("compiledScript", sc.toString))
       gen.writeNumberField("decimals", issue.decimals, numbersAsString)
       gen.writeStringField("description", issue.description)

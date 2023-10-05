@@ -3,24 +3,24 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
-import com.wavesplatform.it._
-import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api._
-import com.wavesplatform.test._
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.it.*
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.it.api.*
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.concurrent.Future.traverse
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class NFTBalanceSuite extends BaseFreeSpec {
-  import NFTBalanceSuite._
+  import NFTBalanceSuite.*
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -43,7 +43,7 @@ class NFTBalanceSuite extends BaseFreeSpec {
     val fundAndIssue =
       for {
         _      <- traverse(nodes)(_.waitForHeight(2))
-        fundTx <- node.transfer(node.address, issuer.toAddress.toString, 1000.waves, 0.001.waves)
+        fundTx <- node.transfer(node.keyPair, issuer.toAddress.toString, 1000.waves, 0.001.waves)
         _      <- node.waitForTransaction(fundTx.id)
         _ <- Future.sequence((simple ++ nft) map { tx =>
           for {
@@ -125,11 +125,10 @@ class NFTBalanceSuite extends BaseFreeSpec {
     "returns error on wrong limit" in {
       val assertion = getNFTPage(node, issuer.toAddress.toString, 10000000, None)
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
-        .recoverWith {
-          case ex: Throwable =>
-            Future.successful {
-              assert(ex.getMessage contains "Too big sequence requested")
-            }
+        .recoverWith { case ex: Throwable =>
+          Future.successful {
+            assert(ex.getMessage contains "Too big sequence requested")
+          }
         }
 
       Await.result(assertion, 10.seconds)
@@ -138,11 +137,10 @@ class NFTBalanceSuite extends BaseFreeSpec {
     "returns error on wrong base58 in after" in {
       val assertion = getNFTPage(node, issuer.toAddress.toString, 100, Some("wr0ngbase58str1ng"))
         .map(_ => org.scalatest.Assertions.fail("BadRequest expected"))
-        .recoverWith {
-          case ex: Throwable =>
-            Future.successful {
-              assert(ex.getMessage contains "Invalid asset id")
-            }
+        .recoverWith { case ex: Throwable =>
+          Future.successful {
+            assert(ex.getMessage contains "Invalid asset id")
+          }
         }
 
       Await.result(assertion, 10.seconds)
@@ -194,12 +192,12 @@ object NFTBalanceSuite {
   }
 
   def fundAddresses(faucet: Node, addrs: String*): Unit = {
-    import com.wavesplatform.it.api.AsyncHttpApi._
+    import com.wavesplatform.it.api.AsyncHttpApi.*
 
     val transactions =
       Future.sequence(addrs map { addr =>
         NodeAsyncHttpApi(faucet)
-          .transfer(faucet.address, addr, 1000.waves, 0.001.waves)
+          .transfer(faucet.keyPair, addr, 1000.waves, 0.001.waves)
           .flatMap { tx =>
             NodeAsyncHttpApi(faucet)
               .waitForTransaction(tx.id, retryInterval = 1.second)
@@ -237,7 +235,7 @@ object NFTBalanceSuite {
     loop(None, Nil)
   }
 
-  //returns asset ids from addresses portfolio
+  // returns asset ids from addresses portfolio
   def getPortfolio(node: Node, address: String): Future[List[String]] = {
     node
       .get(s"/assets/balance/$address")
