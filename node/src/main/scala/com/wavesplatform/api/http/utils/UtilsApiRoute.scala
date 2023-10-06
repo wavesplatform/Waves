@@ -1,4 +1,5 @@
 package com.wavesplatform.api.http.utils
+
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
@@ -24,7 +25,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.utils.Time
 import monix.execution.Scheduler
@@ -58,7 +58,7 @@ case class UtilsApiRoute(
       FeeValidation.ScriptExtraFee
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
+    decompile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -84,28 +84,6 @@ case class UtilsApiRoute(
               Json.obj(wrapped*)
             )
           }
-      }
-    }
-  }
-
-  // Deprecated
-  def compile: Route = path("script" / "compile") {
-    (post & entity(as[String])) { code =>
-      parameter("assetScript".as[Boolean] ? false) { isAssetScript =>
-        executeLimited(ScriptCompiler(code, isAssetScript, estimator())) { result =>
-          complete(
-            result.fold(
-              e => ScriptCompilerError(e),
-              { case (script, complexity) =>
-                Json.obj(
-                  "script"     -> script.bytes().base64,
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
-                )
-              }
-            )
-          )
-        }
       }
     }
   }
@@ -296,7 +274,7 @@ case class UtilsApiRoute(
           },
           { case (result, complexity, log, scriptResult) =>
             val intAsString = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
-            val traceObj = if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj()
+            val traceObj    = if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj()
             traceObj ++ Json.obj(
               "result"       -> ScriptValuesJson.serializeValue(result, intAsString),
               "complexity"   -> complexity,
@@ -329,10 +307,10 @@ case class UtilsApiRoute(
 }
 
 object UtilsApiRoute {
-  val MaxSeedSize      = 1024
-  val DefaultSeedSize  = 32
-  val DefaultPublicKey = PublicKey(ByteStr(new Array[Byte](32)))
-  val DefaultAddress   = DefaultPublicKey.toAddress
+  val MaxSeedSize                 = 1024
+  val DefaultSeedSize             = 32
+  val DefaultPublicKey: PublicKey = PublicKey(ByteStr(new Array[Byte](32)))
+  val DefaultAddress: Address     = DefaultPublicKey.toAddress
 
   object WrongJson                   extends ValidationError
   object ConflictingRequestStructure extends ValidationError

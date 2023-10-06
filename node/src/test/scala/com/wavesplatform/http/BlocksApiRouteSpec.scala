@@ -75,14 +75,6 @@ class BlocksApiRouteSpec
   (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
   (blocksApi.meta _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
 
-  routePath("/first") in {
-    (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
-    Get(routePath("/first")) ~> route ~> check {
-      val response = responseAs[JsObject]
-      response shouldBe testBlock1Json
-    }
-  }
-
   routePath("/last") in {
     (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
@@ -108,25 +100,6 @@ class BlocksApiRouteSpec
     (blocksApi.blockAtHeight _).expects(3).returning(None).once()
     Get(routePath("/at/3")) ~> route ~> check {
       response.status shouldBe StatusCodes.NotFound
-      responseAs[String] should include("block does not exist")
-    }
-  }
-
-  routePath("/signature/{signature}") in {
-    (blocksApi.block _).expects(testBlock1.id()).returning(Some(testBlock1Meta -> Seq.empty)).once()
-    (blocksApi.block _).expects(testBlock2.id()).returning(Some(testBlock2Meta -> Seq.empty)).once()
-    Get(routePath(s"/signature/${testBlock1.id()}")) ~> route ~> check {
-      val response = responseAs[JsObject]
-      response shouldBe testBlock1Json
-    }
-
-    Get(routePath(s"/signature/${testBlock2.id()}")) ~> route ~> check {
-      val response = responseAs[JsObject]
-      response shouldBe testBlock2Json
-    }
-
-    Get(routePath(s"/signature/$invalidBlockId")) ~> route ~> check {
-      response.status.isFailure() shouldBe true
       responseAs[String] should include("block does not exist")
     }
   }
