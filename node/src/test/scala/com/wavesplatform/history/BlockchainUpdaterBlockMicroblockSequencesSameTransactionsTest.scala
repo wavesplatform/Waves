@@ -24,7 +24,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
           d.blockchainUpdater.processBlock(gen) should beRight
           bmb.foreach { case (b, mbs) =>
             d.blockchainUpdater.processBlock(b) should beRight
-            mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb) should beRight)
+            mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb, None) should beRight)
           }
           d.blockchainUpdater.processBlock(last)
           d.balance(last.header.generator.toAddress)
@@ -50,7 +50,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
       val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
       domain.blockchainUpdater.processBlock(genBlock) should beRight
       domain.blockchainUpdater.processBlock(base) should beRight
-      domain.blockchainUpdater.processMicroBlock(micros.head) should beRight
+      domain.blockchainUpdater.processMicroBlock(micros.head, None) should beRight
       domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
       domain.balance(miner.toAddress) shouldBe payment.fee.value
@@ -80,7 +80,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
       val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
       domain.blockchainUpdater.processBlock(genBlock) should beRight
       domain.blockchainUpdater.processBlock(base) should beRight
-      micros.foreach(domain.blockchainUpdater.processMicroBlock(_) should beRight)
+      micros.foreach(domain.blockchainUpdater.processMicroBlock(_, None) should beRight)
       domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
       domain.rocksDBWriter.lastBlock.get.transactionData shouldBe microBlockTxs.flatten

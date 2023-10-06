@@ -39,10 +39,11 @@ object RDB extends StrictLogging {
     val dbDir = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles          = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
-    val txMetaCfOptions  = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txCfOptions      = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val handles             = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -66,7 +67,7 @@ object RDB extends StrictLogging {
         ),
         new ColumnFamilyDescriptor(
           "transactions-snapshot".utf8Bytes,
-          txCfOptions.options
+          txSnapshotCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions-snapshot").toPath, 0L)).asJava)
         )
       ).asJava,
@@ -78,7 +79,7 @@ object RDB extends StrictLogging {
       new TxMetaHandle(handles.get(1)),
       new TxHandle(handles.get(2)),
       new TxHandle(handles.get(3)),
-      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources
+      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources
     )
   }
 

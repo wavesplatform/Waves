@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import io.netty.channel.Channel
@@ -21,20 +21,23 @@ object BlockStats {
   private sealed abstract class Event extends Named
 
   private object Event {
-    case object Inv      extends Event
-    case object Received extends Event
-    case object Replaced extends Event
-    case object Applied  extends Event
-    case object Appended extends Event
-    case object Declined extends Event
-    case object Mined    extends Event
+    case object Inv        extends Event
+    case object Received   extends Event
+    case object Replaced   extends Event
+    case object Applied    extends Event
+    case object Appended   extends Event
+    case object Declined   extends Event
+    case object Mined      extends Event
+    case object Challenged extends Event
   }
 
   private sealed abstract class Type extends Named
 
   private object Type {
-    case object Block extends Type
-    case object Micro extends Type
+    case object Block         extends Type
+    case object Micro         extends Type
+    case object BlockSnapshot extends Type
+    case object MicroSnapshot extends Type
   }
 
   sealed abstract class Source extends Named
@@ -48,6 +51,13 @@ object BlockStats {
     block(b, source)
       .addField("from", nodeName(ch))
       .addField("bt", b.header.baseTarget),
+    Event.Received,
+    Seq.empty
+  )
+
+  def received(s: BlockSnapshot, source: Source, ch: Channel): Unit = write(
+    blockSnapshot(s, source)
+      .addField("from", nodeName(ch)),
     Event.Received,
     Seq.empty
   )
@@ -74,15 +84,11 @@ object BlockStats {
     Seq.empty
   )
 
-  def mined(b: Block, baseHeight: Int): Unit = write(
-    block(b, Source.Broadcast)
-      .tag("parent-id", id(b.header.reference))
-      .addField("txs", b.transactionData.size)
-      .addField("bt", b.header.baseTarget)
-      .addField("height", baseHeight),
-    Event.Mined,
-    Seq.empty
-  )
+  def mined(b: Block, baseHeight: Int): Unit =
+    blockForged(b, baseHeight, Event.Mined)
+
+  def challenged(b: Block, baseHeight: Int): Unit =
+    blockForged(b, baseHeight, Event.Challenged)
 
   def appended(b: Block, complexity: Long): Unit = write(
     measurement(Type.Block)
@@ -98,6 +104,13 @@ object BlockStats {
       .tag("parent-id", id(m.reference))
       .addField("from", nodeName(ch)),
     Event.Inv,
+    Seq.empty
+  )
+
+  def received(m: MicroBlockSnapshot, ch: Channel, blockId: BlockId): Unit = write(
+    microBlockSnapshot(blockId)
+      .addField("from", nodeName(ch)),
+    Event.Received,
     Seq.empty
   )
 
@@ -130,6 +143,16 @@ object BlockStats {
     Seq.empty
   )
 
+  private def blockForged(b: Block, baseHeight: Int, event: Event): Unit = write(
+    block(b, Source.Broadcast)
+      .tag("parent-id", id(b.header.reference))
+      .addField("txs", b.transactionData.size)
+      .addField("bt", b.header.baseTarget)
+      .addField("height", baseHeight),
+    event,
+    Seq.empty
+  )
+
   private def block(b: Block, source: Source): Point.Builder = {
     val isWhitelistMiner = {
       val whitelistAddrs = Set(
@@ -149,6 +172,16 @@ object BlockStats {
       .tag("source", source.name)
       .tag("whitelist", isWhitelistMiner.toString)
   }
+
+  private def blockSnapshot(s: BlockSnapshot, source: Source): Point.Builder = {
+    measurement(Type.BlockSnapshot)
+      .tag("id", id(s.blockId))
+      .tag("source", source.name)
+  }
+
+  private def microBlockSnapshot(totalBlockId: BlockId): Point.Builder =
+    measurement(Type.MicroSnapshot)
+      .tag("id", id(totalBlockId))
 
   private def micro(blockId: BlockId): Point.Builder =
     measurement(Type.Micro)

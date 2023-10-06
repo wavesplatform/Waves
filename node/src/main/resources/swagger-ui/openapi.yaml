@@ -2470,39 +2470,6 @@ paths:
                     type: string
                   balance:
                     type: string
-  '/assets/{assetId}/distribution':
-    get:
-      tags:
-        - assets
-      summary: Asset balance distribution
-      description: Get asset balance distribution by addresses
-      operationId: getAssetDistributionOld
-      parameters:
-        - $ref: '#/components/parameters/assetId'
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: integer
-                  format: int64
-                description: map of assetId <-> balance
-                example:
-                  2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: 15
-                  3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: 25
-            application/json;large-significand-format=string:
-              schema:
-                type: object
-                additionalProperties:
-                  type: string
-                description: map of assetId <-> balance
-                example:
-                  2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: "15"
-                  3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: "25"
-      deprecated: true
   '/assets/{assetId}/distribution/{height}/limit/{limit}':
     get:
       tags:
@@ -3041,31 +3008,6 @@ paths:
       security:
         - APIKey: [ ]
       x-codegen-request-body-name: address
-  '/debug/rollback-to/{id}':
-    delete:
-      tags:
-        - debug
-      summary: Block id
-      description: Rollback the state to the block with a given ID
-      operationId: rollbackToId
-      parameters:
-        - $ref: '#/components/parameters/blockId'
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                required:
-                  - BlockId
-                type: object
-                properties:
-                  BlockId:
-                    type: string
-        '403':
-          $ref: '#/components/responses/ApiKeyNotValid'
-      security:
-        - APIKey: [ ]
   /debug/validate:
     post:
       tags:
