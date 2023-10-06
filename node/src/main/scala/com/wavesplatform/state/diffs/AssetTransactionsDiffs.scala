@@ -89,7 +89,7 @@ object AssetTransactionsDiffs {
       cond(
         !b.isFeatureActivated(BlockRewardDistribution) || script.bytes().size <= MaxExprSizeInBytes,
         (),
-        GenericError("Invalid script")
+        GenericError(s"Script is too large: ${script.bytes().size} bytes > $MaxExprSizeInBytes bytes")
       )
     }
 

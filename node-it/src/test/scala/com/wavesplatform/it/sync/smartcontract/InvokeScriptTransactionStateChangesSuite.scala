@@ -25,9 +25,6 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   var initCallerTxs: Long               = 0
   var initDAppTxs: Long                 = 0
   var initRecipientTxs: Long            = 0
-  var initCallerStateChanges: Long      = 0
-  var initDAppStateChanges: Long        = 0
-  var initRecipientStateChanges: Long   = 0
 
   private lazy val contractAddress: String  = contract.toAddress.toString
   private lazy val recipientAddress: String = recipient.toAddress.toString
@@ -58,23 +55,19 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     sender.waitForHeight(txInfo.height + 1)
 
-    val callerTxs          = sender.transactionsByAddress(callerAddress, 100)
-    val dAppTxs            = sender.transactionsByAddress(contractAddress, 100)
-    val txStateChanges     = sender.stateChanges(id)
-    val callerStateChanges = sender.debugStateChangesByAddress(callerAddress, 100)
-    val dAppStateChanges   = sender.debugStateChangesByAddress(contractAddress, 100)
+    val callerTxs      = sender.transactionsByAddress(callerAddress, 100)
+    val dAppTxs        = sender.transactionsByAddress(contractAddress, 100)
+    val txStateChanges = sender.stateChanges(id)
 
     callerTxs.length shouldBe initCallerTxs + 1
-    callerTxs.length shouldBe callerStateChanges.length
     dAppTxs.length shouldBe initDAppTxs + 1
-    dAppTxs.length shouldBe dAppStateChanges.length
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
     val expected = StateChangesDetails(Seq(DataResponse.put("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
-    callerStateChanges.head.stateChanges.get shouldBe expected
-    dAppStateChanges.head.stateChanges.get shouldBe expected
+    callerTxs.head.stateChanges.get shouldBe expected
+    dAppTxs.head.stateChanges.get shouldBe expected
   }
 
   test("sponsored by dApp") {
@@ -92,35 +85,26 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
-    val callerTxs             = sender.transactionsByAddress(callerAddress, 100)
-    val dAppTxs               = sender.transactionsByAddress(contractAddress, 100)
-    val recipientTxs          = sender.transactionsByAddress(recipientAddress, 100)
-    val txStateChanges        = sender.stateChanges(invokeTx._1.id)
-    val callerStateChanges    = sender.debugStateChangesByAddress(callerAddress, 100)
-    val dAppStateChanges      = sender.debugStateChangesByAddress(contractAddress, 100)
-    val recipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100)
+    val txInfo         = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
+    val callerTxs      = sender.transactionsByAddress(callerAddress, 100)
+    val dAppTxs        = sender.transactionsByAddress(contractAddress, 100)
+    val recipientTxs   = sender.transactionsByAddress(recipientAddress, 100)
+    val txStateChanges = sender.stateChanges(invokeTx._1.id)
 
     callerTxs.length shouldBe initCallerTxs + 2
-    callerTxs.length shouldBe callerStateChanges.length
     dAppTxs.length shouldBe initDAppTxs + 2
-    dAppTxs.length shouldBe dAppStateChanges.length
     recipientTxs.length shouldBe initRecipientTxs + 1
-    recipientTxs.length shouldBe recipientStateChanges.length
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
     txInfoShouldBeEqual(callerTxs.head, txStateChanges)
     txInfoShouldBeEqual(dAppTxs.head, txStateChanges)
     txInfoShouldBeEqual(recipientTxs.head, txStateChanges)
-    txInfoShouldBeEqual(txInfo, callerStateChanges.head)
-    txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
-    txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
     val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipientAddress, Some(simpleAsset), 10)), Seq(), Seq(), Seq(), Seq(), None)
     txStateChanges.stateChanges.get shouldBe expected
-    callerStateChanges.head.stateChanges.get shouldBe expected
-    dAppStateChanges.head.stateChanges.get shouldBe expected
-    recipientStateChanges.head.stateChanges.get shouldBe expected
+    callerTxs.head.stateChanges.get shouldBe expected
+    dAppTxs.head.stateChanges.get shouldBe expected
+    recipientTxs.head.stateChanges.get shouldBe expected
   }
 
   test("sponsored by recipient") {
@@ -134,29 +118,20 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
-    val callerTxs             = sender.transactionsByAddress(callerAddress, 100)
-    val dAppTxs               = sender.transactionsByAddress(contractAddress, 100)
-    val recipientTxs          = sender.transactionsByAddress(recipientAddress, 100)
-    val txStateChanges        = sender.stateChanges(invokeTx._1.id)
-    val callerStateChanges    = sender.debugStateChangesByAddress(callerAddress, 100)
-    val dAppStateChanges      = sender.debugStateChangesByAddress(contractAddress, 100)
-    val recipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100)
+    val txInfo         = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
+    val callerTxs      = sender.transactionsByAddress(callerAddress, 100)
+    val dAppTxs        = sender.transactionsByAddress(contractAddress, 100)
+    val recipientTxs   = sender.transactionsByAddress(recipientAddress, 100)
+    val txStateChanges = sender.stateChanges(invokeTx._1.id)
 
     callerTxs.length shouldBe initCallerTxs + 3
-    callerTxs.length shouldBe callerStateChanges.length
     dAppTxs.length shouldBe initDAppTxs + 3
-    dAppTxs.length shouldBe dAppStateChanges.length
     recipientTxs.length shouldBe initRecipientTxs + 2
-    recipientTxs.length shouldBe recipientStateChanges.length
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
     txInfoShouldBeEqual(callerTxs.head, txStateChanges)
     txInfoShouldBeEqual(dAppTxs.head, txStateChanges)
     txInfoShouldBeEqual(recipientTxs.head, txStateChanges)
-    txInfoShouldBeEqual(txInfo, callerStateChanges.head)
-    txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
-    txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
     val expected = StateChangesDetails(
       Seq(DataResponse.put("integer", 7, "result")),
@@ -168,8 +143,8 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       None
     )
     txStateChanges.stateChanges.get shouldBe expected
-    callerStateChanges.head.stateChanges.get shouldBe expected
-    dAppStateChanges.head.stateChanges.get shouldBe expected
+    callerTxs.head.stateChanges.get shouldBe expected
+    dAppTxs.head.stateChanges.get shouldBe expected
   }
 
   test("None on wrong tx type") {
@@ -253,7 +228,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     val expectedTransferResponses = Seq(TransfersInfoResponse(callerAddress, None, 1), TransfersInfoResponse(callerAddress, None, 2))
 
     val idStateChanges1      = sender.stateChanges(invokeTx1._1.id).stateChanges
-    val addressStateChanges1 = sender.debugStateChangesByAddress(callerAddress, 1).head.stateChanges
+    val addressStateChanges1 = sender.transactionsByAddress(callerAddress, 1).head.stateChanges
 
     Seq(idStateChanges1, addressStateChanges1).foreach { actualStateChanges =>
       actualStateChanges.get.data shouldBe expectedDataResponses
@@ -284,7 +259,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     val expectedBurnResponses = Seq(BurnInfoResponse(simpleAsset, 3), BurnInfoResponse(assetSponsoredByDApp, 4))
 
     val idStateChanges2      = sender.stateChanges(invokeTx2._1.id).stateChanges
-    val addressStateChanges2 = sender.debugStateChangesByAddress(callerAddress, 1).head.stateChanges
+    val addressStateChanges2 = sender.transactionsByAddress(callerAddress, 1).head.stateChanges
 
     Seq(idStateChanges2, addressStateChanges2).foreach { actualStateChanges =>
       actualStateChanges.get.sponsorFees shouldBe expectedSponsorFeeResponses
@@ -360,12 +335,6 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     initCallerTxs = sender.transactionsByAddress(callerAddress, 100).length
     initDAppTxs = sender.transactionsByAddress(contractAddress, 100).length
     initRecipientTxs = sender.transactionsByAddress(recipientAddress, 100).length
-    initCallerStateChanges = sender.debugStateChangesByAddress(callerAddress, 100).length
-    initDAppStateChanges = sender.debugStateChangesByAddress(contractAddress, 100).length
-    initRecipientStateChanges = sender.debugStateChangesByAddress(recipientAddress, 100).length
-    initCallerTxs shouldBe initCallerStateChanges
-    initDAppTxs shouldBe initDAppStateChanges
-    initRecipientTxs shouldBe initRecipientStateChanges
   }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: StateChanges)(implicit pos: Position): Unit = {

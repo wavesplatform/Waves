@@ -2,21 +2,20 @@ package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
-
 import scala.util.Try
-
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto._
+import com.wavesplatform.crypto.*
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.mining.MiningConstraints
-import com.wavesplatform.network.message._
-import com.wavesplatform.network.message.Message._
+import com.wavesplatform.network.message.*
+import com.wavesplatform.network.message.Message.*
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock}
+import com.wavesplatform.protobuf.snapshot.{BlockSnapshot as PBBlockSnapshot, MicroBlockSnapshot as PBMicroBlockSnapshot}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.transaction.{DataTransaction, EthereumTransaction, Transaction, TransactionParsers}
 
@@ -67,9 +66,8 @@ object PeersSpec extends MessageSpec[KnownPeers] {
       address     <- Option(inetAddress.getAddress)
     } yield (address.getAddress, inetAddress.getPort)
 
-    xs.foldLeft(lengthBytes) {
-      case (bs, (peerAddress, peerPort)) =>
-        Bytes.concat(bs, peerAddress, Ints.toByteArray(peerPort))
+    xs.foldLeft(lengthBytes) { case (bs, (peerAddress, peerPort)) =>
+      Bytes.concat(bs, peerAddress, Ints.toByteArray(peerPort))
     }
   }
 }
@@ -114,12 +112,11 @@ trait BlockIdSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
     require(bytes.length <= Ints.BYTES + (length * SignatureLength) + length, "Data does not match length")
 
-    val (_, arrays) = (0 until length).foldLeft((Ints.BYTES, Seq.empty[Array[Byte]])) {
-      case ((pos, arrays), _) =>
-        val length = bytes(pos)
-        val result = bytes.slice(pos + 1, pos + 1 + length)
-        require(result.length == length, "Data does not match length")
-        (pos + length + 1, arrays :+ result)
+    val (_, arrays) = (0 until length).foldLeft((Ints.BYTES, Seq.empty[Array[Byte]])) { case ((pos, arrays), _) =>
+      val length = bytes(pos)
+      val result = bytes.slice(pos + 1, pos + 1 + length)
+      require(result.length == length, "Data does not match length")
+      (pos + length + 1, arrays :+ result)
     }
     wrap(arrays)
   }
@@ -129,9 +126,8 @@ trait BlockIdSeqSpec[A <: AnyRef] extends MessageSpec[A] {
     val length      = signatures.size
     val lengthBytes = Ints.toByteArray(length)
 
-    signatures.foldLeft(lengthBytes) {
-      case (bs, sig) =>
-        Bytes.concat(bs, Array(sig.length.ensuring(_.isValidByte).toByte), sig)
+    signatures.foldLeft(lengthBytes) { case (bs, sig) =>
+      Bytes.concat(bs, Array(sig.length.ensuring(_.isValidByte).toByte), sig)
     }
   }
 }
@@ -295,7 +291,7 @@ object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
 object PBTransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 31: Byte
 
-  //624 + DataTransaction.MaxProtoBytes + 5 + 100 // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
+  // 624 + DataTransaction.MaxProtoBytes + 5 + 100 // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
   override val maxLength: Int = (DataTransaction.MaxBytes * 1.2).toInt
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
@@ -305,13 +301,59 @@ object PBTransactionSpec extends MessageSpec[Transaction] {
     PBTransactions.toByteArray(data)
 }
 
+object GetSnapsnotSpec extends MessageSpec[GetSnapshot] {
+  override val messageCode: MessageCode = 34: Byte
+
+  override val maxLength: Int = SignatureLength
+
+  override def serializeData(msg: GetSnapshot): Array[Byte] = msg.blockId.arr
+
+  override def deserializeData(bytes: Array[Byte]): Try[GetSnapshot] = Try {
+    require(Block.validateReferenceLength(bytes.length), "Data does not match length")
+    GetSnapshot(ByteStr(bytes))
+  }
+}
+
+object MicroSnapshotRequestSpec extends MessageSpec[MicroSnapshotRequest] {
+  override val messageCode: MessageCode = 35: Byte
+
+  override def deserializeData(bytes: Array[Byte]): Try[MicroSnapshotRequest] =
+    Try(MicroSnapshotRequest(ByteStr(bytes)))
+
+  override def serializeData(req: MicroSnapshotRequest): Array[Byte] = req.totalBlockId.arr
+
+  override val maxLength: Int = SignatureLength
+}
+
+object BlockSnapshotResponseSpec extends MessageSpec[BlockSnapshotResponse] {
+  override val messageCode: MessageCode = 36: Byte
+
+  override def deserializeData(bytes: Array[Byte]): Try[BlockSnapshotResponse] =
+    Try(BlockSnapshotResponse.fromProtobuf(PBBlockSnapshot.parseFrom(bytes)))
+
+  override def serializeData(data: BlockSnapshotResponse): Array[Byte] = data.toProtobuf.toByteArray
+
+  override val maxLength: Int = NetworkServer.MaxFrameLength
+}
+
+object MicroBlockSnapshotResponseSpec extends MessageSpec[MicroBlockSnapshotResponse] {
+  override val messageCode: MessageCode = 37: Byte
+
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockSnapshotResponse] =
+    Try(MicroBlockSnapshotResponse.fromProtobuf(PBMicroBlockSnapshot.parseFrom(bytes)))
+
+  override def serializeData(data: MicroBlockSnapshotResponse): Array[Byte] = data.toProtobuf.toByteArray
+
+  override val maxLength: Int = NetworkServer.MaxFrameLength
+}
+
 // Virtual, only for logs
 object HandshakeSpec {
   val messageCode: MessageCode = 101: Byte
 }
 
 object BasicMessagesRepo {
-  type Spec = MessageSpec[_ <: AnyRef]
+  type Spec = MessageSpec[? <: AnyRef]
 
   val specs: Seq[Spec] = Seq(
     GetPeersSpec,
@@ -329,9 +371,13 @@ object BasicMessagesRepo {
     PBMicroBlockSpec,
     PBTransactionSpec,
     GetBlockIdsSpec,
-    BlockIdsSpec
+    BlockIdsSpec,
+    GetSnapsnotSpec,
+    MicroSnapshotRequestSpec,
+    BlockSnapshotResponseSpec,
+    MicroBlockSnapshotResponseSpec
   )
 
-  val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode  -> s).toMap
-  val specsByClasses: Map[Class[_], Spec] = specs.map(s => s.contentClass -> s).toMap
+  val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode -> s).toMap
+  val specsByClasses: Map[Class[?], Spec] = specs.map(s => s.contentClass -> s).toMap
 }

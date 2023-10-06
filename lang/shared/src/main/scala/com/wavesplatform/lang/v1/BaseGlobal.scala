@@ -112,7 +112,7 @@ trait BaseGlobal {
       estimator: ScriptEstimator
   ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     (for {
-      compRes <- ExpressionCompiler.compileWithParseResult(input, offset, context)
+      compRes <- ExpressionCompiler.compileWithParseResult(input, offset, context, stdLibVersion)
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3").leftMap((_, 0, 0))
@@ -165,7 +165,7 @@ trait BaseGlobal {
   val compileFreeCall
       : (String, LibrariesOffset, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     (input, offset, ctx, version, scriptType, estimator) =>
-      compile(input, offset, ctx, version, scriptType, estimator, ContractCompiler.compileFreeCall(_, _, _, version))
+      compile(input, offset, ctx, version, scriptType, estimator, ContractCompiler.compileFreeCall)
 
   val compileDecls
       : (String, LibrariesOffset, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
@@ -178,11 +178,11 @@ trait BaseGlobal {
       version: StdLibVersion,
       scriptType: ScriptType,
       estimator: ScriptEstimator,
-      compiler: (String, LibrariesOffset, CompilerContext) => Either[String, EXPR]
+      compiler: (String, LibrariesOffset, CompilerContext, StdLibVersion) => Either[String, EXPR]
   ): Either[String, (Array[Byte], EXPR, Long)] = {
     val isFreeCall = scriptType == Call
     for {
-      expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, offset, context, version) else compiler(input, offset, context)
+      expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, offset, context, version) else compiler(input, offset, context, version)
       bytes = serializeExpression(expr, version)
       _          <- ExprScript.validateBytes(bytes, isFreeCall)
       complexity <- ExprScript.estimate(expr, version, isFreeCall, estimator, scriptType == Account)

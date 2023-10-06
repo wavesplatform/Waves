@@ -5,8 +5,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import io.grpc.{Metadata, Status => GrpcStatus}
-import play.api.libs.json._
+import io.grpc.{Metadata, Status as GrpcStatus}
+import play.api.libs.json.*
 
 import scala.util.{Failure, Success}
 
@@ -333,7 +333,8 @@ case class TransactionInfo(
     transfers: Option[Seq[Transfer]],
     totalAmount: Option[Long],
     expression: Option[String],
-    stateChanges: Option[StateChangesDetails]
+    stateChanges: Option[StateChangesDetails],
+    applicationStatus: Option[String]
 ) extends TxInfo
 object TransactionInfo {
   implicit val transactionReads: Reads[TransactionInfo] =
@@ -363,6 +364,7 @@ object TransactionInfo {
         totalAmount          <- (jsv \ "totalAmount").validateOpt[Long]
         expression           <- (jsv \ "expression").validateOpt[String]
         stateChanges         <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+        applicationStatus    <- (jsv \ "applicationStatus").validateOpt[String]
       } yield TransactionInfo(
         _type,
         id,
@@ -387,7 +389,8 @@ object TransactionInfo {
         transfers,
         totalAmount,
         expression,
-        stateChanges
+        stateChanges,
+        applicationStatus
       )
     )
 }
@@ -799,10 +802,11 @@ case class Block(
     reward: Option[Long],
     desiredReward: Option[Long],
     vrf: Option[String],
+    challengedHeader: Option[ChallengedBlockHeader],
     version: Option[Byte] = None
 )
 object Block {
-  import PublicKey._
+  import PublicKey.*
 
   implicit val blockFormat: Format[Block] = Format(
     Reads(jsv =>
@@ -827,6 +831,7 @@ object Block {
         baseTarget          <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot    <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf                 <- (jsv \ "VRF").validateOpt[String]
+        challengedHeader    <- (jsv \ "challengedHeader").validateOpt[ChallengedBlockHeader]
       } yield Block(
         id,
         signature,
@@ -847,6 +852,7 @@ object Block {
         reward,
         desiredReward,
         vrf,
+        challengedHeader,
         version
       )
     ),
@@ -870,6 +876,7 @@ case class BlockHeader(
     desiredReward: Option[Long],
     totalFee: Long,
     vrf: Option[String],
+    challengedHeader: Option[ChallengedBlockHeader],
     version: Option[Byte] = None
 )
 object BlockHeader {
@@ -892,6 +899,7 @@ object BlockHeader {
         baseTarget          <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot    <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf                 <- (jsv \ "VRF").validateOpt[String]
+        challengedHeader    <- (jsv \ "challengedHeader").validateOpt[ChallengedBlockHeader]
       } yield BlockHeader(
         id,
         signature,
@@ -908,11 +916,24 @@ object BlockHeader {
         desiredReward,
         totalFee,
         vrf,
+        challengedHeader,
         version
       )
     ),
     Json.writes[BlockHeader]
   )
+}
+
+case class ChallengedBlockHeader(
+    headerSignature: String,
+    features: Set[Short],
+    generator: String,
+    generatorPublicKey: String,
+    desiredReward: Long,
+    stateHash: Option[String]
+)
+object ChallengedBlockHeader {
+  implicit val challengedBlockHeaderFormat: Format[ChallengedBlockHeader] = Json.format
 }
 
 case class GenerationSignatureResponse(generationSignature: String)

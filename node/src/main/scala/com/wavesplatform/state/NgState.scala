@@ -17,14 +17,14 @@ object NgState {
     def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
 
-  case class CachedMicroDiff(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, timestamp: Long)
+  case class CachedMicroDiff(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, computedStateHash: ByteStr, timestamp: Long)
 
   class NgStateCaches {
-    val blockDiffCache = CacheBuilder
+    val blockSnapshotCache = CacheBuilder
       .newBuilder()
       .maximumSize(NgState.MaxTotalDiffs)
       .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build[BlockId, (StateSnapshot, Long, Long)]()
+      .build[BlockId, (StateSnapshot, Long, Long, ByteStr)]()
 
     val forgedBlockCache = CacheBuilder
       .newBuilder()
@@ -37,7 +37,7 @@ object NgState {
 
     def invalidate(newBlockId: BlockId): Unit = {
       forgedBlockCache.invalidateAll()
-      blockDiffCache.invalidate(newBlockId)
+      blockSnapshotCache.invalidate(newBlockId)
       bestBlockCache = None
     }
   }
@@ -50,6 +50,7 @@ case class NgState(
     baseBlockSnapshot: StateSnapshot,
     baseBlockCarry: Long,
     baseBlockTotalFee: Long,
+    baseBlockComputedStateHash: ByteStr,
     approvedFeatures: Set[Short],
     reward: Option[Long],
     hitSource: ByteStr,
@@ -66,26 +67,26 @@ case class NgState(
 
   def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
-  def snapshotFor(totalResBlockRef: BlockId): (StateSnapshot, Long, Long) = {
-    val (diff, carry, totalFee) =
+  def snapshotFor(totalResBlockRef: BlockId): (StateSnapshot, Long, Long, ByteStr) = {
+    val (snapshot, carry, totalFee, computedStateHash) =
       if (totalResBlockRef == base.id())
-        (baseBlockSnapshot, baseBlockCarry, baseBlockTotalFee)
+        (baseBlockSnapshot, baseBlockCarry, baseBlockTotalFee, baseBlockComputedStateHash)
       else
-        internalCaches.blockDiffCache.get(
+        internalCaches.blockSnapshotCache.get(
           totalResBlockRef,
           { () =>
             microBlocks.find(_.idEquals(totalResBlockRef)) match {
               case Some(MicroBlockInfo(blockId, current)) =>
-                val (prevDiff, prevCarry, prevTotalFee)                   = this.snapshotFor(current.reference)
-                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microSnapshots(blockId)
-                (prevDiff |+| currDiff, prevCarry + currCarry, prevTotalFee + currTotalFee)
+                val (prevSnapshot, prevCarry, prevTotalFee, _)                                       = this.snapshotFor(current.reference)
+                val CachedMicroDiff(currSnapshot, currCarry, currTotalFee, currComputedStateHash, _) = this.microSnapshots(blockId)
+                (prevSnapshot |+| currSnapshot, prevCarry + currCarry, prevTotalFee + currTotalFee, currComputedStateHash)
 
               case None =>
-                (StateSnapshot.empty, 0L, 0L)
+                (StateSnapshot.empty, 0L, 0L, ByteStr.empty)
             }
           }
         )
-    (diff, carry, totalFee)
+    (snapshot, carry, totalFee, computedStateHash)
   }
 
   def bestLiquidBlockId: BlockId =
@@ -111,15 +112,20 @@ case class NgState(
           block
       }
 
-  def snapshotOf(id: BlockId): Option[(Block, StateSnapshot, Long, Long, DiscardedMicroBlocks)] =
+  def snapshotOf(id: BlockId): Option[(Block, StateSnapshot, Long, Long, ByteStr, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (block, discarded) =>
-      val (diff, carry, totalFee) = this.snapshotFor(id)
-      (block, diff, carry, totalFee, discarded)
+      val (snapshot, carry, totalFee, computedStateHash) = this.snapshotFor(id)
+      (block, snapshot, carry, totalFee, computedStateHash, discarded)
     }
 
-  def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = snapshotFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
+  def bestLiquidSnapshotAndFees: (StateSnapshot, Long, Long) = {
+    val (snapshot, carry, fee, _) = snapshotFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
+    (snapshot, carry, fee)
+  }
 
   def bestLiquidSnapshot: StateSnapshot = bestLiquidSnapshotAndFees._1
+
+  def bestLiquidComputedStateHash: ByteStr = snapshotFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))._4
 
   def allSnapshots: Seq[(MicroBlock, StateSnapshot)] =
     microBlocks.toVector.map(mb => mb.microBlock -> microSnapshots(mb.totalBlockId).snapshot).reverse
@@ -144,12 +150,14 @@ case class NgState(
       microblockCarry: Long,
       microblockTotalFee: Long,
       timestamp: Long,
+      computedStateHash: ByteStr,
       totalBlockId: Option[BlockId] = None
   ): NgState = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
-    val microSnapshots = this.microSnapshots + (blockId -> CachedMicroDiff(snapshot, microblockCarry, microblockTotalFee, timestamp))
-    val microBlocks    = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
+    val microSnapshots =
+      this.microSnapshots + (blockId -> CachedMicroDiff(snapshot, microblockCarry, microblockTotalFee, computedStateHash, timestamp))
+    val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
     this.copy(microSnapshots = microSnapshots, microBlocks = microBlocks)
   }

@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -55,7 +55,7 @@ class MinerImpl(
     blockchainUpdater: Blockchain & BlockchainUpdater & NG,
     settings: WavesSettings,
     timeService: Time,
-    utx: UtxPoolImpl,
+    utx: UtxPool,
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
@@ -84,7 +84,7 @@ class MinerImpl(
     minerScheduler,
     appenderScheduler,
     transactionAdded,
-    utx.priorityPool.nextMicroBlockSize
+    utx.getPriorityPool.map(p => p.nextMicroBlockSize(_)).getOrElse(identity)
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
@@ -140,12 +140,15 @@ class MinerImpl(
       )
       .leftMap(_.toString)
 
-  private def packTransactionsForKeyBlock(miner: Address, prevStateHash: Option[ByteStr]): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
-    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
+  private def packTransactionsForKeyBlock(
+      miner: Address,
+      reference: ByteStr,
+      prevStateHash: Option[ByteStr]
+  ): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
+    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, settings.enableLightMode, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
-      // TODO: NODE-2594 get next block reward
       BlockDiffer
-        .createInitialBlockSnapshot(blockchainUpdater, miner)
+        .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
         .toOption
         .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
     }
@@ -158,7 +161,7 @@ class MinerImpl(
       )
       val unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      (unconfirmed, updatedMdConstraint.constraints.head, stateHash)
+      (unconfirmed, updatedMdConstraint.head, stateHash)
     }
   }
 
@@ -188,11 +191,11 @@ class MinerImpl(
         s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = ${appender.MaxTimeDrift}"
       )
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
-      // TODO: correctly obtain previous state hash on feature activation height
-      prevStateHash = lastBlockHeader.stateHash.filter(_ =>
-        blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchainUpdater.height + 1)
-      )
-      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, prevStateHash)
+      prevStateHash =
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchainUpdater.height + 1))
+          Some(blockchainUpdater.lastStateHash(Some(reference)))
+        else None
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
       block <- Block
         .buildAndSign(
           version,
@@ -285,7 +288,7 @@ class MinerImpl(
         }
 
         def appendTask(block: Block, totalConstraint: MiningConstraint) =
-          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
+          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block, None).flatMap {
             case Left(BlockFromFuture(_)) => // Time was corrected, retry
               generateBlockTask(account, None)
 
@@ -295,8 +298,10 @@ class MinerImpl(
             case Right(Applied(_, score)) =>
               log.debug(s"Forged and applied $block with cumulative score $score")
               BlockStats.mined(block, blockchainUpdater.height)
-              allChannels.broadcast(BlockForged(block))
-              if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+              if (blockchainUpdater.isLastBlockId(block.id())) {
+                allChannels.broadcast(BlockForged(block))
+                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+              }
               Task.unit
 
             case Right(Ignored) =>

@@ -71,7 +71,7 @@ object Explorer extends ScorexLogging {
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val rdb    = RDB.open(settings.dbSettings)
-    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings)
+    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -108,7 +108,7 @@ object Explorer extends ScorexLogging {
             actualTotalReward += Longs.fromByteArray(e.getValue)
           }
 
-          val actualTotalBalance   = balances.values.sum + reader.carryFee
+          val actualTotalBalance   = balances.values.sum + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
           val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 
@@ -222,24 +222,28 @@ object Explorer extends ScorexLogging {
 
         case "S" =>
           log.info("Collecting DB stats")
-          val iterator = rdb.db.newIterator()
-          val result   = new util.HashMap[Short, Stats]
-          iterator.seekToFirst()
-          while (iterator.isValid) {
-            val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
-            val valueLength = iterator.value().length
-            val keyLength   = iterator.key().length
-            result.compute(
-              keyPrefix,
-              (_, maybePrev) =>
-                maybePrev match {
-                  case null => Stats(1, keyLength, valueLength)
-                  case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
-                }
-            )
-            iterator.next()
+
+          val result = new util.HashMap[Short, Stats]
+          Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
+            Using(rdb.db.newIterator(cf)) { iterator =>
+              iterator.seekToFirst()
+
+              while (iterator.isValid) {
+                val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
+                val valueLength = iterator.value().length
+                val keyLength   = iterator.key().length
+                result.compute(
+                  keyPrefix,
+                  (_, maybePrev) =>
+                    maybePrev match {
+                      case null => Stats(1, keyLength, valueLength)
+                      case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
+                    }
+                )
+                iterator.next()
+              }
+            }
           }
-          iterator.close()
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {

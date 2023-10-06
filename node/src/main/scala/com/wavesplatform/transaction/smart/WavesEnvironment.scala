@@ -7,9 +7,10 @@ import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
@@ -249,6 +250,11 @@ class WavesEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+
+  override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = {
+    val hit = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
+    FairPoSCalculator.V2.calculateDelay(BigInt(1, hit), baseTarget, balance)
+  }
 
   private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
     if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward)) {
