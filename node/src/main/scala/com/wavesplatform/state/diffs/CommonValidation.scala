@@ -172,10 +172,13 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) && blockchain.isFeatureActivated(TransactionStateSnapshot) =>
+        Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
+
       case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !TransactionParsers.all.contains((v.tpe.id.toByte, v.version)) =>
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>
