@@ -535,23 +535,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "script").as[String] shouldBe expectedResult
     }
 
-  routePath("/script/compile") in {
-    Post(routePath("/script/compile"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
-      val json           = responseAs[JsValue]
-      val expectedScript = ExprScript(V2, script).explicitGet()
-
-      Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
-      (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
-    }
-
-    Post(routePath("/script/compile"), badScript) ~> route ~> check {
-      val json = responseAs[JsValue]
-      (json \ "error").as[Int] shouldBe 305
-      (json \ "message").as[String] shouldBe "Script estimation was interrupted"
-    }
-  }
-
   routePath("/script/compileCode") in {
     Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
       responseAs[JsValue] should matchJson("""{

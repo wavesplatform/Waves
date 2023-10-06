@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import java.util.concurrent.TimeUnit
 
-import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
 import com.wavesplatform.account.{Alias, KeyPair}
@@ -13,7 +12,6 @@ import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout, handleAllExcepti
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -3481,16 +3479,6 @@ class DebugApiRouteSpec
       intercept[Exception](assert(RideV6)).getMessage should include(
         s"${BlockchainFeatures.ContinuationTransaction.description} feature has not been activated yet"
       )
-    }
-  }
-
-  routePath("/stateChanges/info/") - {
-    "redirects to /transactions/info method" in {
-      val txId = ByteStr.fill(DigestLength)(1)
-      Get(routePath(s"/stateChanges/info/$txId")) ~> route ~> check {
-        status shouldBe StatusCodes.MovedPermanently
-        header(Location.name).map(_.value) shouldBe Some(s"/transactions/info/$txId")
-      }
     }
   }
 

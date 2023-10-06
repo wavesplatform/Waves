@@ -21,10 +21,10 @@ class MicroblocksFeeTestSuite extends BaseFreeSpec {
     def requests(n: Int): Future[Unit] =
       Future
         .sequence {
-          //Not mining node sends transfer transactions to another not mining node
-          //Mining nodes collect fee
+          // Not mining node sends transfer transactions to another not mining node
+          // Mining nodes collect fee
           (1 to n).map { _ =>
-            notMiner.transfer(notMiner.address, firstAddress, (1 + Random.nextInt(10)).waves, fee)
+            notMiner.transfer(notMiner.keyPair, firstAddress, (1 + Random.nextInt(10)).waves, fee)
           }
         }
         .map(_ => ())
@@ -46,7 +46,7 @@ class MicroblocksFeeTestSuite extends BaseFreeSpec {
       _ <- txRequestsGen(200, 2.waves)
       _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight + 3))
 
-      initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) //100%
+      initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) // 100%
 
       balancesBeforeActivation <- notMiner.debugStateAt(microblockActivationHeight) // 100%
       blockBeforeActivation    <- notMiner.blockHeadersAt(microblockActivationHeight)
