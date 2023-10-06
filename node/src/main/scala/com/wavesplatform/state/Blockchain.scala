@@ -27,7 +27,7 @@ trait Blockchain {
   def blockHeader(height: Int): Option[SignedBlockHeader]
   def hitSource(height: Int): Option[ByteStr]
 
-  def carryFee: Long
+  def carryFee(refId: Option[ByteStr]): Long
 
   def heightOf(blockId: ByteStr): Option[Int]
 
@@ -83,6 +83,8 @@ trait Blockchain {
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
+
+  def lastStateHash(refId: Option[ByteStr]): ByteStr
 }
 
 object Blockchain {

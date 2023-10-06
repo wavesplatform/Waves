@@ -125,7 +125,7 @@ case class StateSnapshot(
 
   def bindElidedTransaction(blockchain: Blockchain, tx: Transaction): StateSnapshot =
     copy(
-      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, this, blockchain))
+      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, StateSnapshot.empty, blockchain))
     )
 
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =

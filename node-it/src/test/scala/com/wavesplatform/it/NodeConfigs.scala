@@ -73,6 +73,8 @@ object NodeConfigs {
       s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $blocks"
 
     val nonMiner: String = "waves.miner.enable = no"
+
+    val lightNode: String = "waves.enable-light-mode = true"
   }
 
 }

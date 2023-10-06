@@ -1,7 +1,5 @@
 package com.wavesplatform.db
 
-import cats.syntax.either.*
-import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, KeyPair}
@@ -23,14 +21,11 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.InitStateHash
-import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, maybeApplySponsorship}
-import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, TransactionDiffer}
+import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
@@ -132,12 +127,28 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
     def differ(blockchain: Blockchain, b: Block) =
-      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, enableExecutionLog = enableExecutionLog)
+      BlockDiffer.fromBlock(
+        blockchain,
+        None,
+        b,
+        None,
+        MiningConstraint.Unlimited,
+        b.header.generationSignature,
+        enableExecutionLog = enableExecutionLog
+      )
 
     preconditions.foreach { precondition =>
       val preconditionBlock = blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) = differ(state, preconditionBlock).explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, None, preconditionBlock.header.generationSignature, preconditionBlock)
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) = differ(state, preconditionBlock).explicitGet()
+      state.append(
+        preconditionDiff,
+        preconditionFees,
+        totalFee,
+        None,
+        preconditionBlock.header.generationSignature,
+        computedStateHash,
+        preconditionBlock
+      )
     }
     val totalDiff1 = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.flatMap(differ(state, _))
     assertion(totalDiff1.map(_.snapshot.toDiff(state)))
@@ -152,7 +163,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       assertion: TracedResult[ValidationError, Diff] => Unit
   ): Unit = withTestState(fs) { (bcu, state) =>
     def getCompBlockchain(blockchain: Blockchain) = {
-      val reward = if (blockchain.height > 0) Some(blockchain.settings.rewardsSettings.initial) else None
+      val reward = if (blockchain.height > 0) bcu.computeNextReward else None
       SnapshotBlockchain(blockchain, reward)
     }
 
@@ -161,20 +172,28 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         getCompBlockchain(blockchain),
         prevBlock,
         b,
+        None,
         MiningConstraint.Unlimited,
         b.header.generationSignature,
         (_, _) => (),
         verify = true,
         enableExecutionLog = enableExecutionLog,
-        txSignParCheck = true,
-        enableStateHash = false
+        txSignParCheck = true
       )
 
     preconditions.foreach { precondition =>
       val preconditionBlock = blockWithComputedStateHash(precondition.block, precondition.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, _) =
+      val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _, computedStateHash) =
         differ(state, state.lastBlock, preconditionBlock).resultE.explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, None, preconditionBlock.header.generationSignature, preconditionBlock)
+      state.append(
+        preconditionDiff,
+        preconditionFees,
+        totalFee,
+        None,
+        preconditionBlock.header.generationSignature,
+        computedStateHash,
+        preconditionBlock
+      )
     }
 
     val totalDiff1 =
@@ -191,7 +210,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   ): Unit = withTestState(fs) { (bcu, state) =>
     def getCompBlockchain(blockchain: Blockchain) =
       if (withNg && fs.preActivatedFeatures.get(BlockchainFeatures.BlockReward.id).exists(_ <= blockchain.height)) {
-        val reward = if (blockchain.height > 0) Some(blockchain.settings.rewardsSettings.initial) else None
+        val reward = if (blockchain.height > 0) bcu.computeNextReward else None
         SnapshotBlockchain(blockchain, reward)
       } else blockchain
 
@@ -200,27 +219,37 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         getCompBlockchain(blockchain),
         if (withNg) prevBlock else None,
         b,
+        None,
         MiningConstraint.Unlimited,
-        b.header.generationSignature,
-        checkStateHash = false
+        b.header.generationSignature
       )
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-      val preconditionBlock                                 = blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, prevBlock, preconditionBlock).explicitGet()
-      state.append(diff, fees, totalFee, None, preconditionBlock.header.generationSignature, preconditionBlock)
+      val preconditionBlock = blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE.explicitGet()
+      val BlockDiffer.Result(diff, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, preconditionBlock).explicitGet()
+      state.append(diff, fees, totalFee, None, preconditionBlock.header.generationSignature, computedStateHash, preconditionBlock)
       Some(preconditionBlock)
     }
 
-    val checkedBlock                                          = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.explicitGet()
-    val BlockDiffer.Result(snapshot, fees, totalFee, _, _, _) = differ(state, state.lastBlock, checkedBlock).explicitGet()
+    val checkedBlock = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.explicitGet()
+    val BlockDiffer.Result(snapshot, fees, totalFee, _, _, computedStateHash) = differ(state, state.lastBlock, checkedBlock).explicitGet()
     val ngState =
-      NgState(checkedBlock, snapshot, fees, totalFee, fs.preActivatedFeatures.keySet, None, checkedBlock.header.generationSignature, Map())
+      NgState(
+        checkedBlock,
+        snapshot,
+        fees,
+        totalFee,
+        computedStateHash,
+        fs.preActivatedFeatures.keySet,
+        None,
+        checkedBlock.header.generationSignature,
+        Map()
+      )
     val cb   = SnapshotBlockchain(state, ngState)
     val diff = snapshot.toDiff(state)
     assertion(diff, cb)
 
-    state.append(snapshot, fees, totalFee, None, checkedBlock.header.generationSignature, checkedBlock)
+    state.append(snapshot, fees, totalFee, None, checkedBlock.header.generationSignature, computedStateHash, checkedBlock)
 
     assertion(diff, state)
   }
@@ -238,7 +267,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withTestState(fs) { (bcu, state) =>
       def getCompBlockchain(blockchain: Blockchain) = {
-        val reward = if (blockchain.height > 0) Some(blockchain.settings.rewardsSettings.initial) else None
+        val reward = if (blockchain.height > 0) bcu.computeNextReward else None
         SnapshotBlockchain(blockchain, reward)
       }
 
@@ -247,9 +276,9 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
           getCompBlockchain(blockchain),
           state.lastBlock,
           b,
+          None,
           MiningConstraint.Unlimited,
-          b.header.generationSignature,
-          checkStateHash = false
+          b.header.generationSignature
         )
 
       test(txs => {
@@ -266,6 +295,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
             result.totalFee,
             None,
             checkedBlock.header.generationSignature.take(Block.HitSourceLength),
+            result.computedStateHash,
             checkedBlock
           )
         }
@@ -288,27 +318,27 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       blockchain: BlockchainUpdater & Blockchain
   ): TracedResult[ValidationError, Block] = {
     (if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
-       val compBlockchain = SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, None)
-       val prevStateHash  = blockchain.lastBlockHeader.flatMap(_.header.stateHash).getOrElse(InitStateHash)
-
+       val compBlockchain =
+         SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
+       val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
        TracedResult(
          BlockDiffer
            .createInitialBlockSnapshot(
              blockchain,
+             blockWithoutStateHash.header.reference,
              blockWithoutStateHash.header.generator.toAddress
            )
        )
          .flatMap { initSnapshot =>
-           val initStateHash =
-             if (initSnapshot == StateSnapshot.empty) prevStateHash
-             else TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+           val initStateHash = BlockDiffer.computeInitialStateHash(compBlockchain, initSnapshot, prevStateHash)
 
-           WithState
+           TxStateSnapshotHashBuilder
              .computeStateHash(
                blockWithoutStateHash.transactionData,
                initStateHash,
                initSnapshot,
-               blockWithoutStateHash.header.generator.toAddress,
+               signer,
+               blockchain.lastBlockTimestamp,
                blockWithoutStateHash.header.timestamp,
                blockWithoutStateHash.header.challengedHeader.isDefined,
                compBlockchain
@@ -442,41 +472,5 @@ object WithState {
       accs.map(acc => AddrWithBalance(acc.toAddress))
 
     implicit def toAddrWithBalance(v: (KeyPair, Long)): AddrWithBalance = AddrWithBalance(v._1.toAddress, v._2)
-  }
-
-  def computeStateHash(
-      txs: Seq[Transaction],
-      initStateHash: ByteStr,
-      initDiff: StateSnapshot,
-      signerAddr: Address,
-      timestamp: Long,
-      isChallenging: Boolean,
-      blockchain: Blockchain
-  ): TracedResult[ValidationError, ByteStr] = {
-    val txDiffer = TransactionDiffer(blockchain.lastBlockTimestamp, timestamp) _
-
-    txs
-      .foldLeft[TracedResult[ValidationError, (ByteStr, StateSnapshot)]](TracedResult(Right(initStateHash -> initDiff))) {
-        case (acc @ TracedResult(Right((prevStateHash, accDiff)), _, _), tx) =>
-          val compBlockchain  = SnapshotBlockchain(blockchain, accDiff)
-          val (_, feeInWaves) = maybeApplySponsorship(compBlockchain, compBlockchain.isSponsorshipActive, tx.assetFee)
-          val minerPortfolio  = Map(signerAddr -> Portfolio.waves(feeInWaves).multiply(CurrentBlockFeePart))
-          val txDifferResult  = txDiffer(compBlockchain, tx)
-          txDifferResult.resultE match {
-            case Right(txSnapshot) =>
-              val txInfo = txSnapshot.transactions.head._2
-              val stateHash =
-                TxStateSnapshotHashBuilder
-                  .createHashFromSnapshot(txSnapshot.addBalances(minerPortfolio, compBlockchain).explicitGet(), Some(txInfo))
-                  .createHash(prevStateHash)
-
-              txDifferResult
-                .copy(resultE = (accDiff |+| txSnapshot).addBalances(minerPortfolio, compBlockchain).map(stateHash -> _).leftMap(GenericError(_)))
-            case Left(_) if isChallenging => acc
-            case Left(err)                => txDifferResult.copy(resultE = err.asLeft[(ByteStr, StateSnapshot)])
-          }
-        case (err @ TracedResult(Left(_), _, _), _) => err
-      }
-      .map(_._1)
   }
 }

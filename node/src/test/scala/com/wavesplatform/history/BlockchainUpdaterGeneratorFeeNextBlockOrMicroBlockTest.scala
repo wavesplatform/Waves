@@ -39,8 +39,8 @@ class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest extends PropSpec wi
         val (block, microBlocks) =
           chainBaseAndMicro(randomSig, genesis, Seq(Seq(somePayment), Seq(generatorPaymentOnFee, someOtherPayment)))
         domain.blockchainUpdater.processBlock(block) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks.head) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should produce("unavailable funds")
+        domain.blockchainUpdater.processMicroBlock(microBlocks.head, None) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(1), None) should produce("unavailable funds")
     }
   }
 
@@ -59,8 +59,8 @@ class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest extends PropSpec wi
         val (block, microBlocks) =
           chainBaseAndMicro(randomSig, genesis, Seq(Seq(somePayment), Seq(generatorPaymentOnFee, someOtherPayment)))
         domain.blockchainUpdater.processBlock(block) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks.head) should beRight
-        domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should produce("unavailable funds")
+        domain.blockchainUpdater.processMicroBlock(microBlocks.head, None) should beRight
+        domain.blockchainUpdater.processMicroBlock(microBlocks(1), None) should produce("unavailable funds")
     }
   }
 }

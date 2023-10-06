@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import cats.data.ValidatedNel
 import com.wavesplatform.account.PrivateKey
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.StateSnapshot
@@ -21,7 +21,7 @@ package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
-  type DiscardedBlocks       = Seq[(Block, ByteStr)]
+  type DiscardedBlocks       = Seq[(Block, ByteStr, Option[BlockSnapshot])]
   type DiscardedMicroBlocks  = Seq[(MicroBlock, StateSnapshot)]
   type AuthorizedTransaction = Authorized & Transaction
 
