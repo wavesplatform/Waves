@@ -283,11 +283,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .filter(_ >= V3)
       .foreach { version =>
         val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
-        for {
-          setScriptTransaction <- setScriptTransactions
-          v4Activation         <- if (version >= V4) Seq(true) else Seq(false, true)
-          v5Activation         <- if (version >= V5) Seq(true) else Seq(false, true)
-        } yield {
+        setScriptTransactions.foreach { setScriptTransaction =>
           val fs = settingsForRide(version).blockchainSettings.functionalitySettings
 
           assertDiffAndState(fs) { append =>

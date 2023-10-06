@@ -162,7 +162,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       scheduler,
       utxEvents.collect { case _: UtxEvent.TxAdded => () }
     )
-    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false) _
+    val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false)(_, None)
 
     object Output {
       private[this] var first = true

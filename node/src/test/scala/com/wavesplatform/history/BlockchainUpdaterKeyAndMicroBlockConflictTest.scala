@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform._
+import com.wavesplatform.*
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
@@ -9,7 +9,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.GenesisTransaction
 import org.scalacheck.Gen
-import org.scalatest._
+import org.scalatest.*
 
 class BlockchainUpdaterKeyAndMicroBlockConflictTest
     extends PropSpec
@@ -18,53 +18,49 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     with BlocksTransactionsHelpers {
 
   property("new key block should be validated to previous") {
-    forAll(Preconditions.conflictingTransfers()) {
-      case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
-        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          d.blockchainUpdater.processBlock(prevBlock) should beRight
-          d.blockchainUpdater.processBlock(keyBlock) should beRight
+    forAll(Preconditions.conflictingTransfers()) { case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
+      withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+        d.blockchainUpdater.processBlock(prevBlock) should beRight
+        d.blockchainUpdater.processBlock(keyBlock) should beRight
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
+        microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_, None) should beRight)
 
-          d.blockchainUpdater.processBlock(keyBlock1) should beRight
-        }
+        d.blockchainUpdater.processBlock(keyBlock1) should beRight
+      }
     }
 
-    forAll(Preconditions.conflictingTransfersInMicro()) {
-      case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
-        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          d.blockchainUpdater.processBlock(prevBlock) should beRight
-          d.blockchainUpdater.processBlock(keyBlock) should beRight
+    forAll(Preconditions.conflictingTransfersInMicro()) { case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
+      withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+        d.blockchainUpdater.processBlock(prevBlock) should beRight
+        d.blockchainUpdater.processBlock(keyBlock) should beRight
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
+        microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_, None) should beRight)
 
-          d.blockchainUpdater.processBlock(keyBlock1) should beRight
-        }
+        d.blockchainUpdater.processBlock(keyBlock1) should beRight
+      }
     }
 
-    forAll(Preconditions.leaseAndLeaseCancel()) {
-      case (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount) =>
-        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.blockchainUpdater.processBlock(_) should beRight)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount.toAddress, 0) > 0)
+    forAll(Preconditions.leaseAndLeaseCancel()) { case (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount) =>
+      withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+        Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.blockchainUpdater.processBlock(_) should beRight)
+        assert(d.blockchainUpdater.effectiveBalance(secondAccount.toAddress, 0) > 0)
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount.toAddress, 0, Some(leaseBlock.id())) > 0)
+        microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_, None) should beRight)
+        assert(d.blockchainUpdater.effectiveBalance(secondAccount.toAddress, 0, Some(leaseBlock.id())) > 0)
 
-          assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
-        }
+        assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
+      }
     }
   }
 
   property("data keys should not be duplicated") {
-    forAll(Preconditions.duplicateDataKeys()) {
-      case (genesisBlock, blocks, microBlocks, address) =>
-        withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, blocks(0), blocks(1)).foreach(d.blockchainUpdater.processBlock(_) should beRight)
-          d.blockchainUpdater.accountData(address, "test") shouldBe defined
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) should beRight)
-          d.blockchainUpdater.accountData(address, "test") shouldBe defined
-        }
+    forAll(Preconditions.duplicateDataKeys()) { case (genesisBlock, blocks, microBlocks, address) =>
+      withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
+        Seq(genesisBlock, blocks(0), blocks(1)).foreach(d.blockchainUpdater.processBlock(_) should beRight)
+        d.blockchainUpdater.accountData(address, "test") shouldBe defined
+        microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_, None) should beRight)
+        d.blockchainUpdater.accountData(address, "test") shouldBe defined
+      }
     }
   }
 
