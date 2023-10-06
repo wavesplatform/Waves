@@ -153,6 +153,20 @@ class ApiCompilerTest extends PropSpec {
         |}
         |""".stripMargin
 
+    val script4 =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |let a = 1 + 1 + 1
+        |let b = a + 1 + 1
+        |let c = b + a + 1
+        |
+        |@Callable(i)
+        |func foo() = []
+        |""".stripMargin
+
     API.compile(script1, estimator, libraries = Map.empty).explicitGet().asInstanceOf[DApp].dAppInfo.globalVariableComplexities shouldBe Map(
       "a" -> 1,
       "b" -> 2
@@ -167,6 +181,12 @@ class ApiCompilerTest extends PropSpec {
       "l" -> 0,
       "a" -> 8,
       "b" -> 16
+    )
+
+    API.compile(script4, estimator, libraries = Map.empty).explicitGet().asInstanceOf[DApp].dAppInfo.globalVariableComplexities shouldBe Map(
+      "a" -> 2,
+      "b" -> 4,
+      "c" -> 6
     )
   }
 

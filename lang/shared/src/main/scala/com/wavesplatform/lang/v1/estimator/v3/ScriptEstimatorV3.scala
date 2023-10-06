@@ -91,7 +91,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
         letCosts <- usedRefs.toSeq.traverse { ref =>
           local {
             for {
-              _    <- set[Id, EstimatorContext, EstimationError](startCtx)
+              _    <- update(funcs.set(_)(startCtx.funcs))
               cost <- bodyEvalCtx.globalLetEvals.getOrElse(ref, zero)
             } yield cost
           }
