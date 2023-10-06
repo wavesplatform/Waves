@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V8}
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
@@ -22,7 +22,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{EthABIConverter, Asset, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, EthABIConverter, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
 import org.scalatest.Inside
 
@@ -115,7 +115,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
     val invoker        = dummyEthInvoke.senderAddress()
     val invokerPk      = dummyEthInvoke.signerPublicKey()
 
-    val emptyScript = Some(ExprScript(Terms.TRUE).explicitGet())
+    val emptyScript = Some(ExprScript(V4, Terms.TRUE).explicitGet())
     val issues =
       (1 to paymentCount).map(_ =>
         IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, emptyScript, 1.waves, ts).explicitGet()
@@ -172,7 +172,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
   property("invoke with scripted payments") {
     val allVersions  = DirectiveDictionary[StdLibVersion].all
     val lastVersion  = allVersions.last
-    val dAppVersions = allVersions.filter(_ >= V3)
+    val dAppVersions = allVersions.filter(_ > V3)
 
     dAppVersions.foreach { v =>
       assert(dAppVersion = v, assetScriptVersion = lastVersion, v.maxPayments, syncCall = v >= V5)
@@ -180,5 +180,6 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
       assert(dAppVersion = lastVersion, assetScriptVersion = v, v.maxPayments)
       assert(dAppVersion = lastVersion, assetScriptVersion = v, 0)
     }
+    assert(V3, V3, V3.maxPayments)
   }
 }
