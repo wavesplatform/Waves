@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -42,7 +42,7 @@ class TransactionBroadcastSpec
     stub[CommonTransactionsApi],
     stub[Wallet],
     blockchain,
-    stub[() => CompositeBlockchain],
+    stub[() => SnapshotBlockchain],
     mockFunction[Int],
     transactionPublisher,
     testTime,

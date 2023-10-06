@@ -19,6 +19,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.THROW
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -334,8 +335,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
-        totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
+        totalPortfolioDiff.assets.values.toSet should (be(Set()) or be(Set(0)))
 
         blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
       }
@@ -407,7 +408,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         val matcherPortfolio =
@@ -521,7 +522,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         val matcherPortfolio =
@@ -653,7 +654,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
       totalPortfolioDiff.balance shouldBe 0
-      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+      totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
       totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
       val combinedPortfolio =
@@ -768,7 +769,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { case (blockDiff, _) =>
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
@@ -1670,7 +1671,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       }
       assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
         case (diff, state) =>
-          diff.scriptsRun shouldBe 0
+          diff.scriptsComplexity shouldBe 1 // throw()
           diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee.value
           diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
           diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
@@ -1694,7 +1695,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             state.balance(exchange.sender.toAddress, asset) shouldBe balance
           }
 
-          state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
+          state.transactionInfo(exchange.id()).map(r => r._2 -> (r._1.status == Status.Succeeded)) shouldBe Some((exchange, false))
       }
     }
   }
@@ -1798,9 +1799,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff = BlockDiffer
-          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
+          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, None, MiningConstraint.Unlimited, newBlock.header.generationSignature)
           .explicitGet()
-        diff.diff.scriptsComplexity shouldBe complexity
+        diff.snapshot.scriptsComplexity shouldBe complexity
 
         val feeUnits = FeeValidation.getMinFee(d.blockchainUpdater, exchange).explicitGet().minFeeInWaves / FeeValidation.FeeUnit
         if (complexity > 0) feeUnits shouldBe 7
@@ -1995,6 +1996,29 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       )
       d.appendBlock()
       d.appendAndAssertSucceed(tx)
+    }
+  }
+
+  property(s"NODE-970. Non-empty attachment field is allowed only after ${BlockchainFeatures.TransactionStateSnapshot.description} activation") {
+    val matcher = TxHelpers.defaultSigner
+    val issuer  = TxHelpers.secondSigner
+
+    withDomain(
+      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 4),
+      AddrWithBalance.enoughBalances(matcher, issuer)
+    ) { d =>
+      val issue = TxHelpers.issue(issuer)
+      val exchange = () =>
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(ByteStr.fill(1)(1))),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = TxHelpers.secondSigner),
+          version = TxVersion.V3
+        )
+
+      d.appendBlock(issue)
+      d.appendBlockE(exchange()) should produce("Attachment field for orders is not supported yet")
+      d.appendBlock()
+      d.appendBlockE(exchange()) should beRight
     }
   }
 

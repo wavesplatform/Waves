@@ -18,9 +18,11 @@ import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import EthTxGenerator.Arg
+import com.wavesplatform.lang.v1.ContractLimits.MaxInvokeScriptSizeInBytes
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, JsonMatchers}
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction}
 import play.api.libs.json.Json
@@ -639,4 +641,61 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     }
   }
 
+  "Ethereum Transaction" should s"be checked for max allowed size after ${BlockchainFeatures.BlockRewardDistribution} activation" in {
+    val dApp      = TxHelpers.signer(1)
+    val ethSigner = TxHelpers.signer(2).toEthKeyPair
+    val issuer    = TxHelpers.signer(3)
+
+    def invokeWithSize(size: Int): EthereumTransaction = {
+      // 46 is for the dApp address and PB fields data
+      EthTxGenerator.generateEthInvoke(ethSigner, dApp.toAddress, "foo", Seq(Arg.Str("1" * (size - 46))), Seq.empty)
+    }
+
+    def invoke(withRedundantBytes: Boolean): EthereumTransaction =
+      EthTxGenerator.generateEthInvoke(ethSigner, dApp.toAddress, "foo", Seq(Arg.Str("1")), Seq.empty, withRedundantBytes = withRedundantBytes)
+
+    def transfer(asset: Asset, withRedundantBytes: Boolean): EthereumTransaction =
+      EthTxGenerator.generateEthTransfer(ethSigner, issuer.toAddress, 1, asset, withRedundantBytes = withRedundantBytes)
+
+    withDomain(
+      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 4),
+      Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(ethSigner.toWavesAddress), AddrWithBalance(issuer.toAddress))
+    ) { d =>
+      val script = TestCompiler(V6).compileContract(
+        """
+          |@Callable(i)
+          |func foo(s: String) = []
+          |""".stripMargin
+      )
+      val issue = TxHelpers.issue(issuer)
+      d.appendBlock(TxHelpers.setScript(dApp, script), issue, TxHelpers.transfer(issuer, ethSigner.toWavesAddress, 10, issue.asset))
+      d.appendAndAssertSucceed(
+        invokeWithSize(MaxInvokeScriptSizeInBytes),
+        invokeWithSize(MaxInvokeScriptSizeInBytes + 1),
+        invoke(false),
+        invoke(true),
+        transfer(issue.asset, withRedundantBytes = false),
+        transfer(issue.asset, withRedundantBytes = true)
+      )
+
+      d.blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution, d.blockchain.height + 1) shouldBe true
+      // activation height
+      val bigSizeInvoke = invokeWithSize(MaxInvokeScriptSizeInBytes + 1)
+      d.appendAndCatchError(bigSizeInvoke) shouldBe TransactionValidationError(
+        GenericError(s"Ethereum Invoke bytes length exceeds limit = $MaxInvokeScriptSizeInBytes"),
+        bigSizeInvoke
+      )
+      val redundantBytesInvoke = invoke(true)
+      d.appendAndCatchError(redundantBytesInvoke) shouldBe TransactionValidationError(
+        GenericError("Redundant bytes were found in Ethereum Invoke"),
+        redundantBytesInvoke
+      )
+      val redundantBytesTransfer = transfer(issue.asset, withRedundantBytes = true)
+      d.appendAndCatchError(redundantBytesTransfer) shouldBe TransactionValidationError(
+        GenericError("Invalid asset data size for Ethereum Transfer"),
+        redundantBytesTransfer
+      )
+      d.appendAndAssertSucceed(invokeWithSize(MaxInvokeScriptSizeInBytes), invoke(false), transfer(issue.asset, withRedundantBytes = false))
+    }
+  }
 }

@@ -1,7 +1,6 @@
 package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicReference
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
@@ -18,6 +17,8 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
 import com.wavesplatform.test.{FlatSpec, *}
@@ -63,7 +64,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           defaultSigner,
           features.sorted,
           -1,
-          Some(stateHash)
+          Some(stateHash),
+          None
         )
         .explicitGet()
 
@@ -135,7 +137,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "Miner" should "generate valid blocks" in forAll(genesis) { case (minerAcc1, minerAcc2, genesis) =>
     val disabledFeatures = new AtomicReference(Set[Short]())
     withBlockchain(disabledFeatures, testTime) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
       withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
         for (h <- 2 until BlockV5ActivationHeight) {
 
@@ -143,7 +145,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
           val forge = miner.forgeBlock(minerAcc1)
           val block = forge.explicitGet()._1
-          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
           blockchain.height shouldBe h
         }
 
@@ -155,7 +157,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         val blockAtActivationHeight  = forgedAtActivationHeight.explicitGet()._1
         blockAtActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-        Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+        Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
         blockchain.height shouldBe BlockV5ActivationHeight
         blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
         blockAtActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
@@ -178,7 +180,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         val blockAfterActivationHeight  = forgedAfterActivationHeight.explicitGet()._1
         blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-        Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+        Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
         blockchain.height shouldBe BlockV5ActivationHeight + 1
         blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
         blockAfterActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
@@ -198,7 +200,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         val blockAfterVRFUsing  = forgedAfterVRFUsing.explicitGet()._1
         blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
-        Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+        Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
         blockchain.height shouldBe BlockV5ActivationHeight + 2
         blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
         blockAfterVRFUsing.signature shouldBe blockchain.lastBlockHeader.value.signature
@@ -238,7 +240,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           val block  = forged.explicitGet()._1
           block.header.version shouldBe Block.ProtoBlockVersion
 
-          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
           blockchain.height shouldBe (h + 1)
 
           val hitSource     = blockchain.hitSource(if (h > 100) h - 100 else h).value
@@ -259,7 +261,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
   "Miner" should "generate valid blocks when feature pre-activated" in forAll(genesis) { case (minerAcc1, _, genesis) =>
     withBlockchain(new AtomicReference(Set()), testTime, preActivatedTestSettings) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
       withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
         for (h <- blockchain.height to 110) {
 
@@ -269,7 +271,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           val block  = forged.explicitGet()._1
           block.header.version shouldBe Block.ProtoBlockVersion
 
-          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
           blockchain.height shouldBe (h + 1)
         }
       }
@@ -279,7 +281,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "Block version" should "be validated accordingly features activation" in forAll(genesis) { case (minerAcc, _, genesis) =>
     val disabledFeatures = new AtomicReference(Set.empty[Short])
     withBlockchain(disabledFeatures, testTime) { blockchain =>
-      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      blockchain.processBlock(genesis, genesis.header.generationSignature, None) should beRight
       withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
         def forge(): Block = {
           val forge = miner.forgeBlock(minerAcc)
@@ -289,7 +291,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         def forgeAppendAndValidate(version: Byte, height: Int): Unit = {
           val block = forge()
           block.header.version shouldBe version
-          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe an[Applied]
           blockchain.height shouldBe height
         }
 
@@ -342,8 +344,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
   private val updaterScenario = for {
     (miner1, miner2, b1) <- genesis
-    b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion)
-    b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion)
+    b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion).block
+    b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion).block
     tx1       = createTx(miner1, miner2.toAddress)
     tx2       = createTx(miner2, miner1.toAddress)
     tx3       = createTx(miner1, miner2.toAddress)
@@ -358,19 +360,19 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "BlockchainUpdater" should "accept valid key blocks and microblocks" in forAll(updaterScenario) {
     case (bs, (ngBlock, ngMicros), (rewardBlock, rewardMicros), (protoBlock, protoMicros), (afterProtoBlock, afterProtoMicros)) =>
       withBlockchain(new AtomicReference(Set())) { blockchain =>
-        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature) should beRight)
+        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature, None) should beRight)
 
-        blockchain.processBlock(ngBlock, ngBlock.header.generationSignature) should beRight
-        ngMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        blockchain.processBlock(ngBlock, ngBlock.header.generationSignature, None) should beRight
+        ngMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
-        blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature) should beRight
-        rewardMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        blockchain.processBlock(rewardBlock, rewardBlock.header.generationSignature, None) should beRight
+        rewardMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
-        blockchain.processBlock(protoBlock, protoBlock.header.generationSignature) should beRight
-        protoMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        blockchain.processBlock(protoBlock, protoBlock.header.generationSignature, None) should beRight
+        protoMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
 
-        blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature) should beRight
-        afterProtoMicros.foreach(m => blockchain.processMicroBlock(m) should beRight)
+        blockchain.processBlock(afterProtoBlock, afterProtoBlock.header.generationSignature, None) should beRight
+        afterProtoMicros.foreach(m => blockchain.processMicroBlock(m, None) should beRight)
       }
   }
 
@@ -418,8 +420,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           block3.id() should have length crypto.DigestLength
 
           val keyBlock = d.appendKeyBlock()
-          val mb1      = d.createMicroBlock(None, TxHelpers.transfer())
-          d.blockchain.processMicroBlock(mb1)
+          val mb1      = d.createMicroBlock()(TxHelpers.transfer())
+          d.blockchain.processMicroBlock(mb1, None)
           d.appendMicroBlock(TxHelpers.transfer())
 
           mb1.totalResBlockSig should have length crypto.SignatureLength
@@ -433,16 +435,18 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     for {
       miner1 <- accountGen
       miner2 <- accountGen
-      genesisBlock = TestBlock.create(
-        time = ntpNow,
-        ref = TestBlock.randomSignature(),
-        signer = TestBlock.defaultSigner,
-        txs = Seq(
-          GenesisTransaction.create(miner1.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
-          GenesisTransaction.create(miner2.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
-        ),
-        version = Block.GenesisBlockVersion
-      )
+      genesisBlock = TestBlock
+        .create(
+          time = ntpNow,
+          ref = TestBlock.randomSignature(),
+          signer = TestBlock.defaultSigner,
+          txs = Seq(
+            GenesisTransaction.create(miner1.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
+            GenesisTransaction.create(miner2.toAddress, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
+          ),
+          version = Block.GenesisBlockVersion
+        )
+        .block
     } yield (miner1, miner2, genesisBlock)
 
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]], time: Time = ntpTime, settings: WavesSettings = testSettings)(
@@ -458,7 +462,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     }
   }
 
-  type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
+  type Appender = Block => Task[Either[ValidationError, BlockApplyResult]]
 
   private def withMiner(blockchain: Blockchain & BlockchainUpdater & NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
@@ -470,7 +474,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
-    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
+    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler)(_, None)
     f(miner, blockAppender, appenderScheduler)
     appenderScheduler.shutdown()
     minerScheduler.shutdown()

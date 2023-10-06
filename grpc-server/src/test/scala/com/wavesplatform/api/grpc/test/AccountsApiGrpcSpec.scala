@@ -2,7 +2,7 @@ package com.wavesplatform.api.grpc.test
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.grpc.{
   AccountRequest,
   AccountsApiGrpcImpl,
@@ -12,19 +12,21 @@ import com.wavesplatform.api.grpc.{
   DataRequest,
   LeaseResponse
 }
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{DataTransactionData, Recipient}
-import com.wavesplatform.state.{EmptyDataEntry, IntegerDataEntry}
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
-
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
 
@@ -142,6 +144,94 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
     }
   }
 
+  "NODE-922. GetBalances should return correct balances for challenged and challenging miners" in {
+    def checkBalances(
+        address: Address,
+        expectedRegular: Long,
+        expectedEffective: Long,
+        expectedGenerating: Long,
+        grpcApi: AccountsApiGrpcImpl
+    ): Assertion = {
+      val expectedResult = List(
+        BalanceResponse.of(
+          BalanceResponse.Balance.Waves(BalanceResponse.WavesBalances(expectedRegular, expectedGenerating, expectedRegular, expectedEffective))
+        )
+      )
+
+      val (observer, result) = createObserver[BalanceResponse]
+      grpcApi.getBalances(
+        BalancesRequest.of(ByteString.copyFrom(address.bytes), Seq.empty),
+        observer
+      )
+      result.runSyncUnsafe() shouldBe expectedResult
+    }
+
+    val sender          = TxHelpers.signer(1)
+    val challengedMiner = TxHelpers.signer(2)
+    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+      val grpcApi = getGrpcApi(d)
+
+      val challengingMiner = d.wallet.generateNewAccount().get
+
+      val initChallengingBalance = 1000.waves
+      val initChallengedBalance  = 2000.waves
+
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, initChallengingBalance),
+        TxHelpers.transfer(sender, challengedMiner.toAddress, initChallengedBalance)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val invalidStateHash = ByteStr.fill(DigestLength)(1)
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq.empty,
+        strictTime = true,
+        generator = challengedMiner,
+        stateHash = Some(Some(invalidStateHash))
+      )
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+
+      checkBalances(challengingMiner.toAddress, initChallengingBalance, initChallengingBalance, initChallengingBalance, grpcApi)
+      checkBalances(challengedMiner.toAddress, initChallengedBalance, initChallengedBalance, initChallengedBalance, grpcApi)
+
+      d.appendBlockE(challengingBlock) should beRight
+
+      checkBalances(
+        challengingMiner.toAddress,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance,
+        grpcApi
+      )
+      checkBalances(challengedMiner.toAddress, initChallengedBalance, 0, 0, grpcApi)
+
+      d.appendBlock()
+
+      checkBalances(
+        challengingMiner.toAddress,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance,
+        grpcApi
+      )
+      checkBalances(challengedMiner.toAddress, initChallengedBalance, initChallengedBalance, 0, grpcApi)
+
+    }
+  }
+
   private def getGrpcApi(d: Domain) =
     new AccountsApiGrpcImpl(d.accountsApi)
+
+  private def getLastBlockMinerReward(d: Domain): Long =
+    BlockRewardCalculator
+      .getBlockRewardShares(
+        d.blockchain.height,
+        d.blockchain.settings.rewardsSettings.initial,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain
+      )
+      .miner
 }

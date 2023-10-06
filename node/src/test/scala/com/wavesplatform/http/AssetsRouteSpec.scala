@@ -8,7 +8,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{AssetIdNotSpecified, AssetsDoesNotExist, InvalidIds, TooBigArrayAllocation}
 import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.AssetsApiRoute
-import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -29,7 +28,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{AssetIdLength, EthTxGenerator, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
@@ -61,7 +60,7 @@ class AssetsRouteSpec
             testWallet,
             DummyTransactionPublisher.accepting,
             d.blockchain,
-            () => d.blockchain.getCompositeBlockchain,
+            () => d.blockchain.snapshotBlockchain,
             TestTime(),
             d.accountsApi,
             d.assetsApi,
@@ -193,56 +192,6 @@ class AssetsRouteSpec
     }
   }
 
-  "/transfer" - {
-    def posting[A: Writes](route: Route, v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
-
-    "accepts TransferRequest" in routeTest() { (_, route) =>
-      val sender    = testWallet.generateNewAccount().get
-      val recipient = testWallet.generateNewAccount().get
-      val req = TransferV1Request(
-        assetId = None,
-        feeAssetId = None,
-        amount = 1.waves,
-        fee = 0.3.waves,
-        sender = sender.toAddress.toString,
-        attachment = Some("attachment"),
-        recipient = recipient.toAddress.toString,
-        timestamp = Some(System.currentTimeMillis())
-      )
-
-      posting(route, req) ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[TransferTransaction]
-      }
-    }
-
-    "accepts VersionedTransferRequest" in routeTest() { (_, route) =>
-      val sender    = testWallet.generateNewAccount().get
-      val recipient = testWallet.generateNewAccount().get
-      val req = TransferV2Request(
-        assetId = None,
-        amount = 1.waves,
-        feeAssetId = None,
-        fee = 0.3.waves,
-        sender = sender.toAddress.toString,
-        attachment = None,
-        recipient = recipient.toAddress.toString,
-        timestamp = Some(System.currentTimeMillis())
-      )
-
-      posting(route, req) ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[TransferV2Request]
-      }
-    }
-
-    "returns a error if it is not a transfer request" in routeTest() { (_, route) =>
-      posting(route, Json.obj("key" -> "value")) ~> check {
-        status shouldBe StatusCodes.BadRequest
-      }
-    }
-  }
-
   routePath(s"/details/{id} - issued by invoke expression") in routeTest(DomainPresets.ContinuationTransaction) { (d, route) =>
     val tx = TxHelpers.invokeExpression(
       expression = TestCompiler(V6).compileFreeCall(
@@ -323,6 +272,7 @@ class AssetsRouteSpec
   routePath(s"/details/{id} - non-smart asset") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
     val issues = (1 to 10).map(i => (i, issueTransaction())).toMap
 
+    d.appendBlock()
     d.appendMicroBlock(issues(1))
     checkDetails(route, issues(1), issues(1).id().toString, assetDesc)
 

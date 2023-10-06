@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
@@ -170,6 +171,15 @@ object Keys {
       Some(cfHandle.handle)
     )
 
+  def transactionStateSnapshotAt(height: Height, n: TxNum, cfHandle: RDB.TxHandle): Key[Option[TransactionStateSnapshot]] =
+    Key.opt[TransactionStateSnapshot](
+      NthTransactionStateSnapshotAtHeight,
+      hNum(height, n),
+      TransactionStateSnapshot.parseFrom,
+      _.toByteArray,
+      Some(cfHandle.handle)
+    )
+
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
     bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray)
 
@@ -225,6 +235,12 @@ object Keys {
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)
 
+  def blockStateHash(height: Int): Key[ByteStr] =
+    Key(BlockStateHash, h(height), Option(_).fold(TxStateSnapshotHashBuilder.InitStateHash)(ByteStr(_)), _.arr)
+
   def ethereumTransactionMeta(height: Height, txNum: TxNum): Key[Option[EthereumTransactionMeta]] =
     Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray)
+
+  def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
+    historyKey(MaliciousMinerBanHeights, addressBytes)
 }

@@ -15,12 +15,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.ContractLimits.{MaxContractSizeInBytes, MaxContractSizeInBytesV6, MaxExprSizeInBytes}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 object SetScriptTransactionDiff {
-  def apply(blockchain: Blockchain)(tx: SetScriptTransaction): Either[ValidationError, Diff] =
+  def apply(blockchain: Blockchain)(tx: SetScriptTransaction): Either[ValidationError, StateSnapshot] =
     for {
       // Validate script size limit
       _ <- tx.script match {
@@ -42,11 +42,12 @@ object SetScriptTransactionDiff {
           AccountScriptInfo(tx.sender, script, verifierComplexity, callableComplexities)
         }
         .traverseTap(checkOverflow(blockchain, _))
-    } yield Diff(
-      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
-      scripts = Map(tx.sender.toAddress -> scriptWithComplexities),
-      scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-    )
+      snapshot <- StateSnapshot.build(
+        blockchain,
+        portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
+        accountScripts = Map(tx.sender -> scriptWithComplexities)
+      )
+    } yield snapshot
 
   def scriptSizeValidation(value: Script, limit: Int = MaxExprSizeInBytes): Either[GenericError, Unit] = {
     Either.cond(

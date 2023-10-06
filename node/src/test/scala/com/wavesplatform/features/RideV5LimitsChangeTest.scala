@@ -4,14 +4,14 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.mining.*
 import com.wavesplatform.mining.MiningConstraints.MaxScriptsComplexityInBlock
-import com.wavesplatform.mining._
 import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.SettingsFromDefaultConfig
-import com.wavesplatform.test._
 import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.PathMockFactory
 
@@ -24,14 +24,20 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
       val setScript = TxHelpers.setScript(contractSigner, contract)
       d.appendBlock(setScript)
 
-      val invokes = for (_ <- 1 to 273) yield TxHelpers.invoke(contractAddress) // 3675 complexity, 1003275 total
+      val invokes = for (_ <- 1 to 277) yield TxHelpers.invoke(contractAddress) // 3620 complexity, 1002740 total
 
       val block = d.createBlock(Block.ProtoBlockVersion, invokes, strictTime = true)
       val differResult = BlockDiffer.fromBlock(
         d.blockchain,
         Some(d.lastBlock),
         block,
-        MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total,
+        None,
+        MiningConstraints(
+          d.blockchain,
+          d.blockchain.height,
+          SettingsFromDefaultConfig.enableLightMode,
+          Some(SettingsFromDefaultConfig.minerSettings)
+        ).total,
         block.header.generationSignature
       )
       differResult should produce("Limit of txs was reached")
@@ -50,25 +56,29 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
       val invokeComplexity = 3620
       val invokes          = for (_ <- 1 to invokesCount) yield TxHelpers.invoke(contractAddress)
 
-      val time = new TestTime()
-
       val block = d.createBlock(Block.ProtoBlockVersion, invokes, strictTime = true)
       val differResult = BlockDiffer
         .fromBlock(
           d.blockchain,
           Some(d.lastBlock),
           block,
-          MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total,
+          None,
+          MiningConstraints(
+            d.blockchain,
+            d.blockchain.height,
+            SettingsFromDefaultConfig.enableLightMode,
+            Some(SettingsFromDefaultConfig.minerSettings)
+          ).total,
           block.header.generationSignature
         )
         .explicitGet()
       differResult.constraint.asInstanceOf[MultiDimensionalMiningConstraint].constraints.head shouldBe OneDimensionalMiningConstraint(
-        rest = MaxScriptsComplexityInBlock.AfterRideV5 - invokesCount * invokeComplexity,
+        rest = MaxScriptsComplexityInBlock.AfterRideV5 - invokesCount * invokeComplexity, // 38400
         TxEstimators.scriptsComplexity,
         "MaxScriptsComplexityInBlock"
       )
 
-      time.setTime(block.header.timestamp)
+      TestTime().setTime(block.header.timestamp)
       d.appendBlock(block)
       d.blockchain.height shouldBe 3
     }

@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
@@ -22,10 +22,11 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{EthABIConverter, Asset, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, EthABIConverter, EthereumTransaction, GenesisTransaction}
 import com.wavesplatform.utils.EthHelpers
+import org.scalatest.Inside
 
-class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
+class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with Inside {
   import DomainPresets.*
 
   private val time = new TestTime
@@ -114,7 +115,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
     val invoker        = dummyEthInvoke.senderAddress()
     val invokerPk      = dummyEthInvoke.signerPublicKey()
 
-    val emptyScript = Some(ExprScript(Terms.TRUE).explicitGet())
+    val emptyScript = Some(ExprScript(V4, Terms.TRUE).explicitGet())
     val issues =
       (1 to paymentCount).map(_ =>
         IssueTransaction.selfSigned(2.toByte, dApp, "Asset", "", ENOUGH_AMT, 8, true, emptyScript, 1.waves, ts).explicitGet()
@@ -142,7 +143,10 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
 
   private def assert(dAppVersion: StdLibVersion, assetScriptVersion: StdLibVersion, paymentCount: Int, syncCall: Boolean = false) = {
     val (preparingTxs, ethInvoke, dApp, dApp2, assets) = preconditions(dAppVersion, assetScriptVersion, paymentCount, syncCall)
-    withDomain(BlockRewardDistribution) { d =>
+    val settings =
+      if (dAppVersion >= V8 || assetScriptVersion >= V8) TransactionStateSnapshot else BlockRewardDistribution
+
+    withDomain(settings) { d =>
       d.appendBlock(preparingTxs*)
       d.appendBlock(ethInvoke)
 
@@ -153,14 +157,22 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
       val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
       d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio
       d.liquidDiff.portfolios(ethInvoke.senderAddress()) shouldBe Portfolio(-ethInvoke.underlying.getGasPrice.longValue()).minus(assetsPortfolio)
-      d.liquidDiff.scriptsRun shouldBe paymentCount + 1 + (if (syncCall) 1 else 0)
+      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        if (syncCall)
+          inside(call1.invokes) { case Seq(call2) =>
+            call2.stateChanges.error shouldBe empty
+            call2.stateChanges.invokes shouldBe empty
+          }
+        else
+          call1.invokes shouldBe empty
+      }
     }
   }
 
   property("invoke with scripted payments") {
     val allVersions  = DirectiveDictionary[StdLibVersion].all
     val lastVersion  = allVersions.last
-    val dAppVersions = allVersions.filter(_ >= V3)
+    val dAppVersions = allVersions.filter(_ > V3)
 
     dAppVersions.foreach { v =>
       assert(dAppVersion = v, assetScriptVersion = lastVersion, v.maxPayments, syncCall = v >= V5)
@@ -168,5 +180,6 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
       assert(dAppVersion = lastVersion, assetScriptVersion = v, v.maxPayments)
       assert(dAppVersion = lastVersion, assetScriptVersion = v, 0)
     }
+    assert(V3, V3, V3.maxPayments)
   }
 }

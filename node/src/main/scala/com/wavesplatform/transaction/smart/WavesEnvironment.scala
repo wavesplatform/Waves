@@ -1,14 +1,16 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
@@ -21,7 +23,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -62,7 +64,7 @@ class WavesEnvironment(
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._1.succeeded)
+      .filter(_._1.status == TxMeta.Status.Succeeded)
       .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
@@ -150,7 +152,8 @@ class WavesEnvironment(
     for {
       address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
-      effectiveBalance <- portfolio.effectiveBalance
+      isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
+      effectiveBalance <- portfolio.effectiveBalance(isBanned)
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
@@ -161,7 +164,7 @@ class WavesEnvironment(
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.succeeded => tm.height.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -247,6 +250,11 @@ class WavesEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+
+  override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = {
+    val hit = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
+    FairPoSCalculator.V2.calculateDelay(BigInt(1, hit), baseTarget, balance)
+  }
 
   private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
     if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward)) {
@@ -353,6 +361,7 @@ object DAppEnvironment {
   }
 }
 
+// todo move to separate class
 // Not thread safe
 class DAppEnvironment(
     nByte: Byte,
@@ -372,13 +381,13 @@ class DAppEnvironment(
     var remainingCalls: Int,
     var availableActions: ActionLimits,
     var availablePayments: Int,
-    var currentDiff: Diff,
+    var currentSnapshot: StateSnapshot,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
 
-  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+  private[this] var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
-  override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
+  override def currentBlockchain(): SnapshotBlockchain = this.mutableBlockchain
 
   override def callScript(
       dApp: Address,
@@ -418,7 +427,7 @@ class DAppEnvironment(
         InvokeScriptResult.empty
       )
       (
-        diff,
+        snapshot,
         evaluated,
         remainingActions,
         remainingPayments
@@ -437,20 +446,18 @@ class DAppEnvironment(
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
-      fixedDiff = diff
-        .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))
-        .withScriptRuns(diff.scriptsRun + 1)
-      newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
+      fixedSnapshot = snapshot
+        .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))
     } yield {
-      currentDiff = newCurrentDiff
-      mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+      currentSnapshot = (currentSnapshot: StateSnapshot) |+| fixedSnapshot
+      mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availablePayments = remainingPayments
       (
         evaluated,
-        diff.scriptsComplexity.toInt,
-        if (enableExecutionLog) DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity) else List.empty
+        snapshot.scriptsComplexity.toInt,
+        if (enableExecutionLog) DiffToLogConverter.convert(snapshot, tx.id(), func, availableComplexity) else List.empty
       )
     }
 

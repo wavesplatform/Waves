@@ -4,6 +4,7 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
@@ -63,13 +64,19 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
       assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx)), fs) { case (blockDiff, newState) =>
         val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
 
         val senderAcc = anotherAliasTx.sender.toAddress
         blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-        addressTransactions(rdb, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(TransactionType.CreateAlias), None).collect {
-          case (_, cat: CreateAliasTransaction) => cat.alias
+        addressTransactions(
+          rdb,
+          Some(Height(newState.height + 1) -> SnapshotOps.fromDiff(blockDiff, newState).explicitGet()),
+          senderAcc,
+          Set(TransactionType.CreateAlias),
+          None
+        ).collect { case (_, cat: CreateAliasTransaction) =>
+          cat.alias
         }.toSet shouldBe Set(
           anotherAliasTx.alias,
           aliasTx.alias

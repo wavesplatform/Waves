@@ -363,17 +363,18 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
   property("issue action results state") {
     val (setScript, invoke, master, invoker, amount) = issuePreconditions(1.005.waves)
     withDomain(balances = AddrWithBalance.enoughBalances(invoker, master)) { d =>
-      val tb1 = TestBlock.create(System.currentTimeMillis(), d.blockchain.lastBlockId.get, Seq(setScript))
-      d.blockchainUpdater.processBlock(tb1, ByteStr(new Array[Byte](32)), verify = false).explicitGet()
-      val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
-      d.blockchainUpdater.processBlock(tb2, ByteStr(new Array[Byte](32)), verify = false).explicitGet()
+      val tb1 = TestBlock.create(System.currentTimeMillis(), d.blockchain.lastBlockId.get, Seq(setScript)).block
+      d.blockchainUpdater.processBlock(tb1, ByteStr(new Array[Byte](32)), None, verify = false).explicitGet()
+      val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke)).block
+      d.blockchainUpdater.processBlock(tb2, ByteStr(new Array[Byte](32)), None, verify = false).explicitGet()
 
       d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
       d.portfolio(invoker.toAddress) shouldEqual Seq()
 
       d.blockchainUpdater.processBlock(
-        TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty),
+        TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty).block,
         ByteStr(new Array[Byte](32)),
+        None,
         verify = false
       )
 

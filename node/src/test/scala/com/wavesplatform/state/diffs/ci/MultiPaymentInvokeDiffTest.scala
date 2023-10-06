@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
 import com.wavesplatform.state.Diff
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -90,7 +91,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         TestBlock.create(Seq(ci)),
         features
       )(_ should matchPattern {
-        case Right(diff: Diff) if diff.transactions.exists(!_.applied) =>
+        case Right(diff: Diff) if diff.transactions.exists(_.status != Status.Succeeded) =>
       })
     }
   }

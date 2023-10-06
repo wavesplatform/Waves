@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import java.util.concurrent.TimeUnit
 
-import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
 import com.wavesplatform.account.{Alias, KeyPair}
@@ -13,7 +12,6 @@ import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout, handleAllExcepti
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -31,6 +29,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash, TxMeta}
@@ -75,6 +74,7 @@ class DebugApiRouteSpec
   (blockchain.heightOf _).when(*).returns(None)
   (() => blockchain.height).when().returns(0)
   (blockchain.balanceSnapshots _).when(*, *, *).returns(Seq.empty)
+  (blockchain.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
 
   val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
     override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
@@ -82,7 +82,7 @@ class DebugApiRouteSpec
     override def state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 
-  val block: Block = TestBlock.create(Nil)
+  val block: Block = TestBlock.create(Nil).block
   val testStateHash: StateHash = {
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
@@ -114,7 +114,7 @@ class DebugApiRouteSpec
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain,
+      () => Some(blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler),
       sharedScheduler
     )
@@ -175,7 +175,7 @@ class DebugApiRouteSpec
       )
 
       "at nonexistent height" in withDomain(settingsWithStateHashes) { d =>
-        d.appendBlock(TestBlock.create(Nil))
+        d.appendBlock(TestBlock.create(Nil).block)
         Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.NotFound
         }
@@ -185,12 +185,12 @@ class DebugApiRouteSpec
       "last" in expectStateHashAt2("last")
 
       def expectStateHashAt2(suffix: String): Assertion = withDomain(settingsWithStateHashes) { d =>
-        val genesisBlock = TestBlock.create(Nil)
+        val genesisBlock = TestBlock.create(Nil).block
         d.appendBlock(genesisBlock)
 
-        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil)
+        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil).block
         d.appendBlock(blockAt2)
-        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
+        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil).block)
 
         val stateHashAt2 = d.rocksDBWriter.loadStateHash(2).value
         Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
@@ -1682,7 +1682,7 @@ class DebugApiRouteSpec
 
         (blockchain.transactionMeta _)
           .when(leaseCancelId)
-          .returns(Some(TxMeta(Height(1), true, 0L)))
+          .returns(Some(TxMeta(Height(1), Status.Succeeded, 0L)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -1703,7 +1703,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Some(blockchain)
         )
         .route
 
@@ -2185,7 +2185,7 @@ class DebugApiRouteSpec
         d.appendBlock(leaseTx)
         d.appendBlock(setScript(dApp1Kp, dApp1), setScript(dApp2Kp, dApp2))
 
-        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => d.blockchain).route
+        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => Some(d.blockchain)).route
         val invoke  = TxHelpers.invoke(dApp1Kp.toAddress)
         val leaseId = Lease.calculateId(Lease(Address(ByteStr(leaseAddress.bytes)), amount, 0), invoke.id())
 
@@ -2830,7 +2830,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Some(blockchain)
         )
         .route
 
@@ -3482,16 +3482,6 @@ class DebugApiRouteSpec
     }
   }
 
-  routePath("/stateChanges/info/") - {
-    "redirects to /transactions/info method" in {
-      val txId = ByteStr.fill(DigestLength)(1)
-      Get(routePath(s"/stateChanges/info/$txId")) ~> route ~> check {
-        status shouldBe StatusCodes.MovedPermanently
-        header(Location.name).map(_.value) shouldBe Some(s"/transactions/info/$txId")
-      }
-    }
-  }
-
   routePath("/minerInfo") - {
     "returns info from wallet if miner private keys not specified in config" in {
       val acc = wallet.generateNewAccount()
@@ -3514,13 +3504,13 @@ class DebugApiRouteSpec
   }
 
   private def routeWithBlockchain(blockchain: Blockchain & NG) =
-    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => Some(blockchain)).route
 
   private def routeWithBlockchain(d: Domain) =
     debugApiRoute
       .copy(
         blockchain = d.blockchain,
-        priorityPoolBlockchain = () => d.blockchain,
+        priorityPoolBlockchain = () => Some(d.blockchain),
         loadBalanceHistory = d.rocksDBWriter.loadBalanceHistory,
         loadStateHash = d.rocksDBWriter.loadStateHash
       )

@@ -14,7 +14,7 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
@@ -61,7 +61,7 @@ class ProtoVersionTransactionsSpec
       transactionsApi,
       testWallet,
       blockchain,
-      mock[() => CompositeBlockchain],
+      mock[() => SnapshotBlockchain],
       () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,

@@ -27,7 +27,7 @@ class TestCompiler(version: StdLibVersion) {
     (baseCompilerContext |+|
       WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)).compilerContext
 
-  lazy val expressionContext: CTX[Environment] =
+  private lazy val expressionContext: CTX[Environment] =
     WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet(), fixBigScriptField = true)
 
   private lazy val expressionCompilerContext =
@@ -71,7 +71,7 @@ class TestCompiler(version: StdLibVersion) {
   ): ExprScript =
     ExprScript(
       version,
-      ExpressionCompiler.compile(script, offset, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1,
+      ExpressionCompiler.compile(script, offset, expressionCompilerContext, version, allowIllFormedStrings).explicitGet()._1,
       checkSize = checkSize
     ).explicitGet()
 
@@ -82,11 +82,11 @@ class TestCompiler(version: StdLibVersion) {
       checkSize: Boolean = true
   ): Either[String, ExprScript] =
     ExpressionCompiler
-      .compile(script, offset, expressionCompilerContext, allowIllFormedStrings)
+      .compile(script, offset, expressionCompilerContext, version, allowIllFormedStrings)
       .map(s => ExprScript(version, s._1, checkSize = checkSize).explicitGet())
 
   def compileAsset(script: String, offset: LibrariesOffset = NoLibraries): Script =
-    ExprScript(version, ExpressionCompiler.compile(script, offset, assetCompilerContext).explicitGet()._1).explicitGet()
+    ExprScript(version, ExpressionCompiler.compile(script, offset, assetCompilerContext, version).explicitGet()._1).explicitGet()
 
   def compileFreeCall(script: String, offset: LibrariesOffset = NoLibraries): ExprScript = {
     val expr = ContractCompiler.compileFreeCall(script, offset, compilerContext, version).explicitGet()

@@ -17,22 +17,19 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsSerializer}
-import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.api.http.StreamSerializerUtils.*
+import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsSerializer}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, TxTimestamp, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.{EthereumTransaction, TxTimestamp, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -48,14 +45,13 @@ case class AssetsApiRoute(
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
-    compositeBlockchain: () => CompositeBlockchain,
+    compositeBlockchain: () => Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
     commonAssetsApi: CommonAssetsApi,
     maxDistributionDepth: Int,
     routeTimeout: RouteTimeout
 ) extends ApiRoute
-    with BroadcastRoute
     with AuthRoute {
 
   private[this] val distributionTaskScheduler = Scheduler(
@@ -68,32 +64,6 @@ case class AssetsApiRoute(
       new DefaultThreadFactory("balance-distribution", true)
     )
   )
-
-  private def deprecatedRoute: Route = {
-    post {
-      (path("transfer") & withAuth) {
-        broadcast[TransferRequest](TransactionFactory.transferAsset(_, wallet, time))
-      } ~ (path("masstransfer") & withAuth) {
-        broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
-      } ~ (path("issue") & withAuth) {
-        broadcast[IssueRequest](TransactionFactory.issue(_, wallet, time))
-      } ~ (path("reissue") & withAuth) {
-        broadcast[ReissueRequest](TransactionFactory.reissue(_, wallet, time))
-      } ~ (path("burn") & withAuth) {
-        broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
-      } ~ (path("sponsor") & withAuth) {
-        broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
-      } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
-        wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
-      }) ~ pathPrefix("broadcast")(
-        path("issue")(broadcast[IssueRequest](_.toTx)) ~
-          path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
-          path("burn")(broadcast[BurnRequest](_.toTx)) ~
-          path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
-          path("transfer")(broadcast[TransferRequest](_.toTx))
-      )
-    }
-  }
 
   override lazy val route: Route =
     pathPrefix("assets") {
@@ -127,12 +97,11 @@ case class AssetsApiRoute(
         (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
-          pathEndOrSingleSlash(balanceDistribution(assetId)) ~
-            (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
-              balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
-            }
+          (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
+            balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
+          }
         }
-      } ~ deprecatedRoute
+      }
     }
 
   private def multipleDetails(ids: List[String], full: Boolean): ToResponseMarshallable =
@@ -209,11 +178,6 @@ case class AssetsApiRoute(
           val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
           Future.successful(errMsg.json: ToResponseMarshallable)
       }
-    }
-
-  def balanceDistribution(assetId: IssuedAsset): Route =
-    balanceDistribution(assetId, blockchain.height, Int.MaxValue, None) { l =>
-      Json.toJson(l.map { case (a, b) => a.toString -> b }.toMap)
     }
 
   def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route =
@@ -335,7 +299,7 @@ object AssetsApiRoute {
       blockchain.transactionInfos(ids).traverse { infoOpt =>
         for {
           (_, tx) <- infoOpt
-            .filter { case (tm, _) => tm.succeeded }
+            .filter { case (tm, _) => tm.status == TxMeta.Status.Succeeded }
             .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
           ts <- (tx match {
             case tx: IssueTransaction                             => Some(tx.timestamp)
@@ -386,7 +350,7 @@ object AssetsApiRoute {
       for {
         (_, tx) <- blockchain
           .transactionInfo(id)
-          .filter { case (tm, _) => tm.succeeded }
+          .filter { case (tm, _) => tm.status == TxMeta.Status.Succeeded }
           .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
         timestamp <- (tx match {
           case tx: IssueTransaction                             => Some(tx.timestamp)
@@ -472,7 +436,7 @@ object AssetsApiRoute {
   }
 
   def assetScriptDetailsSerializer(numbersAsString: Boolean): JsonSerializer[AssetScriptDetails] =
-    (details: AssetScriptDetails, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (details: AssetScriptDetails, gen: JsonGenerator, _: SerializerProvider) => {
       gen.writeStartObject()
       gen.writeNumberField("scriptComplexity", details.scriptComplexity, numbersAsString)
       gen.writeStringField("script", details.script)
@@ -502,7 +466,7 @@ object AssetsApiRoute {
     }
 
   def issueTxSerializer(numbersAsString: Boolean): JsonSerializer[IssueTransaction] =
-    (tx: IssueTransaction, gen: JsonGenerator, serializers: SerializerProvider) => {
+    (tx: IssueTransaction, gen: JsonGenerator, _: SerializerProvider) => {
       gen.writeStartObject()
       gen.writeNumberField("type", tx.tpe.id, numbersAsString)
       gen.writeStringField("id", tx.id().toString)

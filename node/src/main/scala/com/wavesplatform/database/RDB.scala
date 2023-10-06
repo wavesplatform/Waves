@@ -1,20 +1,21 @@
 package com.wavesplatform.database
 
-import java.io.File
-import java.util
 import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.database.RDB.{TxHandle, TxMetaHandle}
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.utils.*
 import org.rocksdb.*
 
+import java.io.File
 import java.nio.file.{Files, Path}
+import java.util
 import scala.jdk.CollectionConverters.*
 
 final class RDB(
     val db: RocksDB,
     val txMetaHandle: TxMetaHandle,
     val txHandle: TxHandle,
+    val txSnapshotHandle: TxHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
   override def close(): Unit = {
@@ -38,10 +39,11 @@ object RDB extends StrictLogging {
     val dbDir = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles          = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
-    val txMetaCfOptions  = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val txCfOptions      = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val handles             = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -49,7 +51,7 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
@@ -62,6 +64,11 @@ object RDB extends StrictLogging {
           "transactions".utf8Bytes,
           txCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions").toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          "transactions-snapshot".utf8Bytes,
+          txSnapshotCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions-snapshot").toPath, 0L)).asJava)
         )
       ).asJava,
       handles
@@ -71,7 +78,8 @@ object RDB extends StrictLogging {
       db,
       new TxMetaHandle(handles.get(1)),
       new TxHandle(handles.get(2)),
-      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources
+      new TxHandle(handles.get(3)),
+      dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources
     )
   }
 

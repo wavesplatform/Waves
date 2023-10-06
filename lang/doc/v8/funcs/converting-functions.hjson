@@ -1,0 +1,155 @@
+{
+  funcs: [
+    {
+      name: "addressFromPublicKey"
+      params: [ "ByteVector" ]
+      doc: "Converts account public key to [address](blockhain/address.md)."
+      paramsDoc: [ "The public key to convert." ]
+      complexity: 1
+    }
+    {
+      name: "addressFromRecipient"
+      params: [ "Address|Alias" ]
+      doc: "Extract address or lookup alias"
+      paramsDoc: [ "Address or alias of the account." ]
+      complexity: 5
+    }
+    {
+      name: "parseInt"
+      params: [ "String" ]
+      doc: "Converts the string representation of a number to its integer equivalent."
+      paramsDoc: [ "The string to parse." ]
+      complexity: 2
+    }
+    {
+      name: "parseIntValue"
+      params: [ "String" ]
+      doc:
+        '''
+        Converts the string representation of a number to its integer equivalent.
+        Raises an exception if the string cannot be parsed.
+        '''
+      paramsDoc: [ "The string to parse." ]
+      complexity: 2
+    }
+    {
+      name: "toBytes"
+      params: [ "Boolean" ]
+      doc: "Converts a boolean to an array of bytes."
+      paramsDoc: [ "The boolean to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBytes"
+      params: [ "Int" ]
+      doc: "Converts an integer to an array of bytes."
+      paramsDoc: [ "The integer to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBytes"
+      params: [ "BigInt" ]
+      doc: "Converts an BigInt to an array of bytes."
+      paramsDoc: [ "The BigInt to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBytes"
+      params: [ "String" ]
+      doc: "Converts a string to an array of bytes."
+      paramsDoc: [ "The string to convert." ]
+      complexity: 8
+    }
+    {
+      name: "toInt"
+      params: [ "ByteVector" ]
+      doc: "Converts an array of bytes to an integer."
+      paramsDoc: [ "The array of bytes to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toInt"
+      params: [ "ByteVector", "Int" ]
+      doc: "Converts an array of bytes to an integer starting from a certain index."
+      paramsDoc: [ "The array of bytes to convert.", "The index to start from." ]
+      complexity: 1
+    }
+    {
+      name: "parseBigInt"
+      params: [ "String" ]
+      doc: "Converts an string to an integer."
+      paramsDoc: [ "The string to convert." ]
+      complexity: 1
+    }
+    {
+      name: "parseBigIntValue"
+      params: [ "String" ]
+      doc: "Converts an string to an integer."
+      paramsDoc: [ "The string to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBigInt"
+      params: [ "ByteVector" ]
+      doc: "Converts an array of bytes to an big integer."
+      paramsDoc: [ "The array of bytes to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBigInt"
+      params: [ "ByteVector", "Int", "Int" ]
+      doc: "Converts an array of bytes to an big integer."
+      paramsDoc: [ "The array of bytes to convert.", "Offset", "Size" ]
+      complexity: 1
+    }
+    {
+      name: "toInt"
+      params: [ "BigInt" ]
+      doc: "Converts a BigInt to an integer."
+      paramsDoc: [ "The BigInt to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toBigInt"
+      params: [ "Int" ]
+      doc: "Converts an integer to an integer."
+      paramsDoc: [ "The integer to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toString"
+      params: [ "Address" ]
+      doc: "Convert address bytes to string"
+      paramsDoc: [ "The address to convert" ]
+      complexity: 1
+    }
+    {
+      name: "toString"
+      params: [ "Boolean" ]
+      doc: "Converts a boolean to a string."
+      paramsDoc: [ "The boolean to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toString"
+      params: [ "Int" ]
+      doc: "Converts an integer to a string."
+      paramsDoc: [ "The integer to convert." ]
+      complexity: 1
+    }
+    {
+      name: "toString"
+      params: [ "BigInt" ]
+      doc: "Convert BigInt to string"
+      paramsDoc: [ "The BigInt to convert" ]
+      complexity: 1
+    }
+    {
+      name: "toUtf8String"
+      params: [ "ByteVector" ]
+      doc: "Converts an array of bytes to a UTF-8 string."
+      paramsDoc: [ "The array of bytes to convert." ]
+      complexity: 7
+    }
+  ]
+}

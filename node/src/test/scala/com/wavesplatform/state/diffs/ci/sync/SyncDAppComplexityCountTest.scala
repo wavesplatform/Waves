@@ -12,9 +12,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
-import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -210,14 +210,17 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
         val totalPortfolios = if (exceeding || raiseError) basePortfolios else basePortfolios |+| additionalPortfolios
 
-        diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
+        diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe
+          totalPortfolios
+            .filter(_._2 != overlappedPortfolio)
+            .map(p => p.copy(_2 = p._2.copy(assets = p._2.assets.filterNot(_._2 == 0))))
       }
     }
   }
 
   private implicit class Ops(m: Map[Address, Portfolio]) {
     def |+|(m2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-      Diff.combine(m, m2).explicitGet()
+      Portfolio.combine(m, m2).explicitGet()
   }
 
   property("complexity border") {

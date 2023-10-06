@@ -32,7 +32,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
 
   def mkBlock(sender: KeyPair, reference: ByteStr, transactions: Seq[Transaction]): Block =
     Block
-      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L, None)
+      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L, None, None)
       .explicitGet()
 
   val setup: Seq[(KeyPair, KeyPair, KeyPair, Seq[Block])] = {
@@ -74,14 +74,15 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
     setup.foreach { case (sender, r1, r2, blocks) =>
       withDomain() { d =>
         for (b <- blocks) {
-          d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
+          d.blockchainUpdater.processBlock(b, b.header.generationSignature, None, verify = false)
         }
 
         Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
 
         d.blockchainUpdater.processBlock(
-          TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty),
+          TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty).block,
           ByteStr(new Array[Byte](32)),
+          None,
           verify = false
         )
 
@@ -115,10 +116,11 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
     "distinct result avoiding inconsistent state" in {
       val startRead = new ReentrantLock()
       withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner), InterferableDB(_, startRead)) { d =>
+        d.appendBlock()
         d.appendMicroBlock(issue())
         startRead.lock()
         val txs = Future { d.addressTransactions(defaultAddress).map(_._2.tpe) }
-        d.blockchain.bestLiquidDiff.synchronized(d.appendKeyBlock())
+        d.blockchain.bestLiquidSnapshot.synchronized(d.appendKeyBlock())
         startRead.unlock()
         Await.result(txs, Inf).map(_.tpe) shouldBe List(TransactionType.Issue)
       }

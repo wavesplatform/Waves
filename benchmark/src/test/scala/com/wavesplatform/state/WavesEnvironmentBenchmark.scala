@@ -136,7 +136,7 @@ object WavesEnvironmentBenchmark {
     }
 
     val environment: Environment[Id] = {
-      val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
+      val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
       new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),

@@ -9,14 +9,13 @@ import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
+import com.wavesplatform.state.TxMeta.Status
+import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, StateSnapshot}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
-
-import scala.collection.immutable.VectorMap
 
 class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets.*
@@ -61,7 +60,15 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val dAppAddress = master.toAddress
 
         def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
-          Vector(NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
+          Vector(
+            NewTransactionInfo(
+              invoke,
+              StateSnapshot.empty,
+              Set(invoke.senderAddress, dAppAddress),
+              if (succeeded) Status.Succeeded else Status.Failed,
+              8
+            )
+          )
 
         val expectedResult =
           if (activated) {
@@ -84,12 +91,10 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             Diff.withTransactions(
               invokeInfo(true),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = VectorMap(asset -> 0)),
-                dAppAddress          -> Portfolio.build(asset, 0),
+                invoke.senderAddress -> Portfolio(-invoke.fee.value),
                 miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
-              scriptsRun = 1,
-              scriptsComplexity = 18,
+              scriptsComplexity = 8,
               scriptResults = Map(
                 invoke.id() -> InvokeScriptResult(
                   transfers = Seq(
@@ -101,10 +106,13 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             )
           }
 
+        def noSnapshot(d: Diff) =
+          d.copy(transactions = d.transactions.map(_.copy(snapshot = StateSnapshot.empty)))
+
         withDomain(if (activated) RideV5 else RideV4, balances) { d =>
           d.appendBlock(setScriptTx)
           d.appendBlock(invoke)
-          d.liquidDiff shouldBe expectedResult
+          noSnapshot(d.liquidDiff) shouldBe expectedResult
         }
       }
     }

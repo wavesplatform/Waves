@@ -5,16 +5,21 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.grpc.{BlockRangeRequest, BlockRequest, BlockWithHeight, BlocksApiGrpcImpl}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain
+import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.state.BlockRewardCalculator
+import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
@@ -26,7 +31,7 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
 
   val sender: KeyPair         = TxHelpers.signer(1)
   val recipient: KeyPair      = TxHelpers.signer(2)
-  val timeout: FiniteDuration = 2.minutes
+  val timeout: FiniteDuration = 1.minute
 
   "GetBlock should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
@@ -81,6 +86,59 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
           vrf,
           Seq(RewardShare(ByteString.copyFrom(block.sender.toAddress.bytes), d.blockchain.settings.rewardsSettings.initial))
         )
+      }
+    }
+  }
+
+  "NODE-972. GetBlock and GetBlockRange should return correct data for orders with attachment" in {
+    def checkOrderAttachment(block: BlockWithHeight, expectedAttachment: ByteStr): Assertion = {
+      PBTransactions
+        .vanilla(block.block.get.transactions.head, unsafe = true)
+        .explicitGet()
+        .asInstanceOf[ExchangeTransaction]
+        .order1
+        .attachment shouldBe Some(expectedAttachment)
+    }
+
+    val sender = TxHelpers.signer(1)
+    val issuer = TxHelpers.signer(2)
+    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, issuer)) { d =>
+      val grpcApi = getGrpcApi(d)
+
+      val attachment = ByteStr.fill(32)(1)
+      val issue      = TxHelpers.issue(issuer)
+      val exchange =
+        TxHelpers.exchangeFromOrders(
+          TxHelpers.order(OrderType.BUY, Waves, issue.asset, version = Order.V4, attachment = Some(attachment)),
+          TxHelpers.order(OrderType.SELL, Waves, issue.asset, version = Order.V4, sender = issuer),
+          version = TxVersion.V3
+        )
+
+      d.appendBlock(issue)
+      val exchangeBlock = d.appendBlock(exchange)
+
+      d.liquidAndSolidAssert { () =>
+        val resultById = Await.result(
+          grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.BlockId(exchangeBlock.id().toByteString), includeTransactions = true)),
+          1.minute
+        )
+
+        checkOrderAttachment(resultById, attachment)
+
+        val resultByHeight = Await.result(
+          grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.Height(3), includeTransactions = true)),
+          1.minute
+        )
+
+        checkOrderAttachment(resultByHeight, attachment)
+
+        val (observer, resultRange) = createObserver[BlockWithHeight]
+        grpcApi.getBlockRange(
+          BlockRangeRequest.of(3, 3, BlockRangeRequest.Filter.Empty, includeTransactions = true),
+          observer
+        )
+
+        checkOrderAttachment(resultRange.runSyncUnsafe().head, attachment)
       }
     }
   }
@@ -193,6 +251,103 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
     }
   }
 
+  "NODE-922. GetBlock should return correct data for challenging block" in {
+    val sender = TxHelpers.signer(1)
+    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
+      val grpcApi          = getGrpcApi(d)
+      val challengingMiner = d.wallet.generateNewAccount().get
+
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, 1000.waves)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val invalidStateHash = ByteStr.fill(DigestLength)(1)
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq(TxHelpers.transfer(sender)),
+        strictTime = true,
+        stateHash = Some(Some(invalidStateHash))
+      )
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+      val blockHeight      = 1002
+
+      d.appendBlockE(challengingBlock) should beRight
+
+      d.liquidAndSolidAssert { () =>
+        val vrf = getBlockVrfPB(d, challengingBlock)
+        vrf.isEmpty shouldBe false
+        val expectedResult = BlockWithHeight.of(
+          Some(PBBlocks.protobuf(challengingBlock)),
+          blockHeight,
+          vrf,
+          getExpectedRewardShares(blockHeight, challengingMiner.toAddress, d.blockchain)
+        )
+
+        val resultById = Await.result(
+          grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.BlockId(challengingBlock.id().toByteString), includeTransactions = true)),
+          timeout
+        )
+
+        resultById shouldBe expectedResult
+
+        val resultByHeight = Await.result(
+          grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.Height(blockHeight), includeTransactions = true)),
+          timeout
+        )
+
+        resultByHeight shouldBe expectedResult
+      }
+    }
+  }
+
+  "NODE-922. GetBlockRange should return correct data for challenging block" in {
+    val sender = TxHelpers.signer(1)
+    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
+      val grpcApi          = getGrpcApi(d)
+      val challengingMiner = d.wallet.generateNewAccount().get
+
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, 1000.waves)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val invalidStateHash = ByteStr.fill(DigestLength)(1)
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq(TxHelpers.transfer(sender)),
+        strictTime = true,
+        stateHash = Some(Some(invalidStateHash))
+      )
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+      val blockHeight      = 1002
+
+      d.appendBlockE(challengingBlock) should beRight
+
+      d.liquidAndSolidAssert { () =>
+        val (observer, result) = createObserver[BlockWithHeight]
+        grpcApi.getBlockRange(
+          BlockRangeRequest.of(blockHeight, blockHeight, BlockRangeRequest.Filter.Empty, includeTransactions = true),
+          observer
+        )
+
+        val vrf = getBlockVrfPB(d, challengingBlock)
+        vrf.isEmpty shouldBe false
+
+        result.runSyncUnsafe() shouldBe Seq(
+          BlockWithHeight.of(
+            Some(PBBlocks.protobuf(challengingBlock)),
+            blockHeight,
+            vrf,
+            getExpectedRewardShares(blockHeight, challengingMiner.toAddress, d.blockchain)
+          )
+        )
+      }
+    }
+  }
+
   private def getBlockVrfPB(d: Domain, block: Block): ByteString =
     d.blocksApi.block(block.id()).flatMap(_._1.vrf).map(_.toByteString).getOrElse(ByteString.EMPTY)
 
@@ -238,6 +393,13 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
       val grpcApi = getGrpcApi(d)
 
       checks(daoAddress, xtnBuybackAddress, d, grpcApi)
+    }
+  }
+
+  private def getExpectedRewardShares(height: Int, miner: Address, blockchain: Blockchain): Seq[RewardShare] = {
+    val expectedRewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, miner, blockchain)
+    expectedRewardShares.map { case (addr, reward) =>
+      RewardShare(ByteString.copyFrom(addr.bytes), reward)
     }
   }
 }

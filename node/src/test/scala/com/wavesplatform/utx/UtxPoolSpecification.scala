@@ -14,7 +14,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
+import com.wavesplatform.history.{DefaultWavesSettings, SnapshotOps, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
@@ -383,7 +383,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       """.stripMargin
     )
     val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000L, ts + 1).explicitGet()
-    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
+    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)).block)
   }
 
   "UTX Pool" - {
@@ -462,12 +462,14 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       withStateWithThreeAccounts { case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = TestTime()
 
-        val precondition = TestBlock.create(
-          time.getTimestamp(),
-          bcu.lastBlockId.get,
-          Seq(dAppSetScript(sender3, time)),
-          sender1
-        )
+        val precondition = TestBlock
+          .create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(dAppSetScript(sender3, time)),
+            sender1
+          )
+          .block
         bcu.processBlock(precondition).explicitGet()
 
         val whiteListGen = Gen.oneOf(
@@ -536,12 +538,14 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = TestTime()
 
-        val precondition = TestBlock.create(
-          time.getTimestamp(),
-          bcu.lastBlockId.get,
-          Seq(dAppSetScript(sender3, time)),
-          sender1
-        )
+        val precondition = TestBlock
+          .create(
+            time.getTimestamp(),
+            bcu.lastBlockId.get,
+            Seq(dAppSetScript(sender3, time)),
+            sender1
+          )
+          .block
         bcu.processBlock(precondition).explicitGet()
 
         val whiteListGen = Gen.listOfN(
@@ -572,7 +576,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           Random.shuffle(whitelistedTxs ++ txs).foreach(tx => utx.putIfNew(tx))
 
-          val (packed, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)
+          val (packed, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited)
           packed.get.take(5) should contain theSameElementsAs whitelistedTxs
         }
     }
@@ -656,7 +660,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         val constraint = MultiDimensionalMiningConstraint(
           NonEmptyList.of(
-            OneDimensionalMiningConstraint(1, TxEstimators.scriptRunNumber, "scriptRunNumber"),
+            OneDimensionalMiningConstraint(3, TxEstimators.scriptsComplexity, "KeyBlock"),
             OneDimensionalMiningConstraint(Block.MaxTransactionsPerBlockVer3, TxEstimators.one, "KeyBlock")
           )
         )
@@ -681,7 +685,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.utxPool.addTransaction(transfer1, verify = true)
         d.utxPool.addTransaction(transfer2, verify = true)
 
-        d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1.get shouldEqual Seq(transfer1, transfer2)
+        d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1.get shouldEqual Seq(transfer1, transfer2)
       }
     }
 
@@ -783,7 +787,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true, nanoTimeSource = () => nanoTimeSource())
 
           utxPool.putIfNew(transfer).resultE should beRight
-          val (tx, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Limit(100 nanos))
+          val (tx, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Limit(100 nanos))
           tx.get should contain(transfer)
           utxPool.close()
         }
@@ -804,7 +808,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             )
           val utxPool        = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings, Int.MaxValue, isMiningEnabled = true)
           val startTime      = System.nanoTime()
-          val (result, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Estimate(3 seconds))
+          val (result, _, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Estimate(3 seconds))
           result shouldBe None
           (System.nanoTime() - startTime).nanos.toMillis shouldBe 3000L +- 1000
           utxPool.close()
@@ -930,9 +934,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invokeTx)
         val event = events.head.asInstanceOf[UtxEvent.TxAdded]
         event.tx.id() shouldBe invokeTx.id()
-        event.diff.scriptsComplexity shouldBe 1011
-        event.diff.portfolios(secondAddress) shouldBe Portfolio.waves(-1)
-        event.diff.portfolios(recipient) shouldBe Portfolio.waves(1)
+        event.snapshot.scriptsComplexity shouldBe 1011
+        event.snapshot.balances((secondAddress, Waves)) shouldBe d.blockchainUpdater.balance(secondAddress, Waves) - 1
+        event.snapshot.balances((recipient, Waves)) shouldBe d.blockchainUpdater.balance(recipient, Waves) + 1
         utx.close()
       }
 
@@ -999,7 +1003,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
           utx.all shouldBe Seq(invoke)
 
-          val (result, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Estimate(3 seconds))
+          val (result, _, _) = utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Estimate(3 seconds))
           result shouldBe Some(Seq(invoke))
           utx.close()
         }
@@ -1020,7 +1024,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val transfer1 = TxHelpers.transfer(amount = 10.waves)
         val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
 
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.createDiff(transfer1)))
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(SnapshotOps.fromDiff(d.createDiff(transfer1), d.blockchain).explicitGet()))
         d.utxPool.addTransaction(transfer2, verify = false)
 
         d.utxPool.cleanUnconfirmed()
@@ -1060,12 +1064,12 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             utx.removeAll(rest)
             None
           }
-          val tb = TestBlock.create(Nil)
+          val tb = TestBlock.create(Nil).block
           (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 
           utx.putIfNew(tx1).resultE should beRight
           rest.foreach(utx.putIfNew(_).resultE should beRight)
-          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited) should matchPattern {
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited) should matchPattern {
             case (Some(Seq(`tx1`)), _, _) => // Success
           }
           utx.all shouldBe Seq(tx1)
@@ -1104,7 +1108,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
         forAll(preconditions) { case (genesis, validTransfer, invalidTransfer) =>
           withDomain() { d =>
-            d.appendBlock(TestBlock.create(Seq(genesis)))
+            d.appendBlock(TestBlock.create(Seq(genesis)).block)
             val time   = TestTime()
             val events = new ListBuffer[UtxEvent]
             val utxPool =
@@ -1137,7 +1141,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             assertEvents { case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass
             }
 
-            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)
+            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited)
             assertEvents { case UtxEvent.TxRemoved(`invalidTransfer`, Some(_)) +: Nil => // Pass
             }
 
@@ -1148,7 +1152,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             addUnverified(validTransfer)
             events.clear()
             time.advance(maxAge + 1000.millis)
-            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)
+            utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited)
             assertEvents { case UtxEvent.TxRemoved(`validTransfer`, Some(GenericError("Expired"))) +: Nil => // Pass
             }
           }
