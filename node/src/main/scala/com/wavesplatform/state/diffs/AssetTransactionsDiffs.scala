@@ -79,7 +79,9 @@ object AssetTransactionsDiffs {
       _ <- checkSize(blockchain, tx.script)
       snapshot <- StateSnapshot.build(
         blockchain,
-        assetScripts = Map(tx.asset -> script.map(AssetScriptInfo.tupled)),
+        assetScripts = script.fold(Map[IssuedAsset, AssetScriptInfo]()) { case (script, complexity) =>
+          Map(tx.asset -> AssetScriptInfo(script, complexity))
+        },
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value))
       )
     } yield snapshot
@@ -120,7 +122,9 @@ object AssetTransactionsDiffs {
       _      <- checkEstimationOverflow(blockchain, script)
       snapshot <- StateSnapshot.build(
         blockchain,
-        assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled)),
+        assetScripts = script.fold(Map[IssuedAsset, AssetScriptInfo]()) { case (script, complexity) =>
+          Map(asset -> AssetScriptInfo(script, complexity))
+        },
         issuedAssets = VectorMap(asset -> NewAssetInfo(assetStatic, assetInfo, assetVolume)),
         portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value))
       )
