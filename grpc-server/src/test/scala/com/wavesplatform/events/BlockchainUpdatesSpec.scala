@@ -860,6 +860,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
           xtnBuybackAddress,
           d.blockchain
         )
+
         append.stateUpdate.get.balances shouldBe Seq(
           PBBalanceUpdate(
             challengingMiner.toAddress.toByteString,

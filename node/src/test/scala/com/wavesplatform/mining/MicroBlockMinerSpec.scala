@@ -1,7 +1,6 @@
 package com.wavesplatform.mining
 
 import java.util.concurrent.CountDownLatch
-
 import com.wavesplatform.TestValues
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.ProtoBlockVersion
@@ -19,7 +18,7 @@ import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, transfer}
 import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl, UtxPriorityPool}
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -109,7 +108,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
   "Micro block miner" should "retry packing UTX regardless of when event has been sent" in {
     withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
       import Scheduler.Implicits.global
-      val utxEvents = ConcurrentSubject.publish[UtxEvent]
+      val utxEvents        = ConcurrentSubject.publish[UtxEvent]
       val eventHasBeenSent = new CountDownLatch(1)
       val inner = new UtxPoolImpl(
         ntpTime,
@@ -124,7 +123,6 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
       )
 
       val utxPool = new UtxPool {
-
 
         override def packUnconfirmed(
             rest: MultiDimensionalMiningConstraint,
@@ -141,14 +139,18 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           (txs, waitingConstraint, stateHash)
         }
 
-        override def putIfNew(tx: Transaction, forceValidate: Boolean) = inner.putIfNew(tx, forceValidate)
-        override def removeAll(txs: Iterable[Transaction]): Unit       = inner.removeAll(txs)
-        override def all                                               = inner.all
-        override def size                                              = inner.size
-        override def transactionById(transactionId: ByteStr)           = inner.transactionById(transactionId)
-        override def close(): Unit                                     = inner.close()
-        override def scheduleCleanup(): Unit                           = inner.scheduleCleanup()
-        override def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit = inner.setPrioritySnapshots(snapshots)
+        override def putIfNew(tx: Transaction, forceValidate: Boolean)                = inner.putIfNew(tx, forceValidate)
+        override def removeAll(txs: Iterable[Transaction]): Unit                      = inner.removeAll(txs)
+        override def all                                                              = inner.all
+        override def size                                                             = inner.size
+        override def transactionById(transactionId: ByteStr)                          = inner.transactionById(transactionId)
+        override def close(): Unit                                                    = inner.close()
+        override def scheduleCleanup(): Unit                                          = inner.scheduleCleanup()
+        override def setPrioritySnapshots(snapshots: Seq[StateSnapshot]): Unit        = inner.setPrioritySnapshots(snapshots)
+        override def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit = inner.addAndScheduleCleanup(transactions)
+        override def resetPriorityPool(): Unit                                        = inner.resetPriorityPool()
+        override def cleanUnconfirmed(): Unit                                         = inner.cleanUnconfirmed()
+        override def getPriorityPool: Option[UtxPriorityPool]                         = inner.getPriorityPool
       }
 
       val miner    = Schedulers.singleThread("miner")

@@ -1,25 +1,23 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.traverse.*
-import com.wavesplatform.account.{Address, KeyPair, SeedKeyPair}
+import com.wavesplatform.account.{Address, SeedKeyPair}
 import com.wavesplatform.block.{Block, ChallengedHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
-import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
-import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -27,31 +25,18 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import monix.execution.Scheduler
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 trait BlockChallenger {
-  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr): Task[Unit]
-  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr): Task[Unit]
+  def challengeBlock(block: Block, ch: Channel): Task[Unit]
+  def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit]
   def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)]
   def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]]
   def getProcessingTx(id: ByteStr): Option[Transaction]
   def allProcessingTxs: Seq[Transaction]
-}
-
-object BlockChallenger {
-  val NoOp: BlockChallenger = new BlockChallenger {
-    override def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr): Task[Unit]            = Task.unit
-    override def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr): Task[Unit] = Task.unit
-    override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] =
-      Left(GenericError("There are no suitable accounts"))
-    override def getChallengingAccounts(challengedMiner: Address): Either[ValidationError, Seq[(SeedKeyPair, Long)]] = Right(Seq.empty)
-    override def getProcessingTx(id: ByteStr): Option[Transaction]                                                   = None
-    override def allProcessingTxs: Seq[Transaction]                                                                  = Seq.empty
-  }
 }
 
 class BlockChallengerImpl(
@@ -61,14 +46,13 @@ class BlockChallengerImpl(
     settings: WavesSettings,
     timeService: Time,
     pos: PoSSelector,
-    minerScheduler: Scheduler,
     appendBlock: Block => Task[Either[ValidationError, BlockApplyResult]]
 ) extends BlockChallenger
     with ScorexLogging {
 
   private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
-  def challengeBlock(block: Block, ch: Channel, prevStateHash: ByteStr): Task[Unit] = {
+  def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
     log.debug(s"Challenging block $block")
 
     withProcessingTxs(block.transactionData) {
@@ -79,21 +63,24 @@ class BlockChallengerImpl(
             block.header.stateHash,
             block.signature,
             block.transactionData,
-            prevStateHash
+            blockchainUpdater.lastStateHash(Some(block.header.reference))
           )
         )
-        applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+        applyResult <- EitherT(appendBlock(challengingBlock))
       } yield applyResult -> challengingBlock).value
     }.map {
       case Right((Applied(_, _), challengingBlock)) =>
         log.debug(s"Successfully challenged $block with $challengingBlock")
-        allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+        BlockStats.challenged(challengingBlock, blockchainUpdater.height)
+        if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
+          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+        }
       case Right((_, challengingBlock)) => log.debug(s"Ignored challenging block $challengingBlock")
       case Left(err)                    => log.debug(s"Could not challenge $block: $err")
     }
   }
 
-  def challengeMicroblock(md: MicroblockData, ch: Channel, prevStateHash: ByteStr): Task[Unit] = {
+  def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
     val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
     log.debug(s"Challenging microblock $idStr")
 
@@ -109,17 +96,20 @@ class BlockChallengerImpl(
               md.microBlock.stateHash,
               md.microBlock.totalResBlockSig,
               txs,
-              prevStateHash
+              blockchainUpdater.lastStateHash(Some(block.header.reference))
             )
           )
-          applyResult <- EitherT(appendBlock(challengingBlock).asyncBoundary)
+          applyResult <- EitherT(appendBlock(challengingBlock))
         } yield applyResult -> challengingBlock).value
       })
     } yield {
       applyResult match {
         case Applied(_, _) =>
           log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
-          allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+          BlockStats.challenged(challengingBlock, blockchainUpdater.height)
+          if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
+            allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
+          }
         case _ =>
           log.debug(s"Ignored challenging block $challengingBlock")
       }
@@ -164,24 +154,33 @@ class BlockChallengerImpl(
       txs: Seq[Transaction],
       prevStateHash: ByteStr
   ): Task[Either[ValidationError, Block]] = Task {
-    val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
+    val prevBlockHeader = blockchainUpdater
+      .heightOf(challengedBlock.header.reference)
+      .flatMap(blockchainUpdater.blockHeader)
+      .map(_.header)
+      .getOrElse(blockchainUpdater.lastBlockHeader.get.header)
 
     for {
       allAccounts  <- getChallengingAccounts(challengedBlock.sender.toAddress)
       (acc, delay) <- pickBestAccount(allAccounts)
-      blockTime = lastBlockHeader.timestamp + delay
+      blockTime = prevBlockHeader.timestamp + delay
+      _ <- Either.cond(
+        blockTime < challengedBlock.header.timestamp,
+        (),
+        GenericError(s"Challenging block timestamp ($blockTime) is not better than challenged block timestamp (${challengedBlock.header.timestamp})")
+      )
       consensusData <-
         pos.consensusData(
           acc,
           blockchainUpdater.height,
           blockchainUpdater.settings.genesisSettings.averageBlockDelay,
-          lastBlockHeader.baseTarget,
-          lastBlockHeader.timestamp,
-          blockchainUpdater.parentHeader(lastBlockHeader, 2).map(_.timestamp),
+          prevBlockHeader.baseTarget,
+          prevBlockHeader.timestamp,
+          blockchainUpdater.parentHeader(prevBlockHeader, 2).map(_.timestamp),
           blockTime
         )
 
-      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, acc.toAddress)
+      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, acc.toAddress)
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,
@@ -196,6 +195,27 @@ class BlockChallengerImpl(
         None
       )
       hitSource <- pos.validateGenerationSignature(blockWithoutChallengeAndStateHash)
+      blockchainWithNewBlock = SnapshotBlockchain(
+        blockchainUpdater,
+        StateSnapshot.empty,
+        blockWithoutChallengeAndStateHash,
+        hitSource,
+        0,
+        blockchainUpdater.computeNextReward,
+        None
+      )
+      stateHash <- TxStateSnapshotHashBuilder
+        .computeStateHash(
+          txs,
+          TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
+          initialBlockSnapshot,
+          acc,
+          Some(prevBlockHeader.timestamp),
+          blockTime,
+          isChallenging = true,
+          blockchainWithNewBlock
+        )
+        .resultE
       challengingBlock <-
         Block.buildAndSign(
           challengedBlock.header.version,
@@ -207,16 +227,7 @@ class BlockChallengerImpl(
           acc,
           blockFeatures(blockchainUpdater, settings),
           blockRewardVote(settings),
-          Some(
-            computeStateHash(
-              txs,
-              TxStateSnapshotHashBuilder.createHashFromSnapshot(initialBlockSnapshot, None).createHash(prevStateHash),
-              initialBlockSnapshot,
-              acc,
-              lastBlockHeader.timestamp,
-              SnapshotBlockchain(blockchainUpdater, StateSnapshot.empty, blockWithoutChallengeAndStateHash, hitSource, 0, None)
-            )
-          ),
+          Some(stateHash),
           Some(
             ChallengedHeader(
               challengedBlock.header.timestamp,
@@ -231,9 +242,10 @@ class BlockChallengerImpl(
           )
         )
     } yield {
+      log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
     }
-  }.executeOn(minerScheduler).flatMap {
+  }.flatMap {
     case res @ Right(block) => waitForTimeAlign(block.header.timestamp).map(_ => res)
     case err @ Left(_)      => Task(err)
   }
@@ -261,31 +273,4 @@ class BlockChallengerImpl(
         Task.unit
       }
     }
-
-  private def computeStateHash(
-      txs: Seq[Transaction],
-      initStateHash: ByteStr,
-      initSnapshot: StateSnapshot,
-      signer: KeyPair,
-      prevBlockTimestamp: Long,
-      blockchain: Blockchain
-  ): ByteStr = {
-    val txDiffer = TransactionDiffer(Some(prevBlockTimestamp), blockchain.lastBlockTimestamp.get) _
-
-    txs
-      .foldLeft(initStateHash -> initSnapshot) { case ((prevStateHash, accSnapshot), tx) =>
-        val accBlockchain = SnapshotBlockchain(blockchain, accSnapshot)
-        val minerPortfolio = Map(signer.toAddress -> Portfolio.waves(tx.fee).multiply(CurrentBlockFeePart))
-        txDiffer(accBlockchain, tx).resultE match {
-          case Right(txSnapshot) =>
-            val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
-            val txInfo                 = txSnapshot.transactions.head._2
-            val stateHash =
-              TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshotWithBalances, Some(txInfo)).createHash(prevStateHash)
-            (stateHash, accSnapshot |+| txSnapshotWithBalances)
-          case Left(_) => (prevStateHash, accSnapshot)
-        }
-      }
-      ._1
-  }
 }

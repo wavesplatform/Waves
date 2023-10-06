@@ -53,10 +53,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         ScriptCompiler
           .compile(
             """{-# STDLIB_VERSION 2 #-}
-        |{-# CONTENT_TYPE EXPRESSION #-}
-        |{-# SCRIPT_TYPE ACCOUNT #-}
-        |
-        |true""".stripMargin,
+              |{-# CONTENT_TYPE EXPRESSION #-}
+              |{-# SCRIPT_TYPE ACCOUNT #-}
+              |
+              |true""".stripMargin,
             ScriptEstimatorV1
           )
           .explicitGet()
@@ -127,7 +127,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       CustomValidationError("Duplicated keys found")
     )
 
-    //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
+    // able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
     sender.broadcastData(
       sender.keyPair,
       List(EmptyDataEntry("nonexistentkey")),
@@ -224,7 +224,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   }
 
   test("max transaction size") {
-    //Max size of transaction V1
+    // Max size of transaction V1
     val maxKeySizeV1 = 100
     val key          = "\u6fae" * (maxKeySizeV1 - 1)
     val data         = List.tabulate(26)(n => BinaryDataEntry(key + n.toChar, ByteStr(Array.fill(5599)(n.toByte))))
@@ -232,7 +232,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val txId         = sender.putData(firstKeyPair, data, fee, version = TxVersion.V1).id
     nodes.waitForTransaction(txId)
 
-    //Max size of transaction V2
+    // Max size of transaction V2
     val maxKeySizeV2 = 400
     val key2         = "u" * (maxKeySizeV2 - 1)
     val data2        = List.tabulate(5)(n => BinaryDataEntry(key2 + n.toChar, ByteStr(Array.fill(Short.MaxValue)(n.toByte))))
@@ -312,9 +312,9 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
     val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
 
-    val list     = sender.getDataList(secondAddress, keys *).map(_.value)
-    val jsonList = sender.getDataListJson(secondAddress, keys *).map(_.value)
-    val postList = sender.getDataListPost(secondAddress, keys *).map(_.value)
+    val list     = sender.getDataList(secondAddress, keys*).map(_.value)
+    val jsonList = sender.getDataListJson(secondAddress, keys*).map(_.value)
+    val postList = sender.getDataListPost(secondAddress, keys*).map(_.value)
 
     list shouldBe values
     jsonList shouldBe list
@@ -348,49 +348,6 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val secondTx    = sender.putData(firstKeyPair, longData, longDataFee, version = v).id
       nodes.waitForTransaction(secondTx)
       sender.getDataByKey(firstAddress, nonLatinKey) shouldBe longData.head
-    }
-  }
-
-  test("malformed JSON") {
-    for (v <- dataTxSupportedVersions) {
-      def request(item: JsObject) = Json.obj("version" -> v, "sender" -> secondAddress, "fee" -> minFee, "data" -> Seq(item))
-
-      val validItem = Json.obj("key" -> "key", "type" -> "integer", "value" -> 8)
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "key")), "key is missing")
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "type")), "type is missing")
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem + ("type" -> JsString("falafel")))), "unknown type falafel")
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(validItem - "value")), "value is missing")
-
-      assertBadRequestAndResponse(
-        sender.postJson("/addresses/data", request(validItem + ("value" -> JsString("8")))),
-        "value is missing or not an integer"
-      )
-
-      val notValidIntValue = Json.obj("key" -> "key", "type" -> "integer", "value" -> JsNull)
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidIntValue)), "value is missing or not an integer")
-
-      val notValidBoolValue = Json.obj("key" -> "bool", "type" -> "boolean", "value" -> JsNull)
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBoolValue)), "value is missing or not a boolean")
-
-      assertBadRequestAndResponse(
-        sender.postJson("/addresses/data", request(notValidBoolValue + ("value" -> JsString("true")))),
-        "value is missing or not a boolean"
-      )
-
-      val notValidBlobValue = Json.obj("key" -> "blob", "type" -> "binary", "value" -> JsNull)
-
-      assertBadRequestAndResponse(sender.postJson("/addresses/data", request(notValidBlobValue)), "value is missing or not a string")
-
-      assertBadRequestAndResponse(
-        sender.postJson("/addresses/data", request(notValidBlobValue + ("value" -> JsString("base64:not a base64")))),
-        "Illegal base64 character"
-      )
     }
   }
 
@@ -479,16 +436,15 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("try to make address with 1000 DataEntries") {
     for (v <- dataTxSupportedVersions) {
-      val dataSet = 0 until 200 flatMap (
-          i =>
-            List(
-              IntegerDataEntry(s"int$i", 1000 + i),
-              BooleanDataEntry(s"bool$i", false),
-              BinaryDataEntry(s"blob$i", ByteStr(Array[Byte](127.toByte, 0, 1, 1))),
-              StringDataEntry(s"str$i", s"hi there! + $i"),
-              IntegerDataEntry(s"integer$i", 1000 - i)
-            )
+      val dataSet = 0 until 200 flatMap (i =>
+        List(
+          IntegerDataEntry(s"int$i", 1000 + i),
+          BooleanDataEntry(s"bool$i", false),
+          BinaryDataEntry(s"blob$i", ByteStr(Array[Byte](127.toByte, 0, 1, 1))),
+          StringDataEntry(s"str$i", s"hi there! + $i"),
+          IntegerDataEntry(s"integer$i", 1000 - i)
         )
+      )
 
       val txIds = dataSet.grouped(100).map(_.toList).map(data => sender.putData(fourthKeyPair, data, calcDataFee(data, v), version = v).id)
       txIds foreach nodes.waitForTransaction

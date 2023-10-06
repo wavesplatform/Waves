@@ -55,7 +55,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     Thread.sleep(5000)
     utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1 shouldBe Some(Seq(tx))
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe Some(Seq(tx))
   }
 
   it should s"reject Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer" in utxTest { (d, utx) =>
@@ -80,7 +80,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.cleanUnconfirmed()
     utx.all shouldBe Seq(tx)
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1 shouldBe None
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe None
     intercept[RuntimeException](d.appendBlock(tx))
 
     d.blockchain.transactionMeta(tx.id()) shouldBe None
@@ -112,7 +112,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     Thread.sleep(5000)
     utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1 shouldBe Some(Seq(tx))
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe Some(Seq(tx))
     d.appendBlock(tx)
 
     d.blockchain.transactionMeta(tx.id()) shouldBe Some(TxMeta(Height(3), Status.Failed, 1212))
@@ -152,7 +152,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     Thread.sleep(5000)
     utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1 shouldBe Some(Seq(tx))
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe Some(Seq(tx))
   }
 
   it should s"drop failed Exchange with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
@@ -190,7 +190,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     Thread.sleep(5000)
     utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None)._1 shouldBe Some(Seq(tx))
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None)._1 shouldBe Some(Seq(tx))
   }
 
   it should "cleanup transaction when script result changes" in utxTest { (d, utx) =>

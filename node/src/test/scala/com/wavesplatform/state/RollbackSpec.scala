@@ -54,7 +54,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
     }
   }
 
-  "Rollback resets" - {
+  "NODE-1143, NODE-1144. Rollback resets" - {
     "Rollback save dropped blocks order" in {
       val sender         = TxHelpers.signer(1)
       val initialBalance = 100.waves
@@ -76,7 +76,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val droppedBlocks = d.rollbackTo(genesisSignature).map(_._1)
         droppedBlocks(0).header.reference shouldBe genesisSignature
         droppedBlocks.map(_.id()).toList shouldBe blocks
-        droppedBlocks foreach d.appendBlock
+        droppedBlocks.foreach { block =>
+          d.appendBlockE(block) should beRight
+        }
       }
     }
 
@@ -1029,31 +1031,31 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         def carry(fee: Long): Long = fee - fee / 5 * 2
 
-        d.carryFee shouldBe carry(0)
+        d.carryFee(None) shouldBe carry(0)
 
         val issueBlockId = appendBlock(issue)
-        d.carryFee shouldBe carry(issue.fee.value)
+        d.carryFee(None) shouldBe carry(issue.fee.value)
 
         val sponsorBlockId = appendBlock(sponsor1)
-        d.carryFee shouldBe carry(sponsor1.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor1.fee.value)
 
         appendBlock(transfer)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
 
         d.rollbackTo(sponsorBlockId)
-        d.carryFee shouldBe carry(sponsor1.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor1.fee.value)
 
         d.rollbackTo(issueBlockId)
-        d.carryFee shouldBe carry(issue.fee.value)
+        d.carryFee(None) shouldBe carry(issue.fee.value)
 
         val transferBlockId = appendBlock(transfer)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
 
         appendBlock(sponsor2)
-        d.carryFee shouldBe carry(sponsor2.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor2.fee.value)
 
         d.rollbackTo(transferBlockId)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
       }
     }
 

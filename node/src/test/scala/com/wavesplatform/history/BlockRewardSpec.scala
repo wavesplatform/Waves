@@ -263,32 +263,32 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result =
-      BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited: MiningConstraint, b.header.generationSignature).explicitGet()
+      BlockDiffer.fromBlock(blockchain, prevBlock, b, None, MiningConstraint.Unlimited: MiningConstraint, b.header.generationSignature).explicitGet()
 
     "when NG state is empty" in forAll(ngEmptyScenario) { case (miner1, miner2, b2s, b3, m3s) =>
       withDomain(rewardSettings) { d =>
         b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-          val BlockDiffer.Result(diff, carryFee, totalFee, _, _, _) = differ(d.rocksDBWriter, prevBlock, curBlock)
-          d.rocksDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, curBlock)
+          val BlockDiffer.Result(diff, carryFee, totalFee, _, _, computedStateHash) = differ(d.rocksDBWriter, prevBlock, curBlock)
+          d.rocksDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, computedStateHash, curBlock)
           Some(curBlock)
         }
 
         d.rocksDBWriter.height shouldBe BlockRewardActivationHeight - 1
         d.rocksDBWriter.balance(miner1.toAddress) shouldBe InitialMinerBalance + OneFee
         d.rdb.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.rocksDBWriter.carryFee shouldBe OneCarryFee
+        d.rocksDBWriter.carryFee(None) shouldBe OneCarryFee
 
         d.blockchainUpdater.processBlock(b3) should beRight
         d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneCarryFee
         d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
-        d.blockchainUpdater.carryFee shouldBe 0L
+        d.blockchainUpdater.carryFee(None) shouldBe 0L
 
-        m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb) should beRight)
+        m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb, None) should beRight)
 
         d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
         d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + OneCarryFee
         d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.blockchainUpdater.carryFee shouldBe OneCarryFee
+        d.blockchainUpdater.carryFee(None) shouldBe OneCarryFee
       }
     }
 
@@ -323,19 +323,19 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     "when received better liquid block" in forAll(betterBlockScenario) { case (miner, b1s, m1s, b2a, b2b) =>
       withDomain(rewardSettings) { d =>
         b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
-        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m) should beRight)
+        m1s.foreach(m => d.blockchainUpdater.processMicroBlock(m, None) should beRight)
 
         d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
         d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
-        d.blockchainUpdater.carryFee shouldBe OneCarryFee
+        d.blockchainUpdater.carryFee(None) shouldBe OneCarryFee
 
         d.blockchainUpdater.processBlock(b2a) should beRight
         d.blockchainUpdater.processBlock(b2b) should beRight
 
         d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneCarryFee
         d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
-        d.blockchainUpdater.carryFee shouldBe 0L
+        d.blockchainUpdater.carryFee(None) shouldBe 0L
       }
     }
 

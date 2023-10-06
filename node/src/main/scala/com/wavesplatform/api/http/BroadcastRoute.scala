@@ -6,7 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.concurrent.Future
 

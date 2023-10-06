@@ -22,7 +22,7 @@ object RollbackBenchmark extends ScorexLogging {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val rdb           = RDB.open(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings)
+    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val issuer = KeyPair(new Array[Byte](32))
 
@@ -80,6 +80,7 @@ object RollbackBenchmark extends ScorexLogging {
       0,
       None,
       genesisBlock.header.generationSignature,
+      ByteStr.empty,
       genesisBlock
     )
 
@@ -103,7 +104,7 @@ object RollbackBenchmark extends ScorexLogging {
     val nextSnapshot = StateSnapshot.build(rocksDBWriter, portfolios2.toMap).explicitGet()
 
     log.info("Appending next block")
-    rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, nextBlock)
+    rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, ByteStr.empty, nextBlock)
 
     log.info("Rolling back")
     val start = System.nanoTime()

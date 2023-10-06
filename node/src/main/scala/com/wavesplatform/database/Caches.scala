@@ -13,7 +13,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
@@ -207,6 +207,7 @@ abstract class Caches extends Blockchain with Storage {
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
+      computedBlockStateHash: ByteStr,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -217,7 +218,15 @@ abstract class Caches extends Blockchain with Storage {
       stateHash: StateHashBuilder.Result
   ): Unit
 
-  override def append(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
+  override def append(
+      snapshot: StateSnapshot,
+      carryFee: Long,
+      totalFee: Long,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      computedBlockStateHash: ByteStr,
+      block: Block
+  ): Unit = {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
     val newMeta = PBBlockMeta(
@@ -318,6 +327,7 @@ abstract class Caches extends Blockchain with Storage {
       newMeta,
       snapshot,
       carryFee,
+      computedBlockStateHash,
       newAddressIds,
       VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
@@ -346,9 +356,9 @@ abstract class Caches extends Blockchain with Storage {
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
-  protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
+  protected def doRollback(targetHeight: Int): DiscardedBlocks
 
-  override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr)]] = {
+  override def rollbackTo(height: Int): Either[String, DiscardedBlocks] = {
     for {
       _ <- Either
         .cond(

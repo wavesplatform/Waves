@@ -853,9 +853,9 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
         d.appendBlockE(TxHelpers.setScript(smartAcc, compiledScript)) should produce("Transaction State Snapshot feature has not been activated yet")
         d.appendBlock()
-        d.appendBlockENoCheck(TxHelpers.setScript(smartAcc, compiledScript)) should beRight
+        d.appendBlockE(TxHelpers.setScript(smartAcc, compiledScript)) should beRight
 
-        d.appendBlockENoCheck(exchange()) should beRight
+        d.appendBlockE(exchange()) should beRight
       }
     }
   }
