@@ -33,7 +33,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
           BlockchainFeatures.SynchronousCalls.id.toInt         -> 0,
           BlockchainFeatures.RideV6.id.toInt                   -> 0,
           BlockchainFeatures.ConsensusImprovements.id.toInt    -> 0,
-          BlockchainFeatures.TransactionStateSnapshot.id.toInt -> 0
+          BlockchainFeatures.LightNode.id.toInt -> 0
         )
       )
       .withDefault(1)

@@ -236,7 +236,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
   }
 
   property(
-    s"NODE-889. Block without challenge (before ${BlockchainFeatures.TransactionStateSnapshot} activation) should not contain ChallengedHeader"
+    s"NODE-889. Block without challenge (before ${BlockchainFeatures.LightNode} activation) should not contain ChallengedHeader"
   ) {
     val sender           = TxHelpers.signer(1)
     val challengedMiner  = TxHelpers.signer(2)
@@ -1032,11 +1032,11 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     }
   }
 
-  property(s"NODE-910. Block at ${BlockchainFeatures.TransactionStateSnapshot} activation height can be challenged") {
+  property(s"NODE-910. Block at ${BlockchainFeatures.LightNode} activation height can be challenged") {
     withDomain(
       DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
-        .setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 1003),
+        .setFeaturesHeight(BlockchainFeatures.LightNode -> 1003),
       balances = AddrWithBalance.enoughBalances(defaultSigner)
     ) { d =>
       val challengingMiner = d.wallet.generateNewAccount().get
@@ -1044,7 +1044,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
       d.appendBlock(TxHelpers.transfer(defaultSigner, challengingMiner.toAddress, 1000.waves))
       (1 to 1000).foreach(_ => d.appendBlock())
 
-      d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
+      d.blockchain.isFeatureActivated(BlockchainFeatures.LightNode) shouldBe false
 
       val originalBlock = d.createBlock(
         Block.ProtoBlockVersion,
@@ -1107,7 +1107,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
     withDomain(
       DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
-        .setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 1008),
+        .setFeaturesHeight(BlockchainFeatures.LightNode -> 1008),
       balances = AddrWithBalance.enoughBalances(sender)
     ) { d =>
       val challengingMiner = d.wallet.generateNewAccount().get
@@ -1975,7 +1975,7 @@ class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTes
   private def rollbackActivationHeightScenario(d: Domain, challengedMiner: KeyPair, txs: Seq[Transaction]): Assertion = {
     (1 to 6).foreach(_ => d.appendBlock())
 
-    d.blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) shouldBe false
+    d.blockchain.isFeatureActivated(BlockchainFeatures.LightNode) shouldBe false
 
     val originalBlock = d.createBlock(
       Block.ProtoBlockVersion,
