@@ -6,19 +6,19 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.*
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
-import com.wavesplatform.lang.v1.compiler.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
 import org.scalatest.Assertion
@@ -1032,14 +1032,14 @@ class DecompilerTest extends PropSpec {
 
   property("BigInt unary minus") {
     assertDecompile(
-      s"""
-         |let a = -toBigInt(1)
-         |true
-       """,
-      s"""
-         |let a = -(toBigInt(1))
-         |true
-       """,
+      """
+        |let a = -toBigInt(1)
+        |true
+      """,
+      """
+        |let a = -(toBigInt(1))
+        |true
+      """,
       V5
     )
   }
@@ -1115,5 +1115,15 @@ class DecompilerTest extends PropSpec {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V6)
       .foreach(assertDecompile(script, decompiledV6, _))
+  }
+
+  property("calculateDelay() and replaceByIndex()") {
+    val script =
+      """
+        |let a = calculateDelay(base58'aaa', 123, Address(base58'bbb'), 456)
+        |let b = replaceByIndex(["a", "b", "c"], 1, "x")
+        |true
+      """
+    assertDecompile(script, script, V8)
   }
 }
