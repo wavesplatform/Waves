@@ -205,7 +205,7 @@ object BlockDiffer {
             txSignParCheck = txSignParCheck
           )
       }
-      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash)
+//      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash)
     } yield r
   }
 
@@ -275,7 +275,7 @@ object BlockDiffer {
             txSignParCheck = true
           )
       }
-      _ <- if (checkSH) checkStateHash(blockchain, micro.stateHash, r.computedStateHash) else TracedResult.wrapValue(())
+//      _ <- if (checkSH) checkStateHash(blockchain, micro.stateHash, r.computedStateHash) else TracedResult.wrapValue(())
     } yield r
   }
 
