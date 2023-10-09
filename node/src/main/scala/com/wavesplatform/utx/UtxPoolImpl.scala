@@ -17,7 +17,7 @@ import com.wavesplatform.state.diffs.SetScriptTransactionDiff.*
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxMeta, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -428,11 +428,17 @@ case class UtxPoolImpl(
                           r.validatedTransactions + tx.id(),
                           r.removedTransactions,
                           r.stateHash
-                            .map(prevStateHash =>
-                              TxStateSnapshotHashBuilder
-                                .createHashFromSnapshot(fullTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
-                                .createHash(prevStateHash)
-                            )
+                            .map { prevStateHash =>
+                              if (tx.isInstanceOf[TransferTransaction]) {
+                                TxStateSnapshotHashBuilder
+                                  .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(txInfo.transaction.id(), TxMeta.Status.Elided)))
+                                  .createHash(prevStateHash)
+                              } else {
+                                TxStateSnapshotHashBuilder
+                                  .createHashFromSnapshot(fullTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                                  .createHash(prevStateHash)
+                              }
+                            }
                         )
                       }).fold(
                         error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
