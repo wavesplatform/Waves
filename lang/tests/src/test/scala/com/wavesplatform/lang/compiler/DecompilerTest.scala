@@ -1117,13 +1117,13 @@ class DecompilerTest extends PropSpec {
       .foreach(assertDecompile(script, decompiledV6, _))
   }
 
-  property("calculateDelay() and replaceByIndex()") {
-    val script =
-      """
-        |let a = calculateDelay(base58'aaa', 123, Address(base58'bbb'), 456)
-        |let b = replaceByIndex(["a", "b", "c"], 1, "x")
-        |true
-      """
+  property("calculateDelay()") {
+    val script = "calculateDelay(base58'aaa', 123, Address(base58'bbb'), 456)"
+    assertDecompile(script, script, V8)
+  }
+
+  property("replaceByIndex()") {
+    val script = """replaceByIndex(["a", "b", "c"], 1, "x")"""
     assertDecompile(script, script, V8)
   }
 }
