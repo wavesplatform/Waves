@@ -17,7 +17,7 @@ import com.wavesplatform.state.diffs.SetScriptTransactionDiff.*
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Portfolio, StateSnapshot, TxMeta, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, NewTransactionInfo, Portfolio, StateSnapshot, TxMeta, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -391,7 +391,10 @@ case class UtxPoolImpl(
                 val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
                 val e                   = differ(updatedBlockchain, tx).resultE
                 e match {
-                  case Right(newSnapshot) =>
+                  case Right(validNewSnapshot) =>
+                    val newSnapshot = if (tx.isInstanceOf[TransferTransaction]) {
+                      StateSnapshot.empty.withTransaction(NewTransactionInfo(tx, StateSnapshot.empty, Set.empty, TxMeta.Status.Elided, 0))
+                    } else validNewSnapshot
                     val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newSnapshot)
                     if (updatedConstraint.isOverfilled) {
                       log.trace(
@@ -429,15 +432,9 @@ case class UtxPoolImpl(
                           r.removedTransactions,
                           r.stateHash
                             .map { prevStateHash =>
-                              if (tx.isInstanceOf[TransferTransaction]) {
-                                TxStateSnapshotHashBuilder
-                                  .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(txInfo.transaction.id(), TxMeta.Status.Elided)))
-                                  .createHash(prevStateHash)
-                              } else {
-                                TxStateSnapshotHashBuilder
-                                  .createHashFromSnapshot(fullTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
-                                  .createHash(prevStateHash)
-                              }
+                              TxStateSnapshotHashBuilder
+                                .createHashFromSnapshot(fullTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                                .createHash(prevStateHash)
                             }
                         )
                       }).fold(

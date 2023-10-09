@@ -366,7 +366,10 @@ object BlockDiffer {
               tx
             ) =>
           val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
-          val res = txDiffer(currBlockchain, tx).flatMap { txSnapshot =>
+          val res = txDiffer(currBlockchain, tx).flatMap { validTxSnapshot =>
+            val txSnapshot = if (tx.isInstanceOf[TransferTransaction]) {
+              StateSnapshot.empty.withTransaction(NewTransactionInfo(tx, StateSnapshot.empty, Set.empty, TxMeta.Status.Elided, 0))
+            } else validTxSnapshot
             val updatedConstraint = currConstraint.put(currBlockchain, tx, txSnapshot)
             if (updatedConstraint.isOverfilled)
               TracedResult(Left(GenericError(s"Limit of txs was reached: $initConstraint -> $updatedConstraint")))
