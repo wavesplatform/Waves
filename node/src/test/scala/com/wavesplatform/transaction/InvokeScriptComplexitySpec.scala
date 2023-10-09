@@ -65,7 +65,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val settings = domainSettingsWithFS(
     SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures =
       BlockchainFeatures.implemented
-        .excl(BlockchainFeatures.TransactionStateSnapshot.id)
+        .excl(BlockchainFeatures.LightNode.id)
         .map {
           case v @ BlockchainFeatures.FeeSponsorship.id =>
             v -> -SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod

@@ -11,7 +11,7 @@ import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFacto
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.TransactionStateSnapshot
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.history.{Domain, SnapshotOps}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -317,7 +317,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       signer: KeyPair,
       blockchain: BlockchainUpdater & Blockchain
   ): TracedResult[ValidationError, Block] = {
-    (if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
+    (if (blockchain.isFeatureActivated(LightNode, blockchain.height + 1)) {
        val compBlockchain =
          SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
        val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
@@ -400,7 +400,7 @@ trait WithDomain extends WithState { _: Suite =>
           domain.appendBlock(
             createGenesisWithStateHash(
               genesis,
-              bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, 1),
+              bcu.isFeatureActivated(BlockchainFeatures.LightNode, 1),
               Some(settings.blockchainSettings.genesisSettings.initialBaseTarget)
             )
           )

@@ -14,7 +14,7 @@ import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, TransactionStateSnapshot}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, LightNode}
 import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -30,7 +30,7 @@ import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{BlockchainUpdater, *}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -300,7 +300,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   ): Either[ValidationError, MicroBlock] = {
     val lastBlock   = this.lastBlock
     val blockSigner = signer.getOrElse(defaultSigner)
-    val stateHashE = if (blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)) {
+    val stateHashE = if (blockchain.isFeatureActivated(BlockchainFeatures.LightNode)) {
       stateHash
         .map(Right(_))
         .getOrElse(
@@ -447,7 +447,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           challengedHeader = challengedHeader
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
-        if (blockchain.isFeatureActivated(TransactionStateSnapshot, blockchain.height + 1)) {
+        if (blockchain.isFeatureActivated(LightNode, blockchain.height + 1)) {
           val hitSource = posSelector.validateGenerationSignature(blockWithoutStateHash).getOrElse(blockWithoutStateHash.header.generationSignature)
           val blockchainWithNewBlock =
             SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, hitSource, 0, blockchain.computeNextReward, None)
