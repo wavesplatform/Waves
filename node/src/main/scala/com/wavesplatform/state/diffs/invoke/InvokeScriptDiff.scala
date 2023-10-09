@@ -8,7 +8,7 @@ import cats.syntax.traverseFilter.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.TransactionStateSnapshot
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.FunctionCallPolicyProvider.*
@@ -241,7 +241,7 @@ object InvokeScriptDiff {
             spentComplexity = remainingComplexity - scriptResult.unusedComplexity.max(0)
 
             _ <-
-              if (blockchain.isFeatureActivated(TransactionStateSnapshot))
+              if (blockchain.isFeatureActivated(LightNode))
                 traced(Right(()))
               else
                 validateIntermediateBalances(blockchain, resultSnapshot, spentComplexity, log)
@@ -353,7 +353,7 @@ object InvokeScriptDiff {
               (resultSnapshot.setScriptsComplexity(0) |+| actionsSnapshot.addScriptsComplexity(paymentsComplexity)).asRight
             )
             _ <-
-              if (blockchain.isFeatureActivated(TransactionStateSnapshot))
+              if (blockchain.isFeatureActivated(LightNode))
                 traced(Right(()))
               else
                 validateIntermediateBalances(blockchain, resultSnapshot, resultSnapshot.scriptsComplexity, log)

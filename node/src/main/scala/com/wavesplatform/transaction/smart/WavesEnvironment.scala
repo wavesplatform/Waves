@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.TransactionStateSnapshot
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -449,7 +449,7 @@ class DAppEnvironment(
           invocationTracker
         )(invoke)
       _ <-
-        if (blockchain.isFeatureActivated(TransactionStateSnapshot))
+        if (blockchain.isFeatureActivated(LightNode))
           validateIntermediateBalances(blockchain, snapshot, totalComplexityLimit - availableComplexity, Nil)
         else
           traced(Right(()))
