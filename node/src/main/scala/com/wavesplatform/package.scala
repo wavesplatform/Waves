@@ -38,7 +38,7 @@ package object wavesplatform {
       .genesis(
         settings.blockchainSettings.genesisSettings,
         blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6),
-        blockchainUpdater.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)
+        blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode)
       )
       .flatMap { genesis =>
         logger.trace(s"Genesis block json: ${genesis.json()}")

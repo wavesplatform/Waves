@@ -579,7 +579,7 @@ object Docker {
       .resolve()
       .getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
     val isRideV6Activated          = features.exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
-    val isTxStateSnapshotActivated = features.exists(_.get(BlockchainFeatures.TransactionStateSnapshot.id).contains(0))
+    val isTxStateSnapshotActivated = features.exists(_.get(BlockchainFeatures.LightNode.id).contains(0))
 
     val genesisSignature = Block.genesis(gs, isRideV6Activated, isTxStateSnapshotActivated).explicitGet().id()
 
