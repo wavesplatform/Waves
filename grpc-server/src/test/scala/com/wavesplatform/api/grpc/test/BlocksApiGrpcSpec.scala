@@ -12,7 +12,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.protobuf.*
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlockHeader, PBBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
 import com.wavesplatform.test.DomainPresets.*
@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
+import com.google.protobuf.empty.Empty
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
 import scala.concurrent.Await
@@ -33,7 +34,7 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
   val recipient: KeyPair      = TxHelpers.signer(2)
   val timeout: FiniteDuration = 1.minute
 
-  "GetBlock should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
+  "Node-941. GetBlock should return block with transactions" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
 
     val block = d.appendBlock(TxHelpers.transfer(sender, recipient.toAddress, 1))
@@ -64,6 +65,93 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
     }
   }
 
+  "Node-1014. GetBlock should return block without transactions if includeTransactions=false" in withDomain(
+    DomainPresets.RideV6,
+    AddrWithBalance.enoughBalances(sender)
+  ) { d =>
+    val grpcApi = getGrpcApi(d)
+
+    val block = d.appendBlock(TxHelpers.transfer(sender, recipient.toAddress, 1))
+
+    // d.liquidAndSolidAssert { () =>
+    val vrf = getBlockVrfPB(d, block)
+    vrf.isEmpty shouldBe false
+
+    val expectedResult = BlockWithHeight.of(
+      Some(PBBlocks.protobuf(block.copy(transactionData = Seq.empty))),
+      2,
+      vrf,
+      Seq(RewardShare(ByteString.copyFrom(block.sender.toAddress.bytes), d.blockchain.settings.rewardsSettings.initial))
+    )
+
+    val resultById = Await.result(
+      grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.BlockId(block.id().toByteString), includeTransactions = false)),
+      timeout
+    )
+
+    resultById shouldBe expectedResult
+
+    val resultByHeight = Await.result(
+      grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.Height(2), includeTransactions = false)),
+      timeout
+    )
+
+    resultByHeight shouldBe expectedResult
+  // }
+  }
+
+  // todo
+  "NODE=1011. GetBlock with height < 1 should produce error" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
+    val grpcApi = getGrpcApi(d)
+    d.appendBlock(TxHelpers.transfer(sender, recipient.toAddress, 1))
+    d.appendBlock()
+    val resultByHeight = Await.result(
+      grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.Height(-2), includeTransactions = false)),
+      timeout
+    )
+
+    print(resultByHeight)
+
+  }
+
+  "NODE=1012. GetBlock with height more than existing should produce error" in withDomain(
+    DomainPresets.RideV6,
+    AddrWithBalance.enoughBalances(sender)
+  ) { d =>
+    val grpcApi = getGrpcApi(d)
+    intercept[Exception](
+      Await.result(grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.Height(2), includeTransactions = false)), timeout)
+    ).toString should include("block does not exist")
+  }
+
+  "NODE=1012. GetBlock with empty blockId should throw error" in withDomain(
+    DomainPresets.RideV6,
+    AddrWithBalance.enoughBalances(sender)
+  ) { d =>
+    val grpcApi = getGrpcApi(d)
+    // grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.BlockId(ByteString.EMPTY)
+    intercept[Exception](
+      Await.result(grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.BlockId(ByteString.EMPTY), includeTransactions = false)), timeout)
+    ).toString should include("block does not exist")
+  }
+
+  // todo genesis
+  "NODE=1103. GetBlock at height 1 should return genesis block" in withDomain(
+    DomainPresets.RideV6
+  ) { d =>
+    val grpcApi = getGrpcApi(d)
+    d.appendBlock(TxHelpers.genesis(sender.toAddress))
+//    val expectedResult = BlockWithHeight.of(
+//      Some(PBBlocks.protobuf(block)),
+//      1,
+//      vrf,
+//      Seq(RewardShare(ByteString.copyFrom(block.sender.toAddress.bytes), d.blockchain.settings.rewardsSettings.initial))
+//    )
+
+    val resultByHeight = Await.result(grpcApi.getBlock(BlockRequest.of(BlockRequest.Request.Height(1), includeTransactions = false)), timeout)
+
+  }
+
   "GetBlockRange should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
 
@@ -88,6 +176,24 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
         )
       }
     }
+  }
+
+  "NODE-1029. GetCurrentHeight should return last block" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
+    val grpcApi = getGrpcApi(d)
+    d.appendBlock(TxHelpers.transfer(sender, recipient.toAddress, 1))
+
+    val lastHeight = Await.result(
+      grpcApi.getCurrentHeight(Empty.of()),
+      timeout
+    )
+    lastHeight shouldBe 2
+
+    d.appendBlock()
+    val nextHeightResult = Await.result(
+      grpcApi.getCurrentHeight(Empty.of()),
+      timeout
+    )
+    nextHeightResult shouldBe 3
   }
 
   "NODE-972. GetBlock and GetBlockRange should return correct data for orders with attachment" in {
