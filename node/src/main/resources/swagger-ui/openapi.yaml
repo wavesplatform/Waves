@@ -2470,6 +2470,38 @@ paths:
                     type: string
                   balance:
                     type: string
+  '/assets/{assetId}/distribution':
+    get:
+      tags:
+        - assets
+      summary: Asset balance distribution
+      description: Get asset balance distribution by addresses
+      operationId: getAssetDistributionOld
+      parameters:
+        - $ref: '#/components/parameters/assetId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int64
+                description: map of assetId <-> balance
+                example:
+                  2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: 15
+                  3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: 25
+            application/json;large-significand-format=string:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                description: map of assetId <-> balance
+                example:
+                  2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: "15"
+                  3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: "25"
   '/assets/{assetId}/distribution/{height}/limit/{limit}':
     get:
       tags:

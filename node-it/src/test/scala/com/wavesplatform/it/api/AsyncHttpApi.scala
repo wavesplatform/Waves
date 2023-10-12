@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.DataEntry.Format
-import com.wavesplatform.state.{AssetDistributionPage, DataEntry, EmptyDataEntry, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction as ExchangeTx}
@@ -336,6 +336,11 @@ object AsyncHttpApi extends Assertions {
       val url   = s"/assets/$asset/distribution/$height/limit/$limit$after"
 
       get(url, amountsAsStrings).as[AssetDistributionPage](amountsAsStrings)
+    }
+
+    def assetDistribution(asset: String, amountsAsStrings: Boolean = false): Future[AssetDistribution] = {
+      val req = s"/assets/$asset/distribution"
+      get(req, amountsAsStrings).as[AssetDistribution](amountsAsStrings)
     }
 
     def effectiveBalance(address: String, confirmations: Option[Int] = None, amountsAsStrings: Boolean = false): Future[Balance] = {
