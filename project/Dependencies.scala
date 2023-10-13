@@ -69,7 +69,7 @@ object Dependencies {
       googleGuava,
       curve25519,
       bouncyCastleProvider,
-      "com.wavesplatform" % "zwaves" % "0.1.7-23-SNAPSHOT",
+      "com.wavesplatform" % "zwaves" % "0.2.0",
       web3jModule("crypto")
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
