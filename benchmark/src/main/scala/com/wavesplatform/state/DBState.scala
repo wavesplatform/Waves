@@ -1,7 +1,5 @@
 package com.wavesplatform.state
 
-import java.io.File
-
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
@@ -13,6 +11,8 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import org.iq80.leveldb.DB
 import org.openjdk.jmh.annotations.{Param, Scope, State, TearDown}
+
+import java.io.File
 
 @State(Scope.Benchmark)
 abstract class DBState extends ScorexLogging {
@@ -31,7 +31,7 @@ abstract class DBState extends ScorexLogging {
 
   AddressScheme.current = new AddressScheme { override val chainId: Byte = 'W' }
 
-  lazy val environment = new WavesEnvironment(
+  lazy val environment = WavesEnvironment(
     AddressScheme.current.chainId,
     Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
     Coeval(levelDBWriter.height),

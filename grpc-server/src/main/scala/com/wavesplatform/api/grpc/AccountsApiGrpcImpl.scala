@@ -39,7 +39,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
     BalanceResponse().withAsset(fromAssetIdAndAmount(v))
 
   override def getBalances(request: BalancesRequest, responseObserver: StreamObserver[BalanceResponse]): Unit = responseObserver.interceptErrors {
-    val addressOption: Option[Address] = if (request.address.isEmpty) None else Some(request.address.toAddress)
+    val addressOption: Option[Address] = if (request.address.isEmpty) None else Some(request.address.toAddress())
     val assetIds: Seq[Asset]           = request.assets.map(id => if (id.isEmpty) Asset.Waves else Asset.IssuedAsset(id.toByteStr))
 
     val responseStream = (addressOption, assetIds) match {
@@ -65,7 +65,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
   }
 
   override def getScript(request: AccountRequest): Future[ScriptResponse] = Future {
-    commonApi.script(request.address.toAddress) match {
+    commonApi.script(request.address.toAddress()) match {
       case Some(desc) => ScriptResponse(PBTransactions.toPBScript(Some(desc.script)), desc.script.expr.toString, desc.verifierComplexity, desc.publicKey.toByteString)
       case None       => ScriptResponse()
     }
@@ -77,7 +77,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
       val result =
         Observable.fromIterator(
           commonApi
-            .activeLeases(request.address.toAddress)
+            .activeLeases(request.address.toAddress())
             .map { case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height, status, _, _) =>
               assert(status == LeaseInfo.Status.Active)
               LeaseResponse(
@@ -98,10 +98,10 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
 
   override def getDataEntries(request: DataRequest, responseObserver: StreamObserver[DataEntryResponse]): Unit = responseObserver.interceptErrors {
     val stream = if (request.key.nonEmpty) {
-      Observable.fromIterable(commonApi.data(request.address.toAddress, request.key))
+      Observable.fromIterable(commonApi.data(request.address.toAddress(), request.key))
     } else {
       // FIXME: Strict loading because of segfault in leveldb
-      Observable.fromIterator(commonApi.dataStream(request.address.toAddress, Option(request.key).filter(_.nonEmpty)).toListL.map(_.iterator))
+      Observable.fromIterator(commonApi.dataStream(request.address.toAddress(), Option(request.key).filter(_.nonEmpty)).toListL.map(_.iterator))
     }
 
     responseObserver.completeWith(stream.map(de => DataEntryResponse(request.address, Some(PBTransactions.toPBDataEntry(de)))))

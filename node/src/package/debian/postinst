@@ -32,10 +32,6 @@ if [ "$1" = configure ]; then
     fi
     chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
 
-    if [ -f /etc/${{app_name}}/waves.json ]; then
-        mv /etc/${{app_name}}/waves.json /etc/${{app_name}}/waves.json.bak
-    fi
-
     if [ ! -f "$config_file" ]; then
         echo Creating default config file ...
         cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"

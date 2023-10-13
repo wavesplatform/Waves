@@ -526,24 +526,27 @@ package object database {
 
   def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
-    TxMeta(height, !data.failed, data.spentComplexity) -> (data.transaction match {
-      case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
-      case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
-      case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
-      case _                          => throw new IllegalArgumentException("Illegal transaction data")
-    })
+    TxMeta(height, !data.failed, data.spentComplexity) -> toVanillaTransaction(data.transaction)
+  }
+
+  def toVanillaTransaction(tx: pb.TransactionData.Transaction): Transaction = tx match {
+    case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
+    case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
+    case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
+    case _                          => throw new IllegalArgumentException("Illegal transaction data")
   }
 
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
-    val ptx = tx match {
-      case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
-    }
-    pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
+    pb.TransactionData(toPbTransaction(tx), !m.succeeded, m.spentComplexity).toByteArray
+  }
+
+  def toPbTransaction(tx: Transaction): TD = tx match {
+    case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+    case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+    case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+    case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+    case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
   }
 
   def loadTransactions(height: Height, db: ReadOnlyDB): Seq[(TxMeta, Transaction)] = {

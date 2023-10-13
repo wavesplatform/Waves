@@ -1,0 +1,785 @@
+openapi: 3.1.0
+info:
+  version: '{{version}}'
+  title: Waves Ride Runner ({{chainId}})
+  description: >-
+    The Waves Ride Runner REST API aims more performant and less resource hungry emulation of some endpoints of Waves node REST API.
+  termsOfService: ''
+  license:
+    name: MIT License
+    url: 'https://github.com/wavesplatform/Waves/blob/version-1.3.x/LICENSE'
+servers:
+  - url: /
+tags:
+  - name: utils
+paths:
+  '/utils/script/evaluate/{address}':
+    post:
+      tags:
+        - utils
+      summary: Evaluate
+      description: >-
+        Evaluates the provided expression, taking into account the deployed dApp
+        contract
+      operationId: evaluateScript
+      parameters:
+        - name: address
+          in: path
+          description: Address of the deployed dApp contract
+          required: true
+          schema:
+            type: string
+        - name: trace
+          in: query
+          description: Trace display in function response
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        description: Expression to evaluate
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/RideExprRequest'
+                - $ref: '#/components/schemas/RideInvocationRequest'
+        required: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  expr:
+                    type: string
+                  result:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      value: { }
+                  complexity:
+                    type: integer
+                    format: int64
+                  stateChanges:
+                    $ref: '#/components/schemas/StateChanges'
+                  vars:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        type:
+                          type: string
+                        value: { }
+                        error:
+                          type: string
+        '400':
+          description: Conflicting request structure
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiError'
+                example:
+                  error: 198
+                  message: Conflicting request structure. Both expression and invocation structure were sent
+components:
+  schemas:
+    NonNegativeAmount:
+      oneOf:
+        - type: integer
+          format: int64
+          minimum: 0
+        - type: string
+          pattern: '^(0|[1-9]\d*)$'
+    Height:
+      type: integer
+      format: int32
+      minimum: 1
+      example: 1610000
+    Hash:
+      type: string
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{32,44}$'
+      example: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
+    AssetId:
+      allOf:
+        - $ref: '#/components/schemas/Hash'
+    AssetName:
+      type: string
+      minLength: 4
+      maxLength: 16
+    AssetDescription:
+      type: string
+      maxLength: 1000
+    AssetDecimals:
+      type: integer
+      minimum: 0
+      maximum: 8
+      example: 2
+    LeaseId:
+      description: Lease ID
+      allOf:
+        - $ref: '#/components/schemas/Hash'
+    TransactionId:
+      allOf:
+        - $ref: '#/components/schemas/Hash'
+    Address:
+      type: string
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{35}$'
+      example: 3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k
+    Amount:
+      type: integer
+      format: int64
+      minimum: 0
+    ApiError:
+      required:
+        - error
+        - message
+      type: object
+      properties:
+        error:
+          type: integer
+          format: int32
+        message:
+          type: string
+    AssetDetailsBase:
+      type: object
+      required:
+        - assetId
+        - name
+        - description
+        - quantity
+        - decimals
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        name:
+          $ref: '#/components/schemas/AssetName'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+        quantity:
+          type: integer
+          format: int64
+          description: Total supply of the asset
+        decimals:
+          $ref: '#/components/schemas/AssetDecimals'
+    AssetDetailsBaseLSF:
+      type: object
+      required:
+        - assetId
+        - name
+        - description
+        - quantity
+        - decimals
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        name:
+          $ref: '#/components/schemas/AssetName'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+        quantity:
+          type: string
+          description: Total supply of the asset
+        decimals:
+          type: string
+    BinaryEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - binary
+        value:
+          type: string
+          format: byte
+    BooleanEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - boolean
+        value:
+          type: boolean
+    IntegerEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - integer
+        value:
+          type: integer
+          format: int64
+    IntegerEntryLSF:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - integer
+        value:
+          type: string
+    StringEntry:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - string
+        value:
+          type: string
+    DataEntry:
+      oneOf:
+        - $ref: '#/components/schemas/BinaryEntry'
+        - $ref: '#/components/schemas/BooleanEntry'
+        - $ref: '#/components/schemas/IntegerEntry'
+        - $ref: '#/components/schemas/StringEntry'
+      discriminator:
+        propertyName: type
+        mapping:
+          binary: '#/components/schemas/BinaryEntry'
+          boolean: '#/components/schemas/BooleanEntry'
+          integer: '#/components/schemas/IntegerEntry'
+          string: '#/components/schemas/StringEntry'
+    DataEntryLSF:
+      oneOf:
+        - $ref: '#/components/schemas/BinaryEntry'
+        - $ref: '#/components/schemas/BooleanEntry'
+        - $ref: '#/components/schemas/IntegerEntryLSF'
+        - $ref: '#/components/schemas/StringEntry'
+      discriminator:
+        propertyName: type
+        mapping:
+          binary: '#/components/schemas/BinaryEntry'
+          boolean: '#/components/schemas/BooleanEntry'
+          integer: '#/components/schemas/IntegerEntryLSF'
+          string: '#/components/schemas/StringEntry'
+    DeleteEntry:
+      required:
+        - key
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          nullable: true
+          description: null for entry deletion
+    LeaseStatus:
+      type: string
+      enum:
+        - active
+        - canceled
+      description: |
+        * `active`: lease is active; 
+        * `canceled`: lease has been canceled
+    LeaseInfo:
+      required:
+        - id
+        - originTransactionId
+        - sender
+        - recipient
+        - amount
+        - height
+        - status
+      type: object
+      properties:
+        id:
+          allOf:
+            - $ref: '#/components/schemas/LeaseId'
+          description: Lease ID
+        originTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease or Invoke Script transaction that created the lease
+        sender:
+          $ref: '#/components/schemas/Address'
+        recipient:
+          allOf:
+            - $ref: '#/components/schemas/Address'
+          description: Lease recipient address
+        amount:
+          type: integer
+          format: int32
+          description: Leased WAVES amount
+          allOf:
+            - $ref: '#/components/schemas/Amount'
+        height:
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: >-
+            The sequential number of the block that contains the origin transaction
+        status:
+          $ref: '#/components/schemas/LeaseStatus'
+        cancelHeight:
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: "The sequential number of the block that contains the cancel transaction"
+        cancelTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease Cancel or Invoke Script transaction that canceled the lease
+    LeaseInfoLSF:
+      required:
+        - id
+        - originTransactionId
+        - sender
+        - recipient
+        - amount
+        - height
+        - status
+      type: object
+      properties:
+        id:
+          allOf:
+            - $ref: '#/components/schemas/LeaseId'
+          description: Lease ID
+        originTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease or Invoke Script transaction that created the lease
+        sender:
+          $ref: '#/components/schemas/Address'
+        recipient:
+          allOf:
+            - $ref: '#/components/schemas/Address'
+          description: Lease recipient address
+        amount:
+          type: string
+          description: Leased WAVES amount
+        height:
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: >-
+            The sequential number of the block that contains the origin transaction
+        status:
+          $ref: '#/components/schemas/LeaseStatus'
+        cancelHeight:
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: "The sequential number of the block that contains the cancel transaction"
+        cancelTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease Cancel or Invoke Script transaction that canceled the lease
+    DataAction:
+      oneOf:
+        - $ref: '#/components/schemas/DataEntry'
+        - $ref: '#/components/schemas/DeleteEntry'
+    DataActionLSF:
+      oneOf:
+        - $ref: '#/components/schemas/DataEntryLSF'
+        - $ref: '#/components/schemas/DeleteEntry'
+    TransferAction:
+      type: object
+      required:
+        - address
+        - asset
+        - amount
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        asset:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+        amount:
+          $ref: '#/components/schemas/Amount'
+    TransferActionLSF:
+      type: object
+      required:
+        - address
+        - asset
+        - amount
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        asset:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+        amount:
+          type: string
+    IssueAction:
+      allOf:
+        - $ref: '#/components/schemas/AssetDetailsBase'
+        - type: object
+          required:
+            - isReissuable
+            - compiledScript
+          properties:
+            isReissuable:
+              type: boolean
+            compiledScript:
+              type: string
+    IssueActionLSF:
+      allOf:
+        - $ref: '#/components/schemas/AssetDetailsBaseLSF'
+        - type: object
+          required:
+            - isReissuable
+            - compiledScript
+          properties:
+            isReissuable:
+              type: boolean
+            compiledScript:
+              type: string
+    ReissueAction:
+      type: object
+      required:
+        - assetId
+        - isReissuable
+        - quantity
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        isReissuable:
+          type: boolean
+        quantity:
+          type: integer
+          format: int64
+    ReissueActionLSF:
+      type: object
+      required:
+        - assetId
+        - isReissuable
+        - quantity
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        isReissuable:
+          type: boolean
+        quantity:
+          type: string
+    BurnAction:
+      type: object
+      required:
+        - assetId
+        - quantity
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        quantity:
+          type: integer
+          format: int64
+    BurnActionLSF:
+      type: object
+      required:
+        - assetId
+        - quantity
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        quantity:
+          type: string
+    SponsorFeeAction:
+      type: object
+      required:
+        - assetId
+        - minSponsoredAssetFee
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        minSponsoredAssetFee:
+          type: integer
+    SponsorFeeActionLSF:
+      type: object
+      required:
+        - assetId
+        - minSponsoredAssetFee
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        minSponsoredAssetFee:
+          type: string
+    LeaseAction:
+      allOf:
+        - $ref: '#/components/schemas/LeaseInfo'
+    LeaseActionLSF:
+      allOf:
+        - $ref: '#/components/schemas/LeaseInfoLSF'
+    LeaseCancelAction:
+      type: object
+      required:
+        - recipient
+      properties: { }
+    InvokeAction:
+      type: object
+      required:
+        - dApp
+        - payment
+        - call
+        - stateChanges
+      properties:
+        error:
+          type: object
+        stateChanges:
+          $ref: '#/components/schemas/StateChanges'
+    InvokeActionLSF:
+      type: object
+      required:
+        - dApp
+        - payment
+        - call
+        - stateChanges
+      properties:
+        error:
+          type: object
+        stateChanges:
+          $ref: '#/components/schemas/StateChangesLSF'
+    StateChanges:
+      type: object
+      required:
+        - data
+        - transfers
+        - issues
+        - reissues
+        - burns
+        - sponsorFees
+        - leases
+        - leaseCancel
+        - invokes
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataAction'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferAction'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/IssueAction'
+        reissues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReissueAction'
+        burns:
+          type: array
+          items:
+            $ref: '#/components/schemas/BurnAction'
+        sponsorFees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SponsorFeeAction'
+        leases:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseAction'
+        leaseCancel:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseCancelAction'
+        invokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvokeAction'
+    StateChangesLSF:
+      type: object
+      required:
+        - data
+        - transfers
+        - issues
+        - reissues
+        - burns
+        - sponsorFees
+        - leases
+        - leaseCancel
+        - invokes
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataActionLSF'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferActionLSF'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/IssueActionLSF'
+        reissues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReissueActionLSF'
+        burns:
+          type: array
+          items:
+            $ref: '#/components/schemas/BurnActionLSF'
+        sponsorFees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SponsorFeeActionLSF'
+        leases:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseActionLSF'
+        leaseCancel:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseCancelAction'
+        invokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvokeActionLSF'
+    RideFunctionCallArg:
+      type: object
+      oneOf:
+        - properties:
+            type:
+              const: 'integer'
+            value:
+              type: integer
+              format: int64
+        - properties:
+            type:
+              const: 'boolean'
+            value:
+              type: boolean
+        - properties:
+            type:
+              const: 'string'
+            value:
+              type: string
+        - properties:
+            type:
+              const: 'binary'
+            value:
+              type: string
+              description: 'Evaluated Ride expression either as a Ride code, or as compiled in base64 representation'
+        - properties:
+            type:
+              const: 'list'
+            value:
+              type: array
+              items:
+                $ref: '#/components/schemas/RideFunctionCallArg'
+    BlockchainOverrides:
+      type: object
+      properties:
+        accounts:
+          type: object
+          description: 'Key is Address'
+          additionalProperties:
+            type: object
+            properties:
+              assetBalances:
+                type: object
+                description: 'Key is AssetId'
+                additionalProperties:
+                  $ref: '#/components/schemas/NonNegativeAmount'
+              regularBalance:
+                $ref: '#/components/schemas/NonNegativeAmount'
+      example:
+        accounts:
+          '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k':
+            assetBalances:
+              'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p': '141592653'
+              '34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ': 5897932
+            regularBalance: '3846264338327'
+    RideExprRequest:
+      type: object
+      properties:
+        expr:
+          type: string
+          example: "default()"
+          description: "Ride expression either as a Ride code, or as compiled in base64 representation"
+        state:
+          $ref: '#/components/schemas/BlockchainOverrides'
+    RideInvocationRequest:
+      type: object
+      properties:
+        call:
+          type: object
+          properties:
+            function:
+              type: string
+              default: "default"
+              nullable: true
+            args:
+              type: array
+              items:
+                $ref: '#/components/schemas/RideFunctionCallArg'
+              nullable: true
+        id:
+          type: string
+          example: "C8AgSFP8y91XUTpGtEQAQyjsSemxoY61ocGM852DFKF6"
+          nullable: true
+        fee:
+          type: number
+          example: 500000
+          nullable: true
+        feeAssetId:
+          type: string
+          example: null
+          nullable: true
+        sender:
+          type: string
+          example: "3Mds6m8XZf4biC72NRkFx2kyoBdC9UvYRUR"
+          nullable: true
+        senderPublicKey:
+          type: string
+          example: "3T9fL3XpeaHYbumohePPUmeuUqhyEeyzifi9vKouV8QoNtAT6kYV1oPAe9e2KCVquPcyXJpr2QwUiQKEUQPGZnc6"
+          nullable: true
+        payment:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                $ref: '#/components/schemas/Amount'
+              assetId:
+                allOf:
+                  - $ref: '#/components/schemas/AssetId'
+                nullable: true
+        state:
+          $ref: '#/components/schemas/BlockchainOverrides'
+  parameters:
+    address:
+      name: address
+      in: path
+      description: Address base58 encoded
+      required: true
+      schema:
+        $ref: '#/components/schemas/Address'

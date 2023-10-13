@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.Id
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
@@ -39,6 +40,16 @@ import scala.util.Try
 
 object WavesEnvironment {
   type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
+
+  def apply(
+      nByte: Byte,
+      in: Coeval[Environment.InputEntity],
+      h: Coeval[Int],
+      blockchain: Blockchain,
+      tthis: Environment.Tthis,
+      ds: DirectiveSet,
+      txId: ByteStr
+  ): WavesEnvironment = new WavesEnvironment(nByte, in, h, blockchain, tthis, ds, txId, blockchain)
 }
 
 class WavesEnvironment(
@@ -48,15 +59,16 @@ class WavesEnvironment(
     blockchain: Blockchain,
     val tthis: Environment.Tthis,
     ds: DirectiveSet,
-    override val txId: ByteStr
+    override val txId: ByteStr,
+    blockchainForRuntime: Blockchain
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment.*
 
-  def currentBlockchain(): Blockchain = blockchain
+  def currentBlockchain(): Blockchain = blockchainForRuntime
 
   override def height: Long = h()
 
-  override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
+  override def multiPaymentAllowed: Boolean = blockchainForRuntime.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
     // There are no new transactions in currentBlockchain
@@ -64,7 +76,7 @@ class WavesEnvironment(
       .transactionInfo(ByteStr(id))
       .filter(_._1.succeeded)
       .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
-      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
+      .map(tx => RealTransactionWrapper(tx, blockchainForRuntime, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity = in()
 
@@ -202,7 +214,7 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
       generatorPublicKey = blockH.generator,
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      if (blockchainForRuntime.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
         getRewards(blockH.generator, bHeight)
       else List.empty
@@ -353,6 +365,15 @@ object DAppEnvironment {
   }
 }
 
+trait DAppEnvironmentInterface extends Environment[Id] {
+  def ds: DirectiveSet
+  def remainingCalls: Int
+  def availableActions: ActionLimits
+  def availablePayments: Int
+  def currentDiff: Diff
+  def invocationRoot: DAppEnvironment.InvocationTreeTracker
+}
+
 // Not thread safe
 class DAppEnvironment(
     nByte: Byte,
@@ -360,7 +381,7 @@ class DAppEnvironment(
     h: Coeval[Int],
     blockchain: Blockchain,
     tthis: Environment.Tthis,
-    ds: DirectiveSet,
+    val ds: DirectiveSet,
     rootVersion: StdLibVersion,
     tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
@@ -372,8 +393,10 @@ class DAppEnvironment(
     var availableActions: ActionLimits,
     var availablePayments: Int,
     var currentDiff: Diff,
-    val invocationRoot: DAppEnvironment.InvocationTreeTracker
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
+    val invocationRoot: DAppEnvironment.InvocationTreeTracker,
+    wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id(), blockchain)
+    with DAppEnvironmentInterface {
 
   private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
 
@@ -433,7 +456,8 @@ class DAppEnvironment(
           availableActions,
           availablePayments,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
-          invocationTracker
+          invocationTracker,
+          wrapDAppEnv
         )(invoke)
       fixedDiff = diff
         .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))

@@ -29,7 +29,7 @@ import monix.execution.schedulers.SchedulerService
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json.*
 
 import scala.concurrent.duration.DurationInt
 
@@ -112,7 +112,7 @@ class UtilsRouteEvaluateSpec
     )
 
     val dAppAccount = TxHelpers.defaultSigner
-    val dAppAddress = TxHelpers.defaultSigner.toAddress
+    val dAppAddress = dAppAccount.toAddress
 
     def evalScript(text: String, address: Address = dAppAddress) =
       Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
@@ -365,10 +365,15 @@ class UtilsRouteEvaluateSpec
           )
         }
         evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
-          (responseAs[JsObject] - "stateChanges") should matchJson(
-            s"""{"result":{"type":"BigInt","value":"${PureContext.BigIntMax
-              .toString()}"},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
-          )
+          (responseAs[JsObject] - "stateChanges") should matchJson(s"""{
+            "result":{
+              "type":"BigInt",
+              "value":"${PureContext.BigIntMax.toString()}"
+            },
+            "complexity":65,
+            "expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")",
+            "address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+            }""")
         }
 
         val dAppAccount2 = TxHelpers.secondSigner
@@ -482,6 +487,24 @@ class UtilsRouteEvaluateSpec
           (json \ "error").as[Int] shouldBe 198
         }
 
+        // wrong invocation format
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("call" -> Json.obj("function" -> 1))) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "message").as[String] shouldBe "failed to parse json message"
+          (json \ "validationErrors") match {
+            case JsDefined(validationErrors) =>
+              validationErrors should matchJson("""{
+                  "obj.call": [
+                    {
+                      "msg": ["Unexpected call function name format"],
+                      "args": []
+                    }
+                  ]
+                }""")
+            case _: JsUndefined => fail("No validation errors")
+          }
+        }
+
         // sender address can be calculated from PK
         Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(asset, None)) ~> route ~> check {
           val json = responseAs[JsValue]
@@ -515,27 +538,30 @@ class UtilsRouteEvaluateSpec
       val assetIssuer        = signer(3)
       val assetIssuerAddress = assetIssuer.toAddress
 
+      val dAppAccount = signer(4) // Should be different from default signer, because we're checking balances
+      val dAppAddress = dAppAccount.toAddress
+
       val issueTx = issue(issuer = assetIssuer)
       val asset   = IssuedAsset(issueTx.id())
 
       def toRide(asset: Asset) = asset.fold("unit")(id => s"base58'$id'")
 
-      def dAppWithTransfer(assetAndAmounts: (Asset, Int)*): Script = {
-        def toScriptTransfer(asset: Asset, amount: Int): String = s"ScriptTransfer(receiver, $amount, ${toRide(asset)})"
+      def dAppWithTransfer(assetAndAmounts: (Asset, Long)*): Script = {
+        def toScriptTransfer(asset: Asset, amount: Long): String = s"ScriptTransfer(receiver, $amount, ${toRide(asset)})"
 
         TestCompiler(V6).compileContract(
           s"""
              | @Callable(i)
              | func default() = {
              |   let receiver = Address(base58'$scriptTransferReceiverAddress')
-             |   [ ${assetAndAmounts.map { case (asset, amount) => toScriptTransfer(asset, amount) }.mkString(", ")} ]
+             |   [ ${assetAndAmounts.map(Function.tupled(toScriptTransfer)).mkString(", ")} ]
              | }""".stripMargin
         )
       }
 
-      def mkSetScriptTx(transferAssetAmounts: (Asset, Int)*) = setScript(dAppAccount, dAppWithTransfer(transferAssetAmounts*))
+      def mkSetScriptTx(transferAssetAmounts: (Asset, Long)*) = setScript(dAppAccount, dAppWithTransfer(transferAssetAmounts*))
 
-      "expr" in {
+      "expr" - {
         def mkExprJson(state: JsObject): JsObject =
           Json
             .parse(
@@ -546,56 +572,116 @@ class UtilsRouteEvaluateSpec
             )
             .as[JsObject]
 
-        val exprTests = Table[Seq[(Asset, Int)]](
-          "paymentAssetWithAmounts",
-          Seq(Asset.Waves -> 1),
-          Seq(asset       -> 1),
-          Seq(Asset.Waves -> 1, asset -> 2)
-        )
+        "negative" in {
+          val exprTests = Table[Seq[(Asset, Long)]](
+            "paymentAssetWithAmounts",
+            Seq(Asset.Waves -> 3),
+            Seq(asset       -> 3),
+            Seq(Asset.Waves -> 3, asset -> 3)
+          )
 
-        forAll(exprTests) { paymentAssetWithAmounts =>
-          val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
+          forAll(exprTests) { paymentAssetWithAmounts =>
+            val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
 
-          val hasIssuedAsset = paymentAssetWithAmounts.exists { case (a, _) => a == asset }
-          withDomain(
-            RideV6,
-            Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
-              if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value))
-              else Seq()
-            }
-          ) { d =>
-            d.appendBlock(setScriptTx)
-            if (hasIssuedAsset) d.appendBlock(issueTx)
+            val hasWavesAsset  = paymentAssetWithAmounts.exists { case (a, _) => a == Asset.Waves }
+            val hasIssuedAsset = paymentAssetWithAmounts.exists { case (a, _) => a == asset }
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
 
-            def collectBalance(asset: Asset): Int = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
-            val blockchainOverrides = Json.obj(
-              "accounts" -> Json.obj(
-                dAppAddress.toString -> Json
-                  .obj("regularBalance" -> collectBalance(Asset.Waves))
-                  .deepMerge {
-                    if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> collectBalance(asset)))
-                    else Json.obj()
-                  }
-              )
-            )
+              // -1 to test insufficient funds
+              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum - 1
 
-            Post(
-              routePath(s"/script/evaluate/$dAppAddress"),
-              mkExprJson(blockchainOverrides)
-            ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
-              val json = responseAs[JsValue]
-              withClue(s"${Json.prettyPrint(json)}: ") {
-                (json \ "error").toOption shouldBe empty
-                withClue("stateChanges: ") {
-                  (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
-                    paymentAssetWithAmounts.map { case (asset, amount) =>
-                      Json.obj(
-                        "address" -> scriptTransferReceiverAddress.toString,
-                        "asset"   -> Json.toJson(asset),
-                        "amount"  -> amount
-                      )
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  dAppAddress.toString -> Json
+                    .obj()
+                    .deepMerge {
+                      if (hasWavesAsset) Json.obj("regularBalance" -> collectLessBalance(Asset.Waves))
+                      else Json.obj()
                     }
-                  )
+                    .deepMerge {
+                      if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> collectLessBalance(asset)))
+                      else Json.obj()
+                    }
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkExprJson(blockchainOverrides)
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").asOpt[Int] shouldBe Some(199)
+                  withClue("message: ") {
+                    (json \ "message").as[String] should include regex """negative \w+ balance.+ -1"""
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        "positive" in {
+          val exprTests = Table[Seq[(Asset, Long)]](
+            "paymentAssetWithAmounts",
+            Seq(Asset.Waves -> 1),
+            Seq(asset       -> 1),
+            Seq(Asset.Waves -> 1, asset -> 2)
+          )
+
+          forAll(exprTests) { paymentAssetWithAmounts =>
+            val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
+
+            val hasIssuedAsset = paymentAssetWithAmounts.exists { case (a, _) => a == asset }
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+
+              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  dAppAddress.toString -> Json
+                    .obj("regularBalance" -> collectBalance(Asset.Waves))
+                    .deepMerge {
+                      if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> collectBalance(asset)))
+                      else Json.obj()
+                    }
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkExprJson(blockchainOverrides)
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").toOption shouldBe empty
+                  withClue("stateChanges: ") {
+                    (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
+                      paymentAssetWithAmounts.map { case (asset, amount) =>
+                        Json.obj(
+                          "address" -> scriptTransferReceiverAddress.toString,
+                          "asset"   -> Json.toJson(asset),
+                          "amount"  -> amount
+                        )
+                      }
+                    )
+                  }
                 }
               }
             }
@@ -604,96 +690,193 @@ class UtilsRouteEvaluateSpec
       }
 
       val defaultInvocationFee = 1234567
-      "invocation" in {
-        val sponsorshipTx = sponsor(asset, Some(100000), assetIssuer)
+      "invocation" - {
+        "negative" in {
+          val sponsorshipTx = sponsor(asset, Some(100000), assetIssuer)
 
-        def toPaymentJson(asset: Asset, amount: Int): String =
-          s""" {
-             |   "assetId": ${Json.toJson(asset)},
-             |   "amount": $amount
-             | }"""
-
-        def mkInvocationWithPaymentJson(feeAsset: Asset, state: JsObject, paymentAssetWithAmounts: Seq[(Asset, Int)]): JsObject = Json
-          .parse(
+          def toPaymentJson(asset: Asset, amount: Long): String =
             s""" {
-               |  "call": {
-               |    "function": "default"
-               |  },
-               |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
-               |  "fee": $defaultInvocationFee,
-               |  "feeAssetId": ${Json.toJson(feeAsset)},
-               |  "sender": "$callerAddress",
-               |  "senderPublicKey": "${callerKeyPair.publicKey}",
-               |  "payment": [
-               |    ${paymentAssetWithAmounts.map(Function.tupled(toPaymentJson)).mkString(",\n")}
-               |  ],
-               |  "state": ${Json.prettyPrint(state)}
-               | }""".stripMargin
-          )
-          .as[JsObject]
+               |   "assetId": ${Json.toJson(asset)},
+               |   "amount": $amount
+               | }"""
 
-        val invocationTests = Table[Asset, Seq[(Asset, Int)]](
-          ("feeAsset", "paymentAssetWithAmounts"),
-          (Asset.Waves, Seq(Asset.Waves -> 1)),
-          (Asset.Waves, Seq(asset -> 1)),
-          (asset, Seq(Asset.Waves -> 1)),
-          (asset, Seq(asset -> 1)),
-          (asset, Seq(Asset.Waves -> 1, asset -> 2)),
-          (Asset.Waves, Seq(Asset.Waves -> 1, asset -> 2))
-        )
-
-        forAll(invocationTests) { case (feeAsset, paymentAssetWithAmounts) =>
-          val setScriptTx    = mkSetScriptTx(paymentAssetWithAmounts*)
-          val hasIssuedAsset = (paymentAssetWithAmounts.map(_._1) :+ feeAsset).contains(asset)
-          withDomain(
-            RideV6,
-            Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
-              val sponsoredExtra = if (feeAsset == asset) sponsorshipTx.fee.value + defaultInvocationFee else 0
-              if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value + sponsoredExtra))
-              else Seq()
-            }
-          ) { d =>
-            d.appendBlock(setScriptTx)
-            if (hasIssuedAsset) d.appendBlock(issueTx)
-            if (feeAsset == asset) d.appendBlock(sponsorshipTx)
-
-            val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
-
-            def collectBalance(asset: Asset): Int = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
-
-            val callerWavesBalance = invocationFeeInWaves + collectBalance(Asset.Waves)
-            val callerAssetBalance = invocationFeeInAsset + collectBalance(asset)
-            val blockchainOverrides = Json.obj(
-              "accounts" -> Json.obj(
-                callerAddress.toString -> Json
-                  .obj(
-                    "regularBalance" -> callerWavesBalance,
-                    "assetBalances"  -> Json.obj(asset.toString -> callerAssetBalance)
-                  )
-              )
+          def mkInvocationWithPaymentJson(feeAsset: Asset, state: JsObject, paymentAssetWithAmounts: Seq[(Asset, Long)]): JsObject = Json
+            .parse(
+              s""" {
+                 |  "call": {
+                 |    "function": "default"
+                 |  },
+                 |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+                 |  "fee": $defaultInvocationFee,
+                 |  "feeAssetId": ${Json.toJson(feeAsset)},
+                 |  "sender": "$callerAddress",
+                 |  "senderPublicKey": "${callerKeyPair.publicKey}",
+                 |  "payment": [
+                 |    ${paymentAssetWithAmounts.map(Function.tupled(toPaymentJson)).mkString(",\n")}
+                 |  ],
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
             )
+            .as[JsObject]
 
-            Post(
-              routePath(s"/script/evaluate/$dAppAddress"),
-              mkInvocationWithPaymentJson(
-                feeAsset = feeAsset,
-                state = blockchainOverrides,
-                paymentAssetWithAmounts = paymentAssetWithAmounts
-              )
-            ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
-              val json = responseAs[JsValue]
-              withClue(s"${Json.prettyPrint(json)}: ") {
-                (json \ "error").toOption shouldBe empty
-                withClue("stateChanges: ") {
-                  (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
-                    paymentAssetWithAmounts.map { case (asset, amount) =>
-                      Json.obj(
-                        "address" -> scriptTransferReceiverAddress.toString,
-                        "asset"   -> Json.toJson(asset),
-                        "amount"  -> amount
-                      )
+          val invocationTests = Table[Asset, Seq[(Asset, Long)]](
+            ("feeAsset", "paymentAssetWithAmounts"),
+            (Asset.Waves, Seq(Asset.Waves -> 1)),
+            (Asset.Waves, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1)),
+            (asset, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1, asset -> 2)),
+            (Asset.Waves, Seq(Asset.Waves -> 1, asset -> 2))
+          )
+
+          forAll(invocationTests) { case (feeAsset, paymentAssetWithAmounts) =>
+            val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
+
+            val hasWavesAsset  = paymentAssetWithAmounts.exists { case (a, _) => a == Asset.Waves }
+            val hasIssuedAsset = (paymentAssetWithAmounts.map(_._1) :+ feeAsset).contains(asset)
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                val sponsoredExtra = if (feeAsset == asset) sponsorshipTx.fee.value + defaultInvocationFee else 0
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value + sponsoredExtra))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+              if (feeAsset == asset) d.appendBlock(sponsorshipTx)
+
+              val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
+
+              // -1 to test insufficient funds
+              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum - 1
+
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  callerAddress.toString -> Json
+                    .obj()
+                    .deepMerge {
+                      if (hasWavesAsset) Json.obj("regularBalance" -> (invocationFeeInWaves + collectLessBalance(Asset.Waves)))
+                      else Json.obj()
                     }
-                  )
+                    .deepMerge {
+                      if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> (invocationFeeInAsset + collectLessBalance(asset))))
+                      else Json.obj()
+                    }
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkInvocationWithPaymentJson(
+                  feeAsset = feeAsset,
+                  state = blockchainOverrides,
+                  paymentAssetWithAmounts = paymentAssetWithAmounts
+                )
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").asOpt[Int] shouldBe Some(402)
+                  withClue("details: ") {
+                    (json \ "details").toString should include regex """negative \w+ balance.+ -1"""
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        "positive" in {
+          val sponsorshipTx = sponsor(asset, Some(100000), assetIssuer)
+
+          def toPaymentJson(asset: Asset, amount: Long): String =
+            s""" {
+               |   "assetId": ${Json.toJson(asset)},
+               |   "amount": $amount
+               | }"""
+
+          def mkInvocationWithPaymentJson(feeAsset: Asset, state: JsObject, paymentAssetWithAmounts: Seq[(Asset, Long)]): JsObject = Json
+            .parse(
+              s""" {
+                 |  "call": {
+                 |    "function": "default"
+                 |  },
+                 |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+                 |  "fee": $defaultInvocationFee,
+                 |  "feeAssetId": ${Json.toJson(feeAsset)},
+                 |  "sender": "$callerAddress",
+                 |  "senderPublicKey": "${callerKeyPair.publicKey}",
+                 |  "payment": [
+                 |    ${paymentAssetWithAmounts.map(Function.tupled(toPaymentJson)).mkString(",\n")}
+                 |  ],
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
+            )
+            .as[JsObject]
+
+          val invocationTests = Table[Asset, Seq[(Asset, Long)]](
+            ("feeAsset", "paymentAssetWithAmounts"),
+            (Asset.Waves, Seq(Asset.Waves -> 1)),
+            (Asset.Waves, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1)),
+            (asset, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1, asset -> 2)),
+            (Asset.Waves, Seq(Asset.Waves -> 1, asset -> 2))
+          )
+
+          forAll(invocationTests) { case (feeAsset, paymentAssetWithAmounts) =>
+            val setScriptTx    = mkSetScriptTx(paymentAssetWithAmounts*)
+            val hasIssuedAsset = (paymentAssetWithAmounts.map(_._1) :+ feeAsset).contains(asset)
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                val sponsoredExtra = if (feeAsset == asset) sponsorshipTx.fee.value + defaultInvocationFee else 0
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value + sponsoredExtra))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+              if (feeAsset == asset) d.appendBlock(sponsorshipTx)
+
+              val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
+
+              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+
+              val callerWavesBalance = invocationFeeInWaves + collectBalance(Asset.Waves)
+              val callerAssetBalance = invocationFeeInAsset + collectBalance(asset)
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  callerAddress.toString -> Json
+                    .obj(
+                      "regularBalance" -> callerWavesBalance,
+                      "assetBalances"  -> Json.obj(asset.toString -> callerAssetBalance)
+                    )
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkInvocationWithPaymentJson(
+                  feeAsset = feeAsset,
+                  state = blockchainOverrides,
+                  paymentAssetWithAmounts = paymentAssetWithAmounts
+                )
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").toOption shouldBe empty
+                  withClue("stateChanges: ") {
+                    (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
+                      paymentAssetWithAmounts.map { case (asset, amount) =>
+                        Json.obj(
+                          "address" -> scriptTransferReceiverAddress.toString,
+                          "asset"   -> Json.toJson(asset),
+                          "amount"  -> amount
+                        )
+                      }
+                    )
+                  }
                 }
               }
             }
