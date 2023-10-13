@@ -155,9 +155,10 @@ class DebugApiRouteSpec
         Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.OK
           responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
-            "blockId" -> blockAt2.id().toString,
-            "height"  -> 2,
-            "version" -> Version.VersionString
+            "blockId"    -> blockAt2.id().toString,
+            "baseTarget" -> blockAt2.header.baseTarget,
+            "height"     -> 2,
+            "version"    -> Version.VersionString
           ))
         }
       }
