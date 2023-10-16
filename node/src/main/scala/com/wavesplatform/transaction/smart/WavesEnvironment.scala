@@ -278,6 +278,7 @@ class WavesEnvironment(
           }
         val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (fullBlockReward - configAddressesReward.map(_._2).sum)
 
+        import com.wavesplatform.utils.byteStrOrdering
         (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
       }
     }

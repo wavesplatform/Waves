@@ -2,7 +2,6 @@ package com.wavesplatform.lang
 
 import cats.syntax.either.*
 import ch.obermuhlner.math.big.BigDecimalMath
-import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto.{Blake2b256, Curve25519, Keccak256, Sha256}
@@ -12,6 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.zwaves.bls12.Groth16 as Bls12Groth16
 import com.wavesplatform.zwaves.bn256.Groth16 as Bn256Groth16
+import org.bouncycastle.util.encoders.Hex
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
 
@@ -38,13 +38,13 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
-  private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
+  import org.web3j.utils.Numeric.*
 
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    tryEither(base16Encoder.encode(input))
+    tryEither(Hex.toHexString(input))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    tryEither(base16Encoder.decode(input.toLowerCase))
+    tryEither(Hex.decode(input.toLowerCase))
 
   private def tryEither[A](f: => A): Either[String, A] =
     Try(f).toEither
@@ -181,6 +181,6 @@ object Global extends BaseGlobal {
       new SignatureData(v, r, s)
     }
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
-    base16Encoder.decode(pk.toString(16))
+    hexStringToByteArray(pk.toString(16))
   }
 }

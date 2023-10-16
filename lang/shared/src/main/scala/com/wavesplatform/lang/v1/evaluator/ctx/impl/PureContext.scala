@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.implicits.*
 import cats.{Id, Monad}
-import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.*
@@ -1471,7 +1470,6 @@ object PureContext {
         notImplemented[Id, EVALUATED]("removeByIndex(list: List[T], index: Int)", xs)
     }
 
-  @VisibleForTesting
   private[v1] def genericListIndexOf(
       element: EVALUATED,
       indexOf: EVALUATED => Int,

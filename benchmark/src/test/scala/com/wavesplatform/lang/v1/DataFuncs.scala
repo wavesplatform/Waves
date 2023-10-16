@@ -12,20 +12,48 @@ import org.openjdk.jmh.infra.Blackhole
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 30)
-@Measurement(iterations = 30)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 class DataFuncs {
   @Benchmark
   def decode64_35Kb(st: StrSt35K, bh: Blackhole): Unit =
     bh.consume(Base64.decode(st.message))
 
   @Benchmark
+  def decode16_32kb_bcprov(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(org.bouncycastle.util.encoders.Hex.decode(st.message))
+
+  @Benchmark
+  def decode16_32kb_guava(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(com.google.common.io.BaseEncoding.base16.decode(st.message))
+
+  @Benchmark
+  def decode16_32kb_commons_codec(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(org.apache.commons.codec.binary.Hex.decodeHex(st.message))
+
+  @Benchmark
+  def decode16_32kb_bigint(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(BigInt(st.message, 16).bigInteger.toByteArray)
+
+  @Benchmark
   def decode64_70Kb(st: StrSt70K, bh: Blackhole): Unit =
     bh.consume(Base64.decode(st.message))
 
   @Benchmark
-  def decode64_105Kb(st: StrSt105K, bh: Blackhole): Unit =
-    bh.consume(Base64.decode(st.message))
+  def decode64_105Kb_jdk(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(java.util.Base64.getDecoder.decode(st.message))
+
+  @Benchmark
+  def decode64_105Kb_bcprov(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(org.bouncycastle.util.encoders.Base64.decode(st.message))
+
+  @Benchmark
+  def decode64_105Kb_guava(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(com.google.common.io.BaseEncoding.base64().decode(st.message))
+
+  @Benchmark
+  def decode64_105Kb_commons_codec(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(org.apache.commons.codec.binary.Base64.decodeBase64(st.message))
 
   @Benchmark
   def decode64_140Kb(st: StrSt140K, bh: Blackhole): Unit =
@@ -149,11 +177,13 @@ class DataFuncs {
 
 object DataFuncs {
   @State(Scope.Benchmark)
+  class StrSt8K extends StrSt(8)
+  @State(Scope.Benchmark)
   class StrSt35K extends StrSt(35)
   @State(Scope.Benchmark)
   class StrSt70K extends StrSt(70)
   @State(Scope.Benchmark)
-  class StrSt105K extends StrSt(105)
+  class StrSt105K extends StrSt(32)
   @State(Scope.Benchmark)
   class StrSt140K extends StrSt(140)
   @State(Scope.Benchmark)

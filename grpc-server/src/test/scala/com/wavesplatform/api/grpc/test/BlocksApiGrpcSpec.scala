@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
-
+import com.wavesplatform.utils.byteStrOrdering
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 

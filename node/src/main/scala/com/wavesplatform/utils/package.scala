@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import com.google.common.base.Charsets
+import com.google.common.primitives.UnsignedBytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
@@ -100,4 +101,6 @@ package object utils {
       case ARR(xs)      => Json.obj("type" -> "Array", "value" -> xs.map(evaluatedWrites.writes))
       case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
     }
+
+    implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => UnsignedBytes.lexicographicalComparator().compare(x.arr, y.arr)
 }
