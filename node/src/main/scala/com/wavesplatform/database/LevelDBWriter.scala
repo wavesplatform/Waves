@@ -750,6 +750,18 @@ abstract class LevelDBWriter private[database] (
             disabledAliases = DisableHijackedAliases.revert(rw)
           }
 
+          val disapprovedFeatures = rw.get(Keys.approvedFeatures).collect { case (id, approvalHeight) if approvalHeight > targetHeight => id }
+          if (disapprovedFeatures.nonEmpty) {
+            approvedFeaturesCache = rw.get(Keys.approvedFeatures) -- disapprovedFeatures
+            rw.put(Keys.approvedFeatures, approvedFeaturesCache)
+          }
+
+          val disactivatedFeatures = rw.get(Keys.activatedFeatures).collect { case (id, activationHeight) if activationHeight > targetHeight => id }
+          if (disactivatedFeatures.nonEmpty) {
+            activatedFeaturesCache = rw.get(Keys.activatedFeatures) -- disactivatedFeatures
+            rw.put(Keys.activatedFeatures, activatedFeaturesCache)
+          }
+
           val hitSource = rw.get(Keys.hitSource(currentHeight)).get
           val block     = createBlock(discardedMeta.header, discardedMeta.signature, loadTransactions(currentHeight, rw).map(_._2)).explicitGet()
 

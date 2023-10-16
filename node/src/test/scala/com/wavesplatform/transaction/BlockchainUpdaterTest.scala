@@ -9,12 +9,13 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.utils.ScorexLogging
 
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 import scala.util.Try
 
-class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
+class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain with ScorexLogging {
 
   private val ApprovalPeriod = 100
 
@@ -129,6 +130,8 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
   }
 
   "features activation after rollback without voting" - {
+    val rollbackSize = WavesSettings.blockchainSettings.functionalitySettings.blocksForFeatureActivation
+
     def appendAndRollback(b: BlockchainUpdaterImpl): Unit = {
       b.processBlock(genesisBlock)
 
@@ -147,8 +150,9 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
       }
 
       markup("Rollback before approving")
-      b.removeAfter(b.blockHeader(ApprovalPeriod - 2).get.id()).explicitGet()
-      b.featureStatus(1, ApprovalPeriod - 2) shouldBe BlockchainFeatureStatus.Undefined
+      val newHeight = ApprovalPeriod - rollbackSize
+      b.removeAfter(b.blockHeader(newHeight).get.id()).explicitGet()
+      b.featureStatus(1, newHeight) shouldBe BlockchainFeatureStatus.Undefined
     }
 
     "should not activate the feature if it wasn't approved" in withDomain(WavesSettings) { domain =>
@@ -156,7 +160,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
       appendAndRollback(b)
 
       markup("Appending blocks without votes to reach ApprovalPeriod height")
-      (1 to 2).foreach { _ =>
+      (1 to rollbackSize).foreach { _ =>
         b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
       }
 
@@ -178,7 +182,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
       appendAndRollback(b)
 
       markup("Appending blocks with votes to reach ApprovalPeriod height")
-      (1 to 2).foreach { _ =>
+      (1 to rollbackSize).foreach { _ =>
         b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
       }
 
