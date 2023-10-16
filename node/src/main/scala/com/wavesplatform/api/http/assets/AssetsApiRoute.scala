@@ -537,9 +537,11 @@ object AssetsApiRoute {
     (value: (Address, Long), gen: JsonGenerator, _: SerializerProvider) => {
       val (address, balance) = value
       if (numbersAsString) {
-        gen.writeStringField(address.toString, balance.toString)
+        gen.writeRaw(s"\"${address.toString}\":")
+        gen.writeString(balance.toString)
       } else {
-        gen.writeNumberField(address.toString, balance)
+        gen.writeRaw(s"\"${address.toString}\":")
+        gen.writeNumber(balance)
       }
     }
 }
