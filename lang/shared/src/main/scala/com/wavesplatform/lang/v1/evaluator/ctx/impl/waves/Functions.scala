@@ -642,6 +642,8 @@ object Functions {
                   }
                 case arg :: _ =>
                   errorF(s"Unexpected recipient arg $arg")
+                case args =>
+                  errorF(s"Unexpected args $args")
               }
             )
             name <- EitherT[F, ExecutionError, String](
@@ -649,6 +651,7 @@ object Functions {
                 case _ :: CONST_STRING(name) :: _ => name.asRight[ExecutionError].pure[F]
                 case _ :: CaseObj(UNIT, _) :: _   => "default".asRight[ExecutionError].pure[F]
                 case _ :: arg :: _                => errorF(s"Unexpected name arg $arg")
+                case args                         => errorF(s"Unexpected args $args")
               }
             )
             payments <- EitherT[F, ExecutionError, Seq[(Option[Array[Byte]], Long)]](

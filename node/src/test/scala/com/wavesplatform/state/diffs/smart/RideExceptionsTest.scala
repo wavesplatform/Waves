@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.{ACCOUNTWAVESBALANCE, CALLDAPP, CREATE_MERKLE_ROOT}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.test.{PropSpec, produce}
@@ -23,6 +23,21 @@ class RideExceptionsTest extends PropSpec with WithDomain {
   property("throwing java exception from ride functions should correctly fail or reject invoke after light node activation") {
     assert(
       FUNCTION_CALL(Native(ACCOUNTWAVESBALANCE), List(REF("unit"))),
+      "Unexpected recipient type Unit",
+      rejectBefore = false
+    )
+    assert(
+      FUNCTION_CALL(Native(ACCOUNTASSETONLYBALANCE), List(REF("unit"), CONST_BYTESTR(ByteStr.empty).explicitGet())),
+      "Unexpected recipient type Unit",
+      rejectBefore = false
+    )
+    assert(
+      FUNCTION_CALL(Native(ACCOUNTSCRIPTHASH), List(REF("unit"))),
+      "Unexpected recipient type Unit",
+      rejectBefore = false
+    )
+    assert(
+      FUNCTION_CALL(Native(CALCULATE_LEASE_ID), List(FUNCTION_CALL(User("Lease"), List(REF("unit"))))),
       "Unexpected recipient type Unit",
       rejectBefore = false
     )
