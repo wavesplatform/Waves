@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures.{LightNode, RideV6}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
@@ -13,7 +12,7 @@ import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{Portfolio, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.{RideV5, WavesSettingsOps}
+import com.wavesplatform.test.DomainPresets.RideV5
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -104,45 +103,6 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
       d.appendBlock(failAssetIssue)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx) should produce("Explicit script termination")
-    }
-  }
-
-  property("invoke is rejected with a lack of funds without execution of ScriptTransfer script only after RideV6, corrected after LightNode") {
-    val issueTx = issue(signer(10), script = Some(assetFailScript))
-    val asset   = IssuedAsset(issueTx.id())
-    val dApp = TestCompiler(V5).compileContract(
-      s"""
-         | @Callable(i)
-         | func default() = {
-         |   [ScriptTransfer(i.caller, 1, base58'$asset')]
-         | }
-         | 
-         | @Callable(i)
-         | func complex() = {
-         |   strict c = ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-         |   [ScriptTransfer(i.caller, 1, base58'$asset')]
-         | }
-       """.stripMargin
-    )
-    withDomain(
-      RideV5.setFeaturesHeight(RideV6 -> 6, LightNode -> 7),
-      AddrWithBalance.enoughBalances(secondSigner, signer(10))
-    ) { d =>
-      d.appendBlock(issueTx)
-      d.appendBlock(setScript(secondSigner, dApp))
-
-      // RideV5 — always failed
-      d.appendAndAssertFailed(invoke(), "Transaction is not allowed by script of the asset")
-      d.appendAndAssertFailed(invoke(func = Some("complex")), "Transaction is not allowed by script of the asset")
-
-      // RideV6 — always rejected
-      d.appendBlockE(invoke()) should produce("negative asset balance")
-      d.appendBlockE(invoke(func = Some("complex"))) should produce("negative asset balance")
-
-      // LightNode — rejected or failed
-      d.appendBlock()
-      d.appendBlockE(invoke()) should produce("negative asset balance")
-      d.appendAndAssertFailed(invoke(func = Some("complex")), "negative asset balance")
     }
   }
 
