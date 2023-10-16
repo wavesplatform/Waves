@@ -413,11 +413,15 @@ object Functions {
       case xs => notImplemented[Id, EVALUATED](s"toString(a: Address)", xs)
     }
 
+  private def errorE[R](message: String, typedError: Boolean): Either[ExecutionError, R] =
+    if (typedError) (message: ExecutionError).asLeft[R]
+    else throw new IllegalArgumentException(message)
+
   private def caseObjToRecipient(c: CaseObj, typedError: Boolean): Either[ExecutionError, Recipient] =
     c.caseType.name match {
       case addressType.name => Right(Recipient.Address(c.fields("bytes").asInstanceOf[CONST_BYTESTR].bs))
       case aliasType.name   => Right(Recipient.Alias(c.fields("alias").asInstanceOf[CONST_STRING].s))
-      case t => if (typedError) Left(s"Unexpected recipient type $t") else throw new IllegalArgumentException(s"Unexpected recipient type $t")
+      case t                => errorE(s"Unexpected recipient type $t", typedError)
     }
 
   def assetBalanceF(typedError: Boolean): BaseFunction[Environment] =
@@ -600,7 +604,7 @@ object Functions {
       Map[StdLibVersion, Long](V5 -> 75L),
       id,
       ANY,
-      ("dapp", addressOrAliasType),
+      ("dApp", addressOrAliasType),
       ("name", optionString),
       ("args", LIST(ANY)),
       ("payments", listPayment)
@@ -608,65 +612,66 @@ object Functions {
       new ContextfulNativeFunction.Extended[Environment](
         name,
         ANY,
-        Seq(("dapp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
+        Seq(("dApp", BYTESTR), ("name", STRING), ("args", LIST(ANY)), ("payments", listPayment))
       ) {
         override def evaluate[F[_]: Monad](
             env: Environment[F],
             args: List[EVALUATED],
             availableComplexity: Int
-        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
-          def errorE[R](message: String): Either[ExecutionError, R] =
-            if (typedError) (message: ExecutionError).asLeft[R]
-            else throw new IllegalArgumentException(message)
+        )(implicit monad: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
           def errorF[R](message: String): F[Either[ExecutionError, R]] =
-            errorE[R](message).pure[F]
+            errorE[R](message, typedError).pure[F]
 
           val processedArgs = for {
-            dAppBytes <- EitherT[F, ExecutionError, ByteStr](args match {
-              case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
-                dApp.fields.get("bytes") match {
-                  case Some(CONST_BYTESTR(d)) => d.asRight[ExecutionError].pure[F]
-                  case a                      => errorF(s"Unexpected address bytes $a")
-                }
-              case (dApp: CaseObj) :: _ if dApp.caseType == aliasType =>
-                dApp.fields.get("alias") match {
-                  case Some(CONST_STRING(a)) =>
-                    if (typedError)
-                      env.resolveAlias(a).map(_.bimap(CommonError(_): ExecutionError, _.bytes))
-                    else
-                      env.resolveAlias(a).map(_.explicitGet().bytes.asRight[ExecutionError])
-                  case arg =>
-                    errorF(s"Unexpected alias arg $arg")
-                }
-              case arg :: _ =>
-                errorF(s"Unexpected recipient arg $arg")
-            })
-            name <- EitherT[F, ExecutionError, String](args match {
-              case _ :: CONST_STRING(name) :: _ => name.asRight[ExecutionError].pure[F]
-              case _ :: CaseObj(UNIT, _) :: _   => "default".asRight[ExecutionError].pure[F]
-              case _ :: arg :: _                => errorF(s"Unexpected name arg $arg")
-            })
-            payments <- EitherT[F, ExecutionError, Seq[(Option[Array[Byte]], Long)]](args match {
-              case _ :: _ :: _ :: ARR(payments) :: Nil =>
-                (payments: Seq[EVALUATED])
-                  .traverse {
-                    case p: CaseObj if p.caseType == paymentType =>
-                      List("assetId", "amount").flatMap(p.fields.get) match {
-                        case CONST_BYTESTR(a) :: CONST_LONG(v) :: Nil => Right((Some(a.arr), v))
-                        case CaseObj(UNIT, _) :: CONST_LONG(v) :: Nil => Right((None, v))
-                        case args                                     => errorE(s"Unexpected payment args $args")
-                      }
-                    case arg =>
-                      errorE(s"Unexpected payment arg $arg")
+            dAppBytes <- EitherT[F, ExecutionError, ByteStr](
+              args match {
+                case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
+                  dApp.fields.get("bytes") match {
+                    case Some(CONST_BYTESTR(d)) => d.asRight[ExecutionError].pure[F]
+                    case a                      => errorF(s"Unexpected address bytes $a")
                   }
-                  .pure[F]
-              case args =>
-                (s"Unexpected args $args": ExecutionError).asLeft[Seq[(Option[Array[Byte]], Long)]].pure[F]
-            })
+                case (dApp: CaseObj) :: _ if dApp.caseType == aliasType =>
+                  dApp.fields.get("alias") match {
+                    case Some(CONST_STRING(a)) =>
+                      if (typedError)
+                        env.resolveAlias(a).map(_.bimap(CommonError(_): ExecutionError, _.bytes))
+                      else
+                        env.resolveAlias(a).map(_.explicitGet().bytes.asRight[ExecutionError])
+                    case arg =>
+                      errorF(s"Unexpected alias arg $arg")
+                  }
+                case arg :: _ =>
+                  errorF(s"Unexpected recipient arg $arg")
+              }
+            )
+            name <- EitherT[F, ExecutionError, String](
+              args match {
+                case _ :: CONST_STRING(name) :: _ => name.asRight[ExecutionError].pure[F]
+                case _ :: CaseObj(UNIT, _) :: _   => "default".asRight[ExecutionError].pure[F]
+                case _ :: arg :: _                => errorF(s"Unexpected name arg $arg")
+              }
+            )
+            payments <- EitherT[F, ExecutionError, Seq[(Option[Array[Byte]], Long)]](
+              args match {
+                case _ :: _ :: _ :: ARR(payments) :: Nil =>
+                  (payments: Seq[EVALUATED])
+                    .traverse {
+                      case p: CaseObj if p.caseType == paymentType =>
+                        List("assetId", "amount").flatMap(p.fields.get) match {
+                          case CONST_BYTESTR(a) :: CONST_LONG(v) :: Nil => Right((Some(a.arr), v))
+                          case CaseObj(UNIT, _) :: CONST_LONG(v) :: Nil => Right((None, v))
+                          case args                                     => errorE(s"Unexpected payment args $args", typedError)
+                        }
+                      case arg =>
+                        errorE(s"Unexpected payment arg $arg", typedError)
+                    }
+                    .pure[F]
+                case args =>
+                  (s"Unexpected args $args": ExecutionError).asLeft[Seq[(Option[Array[Byte]], Long)]].pure[F]
+              }
+            )
           } yield (dAppBytes, name, payments)
-          m.flatMap(Coeval(processedArgs.value)) {
-            case Left(error) =>
-              (error.asLeft[(EVALUATED, Log[F])], availableComplexity).pure[F].pure[Coeval]
+          monad.flatMap(Coeval(processedArgs.value)) {
             case Right((dAppBytes, name, payments)) =>
               args match {
                 case _ :: _ :: ARR(passedArgs) :: _ :: Nil =>
@@ -687,10 +692,12 @@ object Functions {
                       (mappedError, availableComplexity - spentComplexity)
                     })
                 case xs =>
-                  val err =
-                    notImplemented[F, (EVALUATED, Log[F])](s"invoke(dApp: Address, func: String, args: List[Any], payments: List[Payment])", xs)
+                  val signature = "invoke(dApp: Address, func: String, args: List[Any], payments: List[Payment])"
+                  val err       = notImplemented[F, (EVALUATED, Log[F])](signature, xs)
                   Coeval.now(err.map((_, 0)))
               }
+            case Left(error) =>
+              (error.asLeft[(EVALUATED, Log[F])], availableComplexity).pure[F].pure[Coeval]
           }
         }
       }
