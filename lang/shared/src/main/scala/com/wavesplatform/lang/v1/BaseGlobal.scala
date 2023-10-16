@@ -395,6 +395,7 @@ object BaseGlobal {
     def apply(n: Int): T =
       if (from + n < until) arr(from + n)
       else throw new ArrayIndexOutOfBoundsException(n)
+      // should be never thrown due to passing Random.nextInt(arr.size) at the single point of call
 
     def partitionInPlace(p: T => Boolean): (ArrayView[T], ArrayView[T]) = {
       var upper = until - 1
