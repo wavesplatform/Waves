@@ -33,7 +33,7 @@ class InvokeTransferBalanceErrorTest extends PropSpec with WithDomain {
          |   strict c = ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
          |   [ScriptTransfer(i.caller, 1, base58'$asset')]
          | }
-     """.stripMargin
+       """.stripMargin
     )
     withDomain(
       RideV5.setFeaturesHeight(RideV6 -> 6, LightNode -> 7),
