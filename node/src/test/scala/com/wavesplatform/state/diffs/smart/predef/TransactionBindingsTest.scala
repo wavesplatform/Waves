@@ -868,7 +868,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val directives = DirectiveSet(V2, AssetType, Expression).explicitGet()
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, V2, typedError = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet(), fixBigScriptField = true, typedError = true)
 
     val environment = new WavesEnvironment(
@@ -899,7 +899,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, V2, typedError = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives, fixBigScriptField = true, typedError = true)
 
     val env = new WavesEnvironment(

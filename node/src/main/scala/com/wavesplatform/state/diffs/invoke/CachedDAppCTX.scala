@@ -21,7 +21,7 @@ object CachedDAppCTX {
       typedError         <- Seq(true, false)
     } yield {
       val ctx = PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
-        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, version, typedError).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField, typedError)
       ((version, useNewPowPrecision, fixBigScriptField, typedError), InvariableContext(ctx))
     }).toMap

@@ -60,7 +60,7 @@ object BlockchainContext {
           (ds.stdLibVersion, fixUnicodeFunctions, useNewPowPrecision, fixBigScriptField, ds),
           { _ =>
             PureContext.build(ds.stdLibVersion, useNewPowPrecision).withEnvironment[Environment] |+|
-              CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
+              CryptoContext.build(Global, ds.stdLibVersion, typedError).withEnvironment[Environment] |+|
               WavesContext.build(Global, ds, fixBigScriptField, typedError)
           }
         )

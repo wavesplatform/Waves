@@ -41,7 +41,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, version).withEnvironment[Environment],
+          CryptoContext.build(Global, version, typedError = true).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(version, Account, Expression).explicitGet(),

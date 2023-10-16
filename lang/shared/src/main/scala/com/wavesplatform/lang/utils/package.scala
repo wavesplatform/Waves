@@ -76,7 +76,7 @@ package object utils {
       val ds = DirectiveSet(version, scriptType, contentType).explicitGet()
       val ctx = Coeval.evalOnce(
         PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, version, typedError).withEnvironment[Environment] |+|
           WavesContext.build(Global, ds, fixBigScriptField, typedError)
       )
       (ds, useNewPowPrecision, fixBigScriptField, typedError) -> ctx

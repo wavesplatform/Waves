@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.{ACCOUNTWAVESBALANCE, CALLDAPP}
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.{ACCOUNTWAVESBALANCE, CALLDAPP, CREATE_MERKLE_ROOT}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.test.{PropSpec, produce}
@@ -72,6 +72,30 @@ class RideExceptionsTest extends PropSpec with WithDomain {
       ),
       "Unexpected payment arg",
       rejectBefore = true
+    )
+    assert(
+      FUNCTION_CALL(
+        Native(CREATE_MERKLE_ROOT),
+        List(
+          ARR(Vector.fill(16)(CONST_BYTESTR(ByteStr.fill(32)(1)).explicitGet()), true).explicitGet(),
+          CONST_BYTESTR(ByteStr.fill(32)(1)).explicitGet(),
+          CONST_LONG(Long.MaxValue)
+        )
+      ),
+      "integer overflow",
+      rejectBefore = false
+    )
+    assert(
+      FUNCTION_CALL(
+        Native(CREATE_MERKLE_ROOT),
+        List(
+          ARR(Vector.fill(1)(CONST_BYTESTR(ByteStr.fill(32)(1)).explicitGet()), true).explicitGet(),
+          CONST_BYTESTR(ByteStr.fill(32)(1)).explicitGet(),
+          CONST_LONG(100)
+        )
+      ),
+      "Index 100 out of range allowed by proof list length 1",
+      rejectBefore = false
     )
   }
 

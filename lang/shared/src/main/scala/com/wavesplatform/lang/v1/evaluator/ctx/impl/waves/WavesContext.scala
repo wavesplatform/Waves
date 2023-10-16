@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object WavesContext {
-  def build(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean, typedError: Boolean): CTX[Environment] =
+  def build(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean, typedError: Boolean = true): CTX[Environment] =
     invariableCtx |+| variableCtx(global, ds, fixBigScriptField, typedError)
 
   private val commonFunctions =

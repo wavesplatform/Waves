@@ -102,7 +102,7 @@ class FunctionComplexityDocTest extends PropSpec {
 
   property("JS API functions") {
     lazyContexts
-      .flatMap { case ((ds, _, _), _) =>
+      .flatMap { case ((ds, _, _, _), _) =>
         API
           .allFunctions(ds.stdLibVersion.id, ds.scriptType == Asset, ds.contentType == DApp)
           .map((_, ds.stdLibVersion))
@@ -114,7 +114,7 @@ class FunctionComplexityDocTest extends PropSpec {
 
   property("JS API vars") {
     lazyContexts
-      .flatMap { case ((ds, _, _), _) =>
+      .flatMap { case ((ds, _, _, _), _) =>
         API
           .allVars(ds.stdLibVersion.id, ds.scriptType == Asset, ds.contentType == DApp)
           .map((_, ds.stdLibVersion))
