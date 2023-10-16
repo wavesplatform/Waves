@@ -109,7 +109,7 @@ object UtilsEvaluator {
         currentSnapshot = paymentsSnapshot,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
-      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
+      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true, typedError = true)
       dApp = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
       expr <- dAppToExpr(dApp)
       limitedResult <- EvaluatorV2

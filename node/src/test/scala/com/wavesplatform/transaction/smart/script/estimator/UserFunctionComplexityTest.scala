@@ -36,7 +36,8 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
           WavesContext.build(
             Global,
             DirectiveSet(V1, Account, Expression).explicitGet(),
-            fixBigScriptField = true
+            fixBigScriptField = true,
+            typedError = true
           )
         )
       )
@@ -103,7 +104,8 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
           WavesContext.build(
             Global,
             DirectiveSet(V2, Account, Expression).explicitGet(),
-            fixBigScriptField = true
+            fixBigScriptField = true,
+            typedError = true
           )
         )
       )
@@ -170,7 +172,8 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
           WavesContext.build(
             Global,
             DirectiveSet(V3, Account, Expression).explicitGet(),
-            fixBigScriptField = true
+            fixBigScriptField = true,
+            typedError = true
           )
         )
       )

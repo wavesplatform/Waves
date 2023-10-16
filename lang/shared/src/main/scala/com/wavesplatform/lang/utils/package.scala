@@ -64,21 +64,22 @@ package object utils {
     ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
   }
 
-  val lazyContexts: Map[(DirectiveSet, Boolean, Boolean), Coeval[CTX[Environment]]] =
+  val lazyContexts: Map[(DirectiveSet, Boolean, Boolean, Boolean), Coeval[CTX[Environment]]] =
     (for {
       version     <- DirectiveDictionary[StdLibVersion].all
       scriptType  <- DirectiveDictionary[ScriptType].all
       contentType <- DirectiveDictionary[ContentType].all if contentType != DApp || (contentType == DApp && version >= V3 && scriptType == Account)
       useNewPowPrecision <- Seq(false, true)
       fixBigScriptField  <- Seq(false, true)
+      typedError         <- Seq(false, true)
     } yield {
       val ds = DirectiveSet(version, scriptType, contentType).explicitGet()
       val ctx = Coeval.evalOnce(
         PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
           CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-          WavesContext.build(Global, ds, fixBigScriptField)
+          WavesContext.build(Global, ds, fixBigScriptField, typedError)
       )
-      (ds, useNewPowPrecision, fixBigScriptField) -> ctx
+      (ds, useNewPowPrecision, fixBigScriptField, typedError) -> ctx
     }).toMap
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
@@ -165,7 +166,7 @@ package object utils {
       ScriptType.isAssetScript(isTokenContext),
       if (isContract) DApp else Expression
     )
-    lazyContexts((ds.explicitGet(), true, true)).value()
+    lazyContexts((ds.explicitGet(), true, true, true)).value()
   }
 
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
@@ -174,7 +175,7 @@ package object utils {
   }
 
   def compilerContext(ds: DirectiveSet): CompilerContext =
-    lazyContexts((ds.copy(imports = Imports()), true, true))().compilerContext
+    lazyContexts((ds.copy(imports = Imports()), true, true, true))().compilerContext
 
   def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
     combinedContext((v, cType)).decompilerContext

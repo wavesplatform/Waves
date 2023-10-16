@@ -110,7 +110,8 @@ class EvaluatorV2(
               evaluated
             } -> unusedComplexity
           }
-        case f: Simple[Environment] => Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
+        case f: Simple[Environment] =>
+          Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
       }
       for {
         (result, unusedComplexity) <- EvaluationResult(

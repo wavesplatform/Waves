@@ -42,7 +42,8 @@ package object predef {
         ByteStr.empty,
         fixUnicodeFunctions = true,
         useNewPowPrecision = true,
-        fixBigScriptField = true
+        fixBigScriptField = true,
+        typedError = true
       )
       r <- EvaluatorV1().apply[T](evalContext, typedExpr).leftMap(_.message)
     } yield r

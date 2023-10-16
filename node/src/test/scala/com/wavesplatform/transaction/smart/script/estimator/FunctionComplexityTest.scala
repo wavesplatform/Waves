@@ -45,7 +45,8 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
           WavesContext.build(
             Global,
             DirectiveSet(version, Account, Expression).explicitGet(),
-            fixBigScriptField = true
+            fixBigScriptField = true,
+            typedError = true
           )
         )
       )

@@ -141,7 +141,8 @@ class IssueTransactionV2Specification extends PropSpec with WithNewDBForEachTest
             WavesContext.build(
               Global,
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              fixBigScriptField = true
+              fixBigScriptField = true,
+              typedError = true
             )
           )
         )

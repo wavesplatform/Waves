@@ -25,10 +25,10 @@ class TestCompiler(version: StdLibVersion) {
 
   private lazy val compilerContext =
     (baseCompilerContext |+|
-      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)).compilerContext
+      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true, typedError = true)).compilerContext
 
   private lazy val expressionContext: CTX[Environment] =
-    WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet(), fixBigScriptField = true)
+    WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet(), fixBigScriptField = true, typedError = true)
 
   private lazy val expressionCompilerContext =
     (baseCompilerContext |+|
@@ -36,7 +36,7 @@ class TestCompiler(version: StdLibVersion) {
 
   private lazy val assetCompilerContext =
     (baseCompilerContext |+|
-      WavesContext.build(Global, DirectiveSet(version, Asset, Expression).explicitGet(), fixBigScriptField = true)).compilerContext
+      WavesContext.build(Global, DirectiveSet(version, Asset, Expression).explicitGet(), fixBigScriptField = true, typedError = true)).compilerContext
 
   def compile(
       script: String,
