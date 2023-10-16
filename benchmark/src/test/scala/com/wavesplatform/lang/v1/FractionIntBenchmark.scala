@@ -41,7 +41,7 @@ class FractionIntBenchmark {
 @State(Scope.Benchmark)
 class St {
   val ds  = DirectiveSet(V6, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max     = Long.MaxValue
   val maxSqrt = 3037000499L

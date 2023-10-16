@@ -186,7 +186,7 @@ class BigIntOpsBenchmark {
 @State(Scope.Benchmark)
 class BigIntOpsSt {
   val ds  = DirectiveSet(StdLibVersion.VersionDic.all.max, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max     = CONST_BIGINT(PureContext.BigIntMax)
   val prevMax = CONST_BIGINT(PureContext.BigIntMax - 1)
