@@ -30,6 +30,7 @@ import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
@@ -345,6 +346,15 @@ object InvokeDiffsCommon {
       )
   }
 
+  def checkPayments(blockchain: Blockchain, payments: Seq[Payment]): Either[GenericError, Unit] =
+    payments
+      .collectFirstSome {
+        case Payment(_, IssuedAsset(id)) => InvokeDiffsCommon.checkAsset(blockchain, id).swap.toOption
+        case Payment(_, Waves)           => None
+      }
+      .map(GenericError(_))
+      .toLeft(())
+
   def checkAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
     if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
       if (assetId.size != AssetIdLength)
@@ -464,8 +474,8 @@ object InvokeDiffsCommon {
         if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
         else remainingLimit
 
-      val blockchain      = SnapshotBlockchain(sblockchain, currentSnapshot)
-      val actionSender    = Recipient.Address(ByteStr(dAppAddress.bytes))
+      val blockchain   = SnapshotBlockchain(sblockchain, currentSnapshot)
+      val actionSender = Recipient.Address(ByteStr(dAppAddress.bytes))
 
       def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, StateSnapshot] = {
         val AssetTransfer(addressRepr, recipient, amount, asset) = transfer

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.{toBifunctorOps, toFoldableOps}
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures.LightNode
@@ -100,13 +100,7 @@ object CommonValidation {
 
           for {
             address <- blockchain.resolveAlias(citx.dApp)
-            _ <- citx.payments
-              .collectFirstSome {
-                case Payment(_, IssuedAsset(id)) => InvokeDiffsCommon.checkAsset(blockchain, id).swap.toOption
-                case Payment(_, Waves)           => None
-              }
-              .map(GenericError(_))
-              .toLeft(())
+            _       <- InvokeDiffsCommon.checkPayments(blockchain, citx.payments)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                                                      => false
