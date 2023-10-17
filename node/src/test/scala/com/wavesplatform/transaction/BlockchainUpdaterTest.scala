@@ -9,13 +9,12 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.utils.ScorexLogging
 
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 import scala.util.Try
 
-class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain with ScorexLogging {
+class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
 
   private val ApprovalPeriod = 100
 
@@ -127,6 +126,139 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain wi
     b.height shouldBe ApprovalPeriod - 1
     b.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
     b.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+  }
+
+  "multiple features activation: one after another" - {
+    def appendBlocks(b: BlockchainUpdaterImpl, blocks: Int, votes: Short*): Unit = (1 to blocks).foreach { _ =>
+      b.processBlock(getNextTestBlockWithVotes(b, votes)) should beRight
+    }
+
+    def check(
+        b: BlockchainUpdaterImpl,
+        height: Int,
+        approvedFeatures: Map[Int, Int] = Map.empty,
+        activatedFeatures: Map[Int, Int] = Map.empty
+    ): Unit = {
+      b.height shouldBe height
+      withClue("approved:") {
+        b.approvedFeatures shouldBe approvedFeatures
+      }
+      withClue("activated:") {
+        b.activatedFeatures shouldBe activatedFeatures
+      }
+    }
+
+    "without votes for already activated feature" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
+
+      check(b, 1)
+
+      markup("Approving the first feature")
+      appendBlocks(b, blocks = ApprovalPeriod - 1, votes = 1)
+      check(
+        b,
+        ApprovalPeriod,
+        approvedFeatures = Map(1 -> ApprovalPeriod),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2)
+      )
+
+      markup("Approving the second feature without voting for first feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 2)
+      check(
+        b,
+        ApprovalPeriod * 2,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+
+      markup("Activating the second feature")
+      appendBlocks(b, blocks = ApprovalPeriod)
+      check(
+        b,
+        ApprovalPeriod * 3,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+    }
+
+    "with votes for already activated feature" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
+
+      markup("Approving the first feature")
+      appendBlocks(b, blocks = ApprovalPeriod - 1, votes = 1)
+
+      markup("Approving the second feature, still voting for first feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 1, 2)
+      check(
+        b,
+        ApprovalPeriod * 2,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+
+      markup("Activating the second feature")
+      appendBlocks(b, blocks = ApprovalPeriod)
+      check(
+        b,
+        ApprovalPeriod * 3,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+    }
+
+    "with multiple voting periods rollback" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
+
+      markup("Approving the first feature")
+      appendBlocks(b, blocks = ApprovalPeriod - 1, votes = 1)
+
+      markup("Approving the second feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 2)
+
+      markup("Approving the third feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 3)
+
+      markup("Approving the fourth feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 4)
+      check(
+        b,
+        ApprovalPeriod * 4,
+        approvedFeatures = Map(
+          1 -> ApprovalPeriod,
+          2 -> ApprovalPeriod * 2,
+          3 -> ApprovalPeriod * 3,
+          4 -> ApprovalPeriod * 4
+        ),
+        activatedFeatures = Map(
+          1 -> ApprovalPeriod * 2,
+          2 -> ApprovalPeriod * 3,
+          3 -> ApprovalPeriod * 4,
+          4 -> ApprovalPeriod * 5 // Actually, it is not activated, because we haven't reach this height
+        )
+      )
+
+      markup("Rollback")
+      val rollbackHeight = ApprovalPeriod * 2 + 1
+      b.removeAfter(b.blockHeader(rollbackHeight).get.id()).explicitGet()
+      check(
+        b,
+        rollbackHeight,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+
+      markup("Appending blocks without votes to reach the previous height")
+      appendBlocks(b, blocks = ApprovalPeriod * 2 - 1)
+      check(
+        b,
+        ApprovalPeriod * 4,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+    }
   }
 
   "features activation after rollback and appending blocks" - {

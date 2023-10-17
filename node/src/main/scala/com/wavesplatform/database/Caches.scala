@@ -1,6 +1,5 @@
 package com.wavesplatform.database
 
-import java.util
 import cats.data.Ior
 import cats.syntax.monoid.*
 import cats.syntax.option.*
@@ -20,6 +19,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
+import java.util
 import scala.collection.immutable.VectorMap
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -152,6 +152,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadApprovedFeatures(): Map[Short, Int]
   override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
 
+  // Also contains features those will be activated in the future (activationHeight > currentHeight), because they were approved now or before.
   @volatile
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]

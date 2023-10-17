@@ -530,7 +530,7 @@ abstract class LevelDBWriter private[database] (
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
-          approvedFeaturesCache ++= newlyApprovedFeatures
+          approvedFeaturesCache = newlyApprovedFeatures ++ approvedFeaturesCache
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
           val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache).toMap
@@ -754,11 +754,8 @@ abstract class LevelDBWriter private[database] (
           if (disapprovedFeatures.nonEmpty) {
             approvedFeaturesCache --= disapprovedFeatures
             rw.put(Keys.approvedFeatures, approvedFeaturesCache)
-          }
 
-          val disactivatedFeatures = activatedFeaturesCache.collect { case (id, activationHeight) if activationHeight > targetHeight => id }
-          if (disactivatedFeatures.nonEmpty) {
-            activatedFeaturesCache --= disactivatedFeatures
+            activatedFeaturesCache --= disapprovedFeatures // We won't activate them in the future
             rw.put(Keys.activatedFeatures, activatedFeaturesCache)
           }
 
