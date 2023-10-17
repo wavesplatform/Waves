@@ -10,8 +10,9 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Transaction, TransactionType, TxHelpers}
 import org.scalatest.{EitherValues, Inside}
 
@@ -38,13 +39,13 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
 
   private def dApp(asset: IssuedAsset): Script =
     TestCompiler(V4).compileContract(s"""
-         | @Callable(i)
-         | func default() =
-         |  [
-         |     ScriptTransfer(i.caller, 1, base58'$asset'),
-         |     Burn(base58'$asset', 1),
-         |     Reissue(base58'$asset', 1, false)
-         |  ]
+                                        | @Callable(i)
+                                        | func default() =
+                                        |  [
+                                        |     ScriptTransfer(i.caller, 1, base58'$asset'),
+                                        |     Burn(base58'$asset', 1),
+                                        |     Reissue(base58'$asset', 1, false)
+                                        |  ]
       """.stripMargin)
 
   private val paymentPreconditions: (Seq[AddrWithBalance], List[Transaction], () => InvokeScriptTransaction, () => InvokeScriptTransaction) = {
@@ -62,6 +63,33 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
     val invokeFromScripted    = () => TxHelpers.invoke(dAppAcc.toAddress, None, Nil, payments, scriptedInvoker)
     val invokeFromNonScripted = () => TxHelpers.invoke(dAppAcc.toAddress, None, Nil, payments, nonScriptedInvoker)
     (balances, List(issue, transfer1, transfer2, setVerifier, setDApp), invokeFromScripted, invokeFromNonScripted)
+  }
+
+  property("insufficient action fees propagates failed transaction before RIDE V5 activation") {
+    withDomain(RideV4, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val issueTx = issue(script = Some(TestCompiler(V4).compileExpression("true")))
+      val asset   = IssuedAsset(issueTx.id())
+      val dApp = TestCompiler(V4).compileContract(
+        s"""
+           | @Callable(i)
+           | func transfer() = [ScriptTransfer(i.caller, 1, base58'$asset')]
+           | 
+           | @Callable(i)
+           | func reissue() = [Reissue(base58'$asset', 1, true)]
+           | 
+           | @Callable(i)
+           | func burn() = [Burn(base58'$asset', 1)]
+           |
+           | @Callable(i)
+           | func issue() = [Issue("name", "", 1000, 4, true, unit, 0)]
+         """.stripMargin
+      )
+      d.appendBlock(issueTx, setScript(secondSigner, dApp))
+      d.appendAndAssertFailed(invoke(func = Some("transfer")), "with 1 total scripts invoked does not exceed minimal value of 900000 WAVES")
+      d.appendAndAssertFailed(invoke(func = Some("reissue")), "with 1 total scripts invoked does not exceed minimal value of 900000 WAVES")
+      d.appendAndAssertFailed(invoke(func = Some("burn")), "with 1 total scripts invoked does not exceed minimal value of 900000 WAVES")
+      d.appendAndAssertFailed(invoke(func = Some("issue")), "with 1 assets issued does not exceed minimal value of 100500000 WAVES")
+    }
   }
 
   property(s"fee for asset scripts is not required after activation ${BlockchainFeatures.SynchronousCalls}") {

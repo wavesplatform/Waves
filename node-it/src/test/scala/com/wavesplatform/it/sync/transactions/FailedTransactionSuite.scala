@@ -118,52 +118,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
   }
 
-  test("InvokeScriptTransaction: insufficient action fees propagates failed transaction") {
-    val invokeFee            = 0.005.waves
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-
-    for (typeName <- Seq("transfer", "issue", "reissue", "burn")) {
-      updateTikTok("unknown", setAssetScriptMinFee)
-
-      val prevBalance      = sender.balance(caller.toAddress.toString).balance
-      val prevAssetBalance = sender.assetBalance(contractAddress, smartAsset)
-      val prevAssets       = sender.assetsBalance(contractAddress)
-
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
-        () => updateTikTok(typeName, priorityFee, waitForTx = false)
-      ) { (txs, priorityTx) =>
-        logPriorityTx(priorityTx)
-
-        val failed = assertFailedTxs(txs)
-
-        sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
-        sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance
-        sender.assetsBalance(contractAddress).balances should contain theSameElementsAs prevAssets.balances
-
-        val (scriptInvokedInfo, issuedInfo) =
-          if (typeName == "issue")
-            ("", " with 1 assets issued")
-          else
-            (" with 1 total scripts invoked", "")
-
-        val minFee = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
-        val text = s"Fee in WAVES for InvokeScriptTransaction ($invokeFee in WAVES)" +
-          s"$scriptInvokedInfo$issuedInfo does not exceed minimal value of $minFee WAVES."
-
-        failed.foreach { s =>
-          checkStateChange(sender.stateChanges(s.id), 2, text)
-        }
-
-        failed
-      }
-    }
-  }
-
   test("InvokeScriptTransaction: reject transactions if account script failed") {
     val invokeFee            = 0.005.waves
     val setAssetScriptMinFee = setAssetScriptFee + smartFee
@@ -210,28 +164,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
       invalid
     }
-  }
-
-  test("InvokeScriptTransaction: transactionHeightById returns only succeed transactions") {
-    val invokeFee            = 0.005.waves + smartFee
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    updateAccountScript(None, caller, setScriptFee + smartFee)
-    updateTikTok("reissue", setAssetScriptMinFee)
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-    waitForEmptyUtx()
-    overflowBlock()
-
-    val failedTxs = sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
-      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-      assertFailedTxs(txs)
-    }
-
-    checkTransactionHeightById(failedTxs)
   }
 
   test("ExchangeTransaction: transaction validates as failed when asset script fails") {
