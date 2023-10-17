@@ -31,7 +31,7 @@ object Dependencies {
   val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.11" // 1.4.x and later is built for Java 11
   val janino             = "org.codehaus.janino" % "janino"            % "3.1.10"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
-  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.5"
+  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.94.Final"
 
   val catsCore  = catsModule("core", "2.9.0")
@@ -66,10 +66,10 @@ object Dependencies {
       shapeless.value,
       "org.typelevel" %%% "cats-mtl" % "1.3.1",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
+      googleGuava,
       curve25519,
       bouncyCastleProvider,
-      "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
-      "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
+      "com.wavesplatform" % "zwaves" % "0.2.1",
       web3jModule("crypto")
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
