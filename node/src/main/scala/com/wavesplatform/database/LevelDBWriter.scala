@@ -530,10 +530,10 @@ abstract class LevelDBWriter private[database] (
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
-          approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
+          approvedFeaturesCache ++= newlyApprovedFeatures
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache).toMap
 
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
@@ -750,15 +750,15 @@ abstract class LevelDBWriter private[database] (
             disabledAliases = DisableHijackedAliases.revert(rw)
           }
 
-          val disapprovedFeatures = rw.get(Keys.approvedFeatures).collect { case (id, approvalHeight) if approvalHeight > targetHeight => id }
+          val disapprovedFeatures = approvedFeaturesCache.collect { case (id, approvalHeight) if approvalHeight > targetHeight => id }
           if (disapprovedFeatures.nonEmpty) {
-            approvedFeaturesCache = rw.get(Keys.approvedFeatures) -- disapprovedFeatures
+            approvedFeaturesCache --= disapprovedFeatures
             rw.put(Keys.approvedFeatures, approvedFeaturesCache)
           }
 
-          val disactivatedFeatures = rw.get(Keys.activatedFeatures).collect { case (id, activationHeight) if activationHeight > targetHeight => id }
+          val disactivatedFeatures = activatedFeaturesCache.collect { case (id, activationHeight) if activationHeight > targetHeight => id }
           if (disactivatedFeatures.nonEmpty) {
-            activatedFeaturesCache = rw.get(Keys.activatedFeatures) -- disactivatedFeatures
+            activatedFeaturesCache --= disactivatedFeatures
             rw.put(Keys.activatedFeatures, activatedFeaturesCache)
           }
 
