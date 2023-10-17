@@ -32,12 +32,11 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(V1, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V1, typedError = true).withEnvironment[Environment],
+          CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V1, Account, Expression).explicitGet(),
-            fixBigScriptField = true,
-            typedError = true
+            fixBigScriptField = true
           )
         )
       )
@@ -100,12 +99,11 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V2, typedError = true).withEnvironment[Environment],
+          CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V2, Account, Expression).explicitGet(),
-            fixBigScriptField = true,
-            typedError = true
+            fixBigScriptField = true
           )
         )
       )
@@ -168,12 +166,11 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
       .combineAll(
         Seq(
           PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-          CryptoContext.build(Global, V3, typedError = true).withEnvironment[Environment],
+          CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V3, Account, Expression).explicitGet(),
-            fixBigScriptField = true,
-            typedError = true
+            fixBigScriptField = true
           )
         )
       )

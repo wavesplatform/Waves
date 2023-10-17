@@ -137,12 +137,11 @@ class IssueTransactionV2Specification extends PropSpec with WithNewDBForEachTest
         .combineAll(
           Seq(
             PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment],
-            CryptoContext.build(Global, V3, typedError = true).withEnvironment[Environment],
+            CryptoContext.build(Global, V3).withEnvironment[Environment],
             WavesContext.build(
               Global,
               DirectiveSet(V3, Account, Expression).explicitGet(),
-              fixBigScriptField = true,
-              typedError = true
+              fixBigScriptField = true
             )
           )
         )

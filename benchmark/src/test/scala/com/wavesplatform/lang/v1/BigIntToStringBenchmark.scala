@@ -27,7 +27,7 @@ class BigIntToStringBenchmark {
 @State(Scope.Benchmark)
 class BigIntToStringSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val expr = FUNCTION_CALL(
     Native(BIGINT_TO_STRING),

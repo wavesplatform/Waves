@@ -109,7 +109,7 @@ object UtilsEvaluator {
         currentSnapshot = paymentsSnapshot,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
-      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true, typedError = true)
+      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
       dApp = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
       expr <- dAppToExpr(dApp)
       limitedResult <- EvaluatorV2
@@ -122,7 +122,8 @@ object UtilsEvaluator {
           correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
           newMode = blockchain.newEvaluatorMode,
           checkConstructorArgsTypes = true,
-          enableExecutionLog = true
+          enableExecutionLog = true,
+          fixedThrownError = true
         )
         .value()
         .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }

@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
-import com.wavesplatform.lang.{CommonError, ExecutionError}
+import com.wavesplatform.lang.{CommonError, ExecutionError, ThrownError}
 
 import scala.collection.mutable
 import scala.util.Try
@@ -42,17 +42,17 @@ object CryptoContext {
   private def digestAlgValue(tpe: CASETYPEREF): ContextfulVal[NoContext] =
     ContextfulVal.pure(CaseObj(tpe, Map.empty))
 
-  def build(global: BaseGlobal, version: StdLibVersion, typedError: Boolean = true): CTX[NoContext] =
+  def build(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] =
     ctxCache.getOrElse(
-      (global, version, typedError),
+      (global, version),
       ctxCache.synchronized {
-        ctxCache.getOrElseUpdate((global, version, typedError), buildNew(global, version, typedError))
+        ctxCache.getOrElseUpdate((global, version), buildNew(global, version))
       }
     )
 
-  private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion, Boolean), CTX[NoContext]]
+  private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
 
-  private def buildNew(global: BaseGlobal, version: StdLibVersion, typedError: Boolean): CTX[NoContext] = {
+  private def buildNew(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
     def functionFamily(
         startId: Short,
         nameByLimit: Int => String,
@@ -360,7 +360,7 @@ object CryptoContext {
         case xs => notImplemented[Id, EVALUATED](s"checkMerkleProof(merkleRoot: ByteVector, merkleProof: ByteVector, valueBytes: ByteVector)", xs)
       }
 
-    def createMerkleRootF(typedError: Boolean): BaseFunction[NoContext] =
+    val createMerkleRootF: BaseFunction[NoContext] =
       NativeFunction(
         "createMerkleRoot",
         30,
@@ -373,9 +373,9 @@ object CryptoContext {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
           val sizeCheckedProofs = proof.collect { case bs @ CONST_BYTESTR(v) if v.size == 32 => bs }
           if (value.size == 32 && proof.length <= 16 && sizeCheckedProofs.size == proof.size) {
-            def r = createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr))
-            (if (typedError) Try(r).toEither else Right(r))
-              .leftMap(e => (if (e.getMessage != null) e.getMessage else "error"): ExecutionError)
+            Try(createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr)))
+              .toEither
+              .leftMap(e => ThrownError(if (e.getMessage != null) e.getMessage else "error"))
               .flatMap(r => CONST_BYTESTR(ByteStr(r)))
           } else {
             notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector, index: Int)", xs)
@@ -550,11 +550,11 @@ object CryptoContext {
         fromBase16StringF(checkLength = false)
       )
 
-    def fromV4Functions(version: StdLibVersion, typedError: Boolean) =
+    def fromV4Functions(version: StdLibVersion) =
       Array(
         bls12Groth16VerifyF,
         bn256Groth16VerifyF,
-        createMerkleRootF(typedError),
+        createMerkleRootF,
         ecrecover, // new in V4
         rsaVerifyF,
         toBase16StringF(checkLength = true),
@@ -563,8 +563,8 @@ object CryptoContext {
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
-    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, fromV4Functions(V4, typedError))
-    val fromV6Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV4Functions(V6, typedError))
+    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, fromV4Functions(V4))
+    val fromV6Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV4Functions(V6))
 
     version match {
       case V1 | V2 => fromV1Ctx
@@ -574,9 +574,9 @@ object CryptoContext {
     }
   }
 
-  def evalContext[F[_]: Monad](global: BaseGlobal, version: StdLibVersion, typedError: Boolean): EvaluationContext[NoContext, F] =
-    build(global, version, typedError).evaluationContext[F]
+  def evalContext[F[_]: Monad](global: BaseGlobal, version: StdLibVersion): EvaluationContext[NoContext, F] =
+    build(global, version).evaluationContext[F]
 
-  def compilerContext(global: BaseGlobal, version: StdLibVersion, typedError: Boolean): CompilerContext =
-    build(global, version, typedError).compilerContext
+  def compilerContext(global: BaseGlobal, version: StdLibVersion): CompilerContext =
+    build(global, version).compilerContext
 }

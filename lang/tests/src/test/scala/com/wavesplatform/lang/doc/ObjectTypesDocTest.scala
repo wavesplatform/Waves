@@ -19,7 +19,7 @@ class ObjectTypesDocTest extends PropSpec {
     fields.map { case (name, t) => s"$name: $t" }.mkString("\n\n", "\n", "\n\n")
 
   property("all object types") {
-    lazyContexts.foreach { case ((ds, _, _, _), ctx) =>
+    lazyContexts.foreach { case ((ds, _, _), ctx) =>
       ctx().types
         .collect { case CASETYPEREF(name, fields, _) =>
           val codeFields = fields.map { case (name, t) => (name, t.toString) }
