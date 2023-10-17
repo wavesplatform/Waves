@@ -27,10 +27,7 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
 
   private val verifier: Script =
     TestCompiler(V4).compileExpression(
-      s""" {-# STDLIB_VERSION 4        #-}
-         | {-# SCRIPT_TYPE ASSET       #-}
-         | {-# CONTENT_TYPE EXPRESSION #-}
-         |
+      s""" 
          | !(sigVerify_32Kb(base58'', base58'', base58'') ||
          |   sigVerify_32Kb(base58'', base58'', base58'') ||
          |   sigVerify_32Kb(base58'', base58'', base58''))
