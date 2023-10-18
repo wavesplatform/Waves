@@ -11,9 +11,9 @@ object Dependencies {
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.3"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.5"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.2"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
 
@@ -25,21 +25,21 @@ object Dependencies {
 
   val akkaHttp           = akkaHttpModule("akka-http")
   val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  val googleGuava        = "com.google.guava"    % "guava"             % "32.0.1-jre"
+  val googleGuava        = "com.google.guava"    % "guava"             % "32.1.3-jre"
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.11" // 1.4.x and later is built for Java 11
   val janino             = "org.codehaus.janino" % "janino"            % "3.1.10"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.94.Final"
+  val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.100.Final"
 
-  val catsCore  = catsModule("core", "2.9.0")
+  val catsCore  = catsModule("core", "2.10.0")
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.9.4"
+  val playJson = "com.typesafe.play" %% "play-json" % "2.10.1"
 
-  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.16" % Test
+  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.17" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
 
   val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
@@ -91,7 +91,7 @@ object Dependencies {
 
   lazy val qaseReportDeps = Seq(
     playJson,
-    ("io.qase" % "qase-api" % "3.0.5").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+    ("io.qase" % "qase-api" % "3.1.1").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -114,8 +114,8 @@ object Dependencies {
   lazy val node = Def.setting(
     Seq(
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
-      "commons-net"          % "commons-net"              % "3.9.0",
-      "org.apache.commons"   % "commons-lang3"            % "3.12.0",
+      "commons-net"          % "commons-net"              % "3.10.0",
+      "org.apache.commons"   % "commons-lang3"            % "3.13.0",
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonCore,
@@ -136,7 +136,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.0",
-      "com.esaulpaugh"              % "headlong"      % "9.3.0",
+      "com.esaulpaugh"              % "headlong"      % "9.4.0",
       web3jModule("abi"),
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
@@ -185,7 +185,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.5"
+    val circeVersion = "0.14.6"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",
