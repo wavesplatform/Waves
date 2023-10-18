@@ -194,8 +194,7 @@ buildTarballsForDocker := {
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
-checkPRRaw := Def.taskDyn {
-  val res = Def
+checkPRRaw := Def
     .sequential(
       `waves-node` / clean,
       Def.task {
@@ -209,19 +208,9 @@ checkPRRaw := Def.taskDyn {
         (`node-it` / Test / compile).value
         (benchmark / Test / compile).value
         (`node-generator` / Compile / compile).value
+        (`ride-runner` / Test / compile).value
       }
-    )
-    .result
-    .value
-
-  Def.task {
-    (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
-    res match {
-      case Inc(inc: Incomplete) => throw inc
-      case Value(v)             => v
-    }
-  }
-}.value
+    ).value
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val newState = Project
@@ -233,6 +222,11 @@ def checkPR: Command = Command.command("checkPR") { state =>
   Project.extract(newState).runTask(checkPRRaw, newState)
   state
 }
+
+lazy val completeQaseRun = taskKey[Unit]("Complete Qase run")
+completeQaseRun := Def.task {
+  (`lang-testkit` / Test / runMain).toTask(" com.wavesplatform.report.QaseRunCompleter").value
+}.value
 
 lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
 buildDebPackages := {

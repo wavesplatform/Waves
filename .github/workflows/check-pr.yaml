@@ -27,7 +27,7 @@ jobs:
           path: ~/.cache/coursier
           key: coursier-cache
       - name: Check PR
-        run: sbt --mem 6144 --batch checkPR
+        run: sbt --mem 6144 --batch ;checkPR;completeQaseRun
         env:
           QASE_ENABLE: true
           QASE_RUN_NAME: checkPR

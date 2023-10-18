@@ -107,7 +107,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
   "Micro block miner" should "retry packing UTX regardless of when event has been sent" in {
     withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
       import Scheduler.Implicits.global
-      val utxEvents = ConcurrentSubject.publish[UtxEvent]
+      val utxEvents        = ConcurrentSubject.publish[UtxEvent]
       val eventHasBeenSent = new CountDownLatch(1)
       val inner = new UtxPoolImpl(
         ntpTime,
@@ -123,7 +123,6 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
 
       val utxPool = new UtxPool {
 
-
         override def packUnconfirmed(
             rest: MultiDimensionalMiningConstraint,
             strategy: UtxPool.PackStrategy,
@@ -131,9 +130,9 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         ): (Option[Seq[Transaction]], MiningConstraint) = {
           val (txs, constraint) = inner.packUnconfirmed(rest, strategy, cancelled)
           val waitingConstraint = new MiningConstraint {
-            def isFull                                          = { eventHasBeenSent.await(); constraint.isFull }
-            def isOverfilled                                    = constraint.isOverfilled
-            def put(b: Blockchain, tx: Transaction, diff: Diff) = constraint.put(b, tx, diff)
+            def isFull: Boolean                                                   = { eventHasBeenSent.await(); constraint.isFull }
+            def isOverfilled: Boolean                                             = constraint.isOverfilled
+            def put(b: Blockchain, tx: Transaction, diff: Diff): MiningConstraint = constraint.put(b, tx, diff)
           }
           (txs, waitingConstraint)
         }

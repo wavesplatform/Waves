@@ -4,29 +4,29 @@ import com.wavesplatform.ride.runner.RideTestSuite
 import com.wavesplatform.ride.runner.RideTestSuite.getTestSuites
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 
-import java.nio.file.Path
+import java.io.File
 import scala.collection.immutable.SortedSet
 
 class RideTestSuiteTestSuite extends BaseTestSuite with HasTestAccounts {
-  private val rootPath = Path.of("")
+  private val rootPath = new File("").toPath
 
   "RideTestSuite" - {
     "getTestSuites" - {
       "one" in {
-        val aTest = Path.of("a.test")
+        val aTest = new File("a.test").toPath
         getTestSuites(List(aTest)) shouldBe RideTestSuite(path = rootPath, testCases = SortedSet(aTest))
       }
 
       "one nested" in {
-        val aTest = Path.of("foo/bar/a.test")
+        val aTest = new File("foo/bar/a.test").toPath
         getTestSuites(List(aTest)) shouldBe RideTestSuite(
           path = rootPath,
           testSuites = SortedSet(
             RideTestSuite(
-              path = Path.of("foo"),
+              path = new File("foo").toPath,
               testSuites = SortedSet(
                 RideTestSuite(
-                  path = Path.of("foo/bar"),
+                  path = new File("foo/bar").toPath,
                   testCases = SortedSet(aTest)
                 )
               )
@@ -36,33 +36,33 @@ class RideTestSuiteTestSuite extends BaseTestSuite with HasTestAccounts {
       }
 
       "complex" in {
-        val aTest = Path.of("foo/bar/a.test")
-        val bTest = Path.of("foo/bar/baz/b.test")
-        val cTest = Path.of("bar/c.test")
-        val dTest = Path.of("foo/baz/d.test")
+        val aTest = new File("foo/bar/a.test").toPath
+        val bTest = new File("foo/bar/baz/b.test").toPath
+        val cTest = new File("bar/c.test").toPath
+        val dTest = new File("foo/baz/d.test").toPath
 
         getTestSuites(List(aTest, bTest, cTest, dTest)) shouldBe RideTestSuite(
           path = rootPath,
           testSuites = SortedSet(
             RideTestSuite(
-              path = Path.of("bar"),
+              path = new File("bar").toPath,
               testCases = SortedSet(cTest)
             ),
             RideTestSuite(
-              path = Path.of("foo"),
+              path = new File("foo").toPath,
               testSuites = SortedSet(
                 RideTestSuite(
-                  path = Path.of("foo/bar"),
+                  path = new File("foo/bar").toPath,
                   testCases = SortedSet(aTest),
                   testSuites = SortedSet(
                     RideTestSuite(
-                      path = Path.of("foo/bar/baz"),
+                      path = new File("foo/bar/baz").toPath,
                       testCases = SortedSet(bTest)
                     )
                   )
                 ),
                 RideTestSuite(
-                  path = Path.of("foo/baz"),
+                  path = new File("foo/baz").toPath,
                   testCases = SortedSet(dTest)
                 )
               )

@@ -37,7 +37,7 @@ object Dependencies {
   val catsCore  = catsModule("core", "2.10.0")
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.10.1"
+  val playJson = "com.typesafe.play" %% "play-json" % "2.9.4" // 2.10.x and later is built for Java 11
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.17" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
@@ -174,13 +174,14 @@ object Dependencies {
       "org.ehcache"                   % "sizeof"                   % "0.4.3", // Weighing caches
       kamonModule("caffeine"),
       kamonModule("prometheus"),
-      Dependencies.sttp3,
-      Dependencies.sttp3Monix,
-      "org.scala-lang.modules"                                       %% "scala-xml"              % "2.2.0", // JUnit reports
-      Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
-      Dependencies.akkaHttpModule("akka-http-testkit")                % Test,
-      "com.softwaremill.diffx"                                       %% "diffx-core"             % "0.8.3" % Test,
-      "com.softwaremill.diffx"                                       %% "diffx-scalatest-should" % "0.8.3" % Test
+      sttp3,
+      sttp3Monix,
+      "org.scala-lang.modules"                          %% "scala-xml"              % "2.2.0", // JUnit reports
+      leveldbJava().exclude("com.google.guava", "guava") % Test,
+      akkaHttpModule("akka-http-testkit")                % Test,
+      "com.softwaremill.diffx"                          %% "diffx-core"             % "0.8.3" % Test,
+      "com.softwaremill.diffx"                          %% "diffx-scalatest-should" % "0.8.3" % Test,
+      "io.grpc"                                          % "grpc-inprocess"         % scalapb.compiler.Version.grpcJavaVersion % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 

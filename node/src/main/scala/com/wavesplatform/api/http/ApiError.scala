@@ -70,9 +70,9 @@ object ApiError {
   }
 
   case object Unknown extends ApiError {
-    override val id      = 0
-    override val code    = StatusCodes.InternalServerError
-    override val message = "Error is unknown"
+    override val id               = 0
+    override val code: StatusCode = StatusCodes.InternalServerError
+    override val message          = "Error is unknown"
   }
 
   final case class WrongJson(
@@ -80,9 +80,9 @@ object ApiError {
       errors: scala.collection.Seq[(JsPath, scala.collection.Seq[JsonValidationError])] = Seq.empty,
       msg: Option[String] = None
   ) extends ApiError {
-    override val id              = WrongJson.Id
-    override val code            = StatusCodes.BadRequest
-    override val message: String = msg.getOrElse(WrongJson.WrongJsonMessage)
+    override val id               = WrongJson.Id
+    override val code: StatusCode = StatusCodes.BadRequest
+    override val message: String  = msg.getOrElse(WrongJson.WrongJsonMessage)
     override lazy val json: JsObject = Json.obj(
       "error"            -> id,
       "message"          -> message,
@@ -98,9 +98,9 @@ object ApiError {
 
   // API Auth
   case object ApiKeyNotValid extends ApiError {
-    override val id              = 2
-    override val code            = StatusCodes.Forbidden
-    override val message: String = "Provided API key is not correct"
+    override val id               = 2
+    override val code: StatusCode = StatusCodes.Forbidden
+    override val message: String  = "Provided API key is not correct"
   }
 
   case object TooBigArrayAllocation extends ApiError {
@@ -117,32 +117,32 @@ object ApiError {
 
   // VALIDATION
   case object InvalidSignature extends ApiError {
-    override val id      = 101
-    override val code    = StatusCodes.BadRequest
-    override val message = "invalid signature"
+    override val id               = 101
+    override val code: StatusCode = StatusCodes.BadRequest
+    override val message          = "invalid signature"
   }
 
   case object InvalidAddress extends ApiError {
-    override val id      = 102
-    override val code    = StatusCodes.BadRequest
-    override val message = "invalid address"
+    override val id               = 102
+    override val code: StatusCode = StatusCodes.BadRequest
+    override val message          = "invalid address"
   }
 
   case class TooBigInBytes(message: String) extends ApiError {
-    override val id   = 107
-    override val code = StatusCodes.BadRequest
+    override val id               = 107
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
   case object InvalidPublicKey extends ApiError {
-    override val id      = 108
-    override val code    = StatusCodes.BadRequest
-    override val message = "invalid public key"
+    override val id               = 108
+    override val code: StatusCode = StatusCodes.BadRequest
+    override val message          = "invalid public key"
   }
 
   case object InvalidMessage extends ApiError {
-    override val id      = 110
-    override val code    = StatusCodes.BadRequest
-    override val message = "invalid message"
+    override val id               = 110
+    override val code: StatusCode = StatusCodes.BadRequest
+    override val message          = "invalid message"
   }
 
   case object InvalidName extends ApiError {
@@ -210,14 +210,14 @@ object ApiError {
   }
 
   case object BlockDoesNotExist extends ApiError {
-    override val id: Int         = 301
-    override val code            = StatusCodes.NotFound
-    override val message: String = "block does not exist"
+    override val id: Int          = 301
+    override val code: StatusCode = StatusCodes.NotFound
+    override val message: String  = "block does not exist"
   }
 
   final case class AliasDoesNotExist(alias: Alias) extends ApiError {
-    override val id: Int = AliasDoesNotExist.Id
-    override val code    = StatusCodes.NotFound
+    override val id: Int          = AliasDoesNotExist.Id
+    override val code: StatusCode = StatusCodes.NotFound
 
     override lazy val message: String = s"alias '$alias' doesn't exist"
   }
@@ -238,9 +238,9 @@ object ApiError {
   }
 
   case object DataKeyDoesNotExist extends ApiError {
-    override val id: Int         = 304
-    override val code            = StatusCodes.NotFound
-    override val message: String = "no data for this key"
+    override val id: Int          = 304
+    override val code: StatusCode = StatusCodes.NotFound
+    override val message: String  = "no data for this key"
   }
 
   final case class ScriptCompilerError(errorMessage: String) extends ApiError {
@@ -303,9 +303,9 @@ object ApiError {
   }
 
   case object UnsupportedTransactionType extends ApiError {
-    override val id: Int         = 312
-    override val code            = StatusCodes.NotImplemented
-    override val message: String = "transaction type not supported"
+    override val id: Int          = 312
+    override val code: StatusCode = StatusCodes.NotImplemented
+    override val message: String  = "transaction type not supported"
   }
 
   case class AssetDoesNotExist(assetId: IssuedAsset) extends ApiError {
@@ -418,42 +418,42 @@ object ApiError {
   }
 
   case class InvalidTransactionId(message: String) extends ApiError {
-    override val id   = 4001
-    override val code = StatusCodes.BadRequest
+    override val id               = 4001
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
   case class InvalidBlockId(message: String) extends ApiError {
-    override val id   = 4002
-    override val code = StatusCodes.BadRequest
+    override val id               = 4002
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
   case object InvalidAssetId extends ApiError {
-    override val id      = 4007
-    override val message = "Invalid asset id"
-    override val code    = StatusCodes.BadRequest
+    override val id               = 4007
+    override val message          = "Invalid asset id"
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
   case object ServerRequestTimeout extends ApiError {
-    override val id: Int         = 5031
-    override val code            = StatusCodes.ServiceUnavailable
-    override val message: String = "The server was not able to produce a timely response to request"
+    override val id: Int          = 5031
+    override val code: StatusCode = StatusCodes.ServiceUnavailable
+    override val message: String  = "The server was not able to produce a timely response to request"
   }
 
   case object DataKeysNotSpecified extends ApiError {
-    override val id      = 4008
-    override val message = "Key was not specified"
-    override val code    = StatusCodes.BadRequest
+    override val id               = 4008
+    override val message          = "Key was not specified"
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
   case object AssetIdNotSpecified extends ApiError {
-    override val id      = 4009
-    override val message = "Asset ID was not specified"
-    override val code    = StatusCodes.BadRequest
+    override val id               = 4009
+    override val message          = "Asset ID was not specified"
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
   case object ConflictingRequestStructure extends ApiError {
-    override val id      = 198
-    override val message = "Conflicting request structure. Both expression and invocation structure were sent"
-    override val code    = StatusCodes.BadRequest
+    override val id               = 198
+    override val message          = "Conflicting request structure. Both expression and invocation structure were sent"
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 }

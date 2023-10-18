@@ -17,9 +17,9 @@ package object meta {
 
   object MetaMapperStrategyV1
     extends DataMetaMapper(unionTypeMapper, V1)
-    with MetaMapperStrategy[V1.Self]
+    with MetaMapperStrategy
 
   object MetaMapperStrategyV2
     extends DataMetaMapper(listTypeMapper, V2)
-    with MetaMapperStrategy[V2.Self]
+    with MetaMapperStrategy
 }

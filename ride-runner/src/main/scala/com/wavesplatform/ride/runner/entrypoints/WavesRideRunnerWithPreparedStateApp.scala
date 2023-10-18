@@ -30,7 +30,7 @@ import scala.xml.{Elem, PCData}
 object WavesRideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
     val setup = new DefaultOParserSetup {
-      override val showUsageOnError = Some(true)
+      override val showUsageOnError: Option[Boolean] = Some(true)
     }
 
     OParser.parse(commandParser, args, Args(), setup).foreach { args =>

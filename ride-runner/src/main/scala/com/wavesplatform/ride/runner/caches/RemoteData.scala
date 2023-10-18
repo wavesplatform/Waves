@@ -13,12 +13,12 @@ object RemoteData {
 
   case object Absence extends RemoteData[Nothing] {
     override val loaded     = true
-    override val mayBeValue = None
+    override val mayBeValue: Option[Nothing] = None
   }
 
   case object Unknown extends RemoteData[Nothing] {
     override val loaded     = false
-    override val mayBeValue = None
+    override val mayBeValue: Option[Nothing] = None
   }
 
   def apply[T](x: Option[Option[T]]): RemoteData[T] = x match {
