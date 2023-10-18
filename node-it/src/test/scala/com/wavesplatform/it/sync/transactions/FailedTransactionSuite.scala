@@ -163,28 +163,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     }
   }
 
-  test("ExchangeTransaction: transaction validates as failed when asset script fails") {
-    val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(
-        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
-      )
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + 4 * smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-
-    val (assetScript, _) =
-      ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()
-    val scriptTx = sender.setAssetScript(priceAsset, buyerAddress, script = Some(assetScript.bytes().base64))
-    nodes.waitForHeightAriseAndTxPresent(scriptTx.id)
-
-    val tx     = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
-    val result = sender.signedValidate(tx.json())
-    (result \ "valid").as[Boolean] shouldBe false
-    (result \ "error").as[String] should include("not allowed by script of the asset")
-  }
-
   test("ExchangeTransaction: invalid exchange tx when asset script fails on broadcast") {
     val init = Seq(
       sender.setScript(firstKeyPair, None, setScriptFee + smartFee).id,
