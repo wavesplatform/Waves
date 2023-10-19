@@ -429,7 +429,7 @@ class ContractCompilerCompactorTest extends PropSpec {
       s"""
          | {-# STDLIB_VERSION ${version.id} #-}
          | {-# CONTENT_TYPE DAPP #-}
-         | {-# IMPORT lib1,lib2 #-}
+         | {-# IMPORT lib2,lib1 #-}
          |
          | @Verifier(tx)
          | func verify() = {
@@ -443,6 +443,7 @@ class ContractCompilerCompactorTest extends PropSpec {
         directives  <- DirectiveParser(scriptForV(version))
         ds          <- Directive.extractDirectives(directives)
         (linked, _) <- ScriptPreprocessor(scriptForV(version), libraries, ds.imports)
+        _ = println(s"\n\t$linked\n")
         expr = Parser.parseContract(linked).get.value
         r <- compiler.ContractCompiler(ctxForV(version).compilerContext, expr, version, needCompaction = false, removeUnusedCode = true)
       } yield r.compactedSource(version)
