@@ -4,22 +4,22 @@ import cats.syntax.semigroup.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.{Directive, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
-import com.wavesplatform.lang.script.{Script, ScriptPreprocessor}
+import com.wavesplatform.lang.directives.{Directive, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.{Script, ScriptPreprocessor}
 import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj, FUNC}
 import com.wavesplatform.lang.v1.compiler.Types.{ANY, BIGINT, BOOLEAN, LIST, LONG, PARAMETERIZED, PARAMETERIZEDLIST, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding.Down
-import com.wavesplatform.lang.v1.{CTX, compiler}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.{CTX, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
 import com.wavesplatform.test.*
@@ -429,7 +429,7 @@ class ContractCompilerCompactorTest extends PropSpec {
       s"""
          | {-# STDLIB_VERSION ${version.id} #-}
          | {-# CONTENT_TYPE DAPP #-}
-         | {-# IMPORT lib2,lib1 #-}
+         | {-# IMPORT lib1,lib2 #-}
          |
          | @Verifier(tx)
          | func verify() = {
@@ -438,29 +438,18 @@ class ContractCompilerCompactorTest extends PropSpec {
       """.stripMargin
 
     def checkForV(version: StdLibVersion): Assertion = {
-      // noinspection RedundantDefaultArgument
-      val compilationResult = for {
+      val declarations = for {
         directives  <- DirectiveParser(scriptForV(version))
         ds          <- Directive.extractDirectives(directives)
         (linked, _) <- ScriptPreprocessor(scriptForV(version), libraries, ds.imports)
-        _ = println(s"\n\t$linked\n")
         expr = Parser.parseContract(linked).get.value
-        r <- compiler.ContractCompiler(ctxForV(version).compilerContext, expr, version, needCompaction = false, removeUnusedCode = true)
-      } yield r.compactedSource(version)
+        r <- compiler.ContractCompiler(ctxForV(version).compilerContext, expr, version, removeUnusedCode = true)
+      } yield r.decs
 
-      compilationResult.explicitGet() shouldBe s"""{-# STDLIB_VERSION ${version.id} #-}
-                                                  |{-# SCRIPT_TYPE ACCOUNT #-}
-                                                  |{-# CONTENT_TYPE DAPP #-}
-                                                  |func bar () = 2
-                                                  |
-                                                  |
-                                                  |func foo () = 40
-                                                  |
-                                                  |
-                                                  |
-                                                  |@Verifier(tx)
-                                                  |func verify () = ((foo() + bar()) == 42)
-                                                  |""".stripMargin
+      declarations.explicitGet() should contain.only(
+        FUNC("foo", Nil, CONST_LONG(40)),
+        FUNC("bar", Nil, CONST_LONG(2))
+      )
     }
 
     checkForV(V5)
