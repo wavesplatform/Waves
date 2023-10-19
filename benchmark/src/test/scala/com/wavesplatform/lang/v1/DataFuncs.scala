@@ -22,23 +22,23 @@ class DataFuncs {
     bh.consume(Base64.decode(st.message))
 
   @Benchmark
-  def decode16_32kb_bcprov(st: StrSt105K, bh: Blackhole): Unit =
+  def decode16_32kb_bcprov(st: StrSt32K, bh: Blackhole): Unit =
     bh.consume(org.bouncycastle.util.encoders.Hex.decode(st.message))
 
   @Benchmark
-  def decode16_32kb_guava(st: StrSt105K, bh: Blackhole): Unit =
+  def decode16_32kb_guava(st: StrSt32K, bh: Blackhole): Unit =
     bh.consume(com.google.common.io.BaseEncoding.base16.decode(st.message))
 
   @Benchmark
-  def decode16_32kb_commons_codec(st: StrSt105K, bh: Blackhole): Unit =
+  def decode16_32kb_commons_codec(st: StrSt32K, bh: Blackhole): Unit =
     bh.consume(org.apache.commons.codec.binary.Hex.decodeHex(st.message))
 
   @Benchmark
-  def decode16_32kb_web3j(st: StrSt105K, bh: Blackhole): Unit =
+  def decode16_32kb_web3j(st: StrSt32K, bh: Blackhole): Unit =
     bh.consume(org.web3j.utils.Numeric.hexStringToByteArray(st.message))
 
   @Benchmark
-  def decode16_32kb_headlong(st: StrSt105K, bh: Blackhole): Unit =
+  def decode16_32kb_headlong(st: StrSt32K, bh: Blackhole): Unit =
     bh.consume(FastHex.decode(st.message))
 
   @Benchmark
@@ -191,7 +191,9 @@ object DataFuncs {
   @State(Scope.Benchmark)
   class StrSt70K extends StrSt(70)
   @State(Scope.Benchmark)
-  class StrSt105K extends StrSt(32)
+  class StrSt105K extends StrSt(105)
+  @State(Scope.Benchmark)
+  class StrSt32K extends StrSt(32)
   @State(Scope.Benchmark)
   class StrSt140K extends StrSt(140)
   @State(Scope.Benchmark)
