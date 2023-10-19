@@ -63,7 +63,7 @@ object Dependencies {
       shapeless.value,
       "org.typelevel" %%% "cats-mtl" % "1.3.1",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
-      googleGuava,
+      googleGuava, // BaseEncoding.base16()
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",

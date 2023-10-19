@@ -166,7 +166,7 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   }
 
   property("invalid base16 definition") {
-    parse("base16'mid-size'") shouldBe CONST_BYTESTR(Pos(0, 16), PART.INVALID(Pos(8, 15), "invalid characters encountered in Hex string"), None)
+    parse("base16'mid-size'") shouldBe CONST_BYTESTR(Pos(0, 16), PART.INVALID(Pos(8, 15), "Unrecognized character: m"), None)
     parse("base16'123'") shouldBe CONST_BYTESTR(Pos(0, 11), PART.INVALID(Pos(8, 10), "Invalid input length 3"))
   }
 

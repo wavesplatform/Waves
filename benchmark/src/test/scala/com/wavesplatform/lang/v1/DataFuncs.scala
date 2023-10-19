@@ -1,12 +1,14 @@
 package com.wavesplatform.lang.v1
 
-import java.util.concurrent.TimeUnit
-
-import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.DataFuncs._
+import com.esaulpaugh.headlong.util.FastHex
+import com.sun.org.apache.xerces.internal.impl.dv.util.HexBin
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.lang.v1.DataFuncs.*
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
+
+import java.util.concurrent.TimeUnit
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -32,8 +34,16 @@ class DataFuncs {
     bh.consume(org.apache.commons.codec.binary.Hex.decodeHex(st.message))
 
   @Benchmark
-  def decode16_32kb_bigint(st: StrSt105K, bh: Blackhole): Unit =
-    bh.consume(BigInt(st.message, 16).bigInteger.toByteArray)
+  def decode16_32kb_web3j(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(org.web3j.utils.Numeric.hexStringToByteArray(st.message))
+
+  @Benchmark
+  def decode16_32kb_headlong(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(FastHex.decode(st.message))
+
+  @Benchmark
+  def decode16_32kb_jdk_hexbin(st: StrSt105K, bh: Blackhole): Unit =
+    bh.consume(HexBin.decode(st.message))
 
   @Benchmark
   def decode64_70Kb(st: StrSt70K, bh: Blackhole): Unit =
@@ -123,7 +133,6 @@ class DataFuncs {
   def concatr_175Kb(st: StrSt175K, bh: Blackhole): Unit =
     bh.consume("q" ++ st.message)
 
-
   @Benchmark
   def decode58_16b(st: StrSt16b, bh: Blackhole): Unit =
     bh.consume(Base58.decode(st.message))
@@ -172,7 +181,6 @@ class DataFuncs {
   def encode58_896b(st: StrSt896b, bh: Blackhole): Unit =
     bh.consume(Base58.encode(st.bmessage))
 
-
 }
 
 object DataFuncs {
@@ -190,7 +198,7 @@ object DataFuncs {
   class StrSt175K extends StrSt(175)
 
   class StrSt(size: Int) {
-    val message   = "B" * (size * 1024)
+    val message = "B" * (size * 1024)
   }
 
   @State(Scope.Benchmark)
@@ -207,8 +215,8 @@ object DataFuncs {
   class StrSt896b extends StrStS(896)
 
   class StrStS(size: Int) {
-    val message   = "B" * size
-    val bmessage   = randomBytes(size)
+    val message  = "B" * size
+    val bmessage = randomBytes(size)
   }
 
   @State(Scope.Benchmark)
@@ -223,6 +231,6 @@ object DataFuncs {
   class BinSt130K extends BinSt(130)
 
   class BinSt(size: Int) {
-    val message   = randomBytes(size * 1024)
+    val message = randomBytes(size * 1024)
   }
 }
