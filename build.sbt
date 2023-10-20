@@ -6,10 +6,13 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.{Compile, Def}
-import sbt.Keys.{concurrentRestrictions, _}
-
 Global / onChangedBuildSource := ReloadOnSourceChanges
+
+enablePlugins(GitVersioning)
+
+git.uncommittedSignifier := Some("DIRTY")
+git.useGitDescribe := true
+ThisBuild / git.useGitDescribe := true
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -119,7 +122,8 @@ lazy val `waves-node` = (project in file("."))
     `node-generator`,
     benchmark,
     `repl-js`,
-    `repl-jvm`
+    `repl-jvm`,
+    `ride-runner`
   )
 
 inScope(Global)(
@@ -172,9 +176,6 @@ inScope(Global)(
   )
 )
 
-// ThisBuild options
-git.uncommittedSignifier := Some("DIRTY")
-
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
@@ -185,8 +186,14 @@ packageAll := {
 
 lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
 buildTarballsForDocker := {
-  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
-  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
+  IO.copyFile(
+    (node / Universal / packageZipTarball).value,
+    baseDirectory.value / "docker" / "target" / "waves.tgz"
+  )
+  IO.copyFile(
+    (`grpc-server` / Universal / packageZipTarball).value,
+    baseDirectory.value / "docker" / "target" / "waves-grpc-server.tgz"
+  )
   IO.copyFile(
     (`ride-runner` / Universal / packageZipTarball).value,
     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
@@ -195,22 +202,23 @@ buildTarballsForDocker := {
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
-    .sequential(
-      `waves-node` / clean,
-      Def.task {
-        (`lang-tests` / Test / test).value
-        (`repl-jvm` / Test / test).value
-        (`lang-js` / Compile / fastOptJS).value
-        (`lang-tests-js` / Test / test).value
-        (`grpc-server` / Test / test).value
-        (node / Test / test).value
-        (`repl-js` / Compile / fastOptJS).value
-        (`node-it` / Test / compile).value
-        (benchmark / Test / compile).value
-        (`node-generator` / Compile / compile).value
-        (`ride-runner` / Test / compile).value
-      }
-    ).value
+  .sequential(
+    `waves-node` / clean,
+    Def.task {
+      (`lang-tests` / Test / test).value
+      (`repl-jvm` / Test / test).value
+      (`lang-js` / Compile / fastOptJS).value
+      (`lang-tests-js` / Test / test).value
+      (`grpc-server` / Test / test).value
+      (node / Test / test).value
+      (`repl-js` / Compile / fastOptJS).value
+      (`node-it` / Test / compile).value
+      (benchmark / Test / compile).value
+      (`node-generator` / Compile / compile).value
+      (`ride-runner` / Test / compile).value
+    }
+  )
+  .value
 
 def checkPR: Command = Command.command("checkPR") { state =>
   val newState = Project
