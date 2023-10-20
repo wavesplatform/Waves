@@ -56,7 +56,8 @@ object InvokeScriptDiff {
       remainingActions: ActionLimits,
       remainingPayments: Int,
       calledAddresses: Set[Address],
-      invocationRoot: DAppEnvironment.InvocationTreeTracker
+      invocationRoot: DAppEnvironment.InvocationTreeTracker,
+      wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
   )(
       tx: InvokeScript
   ): CoevalR[(Diff, EVALUATED, ActionLimits, Int)] = {
@@ -200,7 +201,7 @@ object InvokeScriptDiff {
                   tx.root.feeAssetId.compatId
                 )
                 val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)
-                val environment = new DAppEnvironment(
+                val environment = wrapDAppEnv(new DAppEnvironment(
                   AddressScheme.current.chainId,
                   Coeval.evalOnce(input),
                   Coeval(height),
@@ -218,8 +219,9 @@ object InvokeScriptDiff {
                   remainingActions,
                   remainingPayments - tx.payments.size,
                   paymentsPartInsideDApp,
-                  invocationRoot
-                )
+                  invocationRoot,
+                  wrapDAppEnv
+                ))
                 for {
                   evaluated <- CoevalR(
                     evaluateV2(

@@ -528,7 +528,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application extends ScorexLogging {
-  private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
+  def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings.*
 
     val maybeExternalConfig = Try(external.map(f => ConfigFactory.parseFile(f.getAbsoluteFile, ConfigParseOptions.defaults().setAllowMissing(false))))

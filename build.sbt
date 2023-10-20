@@ -65,6 +65,7 @@ lazy val `lang-tests-js` = project
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
+lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
 lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
 lazy val `node-generator` = project.dependsOn(node % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
@@ -158,7 +159,7 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
-    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
+    resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
     Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
@@ -177,6 +178,7 @@ git.uncommittedSignifier := Some("DIRTY")
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
+  (`ride-runner` / assembly).value
   buildDebPackages.value
   buildTarballsForDocker.value
 }
@@ -185,6 +187,10 @@ lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server ta
 buildTarballsForDocker := {
   IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
   IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
+  IO.copyFile(
+    (`ride-runner` / Universal / packageZipTarball).value,
+    (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
+  )
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
@@ -232,6 +238,7 @@ lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
 buildDebPackages := {
   (`grpc-server` / Debian / packageBin).value
   (node / Debian / packageBin).value
+  (`ride-runner` / Debian / packageBin).value
 }
 
 def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>

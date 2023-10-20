@@ -52,11 +52,8 @@ class OverriddenBlockchain(underlying: Blockchain, overrides: BlockchainOverride
         .balance(address, Asset.Waves)
         .fold(orig) { regularBalance =>
           orig.headOption match {
-            case None => Seq(BalanceSnapshot(toHeight, regularBalance, 0, 0))
-            case Some(latest) =>
-              val updatedLatest = latest.copy(height = toHeight, regularBalance = regularBalance)
-              if (latest.height < toHeight) updatedLatest +: orig
-              else updatedLatest +: orig.tail
+            case None         => Seq(BalanceSnapshot(toHeight, regularBalance, 0, 0))
+            case Some(latest) => latest.copy(toHeight, regularBalance) +: orig
           }
         }
   }

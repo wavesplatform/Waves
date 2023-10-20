@@ -19,6 +19,12 @@ object Asset {
   object IssuedAsset {
     private val interner                = Interners.newWeakInterner[IssuedAsset]()
     def apply(id: ByteStr): IssuedAsset = interner.intern(new IssuedAsset(id))
+    def fromString[T](str: String, onSuccess: IssuedAsset => T, onFailure: String => T): T =
+      Base58.tryDecodeWithLimit(str) match {
+        case Success(arr) if arr.length != AssetIdLength => onFailure(s"Invalid validation. Size of asset id $str not equal $AssetIdLength bytes")
+        case Success(arr)                                => onSuccess(IssuedAsset(ByteStr(arr)))
+        case _                                           => onFailure("Expected base58-encoded assetId")
+      }
   }
 
   case object Waves extends Asset
@@ -26,13 +32,8 @@ object Asset {
   val WavesName = "WAVES"
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
-    case JsString(str) =>
-      Base58.tryDecodeWithLimit(str) match {
-        case Success(arr) if arr.length != AssetIdLength => JsError(s"Invalid validation. Size of asset id $str not equal $AssetIdLength bytes")
-        case Success(arr)                                => JsSuccess(IssuedAsset(ByteStr(arr)))
-        case _                                           => JsError("Expected base58-encoded assetId")
-      }
-    case _ => JsError("Expected base58-encoded assetId")
+    case JsString(str) => IssuedAsset.fromString(str, JsSuccess(_), JsError(_))
+    case _             => JsError("Expected base58-encoded assetId")
   }
   implicit val assetWrites: Writes[IssuedAsset] = Writes { asset =>
     JsString(asset.id.toString)

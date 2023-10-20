@@ -14,7 +14,7 @@ import play.api.libs.json.*
 
 object InvokeScriptRequest {
 
-  case class FunctionCallPart(function: String, args: List[EVALUATED])
+  case class FunctionCallPart(function: String, args: List[EVALUATED] = Nil)
 
   implicit val EvaluatedReads: Reads[EVALUATED] = (jv: JsValue) => {
     jv \ "type" match {
