@@ -530,10 +530,10 @@ abstract class LevelDBWriter private[database] (
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
-          approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
+          approvedFeaturesCache = newlyApprovedFeatures ++ approvedFeaturesCache
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache).toMap
 
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
@@ -748,6 +748,15 @@ abstract class LevelDBWriter private[database] (
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
+          }
+
+          val disapprovedFeatures = approvedFeaturesCache.collect { case (id, approvalHeight) if approvalHeight > targetHeight => id }
+          if (disapprovedFeatures.nonEmpty) {
+            approvedFeaturesCache --= disapprovedFeatures
+            rw.put(Keys.approvedFeatures, approvedFeaturesCache)
+
+            activatedFeaturesCache --= disapprovedFeatures // We won't activate them in the future
+            rw.put(Keys.activatedFeatures, activatedFeaturesCache)
           }
 
           val hitSource = rw.get(Keys.hitSource(currentHeight)).get
