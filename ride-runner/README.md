@@ -13,7 +13,7 @@ Allows running Ride without a local Waves Node:
 ### Artifacts
 
 * DEB package: `ride-runner/target/waves-ride-runner_${version}_all.deb`
-* Fat JAR for running RIDE with a prepared state: `ride-runner/target/waves-ride-runner-${version}.jar`
+* Fat JAR for running RIDE with a prepared state: `ride-runner/target/waves-ride-runner-all-${version}.jar`
 * Standalone app and service: `ride-runner/docker/ride-runner-targer/waves-ride-runner.tgz`.
   It has the `waves-ride-runner_${version}` directory. Notable:
     * `/bin/waves-ride-runner` - main entrypoint.
@@ -165,7 +165,7 @@ See:
 How to run:
 
 ```shell
-java -jar waves-ride-runner-${version}.jar ./sample-input.conf
+java -jar waves-ride-runner-all-${version}.jar ./sample-input.conf
 ```
 
 You should see the result in JSON.
@@ -173,7 +173,7 @@ You should see the result in JSON.
 Help:
 
 ```shell
-java -jar waves-ride-runner-1.4.18-8f8a0f98d3a2304d9b05c369bd333c8f85044e75-DIRTY.jar --help
+java -jar waves-ride-runner-all-${version}.jar --help
 ```
 
 **Important note**: using multiple different networks may cause errors if you run multiple scripts (for example, if you

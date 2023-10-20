@@ -89,7 +89,7 @@ inTask(assembly)(
   Seq(
     test            := {},
     mainClass       := Some("com.wavesplatform.ride.runner.entrypoints.WavesRideRunnerWithPreparedStateApp"),
-    assemblyJarName := s"waves-ride-runner-${version.value}.jar",
+    assemblyJarName := s"waves-ride-runner-all-${version.value}.jar",
     assemblyMergeStrategy := {
       case p
           if p.endsWith(".proto") ||
