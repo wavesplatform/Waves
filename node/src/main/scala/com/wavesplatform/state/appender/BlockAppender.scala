@@ -65,7 +65,7 @@ object BlockAppender extends ScorexLogging {
         validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
       } yield validApplication).value
 
-    val handle = append.asyncBoundary.map {
+    val handle = append.map {
       case Right(Ignored) => // block already appended
       case Right(Applied(_, _)) =>
         log.debug(s"${id(ch)} Appended $newBlock")
@@ -73,7 +73,8 @@ object BlockAppender extends ScorexLogging {
         span.markNtp("block.applied")
         span.finishNtp()
         BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-        if (newBlock.transactionData.isEmpty) allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block
+        if (blockchainUpdater.isLastBlockId(newBlock.id()) && newBlock.transactionData.isEmpty)
+          allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block
 
       case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ch, s"Could not append $newBlock: $is")
