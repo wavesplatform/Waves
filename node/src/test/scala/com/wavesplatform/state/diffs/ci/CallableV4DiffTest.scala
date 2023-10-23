@@ -390,8 +390,8 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TestBlock.create(Seq(invoke)),
       features
     ) { case (diff, blockchain) =>
-      val asset = diff.issuedAssets.head._1
-      diff.sponsorship shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
+      val asset = diff.assetStatics.head._1
+      diff.sponsorships shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
       blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(minSponsoredAssetFee)
     }
   }

@@ -4,7 +4,6 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.{FlatSpec, TestTime, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -106,9 +105,14 @@ class EthereumTransactionSpec
     val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
-    differ(transfer).combineF(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
-      senderAddress    -> Portfolio.build(-Long.MaxValue, TestAsset, -Long.MaxValue),
-      recipientAddress -> Portfolio.build(LongMaxMinusFee, TestAsset, Long.MaxValue)
+    differ(assetTransfer).balances shouldBe Map(
+      (senderAddress, TestAsset)    -> 0,
+      (senderAddress, Waves)        -> (LongMaxMinusFee + transfer.fee.longValue()),
+      (recipientAddress, TestAsset) -> Long.MaxValue
+    )
+    differ(transfer).balances shouldBe Map(
+      (senderAddress, Waves)    -> transfer.fee.longValue(),
+      (recipientAddress, Waves) -> LongMaxMinusFee
     )
   }
 

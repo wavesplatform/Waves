@@ -2,22 +2,23 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.ScriptsAndSponsorship
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers, TxValidationError, TxVersion}
 
-class TransferDiffTest extends PropSpec with WithState {
-
-  val preconditionsAndTransfer: Seq[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = {
+class TransferDiffTest extends PropSpec with WithDomain {
+  private val preconditionsAndTransfer = {
     val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
@@ -30,25 +31,33 @@ class TransferDiffTest extends PropSpec with WithState {
       maybeAsset1   <- Seq(None, Some(issue1.id())).map(Asset.fromCompatId)
       maybeAsset2   <- Seq(None, Some(issue2.id())).map(Asset.fromCompatId)
       maybeFeeAsset <- Seq(maybeAsset1, maybeAsset2)
+      sponsor1   = TxHelpers.sponsor(IssuedAsset(issue1.id()), minSponsoredAssetFee = Some(FeeUnit), sender = master)
+      sponsor2   = TxHelpers.sponsor(IssuedAsset(issue2.id()), minSponsoredAssetFee = Some(FeeUnit), sender = master)
       transferV1 = TxHelpers.transfer(master, recipient.toAddress, asset = maybeAsset1, feeAsset = maybeFeeAsset, version = TxVersion.V1)
       transferV2 = TxHelpers.transfer(master, recipient.toAddress, asset = maybeAsset1, feeAsset = maybeFeeAsset)
       transfer <- Seq(transferV1, transferV2)
-    } yield (genesis, issue1, issue2, transfer)
+    } yield (genesis, sponsor1, sponsor2, issue1, issue2, transfer)
   }
 
   property("transfers assets to recipient preserving waves invariant") {
-    preconditionsAndTransfer.foreach { case (genesis, issue1, issue2, transfer) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue1, issue2))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) =>
-        assertBalanceInvariant(totalDiff)
-
-        val recipient: Address = transfer.recipient.asInstanceOf[Address]
+    preconditionsAndTransfer.foreach { case (genesis, sponsor1, sponsor2, issue1, issue2, transfer) =>
+      withDomain(ScriptsAndSponsorship) { d =>
+        d.appendBlock(genesis)
+        d.appendBlock(issue1, issue2, sponsor1, sponsor2)
+        d.appendBlock(transfer)
+        assertBalanceInvariant(
+          d.liquidSnapshot,
+          d.rocksDBWriter,
+          (sponsor1.fee.value + sponsor2.fee.value + issue1.fee.value + issue2.fee.value - transfer.fee.value) * 3 / 5
+        )
+        val recipient = transfer.recipient.asInstanceOf[Address]
         if (transfer.sender.toAddress != recipient) {
           transfer.assetId match {
             case aid @ IssuedAsset(_) =>
-              newState.balance(recipient) shouldBe 0
-              newState.balance(recipient, aid) shouldBe transfer.amount.value
+              d.balance(recipient) shouldBe 0
+              d.balance(recipient, aid) shouldBe transfer.amount.value
             case Waves =>
-              newState.balance(recipient) shouldBe transfer.amount.value
+              d.balance(recipient) shouldBe transfer.amount.value
           }
         }
       }

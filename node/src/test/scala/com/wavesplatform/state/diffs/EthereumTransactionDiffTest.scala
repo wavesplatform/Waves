@@ -4,25 +4,25 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.EthereumKeyLength
-import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.v1.ContractLimits.MaxInvokeScriptSizeInBytes
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.RewardsVotingSettings
-import com.wavesplatform.state.{Diff, Portfolio}
+import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{Asset, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.utils.EthConverters.*
-import EthTxGenerator.Arg
-import com.wavesplatform.lang.v1.ContractLimits.MaxInvokeScriptSizeInBytes
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, JsonMatchers}
 import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction}
 import play.api.libs.json.Json
@@ -93,12 +93,14 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     val recipient = TxHelpers.address(2)
     val issuer    = TxHelpers.signer(3)
 
-    val fee     = TestValues.fee
-    val feeDiff = Diff(portfolios = Map(senderKp.toWavesAddress -> Portfolio.waves(fee)))
+    val fee = TestValues.fee
 
-    withDomain(DomainPresets.RideV6.copy(rewardsSettings = RewardsVotingSettings(None)), Seq(AddrWithBalance(senderKp.toWavesAddress))) { d =>
+    withDomain(RideV6.copy(rewardsSettings = RewardsVotingSettings(None)), Seq(AddrWithBalance(senderKp.toWavesAddress))) { d =>
       val wavesTransfer = EthTxGenerator.generateEthTransfer(senderKp, recipient, 1.waves, Waves, fee)
-      assertBalanceInvariant(d.createDiff(wavesTransfer).combineF(feeDiff).explicitGet())
+      assertBalanceInvariant(
+        d.createDiff(wavesTransfer).addBalances(Map(senderKp.toWavesAddress -> Portfolio.waves(fee)), d.blockchain).explicitGet(),
+        d.rocksDBWriter
+      )
 
       val transferPayload = wavesTransfer.payload.asInstanceOf[Transfer]
 
@@ -107,13 +109,16 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
       d.blockchain.balance(senderKp.toWavesAddress) shouldBe ENOUGH_AMT - transferPayload.amount - fee
     }
 
-    withDomain(DomainPresets.RideV6, Seq(AddrWithBalance(senderKp.toWavesAddress), AddrWithBalance(issuer.toAddress))) { d =>
+    withDomain(RideV6, Seq(AddrWithBalance(senderKp.toWavesAddress), AddrWithBalance(issuer.toAddress))) { d =>
       val issue          = TxHelpers.issue(issuer)
       val nativeTransfer = TxHelpers.transfer(issuer, senderKp.toWavesAddress, issue.quantity.value, issue.asset)
       val assetTransfer  = EthTxGenerator.generateEthTransfer(senderKp, recipient, issue.quantity.value, issue.asset, fee)
 
       d.appendBlock(issue, nativeTransfer)
-      assertBalanceInvariant(d.createDiff(assetTransfer).combineF(feeDiff).explicitGet())
+      assertBalanceInvariant(
+        d.createDiff(assetTransfer).addBalances(Map(senderKp.toWavesAddress -> Portfolio.waves(fee)), d.blockchain).explicitGet(),
+        d.rocksDBWriter
+      )
 
       d.appendAndAssertSucceed(assetTransfer)
       d.blockchain.balance(recipient) shouldBe 0L

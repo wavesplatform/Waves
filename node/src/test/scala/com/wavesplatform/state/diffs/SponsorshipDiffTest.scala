@@ -37,15 +37,15 @@ class SponsorshipDiffTest extends PropSpec with WithState {
     val setupBlocks = Seq(block(Seq(genesis, issue)))
 
     assertDiffAndState(setupBlocks, block(Seq(sponsor)), s) { case (diff, state) =>
-      diff.sponsorship shouldBe Map(sponsor.asset -> SponsorshipValue(sponsor.minSponsoredAssetFee.get.value))
+      diff.sponsorships shouldBe Map(sponsor.asset -> SponsorshipValue(sponsor.minSponsoredAssetFee.get.value))
       state.assetDescription(sponsor.asset).map(_.sponsorship) shouldBe sponsor.minSponsoredAssetFee.map(_.value)
     }
     assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1)), s) { case (diff, state) =>
-      diff.sponsorship shouldBe Map(sponsor.asset -> SponsorshipValue(sponsor1.minSponsoredAssetFee.get.value))
+      diff.sponsorships shouldBe Map(sponsor.asset -> SponsorshipValue(sponsor1.minSponsoredAssetFee.get.value))
       state.assetDescription(sponsor.asset).map(_.sponsorship) shouldBe sponsor1.minSponsoredAssetFee.map(_.value)
     }
     assertDiffAndState(setupBlocks, block(Seq(sponsor, sponsor1, cancel)), s) { case (diff, state) =>
-      diff.sponsorship shouldBe Map(sponsor.asset -> SponsorshipValue(0))
+      diff.sponsorships shouldBe Map(sponsor.asset -> SponsorshipValue(0))
       state.assetDescription(sponsor.asset).map(_.sponsorship) shouldBe Some(0)
     }
   }

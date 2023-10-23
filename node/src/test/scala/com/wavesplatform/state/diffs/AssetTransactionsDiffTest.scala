@@ -24,7 +24,8 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.transfer.*
@@ -42,7 +43,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val issue   = TxHelpers.issue(master, 100, reissuable = isReissuable, version = TxVersion.V1)
     val asset   = IssuedAsset(issue.id())
-    val reissue = TxHelpers.reissue(asset, master, 50, version = TxVersion.V1)
+    val reissue = TxHelpers.reissue(asset, master, 50, version = TxVersion.V1, fee = 1.waves)
     val burn    = TxHelpers.burn(asset, 10, master, version = TxVersion.V1)
 
     ((genesis, issue), (reissue, burn))
@@ -50,15 +51,26 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
     val ((gen, issue), (reissue, burn)) = issueReissueBurnTxs(isReissuable = true)
-    assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) { case (blockDiff, newState) =>
-      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-
-      totalPortfolioDiff.balance shouldBe 0
-      totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
-      totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity.value - burn.quantity.value))
-
-      val totalAssetVolume = issue.quantity.value + reissue.quantity.value - burn.quantity.value
-      newState.balance(issue.sender.toAddress, reissue.asset) shouldEqual totalAssetVolume
+    withDomain(RideV3) { d =>
+      d.appendBlock(gen)
+      d.appendBlock(issue)
+      d.appendBlock(reissue, burn)
+      val assetQuantityDiff = reissue.quantity.value - burn.quantity.value
+      d.liquidSnapshot.balances.toSeq
+        .map {
+          case ((`defaultAddress`, Waves), amount) =>
+            Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) + (-issue.fee.value + reissue.fee.value + burn.fee.value) / 5 * 3)
+          case ((address, asset), amount) =>
+            asset -> (amount - d.rocksDBWriter.balance(address, asset))
+        }
+        .groupMap(_._1)(_._2)
+        .foreach {
+          case (asset, Seq(balanceDiff)) if asset == reissue.asset => balanceDiff shouldBe assetQuantityDiff
+          case (_, balanceDiff)                                    => balanceDiff.sum shouldBe 0
+        }
+      val resultQuantity = issue.quantity.value + assetQuantityDiff
+      d.liquidSnapshot.assetVolumes.view.mapValues(_.volume).toMap shouldBe Map(reissue.asset -> resultQuantity)
+      d.balance(issue.sender.toAddress, reissue.asset) shouldEqual resultQuantity
     }
   }
 
@@ -249,7 +261,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
             Height @@ 2
           )
         )
-        blockDiff.transaction(issue.id()) shouldBe defined
+        blockDiff.transactions.get(issue.id()) shouldBe defined
         newState.transactionInfo(issue.id()).isDefined shouldBe true
     }
   }
@@ -257,8 +269,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
   property("Can transfer when script evaluates to TRUE") {
     val (gen, issue, transfer, _, _) = genesisIssueTransferReissue("true")
     assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) { case (blockDiff, newState) =>
-      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-      totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity.value
+      val asset = IssuedAsset(issue.id())
+      blockDiff.balances.collect { case ((_, `asset`), quantity) => quantity }.sum shouldEqual issue.quantity.value
       newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount.value
     }
   }
@@ -320,12 +332,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       )
 
     assertDiffEi(blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
-      val info = ei
-        .explicitGet()
-        .updatedAssets(update.assetId)
-        .left
-        .get
-
+      val info = ei.explicitGet().assetNamesAndDescriptions(update.assetId)
       info.name.toStringUtf8 shouldEqual update.name
       info.description.toStringUtf8 shouldEqual update.description
     }
@@ -403,8 +410,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val (genesis1, issue1, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)
     assertDiffAndState(Seq(TestBlock.create(genesis1)), TestBlock.create(Seq(issue1)), rideV4Activated) { case (blockDiff, _) =>
-      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-      totalPortfolioDiff.assets(IssuedAsset(issue1.id())) shouldEqual issue1.quantity.value
+      val asset = IssuedAsset(issue1.id())
+      blockDiff.balances.collect { case ((_, `asset`), quantity) => quantity }.sum shouldEqual issue1.quantity.value
     }
 
     val (genesis2, issue2, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)
@@ -467,7 +474,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         db.appendBlock(preparingTxs*)
         val tx = scriptedTx()
         db.appendBlock(tx)
-        db.liquidDiff.errorMessage(tx.id()) shouldBe None
+        db.liquidSnapshot.errorMessage(tx.id()) shouldBe None
       }
 
       withDomain(domainSettingsWithFS(settings(checkNegative = true))) { db =>

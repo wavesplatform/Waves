@@ -6,7 +6,6 @@ import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
@@ -175,7 +174,7 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet().toDiff(blockchain)
+    val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
 
@@ -354,7 +353,7 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet().toDiff(blockchain)
+    val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
 

@@ -102,8 +102,8 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.liquidDiff.errorMessage(invoke1.id()) shouldBe empty
-      d.liquidDiff.scriptsComplexity shouldBe 11459 // 3 actions + 2 payments + verifier = 6 * 1900 = 11400
+      d.liquidSnapshot.errorMessage(invoke1.id()) shouldBe empty
+      d.liquidSnapshot.scriptsComplexity shouldBe 11459 // 3 actions + 2 payments + verifier = 6 * 1900 = 11400
       // for dApp evaluated complexity is always used after implementation of the snapshots
 
       d.appendBlock()
@@ -111,8 +111,8 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
-      d.liquidDiff.errorMessage(invoke2.id()) shouldBe empty
-      d.liquidDiff.scriptsComplexity shouldBe 17
+      d.liquidSnapshot.errorMessage(invoke2.id()) shouldBe empty
+      d.liquidSnapshot.scriptsComplexity shouldBe 17
     }
   }
 }

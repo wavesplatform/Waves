@@ -35,12 +35,12 @@ object TxHelpers {
   def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
   def address(i: Int): Address    = signer(i).toAddress
 
-  def defaultSigner: SeedKeyPair = signer(0)
-  def defaultAddress: Address    = defaultSigner.toAddress
-  def secondSigner: SeedKeyPair  = signer(1)
-  def secondAddress: Address     = secondSigner.toAddress
+  val defaultSigner: SeedKeyPair = signer(0)
+  val defaultAddress: Address    = defaultSigner.toAddress
+  val secondSigner: SeedKeyPair  = signer(1)
+  val secondAddress: Address     = secondSigner.toAddress
 
-  def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
+  val defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
   def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
     val firstAccountNum = 100

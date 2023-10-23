@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.settings.RewardsVotingSettings
-import com.wavesplatform.state.{Diff, Portfolio}
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{TxHelpers, TxValidationError, TxVersion}
@@ -17,11 +17,13 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     val sender    = TxHelpers.secondAddress
     val senderKp  = TxHelpers.secondSigner
     val recipient = TxHelpers.address(2)
-    val feeDiff   = Diff(portfolios = Map(sender -> Portfolio.waves(TestValues.fee)))
 
     withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
-      assertBalanceInvariant(d.createDiff(wavesTransfer).combineF(feeDiff).explicitGet())
+      assertBalanceInvariant(
+        d.createDiff(wavesTransfer).addBalances(Map(sender -> Portfolio.waves(TestValues.fee)), d.blockchain).explicitGet(),
+        d.rocksDBWriter
+      )
 
       d.appendAndAssertSucceed(wavesTransfer)
       d.blockchain.balance(recipient) shouldBe wavesTransfer.amount.value
@@ -31,7 +33,10 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(senderKp)) { d =>
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
-      assertBalanceInvariant(d.createDiff(assetTransfer).combineF(feeDiff).explicitGet())
+      assertBalanceInvariant(
+        d.createDiff(assetTransfer).addBalances(Map(sender -> Portfolio.waves(TestValues.fee)), d.blockchain).explicitGet(),
+        d.rocksDBWriter
+      )
 
       d.appendAndAssertSucceed(assetTransfer)
       d.blockchain.balance(recipient) shouldBe 0L
