@@ -1,12 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TestValues
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.settings.RewardsVotingSettings
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{TxHelpers, TxValidationError, TxVersion}
@@ -20,12 +17,8 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
 
     withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
-      assertBalanceInvariant(
-        d.createDiff(wavesTransfer).addBalances(Map(sender -> Portfolio.waves(TestValues.fee)), d.blockchain).explicitGet(),
-        d.rocksDBWriter
-      )
-
       d.appendAndAssertSucceed(wavesTransfer)
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves - wavesTransfer.fee.value * 3 / 5)
       d.blockchain.balance(recipient) shouldBe wavesTransfer.amount.value
       d.blockchain.balance(sender) shouldBe ENOUGH_AMT - wavesTransfer.amount.value - wavesTransfer.fee.value
     }
@@ -33,12 +26,8 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(senderKp)) { d =>
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
-      assertBalanceInvariant(
-        d.createDiff(assetTransfer).addBalances(Map(sender -> Portfolio.waves(TestValues.fee)), d.blockchain).explicitGet(),
-        d.rocksDBWriter
-      )
-
       d.appendAndAssertSucceed(assetTransfer)
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves + (1.waves - assetTransfer.fee.value) * 3 / 5)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, asset) shouldBe 1000L
       d.blockchain.balance(sender) shouldBe ENOUGH_AMT - assetTransfer.fee.value - 1.waves

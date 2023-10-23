@@ -11,7 +11,6 @@ import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.ContractLimits.MaxInvokeScriptSizeInBytes
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.RewardsVotingSettings
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
@@ -96,15 +95,11 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
     val fee = TestValues.fee
 
     withDomain(RideV6.copy(rewardsSettings = RewardsVotingSettings(None)), Seq(AddrWithBalance(senderKp.toWavesAddress))) { d =>
-      val wavesTransfer = EthTxGenerator.generateEthTransfer(senderKp, recipient, 1.waves, Waves, fee)
-      assertBalanceInvariant(
-        d.createDiff(wavesTransfer).addBalances(Map(senderKp.toWavesAddress -> Portfolio.waves(fee)), d.blockchain).explicitGet(),
-        d.rocksDBWriter
-      )
-
+      val wavesTransfer   = EthTxGenerator.generateEthTransfer(senderKp, recipient, 1.waves, Waves, fee)
       val transferPayload = wavesTransfer.payload.asInstanceOf[Transfer]
 
       d.appendAndAssertSucceed(wavesTransfer)
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves - wavesTransfer.fee * 3 / 5)
       d.blockchain.balance(recipient) shouldBe transferPayload.amount
       d.blockchain.balance(senderKp.toWavesAddress) shouldBe ENOUGH_AMT - transferPayload.amount - fee
     }
@@ -115,12 +110,8 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
       val assetTransfer  = EthTxGenerator.generateEthTransfer(senderKp, recipient, issue.quantity.value, issue.asset, fee)
 
       d.appendBlock(issue, nativeTransfer)
-      assertBalanceInvariant(
-        d.createDiff(assetTransfer).addBalances(Map(senderKp.toWavesAddress -> Portfolio.waves(fee)), d.blockchain).explicitGet(),
-        d.rocksDBWriter
-      )
-
       d.appendAndAssertSucceed(assetTransfer)
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves + (issue.fee.value + nativeTransfer.fee.value - assetTransfer.fee) * 3 / 5)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, issue.asset) shouldBe issue.quantity.value
       d.blockchain.balance(senderKp.toWavesAddress) shouldBe ENOUGH_AMT - assetTransfer.fee
@@ -537,20 +528,20 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
       val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
       snapshot should containAppliedTx(invoke.id())
       Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
-                                                                     |  "data" : [ ],
-                                                                     |  "transfers" : [ {
-                                                                     |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                     |    "asset" : null,
-                                                                     |    "amount" : 123
-                                                                     |  } ],
-                                                                     |  "issues" : [ ],
-                                                                     |  "reissues" : [ ],
-                                                                     |  "burns" : [ ],
-                                                                     |  "sponsorFees" : [ ],
-                                                                     |  "leases" : [ ],
-                                                                     |  "leaseCancels" : [ ],
-                                                                     |  "invokes" : [ ]
-                                                                     |}""".stripMargin)
+                                                                         |  "data" : [ ],
+                                                                         |  "transfers" : [ {
+                                                                         |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                         |    "asset" : null,
+                                                                         |    "amount" : 123
+                                                                         |  } ],
+                                                                         |  "issues" : [ ],
+                                                                         |  "reissues" : [ ],
+                                                                         |  "burns" : [ ],
+                                                                         |  "sponsorFees" : [ ],
+                                                                         |  "leases" : [ ],
+                                                                         |  "leaseCancels" : [ ],
+                                                                         |  "invokes" : [ ]
+                                                                         |}""".stripMargin)
     }
   }
 
@@ -591,25 +582,25 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
       val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
       snapshot should containAppliedTx(invoke.id())
       Json.toJson(snapshot.scriptResults.values.head) should matchJson(s"""{
-                                                                      |  "data" : [ ],
-                                                                      |  "transfers" : [ {
-                                                                      |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                      |    "asset" : null,
-                                                                      |    "amount" : 123
-                                                                      |  },
-                                                                      |   {
-                                                                      |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                      |    "asset" : "${issue.asset}",
-                                                                      |    "amount" : 123
-                                                                      |  }],
-                                                                      |  "issues" : [ ],
-                                                                      |  "reissues" : [ ],
-                                                                      |  "burns" : [ ],
-                                                                      |  "sponsorFees" : [ ],
-                                                                      |  "leases" : [ ],
-                                                                      |  "leaseCancels" : [ ],
-                                                                      |  "invokes" : [ ]
-                                                                      |}""".stripMargin)
+                                                                          |  "data" : [ ],
+                                                                          |  "transfers" : [ {
+                                                                          |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                          |    "asset" : null,
+                                                                          |    "amount" : 123
+                                                                          |  },
+                                                                          |   {
+                                                                          |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                          |    "asset" : "${issue.asset}",
+                                                                          |    "amount" : 123
+                                                                          |  }],
+                                                                          |  "issues" : [ ],
+                                                                          |  "reissues" : [ ],
+                                                                          |  "burns" : [ ],
+                                                                          |  "sponsorFees" : [ ],
+                                                                          |  "leases" : [ ],
+                                                                          |  "leaseCancels" : [ ],
+                                                                          |  "invokes" : [ ]
+                                                                          |}""".stripMargin)
     }
   }
 
