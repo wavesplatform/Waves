@@ -35,7 +35,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
           .concatMapIterable(_.map { case (a, d) =>
             NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
           })
-          .take(request.limit)
+          .takeLast(request.limit)
       case _ => Observable.empty
     }
 
