@@ -10,15 +10,15 @@ trait DiffMatchers {
   def containFailedTx(transactionId: ByteStr)  = new DiffAppliedTxMatcher(transactionId, false)
 
   class DiffAppliedTxMatcher(transactionId: ByteStr, shouldBeApplied: Boolean) extends Matcher[StateSnapshot] {
-    override def apply(diff: StateSnapshot): MatchResult = {
-      val isApplied = diff.transactions.get(transactionId) match {
+    override def apply(snapshot: StateSnapshot): MatchResult = {
+      val isApplied = snapshot.transactions.get(transactionId) match {
         case Some(nt) if nt.status == Succeeded => true
         case _                                  => false
       }
       MatchResult(
         shouldBeApplied == isApplied,
-        s"$transactionId was not ${if (shouldBeApplied) "applied" else "failed"}: $diff",
-        s"$transactionId was ${if (shouldBeApplied) "applied" else "failed"}: $diff"
+        s"$transactionId was not ${if (shouldBeApplied) "applied" else "failed"}: $snapshot",
+        s"$transactionId was ${if (shouldBeApplied) "applied" else "failed"}: $snapshot"
       )
     }
   }

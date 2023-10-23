@@ -66,15 +66,14 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
     } yield ()
 
     val limit = GlobalTimer.instance.schedule(Future.failed(new TimeoutException("Time is out for test")), 18.minutes)
-    val testWithDumps = Future.firstCompletedOf(Seq(test, limit)).recoverWith {
-      case e =>
-        for {
-          _     <- dumpBalances()
-          dumps <- traverse(nodes)(dumpBlockChain)
-        } yield {
-          log.debug(dumps.mkString("Dumps:\n", "\n\n", "\n"))
-          throw e
-        }
+    val testWithDumps = Future.firstCompletedOf(Seq(test, limit)).recoverWith { case e =>
+      for {
+        _     <- dumpBalances()
+        dumps <- traverse(nodes)(dumpBlockChain)
+      } yield {
+        log.debug(dumps.mkString("Dumps:\n", "\n\n", "\n"))
+        throw e
+      }
     }
 
     Await.result(testWithDumps, 18.minutes)
@@ -86,9 +85,9 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
       blocks <- node.blockSeq(1, height)
     } yield {
       val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
-      val diff            = txIds -- txsInBlockchain
+      val snapshot        = txIds -- txsInBlockchain
       withClue(s"all transactions in node") {
-        diff shouldBe empty
+        snapshot shouldBe empty
       }
     }
   }
@@ -99,7 +98,7 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
     }.map(_.toMap)
       .map { r =>
         log.debug(s"""Balances:
-             |${r.map { case (config, balance) => s"${config.getString("address")} -> $balance" }.mkString("\n")}""".stripMargin)
+                     |${r.map { case (config, balance) => s"${config.getString("address")} -> $balance" }.mkString("\n")}""".stripMargin)
         r
       }
   }

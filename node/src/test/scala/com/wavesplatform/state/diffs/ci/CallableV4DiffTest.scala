@@ -106,7 +106,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     }
   }
 
-  property("diff contains delete entries") {
+  property("snapshot contains delete entries") {
     val deleteEntryDApp = dApp(
       """
         | [
@@ -131,8 +131,8 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       Seq(TestBlock.create(genesis :+ setScript)),
       TestBlock.create(Seq(invoke)),
       features
-    ) { case (diff, _) =>
-      diff.accountData(master.toAddress) shouldBe
+    ) { case (snapshot, _) =>
+      snapshot.accountData(master.toAddress) shouldBe
         Map(
           "key1" -> EmptyDataEntry("key1"),
           "key2" -> EmptyDataEntry("key2")
@@ -389,9 +389,9 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       Seq(TestBlock.create(genesis :+ setScript)),
       TestBlock.create(Seq(invoke)),
       features
-    ) { case (diff, blockchain) =>
-      val asset = diff.assetStatics.head._1
-      diff.sponsorships shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
+    ) { case (snapshot, blockchain) =>
+      val asset = snapshot.assetStatics.head._1
+      snapshot.sponsorships shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
       blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(minSponsoredAssetFee)
     }
   }

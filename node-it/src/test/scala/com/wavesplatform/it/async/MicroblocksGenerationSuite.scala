@@ -24,8 +24,8 @@ class MicroblocksGenerationSuite extends BaseFreeSpec with TransferSending {
       block.transactions.size shouldBe maxTxs
 
       val blockTxs = block.transactions.map(_.id)
-      val diff     = uploadedTxs.map(_.id).toSet -- blockTxs
-      diff shouldBe empty
+      val snapshot = uploadedTxs.map(_.id).toSet -- blockTxs
+      snapshot shouldBe empty
     },
     3.minutes
   )

@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs.ci.sync
+package com.wavesplatform.state.snapshots.ci.sync
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
@@ -14,8 +14,8 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
+import com.wavesplatform.state.snapshots.ENOUGH_AMT
+import com.wavesplatform.state.snapshots.ci.ciFee
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -130,8 +130,8 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, secondDApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-          case (diff, bc) =>
-            diff.errorMessage(invokeTx.id()) shouldBe None
+          case (snapshot, bc) =>
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
             bc.accountData(secondDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
             bc.accountData(secondDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
@@ -215,8 +215,8 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, mainDApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-          case (diff, bc) =>
-            diff.errorMessage(invokeTx.id()) shouldBe None
+          case (snapshot, bc) =>
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
             bc.accountData(mainDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
             bc.accountData(mainDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
@@ -396,8 +396,8 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, thirdAcc, transferAsset, paymentAsset) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-          case (diff, bc) =>
-            diff.errorMessage(invokeTx.id()) shouldBe None
+          case (snapshot, bc) =>
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
             bc.balance(thirdAcc, IssuedAsset(transferAsset)) shouldBe transferAssetAmount
             bc.balance(thirdAcc, IssuedAsset(paymentAsset)) shouldBe paymentAssetAmount

@@ -141,8 +141,8 @@ class EthOrderSpec
 
     val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "work in exchange transaction with an old order" in {
@@ -174,8 +174,8 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "recover valid ids of exchange tx" in {
@@ -353,8 +353,8 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "work in exchange transaction with matcher script" in {
@@ -392,8 +392,8 @@ class EthOrderSpec
 
     val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "be serialized correctly to EIP-712 json with and without attachment (NODE-996)" in {

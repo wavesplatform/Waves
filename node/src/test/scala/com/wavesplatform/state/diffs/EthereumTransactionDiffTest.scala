@@ -311,23 +311,23 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
         Seq(Payment(321, issue.asset))
       )
 
-      val diff = d.transactionDiffer(invoke).resultE.explicitGet()
-      diff should containAppliedTx(invoke.id())
-      Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                     |  "data" : [ ],
-                                                                     |  "transfers" : [ {
-                                                                     |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                     |    "asset" : null,
-                                                                     |    "amount" : 123
-                                                                     |  } ],
-                                                                     |  "issues" : [ ],
-                                                                     |  "reissues" : [ ],
-                                                                     |  "burns" : [ ],
-                                                                     |  "sponsorFees" : [ ],
-                                                                     |  "leases" : [ ],
-                                                                     |  "leaseCancels" : [ ],
-                                                                     |  "invokes" : [ ]
-                                                                     |}""".stripMargin)
+      val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
+      snapshot should containAppliedTx(invoke.id())
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                         |  "data" : [ ],
+                                                                         |  "transfers" : [ {
+                                                                         |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                         |    "asset" : null,
+                                                                         |    "amount" : 123
+                                                                         |  } ],
+                                                                         |  "issues" : [ ],
+                                                                         |  "reissues" : [ ],
+                                                                         |  "burns" : [ ],
+                                                                         |  "sponsorFees" : [ ],
+                                                                         |  "leases" : [ ],
+                                                                         |  "leaseCancels" : [ ],
+                                                                         |  "invokes" : [ ]
+                                                                         |}""".stripMargin)
     }
   }
 
@@ -400,23 +400,23 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
         Seq(),
         Seq(Payment(321, issue.asset))
       )
-      val diff = d.transactionDiffer(invoke).resultE.explicitGet()
-      diff should containAppliedTx(invoke.id())
-      Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                     |  "data" : [ ],
-                                                                     |  "transfers" : [ {
-                                                                     |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                     |    "asset" : null,
-                                                                     |    "amount" : 123
-                                                                     |  } ],
-                                                                     |  "issues" : [ ],
-                                                                     |  "reissues" : [ ],
-                                                                     |  "burns" : [ ],
-                                                                     |  "sponsorFees" : [ ],
-                                                                     |  "leases" : [ ],
-                                                                     |  "leaseCancels" : [ ],
-                                                                     |  "invokes" : [ ]
-                                                                     |}""".stripMargin)
+      val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
+      snapshot should containAppliedTx(invoke.id())
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                         |  "data" : [ ],
+                                                                         |  "transfers" : [ {
+                                                                         |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                         |    "asset" : null,
+                                                                         |    "amount" : 123
+                                                                         |  } ],
+                                                                         |  "issues" : [ ],
+                                                                         |  "reissues" : [ ],
+                                                                         |  "burns" : [ ],
+                                                                         |  "sponsorFees" : [ ],
+                                                                         |  "leases" : [ ],
+                                                                         |  "leaseCancels" : [ ],
+                                                                         |  "invokes" : [ ]
+                                                                         |}""".stripMargin)
     }
   }
 
@@ -443,24 +443,27 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
 
       d.appendBlock(setScript)
 
-      val invoke = EthTxGenerator.generateEthInvoke(invoker, dApp.toAddress, "deposit", Seq(), Seq())
-      val diff   = d.transactionDiffer(invoke).resultE.explicitGet()
-      diff should containAppliedTx(invoke.id())
-      Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                     |  "data" : [ ],
-                                                                     |  "transfers" : [ {
-                                                                     |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                     |    "asset" : null,
-                                                                     |    "amount" : 123
-                                                                     |  } ],
-                                                                     |  "issues" : [ ],
-                                                                     |  "reissues" : [ ],
-                                                                     |  "burns" : [ ],
-                                                                     |  "sponsorFees" : [ ],
-                                                                     |  "leases" : [ ],
-                                                                     |  "leaseCancels" : [ ],
-                                                                     |  "invokes" : [ ]
-                                                                     |}""".stripMargin)
+      val invoke   = EthTxGenerator.generateEthInvoke(invoker, dApp.toAddress, "deposit", Seq(), Seq())
+      val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
+      snapshot should containAppliedTx(invoke.id())
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(
+        """ {
+          |   "data" : [ ],
+          |   "transfers" : [ {
+          |     "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+          |     "asset" : null,
+          |     "amount" : 123
+          |   } ],
+          |   "issues" : [ ],
+          |   "reissues" : [ ],
+          |   "burns" : [ ],
+          |   "sponsorFees" : [ ],
+          |   "leases" : [ ],
+          |   "leaseCancels" : [ ],
+          |   "invokes" : [ ]
+          | }
+        """.stripMargin
+      )
     }
   }
 
@@ -531,9 +534,9 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
         Seq(),
         Seq(Payment(321, issue.asset))
       )
-      val diff = d.transactionDiffer(invoke).resultE.explicitGet()
-      diff should containAppliedTx(invoke.id())
-      Json.toJson(diff.scriptResults.values.head) should matchJson("""{
+      val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
+      snapshot should containAppliedTx(invoke.id())
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
                                                                      |  "data" : [ ],
                                                                      |  "transfers" : [ {
                                                                      |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
@@ -585,9 +588,9 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
         Seq(),
         Nil
       )
-      val diff = d.transactionDiffer(invoke).resultE.explicitGet()
-      diff should containAppliedTx(invoke.id())
-      Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
+      val snapshot = d.transactionDiffer(invoke).resultE.explicitGet()
+      snapshot should containAppliedTx(invoke.id())
+      Json.toJson(snapshot.scriptResults.values.head) should matchJson(s"""{
                                                                       |  "data" : [ ],
                                                                       |  "transfers" : [ {
                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",

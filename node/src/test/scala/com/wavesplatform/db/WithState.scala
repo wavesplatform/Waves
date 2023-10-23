@@ -230,8 +230,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val preconditionBlock = blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(diff, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, preconditionBlock).explicitGet()
-      state.append(diff, fees, totalFee, None, preconditionBlock.header.generationSignature, computedStateHash, preconditionBlock)
+      val BlockDiffer.Result(snapshot, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, preconditionBlock).explicitGet()
+      state.append(snapshot, fees, totalFee, None, preconditionBlock.header.generationSignature, computedStateHash, preconditionBlock)
       Some(preconditionBlock)
     }
 

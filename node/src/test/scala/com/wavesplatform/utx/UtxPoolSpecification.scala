@@ -1011,7 +1011,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     }
 
     "cleanup" - {
-      "doesnt take the composite diff into account" in withDomain() { d =>
+      "doesnt take the composite snapshot into account" in withDomain() { d =>
         d.helpers.creditWavesToDefaultSigner(11.waves)
         val transfers = Seq.fill(10)(TxHelpers.transfer(amount = 10.waves))
         transfers.foreach(tx => d.utxPool.addTransaction(tx, verify = false))

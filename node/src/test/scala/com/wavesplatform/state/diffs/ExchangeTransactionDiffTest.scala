@@ -997,8 +997,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         TestBlock.create(transfers),
         TestBlock.create(issueAndScripts)
       )
-      assertDiffEi(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2) { diff =>
-        diff.isRight shouldBe true
+      assertDiffEi(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2) { snapshot =>
+        snapshot.isRight shouldBe true
       }
     }
   }
@@ -1310,9 +1310,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       )
       val test = TestBlock.create(Seq(exchangeTx))
       if (o1.version == 2 && o2.version == 2) {
-        assertDiffEi(pretest, test, fs) { diff =>
-          diff.explicitGet()
-        }
+        assertDiffEi(pretest, test, fs)(_.explicitGet())
       } else {
         assertLeft(pretest, test, fs)("Can't process order with signature from scripted account")
       }
@@ -1814,10 +1812,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       ) { d =>
         d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff = BlockDiffer
+        val snapshot = BlockDiffer
           .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, None, MiningConstraint.Unlimited, newBlock.header.generationSignature)
           .explicitGet()
-        diff.snapshot.scriptsComplexity shouldBe complexity
+        snapshot.snapshot.scriptsComplexity shouldBe complexity
 
         val feeUnits = FeeValidation.getMinFee(d.blockchainUpdater, exchange).explicitGet().minFeeInWaves / FeeValidation.FeeUnit
         if (complexity > 0) feeUnits shouldBe 7

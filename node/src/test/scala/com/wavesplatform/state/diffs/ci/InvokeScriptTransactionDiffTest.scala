@@ -1,4 +1,4 @@
-package com.wavesplatform.state.diffs.ci
+package com.wavesplatform.state.snapshots.ci
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
@@ -34,10 +34,10 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produceRejectOrFailedDiff}
+import com.wavesplatform.state.snapshots.FeeValidation.FeeConstants
+import com.wavesplatform.state.snapshots.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.snapshots.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.snapshots.{ENOUGH_AMT, FeeValidation, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -686,7 +686,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         )
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(asset, setScript)
-          val tracedDiff = d.transactionDiffer(ci)
+          val tracedsnapshot = d.transactionDiffer(ci)
           val message    = if (version == V3) "TransactionNotAllowedByScript" else "Transaction is not allowed by script of the asset"
           tracedDiff.resultE should produceRejectOrFailedDiff(message)
           inside(tracedDiff.trace) { case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
@@ -741,7 +741,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         val (_, setScript, ci) = preconditionsAndSetContract(contract, fee = TestValues.invokeFee(2))
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(issue1, issue2, setScript)
-          val tracedDiff = d.transactionDiffer(ci)
+          val tracedsnapshot = d.transactionDiffer(ci)
           tracedDiff.resultE should produceRejectOrFailedDiff("Transaction is not allowed by script")
           inside(tracedDiff.trace) {
             case List(
@@ -774,7 +774,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         )
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(transferringAsset, attachedAsset, setScript)
-          val tracedDiff = d.transactionDiffer(ci)
+          val tracedsnapshot = d.transactionDiffer(ci)
           tracedDiff.resultE should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset ${transferringAsset.id()}")
           inside(tracedDiff.trace) {
             case List(
@@ -1299,15 +1299,15 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     TestCompiler(V4).compileContract(script)
   }
 
-  property("duplicate issuing asset should produce diff error") {
+  property("duplicate issuing asset should produce snapshot error") {
     val genesis1Tx  = TxHelpers.genesis(dAppAddress)
     val genesis2Tx  = TxHelpers.genesis(invokerAddress)
     val setScriptTx = TxHelpers.setScript(dApp, doubleIssueContract)
     val invoke      = TxHelpers.invoke(dAppAddress, Some("f"), fee = TestValues.invokeFee(issues = 2))
     testDiff(Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V4) {
       inside(_) {
-        case Right(diff) =>
-          diff.scriptResults(invoke.id()).error.get.text should include("is already issued")
+        case Right(snapshot) =>
+          snapshot.scriptResults(invoke.id()).error.get.text should include("is already issued")
         case Left(TransactionValidationError(InvokeRejectError(error, _), _)) => error should include("is already issued")
       }
     }
@@ -1460,11 +1460,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .foreach { arg =>
         val invoke = TxHelpers.invoke(dAppAddress, Some("sameComplexity"), args = List(CONST_STRING(arg).explicitGet()))
         testDiffAndState(Seq(TestBlock.create(Seq(gTx1, gTx2, ssTx, iTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V4) {
-          case (diff, _) =>
+          case (snapshot, _) =>
             if (arg == "ok")
-              diff.errorMessage(invoke.id()) shouldBe empty
+              snapshot.errorMessage(invoke.id()) shouldBe empty
             else
-              diff.errorMessage(invoke.id()) shouldBe defined
+              snapshot.errorMessage(invoke.id()) shouldBe defined
         }
 
       }
@@ -1513,9 +1513,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
         val genesisTxs = Seq(gTx1, gTx2) ++ invokerScriptTx ++ iTxs ++ tTxs ++ saTxs :+ ssTx
         testDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V4, to = V5) {
-          case (diff, _) =>
-            diff.errorMessage(invoke.id()) shouldBe defined
-            diff.scriptsComplexity should be > 0L
+          case (snapshot, _) =>
+            snapshot.errorMessage(invoke.id()) shouldBe defined
+            snapshot.scriptsComplexity should be > 0L
         }
         testDiff(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V6) {
           _ should produce("Transaction is not allowed by script of the asset")
@@ -1550,8 +1550,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val invoke   = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
 
     testDiffAndState(Seq(TestBlock.create(Seq(gTx1, gTx2, alias, ssTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V5) {
-      case (diff, bc) =>
-        diff.errorMessage(invoke.id()) shouldBe None
+      case (snapshot, bc) =>
+        snapshot.errorMessage(invoke.id()) shouldBe None
         val hash = ByteStr(com.wavesplatform.lang.Global.blake2b256(script.bytes().arr))
         bc.accountData(dAppAddress, "hash1").get.value shouldBe hash
         bc.accountData(dAppAddress, "hash2").get.value shouldBe hash
