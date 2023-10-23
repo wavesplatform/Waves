@@ -5,13 +5,10 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
-
-import scala.collection.immutable.VectorMap
 
 class InvokeFeeTest extends PropSpec with WithDomain {
   import DomainPresets.*

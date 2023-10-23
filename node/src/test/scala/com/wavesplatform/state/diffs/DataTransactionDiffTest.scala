@@ -4,7 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock.{BlockWithSigner, create as block}
+import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
