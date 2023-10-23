@@ -1,4 +1,4 @@
-package com.wavesplatform.state.snapshots.ci
+package com.wavesplatform.state.diffs.ci
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
@@ -34,10 +34,10 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.snapshots.FeeValidation.FeeConstants
-import com.wavesplatform.state.snapshots.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.snapshots.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.snapshots.{ENOUGH_AMT, FeeValidation, produceRejectOrFailedDiff}
+import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -686,10 +686,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         )
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(asset, setScript)
-          val tracedsnapshot = d.transactionDiffer(ci)
+          val tracedSnapshot = d.transactionDiffer(ci)
           val message    = if (version == V3) "TransactionNotAllowedByScript" else "Transaction is not allowed by script of the asset"
-          tracedDiff.resultE should produceRejectOrFailedDiff(message)
-          inside(tracedDiff.trace) { case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
+          tracedSnapshot.resultE should produceRejectOrFailedDiff(message)
+          inside(tracedSnapshot.trace) { case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
             assetId shouldBe asset.id()
             tne.isAssetScript shouldBe true
           }
@@ -741,9 +741,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         val (_, setScript, ci) = preconditionsAndSetContract(contract, fee = TestValues.invokeFee(2))
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(issue1, issue2, setScript)
-          val tracedsnapshot = d.transactionDiffer(ci)
-          tracedDiff.resultE should produceRejectOrFailedDiff("Transaction is not allowed by script")
-          inside(tracedDiff.trace) {
+          val tracedSnapshot = d.transactionDiffer(ci)
+          tracedSnapshot.resultE should produceRejectOrFailedDiff("Transaction is not allowed by script")
+          inside(tracedSnapshot.trace) {
             case List(
                   InvokeScriptTrace(_, `dAppAddress`, functionCall, Right(scriptResult), _, _),
                   AssetVerifierTrace(allowedAssetId, None, _),
@@ -774,9 +774,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         )
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(transferringAsset, attachedAsset, setScript)
-          val tracedsnapshot = d.transactionDiffer(ci)
-          tracedDiff.resultE should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset ${transferringAsset.id()}")
-          inside(tracedDiff.trace) {
+          val tracedSnapshot = d.transactionDiffer(ci)
+          tracedSnapshot.resultE should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset ${transferringAsset.id()}")
+          inside(tracedSnapshot.trace) {
             case List(
                   InvokeScriptTrace(_, _, _, Right(scriptResults), _, _),
                   AssetVerifierTrace(transferringAssetId, Some(_), _)
