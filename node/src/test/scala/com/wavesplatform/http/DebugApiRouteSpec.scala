@@ -84,6 +84,7 @@ class DebugApiRouteSpec
 
   val block: Block = TestBlock.create(Nil)
   val testStateHash: StateHash = {
+    import com.wavesplatform.utils.byteStrOrdering
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
     StateHash(randomHash, hashes)

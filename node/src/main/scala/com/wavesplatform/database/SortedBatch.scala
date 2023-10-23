@@ -6,6 +6,7 @@ import org.iq80.leveldb.WriteBatch
 import scala.collection.mutable
 
 class SortedBatch extends WriteBatch {
+  import com.wavesplatform.utils.byteStrOrdering
   val addedEntries: mutable.Map[ByteStr, Array[Byte]] = mutable.TreeMap[ByteStr, Array[Byte]]()
   val deletedEntries: mutable.Set[ByteStr]            = mutable.TreeSet[ByteStr]()
 

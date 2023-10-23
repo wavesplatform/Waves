@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.utils.byteStrOrdering
 import com.wavesplatform.events.StateUpdate.{
   AssetInfo,
   AssetStateUpdate,

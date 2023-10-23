@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeTransaction
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 
+import scala.annotation.nowarn
 import scala.collection.immutable.VectorMap
 import scala.util.chaining.*
 
@@ -144,6 +145,7 @@ case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], 
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
+@nowarn
 case class Diff private (
     transactions: Vector[NewTransactionInfo],
     portfolios: Map[Address, Portfolio],

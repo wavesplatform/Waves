@@ -1,5 +1,6 @@
 package com.wavesplatform.ride.runner
 
+import java.io.File
 import java.nio.file.Path
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedSet
@@ -16,7 +17,7 @@ object RideTestSuite {
   def getTestSuites(testCases: List[Path]): RideTestSuite = {
     val testSuites = mutable.Map.empty[Path, RideTestSuite]
 
-    val rootPath = Path.of("") // Dummy path if test cases just file names
+    val rootPath = new File("").toPath // Dummy path if test cases just file names
     testSuites.put(rootPath, RideTestSuite(path = rootPath))
 
     // Adding test cases

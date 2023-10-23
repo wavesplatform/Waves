@@ -3,6 +3,9 @@ package com.wavesplatform.ride.runner.caches
 import com.google.common.collect.Interners
 import com.wavesplatform.state.AccountScriptInfo
 
+import scala.annotation.nowarn
+
+@nowarn
 case class WeighedAccountScriptInfo private (scriptInfoWeight: Int, accountScriptInfo: AccountScriptInfo)
 
 object WeighedAccountScriptInfo {

@@ -60,7 +60,7 @@ object AppInitializer extends ScorexLogging {
     val versionFilePath = rootPath.resolve("version")
     val (cleanup, updateVersion) =
       if (versionFilePath.toFile.exists()) {
-        val rawVersion = Files.readString(versionFilePath, StandardCharsets.UTF_8).trim
+        val rawVersion = new String(Files.readAllBytes(versionFilePath), StandardCharsets.UTF_8).trim
         rawVersion.toIntOption match {
           case Some(version) =>
             if (version != settings.rideRunner.db.version) {
@@ -90,6 +90,6 @@ object AppInitializer extends ScorexLogging {
       }
     }
 
-    if (updateVersion) Files.writeString(versionFilePath, settings.rideRunner.db.version.toString)
+    if (updateVersion) Files.write(versionFilePath, settings.rideRunner.db.version.toString.getBytes(StandardCharsets.UTF_8))
   }
 }

@@ -1,9 +1,8 @@
 package com.wavesplatform.common.state
 
-import scala.util.Try
-
-import com.wavesplatform.common._
 import com.wavesplatform.common.utils.{Base58, Base64}
+
+import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
   private[this] lazy val base58: String = Base58.encode(arr)
@@ -86,6 +85,4 @@ object ByteStr {
   def decodeBase64(s: String): Try[ByteStr] = Base64.tryDecode(s).map { bs =>
     ByteStr(bs)
   }
-
-  implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => ByteStrComparator.compare(x, y)
 }

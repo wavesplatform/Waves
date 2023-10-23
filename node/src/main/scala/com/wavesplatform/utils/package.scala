@@ -1,11 +1,11 @@
 package com.wavesplatform
 
 import com.google.common.base.Charsets
+import com.google.common.primitives.UnsignedBytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import org.apache.commons.lang3.time.DurationFormatUtils
 import play.api.libs.json.*
 
 import java.security.SecureRandom
@@ -46,9 +46,6 @@ package object utils {
 
     f"${bytes / divisor}%.1f $unitString"
   }
-
-  def humanReadableDuration(duration: Long): String =
-    DurationFormatUtils.formatDurationHMS(duration)
 
   implicit class Tap[A](a: A) {
     def tap(g: A => Unit): A = {
@@ -100,4 +97,6 @@ package object utils {
       case ARR(xs)      => Json.obj("type" -> "Array", "value" -> xs.map(evaluatedWrites.writes))
       case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
     }
+
+    implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => UnsignedBytes.lexicographicalComparator().compare(x.arr, y.arr)
 }
