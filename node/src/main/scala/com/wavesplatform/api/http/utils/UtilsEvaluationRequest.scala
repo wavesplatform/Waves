@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.AttachedPaymentExtractor
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{TransactionType, smart}
+import com.wavesplatform.utils.byteStrFormat
 import play.api.libs.json.*
 
 sealed trait UtilsEvaluationRequest {
@@ -44,12 +45,21 @@ object UtilsEvaluationRequest {
 }
 
 case class UtilsExprRequest(
-    expr: Either[ByteStr, String],
+    expr: JsValue,
     state: Option[BlockchainOverrides] = None
 ) extends UtilsEvaluationRequest {
-  def parseCall(version: StdLibVersion): Either[GenericError, Terms.EXPR] = expr match {
-    case Left(binaryCall) => SerdeV1.deserialize(binaryCall.arr).bimap(GenericError(_), _._1)
-    case Right(textCall)  => compile(version, textCall)
+  def parseCall(version: StdLibVersion): Either[GenericError, Terms.EXPR] = {
+    val binaryCall = expr
+      .asOpt[ByteStr]
+      .toRight(GenericError("Unable to parse expr bytes"))
+      .flatMap(bytes => SerdeV1.deserialize(bytes.arr).bimap(GenericError(_), _._1))
+
+    val textCall = expr
+      .asOpt[String]
+      .toRight(GenericError("Unable to read expr string"))
+      .flatMap(compile(version, _))
+
+    binaryCall.orElse(textCall)
   }
 
   private def compile(version: StdLibVersion, str: String): Either[GenericError, EXPR] =
@@ -59,8 +69,6 @@ case class UtilsExprRequest(
 }
 
 object UtilsExprRequest {
-  implicit val byteStrReads: Reads[ByteStr]                   = com.wavesplatform.utils.byteStrFormat
-  implicit val exprReads: Reads[Either[ByteStr, String]]      = com.wavesplatform.api.http.eitherReads[ByteStr, String]
   implicit val utilsExprRequestReads: Reads[UtilsExprRequest] = Json.using[Json.WithDefaultValues].reads[UtilsExprRequest]
 }
 

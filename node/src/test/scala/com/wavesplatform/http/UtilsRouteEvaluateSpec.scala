@@ -67,6 +67,7 @@ class UtilsRouteEvaluateSpec
     val letFromContract = 1000
     val testScript = TxHelpers.scriptV5(
       s"""
+         |let bPm7 = ["a", "b"]
          |let letFromContract = $letFromContract
          |
          |func any(value: Any) = value
@@ -253,6 +254,18 @@ class UtilsRouteEvaluateSpec
             """.stripMargin
         ) ~> route ~> check {
           responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
+        }
+
+        evalScript("bPm7") ~> route ~> check {
+          responseJson.validate[JsObject] shouldBe JsSuccess(
+            Json.obj(
+              "type" -> "Array",
+              "value" -> Json.arr(
+                Json.obj("type" -> "String", "value" -> "a"),
+                Json.obj("type" -> "String", "value" -> "b")
+              )
+            )
+          )
         }
 
         evalScript("letFromContract - 1") ~> route ~> check {
