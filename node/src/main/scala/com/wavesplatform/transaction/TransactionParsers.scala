@@ -45,14 +45,6 @@ object TransactionParsers {
     }
   }.toMap
 
-  val all: Map[(Byte, Byte), TransactionParser] = old.flatMap { case (typeId, builder) =>
-    builder.supportedVersions.map { version =>
-      ((typeId, version), builder)
-    }
-  } ++ modern
-
-  def by(typeId: Byte, version: TxVersion): Option[TransactionParser] = all.get((typeId, version))
-
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def validate(parser: TransactionParser)(tx: parser.TransactionT): Try[Transaction] = {
       import parser.*
