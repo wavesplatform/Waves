@@ -24,7 +24,8 @@ case class SponsorFeeTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.SponsorFee, Seq(asset)) with ProvenTransaction
+) extends Transaction(TransactionType.SponsorFee, Seq(asset))
+    with ProvenTransaction
     with VersionedTransaction.ToV2
     with TxWithFee.InWaves
     with FastHashId
@@ -37,9 +38,7 @@ case class SponsorFeeTransaction(
 
 object SponsorFeeTransaction extends TransactionParser {
   type TransactionT = SponsorFeeTransaction
-
-  override val typeId: TxType                    = 14: Byte
-
+  override val typeId: TxType = 14: Byte
 
   implicit val validator: TxValidator[SponsorFeeTransaction] = SponsorFeeTxValidator
 

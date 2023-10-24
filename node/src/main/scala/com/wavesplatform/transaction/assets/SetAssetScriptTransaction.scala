@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.SetAssetScriptTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.SetAssetScriptTxValidator
@@ -37,9 +37,7 @@ case class SetAssetScriptTransaction(
 
 object SetAssetScriptTransaction extends TransactionParser {
   type TransactionT = SetAssetScriptTransaction
-
-  override val typeId: TxType                    = 15: Byte
-
+  override val typeId: TxType = 15: Byte
 
   implicit val validator: TxValidator[SetAssetScriptTransaction] = SetAssetScriptTxValidator
 
