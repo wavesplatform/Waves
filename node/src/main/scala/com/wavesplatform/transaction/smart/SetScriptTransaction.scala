@@ -22,7 +22,7 @@ case class SetScriptTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.SetScript) with ProvenTransaction
-    with VersionedTransaction
+    with VersionedTransaction.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {

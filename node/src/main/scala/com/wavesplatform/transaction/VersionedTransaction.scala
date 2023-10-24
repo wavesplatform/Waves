@@ -1,11 +1,19 @@
 package com.wavesplatform.transaction
 
 trait VersionedTransaction {
-  def version: TxVersion
+  val version: TxVersion
+  val maxVersion: TxVersion
 }
 
 object VersionedTransaction {
   trait ConstV1 extends VersionedTransaction {
-    def version: TxVersion = TxVersion.V1
+    val version: TxVersion = TxVersion.V1
+    val maxVersion: TxVersion = TxVersion.V1
+  }
+  trait ToV2 extends VersionedTransaction {
+    val maxVersion: TxVersion = TxVersion.V2
+  }
+  trait ToV3 extends VersionedTransaction {
+    val maxVersion: TxVersion = TxVersion.V3
   }
 }

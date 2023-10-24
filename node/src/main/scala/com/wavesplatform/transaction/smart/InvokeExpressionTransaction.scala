@@ -16,7 +16,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Failure, Success, Try}
 
 case class InvokeExpressionTransaction(
-    version: TxVersion,
+    override val version: TxVersion,
     sender: PublicKey,
     expression: ExprScript,
     fee: TxPositiveAmount,
@@ -26,6 +26,7 @@ case class InvokeExpressionTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeExpression, Nil)
     with InvokeTransaction
+    with VersionedTransaction.ConstV1
     with PBSince.V1 {
 
   lazy val expressionBytes: ByteStr = expression.bytes.value()

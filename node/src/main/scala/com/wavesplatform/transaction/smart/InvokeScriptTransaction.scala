@@ -28,6 +28,7 @@ case class InvokeScriptTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeScript, payments.collect(InvokeScriptLike.IssuedAssets))
     with InvokeTransaction
+    with VersionedTransaction.ToV2
     with PBSince.V2 {
 
   override def root: InvokeScriptTransactionLike = this

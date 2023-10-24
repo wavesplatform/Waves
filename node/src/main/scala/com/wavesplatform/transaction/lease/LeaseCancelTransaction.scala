@@ -23,7 +23,7 @@ final case class LeaseCancelTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.LeaseCancel)
     with SigProofsSwitch
-    with VersionedTransaction
+    with VersionedTransaction.ToV3
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V3 {

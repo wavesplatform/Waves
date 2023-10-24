@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 
 import scala.util.{Failure, Try}
@@ -38,9 +38,7 @@ object TransactionParsers {
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
     InvokeScriptTransaction,
-    TransferTransaction,
-    InvokeExpressionTransaction,
-    UpdateAssetInfoTransaction
+    TransferTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
@@ -80,7 +78,4 @@ object TransactionParsers {
       tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes
     } yield tx
   }
-
-  def versionIsCorrect(tx: Transaction & VersionedTransaction): Boolean =
-    TransactionParsers.all.contains((tx.tpe.id.toByte, tx.version))
 }

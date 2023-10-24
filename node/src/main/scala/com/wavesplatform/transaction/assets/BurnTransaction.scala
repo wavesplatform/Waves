@@ -23,7 +23,7 @@ final case class BurnTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Burn, Seq(asset)) with ProvenTransaction
-    with VersionedTransaction
+    with VersionedTransaction.ToV3
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId

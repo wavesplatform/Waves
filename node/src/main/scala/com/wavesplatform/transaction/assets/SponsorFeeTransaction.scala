@@ -25,7 +25,7 @@ case class SponsorFeeTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.SponsorFee, Seq(asset)) with ProvenTransaction
-    with VersionedTransaction
+    with VersionedTransaction.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {

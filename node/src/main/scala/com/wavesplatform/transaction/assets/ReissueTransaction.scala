@@ -24,7 +24,7 @@ case class ReissueTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Reissue, Seq(asset))
-    with VersionedTransaction
+    with VersionedTransaction.ToV3
     with ProvenTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves

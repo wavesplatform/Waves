@@ -30,7 +30,7 @@ case class IssueTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Issue)
-    with VersionedTransaction
+    with VersionedTransaction.ToV3
     with ProvenTransaction
     with FastHashId
     with SigProofsSwitch

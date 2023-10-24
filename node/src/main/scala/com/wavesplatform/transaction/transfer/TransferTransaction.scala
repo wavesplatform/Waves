@@ -32,7 +32,7 @@ case class TransferTransaction(
       case a: IssuedAsset => Seq(a)
     })
     with TransferTransactionLike
-    with VersionedTransaction
+    with VersionedTransaction.ToV3
     with FastHashId
     with SigProofsSwitch
     with TxWithFee.InCustomAsset

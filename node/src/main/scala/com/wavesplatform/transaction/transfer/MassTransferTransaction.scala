@@ -33,7 +33,7 @@ case class MassTransferTransaction(
       case a: IssuedAsset => Seq(a)
     })
     with ProvenTransaction
-    with VersionedTransaction
+    with VersionedTransaction.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
