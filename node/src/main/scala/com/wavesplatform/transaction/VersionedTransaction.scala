@@ -7,7 +7,7 @@ trait VersionedTransaction {
 
 object VersionedTransaction {
   trait ConstV1 extends VersionedTransaction {
-    val version: TxVersion = TxVersion.V1
+    val version: TxVersion    = TxVersion.V1
     val maxVersion: TxVersion = TxVersion.V1
   }
   trait ToV2 extends VersionedTransaction {

@@ -21,11 +21,9 @@ object TransactionParsers {
     CreateAliasTransaction,
     MassTransferTransaction,
     TransferTransaction
-  ).map { x =>
-    x.typeId -> x
-  }.toMap
+  ).map { x => x.typeId -> x }.toMap
 
-  private[this] val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
+  private[this] val modern: Map[Byte, TransactionParser] = Seq[TransactionParser](
     DataTransaction,
     SetScriptTransaction,
     IssueTransaction,
@@ -39,11 +37,7 @@ object TransactionParsers {
     SetAssetScriptTransaction,
     InvokeScriptTransaction,
     TransferTransaction
-  ).flatMap { x =>
-    x.supportedVersions.map { version =>
-      ((x.typeId, version), x)
-    }
-  }.toMap
+  ).map { x => (x.typeId, x) }.toMap
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def validate(parser: TransactionParser)(tx: parser.TransactionT): Try[Transaction] = {
@@ -53,7 +47,7 @@ object TransactionParsers {
     def modernParseBytes: Try[Transaction] = {
       val typeId  = bytes(1)
       val version = bytes(2)
-      modern.get((typeId, version)) match {
+      modern.get(typeId) match {
         case Some(parser) => parser.parseBytes(bytes).flatMap(validate(parser))
         case None         => Failure[Transaction](UnknownTypeAndVersion(typeId, version))
       }
@@ -64,7 +58,6 @@ object TransactionParsers {
         case None         => Failure[Transaction](UnknownType(bytes(0)))
       }
     }
-
     for {
       _  <- Either.cond(bytes.length > 2, (), BufferUnderflow).toTry
       tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes

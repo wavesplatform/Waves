@@ -51,7 +51,7 @@ object IssueTransaction extends TransactionParser {
   val MaxAssetDecimals          = 8
 
   override val typeId: TxType                    = 3: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+
 
   implicit val validator: TxValidator[IssueTransaction] = IssueTxValidator
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =

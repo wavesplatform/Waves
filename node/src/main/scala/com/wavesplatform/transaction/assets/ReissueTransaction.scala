@@ -39,8 +39,7 @@ case class ReissueTransaction(
 object ReissueTransaction extends TransactionParser {
   type TransactionT = ReissueTransaction
 
-  override val typeId: TxType                    = 5: Byte
-  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  override val typeId: TxType = 5: Byte
 
   implicit val validator: TxValidator[ReissueTransaction] = ReissueTxValidator
   implicit def sign(tx: ReissueTransaction, privateKey: PrivateKey): ReissueTransaction =

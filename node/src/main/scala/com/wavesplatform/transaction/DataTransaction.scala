@@ -1,17 +1,17 @@
 package com.wavesplatform.transaction
 
-import scala.util.Try
-
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
-import play.api.libs.json._
+import play.api.libs.json.*
+
+import scala.util.Try
 
 case class DataTransaction(
     version: TxVersion,
@@ -38,13 +38,12 @@ case class DataTransaction(
 object DataTransaction extends TransactionParser {
   type TransactionT = DataTransaction
 
-  val MaxBytes: Int      = 150 * 1024 // uses for RIDE CONST_STRING and CONST_BYTESTR
-  val MaxProtoBytes: Int = 165890 // uses for RIDE CONST_BYTESTR
-  val MaxRideV6Bytes: Int = 165835 // (DataEntry.MaxPBKeySize + DataEntry.MaxValueSize) * 5
-  val MaxEntryCount: Int = 100
+  val MaxBytes: Int       = 150 * 1024 // uses for RIDE CONST_STRING and CONST_BYTESTR
+  val MaxProtoBytes: Int  = 165890     // uses for RIDE CONST_BYTESTR
+  val MaxRideV6Bytes: Int = 165835     // (DataEntry.MaxPBKeySize + DataEntry.MaxValueSize) * 5
+  val MaxEntryCount: Int  = 100
 
-  override val typeId: TxType                    = 12: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val typeId: TxType = 12: Byte
 
   implicit val validator: TxValidator[DataTransaction] = DataTxValidator
 

@@ -261,7 +261,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
   }
 
   ignore("available versions") { // TODO check is commented in CommonValidation
-    val unsupportedVersion   = InvokeExpressionTransaction.supportedVersions.max + 1
+    val unsupportedVersion   = 4
     val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)

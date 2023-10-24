@@ -1,41 +1,38 @@
 package com.wavesplatform.transaction
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction => PBSignedTransaction}
+import com.wavesplatform.crypto
+import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction as PBSignedTransaction}
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.crypto
-import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 
 class ChainIdSpecification extends PropSpec {
-
   private val otherChainId     = 'W'.toByte
   private val aliasFromOther   = Alias.createWithChainId("sasha", otherChainId).explicitGet()
   private val addressFromOther = Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, otherChainId).explicitGet()
   private val addressOrAlias   = Gen.oneOf(aliasFromOther, addressFromOther)
 
-  private def addressOrAliasWithVersion(
-      vs: Set[TxVersion]
-  ): Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
+  private def addressOrAliasWithVersion: Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
     for {
       addressOrAlias <- addressOrAlias
-      version        <- Gen.oneOf(vs.toSeq)
+      version        <- Gen.oneOf(1, 2, 3)
       sender         <- accountGen
       amount         <- Gen.choose(1, 10000000L)
       fee            <- Gen.choose(1000000L, 10000000L)
       ts             <- Gen.choose(1, 1000000L)
-    } yield (addressOrAlias, version, sender, TxPositiveAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(fee), ts)
+    } yield (addressOrAlias, version.toByte, sender, TxPositiveAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(fee), ts)
 
   private def validateFromOtherNetwork(tx: Transaction): Unit = {
     tx.chainId should not be AddressScheme.current.chainId
@@ -52,7 +49,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("TransferTransaction validation") {
-    forAll(addressOrAliasWithVersion(TransferTransaction.supportedVersions)) { case (addressOrAlias, version, sender, amount, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (addressOrAlias, version, sender, amount, fee, ts) =>
       TransferTransaction(
         version,
         sender.publicKey,
@@ -86,7 +83,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("PaymentTransaction validation") {
-    forAll(addressOrAliasWithVersion(PaymentTransaction.supportedVersions)) { case (_, _, sender, amount, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, amount, fee, ts) =>
       PaymentTransaction(
         sender.publicKey,
         addressFromOther,
@@ -112,7 +109,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("LeaseTransaction validation") {
-    forAll(addressOrAliasWithVersion(LeaseTransaction.supportedVersions)) { case (addressOrAlias, version, sender, amount, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (addressOrAlias, version, sender, amount, fee, ts) =>
       LeaseTransaction(
         version,
         sender.publicKey,
@@ -140,7 +137,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("InvokeScriptTransaction validation") {
-    forAll(addressOrAliasWithVersion(InvokeScriptTransaction.supportedVersions)) { case (addressOrAlias, version, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (addressOrAlias, version, sender, _, fee, ts) =>
       InvokeScriptTransaction(
         version,
         sender.publicKey,
@@ -172,7 +169,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("GenesisTransaction validation") {
-    forAll(addressOrAliasWithVersion(GenesisTransaction.supportedVersions)) { case (_, _, _, amount, _, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, _, amount, _, ts) =>
       GenesisTransaction(
         addressFromOther,
         TxNonNegativeAmount.unsafeFrom(amount.value),
@@ -184,7 +181,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("BurnTransaction validation") {
-    forAll(addressOrAliasWithVersion(BurnTransaction.supportedVersions)) { case (_, _, sender, amount, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, amount, fee, ts) =>
       validateFromOtherNetwork(
         BurnTransaction(
           TxVersion.V3,
@@ -201,7 +198,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("CreateAliasTransaction validation") {
-    forAll(addressOrAliasWithVersion(CreateAliasTransaction.supportedVersions)) { case (_, _, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         CreateAliasTransaction(
           TxVersion.V3,
@@ -217,7 +214,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("DataTransaction validation") {
-    forAll(addressOrAliasWithVersion(DataTransaction.supportedVersions)) { case (_, _, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         DataTransaction(
           TxVersion.V2,
@@ -233,7 +230,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("ExchangeTransaction validation") {
-    forAll(addressOrAliasWithVersion(ExchangeTransaction.supportedVersions)) { case (_, _, sender, amount, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, amount, fee, ts) =>
       val pair = AssetPair(Waves, IssuedAsset(ByteStr(bytes32gen.sample.get)))
       validateFromOtherNetwork(
         ExchangeTransaction(
@@ -254,7 +251,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("IssueTransaction validation") {
-    forAll(addressOrAliasWithVersion(IssueTransaction.supportedVersions)) { case (_, _, sender, quantity, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, quantity, fee, ts) =>
       validateFromOtherNetwork(
         IssueTransaction(
           TxVersion.V3,
@@ -275,7 +272,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("LeaseCancelTransaction validation") {
-    forAll(addressOrAliasWithVersion(LeaseCancelTransaction.supportedVersions)) { case (_, _, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         LeaseCancelTransaction(
           TxVersion.V3,
@@ -291,7 +288,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("MassTransferTransaction validation") {
-    forAll(addressOrAliasWithVersion(MassTransferTransaction.supportedVersions)) { case (addressOrAlias, _, sender, amount, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (addressOrAlias, _, sender, amount, fee, ts) =>
       validateFromOtherNetwork(
         MassTransferTransaction(
           TxVersion.V2,
@@ -309,7 +306,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("ReissueTransaction validation") {
-    forAll(addressOrAliasWithVersion(ReissueTransaction.supportedVersions)) { case (_, _, sender, quantity, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, quantity, fee, ts) =>
       validateFromOtherNetwork(
         ReissueTransaction(
           TxVersion.V3,
@@ -327,7 +324,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("SetAssetScriptTransaction validation") {
-    forAll(addressOrAliasWithVersion(SetAssetScriptTransaction.supportedVersions)) { case (_, _, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         SetAssetScriptTransaction(
           TxVersion.V2,
@@ -344,7 +341,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("SetScriptTransaction validation") {
-    forAll(addressOrAliasWithVersion(SetScriptTransaction.supportedVersions)) { case (_, _, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         SetScriptTransaction(
           TxVersion.V2,
@@ -360,7 +357,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("SponsorFeeTransaction validation") {
-    forAll(addressOrAliasWithVersion(SponsorFeeTransaction.supportedVersions)) { case (_, _, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, _, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         SponsorFeeTransaction(
           TxVersion.V2,
@@ -377,7 +374,7 @@ class ChainIdSpecification extends PropSpec {
   }
 
   property("UpdateAssetInfoTransaction validation") {
-    forAll(addressOrAliasWithVersion(UpdateAssetInfoTransaction.supportedVersions)) { case (_, version, sender, _, fee, ts) =>
+    forAll(addressOrAliasWithVersion) { case (_, version, sender, _, fee, ts) =>
       validateFromOtherNetwork(
         UpdateAssetInfoTransaction(
           version,

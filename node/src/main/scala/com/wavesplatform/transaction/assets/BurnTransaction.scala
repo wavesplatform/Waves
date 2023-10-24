@@ -38,7 +38,7 @@ object BurnTransaction extends TransactionParser {
   type TransactionT = BurnTransaction
 
   override val typeId: TxType                    = 6: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
 

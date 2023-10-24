@@ -1025,7 +1025,7 @@ class TransactionsRouteSpec
       def invoke(func: JsObject, expectedArgsLength: Int): Unit = {
         val ist = Json.obj(
           "type"       -> InvokeScriptTransaction.typeId,
-          "version"    -> Gen.oneOf(InvokeScriptTransaction.supportedVersions.toSeq).sample.get,
+          "version"    -> 3,
           "sender"     -> acc1.toAddress,
           "dApp"       -> acc2.toAddress,
           "call"       -> func,

@@ -64,8 +64,6 @@ object ExchangeTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[TxVersion]): Try[ExchangeTransaction] =
     ExchangeTxSerializer.parseBytes(bytes)
 
-  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-
   val typeId: TxType = 7: Byte
 
   def create(

@@ -51,7 +51,7 @@ object UpdateAssetInfoTransaction extends TransactionParser {
   type TransactionT = UpdateAssetInfoTransaction
 
   override val typeId: TxType                    = 17: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

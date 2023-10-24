@@ -51,8 +51,7 @@ case class InvokeExpressionTransaction(
 object InvokeExpressionTransaction extends TransactionParser {
   type TransactionT = InvokeExpressionTransaction
 
-  override val typeId: TxType                    = 18: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val typeId: TxType = 18: Byte
 
   implicit def sign(tx: InvokeExpressionTransaction, privateKey: PrivateKey): InvokeExpressionTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

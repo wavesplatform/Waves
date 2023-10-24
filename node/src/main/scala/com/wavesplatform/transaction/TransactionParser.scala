@@ -5,11 +5,9 @@ import com.wavesplatform.transaction.validation.TxValidator
 import scala.util.Try
 
 trait TransactionParser {
-  type TransactionT <: Transaction
+  type TransactionT <: Transaction with VersionedTransaction
 
   def typeId: TxType
-
-  def supportedVersions: Set[TxVersion]
 
   def parseBytes(bytes: Array[Byte]): Try[TransactionT]
 
