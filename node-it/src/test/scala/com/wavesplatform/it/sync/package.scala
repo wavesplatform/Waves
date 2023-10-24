@@ -53,7 +53,7 @@ package object sync {
     minFee + massTransferFeePerTransfer * (numberOfRecipients + 1)
   }
 
-
+  val supportedVersions: List[Byte]               = List(1, 2, 3)
   val burnTxSupportedVersions: List[Byte]         = List(1, 2, 3)
   val leaseTxSupportedVersions: List[Byte]        = List(1, 2, 3)
   val dataTxSupportedVersions: List[Byte]         = List(1, 2)

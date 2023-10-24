@@ -55,7 +55,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("reject on illegal fields") {
-    val unsupportedVersion = InvokeExpressionTransaction.supportedVersions.max + 1
+    val unsupportedVersion = 4
     assertApiError(
       sender.invokeExpression(firstKeyPair, expr, version = unsupportedVersion.toByte),
       AssertiveApiError(StateCheckFailed.Id, s"Transaction version $unsupportedVersion has not been activated yet", matchMessage = true)
