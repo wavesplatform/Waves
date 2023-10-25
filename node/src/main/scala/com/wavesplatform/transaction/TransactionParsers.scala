@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.transfer.*
 import scala.util.{Failure, Try}
 
 object TransactionParsers {
-  private[this] val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
+  private[this] val old: Map[TxType, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
     PaymentTransaction,
     IssueTransaction,
@@ -23,7 +23,7 @@ object TransactionParsers {
     TransferTransaction
   ).map { x => x.typeId -> x }.toMap
 
-  private[this] val modern: Map[Byte, TransactionParser] = Seq[TransactionParser](
+  private[this] val modern: Map[TxType, TransactionParser] = Seq[TransactionParser](
     DataTransaction,
     SetScriptTransaction,
     IssueTransaction,
@@ -38,6 +38,8 @@ object TransactionParsers {
     InvokeScriptTransaction,
     TransferTransaction
   ).map { x => (x.typeId, x) }.toMap
+
+  val all: Map[TxType, TransactionParser] = old ++ modern
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def validate(parser: TransactionParser)(tx: parser.TransactionT): Try[Transaction] = {
