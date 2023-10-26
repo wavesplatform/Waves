@@ -5402,7 +5402,7 @@ components:
         expr:
           type: string
           example: "default()"
-          description: "Ride expression either as a Ride code, or as compiled in base64 representation"
+          description: "Ride expression"
         state:
           $ref: '#/components/schemas/BlockchainOverrides'
     RideInvocationRequest:

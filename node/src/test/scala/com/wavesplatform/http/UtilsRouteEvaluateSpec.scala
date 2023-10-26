@@ -11,12 +11,9 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
 import com.wavesplatform.test.NumericExt
@@ -64,10 +61,10 @@ class UtilsRouteEvaluateSpec
   }
 
   routePath("/script/evaluate/{address}") - {
-    val letFromContract = 1000
+    val xFromContract = 1000
     val testScript = TxHelpers.scriptV5(
       s"""
-         |let letFromContract = $letFromContract
+         |let x = $xFromContract
          |
          |func any(value: Any) = value
          |func test(i: Int) = i * 10
@@ -116,11 +113,6 @@ class UtilsRouteEvaluateSpec
 
     def evalScript(text: String, address: Address = dAppAddress) =
       Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
-
-    def evalBin(expr: EXPR) = {
-      val serialized = ByteStr(SerdeV1.serialize(expr))
-      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
-    }
 
     def responseJson: JsObject = {
       val fullJson = responseAs[JsObject]
@@ -219,10 +211,6 @@ class UtilsRouteEvaluateSpec
           responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
         }
 
-        evalBin(FUNCTION_CALL(FunctionHeader.User("test"), List(CONST_LONG(123)))) ~> route ~> check {
-          responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
-        }
-
         evalScript("testS()") ~> route ~> check {
           responseJson shouldBe Json.obj("type" -> "String", "value" -> "Test")
         }
@@ -255,8 +243,17 @@ class UtilsRouteEvaluateSpec
           responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
         }
 
-        evalScript("letFromContract - 1") ~> route ~> check {
-          responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
+        evalScript("x") ~> route ~> check {
+          responseJson.validate[JsObject] shouldBe JsSuccess(
+            Json.obj(
+              "type"  -> "Int",
+              "value" -> xFromContract
+            )
+          )
+        }
+
+        evalScript("x - 1") ~> route ~> check {
+          responseJson shouldBe Json.obj("type" -> "Int", "value" -> (xFromContract - 1))
         }
 
         (() => utilsApi.blockchain.settings)

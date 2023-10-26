@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address as RideAddress
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
@@ -44,13 +43,10 @@ object UtilsEvaluationRequest {
 }
 
 case class UtilsExprRequest(
-    expr: Either[ByteStr, String],
+    expr: String,
     state: Option[BlockchainOverrides] = None
 ) extends UtilsEvaluationRequest {
-  def parseCall(version: StdLibVersion): Either[GenericError, Terms.EXPR] = expr match {
-    case Left(binaryCall) => SerdeV1.deserialize(binaryCall.arr).bimap(GenericError(_), _._1)
-    case Right(textCall)  => compile(version, textCall)
-  }
+  def parseCall(version: StdLibVersion): Either[GenericError, Terms.EXPR] = compile(version, expr)
 
   private def compile(version: StdLibVersion, str: String): Either[GenericError, EXPR] =
     ExpressionCompiler
@@ -59,8 +55,6 @@ case class UtilsExprRequest(
 }
 
 object UtilsExprRequest {
-  implicit val byteStrReads: Reads[ByteStr]                   = com.wavesplatform.utils.byteStrFormat
-  implicit val exprReads: Reads[Either[ByteStr, String]]      = com.wavesplatform.api.http.eitherReads[ByteStr, String]
   implicit val utilsExprRequestReads: Reads[UtilsExprRequest] = Json.using[Json.WithDefaultValues].reads[UtilsExprRequest]
 }
 
