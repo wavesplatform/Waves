@@ -77,9 +77,7 @@ case class StateSnapshot(
           pbStatus,
           amount,
           sender.toByteString,
-          ByteString.copyFrom(recipient.asInstanceOf[Address].bytes),
-          sourceId.toByteString,
-          height
+          ByteString.copyFrom(recipient.asInstanceOf[Address].bytes)
         )
       }.toSeq,
       accountScripts.map { case (publicKey, scriptOpt) =>
@@ -184,8 +182,8 @@ object StateSnapshot {
               case _ =>
                 LeaseDetails.Status.Active
             },
-            ls.originTransactionId.toByteStr,
-            ls.height
+            sourceId = ByteStr.empty,
+            height = 0
           )
         )
         .toMap

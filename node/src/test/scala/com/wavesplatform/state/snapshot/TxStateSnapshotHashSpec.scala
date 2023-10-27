@@ -132,7 +132,12 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
         Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
           addr1PortfolioDiff.lease.out
         ),
-        Array(KeyType.LeaseStatus.id.toByte) ++ leaseId.arr ++ (if (leaseDetails.isActive) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.LeaseStatus.id.toByte)
+          ++ leaseId.arr
+          ++ (if (leaseDetails.isActive) Array(1: Byte) else Array(0: Byte))
+          ++ leaseDetails.sender.arr
+          ++ leaseDetails.recipient.bytes
+          ++ Longs.toByteArray(leaseDetails.amount),
         Array(KeyType.Sponsorship.id.toByte) ++ assetId1.id.arr ++ Longs.toByteArray(sponsorship.minFee),
         Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias1.name.getBytes(StandardCharsets.UTF_8),
         Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),

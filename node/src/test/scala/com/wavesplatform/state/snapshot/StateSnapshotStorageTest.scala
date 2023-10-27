@@ -175,7 +175,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             recipient     -> LeaseBalance(leaseTx.amount.value, 0)
           ),
           leaseStates = Map(
-            leaseTx.id() -> LeaseDetails(sender.publicKey, recipient, leaseTx.amount.value, Active, leaseTx.id(), d.solidStateHeight + 2)
+            leaseTx.id() -> LeaseDetails(sender.publicKey, recipient, leaseTx.amount.value, Active, ByteStr.empty, 0)
           )
         )
       )
@@ -198,8 +198,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
               recipient,
               leaseTx.amount.value,
               Cancelled(d.solidStateHeight + 2, Some(leaseCancelTx.id())),
-              leaseTx.id(),
-              d.solidStateHeight
+              ByteStr.empty,
+              0
             )
           )
         )
@@ -333,7 +333,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
           leaseStates = Map(
-            leaseId -> LeaseDetails(dAppPk, senderAddress, 123, Active, invokeId, height)
+            leaseId -> LeaseDetails(dAppPk, senderAddress, 123, Active, ByteStr.empty, 0)
           ),
           accountData = Map(
             dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))
