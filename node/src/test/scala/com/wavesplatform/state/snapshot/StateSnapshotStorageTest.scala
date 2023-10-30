@@ -197,7 +197,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
               sender.publicKey,
               recipient,
               leaseTx.amount.value,
-              Cancelled(d.solidStateHeight + 2, Some(leaseCancelTx.id())),
+              Cancelled(0, None),
               ByteStr.empty,
               0
             )

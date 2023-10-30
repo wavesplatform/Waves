@@ -65,7 +65,7 @@ class StateSnapshotProtoTest extends PropSpec {
           secondSigner.publicKey,
           defaultAddress,
           0,
-          Status.Cancelled(2, Some(ByteStr.fromBytes(5, 5, 5))),
+          Status.Cancelled(0, None),
           ByteStr.empty,
           0
         )
