@@ -75,12 +75,17 @@ object TxStateSnapshotHashBuilder {
     } addEntry(KeyType.AssetScript, asset.id.arr)(scriptInfo.script.bytes().arr)
 
     snapshot.leaseStates.foreach { case (leaseId, details) =>
-      addEntry(KeyType.LeaseStatus, leaseId.arr)(
-        booleanToBytes(details.isActive),
-        details.sender.arr,
-        details.recipient.bytes,
-        Longs.toByteArray(details.amount)
-      )
+      if (details.isActive)
+        addEntry(KeyType.LeaseStatus, leaseId.arr)(
+          booleanToBytes(true),
+          details.sender.arr,
+          details.recipient.bytes,
+          Longs.toByteArray(details.amount)
+        )
+      else
+        addEntry(KeyType.LeaseStatus, leaseId.arr)(
+          booleanToBytes(false)
+        )
     }
 
     snapshot.sponsorships.foreach { case (asset, sponsorship) =>
