@@ -13,7 +13,6 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
-import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -63,18 +62,10 @@ case class StateSnapshot(
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
         S.OrderFill(orderId.toByteString, volume, fee)
       }.toSeq,
-      leaseStates.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, sourceId, height)) =>
-        val pbStatus = status match {
-          case Status.Active =>
-            S.LeaseState.Status.Active(S.LeaseState.Active())
-          case Status.Cancelled(cancelHeight, txId) =>
-            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(cancelHeight, txId.fold(ByteString.EMPTY)(_.toByteString)))
-          case Status.Expired(expiredHeight) =>
-            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(expiredHeight))
-        }
+      leaseStates.map { case (leaseId, details @ LeaseDetails(sender, recipient, amount, _, _, _)) =>
         S.LeaseState(
           leaseId.toByteString,
-          pbStatus,
+          details.isActive,
           amount,
           sender.toByteString,
           ByteString.copyFrom(recipient.asInstanceOf[Address].bytes)
@@ -176,12 +167,10 @@ object StateSnapshot {
             ls.sender.toPublicKey,
             PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
             ls.amount,
-            ls.status match {
-              case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>
-                LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
-              case _ =>
-                LeaseDetails.Status.Active
-            },
+            if (ls.status)
+              LeaseDetails.Status.Active
+            else
+              LeaseDetails.Status.Cancelled(0, None),
             sourceId = ByteStr.empty,
             height = 0
           )
