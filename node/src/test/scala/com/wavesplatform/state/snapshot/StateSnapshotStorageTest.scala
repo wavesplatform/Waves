@@ -5,6 +5,7 @@ import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -194,9 +195,9 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           ),
           leaseStates = Map(
             leaseTx.id() -> LeaseDetails(
-              sender.publicKey,
-              recipient,
-              leaseTx.amount.value,
+              PublicKey(ByteStr.fill(KeyLength)(0)),
+              Address(Array.fill(Address.HashLength)(0)),
+              0,
               Cancelled(0, None),
               ByteStr.empty,
               0

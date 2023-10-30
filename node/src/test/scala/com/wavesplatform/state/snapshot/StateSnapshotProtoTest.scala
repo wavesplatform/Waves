@@ -1,9 +1,10 @@
 package com.wavesplatform.state.snapshot
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.Alias
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
@@ -62,8 +63,8 @@ class StateSnapshotProtoTest extends PropSpec {
       Map(
         ByteStr.fromBytes(4, 5, 6) -> LeaseDetails(defaultSigner.publicKey, secondAddress, 123, Status.Active, ByteStr.empty, 0),
         ByteStr.fromBytes(7, 8, 9) -> LeaseDetails(
-          secondSigner.publicKey,
-          defaultAddress,
+          PublicKey(ByteStr.fill(KeyLength)(0)),
+          Address(Array.fill(Address.HashLength)(0)),
           0,
           Status.Cancelled(0, None),
           ByteStr.empty,

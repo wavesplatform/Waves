@@ -3,16 +3,18 @@ import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
+import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -62,14 +64,14 @@ case class StateSnapshot(
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
         S.OrderFill(orderId.toByteString, volume, fee)
       }.toSeq,
-      leaseStates.map { case (leaseId, details @ LeaseDetails(sender, recipient, amount, _, _, _)) =>
-        S.LeaseState(
-          leaseId.toByteString,
-          details.isActive,
-          amount,
-          sender.toByteString,
-          ByteString.copyFrom(recipient.asInstanceOf[Address].bytes)
-        )
+      leaseStates.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, _, _)) =>
+        val pbStatus = status match {
+          case Status.Active =>
+            S.LeaseState.Status.Active(S.LeaseState.Active(amount, sender.toByteString, recipient.asInstanceOf[Address].toByteString))
+          case _: Status.Cancelled | _: Status.Expired =>
+            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled())
+        }
+        S.LeaseState(leaseId.toByteString, pbStatus)
       }.toSeq,
       accountScripts.map { case (publicKey, scriptOpt) =>
         scriptOpt.fold(
@@ -161,21 +163,28 @@ object StateSnapshot {
         .toMap
 
     val leaseStates: Map[ByteStr, LeaseDetails] =
-      pbSnapshot.leaseStates
-        .map(ls =>
-          ls.leaseId.toByteStr -> LeaseDetails(
-            ls.sender.toPublicKey,
-            PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
-            ls.amount,
-            if (ls.status)
-              LeaseDetails.Status.Active
-            else
+      pbSnapshot.leaseStates.map { ls =>
+        ls.status match {
+          case TransactionStateSnapshot.LeaseState.Status.Active(value) =>
+            ls.leaseId.toByteStr -> LeaseDetails(
+              value.sender.toPublicKey,
+              value.recipient.toAddress,
+              value.amount,
+              LeaseDetails.Status.Active,
+              sourceId = ByteStr.empty,
+              height = 0
+            )
+          case _: TransactionStateSnapshot.LeaseState.Status.Cancelled | TransactionStateSnapshot.LeaseState.Status.Empty =>
+            ls.leaseId.toByteStr -> LeaseDetails(
+              PublicKey(ByteStr.fill(KeyLength)(0)),
+              Address(Array.fill(Address.HashLength)(0)),
+              0,
               LeaseDetails.Status.Cancelled(0, None),
-            sourceId = ByteStr.empty,
-            height = 0
-          )
-        )
-        .toMap
+              sourceId = ByteStr.empty,
+              height = 0
+            )
+        }
+      }.toMap
 
     val aliases: Map[Alias, Address] =
       pbSnapshot.aliases
