@@ -1,5 +1,6 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
 import sbt.{Def, *}
+import scalapb.compiler.Version.scalapbVersion
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -140,13 +141,16 @@ object Dependencies {
     ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value ++ langCompilerPlugins.value
   )
 
-  lazy val scalapbRuntime = Def.setting {
-    val version = scalapb.compiler.Version.scalapbVersion
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.24.4"
+
+  lazy val scalapbRuntime = Def.setting(
     Seq(
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
+      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion).exclude(gProto.organization, gProto.name),
+      ("com.thesamet.scalapb" %%% "scalapb-runtime" % scalapbVersion % "protobuf").exclude(gProto.organization, gProto.name),
+      gProto,
+      gProto % "protobuf"
     )
-  }
+  )
 
   lazy val protobuf = Def.setting {
     scalapbRuntime.value :+ protoSchemasLib % "protobuf"
@@ -155,7 +159,7 @@ object Dependencies {
   lazy val grpc: Seq[ModuleID] = Seq(
     "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion,
     "io.grpc"               % "grpc-services"        % scalapb.compiler.Version.grpcJavaVersion,
-    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapbVersion,
     protoSchemasLib         % "protobuf"
   )
 
