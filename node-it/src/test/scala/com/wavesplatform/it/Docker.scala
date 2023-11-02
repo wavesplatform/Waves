@@ -263,7 +263,7 @@ class Docker(
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .exposedPorts(s"$internalDebuggerPort")
+        .exposedPorts(if (Try(nodeConfig.getBoolean("expose-bu-port")).getOrElse(false)) "6881" else s"$internalDebuggerPort")
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
         .env(envs*)
