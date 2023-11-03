@@ -263,7 +263,7 @@ class Docker(
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .exposedPorts(if (nodeConfig.getStringList("waves.extensions").contains("com.wavesplatform.events.BlockchainUpdates")) "6881" else s"$internalDebuggerPort")
+        .exposedPorts(if (Try(nodeConfig.getStringList("waves.extensions").contains("com.wavesplatform.events.BlockchainUpdates")).getOrElse(false)) "6881" else s"$internalDebuggerPort")
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
         .env(envs*)
