@@ -17,7 +17,6 @@ class GrpcReflectionApiSuite extends GrpcBaseTransactionSuite {
       .Builder(Default, 1, Seq())
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.extensions = [com.wavesplatform.api.grpc.GRPCServerExtension\ncom.wavesplatform.events.BlockchainUpdates]"))
-      .overrideBase(_.raw("expose-bu-port = true"))
       .buildNonConflicting()
 
   test("successful getServerReflectionInfo call for BU") {
