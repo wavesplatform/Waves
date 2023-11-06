@@ -199,14 +199,6 @@ object Keys {
       Some(cfh.handle)
     )
 
-  def blockTransactionsFee(height: Int): Key[Long] =
-    Key(
-      BlockTransactionsFee,
-      h(height),
-      Longs.fromByteArray,
-      Longs.toByteArray
-    )
-
   def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
     Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 
@@ -228,8 +220,6 @@ object Keys {
 
   def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
-
-  def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
 
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)

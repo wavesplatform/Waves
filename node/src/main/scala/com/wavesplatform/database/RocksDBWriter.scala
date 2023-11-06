@@ -768,7 +768,6 @@ class RocksDBWriter(
           blockHeightsToInvalidate.addOne(discardedMeta.id)
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockStateHash(currentHeight))
-          rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
 
           if (DisableHijackedAliases.height == currentHeight) {
