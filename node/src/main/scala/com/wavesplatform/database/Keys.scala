@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
@@ -128,8 +127,8 @@ object Keys {
   val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
   // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
-  def data(address: Address, key: String): Key[CurrentData] =
-    Key(Data, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
+  def data(addressId: AddressId, key: String): Key[CurrentData] =
+    Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
   def dataAt(addressId: AddressId, key: String)(height: Int): Key[DataNode] =
     Key(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataNode(key), writeDataNode)

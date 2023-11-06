@@ -7,10 +7,9 @@ import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftI
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.SnapshotBlockchain
@@ -119,11 +118,20 @@ object CommonAccountsApi {
         .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       rdb.db.resourceObservable.flatMap { dbResource =>
-        Observable
-          .fromIterator(
-            Task(new AddressDataIterator(dbResource, address, entriesFromDiff, pattern).asScala)
-          )
-          .filterNot(_.isEmpty)
+        dbResource.get(Keys.addressId(address)).fold(Observable.empty[DataEntry[?]]) { addressId =>
+          Observable
+            .fromIterator(
+              Task(
+                new AddressDataIterator(
+                  dbResource,
+                  addressId,
+                  entriesFromDiff,
+                  pattern
+                ).asScala
+              )
+            )
+            .filterNot(_.isEmpty)
+        }
       }
     }
 
@@ -207,11 +215,11 @@ object CommonAccountsApi {
 
   class AddressDataIterator(
       db: DBResource,
-      address: Address,
+      addressId: AddressId,
       entriesFromDiff: Array[DataEntry[?]],
       pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
-    val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
+    val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ addressId.toByteArray
 
     val length: Int = entriesFromDiff.length
 
@@ -220,7 +228,7 @@ object CommonAccountsApi {
     var nextIndex                         = 0
     var nextDbEntry: Option[DataEntry[?]] = None
 
-    def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
+    def matches(dataKey: String): Boolean = pattern.forall(_.matcher(dataKey).matches())
 
     final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
       nextDbEntry match {
@@ -244,10 +252,10 @@ object CommonAccountsApi {
           }
         case None =>
           if (dbIterator.isValid) {
-            val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
-            if (matches(key)) {
+            val dataKey = new String(dbIterator.key().drop(prefix.length), Charsets.UTF_8)
+            if (matches(dataKey)) {
               nextDbEntry = Option(dbIterator.value()).map { arr =>
-                Keys.data(address, key).parse(arr).entry
+                Keys.data(addressId, dataKey).parse(arr).entry
               }
             }
             dbIterator.next()

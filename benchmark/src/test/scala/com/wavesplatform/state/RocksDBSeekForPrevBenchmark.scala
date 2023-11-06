@@ -1,11 +1,7 @@
 package com.wavesplatform.state
 
-import java.nio.file.Files
-import java.util.concurrent.TimeUnit
-
 import com.google.common.primitives.{Bytes, Shorts}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.Address
 import com.wavesplatform.database.{
   AddressId,
   CurrentData,
@@ -23,6 +19,9 @@ import com.wavesplatform.state.RocksDBSeekForPrevBenchmark.*
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import org.rocksdb.{ReadOptions, WriteBatch, WriteOptions}
+
+import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -63,11 +62,10 @@ object RocksDBSeekForPrevBenchmark {
       RDB.open(wavesSettings.dbSettings.copy(directory = dir))
     }
 
-    val address: Address     = Address(Array.fill(20)(1.toByte))
     val addressId: AddressId = AddressId(1L)
 
     val keyString                          = "key"
-    val currentDataKey: Array[Byte]        = Keys.data(address, keyString).keyBytes
+    val currentDataKey: Array[Byte]        = Keys.data(addressId, keyString).keyBytes
     val dataNodeKey: Height => Array[Byte] = Keys.dataAt(addressId, "key")(_).keyBytes
     val dataNodeKeyPrefix: Array[Byte] = Bytes.concat(Shorts.toByteArray(KeyTags.DataHistory.id.toShort), addressId.toByteArray, keyString.getBytes)
 

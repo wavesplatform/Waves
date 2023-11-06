@@ -1,6 +1,5 @@
-import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
-import sbt.{Def, _}
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.*
+import sbt.{Def, *}
 
 //noinspection TypeAnnotation
 object Dependencies {
@@ -58,10 +57,10 @@ object Dependencies {
       shapeless.value,
       "org.typelevel" %%% "cats-mtl" % "1.3.0",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
+      googleGuava, // BaseEncoding.base16()
       curve25519,
       bouncyCastleProvider,
-      "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
-      "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
+      "com.wavesplatform" % "zwaves" % "0.2.1",
       web3jModule("crypto")
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
@@ -97,6 +96,7 @@ object Dependencies {
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.8.0",
       "org.apache.commons"   % "commons-lang3"            % "3.12.0",
+      "org.apache.commons"   % "commons-math3"            % "3.6.1", // TODO
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.3" % Runtime,
       kamonCore,

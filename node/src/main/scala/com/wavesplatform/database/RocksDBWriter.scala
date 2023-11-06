@@ -7,8 +7,8 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
-import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
@@ -17,8 +17,7 @@ import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, Bl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
+import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
@@ -165,7 +164,9 @@ class RocksDBWriter(
   override def carryFee(refId: Option[ByteStr]): Long = writableDB.get(Keys.carryFee(height))
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
-    writableDB.get(Keys.data(address, key))
+    addressId(address).fold(CurrentData.empty(key)) { addressId =>
+      writableDB.get(Keys.data(addressId, key))
+    }
 
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
@@ -345,7 +346,7 @@ class RocksDBWriter(
       val addressId = addressIdWithFallback(address, newAddresses)
       changedKeys.put(addressId, key)
 
-      val kdh = Keys.data(address, key)
+      val kdh = Keys.data(addressId, key)
       rw.put(kdh, currentData)
       rw.put(Keys.dataAt(addressId, key)(height), dataNode)
     }
@@ -673,7 +674,7 @@ class RocksDBWriter(
               accountDataToInvalidate += (address -> k)
 
               rw.delete(Keys.dataAt(addressId, k)(currentHeight))
-              rollbackDataHistory(rw, Keys.data(address, k), Keys.dataAt(addressId, k)(_), currentHeight)
+              rollbackDataHistory(rw, Keys.data(addressId, k), Keys.dataAt(addressId, k)(_), currentHeight)
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
