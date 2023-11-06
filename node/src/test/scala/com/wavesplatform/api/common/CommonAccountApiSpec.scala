@@ -35,8 +35,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
       val data5   = data(acc, Seq(EmptyDataEntry("test2"), entry1, entry2), version = V2)
 
       withDomain(RideV4) { d =>
-        val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
-        def dataList(): Set[DataEntry[?]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
+        def dataList(): Set[DataEntry[?]] = d.accountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
         d.appendBlock(genesis)
         d.appendMicroBlock(data1)
@@ -71,8 +70,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
 
       forAll(preconditions) { case (acc, block1, mb1, block2, mb2) =>
         withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-          val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
-          def dataList(): Set[DataEntry[?]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
+          def dataList(): Set[DataEntry[?]] = d.accountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
           d.appendBlock(block1)
           dataList() shouldBe empty
@@ -145,7 +143,6 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           invoke
         )
 
-        val api = CommonAccountsApi(() => d.blockchain.snapshotBlockchain, d.rdb, d.blockchain)
         val leaseId = Lease.calculateId(
           Lease(
             Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),
@@ -154,7 +151,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           ),
           invoke.id()
         )
-        api.leaseInfo(leaseId) shouldBe Some(
+        d.accountsApi.leaseInfo(leaseId) shouldBe Some(
           LeaseInfo(leaseId, invoke.id(), TxHelpers.secondAddress, TxHelpers.defaultAddress, 1, 2, LeaseInfo.Status.Active)
         )
       }

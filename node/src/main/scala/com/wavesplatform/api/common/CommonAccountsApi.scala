@@ -118,7 +118,7 @@ object CommonAccountsApi {
         .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       rdb.db.resourceObservable.flatMap { dbResource =>
-        dbResource.get(Keys.addressId(address)).fold(Observable.empty[DataEntry[?]]) { addressId =>
+        dbResource.get(Keys.addressId(address)).fold(Observable.fromIterable(entriesFromDiff)) { addressId =>
           Observable
             .fromIterator(
               Task(
