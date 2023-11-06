@@ -13,7 +13,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
@@ -207,6 +207,7 @@ abstract class Caches extends Blockchain with Storage {
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
+      computedBlockStateHash: ByteStr,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -217,7 +218,15 @@ abstract class Caches extends Blockchain with Storage {
       stateHash: StateHashBuilder.Result
   ): Unit
 
-  override def append(snapshot: StateSnapshot, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
+  override def append(
+      snapshot: StateSnapshot,
+      carryFee: Long,
+      totalFee: Long,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      computedBlockStateHash: ByteStr,
+      block: Block
+  ): Unit = {
     val newHeight = current.height + 1
     val newScore  = block.blockScore() + current.score
     val newMeta = PBBlockMeta(
@@ -309,7 +318,8 @@ abstract class Caches extends Blockchain with Storage {
     for (((address, _), (entry, _)) <- updatedDataWithNodes) stateHash.addDataEntry(address, entry.entry)
     for ((address, lease)           <- leaseBalances) stateHash.addLeaseBalance(address, lease.in, lease.out)
     for ((address, script)          <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
-    for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, script.map(_.script))
+    for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, Some(script.script))
+    for ((asset, _)                 <- snapshot.assetStatics) if (!snapshot.assetScripts.contains(asset)) stateHash.addAssetScript(asset, None)
     for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
     for ((assetId, sponsorship)     <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address)           <- snapshot.aliases) stateHash.addAlias(address, alias.name)
@@ -318,6 +328,7 @@ abstract class Caches extends Blockchain with Storage {
       newMeta,
       snapshot,
       carryFee,
+      computedBlockStateHash,
       newAddressIds,
       VectorMap() ++ updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
       leaseBalancesWithNodes.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
@@ -342,13 +353,13 @@ abstract class Caches extends Blockchain with Storage {
     for ((alias, address)                    <- snapshot.aliases) aliasCache.put(Alias.create(alias.name).explicitGet(), Some(address))
     leaseBalanceCache.putAll(leaseBalances.asJava)
     scriptCache.putAll(snapshot.accountScriptsByAddress.asJava)
-    assetScriptCache.putAll(snapshot.assetScripts.asJava)
+    assetScriptCache.putAll(snapshot.assetScripts.view.mapValues(Some(_)).toMap.asJava)
     accountDataCache.putAll(updatedDataWithNodes.map { case (key, (value, _)) => (key, value) }.asJava)
   }
 
-  protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
+  protected def doRollback(targetHeight: Int): DiscardedBlocks
 
-  override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr)]] = {
+  override def rollbackTo(height: Int): Either[String, DiscardedBlocks] = {
     for {
       _ <- Either
         .cond(

@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.Block
+import com.google.common.cache.{Cache, CacheBuilder}
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -18,36 +19,45 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 
-case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block]) {
+case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block], snapshots: Map[BlockId, BlockSnapshot]) {
   override def toString: String = s"ExtensionBlocks($remoteScore, ${formatSignatures(blocks.map(_.id()))}"
 }
 
 object RxExtensionLoader extends ScorexLogging {
 
   type ApplyExtensionResult = Either[ValidationError, Option[BigInt]]
+  private val dummy = new Object()
 
   def apply(
       syncTimeOut: FiniteDuration,
+      processedBlocksCacheTimeout: FiniteDuration,
+      isLightMode: Boolean,
       lastBlockIds: Coeval[Seq[ByteStr]],
       peerDatabase: PeerDatabase,
       invalidBlocks: InvalidBlockStorage,
       blocks: Observable[(Channel, Block)],
       signatures: Observable[(Channel, Signatures)],
+      snapshots: Observable[(Channel, BlockSnapshot)],
       syncWithChannelClosed: Observable[ChannelClosedAndSyncWith],
       scheduler: SchedulerService,
       timeoutSubject: Subject[Channel, Channel]
   )(
       extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult]
-  ): (Observable[(Channel, Block)], Coeval[State], RxExtensionLoaderShutdownHook) = {
+  ): (Observable[(Channel, Block, Option[BlockSnapshot])], Coeval[State], RxExtensionLoaderShutdownHook) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
     val extensions: ConcurrentSubject[(Channel, ExtensionBlocks), (Channel, ExtensionBlocks)] = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
-    val simpleBlocks: ConcurrentSubject[(Channel, Block), (Channel, Block)]                   = ConcurrentSubject.publish[(Channel, Block)]
-    @volatile var stateValue: State                                                           = State(LoaderState.Idle, ApplierState.Idle)
-    val lastSyncWith: Coeval[Option[SyncWith]]                                                = lastObserved(syncWithChannelClosed.map(_.syncWith))
+    val simpleBlocksWithSnapshot: ConcurrentSubject[(Channel, Block, Option[BlockSnapshot]), (Channel, Block, Option[BlockSnapshot])] =
+      ConcurrentSubject.publish[(Channel, Block, Option[BlockSnapshot])]
+    @volatile var stateValue: State            = State(LoaderState.Idle, ApplierState.Idle)
+    val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
+
+    val pendingBlocks     = cache[(Channel, BlockId), Block](syncTimeOut)
+    val receivedSnapshots = cache[BlockId, Object](processedBlocksCacheTimeout)
 
     def scheduleBlacklist(ch: Channel, reason: String): Task[Unit] =
       Task {
@@ -134,9 +144,22 @@ object RxExtensionLoader extends ScorexLogging {
               } else {
                 log.trace(s"${id(ch)} Requesting ${unknown.size} blocks")
                 val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsyncLogErr
-                unknown.foreach(s => ch.write(GetBlock(s)))
+                unknown.foreach { s =>
+                  ch.write(GetBlock(s))
+                  if (isLightMode) ch.write(GetSnapshot(s))
+                }
                 ch.flush()
-                state.withLoaderState(LoaderState.ExpectingBlocks(c, unknown, unknown.toSet, Set.empty, blacklistingAsync))
+                state.withLoaderState(
+                  LoaderState.ExpectingBlocksWithSnapshots(
+                    c,
+                    unknown,
+                    unknown.toSet,
+                    Set.empty,
+                    if (isLightMode) unknown.toSet else Set.empty,
+                    Map.empty,
+                    blacklistingAsync
+                  )
+                )
               }
           }
         case _ =>
@@ -147,29 +170,104 @@ object RxExtensionLoader extends ScorexLogging {
 
     def onBlock(state: State, ch: Channel, block: Block): State = {
       state.loaderState match {
-        case LoaderState.ExpectingBlocks(c, requested, expected, recieved, _) if c.channel == ch && expected.contains(block.id()) =>
+        case LoaderState.ExpectingBlocksWithSnapshots(c, requested, expectedBlocks, receivedBlocks, expectedSnapshots, receivedSnapshots, _)
+            if c.channel == ch && expectedBlocks.contains(block.id()) =>
+          val updatedExpectedBlocks = expectedBlocks - block.id()
+
           BlockStats.received(block, BlockStats.Source.Ext, ch)
           ParSignatureChecker.checkBlockSignature(block)
-          if (expected == Set(block.id())) {
-            val blockById = (recieved + block).map(b => b.id() -> b).toMap
-            val ext       = ExtensionBlocks(c.score, requested.map(blockById))
+
+          if (updatedExpectedBlocks.isEmpty && expectedSnapshots.isEmpty) {
+            val blockById = (receivedBlocks + block).map(b => b.id() -> b).toMap
+            val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots)
             log.debug(s"${id(ch)} $ext successfully received")
             extensionLoadingFinished(state.withIdleLoader, ext, ch)
           } else {
             val blacklistAsync = scheduleBlacklist(
               ch,
-              s"Timeout loading one of requested blocks, non-received: ${
-                val totalleft = expected.size - 1
-                if (totalleft == 1) "one=" + requested.last.trim
-                else "total=" + totalleft.toString
-              }"
+              timeoutMsg(isLightMode, updatedExpectedBlocks.size, expectedSnapshots.size, requested)
             ).runAsyncLogErr
-            state.withLoaderState(LoaderState.ExpectingBlocks(c, requested, expected - block.id(), recieved + block, blacklistAsync))
+
+            state.withLoaderState(
+              LoaderState.ExpectingBlocksWithSnapshots(
+                c,
+                requested,
+                updatedExpectedBlocks,
+                receivedBlocks + block,
+                expectedSnapshots,
+                receivedSnapshots,
+                blacklistAsync
+              )
+            )
           }
         case _ =>
-          simpleBlocks.onNext((ch, block))
+          BlockStats.received(block, BlockStats.Source.Broadcast, ch)
+          if (!isLightMode || block.transactionData.isEmpty) {
+            simpleBlocksWithSnapshot.onNext((ch, block, None))
+          } else {
+            val blockId = block.id()
+            if (Option(receivedSnapshots.getIfPresent(blockId)).isEmpty) {
+              pendingBlocks.put((ch, blockId), block)
+              ch.writeAndFlush(GetSnapshot(blockId))
+            }
+          }
           state
+      }
+    }
 
+    def onSnapshot(state: State, ch: Channel, snapshot: BlockSnapshot): State = {
+      if (isLightMode) {
+        state.loaderState match {
+          case LoaderState.ExpectingBlocksWithSnapshots(c, requested, expectedBlocks, receivedBlocks, expectedSnapshots, receivedSnapshots, _)
+              if c.channel == ch && expectedSnapshots.contains(snapshot.blockId) =>
+            val updatedExpectedSnapshots = expectedSnapshots - snapshot.blockId
+
+            BlockStats.received(snapshot, BlockStats.Source.Ext, ch)
+
+            if (updatedExpectedSnapshots.isEmpty && expectedBlocks.isEmpty) {
+              val blockById = receivedBlocks.map(b => b.id() -> b).toMap
+              val ext       = ExtensionBlocks(c.score, requested.map(blockById), receivedSnapshots.updated(snapshot.blockId, snapshot))
+              log.debug(s"${id(ch)} $ext successfully received")
+              extensionLoadingFinished(state.withIdleLoader, ext, ch)
+            } else {
+              val blacklistAsync = scheduleBlacklist(
+                ch,
+                timeoutMsg(isLightMode, expectedBlocks.size, updatedExpectedSnapshots.size, requested)
+              ).runAsyncLogErr
+              state.withLoaderState(
+                LoaderState.ExpectingBlocksWithSnapshots(
+                  c,
+                  requested,
+                  expectedBlocks,
+                  receivedBlocks,
+                  updatedExpectedSnapshots,
+                  receivedSnapshots.updated(snapshot.blockId, snapshot),
+                  blacklistAsync
+                )
+              )
+            }
+          case _ =>
+            BlockStats.received(snapshot, BlockStats.Source.Broadcast, ch)
+            Option(receivedSnapshots.getIfPresent(snapshot.blockId)) match {
+              case Some(_) =>
+                pendingBlocks.invalidate(snapshot.blockId)
+                log.trace(s"${id(ch)} Received snapshot for processed block ${snapshot.blockId}, ignoring at $state")
+              case _ =>
+                Option(pendingBlocks.getIfPresent((ch, snapshot.blockId))) match {
+                  case Some(block) =>
+                    simpleBlocksWithSnapshot.onNext((ch, block, Some(snapshot)))
+                    receivedSnapshots.put(snapshot.blockId, dummy)
+                    pendingBlocks.invalidate(snapshot.blockId)
+                  case None =>
+                    log.trace(s"${id(ch)} Received unexpected snapshot ${snapshot.blockId}, ignoring at $state")
+                }
+            }
+
+            state
+        }
+      } else {
+        log.trace(s"${id(ch)} Received unexpected snapshot ${snapshot.blockId}, ignoring at $state")
+        state
       }
     }
 
@@ -228,6 +326,7 @@ object RxExtensionLoader extends ScorexLogging {
     Observable(
       signatures.observeOn(scheduler).map { case (ch, sigs) => stateValue = onNewSignatures(stateValue, ch, sigs) },
       blocks.observeOn(scheduler).map { case (ch, block) => stateValue = onBlock(stateValue, ch, block) },
+      snapshots.observeOn(scheduler).map { case (ch, snapshot) => stateValue = onSnapshot(stateValue, ch, snapshot) },
       syncWithChannelClosed.observeOn(scheduler).map { ch =>
         stateValue = onNewSyncWithChannelClosed(stateValue, ch)
       },
@@ -239,8 +338,24 @@ object RxExtensionLoader extends ScorexLogging {
       .logErr
       .subscribe()
 
-    (simpleBlocks, Coeval.eval(stateValue), RxExtensionLoaderShutdownHook(extensions, simpleBlocks))
+    (simpleBlocksWithSnapshot, Coeval.eval(stateValue), RxExtensionLoaderShutdownHook(extensions, simpleBlocksWithSnapshot))
   }
+
+  private def timeoutMsg(isLightMode: Boolean, totalLeftBlocks: Int, totalLeftSnapshots: Int, requested: Seq[BlockId]): String = {
+    val snapshotShortMsg = if (isLightMode) " or snapshots" else ""
+    val snapshotsInfo =
+      if (isLightMode)
+        s", non-received snapshots: ${if (totalLeftSnapshots == 1) s"one=${requested.last.trim}" else s"total=$totalLeftSnapshots"}"
+      else ""
+    s"Timeout loading one of requested blocks$snapshotShortMsg, non-received blocks: ${if (totalLeftBlocks == 1) s"one=${requested.last.trim}"
+    else s"total=$totalLeftBlocks"}$snapshotsInfo"
+  }
+
+  private def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
+    CacheBuilder
+      .newBuilder()
+      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .build[K, V]()
 
   sealed trait LoaderState
 
@@ -257,24 +372,29 @@ object RxExtensionLoader extends ScorexLogging {
       override def toString: String = s"ExpectingSignatures($channel)"
     }
 
-    case class ExpectingBlocks(
+    case class ExpectingBlocksWithSnapshots(
         channel: BestChannel,
         allBlocks: Seq[BlockId],
-        expected: Set[BlockId],
-        received: Set[Block],
+        expectedBlocks: Set[BlockId],
+        receivedBlocks: Set[Block],
+        expectedSnapshots: Set[BlockId],
+        receivedSnapshots: Map[BlockId, BlockSnapshot],
         timeout: CancelableFuture[Unit]
     ) extends WithPeer {
       override def toString: String =
-        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${received.size},expected=${if (expected.size == 1) expected.head.trim
-        else expected.size})"
+        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${receivedBlocks.size},expected=${if (expectedBlocks.size == 1) expectedBlocks.head.trim
+        else expectedBlocks.size})"
     }
 
   }
 
-  case class RxExtensionLoaderShutdownHook(extensionChannel: Observer[(Channel, ExtensionBlocks)], simpleBlocksChannel: Observer[(Channel, Block)]) {
+  case class RxExtensionLoaderShutdownHook(
+      extensionChannel: Observer[(Channel, ExtensionBlocks)],
+      simpleBlocksWithSnapshotChannel: Observer[(Channel, Block, Option[BlockSnapshot])]
+  ) {
     def shutdown(): Unit = {
       extensionChannel.onComplete()
-      simpleBlocksChannel.onComplete()
+      simpleBlocksWithSnapshotChannel.onComplete()
     }
   }
 

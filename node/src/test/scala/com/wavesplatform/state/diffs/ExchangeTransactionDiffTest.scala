@@ -336,7 +336,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
-        totalPortfolioDiff.assets.values.toSet should (be (Set()) or be (Set(0)))
+        totalPortfolioDiff.assets.values.toSet should (be(Set()) or be(Set(0)))
 
         blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
       }
@@ -1799,7 +1799,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         d.appendBlock(Seq(tradeableAssetIssue, feeAssetIssue).distinct*)
         val newBlock = d.createBlock(2.toByte, Seq(exchange))
         val diff = BlockDiffer
-          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
+          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, None, MiningConstraint.Unlimited, newBlock.header.generationSignature)
           .explicitGet()
         diff.snapshot.scriptsComplexity shouldBe complexity
 
@@ -1999,12 +1999,12 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property(s"NODE-970. Non-empty attachment field is allowed only after ${BlockchainFeatures.TransactionStateSnapshot.description} activation") {
+  property(s"NODE-970. Non-empty attachment field is allowed only after ${BlockchainFeatures.LightNode.description} activation") {
     val matcher = TxHelpers.defaultSigner
     val issuer  = TxHelpers.secondSigner
 
     withDomain(
-      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 4),
+      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.LightNode -> 4),
       AddrWithBalance.enoughBalances(matcher, issuer)
     ) { d =>
       val issue = TxHelpers.issue(issuer)
@@ -2018,7 +2018,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       d.appendBlock(issue)
       d.appendBlockE(exchange()) should produce("Attachment field for orders is not supported yet")
       d.appendBlock()
-      d.appendBlockENoCheck(exchange()) should beRight
+      d.appendBlockE(exchange()) should beRight
     }
   }
 

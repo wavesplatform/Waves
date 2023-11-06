@@ -28,7 +28,7 @@ case class StateSnapshot(
     assetStatics: VectorMap[IssuedAsset, AssetStatic] = VectorMap(),
     assetVolumes: Map[IssuedAsset, AssetVolumeInfo] = Map(),
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
-    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map(),
+    assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
     sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
     leaseStates: Map[ByteStr, LeaseDetails] = Map(),
     aliases: Map[Alias, Address] = Map(),
@@ -57,7 +57,7 @@ case class StateSnapshot(
         S.AssetNameAndDescription(asset.id.toByteString, info.name.toStringUtf8, info.description.toStringUtf8, info.lastUpdatedAt)
       }.toSeq,
       assetScripts.map { case (asset, script) =>
-        S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString))
+        S.AssetScript(asset.id.toByteString, script.script.bytes().toByteString)
       }.toSeq,
       aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.toSeq,
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
@@ -125,7 +125,7 @@ case class StateSnapshot(
 
   def bindElidedTransaction(blockchain: Blockchain, tx: Transaction): StateSnapshot =
     copy(
-      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, this, blockchain))
+      transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, StateSnapshot.empty, blockchain))
     )
 
   lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStatic, Int)] =
@@ -148,14 +148,9 @@ object StateSnapshot {
         .map(b => b.address.toAddress -> LeaseBalance(b.in, b.out))
         .toMap
 
-    val assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] =
+    val assetScripts: Map[IssuedAsset, AssetScriptInfo] =
       pbSnapshot.assetScripts.map { s =>
-        val info =
-          if (s.script.isEmpty)
-            None
-          else
-            Some(AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), 0))
-        s.assetId.toIssuedAssetId -> info
+        s.assetId.toIssuedAssetId -> AssetScriptInfo(ScriptReader.fromBytes(s.script.toByteArray).explicitGet(), 0)
       }.toMap
 
     val assetStatics: VectorMap[IssuedAsset, AssetStatic] =
@@ -257,7 +252,7 @@ object StateSnapshot {
       orderFills: Map[ByteStr, VolumeAndFee] = Map(),
       issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] = VectorMap(),
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map(),
+      assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
       leaseStates: Map[ByteStr, LeaseDetails] = Map(),
       aliases: Map[Alias, Address] = Map(),

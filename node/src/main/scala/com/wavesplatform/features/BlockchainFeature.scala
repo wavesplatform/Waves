@@ -25,7 +25,7 @@ object BlockchainFeatures {
   val BlockRewardDistribution         = BlockchainFeature(19, "Block Reward Distribution")
   val CappedReward                    = BlockchainFeature(20, "Capped XTN buy-back & DAO amounts")
   val CeaseXtnBuyback                 = BlockchainFeature(21, "Cease XTN buy-back")
-  val TransactionStateSnapshot        = BlockchainFeature(22, "Transaction State Snapshot")
+  val LightNode                       = BlockchainFeature(22, "Light Node")
 
   // Not exposed
   val ContinuationTransaction = BlockchainFeature(23, "Continuation Transaction")
@@ -56,7 +56,7 @@ object BlockchainFeatures {
     BlockRewardDistribution,
     CappedReward,
     CeaseXtnBuyback,
-    TransactionStateSnapshot
+    LightNode
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

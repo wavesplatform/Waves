@@ -589,8 +589,7 @@ object InvokeDiffsCommon {
           StateSnapshot.build(
             blockchain,
             portfolios = Map(pk.toAddress -> Portfolio(assets = VectorMap(asset -> issue.quantity))),
-            issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
-            assetScripts = Map(asset -> None)
+            issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo))
           )
         }
       }

@@ -12,7 +12,7 @@ object TestStorageFactory {
       time: Time,
       blockchainUpdateTriggers: BlockchainUpdateTriggers
   ): (BlockchainUpdaterImpl, RocksDBWriter) = {
-    val rocksDBWriter: RocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, 100)
+    val rocksDBWriter: RocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode, 100)
     (
       new BlockchainUpdaterImpl(rocksDBWriter, settings, time, blockchainUpdateTriggers, loadActiveLeases(rdb, _, _)),
       rocksDBWriter
