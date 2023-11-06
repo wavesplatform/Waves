@@ -24,7 +24,7 @@ class RideVersionDeactivationTest extends PropSpec with WithDomain {
 
   property(s"RIDE V1, V2, V3 are forbidden after TransactionStateSnapshot") {
     withDomain(
-      TransactionStateSnapshot.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 4),
+      TransactionStateSnapshot.setFeaturesHeight(BlockchainFeatures.LightNode -> 4),
       AddrWithBalance.enoughBalances(defaultSigner)
     ) { d =>
       val issueTx = issue(script = Some(verifier(V7)))

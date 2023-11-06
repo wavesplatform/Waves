@@ -498,7 +498,7 @@ object BlockDiffer {
   ): TracedResult[ValidationError, Unit] =
     TracedResult(
       Either.cond(
-        !blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot) || blockStateHash.contains(computedStateHash),
+        !blockchain.isFeatureActivated(BlockchainFeatures.LightNode) || blockStateHash.contains(computedStateHash),
         (),
         InvalidStateHash(blockStateHash)
       )

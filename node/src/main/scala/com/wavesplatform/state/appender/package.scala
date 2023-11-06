@@ -180,7 +180,7 @@ package object appender {
   private def validateChallengedHeader(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     for {
       _ <- Either.cond(
-        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchain.height + 1),
+        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.LightNode, blockchain.height + 1),
         (),
         BlockAppendError("Challenged header is not supported yet", block)
       )
@@ -193,7 +193,7 @@ package object appender {
 
   private def validateStateHash(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     Either.cond(
-      block.header.stateHash.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot, blockchain.height + 1),
+      block.header.stateHash.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.LightNode, blockchain.height + 1),
       (),
       BlockAppendError("Block state hash is not supported yet", block)
     )

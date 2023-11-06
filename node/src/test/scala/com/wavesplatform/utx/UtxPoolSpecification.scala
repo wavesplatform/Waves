@@ -97,7 +97,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           .genesis(
             genesisSettings,
             bcu.isFeatureActivated(BlockchainFeatures.RideV6),
-            bcu.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot)
+            bcu.isFeatureActivated(BlockchainFeatures.LightNode)
           )
           .explicitGet()
       ) should beRight

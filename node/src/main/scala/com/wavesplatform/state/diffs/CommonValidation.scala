@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.features.BlockchainFeatures.TransactionStateSnapshot
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.OverdraftValidationProvider.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
 import com.wavesplatform.lang.ValidationError
@@ -146,8 +146,8 @@ object CommonValidation {
       }
 
       def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {
-        case V1 | V2 | V3 if blockchain.isFeatureActivated(TransactionStateSnapshot) =>
-          Left(ActivationError(s"Script version below V4 is not allowed after ${TransactionStateSnapshot.description} feature activation"))
+        case V1 | V2 | V3 if blockchain.isFeatureActivated(LightNode) =>
+          Left(ActivationError(s"Script version below V4 is not allowed after ${LightNode.description} feature activation"))
         case _ =>
           Right(())
       }
@@ -172,7 +172,7 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
-      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) && blockchain.isFeatureActivated(TransactionStateSnapshot) =>
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case p: PBSince if p.isProtobufVersion =>
