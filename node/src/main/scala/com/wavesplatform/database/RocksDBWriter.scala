@@ -4,7 +4,6 @@ import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
-import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
@@ -410,6 +409,7 @@ class RocksDBWriter(
 
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
+        deleteOldRecords(Height(math.max(1, newSafeRollbackHeight - 1)), rw)
       }
 
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
@@ -630,6 +630,47 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
+  private def deleteOldRecords(height: Height, rw: RW): Unit = {
+    val changedAddressesKey = Keys.changedAddresses(height)
+
+    rw.get(changedAddressesKey).foreach { addressId =>
+      // WAVES balances
+      val wavesBalanceAtKey = Keys.wavesBalanceAt(addressId, height)
+      val wavesBalanceAt    = rw.get(wavesBalanceAtKey)
+
+      // DB won't complain about a non-existed key with height = 0
+      rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
+      rw.delete(wavesBalanceAtKey)
+
+      // Account data
+      val changedDataKeysAtKey = Keys.changedDataKeys(height, addressId)
+      rw.get(changedDataKeysAtKey).foreach { accountDataKey =>
+        val dataKeyAtKey = Keys.dataAt(addressId, accountDataKey)(height)
+        val dataKeyAt    = rw.get(dataKeyAtKey)
+
+        rw.delete(Keys.dataAt(addressId, accountDataKey)(dataKeyAt.prevHeight))
+        rw.delete(dataKeyAtKey)
+      }
+      rw.delete(changedDataKeysAtKey)
+    }
+
+    rw.delete(changedAddressesKey)
+
+    // Asset balances
+    rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(height)) { e =>
+      val asset              = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
+      val changedBalancesKey = Keys.changedBalances(height, asset)
+      rw.get(changedBalancesKey).foreach { addressId =>
+        val assetBalanceAtKey = Keys.assetBalanceAt(addressId, asset, height)
+        val assetBalanceAt    = rw.get(assetBalanceAtKey)
+
+        rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
+        rw.delete(assetBalanceAtKey)
+      }
+      rw.delete(changedBalancesKey)
+    }
+  }
+
   override protected def doRollback(targetHeight: Int): DiscardedBlocks = {
     val targetBlockId = readOnly(_.get(Keys.blockMetaAt(Height @@ targetHeight)))
       .map(_.id)
@@ -660,8 +701,8 @@ class RocksDBWriter(
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
-          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
-            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
+          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(currentHeight)) { e =>
+            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
             for ((addressId, address) <- changedAddresses) {
               balancesToInvalidate += address -> assetId
               rollbackBalanceHistory(rw, Keys.assetBalance(addressId, assetId), Keys.assetBalanceAt(addressId, assetId, _), currentHeight)
