@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.google.common.math.StatsAccumulator
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
@@ -96,19 +96,21 @@ object Explorer extends ScorexLogging {
 
       flag match {
         case "WB" =>
-          val balances = mutable.Map[BigInt, Long]()
+          var accountsBaseTotalBalance = 0L
           rdb.db.iterateOver(KeyTags.WavesBalance) { e =>
-            val addressId = BigInt(e.getKey.drop(6))
-            val balance   = Longs.fromByteArray(e.getValue)
-            balances += (addressId -> balance)
+            val addressId = AddressId(Longs.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+            val key       = Keys.wavesBalance(addressId)
+            accountsBaseTotalBalance += key.parse(e.getValue).balance
           }
 
           var actualTotalReward = 0L
-          rdb.db.iterateOver(KeyTags.BlockReward) { e =>
-            actualTotalReward += Longs.fromByteArray(e.getValue)
+          rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+            val height = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+            val key    = Keys.blockMetaAt(height)
+            actualTotalReward += key.parse(e.getKey).fold(0L)(_.reward)
           }
 
-          val actualTotalBalance   = balances.values.sum + reader.carryFee(None)
+          val actualTotalBalance   = accountsBaseTotalBalance + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
           val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 

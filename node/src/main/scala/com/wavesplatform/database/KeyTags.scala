@@ -44,7 +44,6 @@ object KeyTags extends Enumeration {
   AddressTransactionHeightTypeAndNums,
   TransactionMetaById,
   InvokeScriptResult,
-  BlockReward,
   DisabledAliases,
   AssetStaticInfo,
   NftCount,
