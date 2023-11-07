@@ -5,10 +5,10 @@ import java.nio.charset.StandardCharsets.UTF_8
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.serialization._
+import com.wavesplatform.serialization.*
 import com.wavesplatform.state.DataEntry.Type
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, PBSince, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import play.api.libs.json.{JsObject, Json}
 
@@ -51,7 +51,7 @@ object DataTxSerializer {
   }
 
   def toBytes(tx: DataTransaction): Array[Byte] =
-    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    if (PBSince.affects(tx)) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {

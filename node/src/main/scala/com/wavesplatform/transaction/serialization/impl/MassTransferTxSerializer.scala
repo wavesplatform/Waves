@@ -4,8 +4,8 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.{TxNonNegativeAmount, TxPositiveAmount, TxVersion}
+import com.wavesplatform.serialization.*
+import com.wavesplatform.transaction.{PBSince, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.utils.byteStrFormat
@@ -51,7 +51,7 @@ object MassTransferTxSerializer {
   }
 
   def toBytes(tx: MassTransferTransaction): Array[Byte] =
-    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    if (PBSince.affects(tx)) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
 
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {

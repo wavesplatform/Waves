@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.nio.ByteBuffer
-import java.util
-import java.util.Map as JMap
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -28,15 +25,7 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{
-  EthereumTransaction,
-  GenesisTransaction,
-  PBSince,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers,
-  TxValidationError
-}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError, VersionedTransaction}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -44,6 +33,9 @@ import org.rocksdb.*
 import sun.nio.ch.Util
 import supertagged.TaggedType
 
+import java.nio.ByteBuffer
+import java.util
+import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
@@ -645,11 +637,11 @@ package object database {
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case lps: PBSince with VersionedTransaction if !PBSince.affects(lps) => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: GenesisTransaction                                           => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: PaymentTransaction                                           => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case et: EthereumTransaction                                         => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                               => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }

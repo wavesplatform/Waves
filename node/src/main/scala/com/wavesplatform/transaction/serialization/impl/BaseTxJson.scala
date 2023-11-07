@@ -15,12 +15,12 @@ object BaseTxJson {
       case v: VersionedTransaction => Json.obj("version" -> v.version)
       case _                       => Json.obj()
     }) ++ (tx match {
-      case pbs: PBSince if pbs.isProtobufVersion => Json.obj("chainId" -> tx.chainId)
-      case _                                     => Json.obj()
+      case pbs: PBSince with VersionedTransaction if PBSince.affects(pbs) => Json.obj("chainId" -> tx.chainId)
+      case _                                                              => Json.obj()
     }) ++ (tx match {
       case p: ProvenTransaction =>
         Json.obj(
-          "sender"   -> p.sender.toAddress(p.chainId),
+          "sender"          -> p.sender.toAddress(p.chainId),
           "senderPublicKey" -> p.sender,
           "proofs"          -> JsArray(p.proofs.proofs.map(p => JsString(p.toString)))
         ) ++ (tx match {

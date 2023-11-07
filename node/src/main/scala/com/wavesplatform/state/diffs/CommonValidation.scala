@@ -185,7 +185,7 @@ object CommonValidation {
       case v: VersionedTransaction if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
-      case p: PBSince if p.isProtobufVersion =>
+      case p: PBSince with VersionedTransaction if PBSince.affects(p) =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
       case v: VersionedTransaction if !versionIsCorrect(v) =>

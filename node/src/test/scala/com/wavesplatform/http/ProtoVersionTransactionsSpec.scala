@@ -158,9 +158,9 @@ class ProtoVersionTransactionsSpec
       (reissueTx.json() \ "chainId").asOpt[Byte].value shouldBe reissueTx.chainId
       (burnTx.json() \ "chainId").asOpt[Byte].value shouldBe burnTx.chainId
 
-      issueTx.isProtobufVersion shouldBe true
-      reissueTx.isProtobufVersion shouldBe true
-      burnTx.isProtobufVersion shouldBe true
+      PBSince.affects(issueTx) shouldBe true
+      PBSince.affects(reissueTx) shouldBe true
+      PBSince.affects(burnTx) shouldBe true
     }
 
     "DataTransaction" in {
@@ -183,7 +183,7 @@ class ProtoVersionTransactionsSpec
 
       (dataTx.json() \ "chainId").asOpt[Byte].value shouldBe dataTx.chainId
 
-      dataTx.isProtobufVersion shouldBe true
+      PBSince.affects(dataTx) shouldBe true
     }
 
     "ExchangeTransaction" in {
@@ -210,7 +210,7 @@ class ProtoVersionTransactionsSpec
 
       (exchangeTx.json() \ "chainId").asOpt[Byte].value shouldBe exchangeTx.chainId
 
-      exchangeTx.isProtobufVersion shouldBe true
+      PBSince.affects(exchangeTx) shouldBe true
     }
 
     "InvokeScriptTransaction" in {
@@ -247,7 +247,7 @@ class ProtoVersionTransactionsSpec
 
       (invokeScriptTx.json() \ "chainId").asOpt[Byte].value shouldBe invokeScriptTx.chainId
 
-      invokeScriptTx.isProtobufVersion shouldBe true
+      PBSince.affects(invokeScriptTx) shouldBe true
     }
 
     "LeaseTransaction/LeaseCancelTransaction" in {
@@ -287,8 +287,8 @@ class ProtoVersionTransactionsSpec
       (leaseTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseTx.chainId
       (leaseCancelTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseCancelTx.chainId
 
-      leaseTx.isProtobufVersion shouldBe true
-      leaseCancelTx.isProtobufVersion shouldBe true
+      PBSince.affects(leaseTx) shouldBe true
+      PBSince.affects(leaseCancelTx) shouldBe true
     }
 
     "TransferTransaction" in {
@@ -316,7 +316,7 @@ class ProtoVersionTransactionsSpec
 
       (transferTx.json() \ "chainId").asOpt[Byte].value shouldBe transferTx.chainId
 
-      transferTx.isProtobufVersion shouldBe true
+      PBSince.affects(transferTx) shouldBe true
     }
 
     "MassTransferTransaction" in {
@@ -344,7 +344,7 @@ class ProtoVersionTransactionsSpec
 
       (massTransferTx.json() \ "chainId").asOpt[Byte].value shouldBe massTransferTx.chainId
 
-      massTransferTx.isProtobufVersion shouldBe true
+      PBSince.affects(massTransferTx) shouldBe true
     }
 
     "SetScriptTransaction" in {
@@ -389,7 +389,7 @@ class ProtoVersionTransactionsSpec
 
       decode(base64Str) shouldBe setAssetScriptTx
 
-      setAssetScriptTx.isProtobufVersion shouldBe true
+      PBSince.affects(setAssetScriptTx) shouldBe true
     }
 
     "SponsorshipTransaction" in {
@@ -414,7 +414,7 @@ class ProtoVersionTransactionsSpec
 
       (sponsorshipTx.json() \ "chainId").asOpt[Byte].value shouldBe sponsorshipTx.chainId
 
-      sponsorshipTx.isProtobufVersion shouldBe true
+      PBSince.affects(sponsorshipTx) shouldBe true
     }
 
     "UpdateAssetInfoTransaction" in {

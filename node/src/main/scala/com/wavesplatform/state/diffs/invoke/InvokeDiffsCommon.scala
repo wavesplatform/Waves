@@ -367,7 +367,7 @@ object InvokeDiffsCommon {
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
           val versionInfo = tx.root match {
-            case s: PBSince => s" in tx version >= ${s.protobufVersion}"
+            case s: PBSince => s" in tx version >= ${PBSince.version(s)}"
             case _          => ""
           }
           s"Empty keys aren't allowed$versionInfo"
