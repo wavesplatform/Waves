@@ -263,7 +263,7 @@ class Docker(
 
       val exposedPorts = new java.util.HashSet[String]()
       exposedPorts.add(s"$internalDebuggerPort")
-      if (nodeConfig.getStringList("waves.extensions").contains("com.wavesplatform.events.BlockchainUpdates")) {
+      if (Try(nodeConfig.getStringList("waves.extensions").contains("com.wavesplatform.events.BlockchainUpdates")).getOrElse(false)) {
         exposedPorts.add("6881")
       }
 
