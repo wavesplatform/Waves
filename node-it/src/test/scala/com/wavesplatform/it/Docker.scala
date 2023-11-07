@@ -1,29 +1,13 @@
 package com.wavesplatform.it
 
-import java.io.{FileOutputStream, IOException}
-import java.net.{InetAddress, InetSocketAddress, URL}
-import java.nio.file.{Files, Path, Paths}
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.{Properties, List as JList, Map as JMap}
-import java.util.Collections.*
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
-import scala.annotation.tailrec
-import scala.concurrent.{Await, Future, blocking}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
-import scala.util.{Random, Try}
-import scala.util.control.NonFatal
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.primitives.Ints.*
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.spotify.docker.client.messages.*
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory.*
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -39,6 +23,23 @@ import org.apache.commons.compress.archivers.ArchiveStreamFactory
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl.*
+
+import java.io.{FileOutputStream, IOException}
+import java.net.{InetAddress, InetSocketAddress, URL}
+import java.nio.file.{Files, Path, Paths}
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Collections.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.{Properties, List as JList, Map as JMap}
+import scala.annotation.tailrec
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, Future, blocking}
+import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
+import scala.util.{Random, Try}
 
 class Docker(
     suiteConfig: Config = empty,
@@ -260,10 +261,16 @@ class Docker(
         profilerConfigEnv
       ).filter(_.nonEmpty)
 
+      val exposedPorts = new java.util.HashSet[String]()
+      exposedPorts.add(s"$internalDebuggerPort")
+      if (Try(nodeConfig.getStringList("waves.extensions").contains("com.wavesplatform.events.BlockchainUpdates")).getOrElse(false)) {
+        exposedPorts.add("6881")
+      }
+
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
-        .exposedPorts(s"$internalDebuggerPort")
+        .exposedPorts(exposedPorts)
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
         .env(envs*)
