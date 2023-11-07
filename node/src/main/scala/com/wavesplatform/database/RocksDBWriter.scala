@@ -409,7 +409,7 @@ class RocksDBWriter(
 
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
-        deleteOldRecords(Height(math.max(1, newSafeRollbackHeight - 1)), rw)
+        deleteOldEntries(Height(math.max(1, newSafeRollbackHeight)), rw)
       }
 
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
@@ -630,7 +630,7 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  private def deleteOldRecords(height: Height, rw: RW): Unit = {
+  private def deleteOldEntries(height: Height, rw: RW): Unit = {
     val changedAddressesKey = Keys.changedAddresses(height)
 
     rw.get(changedAddressesKey).foreach { addressId =>
@@ -640,7 +640,6 @@ class RocksDBWriter(
 
       // DB won't complain about a non-existed key with height = 0
       rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
-      rw.delete(wavesBalanceAtKey)
 
       // Account data
       val changedDataKeysAtKey = Keys.changedDataKeys(height, addressId)
@@ -649,7 +648,6 @@ class RocksDBWriter(
         val dataKeyAt    = rw.get(dataKeyAtKey)
 
         rw.delete(Keys.dataAt(addressId, accountDataKey)(dataKeyAt.prevHeight))
-        rw.delete(dataKeyAtKey)
       }
       rw.delete(changedDataKeysAtKey)
     }
@@ -665,7 +663,6 @@ class RocksDBWriter(
         val assetBalanceAt    = rw.get(assetBalanceAtKey)
 
         rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
-        rw.delete(assetBalanceAtKey)
       }
       rw.delete(changedBalancesKey)
     }

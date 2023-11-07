@@ -1,8 +1,10 @@
 package com.wavesplatform.database
 
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.KeyTags.KeyTag
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -155,8 +157,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     d.blockchain.resolveAlias(createAlias.alias) shouldEqual Left(AliasDoesNotExist(createAlias.alias))
   }
 
-  "deleteOldRecords" - {
-    val maxRollbackDepth = 3
+  "deleteOldEntries" - {
+    val maxRollbackDepth = 2
     val cleanupTestsSettings = {
       val s = DomainPresets.RideV6
       s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = maxRollbackDepth))
@@ -172,57 +174,163 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     val carl        = TxHelpers.signer(3)
     val carlAddress = carl.toAddress
 
-    val issueTx         = TxHelpers.issue(issuer = alice)
-    def transferWavesTx = TxHelpers.transfer(from = alice, to = bobAddress)
-    def transferAssetTx = TxHelpers.transfer(from = alice, to = carlAddress, asset = issueTx.asset, amount = 123)
-    val dataKey         = "test"
-    val dataTxFee       = TxPositiveAmount.unsafeFrom(TestValues.fee)
+    val issueTx          = TxHelpers.issue(issuer = alice)
+    def transferWavesTx  = TxHelpers.transfer(from = alice, to = bobAddress)
+    def transferAssetTx  = TxHelpers.transfer(from = alice, to = carlAddress, asset = issueTx.asset, amount = 123)
+    val dataKey          = "test"
+    val dataTxFee        = TxPositiveAmount.unsafeFrom(TestValues.fee)
+    val defaultAddresses = Seq(aliceAddress, bobAddress, carlAddress, TxHelpers.defaultSigner.toAddress)
 
-    def expectedValues(d: Domain): Unit = {
-      val blocksSinceStart = d.blockchain.height - 2 // genesis and a block with issueTx
+    "doesn't affect entries required rollback" in withDomain(
+      cleanupTestsSettings,
+      Seq(AddrWithBalance(aliceAddress, aliceInitBalance))
+    ) { d =>
+      def checkExpectedValues(): Unit = {
+        val blocksSinceStart = d.blockchain.height - 2 // genesis and a block with issueTx
 
-      markup("WAVES balance")
-      d.balance(aliceAddress) shouldBe (aliceInitBalance - issueTx.fee.value - blocksSinceStart * List(
-        transferWavesTx.amount,
-        transferWavesTx.fee,
-        transferAssetTx.fee,
-        dataTxFee
-      ).map(_.value).sum)
-      d.balance(bobAddress) shouldBe (blocksSinceStart * transferWavesTx.amount.value)
-      d.balance(carlAddress) shouldBe 0
+        // WAVES
+        d.balance(aliceAddress) shouldBe (aliceInitBalance - issueTx.fee.value - blocksSinceStart * List(
+          transferWavesTx.amount,
+          transferWavesTx.fee,
+          transferAssetTx.fee,
+          dataTxFee
+        ).map(_.value).sum)
+        d.balance(bobAddress) shouldBe (blocksSinceStart * transferWavesTx.amount.value)
+        d.balance(carlAddress) shouldBe 0
 
-      markup("Asset balance")
-      d.balance(aliceAddress, issueTx.asset) shouldBe (issueTx.quantity.value - blocksSinceStart * transferAssetTx.amount.value)
-      d.balance(bobAddress, issueTx.asset) shouldBe 0
-      d.balance(carlAddress, issueTx.asset) shouldBe (blocksSinceStart * transferAssetTx.amount.value)
+        // Asset
+        d.balance(aliceAddress, issueTx.asset) shouldBe (issueTx.quantity.value - blocksSinceStart * transferAssetTx.amount.value)
+        d.balance(bobAddress, issueTx.asset) shouldBe 0
+        d.balance(carlAddress, issueTx.asset) shouldBe (blocksSinceStart * transferAssetTx.amount.value)
 
-      markup("Data")
-      if (blocksSinceStart > 0) d.blockchain.accountData(aliceAddress, dataKey).get.value shouldBe s"test-$blocksSinceStart"
-      else d.blockchain.accountData(aliceAddress, dataKey) shouldBe empty
-    }
+        // Data
+        if (blocksSinceStart > 0) d.blockchain.accountData(aliceAddress, dataKey).get.value shouldBe s"test-$blocksSinceStart"
+        else d.blockchain.accountData(aliceAddress, dataKey) shouldBe empty
+      }
 
-    "doesn't affect current and past values" in withDomain(cleanupTestsSettings, Seq(AddrWithBalance(aliceAddress, aliceInitBalance))) { d =>
       d.appendBlock(issueTx)
-      expectedValues(d)
 
-      (1 to maxRollbackDepth + 1).foreach { i =>
-        withClue(s"Append ${d.blockchain.height} block: ") {
+      markup("Appending")
+      (1 to maxRollbackDepth + 3).foreach { i =>
+        withClue(s"Append ${d.blockchain.height + 1} block: ") {
           d.appendBlock(
             transferWavesTx,
             transferAssetTx,
             TxHelpers.dataSingle(account = alice, key = dataKey, value = s"test-$i", fee = dataTxFee.value)
           )
-          expectedValues(d)
+          checkExpectedValues()
         }
       }
 
-      (1 to maxRollbackDepth + 1).foreach { _ => // + 1 because of liquid block
+      markup("Rolling back")
+      (1 to maxRollbackDepth + 1).foreach { _ =>
         val rollbackHeight = d.blockchain.height - 1
         withClue(s"Rollback to $rollbackHeight:") {
           d.rollbackTo(rollbackHeight)
-          expectedValues(d)
+          checkExpectedValues()
+        }
+      }
+
+      withClue("No data before current height: ") {
+        checkDataOnlySinceHeight(d, defaultAddresses, d.blockchain.height)
+      }
+    }
+
+    "deletes old entries" in withDomain(
+      cleanupTestsSettings,
+      Seq(AddrWithBalance(aliceAddress, aliceInitBalance))
+    ) { d =>
+      d.appendBlock(issueTx)
+
+      markup("Appending transactions")
+      d.appendBlock(
+        transferWavesTx,
+        transferAssetTx,
+        TxHelpers.dataSingle(account = alice, key = dataKey, value = "test-1", fee = dataTxFee.value)
+      )
+
+      d.appendBlock(
+        transferWavesTx,
+        transferAssetTx,
+        TxHelpers.dataSingle(account = alice, key = dataKey, value = "test-2", fee = dataTxFee.value)
+      )
+
+      markup("Appending empty")
+      (1 to maxRollbackDepth + 1).foreach { _ =>
+        withClue(s"Append ${d.blockchain.height + 1} block: ") {
+          d.appendBlock()
+        }
+      }
+
+      markup("Appending transactions - 2")
+      d.appendBlock(
+        transferWavesTx,
+        transferAssetTx,
+        TxHelpers.dataSingle(account = alice, key = dataKey, value = "test-2", fee = dataTxFee.value)
+      )
+
+      markup("Appending empty - 2")
+      (1 to maxRollbackDepth + 1).foreach { _ =>
+        withClue(s"Append ${d.blockchain.height + 1} block: ") {
+          d.appendBlock()
+        }
+      }
+
+      withClue("No data before current height: ") {
+        checkDataOnlySinceHeight(d, defaultAddresses, d.blockchain.height - maxRollbackDepth - 1)
+      }
+    }
+  }
+
+  private def checkDataOnlySinceHeight(d: Domain, addresses: Seq[Address], sinceHeight: Int): Unit = {
+    val addressIds = addresses.map(getAddressId(d, _))
+    Seq(
+      KeyTags.ChangedAssetBalances,
+      KeyTags.WavesBalanceHistory,
+      KeyTags.AssetBalanceHistory,
+      KeyTags.ChangedDataKeys,
+      KeyTags.DataHistory,
+      KeyTags.ChangedAddresses
+    ).foreach { keyTag =>
+      withClue(s"$keyTag:") {
+        d.rdb.db.iterateOver(keyTag) { e =>
+          val (affectedHeight, affectedAddressIds) = getHeightAndAddressIds(keyTag, e)
+          if (affectedAddressIds.exists(addressIds.contains)) {
+            withClue(s"$addresses: ") {
+              affectedHeight should be >= sinceHeight
+            }
+          }
         }
       }
     }
   }
+
+  private def getHeightAndAddressIds(tag: KeyTag, bytes: DBEntry): (Int, Seq[AddressId]) = {
+    val (heightBytes, addresses) = tag match {
+      case KeyTags.ChangedAddresses | KeyTags.ChangedAssetBalances =>
+        (
+          bytes.getKey.drop(Shorts.BYTES),
+          readAddressIds(bytes.getValue)
+        )
+
+      case KeyTags.WavesBalanceHistory | KeyTags.AssetBalanceHistory | KeyTags.ChangedDataKeys =>
+        (
+          bytes.getKey.takeRight(Ints.BYTES),
+          Seq(AddressId.fromByteArray(bytes.getKey.dropRight(Ints.BYTES).takeRight(Longs.BYTES)))
+        )
+
+      case KeyTags.DataHistory =>
+        (
+          bytes.getKey.takeRight(Ints.BYTES),
+          Seq(AddressId.fromByteArray(bytes.getKey.drop(Shorts.BYTES)))
+        )
+
+      case _ => throw new IllegalArgumentException(s"$tag")
+    }
+
+    (Ints.fromByteArray(heightBytes), addresses)
+  }
+
+  private def getAddressId(d: Domain, address: Address): AddressId =
+    d.rdb.db.get(Keys.addressId(address)).getOrElse(throw new RuntimeException(s"Can't find address id for $address"))
 }
