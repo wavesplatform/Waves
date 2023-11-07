@@ -1,10 +1,12 @@
 package com.wavesplatform.database
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.{V2, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -12,9 +14,9 @@ import com.wavesplatform.settings.{GenesisTransactionSettings, WavesSettings}
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxPositiveAmount}
 
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
   "Slice" - {
@@ -151,5 +153,76 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     d.rollbackTo(1)
     // check if caches are updated after rollback
     d.blockchain.resolveAlias(createAlias.alias) shouldEqual Left(AliasDoesNotExist(createAlias.alias))
+  }
+
+  "deleteOldRecords" - {
+    val maxRollbackDepth = 3
+    val cleanupTestsSettings = {
+      val s = DomainPresets.RideV6
+      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = maxRollbackDepth))
+    }
+
+    val alice            = TxHelpers.signer(1)
+    val aliceAddress     = alice.toAddress
+    val aliceInitBalance = 100.waves
+
+    val bob        = TxHelpers.signer(2)
+    val bobAddress = bob.toAddress
+
+    val carl        = TxHelpers.signer(3)
+    val carlAddress = carl.toAddress
+
+    val issueTx         = TxHelpers.issue(issuer = alice)
+    def transferWavesTx = TxHelpers.transfer(from = alice, to = bobAddress)
+    def transferAssetTx = TxHelpers.transfer(from = alice, to = carlAddress, asset = issueTx.asset, amount = 123)
+    val dataKey         = "test"
+    val dataTxFee       = TxPositiveAmount.unsafeFrom(TestValues.fee)
+
+    def expectedValues(d: Domain): Unit = {
+      val blocksSinceStart = d.blockchain.height - 2 // genesis and a block with issueTx
+
+      markup("WAVES balance")
+      d.balance(aliceAddress) shouldBe (aliceInitBalance - issueTx.fee.value - blocksSinceStart * List(
+        transferWavesTx.amount,
+        transferWavesTx.fee,
+        transferAssetTx.fee,
+        dataTxFee
+      ).map(_.value).sum)
+      d.balance(bobAddress) shouldBe (blocksSinceStart * transferWavesTx.amount.value)
+      d.balance(carlAddress) shouldBe 0
+
+      markup("Asset balance")
+      d.balance(aliceAddress, issueTx.asset) shouldBe (issueTx.quantity.value - blocksSinceStart * transferAssetTx.amount.value)
+      d.balance(bobAddress, issueTx.asset) shouldBe 0
+      d.balance(carlAddress, issueTx.asset) shouldBe (blocksSinceStart * transferAssetTx.amount.value)
+
+      markup("Data")
+      if (blocksSinceStart > 0) d.blockchain.accountData(aliceAddress, dataKey).get.value shouldBe s"test-$blocksSinceStart"
+      else d.blockchain.accountData(aliceAddress, dataKey) shouldBe empty
+    }
+
+    "doesn't affect current and past values" in withDomain(cleanupTestsSettings, Seq(AddrWithBalance(aliceAddress, aliceInitBalance))) { d =>
+      d.appendBlock(issueTx)
+      expectedValues(d)
+
+      (1 to maxRollbackDepth + 1).foreach { i =>
+        withClue(s"Append ${d.blockchain.height} block: ") {
+          d.appendBlock(
+            transferWavesTx,
+            transferAssetTx,
+            TxHelpers.dataSingle(account = alice, key = dataKey, value = s"test-$i", fee = dataTxFee.value)
+          )
+          expectedValues(d)
+        }
+      }
+
+      (1 to maxRollbackDepth + 1).foreach { _ => // + 1 because of liquid block
+        val rollbackHeight = d.blockchain.height - 1
+        withClue(s"Rollback to $rollbackHeight:") {
+          d.rollbackTo(rollbackHeight)
+          expectedValues(d)
+        }
+      }
+    }
   }
 }
