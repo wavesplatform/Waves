@@ -145,7 +145,7 @@ inScope(Global)(
     ),
     crossPaths        := false,
     cancelable        := true,
-    parallelExecution := true,
+    parallelExecution := false,
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
      * I - show reminder of failed and canceled tests without stack traces
