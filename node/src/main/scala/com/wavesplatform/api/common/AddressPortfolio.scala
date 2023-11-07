@@ -29,9 +29,8 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
       def skipEntry(key: Array[Byte]): Boolean =
         !key.endsWith(after.id.arr)
 
-      while (dbIterator.isValid && skipEntry(dbIterator.key())) {
+      while (dbIterator.isValid && skipEntry(dbIterator.key()))
         dbIterator.next()
-      }
       if (dbIterator.isValid && !skipEntry(dbIterator.key()))
         dbIterator.next()
     }
@@ -100,18 +99,20 @@ class BalanceIterator(
     address: Address,
     underlying: Iterator[Seq[(IssuedAsset, Long)]],
     includeAsset: IssuedAsset => Boolean,
-    private var pendingOverrides: Map[(Address, Asset), Long]
+    private var pendingOverrides: Map[(Address, Asset), Long],
+    maybeAfter: Option[IssuedAsset]
 ) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
-
   private def nextOverride(): Seq[(IssuedAsset, Long)] =
     if (pendingOverrides.isEmpty) endOfData()
     else {
       val balances = pendingOverrides.collect {
         case ((`address`, asset: IssuedAsset), balance) if includeAsset(asset) =>
           asset -> balance
-      }.toSeq
+      }
       pendingOverrides = Map.empty
-      balances
+      maybeAfter.filter(balances.contains)
+        .fold(balances)(after => balances.dropWhile(_._1 != after).drop(1))
+        .toSeq
     }
 
   override def computeNext(): Seq[(IssuedAsset, Long)] =
@@ -139,10 +140,13 @@ object AddressPortfolio {
         .get(Keys.addressId(address))
         .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
       asset => loadAssetDescription(asset).exists(_.nft),
-      snapshot.balances
+      snapshot.balances,
+      maybeAfter
     ).asScala
-      .map(_.collect { case (asset, balance) if balance > 0 => asset }
-        .flatMap(a => loadAssetDescription(a).map(a -> _)))
+      .map(
+        _.collect { case (asset, balance) if balance > 0 => asset }
+          .flatMap(a => loadAssetDescription(a).map(a -> _))
+      )
 
   def assetBalanceIterator(
       resource: DBResource,
@@ -156,9 +160,10 @@ object AddressPortfolio {
         .get(Keys.addressId(address))
         .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new AssetBalanceIterator(addressId, resource).asScala),
       includeAsset,
-      snapshot.balances
+      snapshot.balances,
+      None
     ).asScala
-      .map(_.filter { case (asset, balance) =>
-        includeAsset(asset) && balance > 0
-      })
+      .map(
+        _.filter { case (asset, balance) => includeAsset(asset) && balance > 0 }
+      )
 }
