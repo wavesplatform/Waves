@@ -16,6 +16,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.VersionedTransaction.{ConstV1, ToV2, ToV3}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.*
@@ -171,8 +172,14 @@ object CommonValidation {
       else Right(tx)
     }
 
-    def versionIsCorrect(tx: Transaction & VersionedTransaction): Boolean =
-      tx.version > 0 && tx.version <= tx.maxVersion
+    def versionIsCorrect(tx: Transaction & VersionedTransaction): Boolean = {
+      val maxVersion = tx match {
+        case _: ConstV1 => TxVersion.V1
+        case _: ToV2    => TxVersion.V2
+        case _: ToV3    => TxVersion.V3
+      }
+      tx.version > 0 && tx.version <= maxVersion
+    }
 
     val versionsBarrier = tx match {
       case v: VersionedTransaction if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>

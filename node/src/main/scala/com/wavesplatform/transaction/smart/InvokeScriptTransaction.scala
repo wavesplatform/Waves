@@ -16,7 +16,7 @@ import play.api.libs.json.*
 import scala.util.Try
 
 case class InvokeScriptTransaction(
-    version: TxVersion,
+    override val version: TxVersion,
     sender: PublicKey,
     dApp: AddressOrAlias,
     funcCallOpt: Option[FUNCTION_CALL],

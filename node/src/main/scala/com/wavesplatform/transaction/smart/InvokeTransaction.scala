@@ -3,7 +3,8 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.transaction.{Asset, FastHashId, ProvenTransaction, Transaction, TxWithFee, VersionedTransaction}
+import com.wavesplatform.transaction.VersionedTransaction.ConstV1
+import com.wavesplatform.transaction.{Asset, FastHashId, ProvenTransaction, Transaction, TxWithFee}
 
 trait InvokeTransaction
     extends Transaction
@@ -11,7 +12,7 @@ trait InvokeTransaction
     with ProvenTransaction
     with TxWithFee.InCustomAsset
     with FastHashId
-    with VersionedTransaction {
+    with ConstV1 {
   override val checkedAssets: Seq[Asset.IssuedAsset] = super[InvokeScriptTransactionLike].checkedAssets
 }
 
