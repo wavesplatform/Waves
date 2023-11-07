@@ -172,7 +172,7 @@ object CommonValidation {
       else Right(tx)
     }
 
-    def versionIsCorrect(tx: Transaction & VersionedTransaction): Boolean = {
+    def versionIsCorrect(tx: VersionedTransaction): Boolean = {
       val maxVersion = tx match {
         case _: ConstV1 => TxVersion.V1
         case _: ToV2    => TxVersion.V2
