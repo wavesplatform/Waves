@@ -181,12 +181,12 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     val dataTxFee        = TxPositiveAmount.unsafeFrom(TestValues.fee)
     val defaultAddresses = Seq(aliceAddress, bobAddress, carlAddress, TxHelpers.defaultSigner.toAddress)
 
-    "doesn't affect entries required rollback" in withDomain(
+    "doesn't affect entries required for rollback" in withDomain(
       cleanupTestsSettings,
       Seq(AddrWithBalance(aliceAddress, aliceInitBalance))
     ) { d =>
-      def checkExpectedValues(): Unit = {
-        val blocksSinceStart = d.blockchain.height - 2 // genesis and a block with issueTx
+      def checkExpectedState(): Unit = {
+        val blocksSinceStart = d.blockchain.height - 2 // blocks with genesis and issue transactions
 
         // WAVES
         d.balance(aliceAddress) shouldBe (aliceInitBalance - issueTx.fee.value - blocksSinceStart * List(
@@ -218,7 +218,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
             transferAssetTx,
             TxHelpers.dataSingle(account = alice, key = dataKey, value = s"test-$i", fee = dataTxFee.value)
           )
-          checkExpectedValues()
+          checkExpectedState()
         }
       }
 
@@ -227,7 +227,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         val rollbackHeight = d.blockchain.height - 1
         withClue(s"Rollback to $rollbackHeight:") {
           d.rollbackTo(rollbackHeight)
-          checkExpectedValues()
+          checkExpectedState()
         }
       }
 
@@ -241,19 +241,15 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       Seq(AddrWithBalance(aliceAddress, aliceInitBalance))
     ) { d =>
       d.appendBlock(issueTx)
+      def appendBlockWithTxs(i: Int): Unit = d.appendBlock(
+        transferWavesTx,
+        transferAssetTx,
+        TxHelpers.dataSingle(account = alice, key = dataKey, value = s"test-$i", fee = dataTxFee.value)
+      )
 
       markup("Appending transactions")
-      d.appendBlock(
-        transferWavesTx,
-        transferAssetTx,
-        TxHelpers.dataSingle(account = alice, key = dataKey, value = "test-1", fee = dataTxFee.value)
-      )
-
-      d.appendBlock(
-        transferWavesTx,
-        transferAssetTx,
-        TxHelpers.dataSingle(account = alice, key = dataKey, value = "test-2", fee = dataTxFee.value)
-      )
+      appendBlockWithTxs(1)
+      appendBlockWithTxs(2)
 
       markup("Appending empty")
       (1 to maxRollbackDepth + 1).foreach { _ =>
@@ -263,11 +259,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       }
 
       markup("Appending transactions - 2")
-      d.appendBlock(
-        transferWavesTx,
-        transferAssetTx,
-        TxHelpers.dataSingle(account = alice, key = dataKey, value = "test-2", fee = dataTxFee.value)
-      )
+      appendBlockWithTxs(3)
 
       markup("Appending empty - 2")
       (1 to maxRollbackDepth + 1).foreach { _ =>

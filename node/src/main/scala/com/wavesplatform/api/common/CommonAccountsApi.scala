@@ -121,14 +121,7 @@ object CommonAccountsApi {
         dbResource.get(Keys.addressId(address)).fold(Observable.fromIterable(entriesFromDiff)) { addressId =>
           Observable
             .fromIterator(
-              Task(
-                new AddressDataIterator(
-                  dbResource,
-                  addressId,
-                  entriesFromDiff,
-                  pattern
-                ).asScala
-              )
+              Task(new AddressDataIterator(dbResource, addressId, entriesFromDiff, pattern).asScala)
             )
             .filterNot(_.isEmpty)
         }
