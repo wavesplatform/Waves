@@ -3,7 +3,7 @@ package com.wavesplatform.state.appender
 import java.time.Instant
 import cats.data.EitherT
 import cats.syntax.traverse.*
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
@@ -15,7 +15,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, 
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature, InvalidStateHash}
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxForAppender
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -27,21 +27,21 @@ object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxForAppender,
+      utxStorage: UtxPool,
       pos: PoSSelector,
       scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
-  )(newBlock: Block): Task[Either[ValidationError, BlockApplyResult]] =
+  )(newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Either[ValidationError, BlockApplyResult]] =
     Task {
       if (
         blockchainUpdater
           .isLastBlockId(newBlock.header.reference) || blockchainUpdater.lastBlockHeader.exists(_.header.reference == newBlock.header.reference)
       ) {
         if (newBlock.header.challengedHeader.isDefined) {
-          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock)
+          appendChallengeBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         } else {
-          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock)
+          appendKeyBlock(blockchainUpdater, utxStorage, pos, time, log, verify, txSignParCheck)(newBlock, snapshot)
         }
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(Ignored)
@@ -52,28 +52,27 @@ object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxForAppender,
+      utxStorage: UtxPool,
       pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
-      blockChallenger: BlockChallenger,
+      blockChallenger: Option[BlockChallenger],
       scheduler: Scheduler
-  )(ch: Channel, newBlock: Block): Task[Unit] = {
+  )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Unit] = {
     import metrics.*
     implicit val implicitTime: Time = time
 
     val span = createApplySpan(newBlock)
     span.markNtp("block.received")
-    BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
 
     val append =
       (for {
         _ <- EitherT(Task(Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))))
         _ = span.markNtp("block.signatures-validated")
-        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
+        validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock, snapshot))
       } yield validApplication).value
 
-    val handle = append.asyncBoundary.flatMap {
+    val handle = append.flatMap {
       case Right(Ignored) => Task.unit // block already appended
       case Right(Applied(_, _)) =>
         Task {
@@ -82,7 +81,7 @@ object BlockAppender extends ScorexLogging {
           span.markNtp("block.applied")
           span.finishNtp()
           BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
-          if (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined) {
+          if (blockchainUpdater.isLastBlockId(newBlock.id()) && (newBlock.transactionData.isEmpty || newBlock.header.challengedHeader.isDefined)) {
             allChannels.broadcast(BlockForged(newBlock), Some(ch)) // Key block or challenging block
           }
         }
@@ -96,13 +95,9 @@ object BlockAppender extends ScorexLogging {
         span.finishNtp()
         BlockStats.declined(newBlock, BlockStats.Source.Broadcast)
 
-        // TODO: get prev state hash (NODE-2568)
-        blockchainUpdater.lastBlockHeader
-          .flatMap(_.header.stateHash)
-          .traverse { prevStateHash =>
-            blockChallenger.challengeBlock(newBlock, ch, prevStateHash)
-          }
-          .void
+        if (newBlock.header.challengedHeader.isEmpty) {
+          blockChallenger.traverse(_.challengeBlock(newBlock, ch).executeOn(scheduler)).void
+        } else Task.unit
 
       case Left(ve) =>
         Task {

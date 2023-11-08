@@ -51,7 +51,7 @@
       params: [ "BigInt" ]
       doc: "Converts an BigInt to an array of bytes."
       paramsDoc: [ "The BigInt to convert." ]
-      complexity: 65
+      complexity: 1
     }
     {
       name: "toBytes"
@@ -79,28 +79,28 @@
       params: [ "String" ]
       doc: "Converts an string to an integer."
       paramsDoc: [ "The string to convert." ]
-      complexity: 65
+      complexity: 1
     }
     {
       name: "parseBigIntValue"
       params: [ "String" ]
       doc: "Converts an string to an integer."
       paramsDoc: [ "The string to convert." ]
-      complexity: 65
+      complexity: 1
     }
     {
       name: "toBigInt"
       params: [ "ByteVector" ]
       doc: "Converts an array of bytes to an big integer."
       paramsDoc: [ "The array of bytes to convert." ]
-      complexity: 65
+      complexity: 1
     }
     {
       name: "toBigInt"
       params: [ "ByteVector", "Int", "Int" ]
       doc: "Converts an array of bytes to an big integer."
       paramsDoc: [ "The array of bytes to convert.", "Offset", "Size" ]
-      complexity: 65
+      complexity: 1
     }
     {
       name: "toInt"

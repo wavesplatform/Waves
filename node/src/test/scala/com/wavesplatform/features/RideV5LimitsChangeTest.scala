@@ -31,7 +31,13 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
         d.blockchain,
         Some(d.lastBlock),
         block,
-        MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total,
+        None,
+        MiningConstraints(
+          d.blockchain,
+          d.blockchain.height,
+          SettingsFromDefaultConfig.enableLightMode,
+          Some(SettingsFromDefaultConfig.minerSettings)
+        ).total,
         block.header.generationSignature
       )
       differResult should produce("Limit of txs was reached")
@@ -56,7 +62,13 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFacto
           d.blockchain,
           Some(d.lastBlock),
           block,
-          MiningConstraints(d.blockchain, d.blockchain.height, Some(SettingsFromDefaultConfig.minerSettings)).total,
+          None,
+          MiningConstraints(
+            d.blockchain,
+            d.blockchain.height,
+            SettingsFromDefaultConfig.enableLightMode,
+            Some(SettingsFromDefaultConfig.minerSettings)
+          ).total,
           block.header.generationSignature
         )
         .explicitGet()

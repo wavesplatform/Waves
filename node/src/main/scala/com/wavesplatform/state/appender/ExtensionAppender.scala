@@ -11,7 +11,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -23,7 +23,7 @@ object ExtensionAppender extends ScorexLogging {
 
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxPool,
       pos: PoSSelector,
       time: Time,
       invalidBlocks: InvalidBlockStorage,
@@ -63,7 +63,10 @@ object ExtensionAppender extends ScorexLogging {
                   val forkApplicationResultEi = {
                     newBlocks.view
                       .map { b =>
-                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(b)
+                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(
+                          b,
+                          extension.snapshots.get(b.id())
+                        )
                           .map {
                             case (Applied(_, _), height) => BlockStats.applied(b, BlockStats.Source.Ext, height)
                             case _                       =>
@@ -94,7 +97,7 @@ object ExtensionAppender extends ScorexLogging {
                   forkApplicationResultEi match {
                     case Left(e) =>
                       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
-                      droppedBlocks.foreach { case (b, gp) => blockchainUpdater.processBlock(b, gp).explicitGet() }
+                      droppedBlocks.foreach { case (b, gp, sn) => blockchainUpdater.processBlock(b, gp, sn).explicitGet() }
                       Left(e)
 
                     case Right(_) =>

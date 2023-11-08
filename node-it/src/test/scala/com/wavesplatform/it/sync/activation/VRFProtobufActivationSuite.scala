@@ -8,14 +8,14 @@ import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
   val activationHeight = 9
@@ -37,9 +37,11 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     val (defaultName, defaultDescription) = ("asset", "description")
-    assetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
+    assetId =
+      sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
     sender.waitForHeight(7, 3.minutes)
-    otherAssetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
+    otherAssetId =
+      sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, reissuable = true, script = None, waitForTx = true).id
   }
 
   test("miner generates block v4 before activation") {
@@ -174,8 +176,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("rollback to height before activation/at activation/after activation height") {
-    //rollback to activation height
-    nodes.rollback(activationHeight, returnToUTX = true)
+    // rollback to activation height
+    nodes.rollback(activationHeight)
 
     val blockAtActivationHeight1 = sender.blockAt(activationHeight)
     blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
@@ -188,7 +190,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
     returnedTxIds.foreach(sender.waitForTransaction(_, timeout = 8 minutes))
 
-    //rollback to height one block before activation height
+    // rollback to height one block before activation height
     nodes.rollback(activationHeight - 1, returnToUTX = false)
 
     val blockBeforeActivationHeight = sender.blockAt(activationHeight - 1)
@@ -203,8 +205,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     blockAfterActivationHeight2.version.get shouldBe Block.ProtoBlockVersion
     nodes.waitForHeightArise()
 
-    //rollback to height after activation height using rollback to block with signature method
-    nodes.rollbackToBlockId(sender.blockAt(activationHeight + 1).id)
+    nodes.rollback(activationHeight + 1)
 
     val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
     blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion

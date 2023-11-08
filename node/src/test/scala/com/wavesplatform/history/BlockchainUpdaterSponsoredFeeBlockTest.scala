@@ -131,8 +131,8 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
         }
 
         {
-          domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
-          domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
+          domain.blockchainUpdater.processMicroBlock(microBlocks(0), None) should beRight
+          domain.blockchainUpdater.processMicroBlock(microBlocks(1), None) should beRight
 
           val microBlocksWavesFee = microBlocks
             .flatMap(_.transactionData)

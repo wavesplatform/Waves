@@ -12,8 +12,7 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.crypto
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -34,7 +33,6 @@ import com.wavesplatform.utils.{Schedulers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
-import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
@@ -77,12 +75,6 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     5
   )
   private val route = seal(addressApiRoute.route)
-
-  private val generatedMessages = for {
-    account <- Gen.oneOf(allAccounts).label("account")
-    length  <- Gen.chooseNum(10, 1000)
-    message <- Gen.listOfN(length, Gen.alphaNumChar).map(_.mkString).label("message")
-  } yield (account, message)
 
   routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
@@ -199,51 +191,6 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       (json \ "seed").as[String] shouldEqual Base58.encode(account.seed)
     }
   }
-
-  private def testSign(path: String, encode: Boolean): Unit =
-    forAll(generatedMessages) { case (account, message) =>
-      val uri = routePath(s"/$path/${account.toAddress}")
-      Post(uri, message) ~> route should produce(ApiKeyNotValid)
-      Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
-        val resp      = responseAs[JsObject]
-        val signature = ByteStr.decodeBase58((resp \ "signature").as[String]).get
-
-        (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
-        (resp \ "publicKey").as[String] shouldEqual account.publicKey.toString
-
-        crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
-      }
-    }
-
-  routePath("/sign/{address}") in testSign("sign", true)
-  routePath("/signText/{address}") in testSign("signText", false)
-
-  private def testVerify(path: String, encode: Boolean): Unit = {
-
-    forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) { case ((account, message), b58) =>
-      val uri          = routePath(s"/$path/${account.toAddress}")
-      val messageBytes = message.getBytes("UTF-8")
-      val signature    = crypto.sign(account.privateKey, messageBytes)
-      val validBody = Json.obj(
-        "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
-        "publickey" -> JsString(Base58.encode(account.publicKey.arr)),
-        "signature" -> JsString(signature.toString)
-      )
-
-      val emptySignature =
-        Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey.arr)), "signature" -> JsString(""))
-
-      Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
-      Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
-        (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
-      }
-      Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
-        (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
-      }
-    }
-  }
-  routePath("/verifyText/{address}") in testVerify("verifyText", false)
-  routePath("/verify/{address}") in testVerify("verify", true)
 
   routePath("") in {
     Post(routePath("")) ~> route should produce(ApiKeyNotValid)

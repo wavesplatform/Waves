@@ -668,7 +668,7 @@ object PBTransactions {
         val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
         PBTransactions.create(sender, chainId, fee.value, feeAssetId, timestamp, version, proofs, data)
 
-      case tx @ vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, fee, feeAssetId, proofs, chainId) =>
+      case vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, fee, feeAssetId, proofs, chainId) =>
         val data = UpdateAssetInfoTransactionData()
           .withAssetId(assetId.id.toByteString)
           .withName(name)

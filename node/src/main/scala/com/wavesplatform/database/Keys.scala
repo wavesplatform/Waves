@@ -240,6 +240,9 @@ object Keys {
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)
 
+  def blockStateHash(height: Int): Key[ByteStr] =
+    Key(BlockStateHash, h(height), Option(_).fold(TxStateSnapshotHashBuilder.InitStateHash)(ByteStr(_)), _.arr)
+
   def ethereumTransactionMeta(height: Height, txNum: TxNum): Key[Option[EthereumTransactionMeta]] =
     Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray)
 

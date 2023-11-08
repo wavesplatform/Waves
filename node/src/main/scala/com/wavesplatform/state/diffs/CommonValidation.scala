@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.OverdraftValidationProvider.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
 import com.wavesplatform.lang.ValidationError
@@ -144,6 +145,13 @@ object CommonValidation {
         case v                                => barrierByVersion(v)
       }
 
+      def oldScriptVersionDeactivation(sc: Script): Either[ActivationError, Unit] = sc.stdLibVersion match {
+        case V1 | V2 | V3 if blockchain.isFeatureActivated(LightNode) =>
+          Left(ActivationError(s"Script version below V4 is not allowed after ${LightNode.description} feature activation"))
+        case _ =>
+          Right(())
+      }
+
       def scriptTypeActivation(sc: Script): Either[ActivationError, T] = (sc: @unchecked) match {
         case _: ExprScript                        => Right(tx)
         case _: ContractScript.ContractScriptImpl => barrierByVersion(V3)
@@ -151,6 +159,7 @@ object CommonValidation {
 
       for {
         _ <- scriptVersionActivation(sc)
+        _ <- oldScriptVersionDeactivation(sc)
         _ <- scriptTypeActivation(sc)
       } yield tx
 
@@ -163,10 +172,13 @@ object CommonValidation {
     }
 
     val versionsBarrier = tx match {
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
+        Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
+
       case p: PBSince if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !TransactionParsers.all.contains((v.tpe.id.toByte, v.version)) =>
+      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>

@@ -11,6 +11,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.SetScriptTransactionDiff.*
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -63,6 +64,8 @@ case class UtxPoolImpl(
   // State
   val priorityPool               = new UtxPriorityPool(blockchain)
   private[this] val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
+
+  override def getPriorityPool: Option[UtxPriorityPool] = Some(priorityPool)
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
@@ -410,23 +413,30 @@ case class UtxPoolImpl(
                           log.trace(s"Packing transaction ${tx.id()}")
                       }
 
-                      val resultSnapshot =
-                        (r.totalSnapshot |+| newSnapshot)
+                      (for {
+                        resultSnapshot <- (r.totalSnapshot |+| newSnapshot)
                           .addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
-
-                      resultSnapshot.fold(
-                        error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                        fullTxSnapshot <- newSnapshot.addBalances(minerFeePortfolio(updatedBlockchain, tx), updatedBlockchain)
+                      } yield {
+                        val txInfo = newSnapshot.transactions.head._2
                         PackResult(
                           Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                          _,
+                          resultSnapshot,
                           updatedConstraint,
                           r.iterations + 1,
                           newCheckedAddresses,
                           r.validatedTransactions + tx.id(),
                           r.removedTransactions,
                           r.stateHash
-                            .map(prevStateHash => TxStateSnapshotHashBuilder.createHashFromSnapshot(newSnapshot, None).createHash(prevStateHash))
+                            .map(prevStateHash =>
+                              TxStateSnapshotHashBuilder
+                                .createHashFromSnapshot(fullTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                                .createHash(prevStateHash)
+                            )
                         )
+                      }).fold(
+                        error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                        identity
                       )
                     }
 

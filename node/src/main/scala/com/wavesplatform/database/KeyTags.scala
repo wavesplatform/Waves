@@ -61,6 +61,7 @@ object KeyTags extends Enumeration {
   EthereumTransactionMeta,
   NthTransactionStateSnapshotAtHeight,
   MaliciousMinerBanHeights,
+  BlockStateHash,
   AddressLeaseInfoSeqNr,
   AddressLeaseInfoSeq = Value
 
