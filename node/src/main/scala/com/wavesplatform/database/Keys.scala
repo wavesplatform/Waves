@@ -188,12 +188,12 @@ object Keys {
   def addressLeaseSeqNr(addressId: AddressId): Key[Int] =
     bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray)
 
-  def addressLeaseSeq(addressId: AddressId, seqNr: Int): Key[Option[Seq[(ByteStr, LeaseDetails)]]] =
+  def addressLeaseSeq(addressId: AddressId, seqNr: Int): Key[Option[Seq[ByteStr]]] =
     Key.opt(
       AddressLeaseInfoSeq,
       hBytes(addressId.toByteArray, seqNr),
-      readLeaseSeq,
-      writeLeaseSeq
+      readLeaseIdSeq,
+      writeLeaseIdSeq
     )
 
   def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =

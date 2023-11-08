@@ -267,14 +267,14 @@ package object database {
     ndo.toByteArray
   }
 
-  def readLeaseSeq(data: Array[Byte]): Seq[(ByteStr, LeaseDetails)] = {
-    val pb.LeaseIdsAndDetailsSeq(ids, details, _) = pb.LeaseIdsAndDetailsSeq.parseFrom(data)
-    ids.map(_.toByteStr) zip details.map(LeaseDetails.fromProtobuf)
-  }
+  def readLeaseIdSeq(data: Array[Byte]): Seq[ByteStr] =
+    pb.LeaseIdsAndDetailsSeq.parseFrom(data)
+      .ids
+      .map(_.toByteStr)
 
-  def writeLeaseSeq(seq: Seq[(ByteStr, LeaseDetails)]): Array[Byte] = {
-    pb.LeaseIdsAndDetailsSeq(seq.map(_._1.toByteString), seq.map(_._2.toProtobuf)).toByteArray
-  }
+  def writeLeaseIdSeq(ids: Seq[ByteStr]): Array[Byte] =
+    pb.LeaseIdsAndDetailsSeq(ids.map(_.toByteString))
+      .toByteArray
 
   def readStateHash(bs: Array[Byte]): StateHash = {
     val ndi           = newDataInput(bs)

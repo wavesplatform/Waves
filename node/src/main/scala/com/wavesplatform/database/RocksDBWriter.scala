@@ -542,15 +542,15 @@ class RocksDBWriter(
       }
 
       if (dbSettings.storeLeaseStatesByAddress) {
-        val addressIdWithLeases =
+        val addressIdWithLeaseIds =
           for {
             (leaseId, details) <- snapshot.leaseStates.toSeq
             address            <- resolveAlias(details.recipient).toSeq :+ details.sender.toAddress
             addressId = this.addressIdWithFallback(address, newAddresses)
-          } yield (addressId, (leaseId, details))
-        val leasesByAddressId = addressIdWithLeases.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
-        rw.multiGetInts(leasesByAddressId.keys.map(_._2).toSeq)
-          .zip(leasesByAddressId)
+          } yield (addressId, leaseId)
+        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
+        rw.multiGetInts(leaseIdsByAddressId.keys.map(_._2).toSeq)
+          .zip(leaseIdsByAddressId)
           .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIdsAndDetails)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
             rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr), Some(leaseIdsAndDetails))
