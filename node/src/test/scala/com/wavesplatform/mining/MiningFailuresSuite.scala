@@ -53,7 +53,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
       bs.copy(functionalitySettings = fs.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(2.toShort -> 0)))
     }
 
-    val miner = {
+    val (miner, appenderScheduler) = {
       val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
@@ -71,7 +71,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
         scheduler,
         scheduler,
         Observable.empty
-      )
+      ) -> scheduler
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
@@ -112,6 +112,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
     val generateBlock = generateBlockTask(miner)(account)
     generateBlock.runSyncUnsafe() shouldBe ((): Unit)
     minedBlock.header.featureVotes shouldBe empty
+    appenderScheduler.shutdown()
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
