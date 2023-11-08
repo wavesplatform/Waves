@@ -170,7 +170,7 @@ class Docker(
         // Exclude disconnected
         client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
       }
-      .map(_.containerNetworkAddress)
+      .map(_.networkAddress)
       .toSeq
   }
 
@@ -627,9 +627,7 @@ object Docker {
 
     override val apiKey = "integration-test-rest-api"
 
-    override def networkAddress: InetSocketAddress = nodeInfo.hostNetworkAddress
-
-    def containerNetworkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
+    override def networkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
 
     def getConfig: Config = config
   }

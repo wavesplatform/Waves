@@ -80,7 +80,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
         unverifiedPeers.removeIf { x =>
-          Option(x.getAddress).contains(inetAddress.getAddress)
+          Option(x.getAddress).contains(inetAddress)
         }
         blacklist.put(inetAddress, System.currentTimeMillis())
         reasons.put(inetAddress, reason)
