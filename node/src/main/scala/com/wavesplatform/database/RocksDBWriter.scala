@@ -713,6 +713,16 @@ class RocksDBWriter(
                 rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
               }
             }
+
+            if (dbSettings.storeLeaseStatesByAddress) {
+              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId)
+              val leaseSeqNr    = rw.get(leaseSeqNrKey)
+              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
+              rw.get(leaseSeqKey).foreach { _ =>
+                rw.delete(leaseSeqKey)
+                rw.put(leaseSeqNrKey, (leaseSeqNr - 1).max(0))
+              }
+            }
           }
 
           writableDB
