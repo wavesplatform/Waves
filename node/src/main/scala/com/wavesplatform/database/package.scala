@@ -268,12 +268,12 @@ package object database {
   }
 
   def readLeaseIdSeq(data: Array[Byte]): Seq[ByteStr] =
-    pb.LeaseIdsAndDetailsSeq.parseFrom(data)
+    pb.LeaseIds.parseFrom(data)
       .ids
       .map(_.toByteStr)
 
   def writeLeaseIdSeq(ids: Seq[ByteStr]): Array[Byte] =
-    pb.LeaseIdsAndDetailsSeq(ids.map(_.toByteString))
+    pb.LeaseIds(ids.map(_.toByteString))
       .toByteArray
 
   def readStateHash(bs: Array[Byte]): StateHash = {

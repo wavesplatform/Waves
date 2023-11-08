@@ -119,7 +119,6 @@ message LeaseDetails {
   }
 }
 
-message LeaseIdsAndDetailsSeq {
+message LeaseIds {
   repeated bytes ids = 1;
-  repeated LeaseDetails details = 2;
 }
