@@ -36,7 +36,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
 
       withDomain(RideV4) { d =>
         val commonAccountsApi =
-          CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater, d.settings.dbSettings.storeLeaseStatesByAddress)
+          CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
         def dataList(): Set[DataEntry[?]] =
           commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
@@ -76,8 +76,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           val commonAccountsApi = CommonAccountsApi(
             () => d.blockchainUpdater.snapshotBlockchain,
             d.rdb,
-            d.blockchainUpdater,
-            d.settings.dbSettings.storeLeaseStatesByAddress
+            d.blockchainUpdater
           )
           def dataList(): Set[DataEntry[?]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
@@ -152,7 +151,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           invoke
         )
 
-        val api = CommonAccountsApi(() => d.blockchain.snapshotBlockchain, d.rdb, d.blockchain, d.settings.dbSettings.storeLeaseStatesByAddress)
+        val api = CommonAccountsApi(() => d.blockchain.snapshotBlockchain, d.rdb, d.blockchain)
         val leaseId = Lease.calculateId(
           Lease(
             Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),

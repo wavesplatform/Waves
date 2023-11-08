@@ -53,8 +53,7 @@ object CommonAccountsApi {
   def apply(
       compositeBlockchain: () => SnapshotBlockchain,
       rdb: RDB,
-      blockchain: Blockchain,
-      leaseStatesAreStoredByAddress: Boolean
+      blockchain: Blockchain
   ): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =

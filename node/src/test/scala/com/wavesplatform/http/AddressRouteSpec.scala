@@ -92,8 +92,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
           commonAccountsApi = CommonAccountsApi(
             () => d.blockchainUpdater.snapshotBlockchain,
             d.rdb,
-            d.blockchainUpdater,
-            d.settings.dbSettings.storeLeaseStatesByAddress
+            d.blockchainUpdater
           )
         )
         .route
@@ -118,8 +117,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
           commonAccountsApi = CommonAccountsApi(
             () => d.blockchainUpdater.snapshotBlockchain,
             d.rdb,
-            d.blockchainUpdater,
-            d.settings.dbSettings.storeLeaseStatesByAddress
+            d.blockchainUpdater
           )
         )
         .route
@@ -466,8 +464,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
             commonAccountsApi = CommonAccountsApi(
               () => d.blockchainUpdater.snapshotBlockchain,
               d.rdb,
-              d.blockchainUpdater,
-              d.settings.dbSettings.storeLeaseStatesByAddress
+              d.blockchainUpdater
             )
           )
           .route
@@ -522,8 +519,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
             commonAccountsApi = CommonAccountsApi(
               () => d.blockchainUpdater.snapshotBlockchain,
               d.rdb,
-              d.blockchainUpdater,
-              d.settings.dbSettings.storeLeaseStatesByAddress
+              d.blockchainUpdater
             )
           )
           .route

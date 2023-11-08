@@ -97,7 +97,7 @@ class BalancesV4Test extends PropSpec with WithState {
     ) { case (d, s) =>
       val apiBalance =
         com.wavesplatform.api.common
-          .CommonAccountsApi(() => SnapshotBlockchain(s, SnapshotOps.fromDiff(d, s).explicitGet()), rdb, s, leaseStatesAreStoredByAddress = true)
+          .CommonAccountsApi(() => SnapshotBlockchain(s, SnapshotOps.fromDiff(d, s).explicitGet()), rdb, s)
           .balanceDetails(acc1.toAddress)
           .explicitGet()
       val data = d.accountData(dapp.toAddress)

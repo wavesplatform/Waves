@@ -241,7 +241,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val blocksApi: CommonBlocksApi =
         CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb, blockchainUpdater))
       override val accountsApi: CommonAccountsApi =
-        CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater, settings.dbSettings.storeLeaseStatesByAddress)
+        CommonAccountsApi(() => blockchainUpdater.snapshotBlockchain, rdb, blockchainUpdater)
       override val assetsApi: CommonAssetsApi =
         CommonAssetsApi(() => blockchainUpdater.bestLiquidSnapshot.orEmpty, rdb.db, blockchainUpdater)
     }

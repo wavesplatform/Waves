@@ -57,7 +57,7 @@ class LeaseRouteSpec
       d.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchain, d.settings.dbSettings.storeLeaseStatesByAddress),
+      CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler)
     )
 
