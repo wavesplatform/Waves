@@ -633,13 +633,13 @@ class RocksDBWriter(
   private def deleteOldEntries(height: Height, rw: RW): Unit = {
     val changedAddressesKey = Keys.changedAddresses(height)
 
+    val wavesAddressIds    = new ArrayBuffer[AddressId]()
+    val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
+
     rw.get(changedAddressesKey).foreach { addressId =>
       // WAVES balances
-      val wavesBalanceAtKey = Keys.wavesBalanceAt(addressId, height)
-      val wavesBalanceAt    = rw.get(wavesBalanceAtKey)
-
-      // DB won't complain about a non-existed key with height = 0
-      rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
+      wavesAddressIds.addOne(addressId)
+      wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
 
       // Account data
       val changedDataKeysAtKey = Keys.changedDataKeys(height, addressId)
@@ -651,21 +651,36 @@ class RocksDBWriter(
       }
       rw.delete(changedDataKeysAtKey)
     }
-
     rw.delete(changedAddressesKey)
 
+    wavesAddressIds.view
+      .zip(rw.multiGet(wavesBalanceAtKeys, BalanceNode.SizeInBytes))
+      .foreach {
+        // DB won't complain about a non-existed key with height = 0
+        case (addressId, Some(wavesBalanceAt)) => rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
+        case _                                 =>
+      }
+
     // Asset balances
+    val addressIdAndAssets = new ArrayBuffer[(AddressId, IssuedAsset)]()
+    val assetBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]
+
     rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(height)) { e =>
       val asset              = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
       val changedBalancesKey = Keys.changedBalances(height, asset)
       rw.get(changedBalancesKey).foreach { addressId =>
-        val assetBalanceAtKey = Keys.assetBalanceAt(addressId, asset, height)
-        val assetBalanceAt    = rw.get(assetBalanceAtKey)
-
-        rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
+        addressIdAndAssets.addOne((addressId, asset))
+        assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, height))
       }
       rw.delete(changedBalancesKey)
     }
+
+    addressIdAndAssets.view
+      .zip(rw.multiGet(assetBalanceAtKeys, BalanceNode.SizeInBytes))
+      .foreach {
+        case ((addressId, asset), Some(assetBalanceAt)) => rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
+        case _                                          =>
+      }
   }
 
   override protected def doRollback(targetHeight: Int): DiscardedBlocks = {

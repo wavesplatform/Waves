@@ -21,6 +21,7 @@ object CurrentBalance {
 case class BalanceNode(balance: Long, prevHeight: Height)
 object BalanceNode {
   val Empty: BalanceNode = BalanceNode(0, Height(0))
+  val SizeInBytes: Int   = 12
 }
 
 case class CurrentVolumeAndFee(volume: Long, fee: Long, height: Height, prevHeight: Height)
@@ -55,13 +56,7 @@ object DataNode {
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{
-    AddressId as AddressIdTag,
-    EthereumTransactionMeta as EthereumTransactionMetaTag,
-    InvokeScriptResult as InvokeScriptResultTag,
-    LeaseDetails as LeaseDetailsTag,
-    *
-  }
+  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
   val version: Key[Int] = intKey(Version, default = 1)
   val height: Key[Height] =

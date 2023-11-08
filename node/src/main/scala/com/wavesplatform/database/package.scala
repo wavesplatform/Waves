@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.nio.ByteBuffer
-import java.util
-import java.util.Map as JMap
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -28,15 +25,7 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{
-  EthereumTransaction,
-  GenesisTransaction,
-  PBSince,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers,
-  TxValidationError
-}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -44,6 +33,9 @@ import org.rocksdb.*
 import sun.nio.ch.Util
 import supertagged.TaggedType
 
+import java.nio.ByteBuffer
+import java.util
+import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
@@ -371,7 +363,7 @@ package object database {
   def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.height) ++ Ints.toByteArray(balance.prevHeight)
 
-  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == 12)
+  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == BalanceNode.SizeInBytes)
     BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
   else BalanceNode.Empty
 
@@ -409,10 +401,10 @@ package object database {
       }
     }
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.Seq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
@@ -421,7 +413,7 @@ package object database {
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] =
       multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGet[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+    def multiGet[A](readOptions: ReadOptions, keys: collection.Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
       val keyBufs = getKeyBuffersFromKeys(keys)
       val valBufs = getValueBuffers(keys.size, valBufSize)
 
@@ -442,7 +434,7 @@ package object database {
       result
     }
 
-    def multiGetInts(readOptions: ReadOptions, keys: Seq[Key[Int]]): Seq[Option[Int]] = {
+    def multiGetInts(readOptions: ReadOptions, keys: collection.Seq[Key[Int]]): Seq[Option[Int]] = {
       val keyBytes = keys.map(_.keyBytes)
       val keyBufs  = getKeyBuffers(keyBytes)
       val valBufs  = getValueBuffers(keyBytes.size, 4)
@@ -551,7 +543,7 @@ package object database {
 
     private def multiGetOpt[A](
         readOptions: ReadOptions,
-        keys: Seq[Key[Option[A]]],
+        keys: collection.Seq[Key[Option[A]]],
         keyBufs: util.List[ByteBuffer],
         valBufs: util.List[ByteBuffer]
     ): Seq[Option[A]] = {
