@@ -1124,7 +1124,7 @@ class UtilsRouteEvaluateSpec
     }
   }
 
-  "correctly sent chainId when sender is not set" in {
+  "SAPI-833. correctly sent chainId when sender is not set" in {
     val dappAccount    = TxHelpers.signer(224)
     val anotherAccount = TxHelpers.signer(224)
     withDomain(RideV6, Seq(AddrWithBalance(dappAccount.toAddress, 20.waves))) { d =>
