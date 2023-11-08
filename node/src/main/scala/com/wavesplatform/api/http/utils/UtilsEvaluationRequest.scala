@@ -77,7 +77,7 @@ case class UtilsInvocationRequest(
       sender <-
         if (sender.nonEmpty || senderPK == DefaultPublicKey)
           sender
-            .map(Address.fromString(_, None).map(a => RideAddress(ByteStr(a.bytes))))
+            .map(s => Address.fromString(s).map(a => RideAddress(ByteStr(a.bytes))))
             .getOrElse(Right(RideAddress(ByteStr(new Array[Byte](26)))))
         else
           Right(RideAddress(ByteStr(senderPK.toAddress.bytes)))

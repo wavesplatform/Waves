@@ -237,12 +237,12 @@ object PBTransactions {
 
       case Data.MassTransfer(mt) =>
         for {
-          parsedTransfers <- mt.transfers.flatMap { t =>
-            t.getRecipient.toAddressOrAlias(chainId).toOption.map { addressOrAlias =>
+          parsedTransfers <- mt.transfers.traverse { t =>
+            t.getRecipient.toAddressOrAlias(chainId).flatMap { addressOrAlias =>
               TxNonNegativeAmount(t.amount)(NegativeAmount(t.amount, "asset"))
                 .map(ParsedTransfer(addressOrAlias, _))
             }
-          }.sequence
+          }
           tx <- vt.transfer.MassTransferTransaction.create(
             version.toByte,
             sender,

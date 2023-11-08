@@ -121,7 +121,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr, chainId)
+            .fromBytes(bytes.arr, Some(chainId))
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias

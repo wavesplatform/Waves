@@ -28,7 +28,7 @@ final case class CreateAliasTransaction(
     with TxWithFee.InWaves
     with PBSince.V3 {
 
-  lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
+  lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId, Some(chainId)).explicitGet()
 
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTxSerializer.toBytes(this))
