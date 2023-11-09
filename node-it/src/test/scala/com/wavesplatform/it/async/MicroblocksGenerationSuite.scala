@@ -22,10 +22,7 @@ class MicroblocksGenerationSuite extends BaseFreeSpec with TransferSending {
       block       <- miner.blockAt(2)
     } yield {
       block.transactions.size shouldBe maxTxs
-
-      val blockTxs = block.transactions.map(_.id)
-      val snapshot = uploadedTxs.map(_.id).toSet -- blockTxs
-      snapshot shouldBe empty
+      block.transactions.map(_.id) should contain theSameElementsAs uploadedTxs.map(_.id).toSet
     },
     3.minutes
   )

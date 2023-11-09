@@ -83,13 +83,11 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
     for {
       height <- node.height
       blocks <- node.blockSeq(1, height)
-    } yield {
-      val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
-      val snapshot        = txIds -- txsInBlockchain
+    } yield
       withClue(s"all transactions in node") {
-        snapshot shouldBe empty
+        val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
+        txIds should contain theSameElementsAs txsInBlockchain
       }
-    }
   }
 
   private def dumpBalances(): Future[Map[Config, Long]] = {
