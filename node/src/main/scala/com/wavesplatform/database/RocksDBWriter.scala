@@ -717,14 +717,10 @@ class RocksDBWriter(
               val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId)
               val leaseSeqNr    = rw.get(leaseSeqNrKey)
               val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
-
               rw.get(leaseSeqKey)
-                .flatMap { _ =>
-                  rw.get(leaseSeqKey)
-                    .flatMap(_.headOption)
-                    .flatMap(id => writableDB.withResource(r => loadLease(r, id)))
-                    .filter(_.height == currentHeight)
-                }
+                .flatMap(_.headOption)
+                .flatMap(id => writableDB.withResource(r => loadLease(r, id)))
+                .filter(_.height == currentHeight)
                 .foreach { _ =>
                   rw.delete(leaseSeqKey)
                   rw.put(leaseSeqNrKey, (leaseSeqNr - 1).max(0))
