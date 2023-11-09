@@ -43,7 +43,7 @@ class BurnTransactionSpecification extends PropSpec {
   }
 
   property("Burn serialization from TypedTransaction") {
-    forAll(burnGen) { issue: BurnTransaction =>
+    forAll(burnGen) { (issue: BurnTransaction) =>
       val recovered = TransactionParsers.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }

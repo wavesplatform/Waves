@@ -45,7 +45,7 @@ object Gen {
     else
       s"if (${recString(n - 1)}) then true else false"
 
-  def oracleScript(oracle: KeyPair, data: Set[DataEntry[_]], estimator: ScriptEstimator): Script = {
+  def oracleScript(oracle: KeyPair, data: Set[DataEntry[?]], estimator: ScriptEstimator): Script = {
     val conditions =
       data.map {
         case IntegerDataEntry(key, value) => s"""(extract(getInteger(oracle, "$key")) == $value)"""
@@ -53,7 +53,7 @@ object Gen {
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
         case EmptyDataEntry(_)            => ???
-      } reduce [String] { case (l, r) => s"$l && $r " }
+      }.reduce[String] { case (l, r) => s"$l && $r " }
 
     val src =
       s"""

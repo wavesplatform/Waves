@@ -15,6 +15,7 @@ import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.utils.byteStrOrdering
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
 import java.nio.charset.StandardCharsets

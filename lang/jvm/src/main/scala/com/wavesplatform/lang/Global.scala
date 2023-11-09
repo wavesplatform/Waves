@@ -1,11 +1,7 @@
 package com.wavesplatform.lang
 
-import java.math.{BigInteger, MathContext, BigDecimal => BD}
-import java.security.spec.InvalidKeySpecException
-
-import cats.syntax.either._
+import cats.syntax.either.*
 import ch.obermuhlner.math.big.BigDecimalMath
-import com.google.common.base.Utf8
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.utils.{Base58, Base64}
@@ -14,11 +10,13 @@ import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
-import com.wavesplatform.zwaves.bls12.{Groth16 => Bls12Groth16}
-import com.wavesplatform.zwaves.bn256.{Groth16 => Bn256Groth16}
+import com.wavesplatform.zwaves.bls12.Groth16 as Bls12Groth16
+import com.wavesplatform.zwaves.bn256.Groth16 as Bn256Groth16
 import org.web3j.crypto.Sign
 import org.web3j.crypto.Sign.SignatureData
 
+import java.math.{BigInteger, MathContext, BigDecimal as BD}
+import java.security.spec.InvalidKeySpecException
 import scala.annotation.tailrec
 import scala.util.Try
 
@@ -82,8 +80,8 @@ object Global extends BaseGlobal {
   private val longContext    = new MathContext(longDigits)
   private val oldLongContext = MathContext.DECIMAL128
 
-  private val bigIntDigits = 154
-  private val bigMathContext = new MathContext(bigIntDigits)
+  private val bigIntDigits      = 154
+  private val bigMathContext    = new MathContext(bigIntDigits)
   private val oldBigMathContext = new MathContext(156 + 40)
 
   // Math functions
@@ -125,10 +123,8 @@ object Global extends BaseGlobal {
 
   def powBigInt(b: BigInt, bp: Long, e: BigInt, ep: Long, rp: Long, round: Rounding, useNewPrecision: Boolean): Either[String, BigInt] =
     tryEither {
-      val base    = toJBig(b, bp)
-      val exp     = toJBig(e, ep)
-
-
+      val base = toJBig(b, bp)
+      val exp  = toJBig(e, ep)
 
       val context = if (useNewPrecision) bigMathContext else oldBigMathContext
       val res = if (exp == BigDecimal(0.5).bigDecimal) {
@@ -187,7 +183,4 @@ object Global extends BaseGlobal {
     val pk = Sign.signedMessageHashToKey(messageHash, signatureData)
     base16Encoder.decode(pk.toString(16))
   }
-
-  override def isIllFormed(s: String): Boolean =
-    Try(Utf8.encodedLength(s)).isFailure
 }

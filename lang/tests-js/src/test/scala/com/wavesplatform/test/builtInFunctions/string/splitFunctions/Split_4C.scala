@@ -14,7 +14,7 @@ object Split_4C extends JsTestBase {
   private val invalidErrorSplit_4C  = testData.invalidFunctionError("split_4C", 2)
 
   val tests: Tests = Tests {
-    test("split_4C functions compiles") {
+    test("RIDE-202. split_4C function should compile for valid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       for (
         (data, list, function) <- Seq(
@@ -27,7 +27,7 @@ object Split_4C extends JsTestBase {
       }
     }
 
-    test("compilation error split_4C functions") {
+    test("RIDE-203. split_4C function should throw a compilation error for invalid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       for (
         (data, list, function, error) <- Seq(
@@ -41,7 +41,7 @@ object Split_4C extends JsTestBase {
       }
     }
 
-    test("Can't find a function split_4C with versions V3 - V5") {
+    test("RIDE-204. Can't find a function split_4C for RIDE versions V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (

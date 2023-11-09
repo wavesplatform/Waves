@@ -36,6 +36,6 @@ object SignedLeaseCancelV2Request {
       (JsPath \ "fee").read[Long]
   )(SignedLeaseCancelV2Request.apply _)
 
-  implicit val writes =
+  implicit val writes: OWrites[SignedLeaseCancelV2Request] =
     Json.writes[SignedLeaseCancelV2Request].transform((request: JsObject) => request + ("version" -> JsNumber(2)))
 }

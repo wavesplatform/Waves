@@ -29,7 +29,7 @@ object GetBinary extends JsTestBase {
   private val invalidGetBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue()"
 
   val tests: Tests = Tests {
-    test(" Functions getBinary dataTransaction compiles for versions V4 and more") {
+    test("RIDE-92. getBinary functions for dataTransaction should compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -74,7 +74,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test(" Functions getBinary dataTransaction compiles for versions V3") {
+    test("RIDE-93. getBinary function for dataTransaction should compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       for (
         (data, binary) <- Seq(
@@ -93,7 +93,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test(" Can't find getBinary functions overload for V4 and more") {
+    test("RIDE-94. getBinary function should throw an error for invalid data type for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -114,7 +114,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test(" Can't find getBinary functions overload for V3") {
+    test("RIDE-95. getBinary function should throw an error for invalid data type for V3") {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
         for (
           (data, binary) <- Seq(
@@ -133,7 +133,7 @@ object GetBinary extends JsTestBase {
         }
     }
 
-    test(" Invalid getBinary functions for V4 and more") {
+    test("RIDE-96. Invalid getBinary functions should not compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -150,7 +150,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test(" Invalid getBinary functions for V3") {
+    test("RIDE-97. Invalid getBinary functions should not compile for V3") {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
         for (
           (data, binary) <- Seq(

@@ -38,7 +38,7 @@ object GetInteger extends JsTestBase {
   private val invalidGetIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue()"
 
   val tests: Tests = Tests {
-    test(" Functions getInteger dataTransaction compiles for versions V4 and more") {
+    test("RIDE-104. getInteger functions for dataTransaction should compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -83,7 +83,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test(" Functions getInteger dataTransaction compiles for versions V3") {
+    test("RIDE-105. getInteger function for dataTransaction should compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       for (
         (data, binary) <- Seq(
@@ -102,7 +102,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test(" Can't find getInteger functions overload for V4 and more") {
+    test("RIDE-106. getInteger function should throw an error for invalid data type for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -123,7 +123,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test(" Can't find getInteger functions overload for V3") {
+    test("RIDE-107. getInteger function should throw an error for invalid data type for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       for (
         (data, binary) <- Seq(
@@ -142,7 +142,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test(" Invalid getInteger functions for V4 and more") {
+    test("RIDE-108. Invalid getInteger functions should not compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -159,7 +159,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test(" Invalid getInteger functions for V3") {
+    test("RIDE-109. Invalid getInteger functions should not compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       for (
         (data, binary) <- Seq(

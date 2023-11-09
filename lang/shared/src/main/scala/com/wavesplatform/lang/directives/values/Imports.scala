@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.directives.values
 
-import com.wavesplatform.lang.directives._
+import com.wavesplatform.lang.directives.*
 
 case class Imports(fileNames: List[String] = Nil) extends DirectiveValue(fileNames.mkString(", "), 0) {
-  override def key: DirectiveKey = resolveKey[Imports]
+  override def key: DirectiveKey = DirectiveKey.IMPORT
   override val value: Any        = text
 }
 

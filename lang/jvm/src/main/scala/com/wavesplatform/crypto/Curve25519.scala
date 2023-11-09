@@ -1,16 +1,9 @@
 package com.wavesplatform.crypto
 
-import java.lang.reflect.Constructor
-
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 
 object Curve25519 {
-  private lazy val provider: OpportunisticCurve25519Provider = {
-    val constructor = classOf[OpportunisticCurve25519Provider].getDeclaredConstructors.head
-      .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
-    constructor.setAccessible(true)
-    constructor.newInstance()
-  }
+  private lazy val provider = new OpportunisticCurve25519Provider()
 
   val KeyLength: Int = 32
 

@@ -89,7 +89,7 @@ object Exporter extends ScorexLogging {
                 val duration = System.currentTimeMillis() - start
                 log
                   .info(
-                    s"Finished exporting $height blocks in ${humanReadableDuration(duration)}, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+                    s"Finished exporting $height blocks in ${java.time.Duration.ofMillis(duration)}, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
                   )
             }
           }

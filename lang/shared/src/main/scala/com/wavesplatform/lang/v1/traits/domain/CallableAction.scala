@@ -1,16 +1,16 @@
 package com.wavesplatform.lang.v1.traits.domain
 
-import java.io.ByteArrayOutputStream
-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.hacks.Global
-import com.wavesplatform.lang.utils.Serialize._
+import com.wavesplatform.lang.utils.Serialize.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
+
+import java.io.ByteArrayOutputStream
 
 sealed trait CallableAction
 
 case class AssetTransfer(
-    address: Address,
+    recipientAddressBytes: Address,
     recipient: Recipient,
     amount: Long,
     assetId: Option[ByteStr]
@@ -112,9 +112,9 @@ sealed trait DataItem[T] extends DataOp {
 }
 
 object DataItem {
-  case class Lng(k: String, v: Long)     extends DataItem[Long] { val key = k; val value = v }
-  case class Bool(k: String, v: Boolean) extends DataItem[Boolean] { val key = k; val value = v }
-  case class Bin(k: String, v: ByteStr)  extends DataItem[ByteStr] { val key = k; val value = v }
-  case class Str(k: String, v: String)   extends DataItem[String] { val key = k; val value = v }
-  case class Delete(key: String)         extends DataOp
+  case class Lng(key: String, value: Long)     extends DataItem[Long]
+  case class Bool(key: String, value: Boolean) extends DataItem[Boolean]
+  case class Bin(key: String, value: ByteStr)  extends DataItem[ByteStr]
+  case class Str(key: String, value: String)   extends DataItem[String]
+  case class Delete(key: String)               extends DataOp
 }

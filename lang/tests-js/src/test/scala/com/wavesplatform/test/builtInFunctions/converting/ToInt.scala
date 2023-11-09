@@ -21,7 +21,7 @@ object ToInt extends JsTestBase {
   private val invalidParseIntArgBeforeFunc = s"callerTestData.toInt(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test(" Functions toInt compiles with ByteVector") {
+    test("RIDE-77. Functions toInt function should compile for valid ByteVector") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -38,7 +38,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test(" Functions toInt compiles with BigInt") {
+    test("RIDE-78. ToInt function should compile with bigInt for V5, V6 versions") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -53,7 +53,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test(" Functions toInt negative tests") {
+    test("RIDE-79. ToInt function throws an error for invalid values") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
