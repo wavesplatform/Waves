@@ -1132,6 +1132,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         leases(defaultAddress) should contain theSameElementsAs info.tail
         leases(secondAddress) should contain theSameElementsAs info.tail
 
+        d.appendBlock(transfer(defaultSigner, secondAddress), transfer(secondSigner, defaultAddress))
+        // to check that rolling back this block will not affect active leases from previous block
+
         d.rollbackTo(b1.id())
         leases(defaultAddress) should contain theSameElementsAs info
         leases(secondAddress) should contain theSameElementsAs info

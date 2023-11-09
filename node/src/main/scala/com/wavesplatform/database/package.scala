@@ -273,8 +273,7 @@ package object database {
       .map(_.toByteStr)
 
   def writeLeaseIdSeq(ids: Seq[ByteStr]): Array[Byte] =
-    pb.LeaseIds(ids.map(_.toByteString))
-      .toByteArray
+    pb.LeaseIds(ids.map(_.toByteString)).toByteArray
 
   def readStateHash(bs: Array[Byte]): StateHash = {
     val ndi           = newDataInput(bs)
@@ -714,6 +713,10 @@ package object database {
 
     leaseIds.toSet
   }
+
+  def loadLease(resource: DBResource, id: ByteStr): Option[LeaseDetails] =
+    fromHistory(resource, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten
+      .flatMap(_.toOption)
 
   object AddressId extends TaggedType[Long] {
     def fromByteArray(bs: Array[Byte]): Type = AddressId(Longs.fromByteArray(bs))

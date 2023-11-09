@@ -3,7 +3,7 @@ package com.wavesplatform.api.common.lease
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
-import com.wavesplatform.database.{AddressId, DBResource, Keys, readLeaseIdSeq}
+import com.wavesplatform.database.{AddressId, DBResource, Keys}
 import com.wavesplatform.state.reader.LeaseDetails
 
 import scala.collection.mutable
@@ -17,8 +17,8 @@ private class LeaseByAddressIterator(db: DBResource, addressId: AddressId) exten
       val buffer = mutable.Map[ByteStr, LeaseDetails]()
       while (dbIterator.isValid) {
         for {
-          id      <- readLeaseIdSeq(dbIterator.value())
-          details <- loadLease(id)
+          id      <- database.readLeaseIdSeq(dbIterator.value())
+          details <- database.loadLease(db, id)
         } buffer.updateWith(id)(_.fold(Option(details))(oldDetails => if (oldDetails.isActive) Some(details) else None))
         dbIterator.prev()
       }
@@ -29,10 +29,4 @@ private class LeaseByAddressIterator(db: DBResource, addressId: AddressId) exten
     }(
       endOfData()
     )
-
-  private def loadLease(id: ByteStr): Option[LeaseDetails] =
-    database
-      .fromHistory(db, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      .flatten
-      .flatMap(_.toOption)
 }
