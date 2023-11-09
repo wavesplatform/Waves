@@ -104,7 +104,7 @@ case class SignedInvokeScriptRequest(
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
-      _dappAddress <- AddressOrAlias.fromString(dApp, checkChainId = false)
+      _dappAddress <- AddressOrAlias.fromString(dApp)
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
         _sender,

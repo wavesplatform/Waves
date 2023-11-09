@@ -118,11 +118,11 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
   // Utilities
   private def withResolvedAlias(addressOrAlias: Recipient): Option[Address] = addressOrAlias match {
     case addressOrAlias: Recipient.Address => toWavesAddress(addressOrAlias)
-    case Recipient.Alias(name)             => resolveAlias(name).flatMap(x => Address.fromBytes(x.bytes.arr, chainId)).toOption
+    case Recipient.Alias(name)             => resolveAlias(name).flatMap(x => Address.fromBytes(x.bytes.arr, Some(chainId))).toOption
   }
 
   private def toWavesAddress(addr: Recipient.Address): Option[Address] =
-    com.wavesplatform.account.Address.fromBytes(addr.bytes.arr, chainId).toOption
+    com.wavesplatform.account.Address.fromBytes(addr.bytes.arr, Some(chainId)).toOption
 
   // Functions those don't need Blockchain
   override def transferTransactionFromProto(b: Array[Byte]): Id[Option[Tx.Transfer]]       = underlying.transferTransactionById(b)

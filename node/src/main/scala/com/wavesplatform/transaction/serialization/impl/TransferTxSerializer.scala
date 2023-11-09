@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
@@ -9,11 +8,12 @@ import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.byteStrFormat
 import play.api.libs.json.{JsObject, Json}
 
+import java.nio.ByteBuffer
 import scala.util.Try
 
 object TransferTxSerializer {
   def toJson(tx: TransferTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "recipient"  -> recipient.toString,
       "assetId"    -> assetId.maybeBase58Repr,
@@ -24,7 +24,7 @@ object TransferTxSerializer {
   }
 
   def bodyBytes(tx: TransferTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     lazy val baseBytes =
       Bytes.concat(
         sender.arr,
@@ -58,7 +58,7 @@ object TransferTxSerializer {
       val ts         = buf.getLong
       val amount     = TxPositiveAmount.unsafeFrom(buf.getLong)
       val fee        = TxPositiveAmount.unsafeFrom(buf.getLong)
-      val recipient  = buf.getAddressOrAlias()
+      val recipient  = buf.getAddressOrAlias(None)
       val attachment = buf.getByteArrayWithLength
 
       TransferTransaction(

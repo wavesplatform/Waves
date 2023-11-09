@@ -21,7 +21,7 @@ class GrpcReflectionApiSuite extends GrpcBaseTransactionSuite {
 
   test("successful getServerReflectionInfo call for BU") {
     val buChannel = ManagedChannelBuilder
-      .forAddress(nodes.head.networkAddress.getHostString, nodes.head.nodeExternalPort(6881))
+      .forAddress(nodes.head.nodeApiEndpoint.getHost, nodes.head.nodeExternalPort(6881))
       .usePlaintext()
       .build()
     val call    = buChannel.newCall(getServerReflectionInfoMethod, CallOptions.DEFAULT)

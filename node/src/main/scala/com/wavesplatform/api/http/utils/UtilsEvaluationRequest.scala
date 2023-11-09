@@ -74,17 +74,14 @@ case class UtilsInvocationRequest(
       id       <- decodeBase58(id)
       functionCall = InvokeScriptRequest.buildFunctionCall(call)
       feeAssetId <- feeAssetId.traverse(decodeBase58)
-      sender <-
-        if (sender.nonEmpty || senderPK == DefaultPublicKey)
-          sender
-            .map(Address.fromString(_, None).map(a => RideAddress(ByteStr(a.bytes))))
-            .getOrElse(Right(RideAddress(ByteStr(new Array[Byte](26)))))
-        else
-          Right(RideAddress(ByteStr(senderPK.toAddress.bytes)))
+      senderAddress <- sender
+        .fold(RideAddress(ByteStr(senderPK.toAddress.bytes)).asRight[ValidationError]) { s =>
+          Address.fromString(s).map(a => RideAddress(ByteStr(a.bytes)))
+        }
       payments <- AttachedPaymentExtractor
         .extractPayments(payment, V6, blockchainAllowsMultiPayment = true, smart.DApp)
         .leftMap(GenericError(_))
-    } yield Invocation(functionCall, sender, senderPK, sender, senderPK, payments, id, fee, feeAssetId)
+    } yield Invocation(functionCall, senderAddress, senderPK, senderAddress, senderPK, payments, id, fee, feeAssetId)
 
   private def decodeBase58(base58: String): Either[ValidationError, ByteStr] =
     ByteStr.decodeBase58(base58).toEither.leftMap(e => GenericError(String.valueOf(e.getMessage)))

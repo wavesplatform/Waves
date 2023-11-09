@@ -1124,6 +1124,52 @@ class UtilsRouteEvaluateSpec
     }
   }
 
+  "SAPI-833. correctly sent chainId when sender is not set" in {
+    val dappAccount    = TxHelpers.signer(224)
+    val anotherAccount = TxHelpers.signer(224)
+    withDomain(RideV6, Seq(AddrWithBalance(dappAccount.toAddress, 20.waves))) { d =>
+      val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+      d.appendBlock(
+        TxHelpers.setScript(
+          dappAccount,
+          TestCompiler(V6).compileContract("""@Callable(i)
+                                             |func returnCallerData() = {
+                                             |  ([], i.caller.toString() + i.callerPublicKey.toBase58String())
+                                             |}
+                                             |""".stripMargin)
+        )
+      )
+
+      import UtilsApiRoute.{DefaultAddress, DefaultPublicKey}
+
+      val callerData = Table(
+        ("senderPublicKey", "sender", "expectedResult"),
+        (JsNull, JsNull, s"$DefaultAddress$DefaultPublicKey"),
+        (JsString(DefaultPublicKey.toString), JsNull, s"$DefaultAddress$DefaultPublicKey"),
+        (JsNull, JsString(DefaultAddress.toString), s"$DefaultAddress$DefaultPublicKey"),
+        (JsString(dappAccount.publicKey.toString), JsNull, s"${dappAccount.toAddress}${dappAccount.publicKey}"),
+        (JsNull, JsString(dappAccount.toAddress.toString), s"${dappAccount.toAddress}$DefaultPublicKey"),
+        (
+          JsString(dappAccount.publicKey.toString),
+          JsString(anotherAccount.toAddress.toString),
+          s"${anotherAccount.toAddress}${dappAccount.publicKey}"
+        )
+      )
+
+      forAll(callerData) { case (senderPublicKey, sender, resultStr) =>
+        Post(
+          routePath(s"/script/evaluate/${dappAccount.toAddress}"),
+          Json.obj("sender" -> sender, "senderPublicKey" -> senderPublicKey, "call" -> Json.obj("function" -> JsString("returnCallerData")))
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "message").asOpt[String] should not be defined
+          (responseAs[JsObject] \ "result" \ "value" \ "_2" \ "value").as[String] shouldBe resultStr
+          (responseAs[JsObject] \ "call").asOpt[JsObject] shouldBe defined
+        }
+      }
+
+    }
+  }
+
   private def dApp(caller: Address, callerPk: PublicKey, asset: IssuedAsset) =
     TestCompiler(V6).compileContract(
       s"""
@@ -1146,14 +1192,14 @@ class UtilsRouteEvaluateSpec
          | @Callable(i)
          | func default() = {
          |   let check =
-         |     this                    == Address(base58'$defaultAddress')            &&
-         |     i.caller                == Address(base58'${"1" * 26}')                &&
-         |     i.originCaller          == Address(base58'${"1" * 26}')                &&
-         |     i.callerPublicKey       == base58'${"1" * 32}'                         &&
-         |     i.originCallerPublicKey == base58'${"1" * 32}'                         &&
-         |     i.fee                   == 500000                                      &&
-         |     i.payments              == []                                          &&
-         |     i.transactionId         == base58'${"1" * 32}'                         &&
+         |     this                    == Address(base58'$defaultAddress')                 &&
+         |     i.caller                == Address(base58'${UtilsApiRoute.DefaultAddress}') &&
+         |     i.originCaller          == Address(base58'${UtilsApiRoute.DefaultAddress}') &&
+         |     i.callerPublicKey       == base58'${"1" * 32}'                              &&
+         |     i.originCallerPublicKey == base58'${"1" * 32}'                              &&
+         |     i.fee                   == 500000                                           &&
+         |     i.payments              == []                                               &&
+         |     i.transactionId         == base58'${"1" * 32}'                              &&
          |     i.feeAssetId            == unit
          |   if (check) then [] else throw("wrong")
          | }

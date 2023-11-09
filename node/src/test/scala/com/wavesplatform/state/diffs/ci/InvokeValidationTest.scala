@@ -23,7 +23,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
 
   property("invoke by alias with wrong chainId") {
     withDomain(RideV5) { d =>
-      val alias = Alias.fromString("alias:X:alias").explicitGet()
+      val alias = Alias.fromString("alias:X:alias", Some('X'.toByte)).explicitGet()
       d.appendBlockE(invoke(alias)) should produce("Address belongs to another network: expected: 84(T), actual: 88(X)")
     }
   }

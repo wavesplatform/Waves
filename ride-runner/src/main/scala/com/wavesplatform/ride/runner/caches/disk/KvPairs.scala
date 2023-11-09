@@ -188,8 +188,8 @@ object KvPairs {
         AsBytes.optional(weighedAssetDescriptionAsBytes)
       )
 
-  val aliasAsBytes: AsBytes[Alias]                = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
-  private val aliasWithLenAsBytes: AsBytes[Alias] = AsBytes.byteArrayAsBytes.withIntLen.transform(Alias.fromBytes(_).explicitGet(), _.bytes)
+  val aliasAsBytes: AsBytes[Alias]                = AsBytes.byteArrayAsBytes.consumeAll.transform(Alias.fromBytes(_, None).explicitGet(), _.bytes)
+  private val aliasWithLenAsBytes: AsBytes[Alias] = AsBytes.byteArrayAsBytes.withIntLen.transform(Alias.fromBytes(_, None).explicitGet(), _.bytes)
   object AliasesByHeight extends KvPair[state.Height, List[Alias]](79)(implicitly, AsBytes.listAsBytes.consumeAll(aliasWithLenAsBytes))
   object Aliases         extends KvPair[Alias, (state.Height, Option[AddressId])](80)(aliasAsBytes, implicitly)
 

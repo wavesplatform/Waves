@@ -123,7 +123,7 @@ class WavesEnvironmentRebenchmark {
   @Benchmark
   def biggestDataEntries(bh: Blackhole, st: St): Unit = {
     val address = Recipient.Address(
-      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf").explicitGet().bytes)
+      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf", None).explicitGet().bytes)
     )
     val checkBinaryOrString = Random.nextBoolean()
     if (checkBinaryOrString) {
@@ -139,7 +139,7 @@ object WavesEnvironmentRebenchmark {
     lazy val allAliases: Vector[Alias] = {
       val builder = Vector.newBuilder[Alias]
       db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
-        builder += Alias.fromBytes(e.getKey.drop(2)).explicitGet()
+        builder += Alias.fromBytes(e.getKey.drop(2), None).explicitGet()
       }
       builder.result()
     }

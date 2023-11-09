@@ -168,7 +168,7 @@ class CommonValidationTest extends PropSpec with WithState {
 
       val invChainId    = '#'.toByte
       val invChainAddr  = recipient.toAddress(invChainId)
-      val invChainAlias = Alias.createWithChainId("test", invChainId).explicitGet()
+      val invChainAlias = Alias.createWithChainId("test", invChainId, Some(invChainId)).explicitGet()
       Seq(
         TxHelpers.genesis(invChainAddr, amount),
         TxHelpers.payment(master, invChainAddr, amount),
