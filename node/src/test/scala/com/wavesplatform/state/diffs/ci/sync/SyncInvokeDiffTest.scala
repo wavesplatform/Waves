@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -25,6 +25,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
   import DomainPresets._
 
   private val fsWithV5 = RideV5.blockchainSettings.functionalitySettings
+  private val fsWithV6 = RideV6.blockchainSettings.functionalitySettings
 
   private val invoker        = TxHelpers.signer(0)
   private val dApp           = TxHelpers.signer(1)
@@ -1311,6 +1312,130 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
         diff.errorMessage(invokeTx.id()) shouldBe None
         bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe transferAssetAmount
         bc.balance(thirdAcc.toAddress, IssuedAsset(paymentIssue.id())) shouldBe paymentAssetAmount
+    }
+  }
+
+  property("Throw with message inside invoke") {
+    val script =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func bar() = throw("fail") # 1 (throw)
+           """.stripMargin
+      )
+
+    val script1 =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |    strict a = 1${" + 1" * 1000} # 1001 = 1000 (+) + 1 (strict)
+           |    strict r = invoke(Alias("alias"), "bar", [], []) # 77 = 75 (invoke) + 1 (Alias) + 1 (strict)
+           |    []
+           | }
+           """.stripMargin
+      )
+
+    val gTx1 = TxHelpers.genesis(dAppAddress)
+    val gTx2 = TxHelpers.genesis(invokerAddress)
+    val gTx3 = TxHelpers.genesis(thirdAcc.toAddress)
+
+    val aliasTx1 = TxHelpers.createAlias("alias", thirdAcc)
+    val ssTx = TxHelpers.setScript(dApp, script1)
+    val ssTx1 = TxHelpers.setScript(thirdAcc, script)
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, Nil, fee = TestValues.invokeFee(issues = 0))
+    val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx1, ssTx1, ssTx)
+
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
+      case (diff, _) =>
+        diff.scriptsComplexity shouldBe 1079
+    }
+  }
+
+  property("Throw with message inside callable") {
+    val script =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |    let a = 1${" + 1" * 1000} # 1000 (+)
+           |    if (a == 1) then [] else throw("xxx") # 2 = 1 (==) + 1 (throw)
+           | }
+         """.stripMargin
+      )
+
+    val gTx1 = TxHelpers.genesis(dAppAddress)
+    val gTx2 = TxHelpers.genesis(invokerAddress)
+
+    val ssTx = TxHelpers.setScript(dApp, script)
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, Nil, fee = TestValues.invokeFee(issues = 0))
+    val genesisTxs = Seq(gTx1, gTx2, ssTx)
+
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
+      case (diff, _) =>
+        diff.scriptsComplexity shouldBe 1002
+    }
+  }
+
+  property("Throw without message inside invoke") {
+    val script =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func bar() = throw() # 1 (throw)
+           """.stripMargin
+      )
+
+    val script1 =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |    strict a = 1${" + 1" * 1000} # 1001 = 1000 (+) + 1 (strict)
+           |    strict r = invoke(Alias("alias"), "bar", [], []) # 77 = 75 (invoke) + 1 (Alias) + 1 (strict)
+           |    []
+           | }
+           """.stripMargin
+      )
+
+    val gTx1 = TxHelpers.genesis(dAppAddress)
+    val gTx2 = TxHelpers.genesis(invokerAddress)
+    val gTx3 = TxHelpers.genesis(thirdAcc.toAddress)
+
+    val aliasTx1 = TxHelpers.createAlias("alias", thirdAcc)
+    val ssTx = TxHelpers.setScript(dApp, script1)
+    val ssTx1 = TxHelpers.setScript(thirdAcc, script)
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, Nil, fee = TestValues.invokeFee(issues = 0))
+    val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx1, ssTx1, ssTx)
+
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
+      case (diff, _) =>
+        diff.scriptsComplexity shouldBe 1079
+    }
+  }
+
+  property("Throw without message inside callable") {
+    val script =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |    let a = 1${" + 1" * 1000} # 1000 (+)
+           |    if (a == 1) then [] else throw() # 2 = 1 (==) + 1 (throw)
+           | }
+           """.stripMargin
+      )
+
+    val gTx1 = TxHelpers.genesis(dAppAddress)
+    val gTx2 = TxHelpers.genesis(invokerAddress)
+
+    val ssTx = TxHelpers.setScript(dApp, script)
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, Nil, fee = TestValues.invokeFee(issues = 0))
+    val genesisTxs = Seq(gTx1, gTx2, ssTx)
+
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
+      case (diff, _) =>
+        diff.scriptsComplexity shouldBe 1002
     }
   }
 }
