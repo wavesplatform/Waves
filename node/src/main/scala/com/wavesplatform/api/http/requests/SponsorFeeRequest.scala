@@ -4,7 +4,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs}
+import com.wavesplatform.transaction.Proofs
 import play.api.libs.json.{Format, Json}
 
 object SponsorFeeRequest {
@@ -24,7 +24,7 @@ case class SponsorFeeRequest(
 case class SignedSponsorFeeRequest(
     version: Option[Byte],
     senderPublicKey: String,
-    assetId: String,
+    assetId: IssuedAsset,
     minSponsoredAssetFee: Option[Long],
     fee: Long,
     timestamp: Long,
@@ -33,7 +33,6 @@ case class SignedSponsorFeeRequest(
   def toTx: Either[ValidationError, SponsorFeeTransaction] =
     for {
       _sender <- PublicKey.fromBase58String(senderPublicKey)
-      _asset  <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(IssuedAsset(_))
-      t       <- SponsorFeeTransaction.create(version.getOrElse(1.toByte), _sender, _asset, minSponsoredAssetFee.filterNot(_ == 0), fee, timestamp, proofs)
+      t <- SponsorFeeTransaction.create(version.getOrElse(1.toByte), _sender, assetId, minSponsoredAssetFee.filterNot(_ == 0), fee, timestamp, proofs)
     } yield t
 }

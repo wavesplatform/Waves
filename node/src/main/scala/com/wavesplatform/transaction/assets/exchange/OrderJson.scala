@@ -132,15 +132,7 @@ object OrderJson {
     )
   }
 
-  private val assetReads: Reads[Asset] = {
-    case JsNull | JsString("") => JsSuccess(Waves)
-    case JsString(s) =>
-      AssetPair.extractAssetId(s) match {
-        case Failure(_)       => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
-        case Success(assetId) => JsSuccess(assetId)
-      }
-    case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
-  }
+  val assetReads: Reads[Asset] = Asset.assetReads(true)
 
   implicit val assetPairReads: Reads[AssetPair] = {
     val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(assetReads) and
@@ -205,9 +197,7 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").read[Byte] and
-      (JsPath \ "matcherFeeAssetId")
-        .readNullable[Array[Byte]]
-        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_)))) and
+      (JsPath \ "matcherFeeAssetId").readNullable[Asset].map(_.getOrElse(Waves)) and
       (JsPath \ "eip712Signature")
         .readNullable[String]
         .map(_.map(EthEncoding.toBytes)) and

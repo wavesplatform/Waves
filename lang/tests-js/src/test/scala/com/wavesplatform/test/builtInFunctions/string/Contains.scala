@@ -15,7 +15,7 @@ object Contains extends JsTestBase {
   private val invalidErrorContains         = testData.invalidFunctionError("contains", 2)
 
   val tests: Tests = Tests {
-    test("contains functions compiles") {
+    test("RIDE-208. function contains should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -30,7 +30,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test("compilation error contains functions") {
+    test("RIDE-209. function contains throw a compilation error for invalid data") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -48,7 +48,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function for V3") {
+    test("RIDE-210. Can't find a function contains for RIDE V3") {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
         val script = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, contains)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

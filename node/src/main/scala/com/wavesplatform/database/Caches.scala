@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import java.{lang, util}
+import java.{util, lang}
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -198,6 +198,7 @@ abstract class Caches extends Blockchain with Storage {
   protected def loadApprovedFeatures(): Map[Short, Int]
   override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
 
+  // Also contains features those will be activated in the future (activationHeight > currentHeight), because they were approved now or before.
   @volatile
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
@@ -281,7 +282,7 @@ abstract class Caches extends Blockchain with Storage {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
 
     val updatedBalanceNodes = for {
-      ((address, asset), amount) <- snapshot.balances
+      case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
       prevBalance = balancesCache.get(key) if prevBalance.balance != amount
     } yield key -> (
@@ -394,7 +395,7 @@ object Caches {
   def cache[K <: AnyRef, V <: AnyRef](
       maximumSize: Int,
       loader: K => V,
-      batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { _: lang.Iterable[? <: K] => new util.HashMap[K, V]() }
+      batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { (_: lang.Iterable[? <: K]) => new util.HashMap[K, V]() }
   ): LoadingCache[K, V] =
     CacheBuilder
       .newBuilder()

@@ -21,7 +21,7 @@ object IsDataStorageUntouched extends JsTestBase {
   private val invalidFunctionErrorResult: String  = invalidFunctionError("isDataStorageUntouched", 1)
 
   val tests: Tests = Tests {
-    test("functions IsDataStorageUntouched accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-20. Compile isDataStorageUntouched functions for address, alias, and 'this'") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -40,7 +40,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test("Non-matching types for function is DataStorageUntouched") {
+    test("RIDE-21. Non-matching types for function isDataStorageUntouched") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -55,7 +55,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test("Invalid data for functions isDataStorageUntouched") {
+    test("RIDE-22. Invalid data for functions isDataStorageUntouched") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -71,7 +71,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test("Can't find functions isDataStorageUntouched dataStorage accountDataStorage for old Versions") {
+    test("RIDE-23. Can't find functions isDataStorageUntouched dataStorage accountDataStorage for old Versions") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
