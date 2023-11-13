@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
 import java.nio.ByteBuffer
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
@@ -99,7 +100,7 @@ class BalanceIterator(
     address: Address,
     underlying: Iterator[Seq[(IssuedAsset, Long)]],
     includeAsset: IssuedAsset => Boolean,
-    private var pendingOverrides: Map[(Address, Asset), Long],
+    private var pendingOverrides: VectorMap[(Address, Asset), Long],
     maybeAfter: Option[IssuedAsset]
 ) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
   private def nextOverride(): Seq[(IssuedAsset, Long)] =
@@ -109,8 +110,9 @@ class BalanceIterator(
         case ((`address`, asset: IssuedAsset), balance) if includeAsset(asset) =>
           asset -> balance
       }
-      pendingOverrides = Map.empty
-      maybeAfter.filter(balances.contains)
+      pendingOverrides = VectorMap.empty
+      maybeAfter
+        .filter(balances.contains)
         .fold(balances)(after => balances.dropWhile(_._1 != after).drop(1))
         .toSeq
     }
