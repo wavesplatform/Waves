@@ -29,6 +29,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
+import monix.execution.atomic.AtomicLong
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
@@ -44,7 +45,7 @@ object TxHelpers {
 
   def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
     val firstAccountNum = 100
-    val lastAccountNum = firstAccountNum + numberAccounts
+    val lastAccountNum  = firstAccountNum + numberAccounts
     val accountsSeq = (firstAccountNum until lastAccountNum).map { num =>
       val recipient = signer(num).toAddress
       ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
@@ -54,11 +55,8 @@ object TxHelpers {
 
   val matcher: SeedKeyPair = defaultSigner
 
-  private[this] var lastTimestamp = System.currentTimeMillis()
-  def timestamp: Long = {
-    lastTimestamp += 1
-    lastTimestamp
-  }
+  private[this] val lastTimestamp = AtomicLong(System.currentTimeMillis())
+  def timestamp: Long             = lastTimestamp.getAndIncrement()
 
   @throws[IllegalArgumentException]
   def signature(sig: String): Proofs =

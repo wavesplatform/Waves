@@ -13,7 +13,7 @@ object LastIndexOf extends JsTestBase {
   private val invalidLastIndexOfArgBeforeFunc = "bar.indexOf(bar, foo)"
 
   val tests: Tests = Tests {
-    test("LastIndexOf functions compiles with a list") {
+    test("RIDE-160. Function LastIndexOf should compile for valid list") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -30,7 +30,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test("Compilation errors LastIndexOf functions") {
+    test("RIDE-161. Function IndexOf should throw an error for invalid data or type") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

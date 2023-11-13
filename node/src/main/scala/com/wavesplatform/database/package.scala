@@ -634,12 +634,14 @@ package object database {
 
   def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
-    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> (data.transaction match {
-      case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
-      case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
-      case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
-      case _                          => throw new IllegalArgumentException("Illegal transaction data")
-    })
+    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> toVanillaTransaction(data.transaction)
+  }
+
+  def toVanillaTransaction(tx: pb.TransactionData.Transaction): Transaction = tx match {
+    case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
+    case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
+    case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
+    case _                          => throw new IllegalArgumentException("Illegal transaction data")
   }
 
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {

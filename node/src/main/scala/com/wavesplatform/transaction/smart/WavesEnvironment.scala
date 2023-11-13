@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits.catsSyntaxSemigroup
+import cats.Id
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
@@ -41,6 +42,16 @@ import scala.util.Try
 
 object WavesEnvironment {
   type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
+
+  def apply(
+      nByte: Byte,
+      in: Coeval[Environment.InputEntity],
+      h: Coeval[Int],
+      blockchain: Blockchain,
+      tthis: Environment.Tthis,
+      ds: DirectiveSet,
+      txId: ByteStr
+  ): WavesEnvironment = new WavesEnvironment(nByte, in, h, blockchain, tthis, ds, txId, blockchain)
 }
 
 class WavesEnvironment(
@@ -50,15 +61,16 @@ class WavesEnvironment(
     blockchain: Blockchain,
     val tthis: Environment.Tthis,
     ds: DirectiveSet,
-    override val txId: ByteStr
+    override val txId: ByteStr,
+    blockchainForRuntime: Blockchain
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment.*
 
-  def currentBlockchain(): Blockchain = blockchain
+  def currentBlockchain(): Blockchain = blockchainForRuntime
 
   override def height: Long = h()
 
-  override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
+  override def multiPaymentAllowed: Boolean = blockchainForRuntime.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
     // There are no new transactions in currentBlockchain
@@ -66,7 +78,7 @@ class WavesEnvironment(
       .transactionInfo(ByteStr(id))
       .filter(_._1.status == TxMeta.Status.Succeeded)
       .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
-      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
+      .map(tx => RealTransactionWrapper(tx, blockchainForRuntime, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity = in()
 
@@ -111,7 +123,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr, chainId)
+            .fromBytes(bytes.arr, Some(chainId))
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
@@ -205,7 +217,7 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
       generatorPublicKey = blockH.generator,
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      if (blockchainForRuntime.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
         getRewards(blockH.generator, bHeight)
       else List.empty
@@ -274,6 +286,7 @@ class WavesEnvironment(
           }
         val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (fullBlockReward - configAddressesReward.map(_._2).sum)
 
+        import com.wavesplatform.utils.byteStrOrdering
         (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
       }
     }
@@ -361,6 +374,15 @@ object DAppEnvironment {
   }
 }
 
+trait DAppEnvironmentInterface extends Environment[Id] {
+  def ds: DirectiveSet
+  def remainingCalls: Int
+  def availableActions: ActionLimits
+  def availablePayments: Int
+  def currentSnapshot: StateSnapshot
+  def invocationRoot: DAppEnvironment.InvocationTreeTracker
+}
+
 // todo move to separate class
 // Not thread safe
 class DAppEnvironment(
@@ -369,7 +391,7 @@ class DAppEnvironment(
     h: Coeval[Int],
     blockchain: Blockchain,
     tthis: Environment.Tthis,
-    ds: DirectiveSet,
+    val ds: DirectiveSet,
     rootVersion: StdLibVersion,
     tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
@@ -382,8 +404,10 @@ class DAppEnvironment(
     var availableActions: ActionLimits,
     var availablePayments: Int,
     var currentSnapshot: StateSnapshot,
-    val invocationRoot: DAppEnvironment.InvocationTreeTracker
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
+    val invocationRoot: DAppEnvironment.InvocationTreeTracker,
+    wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id(), blockchain)
+    with DAppEnvironmentInterface {
 
   private[this] var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
@@ -444,7 +468,8 @@ class DAppEnvironment(
           availableActions,
           availablePayments,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
-          invocationTracker
+          invocationTracker,
+          wrapDAppEnv
         )(invoke)
       fixedSnapshot = snapshot
         .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))

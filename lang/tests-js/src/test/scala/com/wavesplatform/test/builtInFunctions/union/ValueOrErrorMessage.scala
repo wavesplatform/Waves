@@ -22,7 +22,7 @@ object ValueOrErrorMessage extends JsTestBase {
   private val valueOrErrorInvalidFunctionMessage      = testData.invalidFunctionError("valueOrErrorMessage", 2)
 
   val tests: Tests = Tests {
-    test("valueOrElse functions are compiled with different data types") {
+    test("RIDE-235. valueOrErrorMessage functions are compiled with valid data types.") {
       for (version <- actualVersions) {
         for (
           (dataType, firstData, function) <- Seq(
@@ -41,7 +41,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test("invalid functions valueOrError") {
+    test("RIDE-236. valueOrErrorMessage function should throw a compilation error for invalid data.") {
       for (version <- actualVersions) {
         for (
           (dataType, firstData, function, error) <- Seq(

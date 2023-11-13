@@ -12,7 +12,7 @@ object AddressFromRecipient extends JsTestBase {
   private val invalidFunc                       = "addressFromRecipient()"
 
   val tests: Tests = Tests {
-    test("functions addressFromRecipient compiles for address, alias and 'this'") {
+    test("RIDE-24. Compile addressFromRecipient function for address, alias, and 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -31,7 +31,7 @@ object AddressFromRecipient extends JsTestBase {
       }
     }
 
-    test("addressFromRecipient Non-matching types: expected: Address|Alias") {
+    test("RIDE-25. Invalid data for functions addressFromRecipient") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -46,7 +46,7 @@ object AddressFromRecipient extends JsTestBase {
       }
     }
 
-    test("Function 'addressFromRecipient' requires 1 arguments") {
+    test("RIDE-26. Function 'addressFromRecipient' requires 1 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForAddressFromRecipient(

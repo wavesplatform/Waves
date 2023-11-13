@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 
 object TransferTxValidator extends TxValidator[TransferTransaction] {
   override def validate(transaction: TransferTransaction): ValidatedNel[ValidationError, TransferTransaction] = {
-    import transaction._
+    import transaction.*
     V.seq(transaction)(
       V.transferAttachment(attachment),
       V.addressChainId(recipient, chainId)
