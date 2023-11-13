@@ -302,10 +302,10 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       })
     }
 
-  def assertBalanceInvariant(snapshot: StateSnapshot, db: RocksDBWriter, reward: Long = 0): Unit = {
+  def assertBalanceInvariant(snapshot: StateSnapshot, db: RocksDBWriter, rewardAndFee: Long = 0): Unit = {
     snapshot.balances.toSeq
       .map {
-        case ((`defaultAddress`, Waves), balance) => Waves -> (balance - db.balance(defaultAddress, Waves) - reward)
+        case ((`defaultAddress`, Waves), balance) => Waves -> (balance - db.balance(defaultAddress, Waves) - rewardAndFee)
         case ((address, asset), balance)          => asset -> (balance - db.balance(address, asset))
       }
       .groupMap(_._1)(_._2)

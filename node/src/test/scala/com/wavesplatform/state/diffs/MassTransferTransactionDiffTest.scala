@@ -47,7 +47,9 @@ class MassTransferTransactionDiffTest extends PropSpec with WithDomain {
           d.appendBlock(genesis)
           d.appendBlock(issue)
           d.appendBlock(transfer)
-          assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, (issue.fee.value - transfer.fee.value) * 3 / 5)
+
+          val carryFee = (issue.fee.value - transfer.fee.value) * 3 / 5
+          assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
 
           val totalAmount = transfer.transfers.map(_.amount.value).sum
           val fees        = issue.fee.value + transfer.fee.value

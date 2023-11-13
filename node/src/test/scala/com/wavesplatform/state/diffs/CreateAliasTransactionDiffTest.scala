@@ -69,7 +69,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithDomain {
         d.appendBlock(anotherAliasTx)
         d.liquidSnapshot.balances.collect {
           case ((`defaultAddress`, Waves), balance) =>
-            balance - d.rocksDBWriter.balance(defaultAddress) + (anotherAliasTx.fee.value - aliasTx.fee.value) / 5 * 3
+            val carryFee = (anotherAliasTx.fee.value - aliasTx.fee.value) / 5 * 3
+            balance - d.rocksDBWriter.balance(defaultAddress) + carryFee
           case ((address, Waves), balance) =>
             balance - d.rocksDBWriter.balance(address)
         }.sum shouldBe 0

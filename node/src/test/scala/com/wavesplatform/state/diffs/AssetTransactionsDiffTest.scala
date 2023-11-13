@@ -59,7 +59,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       d.liquidSnapshot.balances.toSeq
         .map {
           case ((`defaultAddress`, Waves), amount) =>
-            Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) + (-issue.fee.value + reissue.fee.value + burn.fee.value) / 5 * 3)
+            val carryFee = (-issue.fee.value + reissue.fee.value + burn.fee.value) / 5 * 3
+            Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) + carryFee)
           case ((address, asset), amount) =>
             asset -> (amount - d.rocksDBWriter.balance(address, asset))
         }

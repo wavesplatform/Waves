@@ -18,7 +18,8 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
       d.appendAndAssertSucceed(wavesTransfer)
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves - wavesTransfer.fee.value * 3 / 5)
+      val rewardFee = 6.waves - wavesTransfer.fee.value * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, rewardFee)
       d.blockchain.balance(recipient) shouldBe wavesTransfer.amount.value
       d.blockchain.balance(sender) shouldBe ENOUGH_AMT - wavesTransfer.amount.value - wavesTransfer.fee.value
     }
@@ -27,7 +28,8 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
       d.appendAndAssertSucceed(assetTransfer)
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves + (1.waves - assetTransfer.fee.value) * 3 / 5)
+      val rewardAndFee = 6.waves + (1.waves - assetTransfer.fee.value) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, rewardAndFee)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, asset) shouldBe 1000L
       d.blockchain.balance(sender) shouldBe ENOUGH_AMT - assetTransfer.fee.value - 1.waves

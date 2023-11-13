@@ -51,7 +51,8 @@ class DataTransactionDiffTest extends PropSpec with WithDomain {
       d.appendBlock(txs(0))
       d.liquidSnapshot.balances((sender, Waves)) shouldBe (ENOUGH_AMT - txs(0).fee.value)
       d.liquidSnapshot.accountData(sender)(item1.key) shouldBe item1
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, -txs(0).fee.value * 3 / 5)
+      val carryFee = -txs(0).fee.value * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
     }
 
     val item2 = items(1)
@@ -61,7 +62,8 @@ class DataTransactionDiffTest extends PropSpec with WithDomain {
       d.liquidSnapshot.balances((sender, Waves)) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee.value).sum)
       d.liquidSnapshot.accountData(sender)(item1.key) shouldBe item1
       d.liquidSnapshot.accountData(sender)(item2.key) shouldBe item2
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, -(txs(0).fee.value + txs(1).fee.value) * 3 / 5)
+      val carryFee = -(txs(0).fee.value + txs(1).fee.value) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
     }
 
     val item3 = items(2)
@@ -71,7 +73,8 @@ class DataTransactionDiffTest extends PropSpec with WithDomain {
       d.liquidSnapshot.balances((sender, Waves)) shouldBe (ENOUGH_AMT - txs.map(_.fee.value).sum)
       d.liquidSnapshot.accountData(sender)(item1.key) shouldBe item3
       d.liquidSnapshot.accountData(sender)(item2.key) shouldBe item2
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter,  -(txs(0).fee.value + txs(1).fee.value + txs(2).fee.value) * 3 / 5)
+      val carryFee = -(txs(0).fee.value + txs(1).fee.value + txs(2).fee.value) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
     }
   }
 

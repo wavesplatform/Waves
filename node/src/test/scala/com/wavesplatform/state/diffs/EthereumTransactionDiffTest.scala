@@ -99,7 +99,8 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
       val transferPayload = wavesTransfer.payload.asInstanceOf[Transfer]
 
       d.appendAndAssertSucceed(wavesTransfer)
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves - wavesTransfer.fee * 3 / 5)
+      val rewardAndFee = 6.waves - wavesTransfer.fee * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, rewardAndFee)
       d.blockchain.balance(recipient) shouldBe transferPayload.amount
       d.blockchain.balance(senderKp.toWavesAddress) shouldBe ENOUGH_AMT - transferPayload.amount - fee
     }
@@ -111,7 +112,8 @@ class EthereumTransactionDiffTest extends FlatSpec with WithDomain with DiffMatc
 
       d.appendBlock(issue, nativeTransfer)
       d.appendAndAssertSucceed(assetTransfer)
-      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, 6.waves + (issue.fee.value + nativeTransfer.fee.value - assetTransfer.fee) * 3 / 5)
+      val rewardAndFee = 6.waves + (issue.fee.value + nativeTransfer.fee.value - assetTransfer.fee) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, rewardAndFee)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, issue.asset) shouldBe issue.quantity.value
       d.blockchain.balance(senderKp.toWavesAddress) shouldBe ENOUGH_AMT - assetTransfer.fee

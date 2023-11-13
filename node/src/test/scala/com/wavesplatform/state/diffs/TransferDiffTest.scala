@@ -45,11 +45,10 @@ class TransferDiffTest extends PropSpec with WithDomain {
         d.appendBlock(genesis)
         d.appendBlock(issue1, issue2, sponsor1, sponsor2)
         d.appendBlock(transfer)
-        assertBalanceInvariant(
-          d.liquidSnapshot,
-          d.rocksDBWriter,
-          (sponsor1.fee.value + sponsor2.fee.value + issue1.fee.value + issue2.fee.value - transfer.fee.value) * 3 / 5
-        )
+
+        val carryFee = (sponsor1.fee.value + sponsor2.fee.value + issue1.fee.value + issue2.fee.value - transfer.fee.value) * 3 / 5
+        assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
+
         val recipient = transfer.recipient.asInstanceOf[Address]
         if (transfer.sender.toAddress != recipient) {
           transfer.assetId match {

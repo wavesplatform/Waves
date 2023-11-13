@@ -336,7 +336,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         d.liquidSnapshot.balances.toSeq
           .map {
             case ((`defaultAddress`, Waves), amount) =>
-              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - (issue1.fee.value + issue2.fee.value - exchange.fee.value) * 3 / 5)
+              val carryFee = (issue1.fee.value + issue2.fee.value - exchange.fee.value) * 3 / 5
+              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - carryFee)
             case ((address, asset), amount) =>
               asset -> (amount - d.rocksDBWriter.balance(address, asset))
           }
@@ -412,7 +413,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         d.liquidSnapshot.balances.toSeq
           .map {
             case ((`defaultAddress`, Waves), amount) =>
-              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - (issue1.fee.value + issue2.fee.value - exchange.fee.value) * 3 / 5)
+              val carryFee = (issue1.fee.value + issue2.fee.value - exchange.fee.value) * 3 / 5
+              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - carryFee)
             case ((address, asset), amount) =>
               asset -> (amount - d.rocksDBWriter.balance(address, asset))
           }
@@ -526,11 +528,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         d.appendBlock(issue1, issue2, issue3, issue4)
         d.appendAndAssertSucceed(exchange)
 
-        val rewardDiff = (issue1.fee.value + issue2.fee.value + issue3.fee.value + issue4.fee.value - exchange.fee.value) * 3 / 5
+        val carryFee = (issue1.fee.value + issue2.fee.value + issue3.fee.value + issue4.fee.value - exchange.fee.value) * 3 / 5
         d.liquidSnapshot.balances.toSeq
           .map {
             case ((`defaultAddress`, Waves), amount) =>
-              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - rewardDiff)
+              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - carryFee)
             case ((address, asset), amount) =>
               asset -> (amount - d.rocksDBWriter.balance(address, asset))
           }
@@ -660,10 +662,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       d.appendBlock(genesises*)
       d.appendBlock(issueTx1, issueTx2, massTransfer)
       d.appendBlock(exchanges*)
-      val rewardDiff = (issueTx1.fee.value + issueTx2.fee.value + massTransfer.fee.value - exchanges.map(_.fee.value).sum) * 3 / 5
+      val carryFee = (issueTx1.fee.value + issueTx2.fee.value + massTransfer.fee.value - exchanges.map(_.fee.value).sum) * 3 / 5
       d.liquidSnapshot.balances.toSeq
         .map {
-          case ((`defaultAddress`, Waves), amount) => Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - rewardDiff)
+          case ((`defaultAddress`, Waves), amount) => Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - carryFee)
           case ((address, asset), amount)          => asset -> (amount - d.rocksDBWriter.balance(address, asset))
         }
         .groupMap(_._1)(_._2)
@@ -779,7 +781,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         d.liquidSnapshot.balances.toSeq
           .map {
             case ((`defaultAddress`, Waves), amount) =>
-              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - (issue.fee.value - exchange.fee.value) * 3 / 5)
+              val carryFee = (issue.fee.value - exchange.fee.value) * 3 / 5
+              Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) - carryFee)
             case ((address, asset), amount) =>
               asset -> (amount - d.rocksDBWriter.balance(address, asset))
           }
