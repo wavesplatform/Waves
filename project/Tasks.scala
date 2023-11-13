@@ -140,8 +140,8 @@ object Tasks {
         .max
 
     val (v1V2Vars, v1V2Funcs) = readV1V2Data()
-    val fromV3FuncDefs        = (3 to currentRideVersion).map(v => s"lazy val funcsV$v = ${readFuncs(v)}").mkString("\n")
-    val fromV3VarDefs         = (3 to currentRideVersion).map(v => s"lazy val varsV$v = ${readVars(v)}").mkString("\n")
+    val fromV3FuncDefs        = (3 to currentRideVersion).map(v => s"lazy val funcsV$v = ${readFuncs(v)}").mkString("\n    ")
+    val fromV3VarDefs         = (3 to currentRideVersion).map(v => s"lazy val varsV$v = ${readVars(v)}").mkString("\n    ")
     val fromV3Vars            = (3 to currentRideVersion).map(v => s"varsV$v").mkString(" ++ ")
     val fromV3Funcs           = (3 to currentRideVersion).map(v => s"funcsV$v").mkString(" ++ ")
     val types                 = (1 to currentRideVersion).map(v => readTypeData(v.toString)).mkString(" ++ ")

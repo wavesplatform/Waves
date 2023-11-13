@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import shapeless.*
+import shapeless3.*
 
 case class CompilerContext(
     predefTypes: Map[String, FINAL],

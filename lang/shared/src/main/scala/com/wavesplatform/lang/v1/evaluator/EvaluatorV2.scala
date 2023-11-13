@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.*
 import monix.eval.Coeval
-import shapeless.syntax.std.tuple.*
+import shapeless3.syntax.std.tuple.*
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer

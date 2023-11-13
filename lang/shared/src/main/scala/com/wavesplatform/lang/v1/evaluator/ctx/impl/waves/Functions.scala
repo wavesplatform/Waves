@@ -25,7 +25,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
 import com.wavesplatform.lang.{CoevalF, CommonError, ExecutionError, FailOrRejectError, ThrownError, toError}
 import monix.eval.Coeval
-import shapeless.Coproduct.unsafeGet
+import shapeless3.Coproduct.unsafeGet
 
 object Functions {
   private def getDataFromStateF(name: String, internalName: Short, dataType: DataType, selfCall: Boolean): BaseFunction[Environment] = {

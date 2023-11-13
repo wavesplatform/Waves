@@ -140,30 +140,33 @@ lazy val `waves-node` = (project in file("."))
     benchmark,
     `repl-js`,
     `repl-jvm`,
-    `ride-runner`
+//    `ride-runner`
   )
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.14",
+    scalaVersion         := "3.3.1",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     publish / skip       := true,
     scalacOptions ++= Seq(
-      "-Xsource:3",
+//      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",
       "-language:higherKinds",
       "-language:implicitConversions",
       "-language:postfixOps",
-      "-Ywarn-unused:-implicits",
-      "-Xlint",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
-      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
-      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s",
+      "-explain",
+      "-Ykind-projector",
+      "-source:future"
+//      "-Ywarn-unused:-implicits",
+//      "-Xlint",
+//      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
+//      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
+//      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s",
       "-Wconf:cat=deprecation&site=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s"
     ),
     crossPaths        := false,
@@ -236,7 +239,7 @@ checkPRRaw := Def
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
       (`node-generator` / Compile / compile).value
-      (`ride-runner` / Test / compile).value
+//      (`ride-runner` / Test / compile).value
     }
   )
   .value

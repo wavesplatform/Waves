@@ -12,7 +12,7 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.3"
+  private def kamonModule(module: String) = ("io.kamon" %% s"kamon-$module" % "2.7.3").cross(CrossVersion.for3Use2_13)
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -24,7 +24,7 @@ object Dependencies {
 
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
-  val akkaHttp        = akkaHttpModule("akka-http")
+  val akkaHttp        = akkaHttpModule("akka-http").cross(CrossVersion.for3Use2_13)
   val googleGuava     = "com.google.guava"    % "guava"             % "33.2.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
@@ -34,9 +34,9 @@ object Dependencies {
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.100.Final"
 
-  val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.12")
+  val shapeless = Def.setting("org.typelevel" %% "shapeless3-deriving" % "3.0.1")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.10.6"
+  val playJson = "org.playframework" %% "play-json" % "3.0.3"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.3" % Test)
@@ -50,8 +50,8 @@ object Dependencies {
 
   val langCompilerPlugins = Def.setting(
     Seq(
-      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-      kindProjector
+//      compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
+//      kindProjector
     )
   )
 
@@ -86,7 +86,7 @@ object Dependencies {
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.18.0",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "6.0.0"
+    ("org.scalamock"     %% "scalamock"       % "6.0.0").cross(CrossVersion.for3Use2_13) // https://github.com/paulbutcher/ScalaMock/pull/490
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
@@ -105,7 +105,9 @@ object Dependencies {
   lazy val node = Def.setting(
     Seq(
       rocksdb,
-      ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
+      ("org.rudogma"       %%% "supertagged"              % "2.0-RC2")
+        .exclude("org.scala-js", "scalajs-library_2.13")
+        .cross(CrossVersion.for3Use2_13),
       "commons-net"          % "commons-net"              % "3.11.1",
       "commons-io"           % "commons-io"               % "2.16.1",
       "com.iheart"          %% "ficus"                    % "1.5.2",
@@ -123,7 +125,7 @@ object Dependencies {
       akkaModule("stream"),
       akkaHttp,
       "org.bitlet" % "weupnp" % "0.1.4",
-      kindProjector,
+//      kindProjector,
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
@@ -136,7 +138,7 @@ object Dependencies {
 
   lazy val nodeTests = Seq(
     akkaModule("testkit")               % Test,
-    akkaHttpModule("akka-http-testkit") % Test
+    akkaHttpModule("akka-http-testkit").cross(CrossVersion.for3Use2_13) % Test
   ) ++ test
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.2" // grpc 1.64.0 still requires 3.25
@@ -171,7 +173,7 @@ object Dependencies {
       sttp3,
       sttp3Monix,
       "org.scala-lang.modules"           %% "scala-xml"              % "2.3.0", // JUnit reports
-      akkaHttpModule("akka-http-testkit") % Test,
+      (akkaHttpModule("akka-http-testkit") % Test).cross(CrossVersion.for3Use2_13),
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
       grpcModule("grpc-inprocess")        % Test

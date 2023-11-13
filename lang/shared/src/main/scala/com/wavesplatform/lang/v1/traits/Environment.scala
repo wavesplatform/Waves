@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.*
 import monix.eval.Coeval
-import shapeless.*
+import shapeless3.*
 
 object Environment {
   case class BalanceDetails(available: Long, regular: Long, generating: Long, effective: Long)

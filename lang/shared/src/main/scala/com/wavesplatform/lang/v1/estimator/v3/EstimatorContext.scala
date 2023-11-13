@@ -5,7 +5,7 @@ import com.wavesplatform.lang.v1.estimator.EstimationError
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.task.TaskM
 import monix.eval.Coeval
-import shapeless.{Lens, lens}
+import shapeless3.{Lens, lens}
 
 private[v3] case class EstimatorContext(
     funcs: Map[FunctionHeader, (Coeval[Long], Set[String])],

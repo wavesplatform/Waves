@@ -3,7 +3,7 @@ enablePlugins(JmhPlugin)
 Jmh / version := "1.37"
 
 libraryDependencies ++= Seq(
-  "org.scodec" %% "scodec-core" % "1.11.10",
+  ("org.scodec" %% "scodec-core" % "1.11.10").cross(CrossVersion.for3Use2_13),
   "org.eclipse.collections"                % "eclipse-collections"   % "11.1.0"
 ) ++ Dependencies.logDeps
 

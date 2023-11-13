@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.LET
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, LetExecResult, LetLogCallback}
-import shapeless.{Lens, lens}
+import shapeless3.{Lens, lens}
 
 import java.util
 
