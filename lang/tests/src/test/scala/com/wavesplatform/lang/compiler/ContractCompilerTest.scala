@@ -1063,7 +1063,7 @@ class ContractCompilerTest extends PropSpec {
       )
   }
 
-  property("union as argument of non-@Callable function is allowed in V6") {
+  property("NODE-516. union as argument of non-@Callable function is allowed in V6") {
     val script =
       """
         |{-# STDLIB_VERSION 6 #-}

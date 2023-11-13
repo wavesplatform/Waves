@@ -537,7 +537,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
+  property("NODE-242. unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
     def checkForExpr(expr: String, version: StdLibVersion): Assertion = {
       val compileVersion = if (version == V6) V5 else version
       val script         = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())

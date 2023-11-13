@@ -28,10 +28,14 @@ import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
+import scala.concurrent.Await
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
 class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
 
-  val sender: KeyPair    = TxHelpers.signer(1)
-  val recipient: KeyPair = TxHelpers.signer(2)
+  val sender: KeyPair         = TxHelpers.signer(1)
+  val recipient: KeyPair      = TxHelpers.signer(2)
+  val timeout: FiniteDuration = 2.minutes
 
   "GetBalances should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
@@ -71,6 +75,28 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       )
       result2.runSyncUnsafe() shouldBe expectedResult
     }
+  }
+
+  "GetScript should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
+    val grpcApi = getGrpcApi(d)
+
+    val script = TxHelpers.script(
+      s"""{-# STDLIB_VERSION 6 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |@Callable(i)
+         |func foo(a: Int) = { ([], a == 42) }""".stripMargin
+    )
+
+    d.appendBlock(TxHelpers.setScript(sender, script))
+
+    val r = Await.result(
+      grpcApi.getScript(AccountRequest.of(ByteString.copyFrom(sender.toAddress.bytes))),
+      timeout
+    )
+
+    r.scriptBytes shouldBe ByteString.copyFrom(script.bytes().arr)
+    r.publicKey shouldBe ByteString.copyFrom(sender.publicKey.arr)
   }
 
   "GetActiveLeases should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>

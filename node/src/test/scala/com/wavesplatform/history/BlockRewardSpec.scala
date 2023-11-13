@@ -338,7 +338,6 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.carryFee(None) shouldBe 0L
       }
     }
-
     val blockWithoutFeesScenario = for {
       (_, _, miner1, miner2, genesisBlock) <- genesis
       b2 = mkEmptyBlock(genesisBlock.id(), miner1)

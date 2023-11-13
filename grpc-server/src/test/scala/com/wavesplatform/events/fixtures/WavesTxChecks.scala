@@ -23,6 +23,7 @@ import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransac
 import org.scalactic.source.Position
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 object WavesTxChecks extends Matchers with OptionValues {
   import PBAmounts.*
@@ -219,7 +220,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: InvokeScriptTransaction, publicKeyHash: Array[Byte])(implicit
+  def checkInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: TransactionBase, publicKeyHash: Array[Byte])(implicit
       pos: Position
   ): Unit = {
     checkBaseTx(actualId, actual, expected)
@@ -230,14 +231,43 @@ object WavesTxChecks extends Matchers with OptionValues {
     }
   }
 
-  def checkInvokeBaseTransactionMetadata(actual: Seq[TransactionMetadata], expected: InvokeScriptTransaction)(implicit
+  def checkEthereumInvokeTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction, publicKeyHash: Array[Byte])(
+      implicit pos: Position
+  ): Unit = {
+    checkBaseTx(actualId, actual, expected)
+    actual.transaction.wavesTransaction.value.data match {
+      case Data.InvokeScript(value) =>
+        value.dApp.get.getPublicKeyHash.toByteArray shouldBe publicKeyHash
+      case _ => fail("not a InvokeScript transaction")
+    }
+  }
+
+  def checkInvokeBaseTransactionMetadata(transactionMetadata: TransactionMetadata, expected: InvokeScriptTransaction)(implicit
       pos: Position
   ): Unit = {
-    val invokeScript = actual.head.getInvokeScript
+    val invokeScript = transactionMetadata.getInvokeScript
 
-    actual.head.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
+    transactionMetadata.senderAddress.toByteArray shouldBe expected.senderAddress.bytes
     invokeScript.dAppAddress.toByteArray shouldBe expected.dApp.bytes
     invokeScript.functionName shouldBe expected.funcCallOpt.get.function.funcName
+  }
+
+  def checkEthereumInvokeBaseTransactionMetadata(
+      transactionMetadata: TransactionMetadata,
+      expected: EthereumTransaction,
+      funcName: String,
+      dAppAddress: Address
+  )(implicit
+      pos: Position
+  ): Unit = {
+    val ethereumMetadata = transactionMetadata.getEthereum
+
+    transactionMetadata.senderAddress.toByteArray shouldBe expected.senderAddress.value().bytes
+    ethereumMetadata.getInvoke.dAppAddress.toByteArray shouldBe dAppAddress.bytes
+    ethereumMetadata.getInvoke.functionName shouldBe funcName
+    ethereumMetadata.fee shouldBe expected.fee
+    ethereumMetadata.timestamp shouldBe expected.timestamp
+    ethereumMetadata.senderPublicKey.toByteArray shouldBe expected.sender.arr
   }
 
   def checkArguments(expectedValues: List[Any], actualArguments: List[Any]): Unit = {
@@ -353,17 +383,69 @@ object WavesTxChecks extends Matchers with OptionValues {
 
   def checkEthereumTransaction(actualId: ByteString, actual: SignedTransaction, expected: EthereumTransaction)(implicit pos: Position): Unit = {
     checkBaseTx(actualId, actual, expected)
-    actual.transaction.ethereumTransaction.value.toByteArray shouldBe expected.bytes.value()
+    withClue("ethereum transaction bytes") {
+      actual.transaction.ethereumTransaction.value.toByteArray shouldBe expected.bytes()
+    }
   }
 
-  def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit = {
-    actual.map { bu =>
-      (
-        (Address.fromBytes(bu.address.toByteArray).explicitGet(), toVanillaAssetId(bu.amountAfter.value.assetId)),
-        (bu.amountBefore, bu.amountAfter.value.amount)
+  class BalanceUpdateMatcher(expected: Map[(Address, Asset), (Long, Long)]) extends Matcher[Seq[BalanceUpdate]] {
+    override def apply(actualBalances: Seq[BalanceUpdate]): MatchResult = {
+      val mismatchedBalancesB = Seq.newBuilder[(Address, Asset, (Long, Long), (Long, Long))]
+      val unexpectedBalancesB = Seq.newBuilder[BalanceUpdate]
+      val unmetExpectations = actualBalances.foldLeft(expected) { case (prevExpected, b) =>
+        val addr  = Address.fromBytes(b.address.toByteArray).explicitGet()
+        val asset = toVanillaAssetId(b.amountAfter.value.assetId)
+        prevExpected.get(addr -> asset) match {
+          case Some((expectedBefore, expectedAfter)) =>
+            if (expectedBefore != b.amountBefore || expectedAfter != b.amountAfter.value.amount) {
+              mismatchedBalancesB += ((addr, asset, (expectedBefore, expectedAfter), (b.amountBefore, b.amountAfter.value.amount)))
+            }
+            prevExpected.removed(addr -> asset)
+          case None =>
+            unexpectedBalancesB += b
+            prevExpected
+        }
+      }
+
+      val mismatched = mismatchedBalancesB.result()
+      val unexpected = unexpectedBalancesB.result()
+
+      val errorMessage = new StringBuilder("Actual balances did not match expectations.")
+      if (unmetExpectations.nonEmpty) {
+        errorMessage.append("\nThe following expected balance updates were not found:")
+        unmetExpectations.foreach { case ((address, asset), (before, after)) =>
+          errorMessage.append(s"\n$address $asset: $before->$after")
+        }
+      }
+      if (unexpected.nonEmpty) {
+        errorMessage.append("\nThe following balance updates were not expected:")
+        unexpected.foreach { b =>
+          errorMessage.append(
+            s"\n${Address.fromBytes(b.address.toByteArray).explicitGet()} ${toVanillaAssetId(b.amountAfter.value.assetId)}: ${b.amountBefore} -> ${b.amountAfter.value.amount}"
+          )
+        }
+      }
+      if (mismatched.nonEmpty) {
+        errorMessage.append("The following balances did not match:")
+        mismatched.foreach { case (address, asset, expected, actual) =>
+          errorMessage.append(
+            s"\n$address $asset: expected $expected != actual $actual"
+          )
+        }
+      }
+
+      MatchResult(
+        unmetExpectations.isEmpty && mismatched.isEmpty && unexpected.isEmpty,
+        errorMessage.toString(),
+        "Actual balances did not differ from the expected balances"
       )
-    }.toMap shouldBe expected
+    }
   }
+
+  def matchBalances(expected: Map[(Address, Asset), (Long, Long)]): Matcher[Seq[BalanceUpdate]] = new BalanceUpdateMatcher(expected)
+
+  def checkBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)])(implicit pos: Position): Unit =
+    actual should matchBalances(expected)
 
   def checkMassTransferBalances(actual: Seq[BalanceUpdate], expected: Map[(Address, Asset), (Long, Long)]): Unit = {
     val actualBalances = actual.map { bu =>

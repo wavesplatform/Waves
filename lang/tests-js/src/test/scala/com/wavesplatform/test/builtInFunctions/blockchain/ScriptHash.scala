@@ -27,7 +27,7 @@ object ScriptHash extends JsTestBase {
   private val invalidScriptHashArgBeforeFunc = s"callerTestData.scriptHash($randomStringArrayElement)"
 
   val tests: Tests = Tests {
-    test("Functions ScriptHash for V5 and more compiles for address") {
+    test("RIDE-39. ScriptHash function should compile for version V5 and higher when called for an address") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -46,7 +46,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test("negative cases ScriptHash for V5 and more") {
+    test("Ride-40. Negative cases for ScriptHash function for version V5 and higher") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -64,7 +64,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test("negative cases CalculateAssetId for version V3, V4") {
+    test("RIDE-41. Negative cases for ScriptHash function for versions V3 and V4") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
