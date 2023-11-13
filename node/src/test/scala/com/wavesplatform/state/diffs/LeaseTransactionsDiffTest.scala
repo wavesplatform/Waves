@@ -17,6 +17,8 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
 
+import scala.collection.immutable.VectorMap
+
 class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
 
   private val allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2
@@ -26,33 +28,33 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
   def total(l: LeaseBalance): Long = l.in - l.out
 
   property("can lease/cancel lease preserving waves invariant") {
-
-    val sunnyDayLeaseLeaseCancel: Seq[(GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] = {
-      val master    = TxHelpers.signer(1)
-      val recipient = TxHelpers.signer(2)
-
-      val genesis = TxHelpers.genesis(master.toAddress)
-      for {
-        lease       <- Seq(TxHelpers.lease(master, recipient.toAddress), TxHelpers.lease(master, recipient.toAddress, version = TxVersion.V1))
-        leaseCancel <- Seq(TxHelpers.leaseCancel(lease.id(), master), TxHelpers.leaseCancel(lease.id(), master, version = TxVersion.V1))
-      } yield (genesis, lease, leaseCancel)
-    }
-
-    sunnyDayLeaseLeaseCancel.foreach { case (genesis, lease, leaseCancel) =>
+    val sender    = TxHelpers.signer(1)
+    val recipient = TxHelpers.signer(2)
+    val miner     = TestBlock.defaultSigner.toAddress
+    val genesis   = TxHelpers.genesis(sender.toAddress)
+    for {
+      lease       <- Seq(TxHelpers.lease(sender, recipient.toAddress), TxHelpers.lease(sender, recipient.toAddress, version = TxVersion.V1))
+      leaseCancel <- Seq(TxHelpers.leaseCancel(lease.id(), sender), TxHelpers.leaseCancel(lease.id(), sender, version = TxVersion.V1))
+    } {
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(lease))) { case (snapshot, _) =>
-//        val totalPortfolioDiff = snapshot.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-//        totalPortfolioDiff.balance shouldBe 0
-//        total(totalPortfolioDiff.lease) shouldBe 0
-//        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
-//        totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
+        snapshot.balances shouldBe VectorMap(
+          (sender.toAddress, Waves) -> (genesis.amount.value - lease.fee.value),
+          (miner, Waves)            -> lease.fee.value
+        )
+        snapshot.leaseBalances shouldBe Map(
+          sender.toAddress    -> LeaseBalance(0, lease.amount.value),
+          recipient.toAddress -> LeaseBalance(lease.amount.value, 0)
+        )
       }
-
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis, lease))), TestBlock.create(Seq(leaseCancel))) { case (snapshot, _) =>
-//        val totalPortfolioDiff = snapshot.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-//        totalPortfolioDiff.balance shouldBe 0
-//        total(totalPortfolioDiff.lease) shouldBe 0
-//        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
-//        totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
+        snapshot.balances shouldBe VectorMap(
+          (miner, Waves)            -> (lease.fee.value + leaseCancel.fee.value),
+          (sender.toAddress, Waves) -> (genesis.amount.value - lease.fee.value - leaseCancel.fee.value)
+        )
+        snapshot.leaseBalances shouldBe Map(
+          sender.toAddress    -> LeaseBalance.empty,
+          recipient.toAddress -> LeaseBalance.empty
+        )
       }
     }
   }
