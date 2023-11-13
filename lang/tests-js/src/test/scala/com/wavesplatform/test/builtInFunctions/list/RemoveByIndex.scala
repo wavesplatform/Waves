@@ -14,7 +14,7 @@ object RemoveByIndex extends JsTestBase {
   private val invalidErrorRemoveByIndex         = testData.invalidFunctionError("removeByIndex", 2)
 
   val tests: Tests = Tests {
-    test("removeByIndex functions compiles with a list") {
+    test("RIDE-168. Function RemoveByIndex should compile for valid list") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -29,7 +29,7 @@ object RemoveByIndex extends JsTestBase {
       }
     }
 
-    test("Compilation errors RemoveByIndex functions") {
+    test("RIDE-169. Function RemoveByIndex should throw an error for invalid data or type") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

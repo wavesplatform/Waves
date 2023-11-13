@@ -262,9 +262,10 @@ case class DebugApiRoute(
       sh <- loadStateHash(height)
       h  <- blockchain.blockHeader(height)
     } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-      "blockId" -> h.id().toString,
-      "height"  -> height,
-      "version" -> Version.VersionString
+      "blockId"    -> h.id().toString,
+      "baseTarget" -> h.header.baseTarget,
+      "height"     -> height,
+      "version"    -> Version.VersionString
     )
 
     result match {

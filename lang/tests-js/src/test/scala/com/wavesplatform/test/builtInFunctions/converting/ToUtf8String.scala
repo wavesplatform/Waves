@@ -7,14 +7,13 @@ import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultStringEntry, actu
 import utest.{Tests, test}
 
 object ToUtf8String extends JsTestBase {
-  // toUtf8String
   private val toUtf8String = "toUtf8String(callerTestData)"
   private val toUtf8StringArgBeforeFunc = "callerTestData.toUtf8String()"
   private val invalidToUtf8String = "toUtf8String()"
   private val invalidToUtf8StringArgBeforeFunc = "callerTestData.toUtf8String(callerTestData)"
 
   val tests: Tests = Tests {
-    test(" Functions toUtf8String compiles") {
+    test("RIDE-83. Functions toUtf8String function should compile for valid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for ((data, function) <- Seq(
@@ -28,7 +27,7 @@ object ToUtf8String extends JsTestBase {
       }
     }
 
-    test(" toUtf8String negative tests") {
+    test("RIDE-84. toUtf8String function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for ((data, function, error) <- Seq(

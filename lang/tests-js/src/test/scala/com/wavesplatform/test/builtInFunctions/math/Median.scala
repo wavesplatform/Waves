@@ -16,7 +16,7 @@ object Median extends JsTestBase {
   private val medianError: String       = testData.invalidFunctionError("median", 1)
 
   val tests: Tests = Tests {
-    test("Median functions compiles with Int") {
+    test("RIDE-181. Median functions should compile with Int") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -31,7 +31,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test("Median functions compiles with BigInt") {
+    test("RIDE-182. Median functions should compile with BigInt for Ride V5, V6") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -46,7 +46,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test("invalid median functions with Int") {
+    test("RIDE-183. Median functions should throw an error for invalid Int data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -66,7 +66,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test("invalid median with BigInt") {
+    test("RIDE-184. Median function should throw an error for invalid BigInt data - Ride V5, V6") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (

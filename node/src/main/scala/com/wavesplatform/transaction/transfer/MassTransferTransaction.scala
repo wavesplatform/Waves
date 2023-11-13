@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, Json, OFormat}
 
 import scala.util.{Either, Try}
 
@@ -77,7 +77,7 @@ object MassTransferTransaction extends TransactionParser {
   )
 
   object Transfer {
-    implicit val jsonFormat = Json.format[Transfer]
+    implicit val jsonFormat: OFormat[Transfer] = Json.format[Transfer]
   }
 
   case class ParsedTransfer(address: AddressOrAlias, amount: TxNonNegativeAmount)

@@ -262,7 +262,7 @@ object InvokeDiffsCommon {
     import actions.*
     for {
       resultTransfers <- transferList.traverse { transfer =>
-        resolveAddress(transfer.address, blockchain)
+        resolveAddress(transfer.recipientAddressBytes, blockchain)
           .map(InvokeScriptResult.Payment(_, Asset.fromCompatId(transfer.assetId), transfer.amount))
           .leftMap {
             case f: FailedTransactionError => f.addComplexity(storingComplexity).withLog(log)
@@ -330,7 +330,7 @@ object InvokeDiffsCommon {
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
         "DApp self-payment is forbidden since V4".asLeft[Unit]
-      else if (transfers.exists(_.address.bytes == ByteStr(dAppAddress.bytes)))
+      else if (transfers.exists(_.recipientAddressBytes.bytes == ByteStr(dAppAddress.bytes)))
         "DApp self-transfer is forbidden since V4".asLeft[Unit]
       else
         ().asRight[String]

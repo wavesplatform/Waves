@@ -18,10 +18,10 @@ object PBRecipients {
     case Address.HashLength => // Compressed address
       val withHeader = Bytes.concat(Array(Address.AddressVersion, chainId), bytes)
       val checksum   = Address.calcCheckSum(withHeader)
-      Address.fromBytes(Bytes.concat(withHeader, checksum), chainId)
+      Address.fromBytes(Bytes.concat(withHeader, checksum), Some(chainId))
 
     case Address.AddressLength => // Regular address
-      Address.fromBytes(bytes, chainId)
+      Address.fromBytes(bytes, Some(chainId))
 
     case crypto.KeyLength => // Public key
       Right(PublicKey(bytes).toAddress(chainId))
@@ -36,7 +36,7 @@ object PBRecipients {
   }
 
   def toAlias(r: PBRecipient, chainId: Byte): Either[ValidationError, Alias] = r.recipient match {
-    case PBRecipient.Recipient.Alias(alias) => Alias.createWithChainId(alias, chainId)
+    case PBRecipient.Recipient.Alias(alias) => Alias.createWithChainId(alias, chainId, Some(chainId))
     case _                                  => Left(GenericError(s"Not an alias: $r"))
   }
 

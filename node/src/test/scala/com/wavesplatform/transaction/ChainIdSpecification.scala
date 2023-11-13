@@ -19,10 +19,11 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import org.scalacheck.Gen
 
 class ChainIdSpecification extends PropSpec {
-  private val otherChainId     = 'W'.toByte
-  private val aliasFromOther   = Alias.createWithChainId("sasha", otherChainId).explicitGet()
-  private val addressFromOther = Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, otherChainId).explicitGet()
-  private val addressOrAlias   = Gen.oneOf(aliasFromOther, addressFromOther)
+  private val otherChainId   = 'W'.toByte
+  private val aliasFromOther = Alias.createWithChainId("sasha", otherChainId, Some(otherChainId)).explicitGet()
+  private val addressFromOther =
+    Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, Some(otherChainId)).explicitGet()
+  private val addressOrAlias = Gen.oneOf(aliasFromOther, addressFromOther)
 
   private def addressOrAliasWithVersion: Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
     for {
@@ -68,7 +69,7 @@ class ChainIdSpecification extends PropSpec {
         TransferTransaction(
           TxVersion.V3,
           sender.publicKey,
-          Alias.createWithChainId("sasha", otherChainId).explicitGet(),
+          Alias.createWithChainId("sasha", otherChainId, Some(otherChainId)).explicitGet(),
           Waves,
           amount,
           Waves,

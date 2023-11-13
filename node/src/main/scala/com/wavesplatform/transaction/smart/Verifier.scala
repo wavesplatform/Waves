@@ -212,7 +212,7 @@ object Verifier extends ScorexLogging {
       case Success(s) => s
     }
 
-    val createTrace = { maybeError: Option[ValidationError] =>
+    val createTrace = { (maybeError: Option[ValidationError]) =>
       val trace = assetIdOpt match {
         case Some(assetId) => AssetVerifierTrace(assetId, maybeError, assetContext)
         case None          => AccountVerifierTrace(senderAddress, maybeError)

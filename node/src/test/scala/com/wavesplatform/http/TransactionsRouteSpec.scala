@@ -1191,12 +1191,13 @@ class TransactionsRouteSpec
         .signWith(defaultSigner.privateKey)
 
       Post(routePath("/broadcast"), tx.json()) ~> route should produce(
-        WrongJson(errors =
-          Seq(
+        WrongJson(
+          errors = Seq(
             JsPath \ "attachment" -> Seq(
               JsonValidationError(s"base58-encoded string length ($attachmentSizeInSymbols) exceeds maximum length of 192")
             )
-          )
+          ),
+          msg = Some("json data validation error, see validationErrors for details")
         )
       )
     }
