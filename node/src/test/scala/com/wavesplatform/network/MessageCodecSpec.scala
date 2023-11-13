@@ -20,7 +20,7 @@ class MessageCodecSpec extends FreeSpec {
     codec.blockCalls shouldBe 1
   }
 
-  "should not block a sender of valid messages" in forAll(randomTransactionGen) { origTx: Transaction with ProvenTransaction =>
+  "should not block a sender of valid messages" in forAll(randomTransactionGen) { (origTx: Transaction with ProvenTransaction) =>
     val codec = new SpyingMessageCodec
     val ch    = new EmbeddedChannel(codec)
 

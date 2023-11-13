@@ -239,13 +239,13 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
       .map(Union(_))
 
   def tupleTypeP[A: P]: P[Tuple] =
-    ("(" ~
+    ("(" ~ comment ~
       P(unionTypeP).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
       )
-      ~/ ")")
+      ~ comment ~/ ")")
       .map(Tuple)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {

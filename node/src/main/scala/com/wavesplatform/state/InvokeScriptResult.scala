@@ -48,7 +48,7 @@ object InvokeScriptResult {
 
   final case class AttachedPayment(assetId: Asset, amount: Long)
   object AttachedPayment {
-    implicit val attachedPaymentWrites = Json.writes[AttachedPayment]
+    implicit val attachedPaymentWrites: OWrites[AttachedPayment] = Json.writes[AttachedPayment]
 
     def fromInvokePaymentList(ps: Seq[InvokeScriptTransaction.Payment]): Seq[AttachedPayment] =
       ps.map(p => AttachedPayment(p.assetId, p.amount))
@@ -56,7 +56,7 @@ object InvokeScriptResult {
 
   final case class Call(function: String, args: Seq[EVALUATED])
   object Call {
-    implicit val callWrites = Json.writes[Call]
+    implicit val callWrites: OWrites[Call] = Json.writes[Call]
 
     def fromFunctionCall(fc: FUNCTION_CALL): Call = Call(fc.function.funcName, fc.args.collect { case e: EVALUATED => e })
   }
@@ -72,17 +72,17 @@ object InvokeScriptResult {
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
-    implicit val jsonWrites = Json.writes[Payment]
+    implicit val jsonWrites: OWrites[Payment] = Json.writes[Payment]
   }
 
   case class Lease(recipient: AddressOrAlias, amount: Long, nonce: Long, id: ByteStr)
   object Lease {
-    implicit val recipientWrites = Writes[AddressOrAlias] {
+    implicit val recipientWrites: Writes[AddressOrAlias] = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
       case alias: Alias     => JsString(alias.toString)
       case _                => JsNull
     }
-    implicit val jsonWrites = Json.writes[Lease]
+    implicit val jsonWrites: OWrites[Lease] = Json.writes[Lease]
   }
 
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
@@ -91,7 +91,7 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
-  implicit val issueFormat = Writes[Issue] { iss =>
+  implicit val issueFormat: Writes[Issue] = Writes[Issue] { iss =>
     Json.obj(
       "assetId"        -> iss.id,
       "name"           -> iss.name,
@@ -103,11 +103,11 @@ object InvokeScriptResult {
       "nonce"          -> iss.nonce
     )
   }
-  implicit val reissueFormat      = Json.writes[Reissue]
-  implicit val burnFormat         = Json.writes[Burn]
-  implicit val sponsorFeeFormat   = Json.writes[SponsorFee]
-  implicit val leaseCancelFormat  = Json.writes[LeaseCancel]
-  implicit val errorMessageFormat = Json.writes[ErrorMessage]
+  implicit val reissueFormat: OWrites[Reissue]           = Json.writes[Reissue]
+  implicit val burnFormat: OWrites[Burn]                 = Json.writes[Burn]
+  implicit val sponsorFeeFormat: OWrites[SponsorFee]     = Json.writes[SponsorFee]
+  implicit val leaseCancelFormat: OWrites[LeaseCancel]   = Json.writes[LeaseCancel]
+  implicit val errorMessageFormat: OWrites[ErrorMessage] = Json.writes[ErrorMessage]
   implicit val invocationFormat: Writes[Invocation] = (i: Invocation) =>
     Json.obj(
       "dApp"         -> i.dApp.toString,
@@ -115,9 +115,9 @@ object InvokeScriptResult {
       "payment"      -> i.payments,
       "stateChanges" -> jsonFormat.writes(i.stateChanges)
     )
-  implicit val jsonFormat = Json.writes[InvokeScriptResult]
+  implicit val jsonFormat: OWrites[InvokeScriptResult] = Json.writes[InvokeScriptResult]
 
-  implicit val monoid = new Monoid[InvokeScriptResult] {
+  implicit val monoid: Monoid[InvokeScriptResult] = new Monoid[InvokeScriptResult] {
     override val empty: InvokeScriptResult =
       InvokeScriptResult.this.empty
 
@@ -175,7 +175,7 @@ object InvokeScriptResult {
       Address.fromBytes(a.bytes.arr).explicitGet()
 
     def langTransferToPayment(t: lang.AssetTransfer): Payment =
-      Payment(langAddressToAddress(t.address), Asset.fromCompatId(t.assetId), t.amount)
+      Payment(langAddressToAddress(t.recipientAddressBytes), Asset.fromCompatId(t.assetId), t.amount)
 
     def langLeaseToLease(l: lang.Lease): Lease =
       Lease(AddressOrAlias.fromRide(l.recipient).explicitGet(), l.amount, l.nonce, lang.Lease.calculateId(l, invokeId))

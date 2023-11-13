@@ -47,21 +47,25 @@ import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
-import org.scalatest.Assertion
+import monix.execution.schedulers.SchedulerService
+import org.scalatest.{Assertion, BeforeAndAfterAll, ParallelTestExecution}
 import play.api.libs.json.*
 
 import java.util.concurrent.locks.ReentrantLock
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Promise}
 
-class BlockChallengeTest extends PropSpec with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers with SharedSchedulerMixin {
+class BlockChallengeTest extends PropSpec
+  with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers with SharedSchedulerMixin with ParallelTestExecution with BeforeAndAfterAll {
 
-  implicit val appenderScheduler: Scheduler = Scheduler.singleThread("appender")
+  implicit val appenderScheduler: SchedulerService = Scheduler.singleThread("appender")
   val settings: WavesSettings =
     DomainPresets.TransactionStateSnapshot.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
   val testTime: TestTime = TestTime()
 
   val invalidStateHash: ByteStr = ByteStr.fill(DigestLength)(1)
+
+  override def afterAll(): Unit = appenderScheduler.shutdown()
 
   property("NODE-883. Invalid challenging block should be ignored") {
     val sender           = TxHelpers.signer(1)

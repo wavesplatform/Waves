@@ -11,7 +11,7 @@ import play.api.libs.json.Json
 class LeaseCancelTransactionSpecification extends PropSpec {
 
   property("Lease cancel serialization roundtrip") {
-    forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
+    forAll(leaseCancelGen) { (tx: LeaseCancelTransaction) =>
       val recovered = LeaseCancelTxSerializer.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
@@ -40,7 +40,7 @@ class LeaseCancelTransactionSpecification extends PropSpec {
   }
 
   property("Lease cancel serialization from TypedTransaction") {
-    forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
+    forAll(leaseCancelGen) { (tx: LeaseCancelTransaction) =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[LeaseCancelTransaction], tx)
     }

@@ -444,7 +444,7 @@ object AttachedPayment {
 case class Invocation(dApp: String, call: Call, payments: Seq[AttachedPayment], stateChanges: StateChangesDetails)
 object Invocation {
   implicit val invokationFormat: Reads[Invocation] = new Reads[Invocation] {
-    override def reads(json: JsValue) =
+    override def reads(json: JsValue): JsResult[Invocation] =
       JsSuccess(
         Invocation(
           (json \ "dApp").as[String],

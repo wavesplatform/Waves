@@ -14,7 +14,7 @@ object ToBytes extends JsTestBase {
   private val invalidToBytesArgBeforeFunc = "callerTestData.toBytes(callerTestData)"
 
   val tests: Tests = Tests {
-    test(" Functions toBytes compiles with int, string, boolean") {
+    test("RIDE-74. toBytes function should compile for valid values int, string, boolean") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -33,7 +33,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test(" Functions toBytes compiles with bigInt for V5, V6 versions") {
+    test("RIDE-75. toBytes function should compile with bigInt for V5, V6 versions") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -48,7 +48,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test(" toBytes negative tests") {
+    test("RIDE-76. toBytes function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
