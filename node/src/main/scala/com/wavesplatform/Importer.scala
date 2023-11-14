@@ -20,10 +20,10 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker, StateSnapshot, TxMeta}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.ParSignatureChecker.sigverify
+import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -38,6 +38,7 @@ import scopt.OParser
 
 import java.io.*
 import java.net.{MalformedURLException, URL}
+import java.time
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -208,7 +209,7 @@ object Importer extends ScorexLogging {
       import scala.concurrent.duration.*
       val millis = (System.nanoTime() - start).nanos.toMillis
       log.info(
-        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}"
+        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${time.Duration.ofMillis(millis)}"
       )
     }
 

@@ -35,8 +35,6 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
 
   def newIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
 
-  def newPrefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
-
   def iterateOverPrefix(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOverPrefix(tag.prefixBytes)(f)
 
   def iterateOverPrefix(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {

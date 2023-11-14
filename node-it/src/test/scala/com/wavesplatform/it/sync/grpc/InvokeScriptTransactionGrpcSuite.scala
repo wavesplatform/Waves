@@ -107,6 +107,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     val scriptInfo = sender.scriptInfo(firstAddress)
     PBTransactions.toVanillaScript(scriptInfo.scriptBytes) shouldBe Some(script)
+    scriptInfo.publicKey shouldBe ByteString.copyFrom(firstAcc.publicKey.arr)
   }
 
   test("dApp caller invokes a nested function on a dApp") {

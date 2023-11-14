@@ -21,7 +21,8 @@ import org.scalatest.{Assertion, CancelAfterFailure}
 class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfterFailure {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
-      .Builder(Default, 2, Seq.empty)
+      .Builder(Default, 1, Seq.empty)
+      .overrideBase(_.quorum(0))
       .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 1)))
       .buildNonConflicting()
 

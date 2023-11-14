@@ -19,7 +19,7 @@ object RsaVerify extends JsTestBase {
   private val invalidErrorRsaVerify         = invalidFunctionError("rsaVerify", 4)
 
   val tests: Tests = Tests {
-    test("rsaVerify functions compiles") {
+    test("RIDE-237. function rsaVerify should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -34,7 +34,7 @@ object RsaVerify extends JsTestBase {
       }
     }
 
-    test("invalid rsaVerify functions") {
+    test("RIDE-238. function rsaVerify throw a compilation error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (

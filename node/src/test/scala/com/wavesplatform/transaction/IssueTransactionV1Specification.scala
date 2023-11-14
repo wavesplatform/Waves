@@ -11,7 +11,7 @@ import play.api.libs.json.Json
 
 class IssueTransactionV1Specification extends PropSpec {
   property("Issue serialization roundtrip") {
-    forAll(issueGen) { issue: IssueTransaction =>
+    forAll(issueGen) { (issue: IssueTransaction) =>
       val recovered = IssueTxSerializer.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }
@@ -47,7 +47,7 @@ class IssueTransactionV1Specification extends PropSpec {
   }
 
   property("Issue serialization from TypedTransaction") {
-    forAll(issueGen) { issue: IssueTransaction =>
+    forAll(issueGen) { (issue: IssueTransaction) =>
       val recovered = TransactionParsers.parseBytes(issue.bytes()).get
       recovered.bytes() shouldEqual issue.bytes()
     }

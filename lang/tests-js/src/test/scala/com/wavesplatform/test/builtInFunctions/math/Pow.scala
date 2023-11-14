@@ -28,7 +28,7 @@ object Pow extends JsTestBase {
   private val powError: String       = testData.invalidFunctionError("pow", 6)
 
   val tests: Tests = Tests {
-    test("Pow functions compiles with Int") {
+    test("RIDE-185. Pow functions should compile with Int") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -43,7 +43,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test("Pow functions compiles with BigInt") {
+    test("RIDE-186. Pow functions should compile with BigInt for Ride V5, V6") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (
@@ -58,7 +58,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test("Invalid data for pow functions with Int") {
+    test("RIDE-187. Median functions should throw an error for invalid Int data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -78,7 +78,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test("Invalid data for pow functions with BigInt") {
+    test("RIDE-188. Median function should throw an error for invalid BigInt data - Ride V5, V6") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         for (

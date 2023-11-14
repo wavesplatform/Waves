@@ -24,7 +24,7 @@ class AccountOrAliasTests extends PropSpec with Inside {
   }
 
   property("Alias can be from other network") {
-    AddressOrAlias.fromString("alias:Q:sasha") shouldBe Alias.createWithChainId("sasha", 'Q'.toByte)
+    AddressOrAlias.fromString("alias:Q:sasha") shouldBe Alias.createWithChainId("sasha", 'Q'.toByte, Some('Q'.toByte))
   }
 
   property("Malformed aliases cannot be reconstructed") {

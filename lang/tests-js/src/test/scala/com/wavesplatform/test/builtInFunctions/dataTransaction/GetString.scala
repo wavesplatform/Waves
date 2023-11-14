@@ -29,7 +29,7 @@ object GetString extends JsTestBase {
   private val invalidGetStringValueArgBeforeFunc = s"callerTestData.getStringValue()"
 
   val tests: Tests = Tests {
-    test(" Functions getString dataTransaction compiles for versions V4 and more") {
+    test("RIDE-110. getString functions for dataTransaction should compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -74,7 +74,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test(" Functions getString dataTransaction compiles for versions V3") {
+    test("RIDE-111. getString function for dataTransaction should compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
       for (
         (data, binary) <- Seq(
@@ -93,7 +93,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test(" Can't find getString functions overload for V4 and more") {
+    test("RIDE-112. getString function should throw an error for invalid data type for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -114,7 +114,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test(" Can't find getString functions overload for V3") {
+    test("RIDE-113. getString function should throw an error for invalid data type for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
       for (
         (data, binary) <- Seq(
@@ -133,7 +133,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test(" Invalid getString functions for V4 and more") {
+    test("RIDE-114. Invalid getString functions should not compile for versions V4 and above") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -150,7 +150,7 @@ object GetString extends JsTestBase {
       }
     }
 
-    test(" Invalid getString functions for V3") {
+    test("RIDE-115. Invalid getString functions should not compile for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
       for (
         (data, binary) <- Seq(
