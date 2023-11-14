@@ -1,14 +1,13 @@
 package com.wavesplatform.it.async
 
-import java.util.concurrent.TimeoutException
-
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it._
-import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.*
+import com.wavesplatform.it.api.AsyncHttpApi.*
+import com.wavesplatform.it.util.*
 
+import java.util.concurrent.TimeoutException
 import scala.concurrent.Future.traverse
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
 @LoadTest
@@ -83,11 +82,10 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
     for {
       height <- node.height
       blocks <- node.blockSeq(1, height)
-    } yield
-      withClue(s"all transactions in node") {
-        val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
-        txIds should contain theSameElementsAs txsInBlockchain
-      }
+    } yield withClue(s"all transactions in node") {
+      val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
+      txIds -- txsInBlockchain shouldBe empty
+    }
   }
 
   private def dumpBalances(): Future[Map[Config, Long]] = {
