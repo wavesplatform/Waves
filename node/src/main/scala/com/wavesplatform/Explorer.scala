@@ -95,18 +95,24 @@ object Explorer extends ScorexLogging {
       flag match {
         case "WB" =>
           var accountsBaseTotalBalance = 0L
+          var wavesBalanceRecords      = 0
           rdb.db.iterateOver(KeyTags.WavesBalance) { e =>
             val addressId = AddressId(Longs.fromByteArray(e.getKey.drop(Shorts.BYTES)))
             val key       = Keys.wavesBalance(addressId)
             accountsBaseTotalBalance += key.parse(e.getValue).balance
+            wavesBalanceRecords += 1
           }
 
           var actualTotalReward = 0L
+          var blocksRecords     = 0
           rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
             val height = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
             val key    = Keys.blockMetaAt(height)
-            actualTotalReward += key.parse(e.getKey).fold(0L)(_.reward)
+            actualTotalReward += key.parse(e.getValue).fold(0L)(_.reward)
+            blocksRecords += 1
           }
+
+          log.info(s"Found $wavesBalanceRecords waves balance records and $blocksRecords block records")
 
           val actualTotalBalance   = accountsBaseTotalBalance + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward

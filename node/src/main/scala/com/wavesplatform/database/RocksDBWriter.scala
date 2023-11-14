@@ -636,7 +636,6 @@ class RocksDBWriter(
       val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
       rw.get(changedAddressesKey).foreach { addressId =>
-        // WAVES balances
         wavesAddressIds.addOne(addressId)
         wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
 
@@ -652,6 +651,7 @@ class RocksDBWriter(
       }
       rw.delete(changedAddressesKey)
 
+      // WAVES balances
       wavesAddressIds.view
         .zip(rw.multiGet(wavesBalanceAtKeys, BalanceNode.SizeInBytes))
         .foreach {
