@@ -60,7 +60,7 @@ object StateUpdate {
     def fromPB(v: PBBalanceUpdate): BalanceUpdate = {
       val (asset, after) = PBAmounts.toAssetAndAmount(v.getAmountAfter)
       val before         = v.amountBefore
-      BalanceUpdate(v.address.toAddress, asset, before, after)
+      BalanceUpdate(v.address.toAddress(), asset, before, after)
     }
 
     def toPB(v: BalanceUpdate): PBBalanceUpdate = {
@@ -81,7 +81,7 @@ object StateUpdate {
 
     def fromPB(v: PBDataEntryUpdate): DataEntryUpdate = {
       DataEntryUpdate(
-        v.address.toAddress,
+        v.address.toAddress(),
         PBTransactions.toVanillaDataEntry(v.getDataEntryBefore),
         PBTransactions.toVanillaDataEntry(v.getDataEntry)
       )
@@ -105,7 +105,7 @@ object StateUpdate {
 
     def fromPB(v: PBLeasingUpdate): LeasingBalanceUpdate = {
       LeasingBalanceUpdate(
-        v.address.toAddress,
+        v.address.toAddress(),
         LeaseBalance(v.inBefore, v.outBefore),
         LeaseBalance(v.inAfter, v.outAfter)
       )
@@ -157,7 +157,7 @@ object StateUpdate {
         },
         v.amount,
         v.sender.toPublicKey,
-        v.recipient.toAddress,
+        v.recipient.toAddress(),
         v.originTransactionId.toByteStr
       )
     }
@@ -386,8 +386,8 @@ object StateUpdate {
     }
   }
 
-  private lazy val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
-  private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
+  private lazy val WavesAlias   = Alias.fromString("alias:W:waves", Some('W'.toByte)).explicitGet()
+  private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd", Some('W'.toByte)).explicitGet()
 
   def atomic(blockchainBeforeWithMinerReward: Blockchain, snapshot: StateSnapshot): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward

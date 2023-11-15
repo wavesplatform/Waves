@@ -1,0 +1,11 @@
+${{header}}
+
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/${{app_name}}/data
+    rm -rf /var/log/${{app_name}}
+
+    userdel ${{app_name}} >/dev/null 2>&1 || true
+    groupdel ${{app_name}} >/dev/null 2>&1 || true
+fi
+
+exit 0

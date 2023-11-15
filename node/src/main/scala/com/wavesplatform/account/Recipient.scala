@@ -10,7 +10,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.Recipient as RideRecipient
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress, WrongChain}
 import com.wavesplatform.utils.{EthEncoding, StringBytes, base58Length}
 import play.api.libs.json.*
 
@@ -41,20 +41,19 @@ final case class Alias(chainId: Byte, name: String) extends AddressOrAlias {
 object AddressOrAlias {
   def fromRide(r: RideRecipient): Either[ValidationError, AddressOrAlias] =
     r match {
-      case RideRecipient.Address(bytes) => Address.fromBytes(bytes.arr)
+      case RideRecipient.Address(bytes) => Address.fromBytes(bytes.arr, Some(AddressScheme.current.chainId))
       case RideRecipient.Alias(name)    => Alias.create(name)
     }
 
-  def fromString(s: String, checkChainId: Boolean = true): Either[ValidationError, AddressOrAlias] = {
+  def fromString(s: String, expectedChainId: Option[Byte] = None): Either[ValidationError, AddressOrAlias] =
     if (s.startsWith(Alias.Prefix))
-      Alias.fromString(s)
+      Alias.fromString(s, expectedChainId)
     else
-      Address.fromString(s, if (checkChainId) Some(AddressScheme.current.chainId) else None)
-  }
+      Address.fromString(s, expectedChainId)
 
   def fromBytes(buf: Array[Byte]): Either[ValidationError, AddressOrAlias] = buf.headOption match {
-    case Some(Address.AddressVersion) => Address.fromBytes(buf)
-    case Some(Alias.AddressVersion)   => Alias.fromBytes(buf)
+    case Some(Address.AddressVersion) => Address.fromBytes(buf, None)
+    case Some(Alias.AddressVersion)   => Alias.fromBytes(buf, None)
     case _                            => throw new IllegalArgumentException(s"Not a valid recipient: ${ByteStr(buf)}")
   }
 }
@@ -111,7 +110,7 @@ object Address {
     )
   }
 
-  def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
+  def fromBytes(addressBytes: Array[Byte], expectedChainId: Option[Byte] = Some(AddressScheme.current.chainId)): Either[InvalidAddress, Address] = {
     bytesCache.get(
       ByteStr(addressBytes),
       { () =>
@@ -126,11 +125,11 @@ object Address {
 
             (for {
               _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-              _ <- Either.cond(
-                network == chainId,
-                (),
-                s"Address belongs to another network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
-              )
+              _ <- expectedChainId match {
+                case Some(exp) if exp != network =>
+                  Left(s"Address belongs to another network: expected: $exp(${exp.toChar}), actual: $network(${network.toChar})")
+                case _ => Right(())
+              }
               checkSum          = addressBytes.takeRight(ChecksumLength)
               checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
               _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
@@ -140,7 +139,7 @@ object Address {
     )
   }
 
-  def fromString(addressStr: String, chainId: Option[Byte] = Some(scheme.chainId)): Either[ValidationError, Address] = {
+  def fromString(addressStr: String, expectedChainId: Option[Byte] = Some(AddressScheme.current.chainId)): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(
@@ -149,7 +148,7 @@ object Address {
         InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}")
       )
       byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
-      address   <- fromBytes(byteArray, chainId.getOrElse(byteArray(1)))
+      address   <- fromBytes(byteArray, expectedChainId)
     } yield address
   }
 
@@ -184,7 +183,7 @@ object Alias {
     createWithChainId(name, AddressScheme.current.chainId)
   }
 
-  def fromString(str: String): Either[ValidationError, Alias] = {
+  def fromString(str: String, expectedChainId: Option[Byte] = Some(AddressScheme.current.chainId)): Either[ValidationError, Alias] = {
     val aliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
     if (!str.startsWith(Prefix)) {
@@ -196,15 +195,15 @@ object Alias {
       if (charSemicolonAlias(1) != ':') {
         Left(GenericError(aliasPatternInfo))
       } else {
-        createWithChainId(name, chainId)
+        createWithChainId(name, chainId, expectedChainId)
       }
     }
   }
 
-  def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
+  def fromBytes(bytes: Array[Byte], expectedChainId: Option[Byte]): Either[ValidationError, Alias] = {
     bytes match {
       case Array(`AddressVersion`, chainId, _, _, rest*) =>
-        createWithChainId(new String(rest.toArray, "UTF-8"), chainId)
+        createWithChainId(new String(rest.toArray, "UTF-8"), chainId, expectedChainId)
 
       case _ =>
         Left(GenericError("Bad alias bytes"))
@@ -214,12 +213,18 @@ object Alias {
   private[this] def isValidAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
-  private[wavesplatform] def createWithChainId(name: String, chainId: Byte): Either[ValidationError, Alias] = {
+  private[wavesplatform] def createWithChainId(
+      name: String,
+      chainId: Byte,
+      expectedChainId: Option[Byte] = Some(AddressScheme.current.chainId)
+  ): Either[ValidationError, Alias] =
     if (name.length < MinLength || MaxLength < name.length)
       Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
     else if (!name.forall(isValidAliasChar))
       Left(GenericError(s"Alias should contain only following characters: $AliasAlphabet"))
     else
-      Right(new Alias(chainId, name))
-  }
+      expectedChainId match {
+        case Some(expected) if expected != chainId => Left(WrongChain(expected, chainId))
+        case _                                     => Right(Alias(chainId, name))
+      }
 }
