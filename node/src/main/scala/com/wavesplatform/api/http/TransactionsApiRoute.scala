@@ -42,7 +42,7 @@ case class TransactionsApiRoute(
   import TransactionsApiRoute.*
 
   private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
-  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {

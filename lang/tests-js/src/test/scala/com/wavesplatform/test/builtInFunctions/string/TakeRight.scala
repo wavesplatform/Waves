@@ -13,7 +13,7 @@ object TakeRight extends JsTestBase {
   private val invalidTakeRightArgBeforeFunc = s"callerTestData.takeRight(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test("Take functions compiles") {
+    test("RIDE-223. function takeRight should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -29,7 +29,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test("invalid takeRight functions") {
+    test("RIDE-224. function takeRight throw a compilation error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

@@ -14,7 +14,7 @@ object Value extends JsTestBase {
   private val invalidErrorValue         = invalidFunctionError("value", 1)
 
   val tests: Tests = Tests {
-    test("Value functions compiles") {
+    test("RIDE-230. function value should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -29,7 +29,7 @@ object Value extends JsTestBase {
       }
     }
 
-    test("Can't find a function overload isDefined") {
+    test("RIDE-231. function value throw a compilation error for can't find overload") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (

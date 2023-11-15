@@ -1,0 +1,18 @@
+[Unit]
+Description=${{descr}}
+Requires=${{start_facilities}}
+
+[Service]
+Type=simple
+ExecStart=/usr/share/${{app_name}}/bin/${{app_name}} \
+  -Dlogback.stdout.pattern="%%-5level %%logger{26} - %%msg%%n" \
+  -- /etc/${{app_name}}/main.conf
+Restart=always
+RestartSec=${{retryTimeout}}
+SuccessExitStatus=143
+User=${{daemon_user}}
+PermissionsStartOnly=true
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

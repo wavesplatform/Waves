@@ -6,6 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -56,7 +57,7 @@ case class ExchangeTransaction(
 object ExchangeTransaction extends TransactionParser {
   type TransactionT = ExchangeTransaction
 
-  implicit val validator = ExchangeTxValidator
+  implicit val validator: TxValidator[ExchangeTransaction] = ExchangeTxValidator
 
   implicit def sign(tx: ExchangeTransaction, privateKey: PrivateKey): ExchangeTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

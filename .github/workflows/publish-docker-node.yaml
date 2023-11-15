@@ -64,12 +64,24 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
 
+      - name: Extract Docker RIDE runner metadata
+        id: meta-ride-runner
+        uses: docker/metadata-action@v4
+        with:
+          images: wavesplatform/ride-runner
+          flavor: |
+            latest=false
+          tags: |
+            type=match,pattern=v(.*),group=1
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+
       - name: Build and push Docker public image
         id: build-and-push-public
         uses: docker/build-push-action@v3
         with:
           context: ./docker
           push: true
+          pull: true
           tags: ${{ steps.meta-public.outputs.tags }}
 
       - name: Build and push Docker private image
@@ -78,6 +90,16 @@ jobs:
         with:
           context: ./docker/private
           push: true
+          pull: true
           tags: ${{ steps.meta-private.outputs.tags }}
           build-args: |
             NODE_TAG=${{ steps.meta-public.outputs.version }}
+
+      - name: Build and push Docker RIDE runner image
+        id: build-and-push-ride-runner
+        uses: docker/build-push-action@v3
+        with:
+          context: ./ride-runner/docker
+          push: true
+          pull: true
+          tags: ${{ steps.meta-ride-runner.outputs.tags }}

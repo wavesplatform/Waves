@@ -1,0 +1,45 @@
+${{header}}
+${{loader-functions}}
+
+config_file=/etc/${{app_name}}/main.conf
+
+if [ "$1" = configure ]; then
+    # make sure the user exists
+    if ! getent passwd ${{app_name}} > /dev/null; then
+        adduser --system $quiet --home /var/lib/${{app_name}} --no-create-home --shell /bin/false --group \
+            --gecos "${{app_name}} node" ${{app_name}}
+    fi
+    # if the user was created manually, make sure the group is there as well
+    if ! getent group ${{app_name}} > /dev/null; then
+        addgroup --system $quiet ${{app_name}}
+    fi
+    # make sure ${{app_name}} is in the ${{app_name}} group
+    if ! id -Gn ${{app_name}} | grep -qw ${{app_name}}; then
+        adduser $quiet ${{app_name}} ${{app_name}}
+    fi
+
+    # ensure home directory ownership
+    mkdir -p /var/lib/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
+
+    # nicer log directory permissions
+    mkdir -p /var/log/${{app_name}}
+    chmod 770 /var/log/${{app_name}}
+    chown root:${{app_name}} /var/log/${{app_name}}
+
+    if [ ! -f "$config_file" ]; then
+        echo Creating default config file ...
+        cp /usr/share/${{app_name}}/doc/main.conf "$config_file"
+        chmod 600 "$config_file"
+        chown ${{app_name}}:${{app_name}} "$config_file"
+    fi
+
+    echo Installing systemd service ...
+    addService ${{app_name}} || true
+fi
+
+echo Restarting systemd service ...
+restartService ${{app_name}} || true
+
+exit 0

@@ -141,11 +141,11 @@ case class StateSnapshot(
 object StateSnapshot {
   def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, TxMeta.Status) = {
     val balances: VectorMap[(Address, Asset), Long] =
-      VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
+      VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress(), b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
     val leaseBalances: Map[Address, LeaseBalance] =
       pbSnapshot.leaseBalances
-        .map(b => b.address.toAddress -> LeaseBalance(b.in, b.out))
+        .map(b => b.address.toAddress() -> LeaseBalance(b.in, b.out))
         .toMap
 
     val assetScripts: Map[IssuedAsset, AssetScriptInfo] =
@@ -192,7 +192,7 @@ object StateSnapshot {
 
     val aliases: Map[Alias, Address] =
       pbSnapshot.aliases
-        .map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress)
+        .map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress())
         .toMap
 
     val orderFills: Map[ByteStr, VolumeAndFee] =
@@ -223,7 +223,7 @@ object StateSnapshot {
             val entry = PBTransactions.toVanillaDataEntry(pbEntry)
             entry.key -> entry
           }.toMap
-        data.address.toAddress -> entries
+        data.address.toAddress() -> entries
       }.toMap
 
     (
