@@ -4,7 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetScriptInfo, Blockchain, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{AssetScriptInfo, Blockchain, LeaseSnapshot, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
@@ -78,7 +78,7 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
 
   override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
 
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = kill("leaseDetails")
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseSnapshot] = kill("leaseDetails")
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
 

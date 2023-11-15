@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Authorized, CreateAliasTransaction, EthereumTransaction}
+import com.wavesplatform.transaction.{Asset, Authorized, CreateAliasTransaction, EthereumTransaction, Transaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -389,7 +389,11 @@ object StateUpdate {
   private lazy val WavesAlias   = Alias.fromString("alias:W:waves", Some('W'.toByte)).explicitGet()
   private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd", Some('W'.toByte)).explicitGet()
 
-  def atomic(blockchainBeforeWithMinerReward: Blockchain, snapshot: StateSnapshot): StateUpdate = {
+  def atomic(
+      blockchainBeforeWithMinerReward: Blockchain,
+      snapshot: StateSnapshot,
+      txWithLeases: Iterable[(Transaction, Map[ByteStr, LeaseSnapshot])]
+  ): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = SnapshotBlockchain(blockchain, snapshot)
 
@@ -426,18 +430,20 @@ object StateUpdate {
       assetAfter  = blockchainAfter.assetDescription(asset)
     } yield AssetStateUpdate(asset.id, assetBefore, assetAfter)
 
-    val updatedLeases = snapshot.leaseStates.map { case (leaseId, newState) =>
-      LeaseUpdate(
-        leaseId,
-        if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
-        newState.amount,
-        newState.sender,
-        newState.recipient match {
-          case `WavesAlias` => WavesAddress
-          case other        => blockchainAfter.resolveAlias(other).explicitGet()
-        },
-        newState.sourceId
-      )
+    val updatedLeases = txWithLeases.flatMap { case (sourceTxId, leases) =>
+      leases.map { case (leaseId, newState) =>
+        LeaseUpdate(
+          leaseId,
+          if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
+          newState.amount,
+          newState.sender,
+          newState.recipient match {
+            case `WavesAlias` => WavesAddress
+            case other        => blockchainAfter.resolveAlias(other).explicitGet()
+          },
+          newState.toDetails(blockchain, Some(sourceTxId), blockchain.leaseDetails(leaseId)).sourceId
+        )
+      }
     }.toVector
 
     val updatedScripts = snapshot.accountScriptsByAddress.map { case (address, newScript) =>
@@ -546,13 +552,17 @@ object StateUpdate {
           val accBlockchain = SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot)
           (
             accSnapshot |+| txInfo.snapshot,
-            updates :+ atomic(accBlockchain, txInfo.snapshot)
+            updates :+ atomic(accBlockchain, txInfo.snapshot, Seq((txInfo.transaction, txInfo.snapshot.leaseStates)))
           )
         }
     val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
     val metadata        = transactionsMetadata(blockchainAfter, totalSnapshot)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
-    val keyBlockUpdate  = atomic(blockchainBeforeWithReward, keyBlockSnapshot)
+    val keyBlockUpdate = atomic(
+      blockchainBeforeWithReward,
+      keyBlockSnapshot,
+      keyBlockSnapshot.transactions.map { case (_, txInfo) => (txInfo.transaction, txInfo.snapshot.leaseStates) }
+    )
     (keyBlockUpdate, txsStateUpdates, metadata, refAssets)
   }
 }

@@ -437,14 +437,13 @@ class BlockchainUpdaterImpl(
     val snapshotsById =
       for {
         lt        <- leaseTransactions
-        ltMeta    <- transactionMeta(lt.id()).toSeq
         recipient <- rocksdb.resolveAlias(lt.recipient).toSeq
         portfolios = Map(
           lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
           recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
         )
         leaseStates = Map(
-          lt.id() -> LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)
+          lt.id() -> LeaseSnapshot(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height))
         )
         snapshot = StateSnapshot.build(rocksdb, portfolios, leaseStates = leaseStates).explicitGet()
       } yield lt.id() -> snapshot

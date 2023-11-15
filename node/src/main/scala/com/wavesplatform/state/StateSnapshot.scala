@@ -31,7 +31,7 @@ case class StateSnapshot(
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
     sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
-    leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+    leaseStates: Map[ByteStr, LeaseSnapshot] = Map(),
     aliases: Map[Alias, Address] = Map(),
     orderFills: Map[ByteStr, VolumeAndFee] = Map(),
     accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -64,7 +64,7 @@ case class StateSnapshot(
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
         S.OrderFill(orderId.toByteString, volume, fee)
       }.toSeq,
-      leaseStates.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, _, _)) =>
+      leaseStates.map { case (leaseId, LeaseSnapshot(sender, recipient, amount, status)) =>
         val pbStatus = status match {
           case Status.Active =>
             S.LeaseState.Status.Active(S.LeaseState.Active(amount, sender.toByteString, recipient.asInstanceOf[Address].toByteString))
@@ -162,26 +162,22 @@ object StateSnapshot {
         .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
         .toMap
 
-    val leaseStates: Map[ByteStr, LeaseDetails] =
+    val leaseStates: Map[ByteStr, LeaseSnapshot] =
       pbSnapshot.leaseStates.map { ls =>
         ls.status match {
           case TransactionStateSnapshot.LeaseState.Status.Active(value) =>
-            ls.leaseId.toByteStr -> LeaseDetails(
+            ls.leaseId.toByteStr -> LeaseSnapshot(
               value.sender.toPublicKey,
               value.recipient.toAddress(),
               value.amount,
-              LeaseDetails.Status.Active,
-              sourceId = ByteStr.empty,
-              height = 0
+              LeaseDetails.Status.Active
             )
           case _: TransactionStateSnapshot.LeaseState.Status.Cancelled | TransactionStateSnapshot.LeaseState.Status.Empty =>
-            ls.leaseId.toByteStr -> LeaseDetails(
+            ls.leaseId.toByteStr -> LeaseSnapshot(
               PublicKey(ByteStr.fill(KeyLength)(0)),
               Address(Array.fill(Address.HashLength)(0)),
               0,
-              LeaseDetails.Status.Cancelled(0, None),
-              sourceId = ByteStr.empty,
-              height = 0
+              LeaseDetails.Status.Cancelled(0, None)
             )
         }
       }.toMap
@@ -250,7 +246,7 @@ object StateSnapshot {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
       assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
-      leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+      leaseStates: Map[ByteStr, LeaseSnapshot] = Map(),
       aliases: Map[Alias, Address] = Map(),
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
       accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -377,9 +373,9 @@ object StateSnapshot {
 
   private def resolvedLeaseStates(
       blockchain: Blockchain,
-      leaseStates: Map[ByteStr, LeaseDetails],
+      leaseStates: Map[ByteStr, LeaseSnapshot],
       aliases: Map[Alias, Address]
-  ): Map[ByteStr, LeaseDetails] =
+  ): Map[ByteStr, LeaseSnapshot] =
     leaseStates.view
       .mapValues(details =>
         details.copy(recipient = details.recipient match {
