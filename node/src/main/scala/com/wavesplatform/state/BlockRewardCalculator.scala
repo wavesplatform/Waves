@@ -58,6 +58,8 @@ object BlockRewardCalculator {
 
     val rewardShares = getBlockRewardShares(height, fullBlockReward, daoAddress, xtnBuybackAddress, blockchain)
 
+    import com.wavesplatform.utils.byteStrOrdering
+
     (Seq(generator     -> rewardShares.miner) ++
       daoAddress.map(_ -> rewardShares.daoAddress) ++
       xtnBuybackAddress.map(_ -> rewardShares.xtnBuybackAddress))

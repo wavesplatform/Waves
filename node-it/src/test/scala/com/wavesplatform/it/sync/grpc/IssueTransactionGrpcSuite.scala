@@ -183,7 +183,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
-  forAll(invalid_assets_names) { invalidAssetName: String =>
+  forAll(invalid_assets_names) { (invalidAssetName: String) =>
     test(s"Not able to create asset named $invalidAssetName") {
       assertGrpcError(
         sender.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee),
