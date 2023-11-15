@@ -1,29 +1,30 @@
 package com.wavesplatform.transaction
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction => PBSignedTransaction}
+import com.wavesplatform.crypto
+import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction as PBSignedTransaction}
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.crypto
-import com.wavesplatform.test.PropSpec
 import org.scalacheck.Gen
 
 class ChainIdSpecification extends PropSpec {
 
-  private val otherChainId     = 'W'.toByte
-  private val aliasFromOther   = Alias.createWithChainId("sasha", otherChainId).explicitGet()
-  private val addressFromOther = Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, otherChainId).explicitGet()
-  private val addressOrAlias   = Gen.oneOf(aliasFromOther, addressFromOther)
+  private val otherChainId   = 'W'.toByte
+  private val aliasFromOther = Alias.createWithChainId("sasha", otherChainId, Some(otherChainId)).explicitGet()
+  private val addressFromOther =
+    Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, Some(otherChainId)).explicitGet()
+  private val addressOrAlias = Gen.oneOf(aliasFromOther, addressFromOther)
 
   private def addressOrAliasWithVersion(
       vs: Set[TxVersion]
@@ -71,7 +72,7 @@ class ChainIdSpecification extends PropSpec {
         TransferTransaction(
           TxVersion.V3,
           sender.publicKey,
-          Alias.createWithChainId("sasha", otherChainId).explicitGet(),
+          Alias.createWithChainId("sasha", otherChainId, Some(otherChainId)).explicitGet(),
           Waves,
           amount,
           Waves,

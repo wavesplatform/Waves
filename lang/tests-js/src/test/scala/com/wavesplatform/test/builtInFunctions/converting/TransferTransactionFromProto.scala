@@ -14,7 +14,7 @@ object TransferTransactionFromProto extends JsTestBase {
   private val invalidTransferTransactionFromProtoArgBeforeFunction = "transferTransactionFromProto()"
 
   val tests: Tests = Tests {
-    test(" Functions transferTransactionFromProto compiles for Issue V4 and more") {
+    test("RIDE-85. transferTransactionFromProto function should compile for Issue V4 and more") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         for (
@@ -29,7 +29,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test(" transferTransactionFromProto negative tests for V4 and more") {
+    test("RIDE-86. transferTransactionFromProto function throws an error for invalid values for V4 and more") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         for (
@@ -50,7 +50,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test("compilation error: transferTransactionFromProto for V3 function is missing") {
+    test("RIDE-87. transferTransactionFromProto function should throw a compilation error for Ride V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", V3)
       for (
         (data, function) <- Seq(

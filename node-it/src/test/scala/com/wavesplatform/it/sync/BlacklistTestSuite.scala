@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api._
+import com.wavesplatform.it.api.*
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class BlacklistTestSuite extends BaseFreeSpec {
 
@@ -20,7 +20,7 @@ class BlacklistTestSuite extends BaseFreeSpec {
   private def otherNodes = dockerNodes().init
 
   "primary node should blacklist other nodes" in {
-    otherNodes.foreach(n => primaryNode.blacklist(n.containerNetworkAddress))
+    otherNodes.foreach(n => primaryNode.blacklist(n.networkAddress))
 
     val expectedBlacklistedPeers = nodes.size - 1
 

@@ -16,7 +16,7 @@ object CheckMerkleProof extends JsTestBase {
   private val invalidErrorCheckMerkleProof = testData.invalidFunctionError("checkMerkleProof", 3)
 
   val tests: Tests = Tests {
-    test("checkMerkleProof functions compiles") {
+    test("RIDE-268. checkMerkleProof function should compile for valid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       for (
         (data, function) <- Seq(
@@ -29,7 +29,7 @@ object CheckMerkleProof extends JsTestBase {
       }
     }
 
-    test("invalid functions checkMerkleProof") {
+    test("RIDE-269. checkMerkleProof function should throw a compilation error for invalid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       for (
         (data, function, error) <- Seq(
@@ -44,7 +44,7 @@ object CheckMerkleProof extends JsTestBase {
       }
     }
 
-    test("check: checkMerkleProof functions compiles") {
+    test("RIDE-270. Can't find a function checkMerkleProof") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (

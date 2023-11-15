@@ -31,7 +31,7 @@ object FromBaseString extends JsTestBase {
   private val invalidErrorForFromBase64String          = invalidFunctionError("fromBase64String", 1)
 
   val tests: Tests = Tests {
-    test("fromBaseString functions compiles") {
+    test("RIDE-118. Function fromBaseString should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (
@@ -51,7 +51,7 @@ object FromBaseString extends JsTestBase {
     }
 
     // invalid data
-    test("fromBaseString functions invalid data") {
+    test("RIDE-119. Function fromBaseString should throw an error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (

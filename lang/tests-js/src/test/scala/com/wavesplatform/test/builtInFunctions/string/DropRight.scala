@@ -13,7 +13,7 @@ object DropRight extends JsTestBase {
   private val invalidDropRightArgBeforeFunc = s"callerTestData.dropRight(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test("Compiles dropRight functions") {
+    test("RIDE-213. function dropRight should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -28,7 +28,7 @@ object DropRight extends JsTestBase {
       }
     }
 
-    test("invalid dropRight functions") {
+    test("RIDE-214. function dropRight throw a compilation error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

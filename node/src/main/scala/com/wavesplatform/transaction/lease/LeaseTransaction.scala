@@ -3,8 +3,9 @@ package com.wavesplatform.transaction.lease
 import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.LeaseTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -37,7 +38,7 @@ object LeaseTransaction extends TransactionParser {
   val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
   val typeId: TxType                    = 8: Byte
 
-  implicit val validator = LeaseTxValidator
+  implicit val validator: TxValidator[LeaseTransaction] = LeaseTxValidator
 
   implicit def sign(tx: LeaseTransaction, privateKey: PrivateKey): LeaseTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
