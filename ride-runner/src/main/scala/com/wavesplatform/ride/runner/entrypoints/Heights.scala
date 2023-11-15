@@ -21,6 +21,7 @@ object Heights {
         settings.onEmptyStartFrom match {
           case Some(onEmptyStartFrom) =>
             val maximumStartHeight = lastHeightAtStart - depth
+            // We should start with -depth offset because of effective balances
             require(onEmptyStartFrom < maximumStartHeight, s"onEmptyStartFrom=$onEmptyStartFrom should be < maximumStartHeight=$maximumStartHeight")
             (
               Height(onEmptyStartFrom),
@@ -28,7 +29,7 @@ object Heights {
             )
 
           case None =>
-            // to guarantee the right generatingBalance
+            // To guarantee the right generatingBalance
             (
               Height(math.max(0, lastHeightAtStart - depth - 1)),
               lastHeightAtStart

@@ -12,8 +12,6 @@ class TestProcessor extends Processor {
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = None
 
-  /** Includes removeBlocksFrom
-    */
   override def forceRollbackLiquid(): Unit = {}
 
   override def removeAllFrom(height: Height): Unit =

@@ -23,9 +23,6 @@ trait Processor {
 
   def removeAllFrom(height: Height): Unit
 
-  /** Includes removeBlocksFrom
-    * @param toHeight
-    */
   def forceRollbackLiquid(): Unit
 
   def startScripts(): Unit
@@ -77,8 +74,6 @@ class BlockchainProcessor(blockchain: LazyBlockchain[RideScriptRunRequest], requ
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchain.hasLocalBlockAt(height, id)
 
-  /** Includes removeBlocksFrom
-    */
   override def forceRollbackLiquid(): Unit =
     lastLiquidBlockEvents match {
       case Nil =>

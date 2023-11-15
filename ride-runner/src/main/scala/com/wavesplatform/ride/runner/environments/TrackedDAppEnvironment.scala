@@ -15,6 +15,7 @@ import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.transaction.smart.{DAppEnvironment, DAppEnvironmentInterface}
 import monix.eval.Coeval
 
+// This is a proxy that helps to register script dependencies.
 // TrackedDAppEnvironment is better than TrackedBlockchain, because callScript calls to Blockchain not only from the
 // script, but from a validation part too. We should re-run a script only if we sure the result will change.
 class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironmentTracker) extends DAppEnvironmentInterface {

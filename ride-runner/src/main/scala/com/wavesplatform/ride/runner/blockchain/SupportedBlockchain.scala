@@ -51,6 +51,10 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   // Ride: assetBalance, wavesBalance
   // override def balance(address: Address, mayBeAssetId: Asset): Long
 
+  // Ride: accountWavesBalanceOf
+  // Blockchain.effectiveBalance, BlockchainExt.hasBannedEffectiveBalance -> WavesEnvironment.accountWavesBalanceOf
+  // override def effectiveBalanceBanHeights(address: Address): Seq[Int]
+
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
   // override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
@@ -90,6 +94,18 @@ trait SupportedBlockchain extends Blockchain with ScorexLogging {
   // Not needed for now.
   // Return None, because it is used in AssetTransactionsDiff.issue, otherwise we can't issue assets in scripts.
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = None
+
+  override def carryFee(refId: Option[BlockId]): Long = kill("carryFee")
+
+  override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = kill("transactionInfos")
+
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = kill("leaseBalances")
+
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = kill("balances")
+
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = kill("wavesBalances")
+
+  override def lastStateHash(refId: Option[BlockId]): BlockId = kill("lastStateHash")
 
   private def kill(methodName: String) = throw new RuntimeException(s"$methodName is not supported, contact with developers")
 }

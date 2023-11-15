@@ -11,6 +11,7 @@ case class RideRunnerAccount(
     assetBalances: Map[IssuedAsset, TxNonNegativeAmount] = Map.empty,
     regularBalance: Option[TxNonNegativeAmount] = None,
     leasing: Option[RideRunnerLeaseBalance] = None,
+    effectiveBalanceBanHeights: List[Int] = List.empty,
     generatingBalance: Option[TxNonNegativeAmount] = None,
     data: Option[Map[String, RideRunnerDataEntry]] = None,
     aliases: List[Alias] = Nil,

@@ -20,7 +20,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScript
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
+import com.wavesplatform.transaction.{Asset, Proofs, TxPositiveAmount}
 
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -90,7 +90,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     blockHeaders
       .get(height)
       .tap { r =>
-        if (r.isEmpty) throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
+        if (r.isEmpty && height <= this.height) // GeneratingBalanceProvider.balance checks for challenging on height + 1
+          throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
       }
 
   // Ride: blockInfoByHeight
@@ -153,6 +154,9 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def balance(address: Address, mayBeAssetId: Asset): Long =
     input.accounts.get(address).flatMap(_.balance(mayBeAssetId)).getOrElse(0L)
 
+  // Ride: accountWavesBalanceOf
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = input.accounts.get(address).fold(Seq.empty[Int])(_.effectiveBalanceBanHeights)
+
   private val balanceSnapshotsCache = mkCache[Address, Seq[BalanceSnapshot]] { address =>
     val generatingBalance = input.accounts
       .get(address)
@@ -183,20 +187,6 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       spentComplexity = 0
     )
   }
-
-  override def carryFee(refId: Option[BlockId]): Long = ???
-
-  override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = ???
-
-  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = ???
-
-  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = ???
-
-  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = ???
-
-  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = ???
-
-  override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =

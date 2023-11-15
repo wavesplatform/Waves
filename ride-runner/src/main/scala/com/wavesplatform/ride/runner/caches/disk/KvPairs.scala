@@ -212,7 +212,10 @@ object KvPairs {
   implicit val dataEntryAsBytes: AsBytes[DataEntry[?]] =
     AsBytes.mk[DataEntry[?]]((os, x) => os.write(DataTxSerializer.serializeEntry(x)), DataTxSerializer.parseEntry)
 
-  implicit val txStatusAsBytes: AsBytes[TxMeta.Status] = ???
+  implicit val txStatusAsBytes: AsBytes[TxMeta.Status] = AsBytes[Int].transform(
+    x => TxMeta.Status.fromProtobuf(com.wavesplatform.protobuf.snapshot.TransactionStatus.fromValue(x)),
+    _.protobuf.value
+  )
 
   implicit val txMetaAsBytes: AsBytes[TxMeta] = AsBytes[(state.Height, TxMeta.Status, Long)].transform[TxMeta](
     Function.tupled(TxMeta.apply),
