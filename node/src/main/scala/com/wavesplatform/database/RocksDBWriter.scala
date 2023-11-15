@@ -484,12 +484,16 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      snapshot.transactions.foreach { case (_, txInfo) =>
-        for ((id, lease) <- txInfo.snapshot.leaseStates) {
-          val details = lease.toDetails(this, Some(txInfo.transaction), leaseDetails(id))
-          rw.put(Keys.leaseDetails(id)(height), Some(Right(details)))
-          expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
-        }
+      val txLeases = for {
+        (_, txInfo) <- snapshot.transactions
+        (id, lease) <- txInfo.snapshot.leaseStates
+      } yield (Some(txInfo.transaction), id, lease)
+      val txLeaseIdSet = txLeases.map(_._2).toSet
+      val allLeases    = txLeases ++ snapshot.leaseStates.collect { case (id, lease) if !txLeaseIdSet.contains(id) => (None, id, lease) }
+      allLeases.foreach { case (txOpt, id, lease) =>
+        val details = lease.toDetails(this, txOpt, leaseDetails(id))
+        rw.put(Keys.leaseDetails(id)(height), Some(Right(details)))
+        expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
 
       for ((addressId, script) <- accountScripts) {
