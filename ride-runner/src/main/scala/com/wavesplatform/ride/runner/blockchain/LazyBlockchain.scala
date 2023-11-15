@@ -26,7 +26,6 @@ import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, TransactionId, TxMeta}
-import com.wavesplatform.transaction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
@@ -42,6 +41,7 @@ class LazyBlockchain[TagT] private (
     db: RideDbAccess,
     diskCaches: DiskCaches,
     blockHeaders: BlockHeaderStorage,
+    bannedGenerators: BannedGeneratorsStorage,
     memCache: MemBlockchainDataCache,
     allTags: CacheKeyTags[TagT]
 ) extends SupportedBlockchain
@@ -85,21 +85,6 @@ class LazyBlockchain[TagT] private (
 
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = blockHeaderWithVrf(Height(height)).map(_.vrf)
-
-
-  override def carryFee(refId: Option[BlockId]): Long = ???
-
-  override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, transaction.Transaction)]] = ???
-
-  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = ???
-
-  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = ???
-
-  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = ???
-
-  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = ???
-
-  override def lastStateHash(refId: Option[BlockId]): BlockId = ???
 
   // Ride: blockInfoByHeight
   override def blockReward(height: Int): Option[Long] = blockHeaderWithVrf(Height(height)).map(_.blockReward)
@@ -182,6 +167,10 @@ class LazyBlockchain[TagT] private (
     .mayBeValue
     .getOrElse(0L)
 
+  // Ride: accountWavesBalanceOf
+  // See GeneratingBalanceProvider.balance
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = bannedGenerators.getHeights(address)
+
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
@@ -236,6 +225,7 @@ class LazyBlockchain[TagT] private (
 
   private def removeAllFromCtx(height: Height)(implicit ctx: ReadWrite): Unit = {
     blockHeaders.removeFrom(height)
+    bannedGenerators.removeFrom(height)
     diskCaches.accountDataEntries
       .removeAllFrom(height)
       .foreach(x => memCache.remove(MemCacheKey.AccountData(x._1, x._2)))
@@ -273,6 +263,7 @@ class LazyBlockchain[TagT] private (
         case Update.Rollback(evt) => rollback(toHeight, evt)
       }
 
+      bannedGenerators.update(event)
       blockHeaders.update(event)
       affected
     }
@@ -534,6 +525,8 @@ object LazyBlockchain {
   )(implicit ctx: ReadOnly): LazyBlockchain[TagT] = {
     val blockHeaders = new BlockHeaderStorage(blockchainApi, diskCaches.blockHeaders)
     blockHeaders.load()
-    new LazyBlockchain[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, memCache, allTags)
+    val bannedGenerators = new BannedGeneratorsStorage(diskCaches.bannedGenerators)
+    bannedGenerators.load(blockHeaders)
+    new LazyBlockchain[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, bannedGenerators, memCache, allTags)
   }
 }
