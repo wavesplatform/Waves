@@ -10,8 +10,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
-import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
@@ -21,6 +21,7 @@ import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
@@ -157,7 +158,7 @@ class WavesEnvironment(
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
-    val addressE: Either[ValidationError, account.Address] = addressOrAlias match {
+    val addressE = addressOrAlias match {
       case Address(bytes) => account.Address.fromBytes(bytes.arr)
       case Alias(name)    => account.Alias.create(name).flatMap(a => blockchain.resolveAlias(a))
     }
@@ -169,7 +170,10 @@ class WavesEnvironment(
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
-      blockchain.generatingBalance(address),
+      if (blockchain.isFeatureActivated(LightNode))
+        currentBlockchain().generatingBalance(address)
+      else
+        blockchain.generatingBalance(address),
       effectiveBalance
     )
   }
