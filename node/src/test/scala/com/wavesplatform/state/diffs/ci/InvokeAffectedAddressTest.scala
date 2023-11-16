@@ -62,4 +62,23 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
       }
     }
   }
+
+  property("tx belongs to invoker on zero balance diff") {
+    def dApp(fee: Long) =
+      TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [ScriptTransfer(i.caller, $fee, unit)]
+         """.stripMargin
+      )
+
+    val invoker = signer(2)
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, invoker)) { d =>
+      val invokeTx = invoke(invoker = invoker)
+      d.appendBlock(setScript(secondSigner, dApp(invokeTx.fee.value)))
+      d.appendAndAssertSucceed(invokeTx)
+      d.liquidDiff.portfolios.get(invoker.toAddress) shouldBe None
+      d.liquidDiff.transaction(invokeTx.id()).get.affected shouldBe Set(invoker.toAddress, secondAddress)
+    }
+  }
 }

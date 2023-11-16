@@ -37,6 +37,7 @@ case class StateSnapshot(
     accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
+    zeroBalanceAffected: Set[Address] = Set(),
     scriptsComplexity: Long = 0
 ) {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
@@ -106,7 +107,7 @@ case class StateSnapshot(
   def addBalances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, StateSnapshot] =
     StateSnapshot
       .balances(portfolios, SnapshotBlockchain(blockchain, this))
-      .map(b => copy(balances = balances ++ b))
+      .map { case (a, b) => copy(zeroBalanceAffected = zeroBalanceAffected ++ a, balances = balances ++ b) }
 
   def withTransaction(tx: NewTransactionInfo): StateSnapshot =
     copy(transactions + (tx.transaction.id() -> tx))
@@ -265,13 +266,13 @@ object StateSnapshot {
   ): Either[ValidationError, StateSnapshot] = {
     val r =
       for {
-        b  <- balances(portfolios, blockchain)
-        lb <- leaseBalances(portfolios, blockchain)
-        of <- this.orderFills(orderFills, blockchain)
+        (affected, balances) <- balances(portfolios, blockchain)
+        leaseBalances        <- leaseBalances(portfolios, blockchain)
+        orderFills           <- this.orderFills(orderFills, blockchain)
       } yield StateSnapshot(
         transactions,
-        b,
-        lb,
+        balances,
+        leaseBalances,
         assetStatics(issuedAssets),
         assetVolumes(blockchain, issuedAssets, updatedAssets),
         assetNamesAndDescriptions(issuedAssets, updatedAssets),
@@ -279,41 +280,41 @@ object StateSnapshot {
         sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
         resolvedLeaseStates(blockchain, leaseStates, aliases),
         aliases,
-        of,
+        orderFills,
         accountScripts,
         accountData,
         scriptResults,
         ethereumTransactionMeta,
+        affected,
         scriptsComplexity
       )
     r.leftMap(GenericError(_))
   }
 
   // ignores lease balances from portfolios
-  private def balances(portfolios: Map[Address, Portfolio], blockchain: Blockchain): Either[String, VectorMap[(Address, Asset), Long]] =
+  private def balances(
+      portfolios: Map[Address, Portfolio],
+      blockchain: Blockchain
+  ): Either[String, (Set[Address], VectorMap[(Address, Asset), Long])] =
     flatTraverse(portfolios) { case (address, Portfolio(wavesAmount, _, assets)) =>
-      val assetBalancesE = flatTraverse(assets) {
+      flatTraverse(assets.asInstanceOf[VectorMap[Asset, Long]] + (Waves -> wavesAmount)) {
         case (_, 0) =>
-          Right(VectorMap[(Address, Asset), Long]())
-        case (assetId, balance) =>
-          safeSum(blockchain.balance(address, assetId), balance, s"$address -> Asset balance")
-            .map(newBalance => VectorMap((address, assetId: Asset) -> newBalance))
+          Right((Set(address), VectorMap[(Address, Asset), Long]()))
+        case (asset, balance) =>
+          val error = if (asset == Waves) "Waves balance" else "Asset balance"
+          safeSum(blockchain.balance(address, asset), balance, s"$address -> $error")
+            .map(newBalance => (Set(), VectorMap((address, asset) -> newBalance)))
       }
-      if (wavesAmount != 0)
-        for {
-          assetBalances   <- assetBalancesE
-          newWavesBalance <- safeSum(blockchain.balance(address), wavesAmount, s"$address -> Waves balance")
-        } yield assetBalances + ((address, Waves) -> newWavesBalance)
-      else
-        assetBalancesE
     }
 
-  private def flatTraverse[E, K1, V1, K2, V2](m: Map[K1, V1])(f: (K1, V1) => Either[E, VectorMap[K2, V2]]): Either[E, VectorMap[K2, V2]] =
-    m.foldLeft(VectorMap[K2, V2]().asRight[E]) {
+  private def flatTraverse[E, A, K1, V1, K2, V2](
+      m: Map[K1, V1]
+  )(f: (K1, V1) => Either[E, (Set[A], VectorMap[K2, V2])]): Either[E, (Set[A], VectorMap[K2, V2])] =
+    m.foldLeft((Set[A](), VectorMap[K2, V2]()).asRight[E]) {
       case (e @ Left(_), _) =>
         e
-      case (Right(acc), (k, v)) =>
-        f(k, v).map(acc ++ _)
+      case (Right((s, m)), (k, v)) =>
+        f(k, v).map { case (ns, nm) => (s ++ ns, m ++ nm) }
     }
 
   def ofLeaseBalances(balances: Map[Address, LeaseBalance], blockchain: Blockchain): Either[String, StateSnapshot] =
@@ -421,6 +422,7 @@ object StateSnapshot {
         combineDataEntries(s1.accountData, s2.accountData),
         s1.scriptResults |+| s2.scriptResults,
         s1.ethereumTransactionMeta ++ s2.ethereumTransactionMeta,
+        s1.zeroBalanceAffected ++ s2.zeroBalanceAffected,
         s1.scriptsComplexity + s2.scriptsComplexity
       )
 

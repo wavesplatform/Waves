@@ -27,10 +27,12 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.TxValidationError.{AccountBalanceError, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals, Default as DefaultPriceMode}
+import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -937,7 +939,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     BlockchainFeatures.FairPoS             -> 0
   )
 
-  private val RideV6 = DomainPresets.RideV6.blockchainSettings.functionalitySettings
+  private val RideV6FS = DomainPresets.RideV6.blockchainSettings.functionalitySettings
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
@@ -997,7 +999,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6FS)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1009,7 +1011,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6FS)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1021,7 +1023,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6FS)("TransactionNotAllowedByScript")
     }
   }
 
@@ -2019,6 +2021,21 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       d.appendBlockE(exchange()) should produce("Attachment field for orders is not supported yet")
       d.appendBlock()
       d.appendBlockE(exchange()) should beRight
+    }
+  }
+
+  property("tx belongs to matcher on zero balance diff") {
+    val matcher = signer(2)
+    withDomain(RideV6, Seq(AddrWithBalance(matcher.toAddress))) { d =>
+      val issueTx  = issue()
+      val asset    = IssuedAsset(issueTx.id())
+      val order1   = order(BUY, Waves, asset, fee = TestValues.fee / 2, matcher = matcher)
+      val order2   = order(SELL, Waves, asset, fee = TestValues.fee / 2, matcher = matcher)
+      val exchange = exchangeFromOrders(order1, order2, matcher = matcher, TestValues.fee)
+      d.appendBlock(issueTx)
+      d.appendBlock(exchange)
+      d.liquidDiff.portfolios.get(matcher.toAddress) shouldBe None
+      d.liquidDiff.transaction(exchange.id()).get.affected shouldBe Set(matcher.toAddress, defaultAddress)
     }
   }
 
