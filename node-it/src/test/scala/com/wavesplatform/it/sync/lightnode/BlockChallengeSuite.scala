@@ -1,4 +1,4 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.lightnode
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
@@ -6,12 +6,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.FairPoSCalculator
-import com.wavesplatform.{TestValues, crypto}
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.api.Block as ApiBlock
-import com.wavesplatform.it.{BaseFunSuite, Node, NodeConfigs, TransferSending}
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
+import com.wavesplatform.it.api.Block as ApiBlock
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.{BaseFunSuite, Node, NodeConfigs, TransferSending}
 import com.wavesplatform.lang.directives.values.V8
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.RawBytes
@@ -19,6 +18,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.{TestValues, crypto}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*

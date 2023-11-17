@@ -1,10 +1,10 @@
-package com.wavesplatform.it.sync
+package com.wavesplatform.it.sync.lightnode
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, TransferSending}
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.{BaseFunSuite, NodeConfigs, TransferSending}
 
 class LightNodeBroadcastSuite extends BaseFunSuite with TransferSending {
   override def nodeConfigs: Seq[Config] =
