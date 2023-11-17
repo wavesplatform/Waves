@@ -1,9 +1,8 @@
 package com.wavesplatform.http
 
-import java.util.concurrent.TimeUnit
-
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
+import com.wavesplatform.*
 import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -42,12 +41,12 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.*
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -1619,10 +1618,10 @@ class DebugApiRouteSpec
     }
 
     "invoke tx returning leases" in {
-      val dAppPk        = TxHelpers.defaultSigner.publicKey
-      val dAppAddress   = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress)
-      val leaseCancelId = ByteStr(bytes32gen.sample.get)
+      val dAppPk          = TxHelpers.defaultSigner.publicKey
+      val dAppAddress     = dAppPk.toAddress
+      val invoke          = TxHelpers.invoke(dAppPk.toAddress)
+      val canceledLeaseId = ByteStr(bytes32gen.sample.get)
 
       val amount1    = 100
       val recipient1 = Recipient.Address(ByteStr.decodeBase58("3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd").get)
@@ -1660,7 +1659,7 @@ class DebugApiRouteSpec
                |      [
                |        Lease(Address(base58'${recipient1.bytes}'), $amount1, $nonce1),
                |        Lease(Alias("${recipient2.name}"), $amount2, $nonce2),
-               |        LeaseCancel(base58'$leaseCancelId')
+               |        LeaseCancel(base58'$canceledLeaseId')
                |      ]
                |    else []
                |}
@@ -1685,13 +1684,13 @@ class DebugApiRouteSpec
         (blockchain.hasAccountScript _).when(*).returns(true)
 
         (blockchain.transactionMeta _)
-          .when(leaseCancelId)
+          .when(canceledLeaseId)
           .returns(Some(TxMeta(Height(1), Status.Succeeded, 0L)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
-          .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, leaseCancelAmount, LeaseDetails.Status.Active, leaseCancelId, 1)))
+          .when(canceledLeaseId)
+          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, leaseCancelAmount, LeaseDetails.Status.Active, invoke.id(), 1)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -1743,8 +1742,8 @@ class DebugApiRouteSpec
                                                                  |    "cancelTransactionId" : null
                                                                  |  } ],
                                                                  |  "leaseCancels" : [ {
-                                                                 |    "id" : "$leaseCancelId",
-                                                                 |    "originTransactionId" : "$leaseCancelId",
+                                                                 |    "id" : "$canceledLeaseId",
+                                                                 |    "originTransactionId" : "${invoke.id()}",
                                                                  |    "sender" : "$dAppAddress",
                                                                  |    "recipient" : "${TxHelpers.defaultAddress}",
                                                                  |    "amount" : $leaseCancelAmount,
@@ -1797,8 +1796,8 @@ class DebugApiRouteSpec
              |      "cancelTransactionId" : null
              |    } ],
              |    "leaseCancels" : [ {
-             |      "id" : "$leaseCancelId",
-             |      "originTransactionId" : "$leaseCancelId",
+             |      "id" : "$canceledLeaseId",
+             |      "originTransactionId" : "${invoke.id()}",
              |      "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |      "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |      "amount" : $leaseCancelAmount,
@@ -2007,7 +2006,7 @@ class DebugApiRouteSpec
              |    "type" : "Array",
              |    "value" : [ {
              |      "type" : "ByteVector",
-             |      "value" : "$leaseCancelId"
+             |      "value" : "$canceledLeaseId"
              |    } ]
              |  }, {
              |    "name" : "LeaseCancel.@complexity",
@@ -2025,7 +2024,7 @@ class DebugApiRouteSpec
              |      "value" : {
              |        "leaseId" : {
              |          "type" : "ByteVector",
-             |          "value" : "$leaseCancelId"
+             |          "value" : "$canceledLeaseId"
              |        }
              |      }
              |    }, {
@@ -2071,7 +2070,7 @@ class DebugApiRouteSpec
              |        "value" : {
              |          "leaseId" : {
              |            "type" : "ByteVector",
-             |            "value" : "$leaseCancelId"
+             |            "value" : "$canceledLeaseId"
              |          }
              |        }
              |      } ]
@@ -2136,7 +2135,7 @@ class DebugApiRouteSpec
              |        "value" : {
              |          "leaseId" : {
              |            "type" : "ByteVector",
-             |            "value" : "$leaseCancelId"
+             |            "value" : "$canceledLeaseId"
              |          }
              |        }
              |      } ]
