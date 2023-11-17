@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
-import org.apache.commons.lang3.SystemUtils
 import supertagged.TaggedType
 
 import scala.jdk.CollectionConverters.*
@@ -119,9 +118,10 @@ package object settings {
       s"waves-$suffix"
     }
 
+    val osName = sys.props.get("os.name").map(_.toLowerCase)
     val parent =
-      if (SystemUtils.IS_OS_WINDOWS) winDefaultDirectory
-      else if (SystemUtils.IS_OS_MAC) osxDefaultDirectory
+      if (osName.exists(_.contains("win"))) winDefaultDirectory
+      else if (osName.exists(_.contains("mac"))) osxDefaultDirectory
       else nixDefaultDirectory
 
     s"$parent/${withNetwork(config)}"

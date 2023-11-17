@@ -12,7 +12,7 @@ import play.api.libs.json.Json
 class TransferTransactionV1Specification extends PropSpec {
 
   property("Transfer serialization roundtrip") {
-    forAll(transferV1Gen) { transfer: TransferTransaction =>
+    forAll(transferV1Gen) { (transfer: TransferTransaction) =>
       val recovered = TransferTransaction.parseBytes(transfer.bytes()).get
 
       recovered.sender shouldEqual transfer.sender
@@ -57,7 +57,7 @@ class TransferTransactionV1Specification extends PropSpec {
   }
 
   property("Transfer serialization from TypedTransaction") {
-    forAll(transferV1Gen) { tx: TransferTransaction =>
+    forAll(transferV1Gen) { (tx: TransferTransaction) =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
     }

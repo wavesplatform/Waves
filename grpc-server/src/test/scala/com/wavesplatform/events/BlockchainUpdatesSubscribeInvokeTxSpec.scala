@@ -70,8 +70,8 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
         d.appendMicroBlock(invoke)
       } { updates =>
         val append              = updates(3).append
-        val transactionMetadata = append.transactionsMetadata
-        val invokeScript        = transactionMetadata.head.getInvokeScript
+        val transactionMetadata = append.transactionsMetadata.head
+        val invokeScript        = transactionMetadata.getInvokeScript
         val arguments           = invokeScript.arguments
         val result              = invokeScript.result.get
         val dataEntries         = append.transactionStateUpdates.head.dataEntries
@@ -178,7 +178,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
         val minerBalanceBeforeInvoke           = 2 * 6.waves + txsBeforeInvoke.map(_.fee.value).sum * 2 / 5
         val minerBalanceAfterInvoke            = minerBalanceBeforeInvoke + invoke.fee.value * 2 / 5
 
-        addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
+        withAddedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
           val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
           checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, dAppAddress, secondAddress)
           checkBalances(
@@ -213,7 +213,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
         val minerBalanceBeforeInvoke           = 2 * 6.waves + txsBeforeInvoke.map(_.fee.value).sum * 2 / 5
         val minerBalanceAfterInvoke            = minerBalanceBeforeInvoke + invoke.fee.value * 2 / 5
 
-        addedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
+        withAddedBlocksAndSubscribe(mainDAppTx, nestedDAppTx, doubleNestedDAppTx) { updates =>
           val actualDataEntries = updates(2).getAppend.transactionStateUpdates.head.dataEntries
           checkInvokeDoubleNestedBlockchainUpdates(updates(2).getAppend, invokerDappAddress, invokerDappAddress)
           checkBalances(
@@ -232,7 +232,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
       }
     }
 
-    def addedBlocksAndSubscribe(
+    def withAddedBlocksAndSubscribe(
         mainDAppTx: SetScriptTransaction,
         nestedDAppTx: SetScriptTransaction,
         doubleNestedDAppTx: SetScriptTransaction
@@ -271,7 +271,7 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
         arguments(4).value.binaryValue.get.toByteArray
       )
       checkInvokeTransaction(append.transactionIds.head, append.transactionAt(0), invoke, dAppAddress.publicKeyHash)
-      checkInvokeBaseTransactionMetadata(append.transactionsMetadata, invoke)
+      checkInvokeBaseTransactionMetadata(append.transactionsMetadata.head, invoke)
       checkArguments(expectedValues, actualArguments)
       checkInvokeScriptResultData(result.data, actualData)
       checkInvokeScriptBaseInvokes(invokes, secondAddress, bar)

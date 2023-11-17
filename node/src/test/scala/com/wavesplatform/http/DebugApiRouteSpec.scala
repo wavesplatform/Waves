@@ -84,6 +84,7 @@ class DebugApiRouteSpec
 
   val block: Block = TestBlock.create(Nil).block
   val testStateHash: StateHash = {
+    import com.wavesplatform.utils.byteStrOrdering
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
     StateHash(randomHash, hashes)
@@ -196,9 +197,10 @@ class DebugApiRouteSpec
         Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.OK
           responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
-            "blockId" -> blockAt2.id().toString,
-            "height"  -> 2,
-            "version" -> Version.VersionString
+            "blockId"    -> blockAt2.id().toString,
+            "baseTarget" -> blockAt2.header.baseTarget,
+            "height"     -> 2,
+            "version"    -> Version.VersionString
           ))
         }
       }
@@ -258,7 +260,9 @@ class DebugApiRouteSpec
       }
       val route = handleAllExceptions(routeWithBlockchain(blockchain))
       validatePost(TxHelpers.invoke()) ~> route ~> check {
-        responseAs[String] shouldBe """{"error":0,"message":"Error is unknown"}"""
+        responseAs[
+          String
+        ] shouldBe """{"error":0,"message":"Error is unknown"}"""
         response.status shouldBe StatusCodes.InternalServerError
       }
     }
