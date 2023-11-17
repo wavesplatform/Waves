@@ -57,6 +57,7 @@ class AssetsRouteSpec
         seal(
           AssetsApiRoute(
             restAPISettings,
+            60.seconds,
             testWallet,
             DummyTransactionPublisher.accepting,
             d.blockchain,
