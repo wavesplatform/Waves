@@ -109,6 +109,8 @@ object RDB extends StrictLogging {
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )
+//      .setMaxBytesForLevelBase()
+//      .setCompactionPriority()
       .setWriteBufferSize(writeBufferSize)
       .setLevelCompactionDynamicLevelBytes(true)
       .useCappedPrefixExtractor(10)
@@ -128,6 +130,7 @@ object RDB extends StrictLogging {
       .setMaxBackgroundJobs(4)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
+      .setMaxSubcompactions(2) // Could lead to max_background_jobs * max_subcompactions background threads
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()
