@@ -1,15 +1,13 @@
 package com.wavesplatform
 
-import java.lang.reflect.Constructor
-
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.*
-import org.whispersystems.curve25519.OpportunisticCurve25519Provider
+import org.whispersystems.curve25519.{OpportunisticCurve25519Provider, VrfSignatureVerificationFailedException}
 
-import scala.util.Try
+import java.lang.reflect.Constructor
 
 package object crypto {
   // Constants
@@ -43,13 +41,16 @@ package object crypto {
     (!checkWeakPk || !isWeakPublicKey(publicKey.arr)) && Curve25519.verify(signature.arr, message, publicKey.arr)
   }
 
-  def verifyVRF(signature: ByteStr, message: Array[Byte], publicKey: PublicKey, checkWeakPk: Boolean = false): Either[ValidationError, ByteStr] = {
-    for {
-      _ <- Either.cond(!checkWeakPk || !isWeakPublicKey(publicKey.arr), (), GenericError("Could not verify VRF proof: weak public key is used"))
-      result <- Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
-        .map(_ => GenericError("Could not verify VRF proof"))
-    } yield result
-  }
+  def verifyVRF(signature: ByteStr, message: Array[Byte], publicKey: PublicKey, checkWeakPk: Boolean = false): Either[ValidationError, ByteStr] =
+    if (checkWeakPk && isWeakPublicKey(publicKey.arr)) {
+      Left(GenericError("Could not verify VRF proof: weak public key is used"))
+    } else
+      try {
+        Right(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr)))
+      } catch {
+        case e: VrfSignatureVerificationFailedException =>
+          Left(GenericError(s"Could not verify VRF proof${Option(e.getMessage).fold("") { msg => ": " + msg }}"))
+      }
 
   // see
   // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17

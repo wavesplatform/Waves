@@ -3,6 +3,7 @@ package com.wavesplatform.it.api
 import com.wavesplatform.it.Node
 import com.wavesplatform.network.client.NetworkSender
 
+import java.net.InetSocketAddress
 import scala.concurrent.Future
 
 object AsyncNetworkApi {
@@ -18,7 +19,7 @@ object AsyncNetworkApi {
         s"it-client-to-${node.name}",
         nonce
       )
-      sender.connect(node.networkAddress).map { ch =>
+      sender.connect(new InetSocketAddress("localhost", node.nodeExternalPort(node.settings.networkSettings.bindAddress.getPort))).map { ch =>
         if (ch.isActive) sender.send(ch, messages*).map(_ => sender.close()) else sender.close()
       }
     }
