@@ -70,7 +70,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     assertBalances(Some(asset))
   }
 
-  test("limit violation requests should be handled correctly") {
+  test("SAPI-29. limit violation requests should be handled correctly") {
     val limit     = miner.config.getInt("waves.rest-api.transactions-by-address-limit")
     val addresses = List.fill(limit + 1)(firstAddress)
     assertApiError(
