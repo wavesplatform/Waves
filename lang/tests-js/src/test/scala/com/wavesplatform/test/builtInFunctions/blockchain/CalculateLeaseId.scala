@@ -12,7 +12,7 @@ object CalculateLeaseId extends JsTestBase {
   private val invalidCalculateLeaseId       = "calculateLeaseId()"
 
   val tests: Tests = Tests {
-    test("Functions calculateLeaseId for V5 and more compiles for address") {
+    test("RIDE-36. calculateLeaseId function should compile for version V5 and higher when called for an address") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -29,7 +29,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test("negative cases CalculateAssetId for version V5 and more") {
+    test("RIDE-37. Negative cases for calculateLeaseId function for version V5 and higher") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -46,7 +46,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test("negative cases CalculateAssetId for version V3, V4") {
+    test("RIDE-38. Negative cases for calculateLeaseId function for versions V3 and V4") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

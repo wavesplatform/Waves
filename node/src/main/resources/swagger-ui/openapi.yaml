@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   version: '{{version}}'
   title: Waves Full Node ({{chainId}})
@@ -287,7 +287,7 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 allOf:
-                  -  $ref: '#/components/schemas/BalanceLSF'
+                  - $ref: '#/components/schemas/BalanceLSF'
                 example:
                   address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
                   confirmations: 3
@@ -446,7 +446,7 @@ paths:
                 type: object
                 properties:
                   address:
-                    type: string
+                    $ref: '#/components/schemas/Address'
                   script:
                     type: string
                     format: byte
@@ -480,6 +480,8 @@ paths:
                     description: >-
                       Extra fee for transactions sending on behalf of the
                       account
+                  publicKey:
+                    $ref: '#/components/schemas/PublicKey'
   '/addresses/{address}':
     delete:
       tags:
@@ -598,7 +600,7 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 allOf:
-                  -  $ref: '#/components/schemas/BalanceLSF'
+                  - $ref: '#/components/schemas/BalanceLSF'
                 example:
                   address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
                   confirmations: 3
@@ -631,7 +633,7 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 allOf:
-                  -  $ref: '#/components/schemas/BalanceLSF'
+                  - $ref: '#/components/schemas/BalanceLSF'
                 example:
                   address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
                   confirmations: 3
@@ -1991,41 +1993,9 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                expr:
-                  type: string
-                id:
-                  type: string
-                  example: "C8AgSFP8y91XUTpGtEQAQyjsSemxoY61ocGM852DFKF6"
-                  nullable: true
-                fee:
-                  type: number
-                  example: 500000
-                  nullable: true
-                feeAssetId:
-                  type: string
-                  example: null
-                  nullable: true
-                sender:
-                  type: string
-                  example: "3Mds6m8XZf4biC72NRkFx2kyoBdC9UvYRUR"
-                  nullable: true
-                senderPublicKey:
-                  type: string
-                  example: "3T9fL3XpeaHYbumohePPUmeuUqhyEeyzifi9vKouV8QoNtAT6kYV1oPAe9e2KCVquPcyXJpr2QwUiQKEUQPGZnc6"
-                  nullable: true
-                payment:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      amount:
-                        $ref: '#/components/schemas/Amount'
-                      assetId:
-                        allOf:
-                          - $ref: '#/components/schemas/AssetId'
-                        nullable: true
+              oneOf:
+                - $ref: '#/components/schemas/RideExprRequest'
+                - $ref: '#/components/schemas/RideInvocationRequest'
         required: true
       responses:
         '200':
@@ -3332,6 +3302,13 @@ paths:
                     type: string
 components:
   schemas:
+    NonNegativeAmount:
+      oneOf:
+        - type: integer
+          format: int64
+          minimum: 0
+        - type: string
+          pattern: '^(0|[1-9]\d*)$'
     Timestamp:
       type: integer
       format: int64
@@ -5226,7 +5203,7 @@ components:
         - dApp
         - payment
         - call
-        - stateCahnges
+        - stateChanges
       properties:
         error:
           type: object
@@ -5238,7 +5215,7 @@ components:
         - dApp
         - payment
         - call
-        - stateCahnges
+        - stateChanges
       properties:
         error:
           type: object
@@ -5342,6 +5319,118 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InvokeActionLSF'
+    RideFunctionCallArg:
+      type: object
+      oneOf:
+        - properties:
+            type:
+              const: 'integer'
+            value:
+              type: integer
+              format: int64
+        - properties:
+            type:
+              const: 'boolean'
+            value:
+              type: boolean
+        - properties:
+            type:
+              const: 'string'
+            value:
+              type: string
+        - properties:
+            type:
+              const: 'binary'
+            value:
+              type: string
+              description: 'Evaluated Ride expression either as a Ride code, or as compiled in base64 representation'
+        - properties:
+            type:
+              const: 'list'
+            value:
+              type: array
+              items:
+                $ref: '#/components/schemas/RideFunctionCallArg'
+    BlockchainOverrides:
+      type: object
+      properties:
+        accounts:
+          type: object
+          description: 'Key is Address'
+          additionalProperties:
+            type: object
+            properties:
+              assetBalances:
+                type: object
+                description: 'Key is AssetId'
+                additionalProperties:
+                  $ref: '#/components/schemas/NonNegativeAmount'
+              regularBalance:
+                $ref: '#/components/schemas/NonNegativeAmount'
+      example:
+        accounts:
+          '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k':
+            assetBalances:
+              'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p': '141592653'
+              '34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ': 5897932
+            regularBalance: '3846264338327'
+    RideExprRequest:
+      type: object
+      properties:
+        expr:
+          type: string
+          example: "default()"
+          description: "Ride expression"
+        state:
+          $ref: '#/components/schemas/BlockchainOverrides'
+    RideInvocationRequest:
+      type: object
+      properties:
+        call:
+          type: object
+          properties:
+            function:
+              type: string
+              default: "default"
+              nullable: true
+            args:
+              type: array
+              items:
+                $ref: '#/components/schemas/RideFunctionCallArg'
+              nullable: true
+        id:
+          type: string
+          example: "C8AgSFP8y91XUTpGtEQAQyjsSemxoY61ocGM852DFKF6"
+          nullable: true
+        fee:
+          type: number
+          example: 500000
+          nullable: true
+        feeAssetId:
+          type: string
+          example: null
+          nullable: true
+        sender:
+          type: string
+          example: "3Mds6m8XZf4biC72NRkFx2kyoBdC9UvYRUR"
+          nullable: true
+        senderPublicKey:
+          type: string
+          example: "3T9fL3XpeaHYbumohePPUmeuUqhyEeyzifi9vKouV8QoNtAT6kYV1oPAe9e2KCVquPcyXJpr2QwUiQKEUQPGZnc6"
+          nullable: true
+        payment:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                $ref: '#/components/schemas/Amount'
+              assetId:
+                allOf:
+                  - $ref: '#/components/schemas/AssetId'
+                nullable: true
+        state:
+          $ref: '#/components/schemas/BlockchainOverrides'
   responses:
     Height:
       description: Block height
@@ -5414,7 +5503,7 @@ components:
           generation-signature: 'qwertyuikmn56khjkKHKJHK787'
         blocksize: 11234
         transactionCount: 10
-        features: [0]
+        features: [ 0 ]
         reward: '30000'
         rewardShares:
           3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'
@@ -5431,7 +5520,7 @@ components:
             version: 2
             sender: '3PGS9W5aZ4kdBFJJ9jxmgjLW8qfqu1b3Y66'
             senderPublicKey: 'EAtFj2ycPFH6hzAadJ9UDbo6UGTbo4fenFbGiSDVYPU6'
-            proof: ['3n8tCEh9dxqvGrc3wuaKpoYX6mpXHfEeY7GFeAKpxZP7yJpqRiiSsyHoD9uCELnNoYBamnnrvY46WzKMVfSRVWGE']
+            proof: [ '3n8tCEh9dxqvGrc3wuaKpoYX6mpXHfEeY7GFeAKpxZP7yJpqRiiSsyHoD9uCELnNoYBamnnrvY46WzKMVfSRVWGE' ]
             recipient: '3PDXpDCRkGz3jNMozjpbbrJeJZhKJHkoqjj'
             assetId: null
             feeAsset: null
@@ -5464,7 +5553,7 @@ components:
           generation-signature: 'qwertyuikmn56khjkKHKJHK787'
         blocksize: 11234
         transactionCount: 10
-        features: [0]
+        features: [ 0 ]
         reward: '30000'
         rewardShares:
           3MtmVzUQQj1keBsr3Pq5DYkutZzu5H8wdgA: '200000000'

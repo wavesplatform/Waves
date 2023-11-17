@@ -14,7 +14,7 @@ object MakeString extends JsTestBase {
   private val invalidErrorMakeString         = invalidFunctionError("makeString", 2)
 
   val tests: Tests = Tests {
-    test("makeString functions compiles") {
+    test("RIDE-192. makeString function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -29,7 +29,7 @@ object MakeString extends JsTestBase {
       }
     }
 
-    test("compilation error makeString functions") {
+    test("RIDE-193. makeString function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
