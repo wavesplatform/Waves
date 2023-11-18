@@ -109,7 +109,6 @@ object RDB extends StrictLogging {
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )
-      .setMaxBytesForLevelBase(134217728) // 128 MiB
 //      .setCompactionPriority()
       .setWriteBufferSize(writeBufferSize)
       .setLevelCompactionDynamicLevelBytes(true)
@@ -125,9 +124,9 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(4)
+      .setIncreaseParallelism(6)
       .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(4)
+      .setMaxBackgroundJobs(6)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
       .setMaxSubcompactions(2) // Could lead to max_background_jobs * max_subcompactions background threads
