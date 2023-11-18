@@ -109,7 +109,7 @@ object RDB extends StrictLogging {
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )
-      .setMaxBytesForLevelBase(536870912) // 512 MiB
+      .setMaxBytesForLevelBase(134217728) // 128 MiB
 //      .setCompactionPriority()
       .setWriteBufferSize(writeBufferSize)
       .setLevelCompactionDynamicLevelBytes(true)
