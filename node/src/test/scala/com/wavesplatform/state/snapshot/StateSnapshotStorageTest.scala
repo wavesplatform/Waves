@@ -10,8 +10,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
-import com.wavesplatform.protobuf.ByteStrExt
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
@@ -50,7 +49,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expectedSnapshotWithMiner, status)
+        PBSnapshots.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get, tx.id(), d.blockchain.height) shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
@@ -95,7 +94,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           assetStatics = VectorMap(
-            asset -> AssetStatic(asset.id.toByteString, issueTx.id().toByteString, sender.publicKey.toByteString, issueTx.decimals.value)
+            asset -> AssetStaticInfo(asset.id, TransactionId(issueTx.id()), sender.publicKey, issueTx.decimals.value, false)
           ),
           assetVolumes = Map(
             asset -> AssetVolumeInfo(isReissuable = true, BigInt(issueTx.quantity.value))
@@ -322,7 +321,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress    -> LeaseBalance(123, 0)
           ),
           assetStatics = VectorMap(
-            dAppAssetId -> AssetStatic(dAppAssetId.id.toByteString, invokeId.toByteString, dAppPk.toByteString, 4)
+            dAppAssetId -> AssetStaticInfo(dAppAssetId.id, TransactionId(invokeId), dAppPk, 4, false)
           ),
           assetVolumes = Map(
             dAppAssetId -> AssetVolumeInfo(true, 1000)

@@ -18,7 +18,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
@@ -298,7 +298,7 @@ class RocksDBWriter(
 
   private def appendBalances(
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
-      assetStatics: Map[IssuedAsset, TransactionStateSnapshot.AssetStatic],
+      assetStatics: Map[IssuedAsset, AssetStaticInfo],
       rw: RW
   ): Unit = {
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
@@ -452,8 +452,8 @@ class RocksDBWriter(
 
       for ((asset, (assetStatic, assetNum)) <- snapshot.indexedAssetStatics) {
         val pbAssetStatic = StaticAssetInfo(
-          assetStatic.sourceTransactionId,
-          assetStatic.issuerPublicKey,
+          assetStatic.source.toByteString,
+          assetStatic.issuer.toByteString,
           assetStatic.decimals,
           assetStatic.nft,
           assetNum,
@@ -523,7 +523,7 @@ class RocksDBWriter(
           val txId = TransactionId(id)
 
           val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((meta, tx)))
-          rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txInfo.snapshot.toProtobuf(txInfo.status)))
+          rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status)))
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
           targetBf.put(id.arr)
 
@@ -798,7 +798,7 @@ class RocksDBWriter(
           ).explicitGet()
 
           val snapshot = if (isLightMode) {
-            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb)))
+            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
           (block, Caches.toHitSource(discardedMeta), snapshot)

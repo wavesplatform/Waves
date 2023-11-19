@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.nio.ByteBuffer
-import java.util
-import java.util.Map as JMap
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -19,24 +16,16 @@ import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
 import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.{ByteStringExt, PBSnapshots}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{
-  EthereumTransaction,
-  GenesisTransaction,
-  PBSince,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers,
-  TxValidationError
-}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -44,6 +33,9 @@ import org.rocksdb.*
 import sun.nio.ch.Util
 import supertagged.TaggedType
 
+import java.nio.ByteBuffer
+import java.util
+import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
@@ -672,8 +664,8 @@ package object database {
     txSnapshots.result()
   }
 
-  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] =
-    loadTxStateSnapshots(height, rdb).map(StateSnapshot.fromProtobuf)
+  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB, transactions: Seq[Transaction]): Seq[(StateSnapshot, TxMeta.Status)] =
+    loadTxStateSnapshots(height, rdb).zip(transactions).map { case (s, tx) => PBSnapshots.fromProtobuf(s, tx.id(), height) }
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {

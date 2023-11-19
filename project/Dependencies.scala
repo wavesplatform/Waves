@@ -6,7 +6,7 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.5.1-SNAPSHOT" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.5.1-85-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
   private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 

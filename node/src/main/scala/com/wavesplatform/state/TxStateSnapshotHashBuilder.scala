@@ -82,7 +82,7 @@ object TxStateSnapshotHashBuilder {
     }
 
     snapshot.assetStatics.foreach { case (asset, assetInfo) =>
-      changedKeys += asset.id.arr ++ assetInfo.issuerPublicKey.toByteArray ++ Array(assetInfo.decimals.toByte) ++ booleanToBytes(assetInfo.nft)
+      changedKeys += asset.id.arr ++ assetInfo.issuer.arr ++ Array(assetInfo.decimals.toByte) ++ booleanToBytes(assetInfo.nft)
     }
 
     snapshot.assetVolumes.foreach { case (asset, volume) =>
@@ -174,12 +174,11 @@ object TxStateSnapshotHashBuilder {
     if (flag) Array(1: Byte) else Array(0: Byte)
 
   private def createHash(bs: Iterable[Array[Byte]]): ByteStr = {
-    val digestFn: Blake2bDigest = newDigestInstance()
+    val digestFn: Blake2bDigest = new Blake2bDigest(crypto.DigestLength * 8)
     bs.foreach(bs => digestFn.update(bs, 0, bs.length))
     val result = new Array[Byte](crypto.DigestLength)
     digestFn.doFinal(result, 0)
     ByteStr(result)
   }
 
-  private def newDigestInstance(): Blake2bDigest = new Blake2bDigest(crypto.DigestLength * 8)
 }

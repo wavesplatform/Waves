@@ -7,6 +7,6 @@ import com.wavesplatform.state.{StateSnapshot, TxMeta}
 case class MicroBlockSnapshot(totalBlockId: BlockId, snapshots: Seq[(StateSnapshot, TxMeta.Status)])
 
 object MicroBlockSnapshot {
-  def fromResponse(response: MicroBlockSnapshotResponse): MicroBlockSnapshot =
-    MicroBlockSnapshot(response.totalBlockId, response.snapshots.map(StateSnapshot.fromProtobuf))
+  def fromResponse(response: MicroBlockSnapshotResponse): MicroBlockSnapshot = ???
+//    MicroBlockSnapshot(response.totalBlockId, response.snapshots.map(StateSnapshot.fromProtobuf))
 }

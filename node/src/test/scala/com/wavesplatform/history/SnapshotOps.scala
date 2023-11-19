@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -58,8 +57,8 @@ object SnapshotOps {
       VectorMap[IssuedAsset, NewAssetInfo]() ++ s.assetStatics.map { case (asset, pbStatic) =>
         val static = AssetStaticInfo(
           asset.id,
-          pbStatic.sourceTransactionId.toTxId,
-          pbStatic.issuerPublicKey.toPublicKey,
+          pbStatic.source,
+          pbStatic.issuer,
           pbStatic.decimals,
           pbStatic.nft
         )

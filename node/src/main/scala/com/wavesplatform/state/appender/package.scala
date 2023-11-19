@@ -146,7 +146,7 @@ package object appender {
           grandParent = blockchain.parentHeader(parent, 2)
           effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
           _                <- validateBlockVersion(height, block, blockchain)
-          _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
+          _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime, currentTs))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
           hitSource        <- pos.validateGenerationSignature(block)
           _ <- pos

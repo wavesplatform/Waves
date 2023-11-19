@@ -17,6 +17,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.settings.WavesSettings
@@ -255,10 +256,12 @@ object Importer extends ScorexLogging {
                 BlockSnapshot(
                   block.id(),
                   block.transactionData
-                    .foldLeft((0, Seq.empty[(StateSnapshot, TxMeta.Status)])) { case ((offset, acc), _) =>
+                    .foldLeft((0, Seq.empty[(StateSnapshot, TxMeta.Status)])) { case ((offset, acc), tx) =>
                       val txSnapshotSize = Ints.fromByteArray(bytes.slice(offset, offset + Ints.BYTES))
-                      val txSnapshot = StateSnapshot.fromProtobuf(
-                        TransactionStateSnapshot.parseFrom(bytes.slice(offset + Ints.BYTES, offset + Ints.BYTES + txSnapshotSize))
+                      val txSnapshot = PBSnapshots.fromProtobuf(
+                        TransactionStateSnapshot.parseFrom(bytes.slice(offset + Ints.BYTES, offset + Ints.BYTES + txSnapshotSize)),
+                        tx.id(),
+                        ???
                       )
                       (offset + Ints.BYTES + txSnapshotSize, txSnapshot +: acc)
                     }

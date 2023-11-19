@@ -7,7 +7,6 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -272,8 +271,8 @@ object SnapshotBlockchain {
       .get(asset)
       .map { case (static, assetNum) =>
         AssetDescription(
-          static.sourceTransactionId.toByteStr,
-          static.issuerPublicKey.toPublicKey,
+          static.source,
+          static.issuer,
           info.get.name,
           info.get.description,
           static.decimals,

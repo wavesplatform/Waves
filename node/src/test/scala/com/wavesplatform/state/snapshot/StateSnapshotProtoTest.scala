@@ -1,18 +1,18 @@
 package com.wavesplatform.state.snapshot
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, secondSigner}
+import com.wavesplatform.utils.StringBytes
 
 import scala.collection.immutable.VectorMap
 
@@ -29,17 +29,17 @@ class StateSnapshotProtoTest extends PropSpec {
         secondAddress  -> LeaseBalance.empty
       ),
       VectorMap(
-        IssuedAsset(ByteStr.fromBytes(1, 1, 1)) -> AssetStatic(
-          ByteString.copyFrom(Array[Byte](1, 1, 1)),
-          ByteString.copyFromUtf8("txId"),
-          ByteString.copyFromUtf8("pk"),
+        IssuedAsset(ByteStr.fromBytes(1, 1, 1)) -> AssetStaticInfo(
+          ByteStr(Array[Byte](1, 1, 1)),
+          TransactionId(ByteStr("txId".utf8Bytes)),
+          PublicKey(ByteStr("pk".utf8Bytes)),
           5,
           nft = true
         ),
-        IssuedAsset(ByteStr.fromBytes(2, 2, 2)) -> AssetStatic(
-          ByteString.copyFrom(Array[Byte](2, 2, 2)),
-          ByteString.copyFromUtf8("txId"),
-          ByteString.copyFromUtf8("pk"),
+        IssuedAsset(ByteStr.fromBytes(2, 2, 2)) -> AssetStaticInfo(
+          ByteStr(Array[Byte](2, 2, 2)),
+          TransactionId(ByteStr("txId".utf8Bytes)),
+          PublicKey(ByteStr("pk".utf8Bytes)),
           5,
           nft = false
         )
@@ -95,6 +95,6 @@ class StateSnapshotProtoTest extends PropSpec {
       )
     )
     Seq(TxMeta.Status.Succeeded, TxMeta.Status.Failed, TxMeta.Status.Elided)
-      .foreach(txStatus => StateSnapshot.fromProtobuf(snapshot.toProtobuf(txStatus)) shouldBe (snapshot, txStatus))
+      .foreach(txStatus => PBSnapshots.fromProtobuf(PBSnapshots.toProtobuf(snapshot, txStatus), ???, ???) shouldBe (snapshot, txStatus))
   }
 }
