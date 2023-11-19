@@ -73,8 +73,8 @@ object Keys {
   def assetBalance(addressId: AddressId, asset: IssuedAsset): Key[CurrentBalance] =
     Key(AssetBalance, addressId.toByteArray ++ asset.id.arr, readCurrentBalance, writeCurrentBalance)
 
-  def assetBalanceAt(addressId: AddressId, asset: IssuedAsset, height: Height): Key[BalanceNode] =
-    Key(AssetBalanceHistory, hBytes(asset.id.arr ++ addressId.toByteArray, height), readBalanceNode, writeBalanceNode)
+  def assetBalanceAt(addressId: AddressId, asset: IssuedAsset, height: Height, cfh: RDB.HistoryHandle): Key[BalanceNode] =
+    Key(AssetBalanceHistory, hBytes(asset.id.arr ++ addressId.toByteArray, height), readBalanceNode, writeBalanceNode, cfh = Some(cfh.handle))
 
   def assetDetailsHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(AssetDetailsHistory, asset.id.arr)
   def assetDetails(asset: IssuedAsset)(height: Int): Key[(AssetInfo, AssetVolumeInfo)] =
@@ -125,8 +125,8 @@ object Keys {
   def data(addressId: AddressId, key: String): Key[CurrentData] =
     Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
-  def dataAt(addressId: AddressId, key: String)(height: Int): Key[DataNode] =
-    Key(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataNode(key), writeDataNode)
+  def dataAt(addressId: AddressId, key: String, cfh: RDB.HistoryHandle)(height: Int): Key[DataNode] =
+    Key(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataNode(key), writeDataNode, cfh = Some(cfh.handle))
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(SponsorshipHistory, asset.id.arr)
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =
@@ -142,8 +142,8 @@ object Keys {
 
   val safeRollbackHeight: Key[Int] = intKey(SafeRollbackHeight)
 
-  def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
-    Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
+  def changedDataKeys(height: Int, addressId: AddressId, cfh: RDB.HistoryHandle): Key[Seq[String]] =
+    Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings, cfh = Some(cfh.handle))
 
   def blockMetaAt(height: Height): Key[Option[PBBlockMeta]] =
     Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta)

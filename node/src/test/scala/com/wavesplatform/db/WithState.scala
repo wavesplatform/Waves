@@ -392,7 +392,8 @@ trait WithDomain extends WithState { _: Suite =>
       try {
         val wrappedDb = wrapDB(rdb.db)
         assert(wrappedDb.getNativeHandle == rdb.db.getNativeHandle, "wrap function should not create new database instance")
-        domain = Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, rdb.txSnapshotHandle, Seq.empty), bcu, blockchain, settings)
+        domain =
+          Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, rdb.txSnapshotHandle, rdb.historyHandle, Seq.empty), bcu, blockchain, settings)
         val genesis = balances.map { case AddrWithBalance(address, amount) =>
           TxHelpers.genesis(address, amount)
         }

@@ -168,7 +168,7 @@ class RocksDBWriter(
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
       ro.get(Keys.addressId(address)).fold(false) { addressId =>
-        ro.prefixExists(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray)
+        ro.prefixExists(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray, Some(rdb.historyHandle.handle))
       }
     }
   }
@@ -311,7 +311,7 @@ class RocksDBWriter(
         case a: IssuedAsset =>
           changedAssetBalances.put(a, addressId.toLong)
           rw.put(Keys.assetBalance(addressId, a), currentBalance)
-          rw.put(Keys.assetBalanceAt(addressId, a, currentBalance.height), balanceNode)
+          rw.put(Keys.assetBalanceAt(addressId, a, currentBalance.height, rdb.historyHandle), balanceNode)
 
           val isNFT = currentBalance.balance > 0 && assetStatics
             .get(a)
@@ -345,11 +345,11 @@ class RocksDBWriter(
 
       val kdh = Keys.data(addressId, key)
       rw.put(kdh, currentData)
-      rw.put(Keys.dataAt(addressId, key)(height), dataNode)
+      rw.put(Keys.dataAt(addressId, key, rdb.historyHandle)(height), dataNode)
     }
 
     changedKeys.asMap().forEach { (addressId, keys) =>
-      rw.put(Keys.changedDataKeys(height, addressId), keys.asScala.toSeq)
+      rw.put(Keys.changedDataKeys(height, addressId, rdb.historyHandle), keys.asScala.toSeq)
     }
   }
 
@@ -640,12 +640,12 @@ class RocksDBWriter(
         wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
 
         // Account data
-        val changedDataKeysAtKey = Keys.changedDataKeys(height, addressId)
+        val changedDataKeysAtKey = Keys.changedDataKeys(height, addressId, rdb.historyHandle)
         rw.get(changedDataKeysAtKey).foreach { accountDataKey =>
-          val dataKeyAtKey = Keys.dataAt(addressId, accountDataKey)(height)
+          val dataKeyAtKey = Keys.dataAt(addressId, accountDataKey, rdb.historyHandle)(height)
           val dataKeyAt    = rw.get(dataKeyAtKey)
 
-          rw.delete(Keys.dataAt(addressId, accountDataKey)(dataKeyAt.prevHeight))
+          rw.delete(Keys.dataAt(addressId, accountDataKey, rdb.historyHandle)(dataKeyAt.prevHeight))
         }
         rw.delete(changedDataKeysAtKey)
       }
@@ -669,7 +669,7 @@ class RocksDBWriter(
         val changedBalancesKey = Keys.changedBalances(height, asset)
         rw.get(changedBalancesKey).foreach { addressId =>
           addressIdAndAssets.addOne((addressId, asset))
-          assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, height))
+          assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, height, rdb.historyHandle))
         }
         rw.delete(changedBalancesKey)
       }
@@ -677,8 +677,9 @@ class RocksDBWriter(
       addressIdAndAssets.view
         .zip(rw.multiGet(assetBalanceAtKeys, BalanceNode.SizeInBytes))
         .foreach {
-          case ((addressId, asset), Some(assetBalanceAt)) => rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
-          case _                                          =>
+          case ((addressId, asset), Some(assetBalanceAt)) =>
+            rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight, rdb.historyHandle))
+          case _ =>
         }
     }
   }
@@ -717,19 +718,24 @@ class RocksDBWriter(
             val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
             for ((addressId, address) <- changedAddresses) {
               balancesToInvalidate += address -> assetId
-              rollbackBalanceHistory(rw, Keys.assetBalance(addressId, assetId), Keys.assetBalanceAt(addressId, assetId, _), currentHeight)
+              rollbackBalanceHistory(
+                rw,
+                Keys.assetBalance(addressId, assetId),
+                Keys.assetBalanceAt(addressId, assetId, _, rdb.historyHandle),
+                currentHeight
+              )
             }
           }
 
           for ((addressId, address) <- changedAddresses) {
-            for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
+            for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId, rdb.historyHandle))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
               accountDataToInvalidate += (address -> k)
 
-              rw.delete(Keys.dataAt(addressId, k)(currentHeight))
-              rollbackDataHistory(rw, Keys.data(addressId, k), Keys.dataAt(addressId, k)(_), currentHeight)
+              rw.delete(Keys.dataAt(addressId, k, rdb.historyHandle)(currentHeight))
+              rollbackDataHistory(rw, Keys.data(addressId, k), Keys.dataAt(addressId, k, rdb.historyHandle)(_), currentHeight)
             }
-            rw.delete(Keys.changedDataKeys(currentHeight, addressId))
+            rw.delete(Keys.changedDataKeys(currentHeight, addressId, rdb.historyHandle))
 
             balancesToInvalidate += (address -> Waves)
             rollbackBalanceHistory(rw, Keys.wavesBalance(addressId), Keys.wavesBalanceAt(addressId, _), currentHeight)
@@ -1050,7 +1056,7 @@ class RocksDBWriter(
       val (balance, balanceNodeKey) =
         assetId match {
           case Waves                  => (db.get(Keys.wavesBalance(aid)), Keys.wavesBalanceAt(aid, _))
-          case asset @ IssuedAsset(_) => (db.get(Keys.assetBalance(aid, asset)), Keys.assetBalanceAt(aid, asset, _))
+          case asset @ IssuedAsset(_) => (db.get(Keys.assetBalance(aid, asset)), Keys.assetBalanceAt(aid, asset, _, rdb.historyHandle))
         }
 
       if (balance.height > height) {

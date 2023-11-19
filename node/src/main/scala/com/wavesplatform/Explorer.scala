@@ -222,34 +222,36 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(rdb.db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
-          loadBalanceHistory(Keys.assetBalance(addressId, asset), Keys.assetBalanceAt(addressId, asset, _)).foreach { case (h, balance) =>
-            log.info(s"h = $h: balance = $balance")
+          loadBalanceHistory(Keys.assetBalance(addressId, asset), Keys.assetBalanceAt(addressId, asset, _, rdb.historyHandle)).foreach {
+            case (h, balance) =>
+              log.info(s"h = $h: balance = $balance")
           }
 
         case "S" =>
           log.info("Collecting DB stats")
 
           val result = new util.HashMap[Short, Stats]
-          Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
-            Using(rdb.db.newIterator(cf)) { iterator =>
-              iterator.seekToFirst()
+          Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle, rdb.historyHandle.handle)
+            .foreach { cf =>
+              Using(rdb.db.newIterator(cf)) { iterator =>
+                iterator.seekToFirst()
 
-              while (iterator.isValid) {
-                val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
-                val valueLength = iterator.value().length
-                val keyLength   = iterator.key().length
-                result.compute(
-                  keyPrefix,
-                  (_, maybePrev) =>
-                    maybePrev match {
-                      case null => Stats(1, keyLength, valueLength)
-                      case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
-                    }
-                )
-                iterator.next()
+                while (iterator.isValid) {
+                  val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
+                  val valueLength = iterator.value().length
+                  val keyLength   = iterator.key().length
+                  result.compute(
+                    keyPrefix,
+                    (_, maybePrev) =>
+                      maybePrev match {
+                        case null => Stats(1, keyLength, valueLength)
+                        case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
+                      }
+                  )
+                  iterator.next()
+                }
               }
             }
-          }
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
