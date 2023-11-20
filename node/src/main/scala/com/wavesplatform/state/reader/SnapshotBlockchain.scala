@@ -83,18 +83,10 @@ case class SnapshotBlockchain(
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
     SnapshotBlockchain.assetDescription(asset, snapshot, height, inner)
 
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
-    lazy val innerDetails = inner.leaseDetails(leaseId)
-    val txOpt =
-      snapshot.transactions
-        .collectFirst {
-          case (_, txInfo) if txInfo.snapshot.leaseStates.contains(leaseId) => txInfo.transaction
-        }
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
     snapshot.leaseStates
       .get(leaseId)
-      .map(_.toDetails(this, txOpt, innerDetails))
-      .orElse(innerDetails)
-  }
+      .orElse(inner.leaseDetails(leaseId))
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     snapshot.transactions

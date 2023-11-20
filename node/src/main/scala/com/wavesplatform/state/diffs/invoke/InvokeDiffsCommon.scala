@@ -464,8 +464,8 @@ object InvokeDiffsCommon {
         if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
         else remainingLimit
 
-      val blockchain      = SnapshotBlockchain(sblockchain, currentSnapshot)
-      val actionSender    = Recipient.Address(ByteStr(dAppAddress.bytes))
+      val blockchain   = SnapshotBlockchain(sblockchain, currentSnapshot)
+      val actionSender = Recipient.Address(ByteStr(dAppAddress.bytes))
 
       def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, StateSnapshot] = {
         val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
@@ -628,10 +628,10 @@ object InvokeDiffsCommon {
 
       def applyLease(l: Lease): TracedResult[ValidationError, StateSnapshot] =
         for {
-          _         <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
-          recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
+          validAmount <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
+          recipient   <- TracedResult(AddressOrAlias.fromRide(l.recipient))
           leaseId = Lease.calculateId(l, tx.txId)
-          diff <- DiffsCommon.processLease(blockchain, l.amount, pk, recipient, fee = 0, leaseId, tx.txId)
+          diff <- DiffsCommon.processLease(blockchain, validAmount, pk, recipient, fee = 0, leaseId, tx.txId)
         } yield diff
 
       def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, StateSnapshot] =

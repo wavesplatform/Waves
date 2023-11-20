@@ -24,8 +24,16 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{
+  EthereumTransaction,
+  GenesisTransaction,
+  PBSince,
+  PaymentTransaction,
+  Transaction,
+  TransactionParsers,
+  TxPositiveAmount,
+  TxValidationError
+}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -135,47 +143,39 @@ package object database {
   def writeLeaseBalance(lb: CurrentLeaseBalance): Array[Byte] =
     Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ Ints.toByteArray(lb.height) ++ Ints.toByteArray(lb.prevHeight)
 
-  def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
-    lde.fold(
-      _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
-      ld =>
-        pb.LeaseDetails(
-          ByteString.copyFrom(ld.sender.arr),
-          Some(PBRecipients.create(ld.recipient)),
-          ld.amount,
-          ByteString.copyFrom(ld.sourceId.arr),
-          ld.height,
-          ld.status match {
-            case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-            case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-              pb.LeaseDetails.Status
-                .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-          }
-        ).toByteArray
-    )
+  def writeLeaseDetails(ld: LeaseDetails): Array[Byte] =
+    pb.LeaseDetails(
+      ByteString.copyFrom(ld.sender.arr),
+      Some(PBRecipients.create(ld.recipientAddress)),
+      ld.amount.value,
+      ByteString.copyFrom(ld.sourceId.arr),
+      ld.height,
+      ld.status match {
+        case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+        case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+          pb.LeaseDetails.Status
+            .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+      }
+    ).toByteArray
 
-  def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
-    if (data.length == 1) Left(data(0) == 1)
-    else {
-      val d = pb.LeaseDetails.parseFrom(data)
-      Right(
-        LeaseDetails(
-          d.senderPublicKey.toPublicKey,
-          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          d.amount,
-          d.status match {
-            case pb.LeaseDetails.Status.Active(_)                                   => LeaseDetails.Status.Active
-            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
-            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
-              LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
-            case pb.LeaseDetails.Status.Empty => ???
-          },
-          d.sourceId.toByteStr,
-          d.height
-        )
-      )
-    }
+  def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
+    val d = pb.LeaseDetails.parseFrom(data)
+    LeaseDetails(
+      d.senderPublicKey.toPublicKey,
+      PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+      TxPositiveAmount.unsafeFrom(d.amount),
+      d.status match {
+        case pb.LeaseDetails.Status.Active(_)                                   => LeaseDetails.Status.Active
+        case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+        case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
+          LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
+        case pb.LeaseDetails.Status.Empty => ???
+      },
+      d.sourceId.toByteStr,
+      d.height
+    )
+  }
 
   def readVolumeAndFeeNode(data: Array[Byte]): VolumeAndFeeNode = if (data != null && data.length == 20)
     VolumeAndFeeNode(Longs.fromByteArray(data.take(8)), Longs.fromByteArray(data.slice(8, 16)), Height(Ints.fromByteArray(data.takeRight(4))))
@@ -245,17 +245,6 @@ package object database {
       volumeInfo.isReissuable,
       ByteString.copyFrom(volumeInfo.volume.toByteArray)
     ).toByteArray
-  }
-
-  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
-    val sai = pb.StaticAssetInfo.parseFrom(bb)
-    AssetStaticInfo(
-      sai.id.toByteStr,
-      TransactionId(sai.sourceId.toByteStr),
-      PublicKey(sai.issuerPublicKey.toByteArray),
-      sai.decimals,
-      sai.isNft
-    )
   }
 
   def writeBlockMeta(data: pb.BlockMeta): Array[Byte] = data.toByteArray
@@ -700,16 +689,13 @@ package object database {
       Height(pbStaticInfo.height)
     )
 
-  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = rdb.db.withResource { r =>
+  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
     (for {
-      id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      if details.exists(_.fold(identity, _.isActive))
-      tm <- r.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
-      tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
-    } yield tx).collect {
-      case (ltm, lt: LeaseTransaction) if ltm.status == TxMeta.Status.Succeeded => lt
-    }.toSeq
+      id              <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      maybeNewDetails <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
+      newDetails      <- maybeNewDetails
+      if newDetails.isActive
+    } yield (id, newDetails)).toMap
   }
 
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
@@ -726,7 +712,7 @@ package object database {
     iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
     while (iterator.isValid && keyInRange()) {
       val leaseId = ByteStr(iterator.key().drop(6))
-      if (includeCancelled || readLeaseDetails(iterator.value()).fold(identity, _.isActive))
+      if (includeCancelled || readLeaseDetails(iterator.value()).isActive)
         leaseIds += leaseId
       else
         leaseIds -= leaseId

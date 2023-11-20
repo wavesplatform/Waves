@@ -2,69 +2,55 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.NTPTime
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
-import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
+import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Height, TxMeta}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, signer}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
-import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
+import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxPositiveAmount, TxVersion}
+import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalacheck.Gen
-import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
-class LeaseRouteSpec
-    extends RouteSpec("/leasing")
-    with TransactionGen
-    with RestAPISettingsHelper
-    with NTPTime
-    with WithDomain
-    with TestWallet
-    with PathMockFactory
-    with SharedSchedulerMixin {
+class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper with NTPTime with SharedDomain with SharedSchedulerMixin {
   private def route(domain: Domain) =
     LeaseApiRoute(
       restAPISettings,
-      testWallet,
+      domain.wallet,
       domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
       CommonAccountsApi(() => domain.blockchainUpdater.snapshotBlockchain, domain.rdb, domain.blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler)
-    )
+    ).route
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
-    withDomain(settings = settings, balances = balances) { d =>
-      f(d, route(d).route)
-    }
+    f(domain, route(domain))
 
   private def setScriptTransaction(sender: KeyPair) =
     SetScriptTransaction
@@ -133,7 +119,8 @@ class LeaseRouteSpec
       }
     }
 
-  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)
+  private def toDetails(lt: LeaseTransaction, blockchain: Blockchain) =
+    LeaseDetails(lt.sender, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, LeaseDetails.Status.Active, lt.id(), 1)
 
   private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] =
     for {
@@ -150,7 +137,7 @@ class LeaseRouteSpec
     "created and cancelled by Lease/LeaseCancel transactions" in forAll(leaseTx) { leaseTransaction =>
       withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
         d.appendBlock(leaseTransaction)
-        val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
+        val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction, d.blockchain))
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, expectedDetails)
           checkActiveLeasesFor(leaseTransaction.recipient, r, expectedDetails)
@@ -168,7 +155,7 @@ class LeaseRouteSpec
     "created by LeaseTransaction and canceled by InvokeScriptTransaction" in forAll(leaseTx) { leaseTransaction =>
       withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
         d.appendBlock(leaseTransaction)
-        val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
+        val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction, d.blockchain))
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(leaseTransaction.sender.toAddress, r, expectedDetails)
@@ -225,7 +212,8 @@ class LeaseRouteSpec
               i.value
             }
             .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
+          val expectedDetails =
+            Seq(leaseId -> LeaseDetails(setScript.sender, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
 
           d.liquidAndSolidAssert { () =>
             checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
@@ -254,7 +242,8 @@ class LeaseRouteSpec
             i.value
           }
           .get
-        val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
+        val expectedDetails =
+          Seq(leaseId -> LeaseDetails(setScript.sender, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
@@ -300,7 +289,8 @@ class LeaseRouteSpec
             i.value
           }
           .get
-        val expectedDetails = Seq(leaseId -> LeaseDetails(sender.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
+        val expectedDetails =
+          Seq(leaseId -> LeaseDetails(sender.publicKey, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
@@ -337,7 +327,8 @@ class LeaseRouteSpec
             i.value
           }
           .get
-        val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
+        val expectedDetails =
+          Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
@@ -418,7 +409,8 @@ class LeaseRouteSpec
           }
           .get
 
-        val expectedDetails = Seq(leaseId -> LeaseDetails(target.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, ist.id(), 1))
+        val expectedDetails =
+          Seq(leaseId -> LeaseDetails(target.publicKey, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, ist.id(), 1))
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(target.toAddress, r, expectedDetails)
@@ -486,7 +478,7 @@ class LeaseRouteSpec
           getLeaseId(dApp1.toAddress) -> LeaseDetails(
             dApp1.publicKey,
             leaseRecipient1.toAddress,
-            leaseAmount1,
+            TxPositiveAmount.unsafeFrom(leaseAmount1),
             LeaseDetails.Status.Active,
             invokeTx.id(),
             3
@@ -496,7 +488,7 @@ class LeaseRouteSpec
           getLeaseId(dApp2.toAddress) -> LeaseDetails(
             dApp2.publicKey,
             leaseRecipient2.toAddress,
-            leaseAmount2,
+            TxPositiveAmount.unsafeFrom(leaseAmount2),
             LeaseDetails.Status.Active,
             invokeTx.id(),
             3
@@ -515,42 +507,13 @@ class LeaseRouteSpec
   }
 
   routePath("/info") in {
-    val blockchain = stub[Blockchain]
-    val commonApi  = stub[CommonAccountsApi]
-
-    val route = LeaseApiRoute(
-      restAPISettings,
-      stub[Wallet],
-      blockchain,
-      stub[TransactionPublisher],
-      SystemTime,
-      commonApi,
-      new RouteTimeout(60.seconds)(sharedScheduler)
-    ).route
 
     val lease       = TxHelpers.lease()
     val leaseCancel = TxHelpers.leaseCancel(lease.id())
-    (blockchain.transactionInfo _).when(lease.id()).returning(Some(TxMeta(Height(1), Status.Succeeded, 0L) -> lease))
-    (commonApi.leaseInfo _)
-      .when(lease.id())
-      .returning(
-        Some(
-          LeaseInfo(
-            lease.id(),
-            lease.id(),
-            lease.sender.toAddress,
-            lease.recipient.asInstanceOf[Address],
-            lease.amount.value,
-            1,
-            LeaseInfo.Status.Canceled,
-            Some(2),
-            Some(leaseCancel.id())
-          )
-        )
-      )
-    (commonApi.leaseInfo _).when(*).returning(None)
+    domain.appendBlock(lease)
+    domain.appendBlock(leaseCancel)
 
-    Get(routePath(s"/info/${lease.id()}")) ~> route ~> check {
+    Get(routePath(s"/info/${lease.id()}")) ~> route(domain) ~> check {
       val response = responseAs[JsObject]
       response should matchJson(s"""{
                                    |  "id" : "${lease.id()}",
@@ -588,7 +551,7 @@ class LeaseRouteSpec
                                        |  "cancelTransactionId" : "${leaseCancel.id()}"
                                        |}]""".stripMargin)
 
-    Get(routePath(s"/info?id=${lease.id()}&id=${lease.id()}")) ~> route ~> check {
+    Get(routePath(s"/info?id=${lease.id()}&id=${lease.id()}")) ~> route(domain) ~> check {
       val response = responseAs[JsArray]
       response should matchJson(leasesListJson)
     }
@@ -596,7 +559,7 @@ class LeaseRouteSpec
     Post(
       routePath(s"/info"),
       HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Seq(lease.id().toString, lease.id().toString)).toString())
-    ) ~> route ~> check {
+    ) ~> route(domain) ~> check {
       val response = responseAs[JsArray]
       response should matchJson(leasesListJson)
     }
@@ -607,7 +570,7 @@ class LeaseRouteSpec
         ContentTypes.`application/json`,
         Json.obj("ids" -> (0 to restAPISettings.transactionsByAddressLimit).map(_ => lease.id().toString)).toString()
       )
-    ) ~> route ~> check {
+    ) ~> route(domain) ~> check {
       val response = responseAs[JsObject]
       response should matchJson("""{
                                   |  "error" : 10,
@@ -618,12 +581,12 @@ class LeaseRouteSpec
     Post(
       routePath(s"/info"),
       FormData("id" -> lease.id().toString, "id" -> lease.id().toString)
-    ) ~> route ~> check {
+    ) ~> route(domain) ~> check {
       val response = responseAs[JsArray]
       response should matchJson(leasesListJson)
     }
 
-    Get(routePath(s"/info?id=nonvalid&id=${leaseCancel.id()}")) ~> route ~> check {
+    Get(routePath(s"/info?id=nonvalid&id=${leaseCancel.id()}")) ~> route(domain) ~> check {
       val response = responseAs[JsObject]
       response should matchJson(s"""
                                    |{

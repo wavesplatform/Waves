@@ -25,11 +25,11 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEnt
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{AssetIdLength, EthTxGenerator, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalatest.concurrent.Eventually
@@ -59,7 +59,6 @@ class AssetsRouteSpec
             restAPISettings,
             60.seconds,
             testWallet,
-            DummyTransactionPublisher.accepting,
             d.blockchain,
             () => d.blockchain.snapshotBlockchain,
             TestTime(),
@@ -287,7 +286,7 @@ class AssetsRouteSpec
       checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
     }
 
-    d.appendBlock((7 to 10).map(issues): _*)
+    d.appendBlock((7 to 10).map(issues) *)
     (1 to 6).foreach { i =>
       checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
     }

@@ -99,7 +99,7 @@ object Keys {
     Key(LeaseBalance, addressId.toByteArray, readLeaseBalance, writeLeaseBalance)
 
   def leaseDetailsHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseDetailsHistory, leaseId.arr)
-  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =
+  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[LeaseDetails]] =
     Key.opt(LeaseDetailsTag, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
 
   def filledVolumeAndFeeAt(orderId: ByteStr, height: Height): Key[VolumeAndFeeNode] =

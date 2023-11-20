@@ -131,7 +131,7 @@ package object rocksdb {
       ld =>
         pb.LeaseDetails(
           ByteString.copyFrom(ld.sender.arr),
-          Some(PBRecipients.create(ld.recipient)),
+          Some(PBRecipients.create(ld.recipientAddress)),
           ld.amount,
           ByteString.copyFrom(ld.sourceId.arr),
           ld.height,

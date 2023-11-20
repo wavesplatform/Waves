@@ -60,13 +60,8 @@ class StateSnapshotProtoTest extends PropSpec {
         IssuedAsset(ByteStr.fromBytes(2, 2, 2)) -> SponsorshipValue(0)
       ),
       Map(
-        ByteStr.fromBytes(4, 5, 6) -> LeaseSnapshot(defaultSigner.publicKey, secondAddress, 123, Status.Active),
-        ByteStr.fromBytes(7, 8, 9) -> LeaseSnapshot(
-          PublicKey(ByteStr.fill(KeyLength)(0)),
-          Address(Array.fill(Address.HashLength)(0)),
-          0,
-          Status.Cancelled(0, None)
-        )
+        ByteStr.fromBytes(4, 5, 6) -> ???,
+        ByteStr.fromBytes(7, 8, 9) -> ???
       ),
       Map(
         Alias.create("alias").explicitGet()  -> defaultAddress,

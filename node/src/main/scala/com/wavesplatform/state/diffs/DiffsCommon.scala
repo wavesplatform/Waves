@@ -16,8 +16,9 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, LeaseSnapshot, Portfolio, SponsorshipValue, StateSnapshot}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, Portfolio, SponsorshipValue, StateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object DiffsCommon {
@@ -134,7 +135,7 @@ object DiffsCommon {
 
   def processLease(
       blockchain: Blockchain,
-      amount: Long,
+      amount: TxPositiveAmount,
       sender: PublicKey,
       recipient: AddressOrAlias,
       fee: Long,
@@ -156,17 +157,17 @@ object DiffsCommon {
       )
       leaseBalance    = blockchain.leaseBalance(senderAddress)
       senderBalance   = blockchain.balance(senderAddress, Waves)
-      requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount + fee else amount
+      requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount.value + fee else amount.value
       _ <- Either.cond(
         senderBalance - leaseBalance.out >= requiredBalance,
         (),
         GenericError(s"Cannot lease more than own: Balance: $senderBalance, already leased: ${leaseBalance.out}")
       )
       portfolioDiff = Map(
-        senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
-        recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
+        senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount.value)),
+        recipientAddress -> Portfolio(0, LeaseBalance(amount.value, 0))
       )
-      details = LeaseSnapshot(sender, recipient, amount, LeaseDetails.Status.Active)
+      details = LeaseDetails(sender, recipientAddress, amount, LeaseDetails.Status.Active, txId, blockchain.height)
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolioDiff,
@@ -186,7 +187,7 @@ object DiffsCommon {
     val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
       lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
-      recipient <- blockchain.resolveAlias(lease.recipient)
+      recipient <- blockchain.resolveAlias(lease.recipientAddress)
       _ <- Either.cond(
         lease.isActive || time <= allowedTs,
         (),
@@ -200,14 +201,14 @@ object DiffsCommon {
             s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
       )
-      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
-      recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
+      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount.value)))
+      recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount.value, 0)))
       actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
       portfolios <- Portfolio.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolios,
-        leaseStates = Map(leaseId -> LeaseSnapshot.fromDetails(actionInfo))
+        leaseStates = Map(leaseId -> actionInfo)
       )
     } yield snapshot
   }

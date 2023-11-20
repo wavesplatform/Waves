@@ -37,7 +37,7 @@ import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, T
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, EthTxGenerator, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, EthTxGenerator, TxHelpers, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
@@ -302,11 +302,11 @@ class TransactionsRouteSpec
 
       (blockchain.leaseDetails _)
         .expects(leaseId1)
-        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId1, 1)))
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, TxPositiveAmount(123), LeaseDetails.Status.Active, leaseId1, 1)))
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
         .expects(leaseId2)
-        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId2, 1)))
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, TxPositiveAmount(123), LeaseDetails.Status.Active, leaseId2, 1)))
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
@@ -315,7 +315,7 @@ class TransactionsRouteSpec
             LeaseDetails(
               TestValues.keyPair.publicKey,
               TestValues.address,
-              123,
+              TxPositiveAmount(123),
               LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)),
               leaseCancelId,
               1
@@ -553,7 +553,7 @@ class TransactionsRouteSpec
         .when(lease.id())
         .returns(
           Some(
-            LeaseDetails(lease.sender, lease.recipient, lease.amount.value, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)
+            LeaseDetails(lease.sender, ???, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)
           )
         )
 
@@ -689,11 +689,11 @@ class TransactionsRouteSpec
 
       (blockchain.leaseDetails _)
         .expects(leaseId1)
-        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId1, 1)))
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, TxPositiveAmount(123), LeaseDetails.Status.Active, leaseId1, 1)))
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
         .expects(leaseId2)
-        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, leaseId2, 1)))
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, TxPositiveAmount(123), LeaseDetails.Status.Active, leaseId2, 1)))
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
         .expects(leaseCancelId)
@@ -702,7 +702,7 @@ class TransactionsRouteSpec
             LeaseDetails(
               TestValues.keyPair.publicKey,
               TestValues.address,
-              123,
+              TxPositiveAmount(123),
               LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)),
               leaseCancelId,
               1
@@ -712,7 +712,7 @@ class TransactionsRouteSpec
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
         .expects(nestedLeaseId)
-        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, 123, LeaseDetails.Status.Active, nestedLeaseId, 1)))
+        .returning(Some(LeaseDetails(TestValues.keyPair.publicKey, TestValues.address, TxPositiveAmount(123), LeaseDetails.Status.Active, nestedLeaseId, 1)))
         .anyNumberOfTimes()
       (blockchain.leaseDetails _)
         .expects(nestedLeaseCancelId)
@@ -721,7 +721,7 @@ class TransactionsRouteSpec
             LeaseDetails(
               TestValues.keyPair.publicKey,
               TestValues.address,
-              123,
+              TxPositiveAmount(123),
               LeaseDetails.Status.Cancelled(2, Some(nestedLeaseCancelId)),
               nestedLeaseCancelId,
               1

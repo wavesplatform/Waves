@@ -1,13 +1,13 @@
 package com.wavesplatform.state
+
 import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -23,7 +23,7 @@ case class StateSnapshot(
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
     sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
-    leaseStates: Map[ByteStr, LeaseSnapshot] = Map(),
+    leaseStates: Map[ByteStr, LeaseDetails] = Map(),
     aliases: Map[Alias, Address] = Map(),
     orderFills: Map[ByteStr, VolumeAndFee] = Map(),
     accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -79,7 +79,7 @@ object StateSnapshot {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
       assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
-      leaseStates: Map[ByteStr, LeaseSnapshot] = Map(),
+      leaseStates: Map[ByteStr, LeaseDetails] = Map(),
       aliases: Map[Alias, Address] = Map(),
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
       accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -102,7 +102,7 @@ object StateSnapshot {
         assetNamesAndDescriptions(issuedAssets, updatedAssets),
         assetScripts,
         sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-        resolvedLeaseStates(blockchain, leaseStates, aliases),
+        leaseStates,
         aliases,
         of,
         accountScripts,
@@ -196,20 +196,6 @@ object StateSnapshot {
     }
     issued ++ updated
   }
-
-  private def resolvedLeaseStates(
-      blockchain: Blockchain,
-      leaseStates: Map[ByteStr, LeaseSnapshot],
-      aliases: Map[Alias, Address]
-  ): Map[ByteStr, LeaseSnapshot] =
-    leaseStates.view
-      .mapValues(details =>
-        details.copy(recipient = details.recipient match {
-          case address: Address => address
-          case alias: Alias     => aliases.getOrElse(alias, blockchain.resolveAlias(alias).explicitGet())
-        })
-      )
-      .toMap
 
   private def orderFills(volumeAndFees: Map[ByteStr, VolumeAndFee], blockchain: Blockchain): Either[String, Map[ByteStr, VolumeAndFee]] =
     volumeAndFees.toSeq

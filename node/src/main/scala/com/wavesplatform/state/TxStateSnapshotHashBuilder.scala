@@ -69,7 +69,7 @@ object TxStateSnapshotHashBuilder {
     snapshot.leaseStates.foreach { case (leaseId, details) =>
       changedKeys += leaseId.arr ++ booleanToBytes(details.isActive)
       if (details.isActive) {
-        changedKeys += leaseId.arr ++ details.sender.arr ++ details.recipient.bytes ++ Longs.toByteArray(details.amount)
+        changedKeys += leaseId.arr ++ details.sender.arr ++ details.recipientAddress.bytes ++ Longs.toByteArray(details.amount.value)
       }
     }
 

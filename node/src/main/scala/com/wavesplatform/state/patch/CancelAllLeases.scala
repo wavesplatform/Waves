@@ -5,7 +5,8 @@ import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseSnapshot, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, StateSnapshot}
+import com.wavesplatform.transaction.TxPositiveAmount
 import play.api.libs.json.{Json, OFormat}
 
 case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
@@ -13,11 +14,11 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
 
   private[patch] case class CancelledLeases(balances: Map[Address, LeaseBalance], cancelledLeases: Seq[LeaseData]) {
     private[this] val height: Int = patchHeight.getOrElse(0)
-    val leaseStates: Map[ByteStr, LeaseSnapshot] = cancelledLeases.map { data =>
+    val leaseStates: Map[ByteStr, LeaseDetails] = cancelledLeases.map { data =>
       val sender    = PublicKey(ByteStr.decodeBase58(data.senderPublicKey).get)
       val recipient = Address.fromString(data.recipient).explicitGet()
       val id        = ByteStr.decodeBase58(data.id).get
-      (id, LeaseSnapshot(sender, recipient, data.amount, status = LeaseDetails.Status.Expired(height)))
+      (id, LeaseDetails(sender, recipient, TxPositiveAmount.unsafeFrom(data.amount), status = LeaseDetails.Status.Expired(height), id, height))
     }.toMap
   }
 

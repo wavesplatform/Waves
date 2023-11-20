@@ -188,8 +188,8 @@ object CommonAccountsApi {
         leaseId,
         ld.sourceId,
         ld.sender.toAddress,
-        blockchain.resolveAlias(ld.recipient).orElse(resolveDisabledAlias(leaseId)).explicitGet(),
-        ld.amount,
+        blockchain.resolveAlias(ld.recipientAddress).orElse(resolveDisabledAlias(leaseId)).explicitGet(),
+        ld.amount.value,
         ld.height,
         ld.status match {
           case Status.Active          => LeaseInfo.Status.Active

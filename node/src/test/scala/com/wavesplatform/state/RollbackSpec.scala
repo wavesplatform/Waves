@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
 import org.scalatest.{Assertion, Assertions}
 
 class RollbackSpec extends FreeSpec with WithDomain {
@@ -181,7 +181,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.height shouldBe 2
         val blockWithLeaseId = d.lastBlockId
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
+          LeaseDetails(sender.publicKey, recipient.toAddress, lt.amount, LeaseDetails.Status.Active, lt.id(), 2)
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -200,7 +200,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           LeaseDetails(
             sender.publicKey,
             recipient.toAddress,
-            leaseAmount,
+            lt.amount,
             LeaseDetails.Status.Cancelled(d.blockchain.height, Some(leaseCancel.id())),
             lt.id(),
             2
@@ -211,7 +211,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         d.rollbackTo(blockWithLeaseId)
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
+          LeaseDetails(sender.publicKey, recipient.toAddress, lt.amount, LeaseDetails.Status.Active, lt.id(), 2)
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -694,7 +694,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val (leaseAmount, leaseFc) = leaseFunctionCall(leaseRecipientAddress.toAddress)
 
             def leaseDetails(invokeId: ByteStr) =
-              Some(LeaseDetails(checkPk, leaseRecipientAddress.toAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 3))
+              Some(LeaseDetails(checkPk, leaseRecipientAddress.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount), LeaseDetails.Status.Active, invokeId, 3))
 
             // liquid block rollback
             val invokeId1 = append(d.lastBlockId, leaseFc)
@@ -760,7 +760,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             LeaseDetails(
               checkPk,
               leaseRecipientAddress,
-              leaseAmount,
+              TxPositiveAmount.unsafeFrom(leaseAmount),
               if (cancelId.isEmpty) LeaseDetails.Status.Active
               else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId)),
               sourceId,

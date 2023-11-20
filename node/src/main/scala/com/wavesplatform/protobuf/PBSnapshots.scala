@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
@@ -12,8 +11,8 @@ import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{Asset, TxPositiveAmount}
 
 import scala.collection.immutable.VectorMap
 
@@ -46,10 +45,10 @@ object PBSnapshots {
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
         S.OrderFill(orderId.toByteString, volume, fee)
       }.toSeq,
-      leaseStates.map { case (leaseId, LeaseSnapshot(sender, recipient, amount, status)) =>
-        val pbStatus = status match {
+      leaseStates.map { case (leaseId, ld) =>
+        val pbStatus = ld.status match {
           case Status.Active =>
-            S.LeaseState.Status.Active(S.LeaseState.Active(amount, sender.toByteString, recipient.asInstanceOf[Address].toByteString))
+            S.LeaseState.Status.Active(S.LeaseState.Active(ld.amount.value, ld.sender.toByteString, ld.recipientAddress.toByteString))
           case _: Status.Cancelled | _: Status.Expired =>
             S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled())
         }
@@ -116,23 +115,20 @@ object PBSnapshots {
         .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
         .toMap
 
-    val leaseStates: Map[ByteStr, LeaseSnapshot] =
+    val leaseStates: Map[ByteStr, LeaseDetails] =
       pbSnapshot.leaseStates.map { ls =>
         ls.status match {
           case TransactionStateSnapshot.LeaseState.Status.Active(value) =>
-            ls.leaseId.toByteStr -> LeaseSnapshot(
+            ls.leaseId.toByteStr -> LeaseDetails(
               value.sender.toPublicKey,
               value.recipient.toAddress(),
-              value.amount,
-              LeaseDetails.Status.Active
+              TxPositiveAmount.unsafeFrom(value.amount),
+              LeaseDetails.Status.Active,
+              txId,
+              height
             )
           case _: TransactionStateSnapshot.LeaseState.Status.Cancelled | TransactionStateSnapshot.LeaseState.Status.Empty =>
-            ls.leaseId.toByteStr -> LeaseSnapshot(
-              PublicKey(ByteStr.fill(KeyLength)(0)),
-              Address(Array.fill(Address.HashLength)(0)),
-              0,
-              LeaseDetails.Status.Cancelled(0, None)
-            )
+            ls.leaseId.toByteStr -> ???
         }
       }.toMap
 

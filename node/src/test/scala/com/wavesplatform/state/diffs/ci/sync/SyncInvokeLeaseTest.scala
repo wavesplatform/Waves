@@ -44,11 +44,11 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
       d.appendAndAssertSucceed(invoke(dApp1Address))
       val lease1 = d.liquidDiff.leaseState.head._2
       lease1.status shouldBe a[Cancelled]
-      lease1.recipient shouldBe dApp2Address
+      lease1.recipientAddress shouldBe dApp2Address
       lease1.amount shouldBe 1
       val lease2 = d.liquidDiff.leaseState.last._2
       lease2.status shouldBe Active
-      lease2.recipient shouldBe dApp2Address
+      lease2.recipientAddress shouldBe dApp2Address
       lease2.amount shouldBe 555
     }
   }

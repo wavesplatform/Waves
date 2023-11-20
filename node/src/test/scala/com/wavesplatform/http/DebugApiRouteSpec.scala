@@ -38,7 +38,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
@@ -1690,7 +1690,7 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(canceledLeaseId)
-          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, leaseCancelAmount, LeaseDetails.Status.Active, invoke.id(), 1)))
+          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, TxPositiveAmount.unsafeFrom(leaseCancelAmount), LeaseDetails.Status.Active, invoke.id(), 1)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)

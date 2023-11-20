@@ -22,7 +22,6 @@ import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
@@ -37,7 +36,7 @@ class BlockchainUpdaterImpl(
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
-    collectActiveLeases: (Int, Int) => Seq[LeaseTransaction],
+    collectActiveLeases: (Int, Int) => Map[ByteStr, LeaseDetails],
     miner: Miner = _ => ()
 ) extends Blockchain
     with BlockchainUpdater
@@ -55,7 +54,7 @@ class BlockchainUpdaterImpl(
 
   private val lock                     = new ReentrantReadWriteLock(true)
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
-  def readLock[B](f: => B): B          = inLock(lock.readLock(), f)
+  private def readLock[B](f: => B): B          = inLock(lock.readLock(), f)
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
@@ -419,7 +418,7 @@ class BlockchainUpdaterImpl(
         )
     }
 
-  private def collectLeasesToCancel(newHeight: Int): Seq[LeaseTransaction] =
+  private def collectLeasesToCancel(newHeight: Int): Map[ByteStr, LeaseDetails] =
     if (rocksdb.isFeatureActivated(BlockchainFeatures.LeaseExpiration, newHeight)) {
       val toHeight = newHeight - rocksdb.settings.functionalitySettings.leaseExpiration
       val fromHeight = rocksdb.featureActivationHeight(BlockchainFeatures.LeaseExpiration.id) match {
@@ -431,24 +430,22 @@ class BlockchainUpdaterImpl(
           toHeight
       }
       collectActiveLeases(fromHeight, toHeight)
-    } else Seq.empty
+    } else Map.empty
 
-  private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, StateSnapshot] = {
-    val snapshotsById =
-      for {
-        lt        <- leaseTransactions
-        recipient <- rocksdb.resolveAlias(lt.recipient).toSeq
-        portfolios = Map(
-          lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
-          recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
-        )
-        leaseStates = Map(
-          lt.id() -> LeaseSnapshot(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height))
-        )
-        snapshot = StateSnapshot.build(rocksdb, portfolios, leaseStates = leaseStates).explicitGet()
-      } yield lt.id() -> snapshot
-    snapshotsById.toMap
-  }
+  private def cancelLeases(leaseTransactions: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
+    for {
+      (id, lt)  <- leaseTransactions
+      ltMeta    <- transactionMeta(id).toSeq
+      recipient <- rocksdb.resolveAlias(lt.recipientAddress).toSeq
+      portfolios = Map(
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
+      )
+      leaseStates = Map(
+        id -> LeaseDetails(lt.sender, lt.recipientAddress, lt.amount, LeaseDetails.Status.Expired(height), id, ltMeta.height)
+      )
+      snapshot = StateSnapshot.build(rocksdb, portfolios, leaseStates = leaseStates).explicitGet()
+    } yield id -> snapshot
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = writeLock {
     log.info(s"Trying rollback blockchain to $blockId")
@@ -821,7 +818,7 @@ object BlockchainUpdaterImpl {
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 
-  def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
+  private def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.header.generator == b2.header.generator &&
       b1.header.baseTarget == b2.header.baseTarget &&
       b1.header.reference == b2.header.reference &&

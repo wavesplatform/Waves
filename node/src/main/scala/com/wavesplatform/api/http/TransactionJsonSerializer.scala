@@ -448,7 +448,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
   ): LeaseRef = {
     val detailsOpt           = blockchain.leaseDetails(leaseId)
     val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
-    val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipient))
+    val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipientAddress))
     val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
 
     val statusOpt = detailsOpt.map(_.status)
@@ -464,7 +464,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
       detailsOpt.map(_.sourceId),
       detailsOpt.map(_.sender.toAddress),
       resolvedRecipientOpt,
-      amountOpt orElse detailsOpt.map(_.amount),
+      amountOpt orElse detailsOpt.map(_.amount.value),
       txMetaOpt.map(_.height),
       status,
       statusDataOpt.flatMap(_._1),

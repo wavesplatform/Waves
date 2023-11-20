@@ -1,12 +1,13 @@
 package com.wavesplatform.state.patch
 
 import cats.implicits.{catsSyntaxAlternativeSeparate, catsSyntaxSemigroup, toFoldableOps}
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseSnapshot, Portfolio, StateSnapshot}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, Portfolio, StateSnapshot}
+import com.wavesplatform.transaction.TxPositiveAmount
 import play.api.libs.json.{Json, Reads}
 
 case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatures.SynchronousCalls, Set('W')) {
@@ -19,19 +20,20 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
       height: Int
   )
 
-  def patchData: Map[ByteStr, (LeaseSnapshot, Address)] = {
+  def patchData: Map[ByteStr, (LeaseDetails, Address)] = {
     implicit val cancelDetailsReads: Reads[CancelDetails] = Json.reads
 
     readPatchData[Seq[CancelDetails]]().map { cancelDetails =>
       val leaseId          = ByteStr(Base58.decode(cancelDetails.id))
       val sender           = PublicKey(Base58.decode(cancelDetails.senderPublicKey))
-      val recipientAlias   = Alias.fromString(cancelDetails.recipientAlias).explicitGet()
       val recipientAddress = Address.fromString(cancelDetails.recipientAddress).explicitGet()
-      leaseId -> (LeaseSnapshot(
+      leaseId -> (LeaseDetails(
         sender,
-        recipientAlias,
-        cancelDetails.amount,
-        LeaseDetails.Status.Expired(0)
+        recipientAddress,
+        TxPositiveAmount.unsafeFrom(cancelDetails.amount),
+        LeaseDetails.Status.Expired(0),
+        leaseId,
+        cancelDetails.height
       ) -> recipientAddress)
     }.toMap
   }
@@ -42,8 +44,8 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
         (
           Portfolio
             .combine(
-              Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))),
-              Map(recipientAddress    -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
+              Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount.value))),
+              Map(recipientAddress    -> Portfolio(lease = LeaseBalance(-ld.amount.value, 0)))
             )
             .explicitGet(),
           StateSnapshot(
