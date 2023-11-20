@@ -12,8 +12,8 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
-import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.LeaseDetails.Status
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation

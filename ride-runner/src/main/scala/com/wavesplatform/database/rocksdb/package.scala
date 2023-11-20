@@ -15,7 +15,6 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction
 import com.wavesplatform.utils.*
 import monix.eval.Task

@@ -22,7 +22,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.LeaseDetails
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{RideV6, TransactionStateSnapshot}

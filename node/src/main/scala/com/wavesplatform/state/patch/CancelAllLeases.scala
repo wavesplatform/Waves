@@ -1,12 +1,10 @@
 package com.wavesplatform.state.patch
 
 import cats.implicits.catsSyntaxSemigroup
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, LeaseBalance, StateSnapshot}
-import com.wavesplatform.transaction.TxPositiveAmount
+import com.wavesplatform.state.{Blockchain, LeaseBalance, LeaseDetails, StateSnapshot}
 import play.api.libs.json.{Json, OFormat}
 
 case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
@@ -14,11 +12,8 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
 
   private[patch] case class CancelledLeases(balances: Map[Address, LeaseBalance], cancelledLeases: Seq[LeaseData]) {
     private[this] val height: Int = patchHeight.getOrElse(0)
-    val leaseStates: Map[ByteStr, LeaseDetails] = cancelledLeases.map { data =>
-      val sender    = PublicKey(ByteStr.decodeBase58(data.senderPublicKey).get)
-      val recipient = Address.fromString(data.recipient).explicitGet()
-      val id        = ByteStr.decodeBase58(data.id).get
-      (id, LeaseDetails(sender, recipient, TxPositiveAmount.unsafeFrom(data.amount), status = LeaseDetails.Status.Expired(height), id, height))
+    val leaseStates: Map[ByteStr, LeaseDetails.Status.Inactive] = cancelledLeases.map { data =>
+      (ByteStr.decodeBase58(data.id).get, LeaseDetails.Status.Cancelled(height, None))
     }.toMap
   }
 
@@ -29,6 +24,6 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
 
   def apply(blockchain: Blockchain): StateSnapshot = {
     val patch = readPatchData[CancelledLeases]()
-    StateSnapshot.ofLeaseBalances(patch.balances, blockchain).explicitGet() |+| StateSnapshot(leaseStates = patch.leaseStates)
+    StateSnapshot.ofLeaseBalances(patch.balances, blockchain).explicitGet() |+| StateSnapshot(cancelledLeases = patch.leaseStates)
   }
 }

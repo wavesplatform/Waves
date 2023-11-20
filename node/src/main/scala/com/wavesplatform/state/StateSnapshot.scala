@@ -7,7 +7,6 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -23,7 +22,8 @@ case class StateSnapshot(
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
     sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
-    leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+    newLeases: Map[ByteStr, LeaseStaticInfo] = Map(),
+    cancelledLeases: Map[ByteStr, LeaseDetails.Status.Inactive] = Map.empty,
     aliases: Map[Alias, Address] = Map(),
     orderFills: Map[ByteStr, VolumeAndFee] = Map(),
     accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -79,7 +79,8 @@ object StateSnapshot {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
       assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
-      leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+      newLeases: Map[ByteStr, LeaseStaticInfo] = Map(),
+      cancelledLeases: Map[ByteStr, LeaseDetails.Status.Inactive] = Map.empty,
       aliases: Map[Alias, Address] = Map(),
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
       accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -102,7 +103,8 @@ object StateSnapshot {
         assetNamesAndDescriptions(issuedAssets, updatedAssets),
         assetScripts,
         sponsorships.collect { case (asset, value: SponsorshipValue) => (asset, value) },
-        leaseStates,
+        newLeases,
+        cancelledLeases,
         aliases,
         of,
         accountScripts,
@@ -218,7 +220,8 @@ object StateSnapshot {
         s1.assetNamesAndDescriptions ++ s2.assetNamesAndDescriptions,
         s1.assetScripts ++ s2.assetScripts,
         s1.sponsorships ++ s2.sponsorships,
-        s1.leaseStates ++ s2.leaseStates,
+        s1.newLeases ++ s2.newLeases,
+        s1.cancelledLeases ++ s2.cancelledLeases,
         s1.aliases ++ s2.aliases,
         s1.orderFills ++ s2.orderFills,
         s1.accountScripts ++ s2.accountScripts,

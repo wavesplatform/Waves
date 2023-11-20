@@ -22,7 +22,6 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{ByteStringExt, PBSnapshots}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{
   EthereumTransaction,
@@ -151,29 +150,30 @@ package object database {
       ByteString.copyFrom(ld.sourceId.arr),
       ld.height,
       ld.status match {
-        case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+        case LeaseDetails.Status.Active => pb.LeaseDetails.CancelReason.Empty
         case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-          pb.LeaseDetails.Status
+          pb.LeaseDetails.CancelReason
             .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height))
       }
     ).toByteArray
 
   def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
     val d = pb.LeaseDetails.parseFrom(data)
     LeaseDetails(
-      d.senderPublicKey.toPublicKey,
-      PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-      TxPositiveAmount.unsafeFrom(d.amount),
-      d.status match {
-        case pb.LeaseDetails.Status.Active(_)                                   => LeaseDetails.Status.Active
-        case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
-        case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
+      LeaseStaticInfo(
+        d.senderPublicKey.toPublicKey,
+        PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+        TxPositiveAmount.unsafeFrom(d.amount),
+        d.sourceId.toByteStr,
+        d.height
+      ),
+      d.cancelReason match {
+        case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+        case pb.LeaseDetails.CancelReason.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
           LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
-        case pb.LeaseDetails.Status.Empty => ???
-      },
-      d.sourceId.toByteStr,
-      d.height
+        case pb.LeaseDetails.CancelReason.Empty => LeaseDetails.Status.Active
+      }
     )
   }
 

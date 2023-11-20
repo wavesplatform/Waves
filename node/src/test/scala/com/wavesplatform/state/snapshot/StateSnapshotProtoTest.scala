@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, secondSigner}

@@ -12,7 +12,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash

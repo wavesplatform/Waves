@@ -22,7 +22,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*

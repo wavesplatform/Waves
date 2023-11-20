@@ -5,7 +5,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
+import com.wavesplatform.state.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.TxHelpers.*

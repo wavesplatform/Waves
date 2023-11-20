@@ -6,11 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.NewAsset
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, TxPositiveAmount}
 
@@ -29,8 +27,10 @@ object PBSnapshots {
       leaseBalances.map { case (address, balance) =>
         S.LeaseBalance(address.toByteString, balance.in, balance.out)
       }.toSeq,
+      newLeases = Seq(),
+      cancelledLeases = Seq(),
       assetStatics.map { case (id, st) =>
-        AssetStatic(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft)
+        NewAsset(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft)
       }.toSeq,
       assetVolumes.map { case (asset, info) =>
         S.AssetVolume(asset.id.toByteString, info.isReissuable, ByteString.copyFrom(info.volume.toByteArray))
@@ -44,15 +44,6 @@ object PBSnapshots {
       aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.headOption,
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
         S.OrderFill(orderId.toByteString, volume, fee)
-      }.toSeq,
-      leaseStates.map { case (leaseId, ld) =>
-        val pbStatus = ld.status match {
-          case Status.Active =>
-            S.LeaseState.Status.Active(S.LeaseState.Active(ld.amount.value, ld.sender.toByteString, ld.recipientAddress.toByteString))
-          case _: Status.Cancelled | _: Status.Expired =>
-            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled())
-        }
-        S.LeaseState(leaseId.toByteString, pbStatus)
       }.toSeq,
       accountScripts.map { case (publicKey, scriptOpt) =>
         scriptOpt.fold(
@@ -115,22 +106,13 @@ object PBSnapshots {
         .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
         .toMap
 
-    val leaseStates: Map[ByteStr, LeaseDetails] =
-      pbSnapshot.leaseStates.map { ls =>
-        ls.status match {
-          case TransactionStateSnapshot.LeaseState.Status.Active(value) =>
-            ls.leaseId.toByteStr -> LeaseDetails(
-              value.sender.toPublicKey,
-              value.recipient.toAddress(),
-              TxPositiveAmount.unsafeFrom(value.amount),
-              LeaseDetails.Status.Active,
-              txId,
-              height
-            )
-          case _: TransactionStateSnapshot.LeaseState.Status.Cancelled | TransactionStateSnapshot.LeaseState.Status.Empty =>
-            ls.leaseId.toByteStr -> ???
-        }
-      }.toMap
+    val newLeases = pbSnapshot.newLeases.map { l => l.leaseId.toByteStr ->
+      LeaseStaticInfo(l.senderPublicKey.toPublicKey, l.recipientAddress.toAddress(), TxPositiveAmount.unsafeFrom(l.amount), txId, height)
+    }.toMap
+
+    val cancelledLeases = pbSnapshot.cancelledLeases.map { cl =>
+      cl.leaseId.toByteStr -> LeaseDetails.Status.Cancelled(height, Some(txId))
+    }.toMap
 
     val aliases: Map[Alias, Address] =
       pbSnapshot.aliases
@@ -178,7 +160,8 @@ object PBSnapshots {
         assetNamesAndDescriptions,
         assetScripts,
         sponsorships,
-        leaseStates,
+        newLeases,
+        cancelledLeases,
         aliases,
         orderFills,
         accountScripts,
@@ -187,5 +170,4 @@ object PBSnapshots {
       TxMeta.Status.fromProtobuf(pbSnapshot.transactionStatus)
     )
   }
-
 }

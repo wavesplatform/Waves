@@ -30,8 +30,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings, Wa
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, LeaseDetails, NG, StateHash, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -1690,7 +1689,18 @@ class DebugApiRouteSpec
 
         (blockchain.leaseDetails _)
           .when(canceledLeaseId)
-          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, TxPositiveAmount.unsafeFrom(leaseCancelAmount), LeaseDetails.Status.Active, invoke.id(), 1)))
+          .returns(
+            Some(
+              LeaseDetails(
+                dAppPk,
+                TxHelpers.defaultAddress,
+                TxPositiveAmount.unsafeFrom(leaseCancelAmount),
+                LeaseDetails.Status.Active,
+                invoke.id(),
+                1
+              )
+            )
+          )
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)

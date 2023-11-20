@@ -26,7 +26,6 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

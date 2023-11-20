@@ -9,7 +9,6 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils.*

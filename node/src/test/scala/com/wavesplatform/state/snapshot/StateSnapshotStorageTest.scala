@@ -15,8 +15,8 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
+import com.wavesplatform.state.LeaseDetails
+import com.wavesplatform.state.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}

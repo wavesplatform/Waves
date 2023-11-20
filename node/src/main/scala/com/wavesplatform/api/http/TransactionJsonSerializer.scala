@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.LeaseDetails
 import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}

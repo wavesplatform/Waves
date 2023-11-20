@@ -21,7 +21,6 @@ import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, Transactio
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
@@ -484,8 +483,16 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for ((id, details) <- snapshot.leaseStates) {
-        rw.put(Keys.leaseDetails(id)(height), Some(details))
+      for ((id, li) <- snapshot.newLeases) {
+        rw.put(Keys.leaseDetails(id)(height), Some(LeaseDetails(li, snapshot.cancelledLeases.getOrElse(id, LeaseDetails.Status.Active))))
+        expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
+      }
+
+      for ((id, status) <- snapshot.cancelledLeases if !snapshot.newLeases.contains(id)) {
+        rw.fromHistory(Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten.foreach { d =>
+          rw.put(Keys.leaseDetails(id)(height), Some(d.copy(status = status)))
+        }
+
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
 

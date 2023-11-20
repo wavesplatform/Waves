@@ -6,7 +6,6 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 

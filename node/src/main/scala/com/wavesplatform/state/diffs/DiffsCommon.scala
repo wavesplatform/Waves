@@ -15,8 +15,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.traits.domain.*
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, Portfolio, SponsorshipValue, StateSnapshot}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, LeaseDetails, LeaseStaticInfo, Portfolio, SponsorshipValue, StateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -167,11 +166,10 @@ object DiffsCommon {
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount.value)),
         recipientAddress -> Portfolio(0, LeaseBalance(amount.value, 0))
       )
-      details = LeaseDetails(sender, recipientAddress, amount, LeaseDetails.Status.Active, txId, blockchain.height)
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolioDiff,
-        leaseStates = Map(leaseId -> details)
+        newLeases = Map(leaseId -> LeaseStaticInfo(sender, recipientAddress, amount, txId, blockchain.height))
       )
     } yield snapshot
   }
@@ -203,12 +201,11 @@ object DiffsCommon {
       )
       senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount.value)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount.value, 0)))
-      actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
       portfolios <- Portfolio.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolios,
-        leaseStates = Map(leaseId -> actionInfo)
+        cancelledLeases = Map(leaseId -> LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
       )
     } yield snapshot
   }

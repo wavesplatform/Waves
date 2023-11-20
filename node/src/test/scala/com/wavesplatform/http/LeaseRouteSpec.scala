@@ -18,8 +18,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, LeaseDetails}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.EthTxGenerator.Arg

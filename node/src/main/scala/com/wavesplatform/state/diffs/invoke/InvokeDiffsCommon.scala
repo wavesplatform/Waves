@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.state.diffs.{BalanceDiffValidation, DiffsCommon}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction

@@ -1,4 +1,4 @@
-package com.wavesplatform.state.reader
+package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -8,8 +8,9 @@ object LeaseDetails {
   sealed trait Status
   object Status {
     case object Active                                             extends Status
-    final case class Cancelled(height: Int, txId: Option[ByteStr]) extends Status
-    final case class Expired(height: Int)                          extends Status
+    sealed trait Inactive                                          extends Status
+    final case class Cancelled(height: Int, txId: Option[ByteStr]) extends Inactive
+    final case class Expired(height: Int)                          extends Inactive
 
     implicit class StatusExt(val status: Status) extends AnyVal {
       def cancelHeight: Option[Int] = status match {
@@ -27,6 +28,14 @@ object LeaseDetails {
   }
 }
 
-case class LeaseDetails(sender: PublicKey, recipientAddress: Address, amount: TxPositiveAmount, status: LeaseDetails.Status, sourceId: ByteStr, height: Int) {
-  def isActive: Boolean = status == LeaseDetails.Status.Active
+case class LeaseDetails(
+    static: LeaseStaticInfo,
+    status: LeaseDetails.Status
+) {
+  def isActive: Boolean         = status == LeaseDetails.Status.Active
+  def sender: PublicKey         = static.sender
+  def sourceId: ByteStr         = static.sourceId
+  def amount: TxPositiveAmount  = static.amount
+  def height: Int               = static.height
+  def recipientAddress: Address = static.recipientAddress
 }

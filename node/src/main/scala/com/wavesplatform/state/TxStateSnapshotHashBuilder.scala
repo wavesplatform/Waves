@@ -11,7 +11,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, maybeApplySponsorship}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
@@ -66,11 +65,13 @@ object TxStateSnapshotHashBuilder {
       (asset, scriptInfo) <- snapshot.assetScripts
     } changedKeys += asset.id.arr ++ scriptInfo.script.bytes().arr
 
-    snapshot.leaseStates.foreach { case (leaseId, details) =>
-      changedKeys += leaseId.arr ++ booleanToBytes(details.isActive)
-      if (details.isActive) {
-        changedKeys += leaseId.arr ++ details.sender.arr ++ details.recipientAddress.bytes ++ Longs.toByteArray(details.amount.value)
-      }
+    snapshot.newLeases.foreach { case (leaseId, details) =>
+      changedKeys += leaseId.arr ++ booleanToBytes(true)
+      changedKeys += leaseId.arr ++ details.sender.arr ++ details.recipientAddress.bytes ++ Longs.toByteArray(details.amount.value)
+    }
+
+    snapshot.cancelledLeases.keys.foreach { leaseId =>
+      changedKeys += leaseId.arr ++ booleanToBytes(false)
     }
 
     snapshot.sponsorships.foreach { case (asset, sponsorship) =>

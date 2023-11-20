@@ -18,7 +18,6 @@ import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -435,16 +434,15 @@ class BlockchainUpdaterImpl(
   private def cancelLeases(leaseTransactions: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
     for {
       (id, lt)  <- leaseTransactions
-      ltMeta    <- transactionMeta(id).toSeq
       recipient <- rocksdb.resolveAlias(lt.recipientAddress).toSeq
       portfolios = Map(
         lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
         recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
       )
       leaseStates = Map(
-        id -> LeaseDetails(lt.sender, lt.recipientAddress, lt.amount, LeaseDetails.Status.Expired(height), id, ltMeta.height)
+        id -> LeaseDetails.Status.Expired(height)
       )
-      snapshot = StateSnapshot.build(rocksdb, portfolios, leaseStates = leaseStates).explicitGet()
+      snapshot = StateSnapshot.build(rocksdb, portfolios, cancelledLeases = leaseStates).explicitGet()
     } yield id -> snapshot
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = writeLock {
