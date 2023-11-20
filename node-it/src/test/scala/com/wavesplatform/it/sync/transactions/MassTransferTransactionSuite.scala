@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -262,7 +263,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       def id(obj: JsObject) = obj.value("id").as[String]
 
       val noProof = signedMassTransfer - "proofs"
-      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
+      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), s"${WrongJson.WrongJsonDataMessage}.*proofs.*missing")
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
       val badProof = signedMassTransfer ++ Json.obj("proofs" -> Seq(fakeSignature.toString))

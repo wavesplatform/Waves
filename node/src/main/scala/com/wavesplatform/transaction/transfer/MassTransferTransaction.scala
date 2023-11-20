@@ -1,22 +1,21 @@
 package com.wavesplatform.transaction.transfer
 
 import scala.util.{Either, Try}
-
-import cats.instances.list._
-import cats.syntax.traverse._
-import com.wavesplatform.account._
+import cats.instances.list.*
+import cats.syntax.traverse.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, Json, OFormat}
 
 case class MassTransferTransaction(
     version: TxVersion,
@@ -75,7 +74,7 @@ object MassTransferTransaction extends TransactionParser {
   )
 
   object Transfer {
-    implicit val jsonFormat = Json.format[Transfer]
+    implicit val jsonFormat: OFormat[Transfer] = Json.format[Transfer]
   }
 
   case class ParsedTransfer(address: AddressOrAlias, amount: TxNonNegativeAmount)

@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.*
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.collection.immutable.VectorMap
@@ -21,7 +22,7 @@ object SnapshotOps {
         updatedAssets,
         s.aliases,
         orderFills(blockchain),
-        s.leaseStates,
+        s.leaseStates.map(l => (l._1, LeaseDetails(l._2.sender, l._2.recipient, l._2.amount, l._2.status, ByteStr.empty, 0))),
         s.accountScripts,
         s.assetScripts.view.mapValues(Some(_)).toMap,
         s.accountData,
@@ -96,7 +97,7 @@ object SnapshotOps {
       diff.updatedAssets,
       diff.assetScripts.collect { case (asset, Some(info)) => (asset, info) },
       diff.sponsorship,
-      diff.leaseState,
+      diff.leaseState.map(l => (l._1, LeaseSnapshot(l._2.sender, l._2.recipient, l._2.amount, l._2.status))),
       diff.aliases,
       diff.accountData,
       diff.scripts,

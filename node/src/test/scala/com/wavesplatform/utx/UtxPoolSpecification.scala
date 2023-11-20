@@ -1060,7 +1060,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           (blockchain.wavesBalances _).when(*).returning(Map(acc.toAddress -> ENOUGH_AMT, acc1.toAddress -> ENOUGH_AMT))
 
           (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-          (blockchain.accountScript _).when(*).onCall { _: Address =>
+          (blockchain.accountScript _).when(*).onCall { (_: Address) =>
             utx.removeAll(rest)
             None
           }

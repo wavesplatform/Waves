@@ -5,6 +5,7 @@ import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -15,7 +16,6 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{NumericExt, PropSpec}
@@ -175,7 +175,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             recipient     -> LeaseBalance(leaseTx.amount.value, 0)
           ),
           leaseStates = Map(
-            leaseTx.id() -> LeaseDetails(sender.publicKey, recipient, leaseTx.amount.value, Active, leaseTx.id(), d.solidStateHeight + 2)
+            leaseTx.id() -> LeaseSnapshot(sender.publicKey, recipient, leaseTx.amount.value, Active)
           )
         )
       )
@@ -193,13 +193,11 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             recipient     -> LeaseBalance(0, 0)
           ),
           leaseStates = Map(
-            leaseTx.id() -> LeaseDetails(
-              sender.publicKey,
-              recipient,
-              leaseTx.amount.value,
-              Cancelled(d.solidStateHeight + 2, Some(leaseCancelTx.id())),
-              leaseTx.id(),
-              d.solidStateHeight
+            leaseTx.id() -> LeaseSnapshot(
+              PublicKey(ByteStr.fill(KeyLength)(0)),
+              Address(Array.fill(Address.HashLength)(0)),
+              0,
+              Cancelled(0, None)
             )
           )
         )
@@ -333,7 +331,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
           leaseStates = Map(
-            leaseId -> LeaseDetails(dAppPk, senderAddress, 123, Active, invokeId, height)
+            leaseId -> LeaseSnapshot(dAppPk, senderAddress, 123, Active)
           ),
           accountData = Map(
             dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))

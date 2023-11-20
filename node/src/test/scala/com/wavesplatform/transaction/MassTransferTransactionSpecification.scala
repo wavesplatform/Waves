@@ -36,7 +36,7 @@ class MassTransferTransactionSpecification extends PropSpec {
     chainId   <- Seq(Byte.MinValue, 0: Byte, AddressScheme.current.chainId, Byte.MaxValue)
     version   <- massTransferTxSupportedVersions
     asset     <- Seq(Waves, asset)
-    recipient <- Seq(recipient.toAddress, Alias(chainId, "0000"))
+    recipient <- Seq(recipient.toAddress(chainId), Alias(chainId, "0000"))
     fee       <- Seq(1, Long.MaxValue)
     transfers <- Seq(
       Seq.empty,

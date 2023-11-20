@@ -14,7 +14,7 @@ object AddressFromPublicKey extends JsTestBase {
   private val invalidAddressFromPublicKeyData          = s"addressFromPublicKey(callerTestData, $randomUnionArrayElement)"
 
   val tests: Tests = Tests {
-    test(" Functions AddressFromPublicKey compiles") {
+    test("RIDE-60. AddressFromPublicKey function should compile for valid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         for (
@@ -29,7 +29,7 @@ object AddressFromPublicKey extends JsTestBase {
       }
     }
 
-    test(" AddressFromPublicKey Can't find a function overload") {
+    test("RIDE-61. AddressFromPublicKey function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         for (

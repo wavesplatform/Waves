@@ -27,7 +27,14 @@ jobs:
           path: ~/.cache/coursier
           key: coursier-cache
       - name: Check PR
-        run: sbt --mem 6144 --batch checkPR
+        run: sbt --mem 6144 --batch ";checkPR;completeQaseRun"
+        env:
+          QASE_ENABLE: true
+          QASE_RUN_NAME: checkPR
+          QASE_RUN_ID: 1
+          QASE_PROJECT_CODE: PR
+          QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
+          CHECKPR_RUN_ID: ${{ github.run_id }}
       - uses: dorny/paths-filter@v2
         id: filter
         with:

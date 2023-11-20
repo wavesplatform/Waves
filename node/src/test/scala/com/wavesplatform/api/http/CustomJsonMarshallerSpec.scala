@@ -115,6 +115,7 @@ class CustomJsonMarshallerSpec
 
   private val assetsRoute = AssetsApiRoute(
     restAPISettings,
+    60.seconds,
     testWallet,
     publisher,
     blockchain,
