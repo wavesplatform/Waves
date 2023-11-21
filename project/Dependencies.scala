@@ -82,6 +82,8 @@ object Dependencies {
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.17.0",
+    "org.mockito"        % "mockito-all"     % "1.10.19",
+    "org.scalamock"     %% "scalamock"       % "5.2.0"
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
@@ -124,7 +126,6 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit"                 %% "refined-cats"  % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "9.4.0",
       web3jModule("abi"),
       akkaModule("testkit")               % Test,

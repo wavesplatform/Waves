@@ -1,15 +1,15 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.ConcurrentHashMap
-
 import com.wavesplatform.Version
 import com.wavesplatform.test.FreeSpec
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.channel.group.ChannelGroup
+import io.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
+import io.netty.util.concurrent.GlobalEventExecutor
 import org.scalamock.scalatest.MockFactory
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
@@ -26,7 +26,7 @@ class ClientSpec extends FreeSpec with MockFactory {
   private val serverHandshake = clientHandshake.copy(nodeNonce = Random.nextInt())
 
   "should send only a local handshake on connection" in {
-    val channel = createEmbeddedChannel(mock[ChannelGroup])
+    val channel = createEmbeddedChannel(new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
 
     val sentClientHandshakeBuff = channel.readOutbound[ByteBuf]()
     Handshake.decode(sentClientHandshakeBuff) shouldBe clientHandshake
@@ -35,7 +35,12 @@ class ClientSpec extends FreeSpec with MockFactory {
 
   "should add a server's channel to all channels after the handshake only" in {
     var channelWasAdded = false
-    val allChannels     = mock[ChannelGroup]
+    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE) {
+      override def add(channel: Channel): Boolean = {
+        channelWasAdded = true
+        super.add(channel)
+      }
+    }
     (allChannels.add _).expects(*).onCall { (_: Channel) =>
       channelWasAdded = true
       true
@@ -64,5 +69,4 @@ class ClientSpec extends FreeSpec with MockFactory {
       allChannels = allChannels
     )
   )
-
 }
