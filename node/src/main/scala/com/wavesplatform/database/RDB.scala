@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.typesafe.scalalogging.StrictLogging
-import com.wavesplatform.database.RDB.{HistoryHandle, TxHandle, TxMetaHandle}
+import com.wavesplatform.database.RDB.{TxHandle, TxMetaHandle}
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.utils.*
 import org.rocksdb.*
@@ -16,7 +16,6 @@ final class RDB(
     val txMetaHandle: TxMetaHandle,
     val txHandle: TxHandle,
     val txSnapshotHandle: TxHandle,
-    val historyHandle: HistoryHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
   override def close(): Unit = {
@@ -28,7 +27,6 @@ final class RDB(
 object RDB extends StrictLogging {
   final class TxMetaHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class TxHandle private[RDB] (val handle: ColumnFamilyHandle)
-  final class HistoryHandle private[RDB] (val handle: ColumnFamilyHandle)
   case class OptionsWithResources[A](options: A, resources: Seq[RocksObject])
 
   def open(settings: DBSettings): RDB = {
@@ -46,7 +44,6 @@ object RDB extends StrictLogging {
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
-    val historyCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -72,11 +69,6 @@ object RDB extends StrictLogging {
           "transactions-snapshot".utf8Bytes,
           txSnapshotCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions-snapshot").toPath, 0L)).asJava)
-        ),
-        new ColumnFamilyDescriptor(
-          "history".utf8Bytes,
-          historyCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "history").toPath, 0L)).asJava)
         )
       ).asJava,
       handles
@@ -87,7 +79,6 @@ object RDB extends StrictLogging {
       new TxMetaHandle(handles.get(1)),
       new TxHandle(handles.get(2)),
       new TxHandle(handles.get(3)),
-      new HistoryHandle(handles.get(4)),
       dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources
     )
   }
@@ -133,9 +124,9 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(4)
+      .setIncreaseParallelism(6)
       .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(4)
+      .setMaxBackgroundJobs(6)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
       .setMaxSubcompactions(2) // Could lead to max_background_jobs * max_subcompactions background threads

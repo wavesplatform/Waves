@@ -63,10 +63,9 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
       }
     }
 
-  def prefixExists(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle] = None): Boolean =
-    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
-      iter =>
-        iter.seek(prefix)
-        iter.isValid
-    }
+  def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
+    iter =>
+      iter.seek(prefix)
+      iter.isValid
+  }
 }
