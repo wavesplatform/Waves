@@ -61,11 +61,11 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     }
   }
 
-  test("balances for waves should be correct") {
+  test("balances for waves should be correct (SAPI-805)") {
     assertBalances(None)
   }
 
-  test("balances for issued asset should be correct") {
+  test("balances for issued asset should be correct (SAPI-804)") {
     val asset = miner.issue(miner.keyPair, "Test", "Test", 10000, 0, waitForTx = true).id
     assertBalances(Some(asset))
   }
@@ -83,7 +83,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
   }
 
-  test("requests to the illegal height should be handled correctly ") {
+  test("SAPI-30. requests to the illegal height should be handled correctly ") {
     val height = miner.height + 100
     assertApiError(
       miner.get(s"/addresses/balance?height=$height&address=$firstKeyPair"),

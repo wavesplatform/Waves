@@ -76,7 +76,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   )
   private val route = seal(addressApiRoute.route)
 
-  routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
+  routePath("/balance/{address}/{confirmations} (SAPI-1)") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
       addressApiRoute
         .copy(
@@ -135,7 +135,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath("/seq/{from}/{to}") in {
+  routePath("/seq/{from}/{to} (SAPI-3)") in {
     val r1 = Get(routePath("/seq/1/4")) ~> route ~> check {
       val response = responseAs[Seq[String]]
       response.length shouldBe 3
@@ -161,7 +161,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath("/validate/{address}") in {
+  routePath("(SAPI-9) /validate/{address}") in {
     val t = Table(("address", "valid"), (allAddresses.map(_ -> true) :+ "3P2HNUd5VUPLMQkJmctTPEeeHumiPN2GkTb" -> false)*)
 
     forAll(t) { (a, v) =>
@@ -173,7 +173,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath("/seed/{address}") in {
+  routePath("(SAPI-8) /seed/{address}") in {
     val account = allAccounts.head
     val path    = routePath(s"/seed/${account.toAddress}")
     Get(path) ~> route should produce(ApiKeyNotValid)
@@ -184,20 +184,20 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath("") in {
+  routePath("(SAPI-13)") in {
     Post(routePath("")) ~> route should produce(ApiKeyNotValid)
     Post(routePath("")) ~> ApiKeyHeader ~> route ~> check {
       allAddresses should not contain (responseAs[JsObject] \ "address").as[String]
     }
   }
 
-  routePath("/{address}") in {
+  routePath("/{address} (SAPI-14)") in {
     Delete(routePath(s"/${allAddresses.head}")) ~> ApiKeyHeader ~> route ~> check {
       (responseAs[JsObject] \ "deleted").as[Boolean] shouldBe true
     }
   }
 
-  routePath(s"/scriptInfo/${allAddresses(1)}") in {
+  routePath(s"/scriptInfo/${allAddresses(1)} (SAPI-15)") in {
     val script = ExprScript(TRUE).explicitGet()
 
     (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
@@ -400,7 +400,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath(s"/data/{address} with Transfer-Encoding: chunked") in {
+  routePath(s"/data/{address} with Transfer-Encoding: chunked (SAPI-26)") in {
     val account = TxHelpers.signer(1)
 
     withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
@@ -428,7 +428,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath(s"/data/{address} - handles keys limit") in {
+  routePath(s"/data/{address} - handles keys limit (SAPI-247)") in {
     def checkErrorResponse(): Unit = {
       response.status shouldBe StatusCodes.BadRequest
       (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(addressApiRoute.settings.dataKeysRequestLimit).message
@@ -493,7 +493,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath(s"/data/{address} - handles empty keys input in POST") in {
+  routePath(s"/data/{address} - handles empty keys input in POST (SAPI-251)") in {
     def checkErrorResponse(): Unit = {
       response.status shouldBe StatusCodes.BadRequest
       (responseAs[JsObject] \ "message").as[String] shouldBe DataKeysNotSpecified.message

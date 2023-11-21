@@ -307,7 +307,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     }
   }
 
-  test("queries for multiple keys") {
+  test("SAPI-371 queries for multiple keys") {
     val tooBigKey = "toobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkey"
     val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
     val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
@@ -321,7 +321,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     postList shouldBe list
   }
 
-  test("queries for nonexistent data") {
+  test("SAPI-31 queries for nonexistent data") {
     def assertNotFound(url: String): Assertion = Try(sender.get(url)) match {
       case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
         statusCode shouldBe 404
