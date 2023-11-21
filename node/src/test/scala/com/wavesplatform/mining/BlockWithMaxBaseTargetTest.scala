@@ -130,7 +130,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
     )
 
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
     val utxPoolStub = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings, settings.maxTxErrorLogSize, settings0.minerSettings.enable)

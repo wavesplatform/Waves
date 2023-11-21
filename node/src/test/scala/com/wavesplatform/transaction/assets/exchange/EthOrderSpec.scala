@@ -2,15 +2,26 @@ package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
-import com.wavesplatform.test.{FlatSpec, SharedDomain}
+import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.BlockchainStubHelpers
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
+import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 import play.api.libs.json.{JsArray, JsObject, Json}
 
-class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with DiffMatchers with SharedDomain with JsonMatchers {
+class EthOrderSpec
+    extends FlatSpec
+    with BeforeAndAfterAll
+    with PathMockFactory
+    with BlockchainStubHelpers
+    with EthHelpers
+    with DiffMatchers
+    with JsonMatchers {
   import EthOrderSpec.{ethBuyOrder, ethSellOrder}
 
   "ETH signed order" should "recover signer public key correctly" in {
@@ -113,13 +124,39 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with 
   }
 
   it should "work in exchange transaction" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(ethBuyOrder.senderAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress  -> Long.MaxValue / 3
+          )
+        )
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
 
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = domain.transactionDiffer(transaction).resultE.explicitGet()
+    val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
 
   it should "work in exchange transaction with an old order" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
+
     val buyOrder = Order
       .selfSigned(
         Order.V3,
@@ -136,12 +173,20 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with 
       )
       .explicitGet()
 
+    val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = domain.transactionDiffer(transaction).resultE.explicitGet()
+    val diff        = differ(transaction).resultE.explicitGet().toDiff(blockchain)
     diff should containAppliedTx(transaction.id())
   }
 
   it should "recover valid ids of exchange tx" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
+
     val buyOrder = Order
       .selfSigned(
         Order.V3,
@@ -164,6 +209,8 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with 
         "0x6c4385dd5f6f1200b4d0630c9076104f34c801c16a211e505facfd743ba242db4429b966ffa8d2a9aff9037dafda78cfc8f7c5ef1c94493f5954bc7ebdb649281b"
       )
     )
+
+    StubHelpers(blockchain).creditBalance(sellOrder.senderAddress, *)
 
     val transaction = TxHelpers
       .exchange(
@@ -244,6 +291,17 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with 
   }
 
   it should "not work in exchange transaction with changed signature" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, TestEthOrdersPublicKey.toAddress -> Long.MaxValue / 3))
+      sh.issueAsset(ByteStr(EthStubBytes32))
+    }
+
+    val differ = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers
       .exchange(ethBuyOrder, ethSellOrder, version = TxVersion.V3, timestamp = 100)
       .copy(
@@ -254,19 +312,29 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with 
         )
       )
 
-    domain.transactionDiffer(transaction).resultE should matchPattern {
+    differ(transaction).resultE should matchPattern {
       case Left(err) if err.toString.contains("negative waves balance") =>
     }
   }
 
   it should "work in exchange transaction with asset script" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
 
-    // TODO: something more smart ?
-    val script = TxHelpers.script("""
-                                    |match tx {
-                                    |  case e: ExchangeTransaction => true
-                                    |  case _ => false
-                                    |}""".stripMargin)
+      // TODO: something more smart ?
+      val script = TxHelpers.script("""
+                                      |match tx {
+                                      |  case e: ExchangeTransaction => true
+                                      |  case _ => false
+                                      |}""".stripMargin)
+
+      sh.issueAsset(ByteStr(EthStubBytes32), Some(script))
+    }
 
     val buyOrder = Order
       .selfSigned(
@@ -284,29 +352,48 @@ class EthOrderSpec extends FlatSpec with BeforeAndAfterAll with EthHelpers with 
       )
       .explicitGet()
 
+    val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = domain.transactionDiffer(transaction).resultE.explicitGet()
+    val diff        = differ(transaction).resultE.explicitGet().toDiff(blockchain)
     diff should containAppliedTx(transaction.id())
   }
 
   it should "work in exchange transaction with matcher script" in {
+    val blockchain = createBlockchainStub { blockchain =>
+      val sh = StubHelpers(blockchain)
+      sh.creditBalance(TxHelpers.matcher.toAddress, *)
+      sh.creditBalance(ethBuyOrder.senderAddress, *)
+      sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress  -> Long.MaxValue / 3
+          )
+        )
+      sh.issueAsset(ByteStr(EthStubBytes32))
 
-    val script = TxHelpers.script(
-      """
-        |{-# STDLIB_VERSION 5 #-}
-        |{-# CONTENT_TYPE EXPRESSION #-}
-        |{-# SCRIPT_TYPE ACCOUNT #-}
-        |
-        |
-        |match tx {
-        |  case e: ExchangeTransaction => if (e.buyOrder.proofs[0] == base58'' && e.sellOrder.proofs[0] == base58'') then true else throw("Only ethereum")
-        |  case _: Order => true
-        |  case _ => false
-        |}""".stripMargin
-    )
+      val script = TxHelpers.script(
+        """
+          |{-# STDLIB_VERSION 5 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |
+          |match tx {
+          |  case e: ExchangeTransaction => if (e.buyOrder.proofs[0] == base58'' && e.sellOrder.proofs[0] == base58'') then true else throw("Only ethereum")
+          |  case _: Order => true
+          |  case _ => false
+          |}""".stripMargin
+      )
+      sh.setScript(TxHelpers.matcher.toAddress, script)
+    }
 
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = domain.transactionDiffer(transaction).resultE.explicitGet()
+    val diff        = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
   }
 

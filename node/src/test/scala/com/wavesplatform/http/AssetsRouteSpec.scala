@@ -25,11 +25,11 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEnt
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{AssetIdLength, EthTxGenerator, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalatest.concurrent.Eventually

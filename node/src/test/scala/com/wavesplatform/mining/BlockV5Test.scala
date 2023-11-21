@@ -454,7 +454,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   ): Unit = {
     withRocksDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl =
-        new BlockchainUpdaterImpl(blockchain, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty) {
+        new BlockchainUpdaterImpl(blockchain, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty) {
           override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
         }
       try f(bcu)

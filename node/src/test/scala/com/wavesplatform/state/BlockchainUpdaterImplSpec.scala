@@ -24,11 +24,12 @@ import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{Schedulers, SystemTime, Time}
 import com.wavesplatform.{EitherMatchers, NTPTime}
 import monix.execution.Scheduler.Implicits.global
+import org.scalamock.scalatest.MockFactory
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings {
+class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
   import DomainPresets.*
 
   private val FEE_AMT = 1000000L
@@ -88,14 +89,74 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
   "blockchain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, BlockchainUpdateTriggers.noop)((_, _) => ())
+        val triggersMock = mock[BlockchainUpdateTriggers]
+
+        inSequence {
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, snapshot, _, _, bc) =>
+              bc.height == 0 &&
+              block.transactionData.length == 1 &&
+              snapshot.balances.isEmpty &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
+            })
+            .once()
+
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, snapshot, _, _, bc) =>
+              val txInfo = snapshot.transactions.head
+              val tx     = txInfo._2.transaction.asInstanceOf[TransferTransaction]
+
+              bc.height == 1 &&
+              block.transactionData.length == 5 &&
+              // miner reward, no NG — all txs fees
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 5 &&
+              // first Tx updated balances
+              snapshot.transactions.head._2.snapshot.balances((tx.recipient.asInstanceOf[Address], Waves)) == (ENOUGH_AMT / 5) &&
+              snapshot.transactions.head._2.snapshot.balances((tx.sender.toAddress, Waves)) == ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT
+            })
+            .once()
+
+          (triggersMock.onProcessBlock _).expects(*, *, *, *, *).once()
+        }
+
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, triggersMock)((_, _) => ())
       }
     }
 
     "with NG" - {
       "genesis block and two transfers blocks" in {
+        val triggersMock = mock[BlockchainUpdateTriggers]
 
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, BlockchainUpdateTriggers.noop)((_, _) => ())
+        inSequence {
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, snapshot, _, _, bc) =>
+              bc.height == 0 &&
+              block.transactionData.length == 1 &&
+              snapshot.balances.isEmpty &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
+            })
+            .once()
+
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, snapshot, _, _, bc) =>
+              bc.height == 1 &&
+              block.transactionData.length == 5 &&
+              snapshot.balances.isEmpty // no txs with fee in previous block
+            })
+            .once()
+
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, snapshot, _, _, bc) =>
+              bc.height == 2 &&
+              block.transactionData.length == 4 &&
+              snapshot.balances.size == 1 &&
+              snapshot.balances.head._2 == FEE_AMT * 5 // all fee from previous block
+            })
+            .once()
+        }
+
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, triggersMock)((_, _) => ())
       }
 
       "block, then 2 microblocks, then block referencing previous microblock" in withDomain(NG) { d =>
@@ -115,11 +176,65 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           (genesis, transfers)
         }
 
-        d.triggers = d.triggers :+ BlockchainUpdateTriggers.noop
+        val triggersMock = mock[BlockchainUpdateTriggers]
+
+        d.triggers = d.triggers :+ triggersMock
 
         val (genesis, transfers)       = preconditions(0)
         val (block1, microBlocks1And2) = chainBaseAndMicro(randomSig, genesis, Seq(transfers.take(2), Seq(transfers(2))))
         val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockSig, transfers(3), Seq(Seq(transfers(4))))
+
+        inSequence {
+          // genesis
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, snapshot, _, _, bc) =>
+              bc.height == 0 &&
+              block.transactionData.length == 1 &&
+              snapshot.balances.isEmpty &&
+              snapshot.transactions.head._2.snapshot.balances.head._2 == ENOUGH_AMT
+            })
+            .once()
+
+          // microblock 1
+          (triggersMock.onProcessMicroBlock _)
+            .expects(where { (microBlock, snapshot, bc, _, _) =>
+              bc.height == 1 &&
+              microBlock.transactionData.length == 2 &&
+              snapshot.balances.isEmpty // no txs with fee in previous block
+            })
+            .once()
+
+          // microblock 2
+          (triggersMock.onProcessMicroBlock _)
+            .expects(where { (microBlock, snapshot, bc, _, _) =>
+              bc.height == 1 &&
+              microBlock.transactionData.length == 1 &&
+              snapshot.balances.isEmpty // no txs with fee in previous block
+            })
+            .once()
+
+          // rollback microblock
+          (triggersMock.onMicroBlockRollback _)
+            .expects(where { (_, toSig) =>
+              toSig == microBlocks1And2.head.totalResBlockSig
+            })
+            .once()
+
+          // next keyblock
+          (triggersMock.onProcessBlock _)
+            .expects(where { (block, _, _, _, bc) =>
+              bc.height == 1 &&
+              block.header.reference == microBlocks1And2.head.totalResBlockSig
+            })
+            .once()
+
+          // microblock 3
+          (triggersMock.onProcessMicroBlock _)
+            .expects(where { (microBlock, _, bc, _, _) =>
+              bc.height == 2 && microBlock.reference == block2.signature
+            })
+            .once()
+        }
 
         d.blockchainUpdater.processBlock(block1) should beRight
         d.blockchainUpdater.processMicroBlock(microBlocks1And2.head, None) should beRight

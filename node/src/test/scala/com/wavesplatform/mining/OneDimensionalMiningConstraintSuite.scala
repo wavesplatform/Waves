@@ -1,11 +1,12 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.state.StateSnapshot
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Transaction
 import org.scalacheck.Gen
+import org.scalamock.scalatest.PathMockFactory
 
-class OneDimensionalMiningConstraintSuite extends FreeSpec {
+class OneDimensionalMiningConstraintSuite extends FreeSpec with PathMockFactory {
   "OneDimensionalMiningConstraint" - {
     "should be full if the limit is 0, but not overfilled" in {
       val tank = createConstConstraint(0, 1, "const")
@@ -15,7 +16,7 @@ class OneDimensionalMiningConstraintSuite extends FreeSpec {
 
     "put(transaction)" - tests { (maxTxs, txs) =>
       val constraint = createConstConstraint(maxTxs, transactionSize = 1, "txSize")
-      txs.foldLeft(constraint)(_.put(null, _, StateSnapshot.empty))
+      txs.foldLeft(constraint)(_.put(stub[Blockchain], _, StateSnapshot.empty))
     }
   }
 

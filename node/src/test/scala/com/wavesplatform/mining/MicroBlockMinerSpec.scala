@@ -1,5 +1,6 @@
 package com.wavesplatform.mining
 
+import java.util.concurrent.CountDownLatch
 import com.wavesplatform.TestValues
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.ProtoBlockVersion
@@ -21,12 +22,12 @@ import com.wavesplatform.utx.{UtxPool, UtxPoolImpl, UtxPriorityPool}
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
+import org.scalamock.scalatest.PathMockFactory
 
-import java.util.concurrent.CountDownLatch
 import scala.concurrent.duration.*
 import scala.util.Random
 
-class MicroBlockMinerSpec extends FlatSpec with WithDomain {
+class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain {
   "Micro block miner" should "generate microblocks in flat interval" in {
     val scheduler = Schedulers.singleThread("test")
     val acc       = TestValues.keyPair

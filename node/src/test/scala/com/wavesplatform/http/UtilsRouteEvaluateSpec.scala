@@ -8,12 +8,13 @@ import com.wavesplatform.api.http.utils.{UtilsApiRoute, UtilsInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.state.IntegerDataEntry
+import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -22,13 +23,20 @@ import com.wavesplatform.transaction.{Asset, AssetIdLength, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
 import play.api.libs.json.*
 
 import scala.concurrent.duration.DurationInt
 
-class UtilsRouteEvaluateSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with Inside with WithDomain {
+class UtilsRouteEvaluateSpec
+    extends RouteSpec("/utils")
+    with RestAPISettingsHelper
+    with PropertyChecks
+    with PathMockFactory
+    with Inside
+    with WithDomain {
   private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
     new HashedWheelTimer(),
     5.seconds,
@@ -44,7 +52,7 @@ class UtilsRouteEvaluateSpec extends RouteSpec("/utils") with RestAPISettingsHel
     Int.MaxValue,
     () => ScriptEstimatorV3(true, false),
     timeBounded,
-    null
+    stub[Blockchain]("globalBlockchain")
   )
 
   override def afterAll(): Unit = {
@@ -247,6 +255,15 @@ class UtilsRouteEvaluateSpec extends RouteSpec("/utils") with RestAPISettingsHel
         evalScript("x - 1") ~> route ~> check {
           responseJson shouldBe Json.obj("type" -> "Int", "value" -> (xFromContract - 1))
         }
+
+        (() => utilsApi.blockchain.settings)
+          .when()
+          .returning(DefaultBlockchainSettings)
+          .anyNumberOfTimes()
+        (utilsApi.blockchain.leaseBalance _)
+          .when(*)
+          .returning(LeaseBalance.empty)
+          .anyNumberOfTimes()
 
         evalScript(""" testSyncInvoke() """) ~> route ~> check {
           val result = responseAs[JsObject]

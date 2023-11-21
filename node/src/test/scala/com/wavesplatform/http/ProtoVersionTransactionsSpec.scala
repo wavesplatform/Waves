@@ -2,7 +2,9 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
@@ -11,7 +13,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.test.SharedDomain
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
@@ -21,7 +24,9 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utils.SharedSchedulerMixin
+import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import play.api.libs.json.*
 
@@ -30,8 +35,9 @@ import scala.concurrent.duration.*
 class ProtoVersionTransactionsSpec
     extends RouteSpec("/transactions")
     with RestAPISettingsHelper
+    with MockFactory
     with OptionValues
-    with SharedDomain
+    with TestWallet
     with SharedSchedulerMixin {
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
@@ -43,16 +49,20 @@ class ProtoVersionTransactionsSpec
 
   private val Now: Long = ntpNow
 
-  private val account: KeyPair = domain.wallet.generateNewAccount().get
+  private val account: KeyPair = testWallet.generateNewAccount().get
 
+  private val blockchain: Blockchain = mock[Blockchain]
+  private val utx: UtxPool           = mock[UtxPool]
+
+  private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
     TransactionsApiRoute(
       restAPISettings,
-      domain.transactionsApi,
-      domain.wallet,
-      domain.blockchain,
-      () => domain.blockchain,
-      () => domain.utxPool.size,
+      transactionsApi,
+      testWallet,
+      blockchain,
+      mock[() => SnapshotBlockchain],
+      () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,
       new RouteTimeout(60.seconds)(sharedScheduler)

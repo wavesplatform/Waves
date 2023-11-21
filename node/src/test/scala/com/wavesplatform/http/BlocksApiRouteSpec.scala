@@ -15,21 +15,29 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.BlockRewardCalculator
+import com.wavesplatform.state.{BlockRewardCalculator, Blockchain}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
+import monix.reactive.Observable
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Assertion
 import play.api.libs.json.*
 
 import scala.concurrent.duration.*
 import scala.util.Random
 
-class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper with TestWallet with WithDomain with SharedSchedulerMixin {
-  private val blocksApi: CommonBlocksApi = ???
+class BlocksApiRouteSpec
+    extends RouteSpec("/blocks")
+    with PathMockFactory
+    with RestAPISettingsHelper
+    with TestWallet
+    with WithDomain
+    with SharedSchedulerMixin {
+  private val blocksApi = mock[CommonBlocksApi]
   private val blocksApiRoute: BlocksApiRoute =
     BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(sharedScheduler))
   private val route = blocksApiRoute.route
@@ -64,8 +72,12 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
     BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id())).copy(rewardShares = Seq(testBlock2.header.generator.toAddress -> 5))
 
   private val invalidBlockId = ByteStr(new Array[Byte](32))
+  (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
+  (blocksApi.meta _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
 
   routePath("/last") in {
+    (() => blocksApi.currentHeight).expects().returning(2).once()
+    (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
@@ -73,16 +85,19 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/at/{height}") in {
+    (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
     Get(routePath("/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
     }
 
+    (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
     }
 
+    (blocksApi.blockAtHeight _).expects(3).returning(None).once()
     Get(routePath("/at/3")) ~> route ~> check {
       response.status shouldBe StatusCodes.NotFound
       responseAs[String] should include("block does not exist")
@@ -90,6 +105,8 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/{id}") in {
+    (blocksApi.block _).expects(testBlock1.id()).returning(Some(testBlock1Meta -> Seq.empty)).once()
+    (blocksApi.block _).expects(testBlock2.id()).returning(Some(testBlock2Meta -> Seq.empty)).once()
 
     Get(routePath(s"/${testBlock1.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -108,6 +125,17 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/seq/{from}/{to}") in {
+    (blocksApi
+      .blocksRange(_: Int, _: Int))
+      .expects(1, 2)
+      .returning(
+        Observable.fromIterable(
+          Seq(
+            testBlock1Meta -> Seq.empty,
+            testBlock2Meta -> Seq.empty
+          )
+        )
+      )
     Get(routePath("/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1Json, testBlock2Json)
@@ -115,6 +143,8 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/headers/last") in {
+    (() => blocksApi.currentHeight).expects().returning(2).once()
+    (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
     Get(routePath("/headers/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
@@ -122,6 +152,9 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/headers/{id}") in {
+    (blocksApi.meta _).expects(testBlock1.id()).returning(Some(testBlock1Meta)).once()
+    (blocksApi.meta _).expects(testBlock2.id()).returning(Some(testBlock2Meta)).once()
+
     Get(routePath(s"/headers/${testBlock1.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1HeaderJson
@@ -140,6 +173,10 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/headers/at/{height}") in {
+    (blocksApi.metaAtHeight _).expects(1).returning(Some(testBlock1Meta)).once()
+    (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
+    (blocksApi.metaAtHeight _).expects(3).returning(None).once()
+
     Get(routePath("/headers/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1HeaderJson
@@ -157,6 +194,16 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   }
 
   routePath("/headers/seq/{from}/{to}") in {
+    (blocksApi.metaRange _)
+      .expects(1, 2)
+      .returning(
+        Observable.fromIterable(
+          Seq(
+            testBlock1Meta,
+            testBlock2Meta
+          )
+        )
+      )
     Get(routePath("/headers/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1HeaderJson, testBlock2HeaderJson)
@@ -182,12 +229,15 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
       )
     )
 
+    val blockchain = stub[Blockchain]
+    (blockchain.heightOf _).when(blocks.last.id()).returning(Some(3))
+
     def metaAt(height: Int): Option[BlockMeta] =
       if (height >= 1 && height <= 3)
         Some(BlockMeta(blocks(height - 1).header, ByteStr.empty, None, 1, 0, 0, 0, None, Seq.empty, None))
       else None
 
-    val blocksApi = CommonBlocksApi(???, metaAt, _ => None)
+    val blocksApi = CommonBlocksApi(blockchain, metaAt, _ => None)
     val route     = blocksApiRoute.copy(commonApi = blocksApi).route
     Get(routePath(s"/delay/${blocks.last.id()}/3")) ~> route ~> check {
       val delay = (responseAs[JsObject] \ "delay").as[Int]
@@ -214,10 +264,23 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with RestAPISettingsHelper
   routePath("/heightByTimestamp") - {
     def emulateBlocks(blocks: IndexedSeq[Block]): CommonBlocksApi = {
       require(blocks.nonEmpty)
-      ???
+      val blocksApi = stub[CommonBlocksApi]
+      (() => blocksApi.currentHeight).when().returning(blocks.length)
+      (blocksApi.metaAtHeight _)
+        .when(*)
+        .onCall { (height: Int) =>
+          if (height < 1 || height > blocks.size) None
+          else {
+            val block = blocks(height - 1)
+            Some(BlockMeta(block.header, block.signature, None, height, 1, 0, 0L, None, Seq.empty, None))
+          }
+        }
+      blocksApi
     }
 
     "missing blocks" in {
+      (blocksApi.metaAtHeight _).expects(1).returning(None).repeat(2)
+      (() => blocksApi.currentHeight).expects().returning(5).repeat(2)
       Get(routePath(s"/heightByTimestamp/1")) ~> route ~> check {
         responseAs[JsObject] shouldBe Json.parse("{\"error\":199,\"message\":\"State was altered\"}")
       }

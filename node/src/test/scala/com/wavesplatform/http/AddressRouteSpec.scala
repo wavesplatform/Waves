@@ -7,10 +7,14 @@ import akka.http.scaladsl.testkit.RouteTestTimeout
 import akka.stream.scaladsl.Source
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
@@ -21,27 +25,32 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.{Schedulers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
 import monix.execution.schedulers.SchedulerService
+import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
 import scala.concurrent.duration.*
 
-class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelper with SharedDomain with SharedSchedulerMixin {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain with SharedSchedulerMixin {
 
   private val wallet = Wallet(WalletSettings(None, Some("123"), Some(ByteStr(Longs.toByteArray(System.nanoTime())))))
   wallet.generateNewAccounts(10)
   private val allAccounts  = wallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.toAddress)
+  private val blockchain   = stub[Blockchain]("globalBlockchain")
+  (() => blockchain.activatedFeatures).when().returning(Map())
 
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.accepting
+
+  private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
   private val timeLimited: SchedulerService = Schedulers.timeBoundedFixedPool(
     new HashedWheelTimer(),
@@ -57,20 +66,27 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
   private val addressApiRoute: AddressApiRoute = AddressApiRoute(
     restAPISettings,
     wallet,
-    domain.blockchain,
+    blockchain,
     utxPoolSynchronizer,
     new TestTime,
     timeLimited,
     new RouteTimeout(60.seconds)(sharedScheduler),
-    domain.accountsApi,
+    commonAccountApi,
     5
   )
   private val route = seal(addressApiRoute.route)
 
-  routePath("/balance/{address}/{confirmations}") in {
+  routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
+    val route =
+      addressApiRoute
+        .copy(
+          blockchain = d.blockchainUpdater,
+          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
+        )
+        .route
     val address = TxHelpers.signer(1).toAddress
 
-    for (_ <- 1 until 10) domain.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
+    for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
 
     Get(routePath(s"/balance/$address/10")) ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> "Unable to get balance past height 5")
@@ -81,15 +97,22 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
     }
   }
 
-  routePath("/balance") in {
+  routePath("/balance") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
+    val route =
+      addressApiRoute
+        .copy(
+          blockchain = d.blockchainUpdater,
+          commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
+        )
+        .route
     val address       = TxHelpers.signer(1).toAddress
     val transferCount = 5
 
     val issue = TxHelpers.issue(TxHelpers.defaultSigner)
-    domain.appendBlock(issue)
+    d.appendBlock(issue)
 
     for (_ <- 1 until transferCount)
-      domain.appendBlock(
+      d.appendBlock(
         TxHelpers.transfer(TxHelpers.defaultSigner, address, amount = 1),
         TxHelpers.transfer(TxHelpers.defaultSigner, address, asset = issue.asset, amount = 2)
       )
@@ -177,6 +200,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     val script = ExprScript(TRUE).explicitGet()
 
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
+    (blockchain.hasAccountScript _).when(allAccounts(1).toAddress).returns(true).once()
+
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1).toString
@@ -187,6 +214,10 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
       (response \ "publicKey").as[String] shouldBe allAccounts(1).publicKey.toString
     }
+
+    (commonAccountApi.script _).expects(allAccounts(2).toAddress).returning(None).once()
+    (blockchain.accountScript _).when(allAccounts(2).toAddress).returns(None).once()
+    (blockchain.hasAccountScript _).when(allAccounts(2).toAddress).returns(false).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -228,6 +259,14 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
 
     val contractScript       = ContractScript(V3, contractWithMeta).explicitGet()
     val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "d" -> 100L, "verify" -> 11L)
+    (commonAccountApi.script _)
+      .expects(allAccounts(3).toAddress)
+      .returning(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L)))
+      .once()
+    (blockchain.accountScript _)
+      .when(allAccounts(3).toAddress)
+      .returns(Some(AccountScriptInfo(allAccounts(3).publicKey, contractScript, 11L, complexitiesByEstimator = Map(1 -> callableComplexities))))
+    (blockchain.hasAccountScript _).when(allAccounts(3).toAddress).returns(true).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -258,6 +297,9 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
     }
 
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
+    (blockchain.accountScript _)
+      .when(allAccounts(4).toAddress)
+      .onCall((_: Address) => Some(AccountScriptInfo(allAccounts(4).publicKey, ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -265,6 +307,12 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
       (response \ "meta" \ "version").as[String] shouldBe "0"
     }
 
+    (blockchain.accountScript _)
+      .when(allAccounts(5).toAddress)
+      .onCall { (_: Address) =>
+        Thread.sleep(100000)
+        None
+      }
 
     implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
     implicit val timeout          = routeTestTimeout.duration
@@ -275,6 +323,19 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
 
     val contractWithoutVerifier             = contractWithMeta.copy(verifierFuncOpt = None)
     val contractWithoutVerifierComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
+    (blockchain.accountScript _)
+      .when(allAccounts(6).toAddress)
+      .onCall((_: Address) =>
+        Some(
+          AccountScriptInfo(
+            allAccounts(6).publicKey,
+            ContractScript(V3, contractWithoutVerifier).explicitGet(),
+            0L,
+            complexitiesByEstimator = Map(1 -> contractWithoutVerifierComplexities)
+          )
+        )
+      )
+    (blockchain.hasAccountScript _).when(allAccounts(6).toAddress).returns(true).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(6)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -289,10 +350,14 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
   }
 
   routePath(s"/scriptInfo/ after ${BlockchainFeatures.SynchronousCalls}") in {
+    val blockchain = stub[Blockchain]("blockchain")
+    val route      = seal(addressApiRoute.copy(blockchain = blockchain).route)
+    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
 
     val script                            = ExprScript(TRUE).explicitGet()
     def info(complexity: Int, index: Int) = Some(AccountScriptInfo(allAccounts(index).publicKey, script, complexity))
 
+    (blockchain.accountScript _).when(allAddresses(1)).returns(info(201, 1))
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(1).toString
@@ -303,6 +368,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
       (response \ "publicKey").as[String] shouldBe allAccounts(1).publicKey.toString
     }
 
+    (blockchain.accountScript _).when(allAddresses(2)).returns(info(199, 2))
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(2).toString
@@ -313,6 +379,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
       (response \ "publicKey").as[String] shouldBe allAccounts(2).publicKey.toString
     }
 
+    (blockchain.accountScript _).when(allAddresses(3)).returns(None)
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3).toString
@@ -336,8 +403,16 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
   routePath(s"/data/{address} with Transfer-Encoding: chunked") in {
     val account = TxHelpers.signer(1)
 
-    {
-      domain.appendBlock(TxHelpers.dataSingle(account))
+    withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
+      d.appendBlock(TxHelpers.dataSingle(account))
+
+      val route =
+        addressApiRoute
+          .copy(
+            blockchain = d.blockchainUpdater,
+            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
+          )
+          .route
 
       val requestBody = Json.obj("keys" -> Seq("test"))
 
@@ -379,8 +454,16 @@ class AddressRouteSpec extends RouteSpec("/addresses") with RestAPISettingsHelpe
     val key     = "testKey"
     val value   = "testValue"
 
-    {
-      domain.appendBlock(TxHelpers.dataSingle(account, key = key, value = value))
+    withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
+      d.appendBlock(TxHelpers.dataSingle(account, key = key, value = value))
+
+      val route =
+        addressApiRoute
+          .copy(
+            blockchain = d.blockchainUpdater,
+            commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchainUpdater)
+          )
+          .route
 
       val maxLimitKeys      = Seq.fill(addressApiRoute.settings.dataKeysRequestLimit)(key)
       val moreThanLimitKeys = key +: maxLimitKeys

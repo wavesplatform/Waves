@@ -1,27 +1,28 @@
 package com.wavesplatform.http
 
+import java.net.{InetAddress, InetSocketAddress}
+import java.util.concurrent.ConcurrentHashMap
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.PeersApiRoute
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import io.netty.channel.Channel
-import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 
-import java.net.{InetAddress, InetSocketAddress}
-import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.{Duration, DurationInt}
 
-class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks {
+class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks with MockFactory {
 
   import PeersRouteSpec.*
 
-  private val peerDatabase   = PeerDatabase.NoOp
+  private val peerDatabase   = mock[PeerDatabase]
+  private val connectToPeer  = mockFunction[InetSocketAddress, Unit]
   private val inetAddressGen = Gen.listOfN(4, Arbitrary.arbitrary[Byte]).map(_.toArray).map(InetAddress.getByAddress)
   private val inetSocketAddressGen = for {
     address <- inetAddressGen
-    port    <- Gen.chooseNum(0, 0xffff)
+    port    <- Gen.chooseNum(0, 0xFFFF)
   } yield new InetSocketAddress(address, port)
 
   private val versionGen = for {
@@ -46,8 +47,8 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
 
     forAll(genListOf(TestsCount, gen)) { (l: List[PeerInfo]) =>
       val connections = new ConcurrentHashMap[Channel, PeerInfo]()
-      val route       = PeersApiRoute(restAPISettings, ???, peerDatabase, connections).route
-      l.foreach(i => connections.put(new EmbeddedChannel(), i))
+      val route       = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, connections).route
+      l.foreach(i => connections.put(mock[Channel], i))
 
       val result = Get(routePath("/connected")) ~> route ~> runRoute
 
@@ -73,19 +74,20 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     } yield inetAddress -> ts
 
     forAll(genListOf(TestsCount, gen)) { m =>
-      val route  = PeersApiRoute(restAPISettings, ???, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
+      (() => peerDatabase.knownPeers).expects().returning(m.toMap[InetSocketAddress, Long])
+      val route  = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
       val result = Get(routePath("/all")) ~> route ~> runRoute
 
       check {
-        responseAs[AllPeers].peers should contain theSameElementsAs m.map { case (address, timestamp) =>
-          Peer(address.toString, timestamp)
+        responseAs[AllPeers].peers should contain theSameElementsAs m.map {
+          case (address, timestamp) => Peer(address.toString, timestamp)
         }
       }(result)
     }
   }
 
   routePath("/connect") in {
-    val route      = PeersApiRoute(restAPISettings, ???, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
+    val route      = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
     val connectUri = routePath("/connect")
     Post(connectUri, ConnectReq("example.com", 1)) ~> route should produce(ApiKeyNotValid)
     Post(connectUri, "") ~> ApiKeyHeader ~> route ~> check(handled shouldEqual false)
@@ -94,7 +96,8 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
 
     val address = inetSocketAddressGen.sample.get
-    val result  = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> ApiKeyHeader ~> route ~> runRoute
+    connectToPeer.expects(address).once()
+    val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> ApiKeyHeader ~> route ~> runRoute
     check {
       responseAs[ConnectResp].hostname shouldEqual address.getHostName
     }(result)
