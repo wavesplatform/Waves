@@ -1,29 +1,22 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
-import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
-import com.wavesplatform.test.TestTime
+import com.wavesplatform.test.SharedDomain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.AccountVerifierTrace
 import com.wavesplatform.transaction.{Asset, AssetIdLength, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
-import com.wavesplatform.wallet.Wallet
-import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.concurrent.Future
@@ -33,23 +26,19 @@ import scala.util.Random
 class TransactionBroadcastSpec
     extends RouteSpec("/transactions")
     with RestAPISettingsHelper
-    with PathMockFactory
-    with BlockchainStubHelpers
+    with SharedDomain
     with EthHelpers
     with SharedSchedulerMixin {
-  private val blockchain           = stub[Blockchain]
-  private val transactionPublisher = stub[TransactionPublisher]
-  private val testTime             = new TestTime
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
-    stub[CommonTransactionsApi],
-    stub[Wallet],
-    blockchain,
-    stub[() => SnapshotBlockchain],
-    mockFunction[Int],
-    transactionPublisher,
-    testTime,
+    domain.transactionsApi,
+    domain.wallet,
+    domain.blockchain,
+    () => domain.blockchain,
+    () => domain.utxPool.size,
+    (tx, _) => Future.successful(domain.utxPool.putIfNew(tx)),
+    domain.testTime,
     new RouteTimeout(60.seconds)(sharedScheduler)
   )
 
@@ -58,27 +47,6 @@ class TransactionBroadcastSpec
   "exchange" - {
     "accepted with ETH signed orders" in {
       import com.wavesplatform.transaction.assets.exchange.EthOrderSpec.{ethBuyOrder, ethSellOrder}
-
-      val blockchain = createBlockchainStub { blockchain =>
-        val sh = StubHelpers(blockchain)
-        sh.creditBalance(TxHelpers.matcher.toAddress, *)
-        sh.creditBalance(ethBuyOrder.senderAddress, *)
-        sh.creditBalance(ethSellOrder.senderAddress, *)
-        (blockchain.wavesBalances _)
-          .when(*)
-          .returns(
-            Map(
-              TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
-              ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
-              ethSellOrder.senderAddress  -> Long.MaxValue / 3
-            )
-          )
-        sh.issueAsset(ByteStr(EthStubBytes32))
-      }
-
-      val transactionPublisher = blockchain.stub.transactionPublisher(testTime)
-
-      val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
 
       val transaction = TxHelpers.exchange(
         ethBuyOrder,
@@ -89,7 +57,7 @@ class TransactionBroadcastSpec
         version = TxVersion.V3,
         timestamp = 100
       )
-      testTime.setTime(100)
+      domain.testTime.setTime(100)
       val validResponseJson =
         s"""{
            |  "type" : 7,
@@ -189,7 +157,7 @@ class TransactionBroadcastSpec
         Seq.empty,
         TxPositiveAmount.unsafeFrom(500000L),
         Asset.Waves,
-        testTime.getTimestamp(),
+        domain.testTime.getTimestamp(),
         Proofs.empty,
         AddressScheme.current.chainId
       ).signWith(sender.privateKey)
@@ -198,11 +166,6 @@ class TransactionBroadcastSpec
 
     "shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
-      (transactionPublisher.validateAndBroadcast _)
-        .when(*, None)
-        .returning(
-          Future.successful(TracedResult(Right(true), List(accountTrace)))
-        )
       Post(routePath("/broadcast?trace=true"), ist.json()) ~> route ~> check {
         val result = responseAs[JsObject]
         (result \ "trace").as[JsValue] shouldBe Json.arr(accountTrace.json)
@@ -211,11 +174,6 @@ class TransactionBroadcastSpec
 
     "does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
-      (transactionPublisher.validateAndBroadcast _)
-        .when(*, None)
-        .returning(
-          Future.successful(TracedResult(Right(true), List(accountTrace)))
-        )
       Post(routePath("/broadcast"), ist.json()) ~> route ~> check {
         (responseAs[JsObject] \ "trace") shouldBe empty
       }
@@ -238,58 +196,29 @@ class TransactionBroadcastSpec
       val recipient2 = Recipient.Alias("some_alias")
       val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id())
 
-      val blockchain = createBlockchainStub { blockchain =>
-        blockchain.stub.activateAllFeatures()
-
-        val (dAppScript, _) = ScriptCompiler
-          .compile(
-            s"""
-               |{-# STDLIB_VERSION 5 #-}
-               |{-# SCRIPT_TYPE ACCOUNT #-}
-               |{-# CONTENT_TYPE DAPP #-}
-               |
-               |@Callable(i)
-               |func test() = {
-               |  let test = 1
-               |  if (test == 1)
-               |    then
-               |      [
-               |        Lease(Address(base58'${recipient1.bytes}'), $amount1, $nonce1),
-               |        Lease(Alias("${recipient2.name}"), $amount2, $nonce2),
-               |        LeaseCancel(base58'$leaseCancelId')
-               |      ]
-               |    else []
-               |}
-               |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
-          )
-          .explicitGet()
-
-        (blockchain.leaseDetails _)
-          .when(*)
-          .returns(None)
-          .anyNumberOfTimes()
-        (blockchain.resolveAlias _)
-          .when(*)
-          .returns(Right(accountGen.sample.get.toAddress))
-          .anyNumberOfTimes()
-        (blockchain.accountScript _)
-          .when(*)
-          .returns(
-            Some(
-              AccountScriptInfo(
-                TxHelpers.defaultSigner.publicKey,
-                dAppScript,
-                0L,
-                Map(3 -> Seq("test").map(_ -> 0L).toMap)
-              )
-            )
-          )
-
-        (blockchain.hasAccountScript _).when(*).returns(true)
-      }
-      val publisher = createTxPublisherStub(blockchain, enableExecutionLog = true)
-      val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
+      val (dAppScript, _) = ScriptCompiler
+        .compile(
+          s"""
+             |{-# STDLIB_VERSION 5 #-}
+             |{-# SCRIPT_TYPE ACCOUNT #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(i)
+             |func test() = {
+             |  let test = 1
+             |  if (test == 1)
+             |    then
+             |      [
+             |        Lease(Address(base58'${recipient1.bytes}'), $amount1, $nonce1),
+             |        Lease(Alias("${recipient2.name}"), $amount2, $nonce2),
+             |        LeaseCancel(base58'$leaseCancelId')
+             |      ]
+             |    else []
+             |}
+             |""".stripMargin,
+          ScriptEstimatorV3(fixOverflow = true, overhead = true)
+        )
+        .explicitGet()
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
         responseAs[JsObject] should matchJson(

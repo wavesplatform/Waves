@@ -1,20 +1,18 @@
 package com.wavesplatform.transaction.smart
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
-import com.wavesplatform.test.{FlatSpec, TestTime, produce}
+import com.wavesplatform.test.{FlatSpec, SharedDomain, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
-import com.wavesplatform.{BlockchainStubHelpers, TestValues}
-import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.web3j.crypto.*
 import play.api.libs.json.Json
@@ -22,10 +20,9 @@ import play.api.libs.json.Json
 class EthereumTransactionSpec
     extends FlatSpec
     with BeforeAndAfterAll
-    with PathMockFactory
-    with BlockchainStubHelpers
     with EthHelpers
     with DiffMatchers
+    with SharedDomain
     with JsonMatchers
     with Inside {
 
@@ -92,21 +89,17 @@ class EthereumTransactionSpec
     val senderAddress    = TxHelpers.defaultSigner.toEthWavesAddress
     val recipientAddress = TxHelpers.secondSigner.toAddress
 
-    val blockchain = createBlockchainStub { b =>
-      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6, BlockchainFeatures.Ride4DApps)
-      b.stub.issueAsset(TestAsset.id)
-      b.stub.creditBalance(senderAddress, Waves, Long.MaxValue)
-      b.stub.creditBalance(senderAddress, TestAsset, Long.MaxValue)
-      (b.wavesBalances _).when(*).returns(Map(senderAddress -> Long.MaxValue))
-      (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
-    }
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis())).andThen(_.resultE.explicitGet())
-
     val LongMaxMinusFee = Long.MaxValue - 200000
     val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
-    differ(transfer).combineF(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
+    domain
+      .transactionDiffer(transfer)
+      .resultE
+      .explicitGet()
+      .combineF(domain.transactionDiffer(assetTransfer).resultE.explicitGet())
+      .explicitGet()
+      .portfolios shouldBe Map(
       senderAddress    -> Portfolio.build(-Long.MaxValue, TestAsset, -Long.MaxValue),
       recipientAddress -> Portfolio.build(LongMaxMinusFee, TestAsset, Long.MaxValue)
     )
@@ -196,33 +189,7 @@ class EthereumTransactionSpec
   it should "work with all types of arguments except unions" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
 
-      val script = TxHelpers.script(
-        """{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func deposit(amount: Int, bs: ByteVector, str: String, bool: Boolean, list: List[Int]) = {
-          |  [
-          |    ScriptTransfer(i.caller, amount, unit)
-          |  ]
-          |}
-          |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
-
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -236,7 +203,7 @@ class EthereumTransactionSpec
       ),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
+    val diff = domain.transactionDiffer(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
@@ -258,29 +225,7 @@ class EthereumTransactionSpec
   it should "not work with union type" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
 
-      val script = TxHelpers.script(
-        """{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func test(union: String|Int) = []
-          |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
-
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -291,40 +236,28 @@ class EthereumTransactionSpec
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
 
-    val diff = differ(transaction).resultE
+    val diff = domain.transactionDiffer(transaction).resultE
     diff should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
 
-      val script = TxHelpers.script(
-        """{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func deposit() = {
-          |  [
-          |    ScriptTransfer(i.caller, 123, unit)
-          |  ]
-          |}
-          |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+    val script = TxHelpers.script(
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable (i)
+        |func deposit() = {
+        |  [
+        |    ScriptTransfer(i.caller, 123, unit)
+        |  ]
+        |}
+        |""".stripMargin
+    )
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -332,7 +265,7 @@ class EthereumTransactionSpec
       Seq(),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
+    val diff = domain.transactionDiffer(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
@@ -354,35 +287,23 @@ class EthereumTransactionSpec
   it should "work with no payments" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
 
-      val script = TxHelpers.script(
-        """{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func deposit() = {
-          |  [
-          |    ScriptTransfer(i.caller, 123, unit)
-          |  ]
-          |}
-          |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+    val script = TxHelpers.script(
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable (i)
+        |func deposit() = {
+        |  [
+        |    ScriptTransfer(i.caller, 123, unit)
+        |  ]
+        |}
+        |""".stripMargin
+    )
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(invokerAccount, dAppAccount.toAddress, "deposit", Seq(), Seq())
-    val diff        = differ(transaction).resultE.explicitGet()
+    val diff        = domain.transactionDiffer(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
@@ -404,33 +325,21 @@ class EthereumTransactionSpec
   it should "fail with max+1 payments" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
 
-      val script = TxHelpers.script(
-        """{-# STDLIB_VERSION 5 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func deposit() = {
-          |  [
-          |    ScriptTransfer(i.caller, 123, unit)
-          |  ]
-          |}
-          |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+    val script = TxHelpers.script(
+      """{-# STDLIB_VERSION 5 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable (i)
+        |func deposit() = {
+        |  [
+        |    ScriptTransfer(i.caller, 123, unit)
+        |  ]
+        |}
+        |""".stripMargin
+    )
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -438,39 +347,27 @@ class EthereumTransactionSpec
       Seq(),
       (1 to com.wavesplatform.lang.v1.ContractLimits.MaxAttachedPaymentAmountV5 + 1).map(InvokeScriptTransaction.Payment(_, Waves))
     )
-    differ(transaction).resultE should produceRejectOrFailedDiff("Script payment amount=11 should not exceed 10")
+    domain.transactionDiffer(transaction).resultE should produceRejectOrFailedDiff("Script payment amount=11 should not exceed 10")
   }
 
   it should "work with default function" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(ByteStr(EthStubBytes32))
 
-      val script = TxHelpers.script(
-        """{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func default() = {
-          |  [
-          |    ScriptTransfer(i.caller, 123, unit)
-          |  ]
-          |}
-          |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+    val script = TxHelpers.script(
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable (i)
+        |func default() = {
+        |  [
+        |    ScriptTransfer(i.caller, 123, unit)
+        |  ]
+        |}
+        |""".stripMargin
+    )
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -478,7 +375,7 @@ class EthereumTransactionSpec
       Seq(),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
+    val diff = domain.transactionDiffer(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
     Json.toJson(diff.scriptResults.values.head) should matchJson("""{
                                                                    |  "data" : [ ],
@@ -500,34 +397,22 @@ class EthereumTransactionSpec
   it should "return money in transfers asset+waves" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(TestAsset.id)
 
-      val script = TxHelpers.script(
-        s"""{-# STDLIB_VERSION 4 #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |
-           |@Callable (i)
-           |func default() = {
-           |  [
-           |    ScriptTransfer(i.caller, 123, unit),
-           |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
-           |  ]
-           |}
-           |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+    val script = TxHelpers.script(
+      s"""{-# STDLIB_VERSION 4 #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |
+         |@Callable (i)
+         |func default() = {
+         |  [
+         |    ScriptTransfer(i.caller, 123, unit),
+         |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
+         |  ]
+         |}
+         |""".stripMargin
+    )
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -535,7 +420,7 @@ class EthereumTransactionSpec
       Seq(),
       Nil
     )
-    val diff = differ(transaction).resultE.explicitGet()
+    val diff = domain.transactionDiffer(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
     Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
                                                                     |  "data" : [ ],
@@ -562,31 +447,19 @@ class EthereumTransactionSpec
   it should "test minimum fee" in {
     val invokerAccount = TxHelpers.defaultSigner.toEthKeyPair
     val dAppAccount    = TxHelpers.secondSigner
-    val blockchain = createBlockchainStub { blockchain =>
-      val sh = StubHelpers(blockchain)
-      sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      sh.creditBalance(invokerAccount.toWavesAddress, *)
-      sh.creditBalance(dAppAccount.toAddress, *)
-      (blockchain.wavesBalances _)
-        .when(*)
-        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
-      sh.issueAsset(TestAsset.id)
 
-      val script = TxHelpers.script(
-        s"""{-# STDLIB_VERSION 4 #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |
-           |@Callable (i)
-           |func default() = {
-           |  [ ]
-           |}
-           |""".stripMargin
-      )
-      sh.setScript(dAppAccount.toAddress, script)
-    }
+    val script = TxHelpers.script(
+      s"""{-# STDLIB_VERSION 4 #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |
+         |@Callable (i)
+         |func default() = {
+         |  [ ]
+         |}
+         |""".stripMargin
+    )
 
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(
       invokerAccount,
       dAppAccount.toAddress,
@@ -596,7 +469,7 @@ class EthereumTransactionSpec
       fee = 499999
     )
 
-    intercept[RuntimeException](differ(transaction).resultE.explicitGet()).toString should include(
+    intercept[RuntimeException](domain.transactionDiffer(transaction).resultE.explicitGet()).toString should include(
       "Fee in WAVES for InvokeScriptTransaction (499999 in WAVES) does not exceed minimal value of 500000 WAVES"
     )
   }

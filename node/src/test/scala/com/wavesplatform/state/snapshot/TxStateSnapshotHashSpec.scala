@@ -8,7 +8,7 @@ import com.wavesplatform.crypto.fastHash
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.snapshot.{TransactionStatus, TransactionStateSnapshot as TSS}
-import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
+import com.wavesplatform.protobuf.transaction.DataEntry
 import com.wavesplatform.protobuf.{Amount, PBSnapshots}
 import com.wavesplatform.state.*
 import com.wavesplatform.test.*
@@ -85,15 +85,15 @@ class TxStateSnapshotHashSpec extends PropSpec {
       TSS.LeaseBalance(bs(address1.bytes), out = 45.waves),
       TSS.LeaseBalance(bs(address2.bytes), in = 55.waves)
     ),
-    leaseStates = Seq(
-      TSS.LeaseState(leaseId, TSS.LeaseState.Status.Active(TSS.LeaseState.Active(25.waves, bs(signer101.publicKey.arr), bs(address2.bytes))))
+    newLeases = Seq(
+      TSS.NewLease(leaseId,  bs(signer101.publicKey.arr), bs(address2.bytes), 25.waves)
     )
   )
 
   private val cancelledLease = TSS(
     leaseBalances = Seq(TSS.LeaseBalance(bs(address1.bytes), out = 20.waves), TSS.LeaseBalance(bs(address2.bytes), in = 0.waves)),
-    leaseStates = Seq(
-      TSS.LeaseState(leaseId, TSS.LeaseState.Status.Cancelled(TSS.LeaseState.Cancelled()))
+    cancelledLeases = Seq(
+      TSS.CancelledLease(leaseId)
     )
   )
 
@@ -114,8 +114,8 @@ class TxStateSnapshotHashSpec extends PropSpec {
 
   private val newAsset = TSS(
     assetStatics = Seq(
-      TSS.AssetStatic(assetId1, hashInt(0x88aadd55), nft = true),
-      TSS.AssetStatic(assetId2, hashInt(0x88aadd55), decimals = 8)
+      TSS.NewAsset(assetId1, hashInt(0x88aadd55), nft = true),
+      TSS.NewAsset(assetId2, hashInt(0x88aadd55), decimals = 8)
     ),
     assetVolumes = Seq(
       TSS.AssetVolume(assetId2, true, bs((BigInt(Long.MaxValue) * 10).toByteArray)),
@@ -145,13 +145,14 @@ class TxStateSnapshotHashSpec extends PropSpec {
   private val all = TSS(
     assetBalances.balances ++ wavesBalances.balances,
     newLease.leaseBalances ++ cancelledLease.leaseBalances,
+    newLease.newLeases,
+    cancelledLease.cancelledLeases,
     newAsset.assetStatics,
     newAsset.assetVolumes ++ reissuedAsset.assetVolumes,
     newAsset.assetNamesAndDescriptions ++ renamedAsset.assetNamesAndDescriptions,
     newAsset.assetScripts,
     alias.aliases,
     volumeAndFee.orderFills,
-    newLease.leaseStates ++ cancelledLease.leaseStates,
     accountScript.accountScripts,
     dataEntries.accountData,
     sponsorship.sponsorships,

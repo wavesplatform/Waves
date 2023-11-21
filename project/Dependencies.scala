@@ -82,8 +82,6 @@ object Dependencies {
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
     "org.scalacheck"    %% "scalacheck"      % "1.17.0",
-    "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "5.2.0"
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(

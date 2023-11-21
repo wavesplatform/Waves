@@ -174,7 +174,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress -> LeaseBalance(0, leaseTx.amount.value),
             recipient     -> LeaseBalance(leaseTx.amount.value, 0)
           ),
-          leaseStates = Map(
+          newLeases = Map(
             leaseTx.id() -> ???
           )
         )
@@ -192,7 +192,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress -> LeaseBalance(0, 0),
             recipient     -> LeaseBalance(0, 0)
           ),
-          leaseStates = Map(
+          newLeases = Map(
             leaseTx.id() -> ???
           )
         )
@@ -325,7 +325,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           assetNamesAndDescriptions = Map(
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
-          leaseStates = Map(
+          newLeases = Map(
             leaseId -> ???
           ),
           accountData = Map(

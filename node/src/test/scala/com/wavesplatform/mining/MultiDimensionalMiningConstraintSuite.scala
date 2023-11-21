@@ -1,12 +1,11 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.state.{Blockchain, StateSnapshot}
+import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Transaction
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalamock.scalatest.PathMockFactory
 
-class MultiDimensionalMiningConstraintSuite extends FreeSpec with PathMockFactory {
+class MultiDimensionalMiningConstraintSuite extends FreeSpec {
   "MultiDimensionalMiningConstraint" - {
     "isFull" - {
       val emptyConstraintGen: Gen[MultiDimensionalMiningConstraint] = for {
@@ -40,7 +39,7 @@ class MultiDimensionalMiningConstraintSuite extends FreeSpec with PathMockFactor
     }
 
     "put(transaction)" - tests(createConstConstraint(_, transactionSize = 1, "txSize")) { (initConstraint, txs) =>
-      txs.foldLeft(initConstraint)(_.put(stub[Blockchain], _, StateSnapshot.empty))
+      txs.foldLeft(initConstraint)(_.put(null, _, StateSnapshot.empty))
     }
   }
 

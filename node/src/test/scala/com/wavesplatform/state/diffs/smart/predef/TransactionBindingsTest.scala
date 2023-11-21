@@ -13,17 +13,15 @@ import com.wavesplatform.lang.directives.values.{Asset as AssetType, *}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ci.*
 import com.wavesplatform.test.*
@@ -31,19 +29,18 @@ import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Asset, DataTransaction, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
-import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
 import shapeless.Coproduct
 
 import scala.util.Random
 
-class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with WithDomain {
+class TransactionBindingsTest extends PropSpec with EitherValues with WithDomain {
   private val T = 'T'.toByte
 
   property("TransferTransaction binding") {
@@ -354,12 +351,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | }
          |""".stripMargin
 
-    val blockchain = stub[Blockchain]
-    (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
-    (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
-
-    val result = runScriptWithCustomContext(script, tx, V4, blockchain)
+    val result = runScriptWithCustomContext(script, tx, V4, null)
     result shouldBe evaluated(true)
   }
 
@@ -894,8 +886,6 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val expr = Parser.parseExpr(script).get.value
 
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
-    val blockchain = stub[Blockchain]
-    (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
     val ctx =
       PureContext.build(V2, useNewPowPrecision = true).withEnvironment[Environment] |+|
@@ -904,7 +894,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
     val env = WavesEnvironment(
       chainId,
-      Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
+      Coeval(buildThisValue(t, null, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
       null,
       EmptyBlockchain,
       Coproduct[Environment.Tthis](Environment.AssetId(Array())),

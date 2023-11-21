@@ -13,23 +13,25 @@ import scala.collection.immutable.VectorMap
 object SnapshotOps {
   implicit class TransactionStateSnapshotExt(val s: StateSnapshot) extends AnyVal {
     def toDiff(blockchain: Blockchain): Diff =
-      Diff.withTransactions(
-        s.transactions.values.toVector,
-        portfolios(blockchain),
-        issuedAssets,
-        updatedAssets,
-        s.aliases,
-        orderFills(blockchain),
-        s.leaseStates.map(l => (l._1, LeaseDetails(l._2.sender, l._2.recipientAddress, l._2.amount, l._2.status, ByteStr.empty, 0))),
-        s.accountScripts,
-        s.assetScripts.view.mapValues(Some(_)).toMap,
-        s.accountData,
-        s.sponsorships,
-        scriptsRun = 0,
-        s.scriptsComplexity,
-        s.scriptResults,
-        s.ethereumTransactionMeta
-      )
+        Diff.withTransactions(
+          s.transactions.values.toVector,
+          portfolios(blockchain),
+          issuedAssets,
+          updatedAssets,
+          s.aliases,
+          orderFills(blockchain),
+          s.newLeases.map {
+            case (id, l) => id -> LeaseDetails(l, s.cancelledLeases.getOrElse(id, LeaseDetails.Status.Active))
+          },
+          s.accountScripts,
+          s.assetScripts.view.mapValues(Some(_)).toMap,
+          s.accountData,
+          s.sponsorships,
+          scriptsRun = 0,
+          s.scriptsComplexity,
+          s.scriptResults,
+          s.ethereumTransactionMeta
+        )
 
     private def portfolios(blockchain: Blockchain): Map[Address, Portfolio] =
       Portfolio.combine(balancePortfolios(blockchain), leasePortfolios(blockchain)).explicitGet()
@@ -95,7 +97,8 @@ object SnapshotOps {
       diff.updatedAssets,
       diff.assetScripts.collect { case (asset, Some(info)) => (asset, info) },
       diff.sponsorship,
-      diff.leaseState.map(l => (l._1, ???)),
+      diff.leaseState.collect { case (id, details) if details.isActive => id -> details.static},
+      diff.leaseState.collect { case (id, LeaseDetails(_, s: LeaseDetails.Status.Inactive)) => id -> s},
       diff.aliases,
       diff.accountData,
       diff.scripts,

@@ -62,6 +62,7 @@ class StateSnapshotProtoTest extends PropSpec {
         ByteStr.fromBytes(4, 5, 6) -> ???,
         ByteStr.fromBytes(7, 8, 9) -> ???
       ),
+      Map(),
       Map(
         Alias.create("alias").explicitGet()  -> defaultAddress,
         Alias.create("alias2").explicitGet() -> secondAddress

@@ -18,7 +18,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, LeaseDetails}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, LeaseDetails, LeaseStaticInfo}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.EthTxGenerator.Arg
@@ -119,7 +119,10 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
     }
 
   private def toDetails(lt: LeaseTransaction, blockchain: Blockchain) =
-    LeaseDetails(lt.sender, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, LeaseDetails.Status.Active, lt.id(), 1)
+    LeaseDetails(
+      LeaseStaticInfo(lt.sender, blockchain.resolveAlias(lt.recipient).explicitGet(), lt.amount, lt.id(), blockchain.height),
+      LeaseDetails.Status.Active
+    )
 
   private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] =
     for {
@@ -212,7 +215,12 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
             }
             .get
           val expectedDetails =
-            Seq(leaseId -> LeaseDetails(setScript.sender, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
+            Seq(
+              leaseId -> LeaseDetails(
+                LeaseStaticInfo(setScript.sender, recipient, TxPositiveAmount(10_000_00000000L), invoke.id(), 1),
+                LeaseDetails.Status.Active
+              )
+            )
 
           d.liquidAndSolidAssert { () =>
             checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
@@ -242,7 +250,12 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
           }
           .get
         val expectedDetails =
-          Seq(leaseId -> LeaseDetails(setScript.sender, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
+          Seq(
+            leaseId -> LeaseDetails(
+              LeaseStaticInfo(setScript.sender, recipient, TxPositiveAmount(10_000_00000000L), invoke.id(), 1),
+              LeaseDetails.Status.Active
+            )
+          )
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
@@ -289,7 +302,12 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
           }
           .get
         val expectedDetails =
-          Seq(leaseId -> LeaseDetails(sender.publicKey, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
+          Seq(
+            leaseId -> LeaseDetails(
+              LeaseStaticInfo(sender.publicKey, recipient, TxPositiveAmount(10_000_00000000L), invoke.id(), 1),
+              LeaseDetails.Status.Active
+            )
+          )
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
@@ -327,7 +345,12 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
           }
           .get
         val expectedDetails =
-          Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, invoke.id(), 1))
+          Seq(
+            leaseId -> LeaseDetails(
+              LeaseStaticInfo(dApp.publicKey, recipient, TxPositiveAmount(10_000_00000000L), invoke.id(), 1),
+              LeaseDetails.Status.Active
+            )
+          )
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
@@ -409,7 +432,12 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
           .get
 
         val expectedDetails =
-          Seq(leaseId -> LeaseDetails(target.publicKey, recipient, TxPositiveAmount(10_000_00000000L), LeaseDetails.Status.Active, ist.id(), 1))
+          Seq(
+            leaseId -> LeaseDetails(
+              LeaseStaticInfo(target.publicKey, recipient, TxPositiveAmount(10_000_00000000L), ist.id(), 1),
+              LeaseDetails.Status.Active
+            )
+          )
 
         d.liquidAndSolidAssert { () =>
           checkActiveLeasesFor(target.toAddress, r, expectedDetails)
@@ -475,22 +503,14 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with RestAPISettingsHelper wi
 
         val leaseDetails1 = Seq(
           getLeaseId(dApp1.toAddress) -> LeaseDetails(
-            dApp1.publicKey,
-            leaseRecipient1.toAddress,
-            TxPositiveAmount.unsafeFrom(leaseAmount1),
-            LeaseDetails.Status.Active,
-            invokeTx.id(),
-            3
+            LeaseStaticInfo(dApp1.publicKey, leaseRecipient1.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount1), invokeTx.id(), 3),
+            LeaseDetails.Status.Active
           )
         )
         val leaseDetails2 = Seq(
           getLeaseId(dApp2.toAddress) -> LeaseDetails(
-            dApp2.publicKey,
-            leaseRecipient2.toAddress,
-            TxPositiveAmount.unsafeFrom(leaseAmount2),
-            LeaseDetails.Status.Active,
-            invokeTx.id(),
-            3
+            LeaseStaticInfo(dApp2.publicKey, leaseRecipient2.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount2), invokeTx.id(), 3),
+            LeaseDetails.Status.Active
           )
         )
 

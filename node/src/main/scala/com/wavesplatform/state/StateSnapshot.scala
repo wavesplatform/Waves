@@ -15,7 +15,7 @@ import scala.collection.immutable.VectorMap
 
 case class StateSnapshot(
     transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
-    balances: VectorMap[(Address, Asset), Long] = VectorMap(),
+    balances: VectorMap[(Address, Asset), Long] = VectorMap(), // VectorMap is used to preserve the order of NFTs for a given address
     leaseBalances: Map[Address, LeaseBalance] = Map(),
     assetStatics: VectorMap[IssuedAsset, AssetStaticInfo] = VectorMap(),
     assetVolumes: Map[IssuedAsset, AssetVolumeInfo] = Map(),
