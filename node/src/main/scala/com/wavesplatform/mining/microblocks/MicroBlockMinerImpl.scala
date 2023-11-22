@@ -171,7 +171,10 @@ class MicroBlockMinerImpl(
             signer = account,
             featureVotes = accumulatedBlock.header.featureVotes,
             rewardVote = accumulatedBlock.header.rewardVote,
-            stateHash = stateHash,
+            stateHash = if (blockchainUpdater.supportsLightNodeBlockFields())
+              stateHash
+            else
+              None,
             challengedHeader = None
           )
           .leftMap(BlockBuildError)

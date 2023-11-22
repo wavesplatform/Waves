@@ -47,7 +47,7 @@ package object crypto {
     for {
       _ <- Either.cond(!checkWeakPk || !isWeakPublicKey(publicKey.arr), (), GenericError("Could not verify VRF proof: weak public key is used"))
       result <- Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
-        .map(_ => GenericError("Could not verify VRF proof"))
+        .map(_ => throw new RuntimeException("Could not verify VRF proof"))
     } yield result
   }
 

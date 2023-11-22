@@ -324,7 +324,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
        TracedResult(
          BlockDiffer
            .createInitialBlockSnapshot(
-             blockchain,
+             blockchain.asInstanceOf[BlockchainUpdaterImpl],
              blockWithoutStateHash.header.reference,
              blockWithoutStateHash.header.generator.toAddress
            )
