@@ -54,7 +54,7 @@ class BlockChallengerImpl(
   private val processingTxs: ConcurrentHashMap[ByteStr, Transaction] = new ConcurrentHashMap()
 
   def challengeBlock(block: Block, ch: Channel): Task[Unit] = {
-    println(s"Challenging block $block")
+    log.debug(s"Challenging block $block")
 
     withProcessingTxs(block.transactionData) {
       (for {
@@ -71,19 +71,19 @@ class BlockChallengerImpl(
       } yield applyResult -> challengingBlock).value
     }.map {
       case Right((Applied(_, _), challengingBlock)) =>
-        println(s"Successfully challenged $block with $challengingBlock")
+        log.debug(s"Successfully challenged $block with $challengingBlock")
         BlockStats.challenged(challengingBlock, blockchainUpdater.height)
         if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
           allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
         }
-      case Right((_, challengingBlock)) => println(s"Ignored challenging block $challengingBlock")
-      case Left(err)                    => println(s"Could not challenge $block: $err")
+      case Right((_, challengingBlock)) => log.debug(s"Ignored challenging block $challengingBlock")
+      case Left(err)                    => log.debug(s"Could not challenge $block: $err")
     }
   }
 
   def challengeMicroblock(md: MicroblockData, ch: Channel): Task[Unit] = {
     val idStr = md.invOpt.map(_.totalBlockId.toString).getOrElse(s"(sig=${md.microBlock.totalResBlockSig})")
-    println(s"Challenging microblock $idStr")
+    log.debug(s"Challenging microblock $idStr")
 
     (for {
       discarded <- EitherT(Task(blockchainUpdater.removeAfter(blockchainUpdater.lastBlockHeader.get.header.reference)))
@@ -106,16 +106,16 @@ class BlockChallengerImpl(
     } yield {
       applyResult match {
         case Applied(_, _) =>
-          println(s"Successfully challenged microblock $idStr with $challengingBlock")
+          log.debug(s"Successfully challenged microblock $idStr with $challengingBlock")
           BlockStats.challenged(challengingBlock, blockchainUpdater.height)
           if (blockchainUpdater.isLastBlockId(challengingBlock.id())) {
             allChannels.broadcast(BlockForged(challengingBlock), Some(ch))
           }
         case _ =>
-          println(s"Ignored challenging block $challengingBlock")
+          log.debug(s"Ignored challenging block $challengingBlock")
       }
     }).fold(
-      err => println(s"Could not challenge microblock $idStr: $err"),
+      err => log.debug(s"Could not challenge microblock $idStr: $err"),
       identity
     )
   }
@@ -244,7 +244,7 @@ class BlockChallengerImpl(
           else None
         )
     } yield {
-      println(s"Forged challenging block $challengingBlock")
+      log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
     }
   }.flatMap {
