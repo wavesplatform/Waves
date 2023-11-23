@@ -17,7 +17,7 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.Duration.Inf
 
 package object mining {
   private[mining] def createConstConstraint(maxSize: Long, transactionSize: => Long, description: String) = OneDimensionalMiningConstraint(
@@ -50,7 +50,7 @@ package object mining {
     val miner = new MinerImpl(channels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable(), timeDrift)
     def appendBlock(b: Block) = {
       val appendTask = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler, verify)(b, None)
-      Await.result(appendTask.runToFuture(appenderScheduler), 10.seconds)
+      Await.result(appendTask.runToFuture(appenderScheduler), Inf)
     }
     f(miner, appendBlock)
     appenderScheduler.shutdown()
