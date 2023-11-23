@@ -128,9 +128,9 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
       val predictedHeight = (lowerBound + offset).max(lowerBound).min(upperBound)
 
       val timestamp      = timestampOf(predictedHeight)
-      val rightTimestmap = timestampOf(predictedHeight + 1, Long.MaxValue)
+      val rightTimestamp = timestampOf(predictedHeight + 1, Long.MaxValue)
       val leftHit        = timestamp <= target
-      val rightHit       = rightTimestmap <= target
+      val rightHit       = rightTimestamp <= target
 
       val (newLower, newUpper) = {
         if (!leftHit) (lowerBound, (predictedHeight - 1).max(lowerBound))
