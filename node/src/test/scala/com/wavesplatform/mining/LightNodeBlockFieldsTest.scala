@@ -58,19 +58,22 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         ) {
           override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
         }
-
         def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
         def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
         def appendMicro() = {
           d.utxPool.putIfNew(transfer()).resultE.explicitGet()
           microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
         }
-        def challengeBlock() = challenger.challengeBlock(miner.forgeBlock(defaultSigner).explicitGet()._1, null).runSyncUnsafe()
+        def challengeBlock() = {
+          val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
+          challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
+        }
 
         appendBlock()
         d.blockchain.height shouldBe 2
         d.blockchain.isFeatureActivated(LightNode) shouldBe true
         block(2).stateHash shouldBe None
+
         appendMicro()
         block(2).stateHash shouldBe None
 
@@ -82,6 +85,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         (1 to 998).foreach(_ => appendBlock())
         d.blockchain.height shouldBe 1001
         block(1001).stateHash shouldBe None
+
         appendMicro()
         block(1001).stateHash shouldBe None
 
@@ -89,6 +93,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         d.blockchain.height shouldBe 1002
         val hash1 = block(1002).stateHash
         hash1 shouldBe defined
+
         appendMicro()
         val hash2 = block(1002).stateHash
         hash2 shouldBe defined
@@ -99,9 +104,6 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         block(1001).stateHash shouldBe None
         block(1001).challengedHeader shouldBe None
 
-        d.rollbackTo(1000)
-        val invalidBlock = d.createBlock(ProtoBlockVersion, Seq.empty, strictTime = true, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
-        append(invalidBlock).explicitGet()
         challengeBlock()
         block(1002).stateHash shouldBe defined
         block(1002).challengedHeader shouldBe defined
