@@ -1,7 +1,5 @@
 package com.wavesplatform
 
-import java.lang.reflect.Constructor
-
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -9,6 +7,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.*
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 
+import java.lang.reflect.Constructor
 import scala.util.Try
 
 package object crypto {
@@ -47,7 +46,7 @@ package object crypto {
     for {
       _ <- Either.cond(!checkWeakPk || !isWeakPublicKey(publicKey.arr), (), GenericError("Could not verify VRF proof: weak public key is used"))
       result <- Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))).toEither.left
-        .map(_ => throw new RuntimeException("Could not verify VRF proof"))
+        .map(_ => GenericError("Could not verify VRF proof"))
     } yield result
   }
 
