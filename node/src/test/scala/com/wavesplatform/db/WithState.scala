@@ -400,7 +400,7 @@ trait WithDomain extends WithState { _: Suite =>
           domain.appendBlock(
             createGenesisWithStateHash(
               genesis,
-              bcu.isFeatureActivated(BlockchainFeatures.LightNode, 1),
+              fillStateHash = blockchain.supportsLightNodeBlockFields(),
               Some(settings.blockchainSettings.genesisSettings.initialBaseTarget)
             )
           )
@@ -424,7 +424,7 @@ trait WithDomain extends WithState { _: Suite =>
       .filter(v => v >= from && v <= to)
       .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
 
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean, baseTarget: Option[Long] = None): Block = {
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], fillStateHash: Boolean, baseTarget: Option[Long] = None): Block = {
     val timestamp = txs.map(_.timestamp).max
     val genesisSettings = GenesisSettings(
       timestamp,
@@ -457,7 +457,7 @@ trait WithDomain extends WithState { _: Suite =>
         GenesisGenerator,
         Seq.empty,
         -1,
-        Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
+        Option.when(fillStateHash)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
         None
       )
     } yield block).explicitGet()
