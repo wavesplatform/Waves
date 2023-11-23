@@ -5,7 +5,6 @@ import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -15,15 +14,12 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.LeaseDetails
-import com.wavesplatform.state.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers}
 
 import scala.collection.immutable.VectorMap
 import scala.math.pow
@@ -50,7 +46,11 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        PBSnapshots.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get, tx.id(), d.blockchain.height) shouldBe (expectedSnapshotWithMiner, status)
+        PBSnapshots.fromProtobuf(
+          d.rocksDBWriter.transactionSnapshot(tx.id()).get,
+          tx.id(),
+          d.blockchain.height
+        ) shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
@@ -215,8 +215,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           sender,
           fee = fee,
           to = Seq(
-            ParsedTransfer(TxHelpers.signer(4).toAddress, TxNonNegativeAmount(123)),
-            ParsedTransfer(TxHelpers.signer(5).toAddress, TxNonNegativeAmount(456))
+            TxHelpers.signer(4).toAddress -> 123,
+            TxHelpers.signer(5).toAddress -> 456
           )
         ),
         StateSnapshot(

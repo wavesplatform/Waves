@@ -42,7 +42,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
         List(
           TxHelpers.massTransfer(
             sender,
-            Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount)), ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))),
+            Seq(
+              recipient -> amount,
+              recipient -> amount
+            ),
             fee = 10000,
             timestamp = nextTs,
             version = TxVersion.V1

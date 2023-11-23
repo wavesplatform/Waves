@@ -54,9 +54,9 @@ object TxStateSnapshotHashBuilder {
       changedKeys += address.bytes ++ alias.name.getBytes(StandardCharsets.UTF_8)
     }
 
-    snapshot.accountScriptsByAddress.foreach { case (address, sv) =>
-      changedKeys += address.bytes ++ (sv match {
-        case Some(s) => s.script.bytes().arr ++ s.publicKey.arr ++ Longs.toByteArray(s.verifierComplexity)
+    snapshot.accountScripts.foreach { case (pk, sv) =>
+      changedKeys += pk.arr ++ (sv match {
+        case Some(s) => s.script.bytes().arr ++ Longs.toByteArray(s.verifierComplexity)
         case None    => Array.emptyByteArray
       })
     }

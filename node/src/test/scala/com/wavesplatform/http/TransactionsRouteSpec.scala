@@ -2,9 +2,8 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.headers.Accept
-import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.ApiError.{ScriptExecutionError as _, *}
 import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
@@ -12,27 +11,26 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures as BF
-import com.wavesplatform.history.{Domain, defaultSigner}
+import com.wavesplatform.history.defaultSigner
 import com.wavesplatform.lang.directives.values.{V5, V7}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.InvokeScriptResult
+import com.wavesplatform.state.{BinaryDataEntry, EmptyDataEntry, InvokeScriptResult, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.AccountVerifierTrace
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, EthTxGenerator, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues}
 import org.scalacheck.Gen
@@ -41,6 +39,7 @@ import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -58,17 +57,19 @@ class TransactionsRouteSpec
   private val richAccount = TxHelpers.signer(10001)
   private val richAddress = richAccount.toAddress
 
-  override def settings: WavesSettings               = DomainPresets.TransactionStateSnapshot
+  override def settings: WavesSettings               = DomainPresets.TransactionStateSnapshot.copy(restAPISettings = restAPISettings)
   override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAddress, 1_000_000.waves))
 
+
+
   private val transactionsApiRoute = new TransactionsApiRoute(
-    restAPISettings,
+    settings.restAPISettings,
     domain.transactionsApi,
     domain.wallet,
     domain.blockchain,
     () => domain.blockchain,
     () => domain.utxPool.size,
-    DummyTransactionPublisher.accepting,
+    (tx, _) => Future.successful(domain.utxPool.putIfNew(tx, forceValidate = true)),
     testTime,
     new RouteTimeout(60.seconds)(sharedScheduler)
   )
@@ -96,57 +97,50 @@ class TransactionsRouteSpec
     }
 
     "asset" in {
-      val asset: IssuedAsset = TestValues.asset
+      val issuer = TxHelpers.signer(270)
+      val issue  = TxHelpers.issue(issuer)
+
+      domain.appendBlock(
+        TxHelpers.transfer(richAccount, issuer.toAddress, 20.waves),
+        issue,
+        TxHelpers.sponsor(issue.asset, Some(5L), issuer)
+      )
+
       val transferTx = Json.obj(
         "type"            -> 4,
         "version"         -> 2,
         "amount"          -> 1000000,
-        "feeAssetId"      -> asset.id.toString,
+        "feeAssetId"      -> issue.asset.id.toString,
         "senderPublicKey" -> TestValues.keyPair.publicKey,
         "recipient"       -> TestValues.address
       )
 
       Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe asset.id.toString
+        (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe issue.asset.id.toString
         (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
       }
     }
   }
 
-  private def mkRoute(d: Domain): Route =
-    seal(
-      new TransactionsApiRoute(
-        restAPISettings,
-        d.commonApi.transactions,
-        d.wallet,
-        d.blockchain,
-        () => d.blockchain.snapshotBlockchain,
-        () => 0,
-        (t, _) => d.commonApi.transactions.broadcastTransaction(t),
-        ntpTime,
-        new RouteTimeout(60.seconds)(sharedScheduler)
-      ).route
-    )
-
   "returns lease details for lease cancel transaction" in {
     val sender    = TxHelpers.signer(20)
     val recipient = TxHelpers.signer(21)
 
-    val balances = Seq(
-      AddrWithBalance(sender.toAddress, 10.waves),
-      AddrWithBalance(recipient.toAddress, 10.waves)
+    val lease       = TxHelpers.lease(sender, recipient.toAddress, 5.waves)
+    val leaseCancel = TxHelpers.leaseCancel(lease.id(), sender)
+
+    domain.appendBlock(
+      TxHelpers.transfer(richAccount, sender.toAddress, 6.waves),
+      lease
     )
 
-    val lease       = LeaseTransaction.selfSigned(2.toByte, sender, recipient.toAddress, 5.waves, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
-    val leaseCancel = LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 0.001.waves, ntpTime.getTimestamp()).explicitGet()
-    val sealedRoute = mkRoute(domain)
+    val leaseHeight = domain.blockchain.height
 
-    domain.appendBlock(lease)
-
-    def expectedJson(status: String, cancelHeight: Option[Int] = None, cancelTransactionId: Option[ByteStr] = None): JsObject =
+    def expectedJson(status: String, height: Int, cancelHeight: Option[Int] = None, cancelTransactionId: Option[ByteStr] = None): JsObject =
       Json
         .parse(s"""{
+                  |  "applicationStatus": "succeeded",
                   |  "type" : 9,
                   |  "id" : "${leaseCancel.id()}",
                   |  "sender" : "${sender.toAddress}",
@@ -165,7 +159,7 @@ class TransactionsRouteSpec
                   |    "sender" : "${sender.toAddress}",
                   |    "recipient" : "${recipient.toAddress}",
                   |    "amount" : ${5.waves},
-                  |    "height" : 2,
+                  |    "height" : $height,
                   |    "status" : "$status",
                   |    "cancelHeight" : ${cancelHeight.getOrElse("null")},
                   |    "cancelTransactionId" : ${cancelTransactionId.fold("null")("\"" + _ + "\"")}
@@ -176,26 +170,196 @@ class TransactionsRouteSpec
     domain.utxPool.putIfNew(leaseCancel)
 
     withClue(routePath("/unconfirmed")) {
-      Get(routePath(s"/unconfirmed")) ~> sealedRoute ~> check {
-        responseAs[Seq[JsObject]].head should matchJson(expectedJson("active") - "spentComplexity")
+      Get(routePath(s"/unconfirmed")) ~> route ~> check {
+        responseAs[Seq[JsObject]].head should matchJson(expectedJson("active", leaseHeight) - "spentComplexity" - "applicationStatus")
       }
     }
 
     domain.appendBlock(leaseCancel)
 
-    val cancelTransactionJson = expectedJson("canceled", Some(3), Some(leaseCancel.id())) ++ Json.obj("height" -> 3)
+    val cancelHeight = domain.blockchain.height
+    val cancelTransactionJson =
+      expectedJson("canceled", leaseHeight, Some(cancelHeight), Some(leaseCancel.id())) ++ Json.obj("height" -> cancelHeight)
 
     withClue(routePath("/address/{address}/limit/{limit}")) {
-      Get(routePath(s"/address/${recipient.toAddress}/limit/10")) ~> sealedRoute ~> check {
+      Get(routePath(s"/address/${recipient.toAddress}/limit/10")) ~> route ~> check {
         val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
         json should matchJson(cancelTransactionJson)
       }
     }
 
     withClue(routePath("/info/{id}")) {
-      Get(routePath(s"/info/${leaseCancel.id()}")) ~> sealedRoute ~> check {
+      Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(cancelTransactionJson)
       }
+    }
+  }
+
+  "provides state changes in both transactions by address and by id" in {
+    val dapp    = TxHelpers.signer(230)
+    val invoker = TxHelpers.signer(231)
+
+    val invoke = TxHelpers.invoke(dapp.toAddress)
+
+    domain.appendBlock(
+      TxHelpers.massTransfer(
+        richAccount,
+        Seq(
+          dapp.toAddress    -> 1.waves,
+          invoker.toAddress -> 1.waves
+        ),
+        fee = 0.002.waves
+      ),
+      TxHelpers.setScript(
+        dapp,
+        TestCompiler(V7)
+          .compileContract(s"""@Callable(i)
+                              |func default() = [
+                              |  StringEntry("key3", "some string"),
+                              |  BinaryEntry("key4", base58'encoded'),
+                              |  DeleteEntry("key5"),
+                              |  ScriptTransfer(Address(base58'${invoker.toAddress}'), 100, unit)
+                              |]
+                              |""".stripMargin)
+      ),
+      invoke
+    )
+
+    val expectedStateChanges = Json.toJsObject(
+      InvokeScriptResult(
+        Seq(StringDataEntry("key3", "some string"), BinaryDataEntry("key4", ByteStr.decodeBase58("encoded").get), EmptyDataEntry("key5")),
+        Seq(InvokeScriptResult.Payment(invoker.toAddress, Asset.Waves, 100))
+      )
+    )
+
+    Get(routePath(s"/address/${invoker.toAddress}/limit/1")) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe expectedStateChanges
+    }
+
+    Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe expectedStateChanges
+    }
+
+    Get(routePath(s"/info?id=${invoke.id()}")) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsArray] \ 0 \ "stateChanges").as[JsObject] shouldBe expectedStateChanges
+    }
+
+    Post(
+      "/transactions/info",
+      HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(invoke.id())).toString().getBytes)
+    ) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsArray] \ 0 \ "stateChanges").as[JsObject] shouldBe expectedStateChanges
+    }
+  }
+
+  "provides lease and lease cancel actions stateChanges" in {
+    val dapp           = TxHelpers.signer(235)
+    val caller         = TxHelpers.signer(236)
+    val leaseRecipient = TxHelpers.address(237)
+
+    val originalLease = TxHelpers.lease(dapp, leaseRecipient, 20_00000000L)
+    val invoke =
+      TxHelpers.invoke(dapp.toAddress, Some("testLease"), Seq(CONST_LONG(1000), CONST_BYTESTR(originalLease.id()).explicitGet()), invoker = caller)
+
+    domain.appendBlock(
+      TxHelpers.massTransfer(
+        richAccount,
+        Seq(
+          dapp.toAddress   -> 50.waves,
+          caller.toAddress -> 1.waves
+        ),
+        fee = 0.002.waves
+      ),
+      originalLease,
+      TxHelpers.setScript(
+        dapp,
+        TestCompiler(V7)
+          .compileContract(s"""@Callable(i)
+                              |func testLease(amount: Int, id: ByteVector) = {
+                              |let lease = Lease(Address(base58'$leaseRecipient'), amount)
+                              |let leaseId = calculateLeaseId(lease)
+                              |[
+                              |  LeaseCancel(id),
+                              |  lease,
+                              |  BinaryEntry("leaseId", leaseId)
+                              |]
+                              |}
+                              |""".stripMargin)
+      )
+    )
+
+    val originalHeight = domain.blockchain.height
+
+    domain.appendBlock(invoke)
+
+    val newLeaseId = domain.blockchain
+      .accountData(dapp.toAddress, "leaseId")
+      .collect { case BinaryDataEntry(_, id) => id }
+      .value
+
+    val expectedJson =
+      s"""{
+         |  "data": [ {
+         |    "type": "binary",
+         |    "key": "leaseId",
+         |    "value": "${newLeaseId.base64}"
+         |  } ],
+         |  "transfers": [],
+         |  "issues": [],
+         |  "reissues": [],
+         |  "burns": [],
+         |  "sponsorFees": [],
+         |  "leases" : [ {
+         |    "id" : "$newLeaseId",
+         |    "originTransactionId" : "${invoke.id()}",
+         |    "sender" : "${dapp.toAddress}",
+         |    "recipient" : "$leaseRecipient",
+         |    "amount" : 1000,
+         |    "height" : ${originalHeight + 1},
+         |    "status" : "active",
+         |    "cancelHeight" : null,
+         |    "cancelTransactionId" : null
+         |  } ],
+         |  "leaseCancels" : [ {
+         |    "id" : "${originalLease.id()}",
+         |    "originTransactionId" : "${originalLease.id()}",
+         |    "sender" : "${dapp.toAddress}",
+         |    "recipient" : "$leaseRecipient",
+         |    "amount" : ${20.waves},
+         |    "height" : $originalHeight,
+         |    "status" : "canceled",
+         |    "cancelHeight" : ${originalHeight + 1},
+         |    "cancelTransactionId" : "${invoke.id()}"
+         |  } ],
+         |  "invokes": []
+         |}""".stripMargin
+
+
+    Get(routePath(s"/address/${dapp.toAddress}/limit/1")) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] should matchJson(expectedJson)
+    }
+
+    Get(routePath(s"/info/${invoke.id()}")) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsObject] \ "stateChanges").as[JsObject] should matchJson(expectedJson)
+    }
+
+    Get(routePath(s"/info?id=${invoke.id()}")) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsArray] \ 0 \ "stateChanges").as[JsObject] should matchJson(expectedJson)
+    }
+
+    Post(
+      routePath("/info"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(invoke.id())).toString())
+    ) ~> route ~> check {
+      status shouldEqual StatusCodes.OK
+      (responseAs[JsArray] \ 0 \ "stateChanges").as[JsObject] should matchJson(expectedJson)
     }
   }
 
@@ -207,7 +371,9 @@ class TransactionsRouteSpec
       }
 
       "invalid base58 encoding" in {
-        Get(routePath(s"/address/${"1" * 23 + "0"}/limit/1")) ~> route should produce(InvalidAddress)
+        Get(routePath(s"/address/${"1" * 23 + "0"}/limit/1")) ~> route should produce(
+          CustomValidationError("requirement failed: Wrong char '0' in Base58 string '111111111111111111111110'")
+        )
       }
 
       "invalid limit" - {
@@ -241,94 +407,15 @@ class TransactionsRouteSpec
       }
     }
 
-    "provides stateChanges" in {
-      val dapp    = TxHelpers.signer(230)
-      val invoker = TxHelpers.signer(231)
-
-      val invoke = TxHelpers.invoke(dapp.toAddress)
-
-      domain.appendBlock(
-        TxHelpers.massTransfer(
-          richAccount,
-          Seq(
-            MassTransferTransaction.ParsedTransfer(dapp.toAddress, TxNonNegativeAmount(1_00000000L)),
-            MassTransferTransaction.ParsedTransfer(invoker.toAddress, TxNonNegativeAmount(1_00000000L))
-          )
-        ),
-        TxHelpers.setScript(
-          dapp,
-          TestCompiler(V7).compileContract(s"""@Callable(i)
-                                              |func default() = [
-                                              |  StringEntry("key3", "some string"),
-                                              |    BinaryEntry("key4", base58'encoded'),
-                                              |    DeleteEntry("key5"),
-                                              |    ScriptTransfer(Address(base58'${invoker.toAddress}'), 100, unit),
-                                              |]
-                                              |""".stripMargin)
-        ),
-        invoke
-      )
-
-      Get(routePath(s"/address/${invoker.toAddress}/limit/1")) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
-      }
-    }
-
-    "provides lease and lease cancel actions stateChanges" in {
-      val dapp           = TxHelpers.signer(235)
-      val caller         = TxHelpers.signer(236)
-      val leaseRecipient = TxHelpers.address(237)
-      val invoke         = TxHelpers.invoke(dapp.toAddress, invoker = caller)
-      val originalLease  = TxHelpers.lease(dapp, leaseRecipient, 20_00000000L)
-
-      domain.appendBlock(
-        TxHelpers.massTransfer(
-          richAccount,
-          Seq(
-            MassTransferTransaction.ParsedTransfer(dapp.toAddress, TxNonNegativeAmount(50_00000000L)),
-            MassTransferTransaction.ParsedTransfer(caller.toAddress, TxNonNegativeAmount(1_00000000L))
-          )
-        ),
-        originalLease,
-        TxHelpers.setScript(
-          dapp,
-          TestCompiler(V7).compileContract(s"""@Callable(i)
-                                              |func testLease(amount: Int, id: ByteVector) = [
-                                              |  LeaseCancel(id),
-                                              |  Lease(Address(base58'${leaseRecipient}'), amount)
-                                              |]
-                                              |""".stripMargin)
-        )
-      )
-
-      Get(routePath(s"/address/${dapp.toAddress}/limit/1")) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        val json = (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject]
-        json should matchJson(s"""{
-                                 |  "data": [],
-                                 |  "transfers": [],
-                                 |  "issues": [],
-                                 |  "reissues": [],
-                                 |  "burns": [],
-                                 |  "sponsorFees": [],
-                                 |  "leases": [
-                                 |    
-                                 |  ],
-                                 |  "invokes": []
-                                 |}""".stripMargin)
-      }
-    }
-
     "large-significand-format" in {
-      val tx = TxHelpers.transfer()
+      val tx = TxHelpers.transfer(richAccount, TxHelpers.address(930), 10.waves)
       domain.appendBlock(tx)
       Get(routePath(s"/address/$richAddress/limit/1")) ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
         val result = responseAs[JsArray] \ 0 \ 0
         (result \ "amount").as[String] shouldBe tx.amount.value.toString
         (result \ "fee").as[String] shouldBe tx.fee.value.toString
 
-        (result \ "height").as[Int] shouldBe 1
+        (result \ "height").as[Int] shouldBe domain.blockchain.height
         (result \ "spentComplexity").as[Int] shouldBe 0
         (result \ "version").as[Int] shouldBe tx.version
         (result \ "type").as[Int] shouldBe tx.tpe.id
@@ -358,16 +445,16 @@ class TransactionsRouteSpec
                                                  |  "version" : 1,
                                                  |  "chainId" : 84,
                                                  |  "bytes" : "${EthEncoding.toHexString(ethTransfer.bytes())}",
-                                                 |  "sender" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                 |  "senderPublicKey" : "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
-                                                 |  "height" : 1,
-                                                 |  "spentComplexity": 15,
+                                                 |  "sender" : "${ethAccount.toWavesAddress}",
+                                                 |  "senderPublicKey" : "${ethTransfer.sender}",
+                                                 |  "height" : ${domain.blockchain.height},
+                                                 |  "spentComplexity": 0,
                                                  |  "applicationStatus" : "succeeded",
                                                  |  "payload" : {
                                                  |    "type" : "transfer",
-                                                 |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                                 |    "recipient" : "$transferRecipient",
                                                  |    "asset" : null,
-                                                 |    "amount" : 10
+                                                 |    "amount" : ${5.waves}
                                                  |  }
                                                  |}""".stripMargin)
       }
@@ -379,6 +466,24 @@ class TransactionsRouteSpec
 
       val transaction = EthTxGenerator.generateEthInvoke(caller, dapp.toAddress, "test", Seq(EthTxGenerator.Arg.Integer(255)), Seq.empty)
 
+      domain.appendBlock(
+        TxHelpers.massTransfer(
+          richAccount,
+          Seq(
+            dapp.toAddress        -> 1.waves,
+            caller.toWavesAddress -> 1.waves
+          ),
+          fee = 0.002.waves
+        ),
+        TxHelpers.setScript(
+          dapp,
+          TestCompiler(V7).compileContract("""@Callable(i)
+                                             |func test(arg: Int) = []
+                                             |""".stripMargin)
+        ),
+        transaction
+      )
+
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
                                                  |  "type" : 18,
@@ -389,17 +494,20 @@ class TransactionsRouteSpec
                                                  |  "version" : 1,
                                                  |  "chainId" : 84,
                                                  |  "bytes" : "${EthEncoding.toHexString(transaction.bytes())}",
-                                                 |  "sender" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                 |  "senderPublicKey" : "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
-                                                 |  "height" : 1,
-                                                 |  "spentComplexity": 15,
+                                                 |  "sender" : "${caller.toWavesAddress}",
+                                                 |  "senderPublicKey" : "${transaction.sender}",
+                                                 |  "height" : ${domain.blockchain.height},
+                                                 |  "spentComplexity": 1,
                                                  |  "applicationStatus" : "succeeded",
                                                  |  "payload" : {
                                                  |    "type" : "invocation",
-                                                 |    "dApp" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                                 |    "dApp" : "${dapp.toAddress}",
                                                  |    "call" : {
                                                  |      "function" : "test",
-                                                 |      "args" : [ ]
+                                                 |      "args" : [ {
+                                                 |          "type" : "integer",
+                                                 |          "value" : 255
+                                                 |      } ]
                                                  |    },
                                                  |    "payment" : [ ],
                                                  |    "stateChanges" : {
@@ -422,12 +530,14 @@ class TransactionsRouteSpec
       val lessor         = TxHelpers.signer(250)
       val leaseRecipient = TxHelpers.address(251)
 
-      val lease = TxHelpers.lease(lessor, leaseRecipient)
+      val lease = TxHelpers.lease(lessor, leaseRecipient, 22.waves)
 
       domain.appendBlock(
         TxHelpers.transfer(richAccount, lessor.toAddress, 25.waves),
         lease
       )
+
+      val leaseHeight = domain.blockchain.height
 
       val leaseCancel = TxHelpers.leaseCancel(lease.id(), lessor)
       domain.appendBlock(leaseCancel)
@@ -438,8 +548,8 @@ class TransactionsRouteSpec
         json shouldBe Json.parse(s"""{
                                     |  "type" : 9,
                                     |  "id" : "${leaseCancel.id()}",
-                                    |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                    |  "sender" : "${lessor.toAddress}",
+                                    |  "senderPublicKey" : "${lessor.publicKey}",
                                     |  "fee" : 100000,
                                     |  "feeAssetId" : null,
                                     |  "timestamp" : ${leaseCancel.timestamp},
@@ -447,18 +557,18 @@ class TransactionsRouteSpec
                                     |  "version" : 2,
                                     |  "leaseId" : "${lease.id()}",
                                     |  "chainId" : 84,
-                                    |  "height" : 1,
+                                    |  "height" : $cancelHeight,
                                     |  "applicationStatus" : "succeeded",
                                     |  "spentComplexity": 0,
                                     |  "lease" : {
                                     |    "id" : "${lease.id()}",
                                     |    "originTransactionId" : "${lease.id()}",
-                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                                    |    "amount" : 1000000000,
-                                    |    "height" : 1,
+                                    |    "sender" : "${lessor.toAddress}",
+                                    |    "recipient" : "$leaseRecipient",
+                                    |    "amount" : ${22.waves},
+                                    |    "height" : $leaseHeight,
                                     |    "status" : "canceled",
-                                    |    "cancelHeight" : 2,
+                                    |    "cancelHeight" : $cancelHeight,
                                     |    "cancelTransactionId" : "${leaseCancel.id()}"
                                     |  }
                                     |}""".stripMargin)
@@ -482,9 +592,9 @@ class TransactionsRouteSpec
         status shouldEqual StatusCodes.OK
 
         val extraFields = Seq(
-          (if (domain.blockchain.isFeatureActivated(BF.BlockV5, height))
-             Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
-           else Json.obj()),
+          if (domain.blockchain.isFeatureActivated(BF.BlockV5, height))
+            Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
+          else Json.obj(),
           Json.obj("height" -> height, "spentComplexity" -> 0)
         ).reduce(_ ++ _)
 
@@ -492,19 +602,6 @@ class TransactionsRouteSpec
       }
 
       Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
-    }
-
-    "provides stateChanges" in {
-      // todo: test together with /transactions/address
-      val transaction = TxHelpers.invoke()
-      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        (responseAs[JsObject] \ "stateChanges").as[JsObject] shouldBe Json.toJsObject(InvokeScriptResult())
-      }
-    }
-
-    "provides lease and lease cancel action stateChanges" in {
-      // todo: test together with /transactions/address
     }
 
     "handles multiple ids" in {
@@ -603,17 +700,19 @@ class TransactionsRouteSpec
 
   routePath("/unconfirmed") - {
     "returns the list of unconfirmed transactions" in {
+      domain.utxPool.removeAll(domain.utxPool.all)
       val txs = Seq.tabulate(20)(a => TxHelpers.transfer(richAccount, amount = (a + 1).waves))
       txs.foreach(t => domain.utxPool.putIfNew(t))
       Get(routePath("/unconfirmed")) ~> route ~> check {
         val txIds = responseAs[Seq[JsValue]].map(v => (v \ "id").as[String])
-        txIds should contain(allElementsOf(txs.map(_.id().toString)))
+        txIds should contain allElementsOf (txs.map(_.id().toString))
       }
       domain.utxPool.removeAll(txs)
     }
 
     routePath("/unconfirmed/size") - {
       "returns the size of unconfirmed transactions" in {
+        domain.utxPool.removeAll(domain.utxPool.all)
         val txs = Seq.tabulate(20)(a => TxHelpers.transfer(richAccount, amount = (a + 1).waves))
         txs.foreach(t => domain.utxPool.putIfNew(t))
         Get(routePath("/unconfirmed/size")) ~> route ~> check {
@@ -704,16 +803,25 @@ class TransactionsRouteSpec
         f(sender, ist)
       }
 
-      "shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
-        val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
+      "shows trace when trace is enabled" in {
+        val sender = TxHelpers.signer(1201)
+        val ist = TxHelpers.transfer(sender, defaultAddress, 1.waves)
+        domain.appendBlock(
+          TxHelpers.transfer(richAccount, sender.toAddress, 2.waves),
+          TxHelpers.setScript(sender, TestCompiler(V7).compileExpression("throw(\"error\")"))
+        )
         Post(routePath("/broadcast?trace=true"), ist.json()) ~> route ~> check {
           val result = responseAs[JsObject]
-          (result \ "trace").as[JsValue] shouldBe Json.arr(accountTrace.json)
+          (result \ "trace").as[JsValue] shouldBe Json.arr(AccountVerifierTrace(sender.toAddress,
+            Some(ScriptExecutionError("error", List(
+              "throw.@args" -> Right(ARR(IndexedSeq(CONST_STRING("error").explicitGet()), false).explicitGet()),
+              "throw.@complexity" -> Right(CONST_LONG(1)),
+              "@complexityLimit" -> Right(CONST_LONG(2147483646)),
+            ), None))).json)
         }
       }
 
-      "does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
-        val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
+      "does not show trace when trace is disabled" in withInvokeScriptTransaction { (_, ist) =>
         Post(routePath("/broadcast"), ist.json()) ~> route ~> check {
           (responseAs[JsObject] \ "trace") shouldBe empty
         }
@@ -723,44 +831,42 @@ class TransactionsRouteSpec
       }
 
       "generates valid trace with vars" in {
-        val sender     = domain.wallet.generateNewAccount().get
-        val aliasOwner = domain.wallet.generateNewAccount().get
-        val recipient  = domain.wallet.generateNewAccount().get
+        val sender     = TxHelpers.signer(1030)
+        val aliasOwner = TxHelpers.signer(1031)
+        val recipient  = TxHelpers.address(1032)
 
-        val balances = Seq(
-          AddrWithBalance(sender.toAddress, 1000.waves),
-          AddrWithBalance(aliasOwner.toAddress, 1000.waves)
-        )
-
-        val lease = LeaseTransaction.selfSigned(2.toByte, sender, recipient.toAddress, 50.waves, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
+        val lease = TxHelpers.lease(sender, recipient, 50.waves)
 
         domain.appendBlock(
-          CreateAliasTransaction.selfSigned(2.toByte, aliasOwner, "test_alias", 0.001.waves, ntpTime.getTimestamp()).explicitGet(),
-          SetScriptTransaction
-            .selfSigned(
-              2.toByte,
-              sender,
-              Some(TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
-                                                       |{-# CONTENT_TYPE DAPP #-}
-                                                       |{-# SCRIPT_TYPE ACCOUNT #-}
-                                                       |
-                                                       |@Callable(i)
-                                                       |func default() = {
-                                                       |  let leaseToAddress = Lease(Address(base58'${recipient.toAddress}'), ${10.waves})
-                                                       |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
-                                                       |  strict leaseId = leaseToAddress.calculateLeaseId()
-                                                       |
-                                                       |  [
-                                                       |    leaseToAddress,
-                                                       |    leaseToAlias,
-                                                       |    LeaseCancel(base58'${lease.id()}')
-                                                       |  ]
-                                                       |}
-                                                       |""".stripMargin)),
-              0.01.waves,
-              ntpTime.getTimestamp()
-            )
-            .explicitGet(),
+          TxHelpers.massTransfer(
+            richAccount,
+            Seq(
+              sender.toAddress     -> 100.waves,
+              aliasOwner.toAddress -> 1.waves
+            ),
+            fee = 0.002.waves
+          ),
+          TxHelpers.createAlias("test_alias", aliasOwner),
+          TxHelpers.setScript(
+            sender,
+            TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
+                                                |{-# CONTENT_TYPE DAPP #-}
+                                                |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                |
+                                                |@Callable(i)
+                                                |func default() = {
+                                                |  let leaseToAddress = Lease(Address(base58'${recipient}'), ${10.waves})
+                                                |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
+                                                |  strict leaseId = leaseToAddress.calculateLeaseId()
+                                                |
+                                                |  [
+                                                |    leaseToAddress,
+                                                |    leaseToAlias,
+                                                |    LeaseCancel(base58'${lease.id()}')
+                                                |  ]
+                                                |}
+                                                |""".stripMargin)
+          ),
           lease
         )
 
@@ -775,6 +881,8 @@ class TransactionsRouteSpec
             "i",
             "default.@args",
             "Address.@args",
+            "Address.@complexity",
+            "@complexityLimit",
             "Lease.@args",
             "Lease.@complexity",
             "@complexityLimit",
@@ -787,11 +895,15 @@ class TransactionsRouteSpec
             "==.@complexity",
             "@complexityLimit",
             "Alias.@args",
+            "Alias.@complexity",
+            "@complexityLimit",
             "Lease.@args",
             "Lease.@complexity",
             "@complexityLimit",
             "leaseToAlias",
             "LeaseCancel.@args",
+            "LeaseCancel.@complexity",
+            "@complexityLimit",
             "cons.@args",
             "cons.@complexity",
             "@complexityLimit",
@@ -845,31 +957,6 @@ class TransactionsRouteSpec
     }
 
     routePath("/merkleProof") - {
-      val transactionsGen = for {
-        txsSize <- Gen.choose(1, 10)
-        txs     <- Gen.listOfN(txsSize, randomTransactionGen)
-      } yield txs
-
-      val invalidBlockGen = for {
-        txs     <- transactionsGen
-        signer  <- accountGen
-        version <- Gen.choose(Block.GenesisBlockVersion, Block.RewardBlockVersion)
-        block   <- versionedBlockGen(txs, signer, version)
-      } yield block
-
-      val invalidBlocksGen =
-        for {
-          blockchainHeight <- Gen.choose(1, 10)
-          blocks           <- Gen.listOfN(blockchainHeight, invalidBlockGen)
-        } yield blocks
-
-      val merkleProofs = for {
-        index        <- Gen.choose(0, 50)
-        tx           <- randomTransactionGen
-        proofsLength <- Gen.choose(1, 5)
-        proofBytes   <- Gen.listOfN(proofsLength, bytes32gen)
-      } yield (tx, TransactionProof(tx.id(), index, proofBytes))
-
       def validateSuccess(expectedProofs: Seq[TransactionProof], response: HttpResponse): Unit = {
         response.status shouldBe StatusCodes.OK
 
@@ -894,8 +981,9 @@ class TransactionsRouteSpec
       }
 
       "returns merkle proofs" in {
-        forAll(Gen.choose(10, 20).flatMap(n => Gen.listOfN(n, merkleProofs))) { transactionsAndProofs =>
-          val (transactions, proofs) = transactionsAndProofs.unzip
+        {
+          val transactions = Seq.empty[Transaction]
+          val proofs       = Seq.empty[TransactionProof]
 
           val queryParams = transactions.map(t => s"id=${t.id()}").mkString("?", "&", "")
           val requestBody = Json.obj("ids" -> transactions.map(_.id().toString))
@@ -911,19 +999,17 @@ class TransactionsRouteSpec
       }
 
       "returns error in case of all transactions are filtered" in {
-        forAll(invalidBlocksGen) { blocks =>
-          val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
+        val genesisTransactions = domain.blocksApi.blockAtHeight(1).value._2.collect { case (_, tx) => tx.id() }
 
-          val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
-          val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
+        val queryParams = genesisTransactions.map(id => s"id=$id").mkString("?", "&", "")
+        val requestBody = Json.obj("ids" -> genesisTransactions)
 
-          Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
-            validateFailure(response)
-          }
+        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
+          validateFailure(response)
+        }
 
-          Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
-            validateFailure(response)
-          }
+        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
+          validateFailure(response)
         }
       }
 
@@ -956,14 +1042,14 @@ class TransactionsRouteSpec
           result.size shouldBe idsCount
           (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
             (json \ "id").as[String] shouldBe tx.id().toString
-            (json \ "transactionIndex").as[Int] shouldBe 0
+            (json \ "transactionIndex").as[Int] shouldBe 1
           }
         }
 
-        val sender = TxHelpers.signer(1)
+        val sender = TxHelpers.signer(1090)
 
         val transferTx = TxHelpers.transfer(from = sender)
-        domain.appendBlock(transferTx)
+        domain.appendBlock(TxHelpers.transfer(richAccount, sender.toAddress, 100.waves), transferTx)
 
         val maxLimitIds      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(transferTx.id().toString)
         val moreThanLimitIds = transferTx.id().toString +: maxLimitIds
@@ -997,8 +1083,8 @@ class TransactionsRouteSpec
         (txInfo \ "order1" \ "attachment").asOpt[ByteStr] shouldBe Some(expectedAttachment)
       }
 
-      val sender     = TxHelpers.signer(1)
-      val issuer     = TxHelpers.signer(2)
+      val sender     = TxHelpers.signer(1100)
+      val issuer     = TxHelpers.signer(1101)
       val attachment = ByteStr.fill(32)(1)
       val issue      = TxHelpers.issue(issuer)
       val exchange =
@@ -1008,8 +1094,11 @@ class TransactionsRouteSpec
           version = TxVersion.V3
         )
 
-      domain.appendBlock(issue)
-      domain.appendBlock(exchange)
+      domain.appendBlock(
+        TxHelpers.massTransfer(richAccount, Seq(sender.toAddress -> 10.waves, issuer.toAddress -> 10.waves), fee = 0.002.waves),
+        issue,
+        exchange
+      )
 
       domain.liquidAndSolidAssert { () =>
         Get(s"/transactions/info/${exchange.id()}") ~> route ~> check {

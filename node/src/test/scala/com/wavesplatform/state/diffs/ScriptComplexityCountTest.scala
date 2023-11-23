@@ -12,8 +12,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import org.scalatest.Inside
 
 // noinspection NameBooleanParameters
@@ -57,7 +56,7 @@ class ScriptComplexityCountTest extends PropSpec with WithDomain with Inside {
     val dataTx        = data(master, Seq(BooleanDataEntry("q", true)))
     val tr1           = transfer(master, acc.toAddress, 10000000000L)
     val tr2           = transfer(master, acc.toAddress, additionalAmount, issueScr.asset)
-    val massTransfers = Seq(ParsedTransfer(acc.toAddress, TxNonNegativeAmount.unsafeFrom(1)))
+    val massTransfers = Seq(acc.toAddress -> 1L)
     val mt1           = massTransfer(master, massTransfers, version = TxVersion.V1, fee = 1.waves)
     val mt2           = massTransfer(master, massTransfers, issueScr.asset, fee = 1.waves)
     val l             = lease(master, acc.toAddress, 1)
