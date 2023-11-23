@@ -16,6 +16,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.Result
 import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
@@ -128,7 +129,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       }
 
       "arbitrary block/microblock" in
-        withDomain(DomainPresets.TransactionStateSnapshot) { d =>
+        withDomain(DomainPresets.TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))) { d =>
           val genesis = createGenesisWithStateHash(Seq(TxHelpers.genesis(TxHelpers.address(1))), fillStateHash = true)
           d.appendBlock(genesis)
 

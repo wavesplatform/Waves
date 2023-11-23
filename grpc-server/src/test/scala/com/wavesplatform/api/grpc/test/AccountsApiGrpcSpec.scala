@@ -3,15 +3,7 @@ package com.wavesplatform.api.grpc.test
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.api.grpc.{
-  AccountRequest,
-  AccountsApiGrpcImpl,
-  BalanceResponse,
-  BalancesRequest,
-  DataEntryResponse,
-  DataRequest,
-  LeaseResponse
-}
+import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpcImpl, BalanceResponse, BalancesRequest, DataEntryResponse, DataRequest, LeaseResponse}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
@@ -27,6 +19,7 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
+import com.wavesplatform.test.DomainPresets.*
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -194,7 +187,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
     val sender          = TxHelpers.signer(1)
     val challengedMiner = TxHelpers.signer(2)
-    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+    withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), balances = AddrWithBalance.enoughBalances(sender)) { d =>
       val grpcApi = getGrpcApi(d)
 
       val challengingMiner = d.wallet.generateNewAccount().get

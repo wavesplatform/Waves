@@ -224,6 +224,6 @@ object Blockchain {
       blockchain.effectiveBalanceBanHeights(address).contains(height)
 
     def supportsLightNodeBlockFields(height: Int = blockchain.height): Boolean =
-      blockchain.isFeatureActivated(LightNode)//.exists(height >= _ + 1000L)
+      blockchain.featureActivationHeight(LightNode.id).exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
   }
 }

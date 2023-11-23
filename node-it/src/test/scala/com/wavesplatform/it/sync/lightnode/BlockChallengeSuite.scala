@@ -36,6 +36,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
           BlockchainFeatures.LightNode.id.toInt -> 0
         )
       )
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.light-node-block-fields-absence-interval = 0"))
       .withDefault(1)
       .withSpecial(1, _.lightNode)
       .withSpecial(2, _.nonMiner)
