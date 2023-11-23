@@ -121,6 +121,7 @@ object RDB extends StrictLogging {
 
       if (isDefault)
         r
+          .setWriteBufferSize(writeBufferSize * 2)
           .setMaxWriteBufferNumber(3)
           .setMinWriteBufferNumberToMerge(2)
       else r

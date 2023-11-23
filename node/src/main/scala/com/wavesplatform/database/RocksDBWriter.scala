@@ -630,11 +630,11 @@ class RocksDBWriter(
 
   private def deleteOldEntries(height: Height, readOptions: ReadOptions, writeOptions: WriteOptions, rw: RW): Unit = {
     val changedAddressesKey = Keys.changedAddresses(height)
+    val changedAddresses = rw.get(changedAddressesKey)
 
-    val wavesAddressIds    = new ArrayBuffer[AddressId]()
-    val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
-
-    rw.get(changedAddressesKey).foreach { addressId =>
+    val wavesAddressIds    = new ArrayBuffer[AddressId](changedAddresses.size)
+    val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]](changedAddresses.size)
+    changedAddresses.foreach { addressId =>
       wavesAddressIds.addOne(addressId)
       wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
 
