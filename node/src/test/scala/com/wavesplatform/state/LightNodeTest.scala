@@ -16,6 +16,8 @@ import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
+import com.wavesplatform.utils.SystemTime
+import io.netty.channel.embedded.EmbeddedChannel
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 
@@ -138,8 +140,8 @@ class LightNodeTest extends PropSpec with WithDomain {
         )
 
         val appender =
-          ExtensionAppender(d.blockchain, d.utxPool, d.posSelector, TestTime(), InvalidBlockStorage.NoOp, PeerDatabase.NoOp, Scheduler.global)(
-            null,
+          ExtensionAppender(d.blockchain, d.utxPool, d.posSelector, TestTime(extensionBlocks.blocks.last.header.timestamp), InvalidBlockStorage.NoOp, PeerDatabase.NoOp, Scheduler.global)(
+            new EmbeddedChannel(),
             _
           )
 
@@ -162,7 +164,7 @@ class LightNodeTest extends PropSpec with WithDomain {
       val challengingBlock = d.createChallengingBlock(challengingMiner, invalidBlock, strictTime = true)
       val txSnapshots      = getTxSnapshots(d, challengingBlock)
 
-      val appender = BlockAppender(d.blockchainUpdater, TestTime(), d.utxPool, d.posSelector, Scheduler.global) _
+      val appender = BlockAppender(d.blockchainUpdater, TestTime(challengingBlock.header.timestamp), d.utxPool, d.posSelector, Scheduler.global) _
 
       appender(challengingBlock, Some(BlockSnapshot(challengingBlock.id(), txSnapshots))).runSyncUnsafe() shouldBe Right(
         Applied(Seq.empty, d.blockchain.score)

@@ -71,7 +71,10 @@ class BlockChallengeTest
 
   val invalidStateHash: ByteStr = ByteStr.fill(DigestLength)(1)
 
-  override def afterAll(): Unit = appenderScheduler.shutdown()
+  override def afterAll(): Unit = {
+    super.afterAll()
+    appenderScheduler.shutdown()
+  }
 
   property("NODE-883. Invalid challenging block should be ignored") {
     val sender           = TxHelpers.signer(1)

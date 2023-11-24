@@ -97,13 +97,13 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private[this] val dbDeps =
-    Seq(
-      "org.rocksdb" % "rocksdbjni" % "8.5.4"
-    )
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.5.4"
+
+  private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
 
   lazy val node = Def.setting(
     Seq(
+      rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.10.0",
       "com.iheart"          %% "ficus"                    % "1.5.2",
@@ -129,8 +129,9 @@ object Dependencies {
       "com.esaulpaugh"              % "headlong"      % "9.4.0",
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test
-    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value ++ langCompilerPlugins.value
+      akkaHttpModule("akka-http-testkit") % Test,
+      scalapbJson % Test,
+    ) ++ test ++ console ++ logDeps  ++ protobuf.value ++ langCompilerPlugins.value
   )
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.24.4"
@@ -157,8 +158,8 @@ object Dependencies {
 
   lazy val rideRunner = Def.setting(
     Seq(
-      "org.rocksdb"           % "rocksdbjni"     % "8.3.2",
-      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1",
+      rocksdb,
+      scalapbJson,
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",

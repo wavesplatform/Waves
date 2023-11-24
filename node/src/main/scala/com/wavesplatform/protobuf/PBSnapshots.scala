@@ -27,8 +27,12 @@ object PBSnapshots {
       leaseBalances.map { case (address, balance) =>
         S.LeaseBalance(address.toByteString, balance.in, balance.out)
       }.toSeq,
-      newLeases = Seq(),
-      cancelledLeases = Seq(),
+      newLeases = snapshot.newLeases.view.map { case (id, ld) =>
+        S.NewLease(id.toByteString, ld.sender.toByteString, ld.recipientAddress.toByteString, ld.amount.value)
+      }.toSeq,
+      cancelledLeases = snapshot.cancelledLeases.view.map { case (id, _) =>
+        S.CancelledLease(id.toByteString)
+      }.toSeq,
       assetStatics.map { case (id, st) =>
         NewAsset(id.id.toByteString, st.issuer.toByteString, st.decimals, st.nft)
       }.toSeq,
@@ -106,8 +110,9 @@ object PBSnapshots {
         .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
         .toMap
 
-    val newLeases = pbSnapshot.newLeases.map { l => l.leaseId.toByteStr ->
-      LeaseStaticInfo(l.senderPublicKey.toPublicKey, l.recipientAddress.toAddress(), TxPositiveAmount.unsafeFrom(l.amount), txId, height)
+    val newLeases = pbSnapshot.newLeases.map { l =>
+      l.leaseId.toByteStr ->
+        LeaseStaticInfo(l.senderPublicKey.toPublicKey, l.recipientAddress.toAddress(), TxPositiveAmount.unsafeFrom(l.amount), txId, height)
     }.toMap
 
     val cancelledLeases = pbSnapshot.cancelledLeases.map { cl =>

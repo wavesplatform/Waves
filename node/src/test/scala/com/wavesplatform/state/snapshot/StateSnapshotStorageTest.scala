@@ -19,7 +19,7 @@ import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxPositiveAmount}
 
 import scala.collection.immutable.VectorMap
 import scala.math.pow
@@ -49,7 +49,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         PBSnapshots.fromProtobuf(
           d.rocksDBWriter.transactionSnapshot(tx.id()).get,
           tx.id(),
-          d.blockchain.height
+          d.blockchain.height - 1
         ) shouldBe (expectedSnapshotWithMiner, status)
       }
 
@@ -175,7 +175,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             recipient     -> LeaseBalance(leaseTx.amount.value, 0)
           ),
           newLeases = Map(
-            leaseTx.id() -> ???
+            leaseTx.id() -> LeaseStaticInfo(leaseTx.sender, recipient, leaseTx.amount, leaseTx.id(), d.blockchain.height + 1)
           )
         )
       )
@@ -192,8 +192,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress -> LeaseBalance(0, 0),
             recipient     -> LeaseBalance(0, 0)
           ),
-          newLeases = Map(
-            leaseTx.id() -> ???
+          cancelledLeases = Map(
+            leaseTx.id() -> LeaseDetails.Status.Cancelled(d.blockchain.height + 1, Some(leaseCancelTx.id()))
           )
         )
       )
@@ -326,7 +326,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
           newLeases = Map(
-            leaseId -> ???
+            leaseId -> LeaseStaticInfo(dAppPk, senderAddress, TxPositiveAmount(123), invokeId, height)
           ),
           accountData = Map(
             dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))
@@ -351,7 +351,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           assetNamesAndDescriptions = Map(
-            asset2 -> AssetInfo(updateAssetTx.name, updateAssetTx.description, Height(d.solidStateHeight + 2))
+            asset2 -> AssetInfo(updateAssetTx.name, updateAssetTx.description, Height(d.blockchain.height + 1))
           )
         )
       )

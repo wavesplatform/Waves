@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxPositiveAmount, TxVersion}
 import org.scalatest.{Assertion, Assertions}
 
 class RollbackSpec extends FreeSpec with WithDomain {
@@ -32,7 +32,6 @@ class RollbackSpec extends FreeSpec with WithDomain {
   private def nextTs = time.getTimestamp()
 
   private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
-    import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
         val lease       = TxHelpers.lease(sender, recipient, amount, fee = 100000L, timestamp = nextTs, version = TxVersion.V1)

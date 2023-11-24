@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import cats.Monoid
 import cats.implicits.catsSyntaxSemigroup
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -17,13 +17,12 @@ import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Authorized, CreateAliasTransaction, EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, Authorized, CreateAliasTransaction, EthereumTransaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -386,14 +385,7 @@ object StateUpdate {
     }
   }
 
-  private lazy val WavesAlias   = Alias.fromString("alias:W:waves", Some('W'.toByte)).explicitGet()
-  private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd", Some('W'.toByte)).explicitGet()
-
-  def atomic(
-      blockchainBeforeWithMinerReward: Blockchain,
-      snapshot: StateSnapshot,
-      txWithLeases: Iterable[(Transaction, Map[ByteStr, LeaseSnapshot])]
-  ): StateUpdate = {
+  def atomic(blockchainBeforeWithMinerReward: Blockchain, snapshot: StateSnapshot): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = SnapshotBlockchain(blockchain, snapshot)
 
@@ -430,27 +422,37 @@ object StateUpdate {
       assetAfter  = blockchainAfter.assetDescription(asset)
     } yield AssetStateUpdate(asset.id, assetBefore, assetAfter)
 
-    val updatedLeases = txWithLeases.flatMap { case (sourceTxId, leases) =>
-      leases.map { case (leaseId, newState) =>
+    val newLeaseUpdates = snapshot.newLeases.collect {
+      case (newId, staticInfo) if !snapshot.cancelledLeases.contains(newId) =>
         LeaseUpdate(
-          leaseId,
-          if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
-          newState.amount,
-          newState.sender,
-          newState.recipient match {
-            case `WavesAlias` => WavesAddress
-            case other        => blockchainAfter.resolveAlias(other).explicitGet()
-          },
-          newState.toDetails(blockchain, Some(sourceTxId), blockchain.leaseDetails(leaseId)).sourceId
+          newId,
+          LeaseStatus.Active,
+          staticInfo.amount.value,
+          staticInfo.sender,
+          staticInfo.recipientAddress,
+          staticInfo.sourceId
         )
-      }
-    }.toVector
+    }
+
+    val cancelledLeaseUpdates = snapshot.cancelledLeases.map { case (id, _) =>
+      val si = snapshot.newLeases.get(id).orElse(blockchain.leaseDetails(id).map(_.static))
+      LeaseUpdate(
+        id,
+        LeaseStatus.Inactive,
+        si.fold(0L)(_.amount.value),
+        si.fold(PublicKey(new Array[Byte](32)))(_.sender),
+        si.fold(PublicKey(new Array[Byte](32)).toAddress)(_.recipientAddress),
+        si.fold(ByteStr.empty)(_.sourceId)
+      )
+    }
+
+    val updatedLeases = newLeaseUpdates ++ cancelledLeaseUpdates
 
     val updatedScripts = snapshot.accountScriptsByAddress.map { case (address, newScript) =>
       ScriptUpdate(ByteStr(address.bytes), blockchain.accountScript(address).map(_.script.bytes()), newScript.map(_.script.bytes()))
     }.toVector
 
-    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases, updatedScripts, Seq.empty)
+    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases.toSeq, updatedScripts, Seq.empty)
   }
 
   private[this] def transactionsMetadata(blockchain: Blockchain, snapshot: StateSnapshot): Seq[TransactionMetadata] = {
@@ -552,17 +554,13 @@ object StateUpdate {
           val accBlockchain = SnapshotBlockchain(blockchainBeforeWithReward, accSnapshot)
           (
             accSnapshot |+| txInfo.snapshot,
-            updates :+ atomic(accBlockchain, txInfo.snapshot, Seq((txInfo.transaction, txInfo.snapshot.leaseStates)))
+            updates :+ atomic(accBlockchain, txInfo.snapshot)
           )
         }
     val blockchainAfter = SnapshotBlockchain(blockchainBeforeWithReward, totalSnapshot)
     val metadata        = transactionsMetadata(blockchainAfter, totalSnapshot)
     val refAssets       = referencedAssets(blockchainAfter, txsStateUpdates)
-    val keyBlockUpdate = atomic(
-      blockchainBeforeWithReward,
-      keyBlockSnapshot,
-      keyBlockSnapshot.transactions.map { case (_, txInfo) => (txInfo.transaction, txInfo.snapshot.leaseStates) }
-    )
+    val keyBlockUpdate  = atomic(blockchainBeforeWithReward, keyBlockSnapshot)
     (keyBlockUpdate, txsStateUpdates, metadata, refAssets)
   }
 }

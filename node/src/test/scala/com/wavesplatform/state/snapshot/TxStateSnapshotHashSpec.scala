@@ -21,9 +21,11 @@ class TxStateSnapshotHashSpec extends PropSpec {
   val stateHash         = new StateHashBuilder
   private val signer101 = TxHelpers.signer(101)
   private val signer102 = TxHelpers.signer(102)
+  private val signer103 = TxHelpers.signer(103)
 
   private val address1 = signer101.toAddress
   private val address2 = signer102.toAddress
+  private val address3 = signer103.toAddress
 
   private val assetId1 = hashInt(0xaa22aa44)
   private val assetId2 = hashInt(0xbb22aa44)
@@ -54,7 +56,7 @@ class TxStateSnapshotHashSpec extends PropSpec {
         bs(address1.bytes),
         Seq(
           DataEntry("foo", DataEntry.Value.Empty),
-          DataEntry("baz", DataEntry.Value.StringValue("StringValue")),
+          DataEntry("bar", DataEntry.Value.StringValue("StringValue")),
           DataEntry("baz", DataEntry.Value.BinaryValue(bs(address1.bytes)))
         )
       ),
@@ -91,7 +93,8 @@ class TxStateSnapshotHashSpec extends PropSpec {
   )
 
   private val cancelledLease = TSS(
-    leaseBalances = Seq(TSS.LeaseBalance(bs(address1.bytes), out = 20.waves), TSS.LeaseBalance(bs(address2.bytes), in = 0.waves)),
+    leaseBalances = Seq(
+      TSS.LeaseBalance(bs(address3.bytes), out = 20.waves), TSS.LeaseBalance(bs(TxHelpers.address(104).bytes), in = 0.waves)),
     cancelledLeases = Seq(
       TSS.CancelledLease(leaseId)
     )
@@ -126,16 +129,20 @@ class TxStateSnapshotHashSpec extends PropSpec {
 
   private val reissuedAsset = TSS(
     assetVolumes = Seq(
-      TSS.AssetVolume(assetId2, false, bs((BigInt(10_00000000L)).toByteArray)),
+      TSS.AssetVolume(hashInt(0x23aadd55), false, bs((BigInt(10000000_00L)).toByteArray)),
     )
   )
   private val renamedAsset = TSS(
     assetNamesAndDescriptions = Seq(
-      TSS.AssetNameAndDescription()
+      TSS.AssetNameAndDescription(
+        assetId2, "newname", "some fancy description"
+      )
     )
   )
   private val failedTransaction = TSS(
-    balances = Seq(),
+    balances = Seq(
+      TSS.Balance(bs(address2.bytes), Some(Amount(amount = 25.995.waves)))
+    ),
     transactionStatus = TransactionStatus.FAILED
   )
   private val elidedTransaction = TSS(
@@ -160,8 +167,9 @@ class TxStateSnapshotHashSpec extends PropSpec {
   )
 
   private val testData = Table(
-    ("state snapshot", "base64 bytes", "tx id", "previous state hash", "expected result"),
+    ("clue", "state snapshot", "base64 bytes", "tx id", "previous state hash", "expected result"),
     (
+      "waves balances",
       wavesBalances,
       "CiQKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgYQgJTr3AMKJAoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSBhCAqNa5Bw==",
       ByteStr.empty,
@@ -169,6 +177,7 @@ class TxStateSnapshotHashSpec extends PropSpec {
       "954bf440a83542e528fe1e650471033e42d97c5896cc571aec39fccc912d7db0"
     ),
     (
+      "asset balances",
       assetBalances,
       "CkMKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EiUKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEJBOCkQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEiYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEKCcAQ==",
       ByteStr.empty,
@@ -176,120 +185,134 @@ class TxStateSnapshotHashSpec extends PropSpec {
       "534e27c3a787536e18faf844ff217a8f14e5323dfcd3cc5b9ab3a8e261f60cf7"
     ),
     (
+      "data entries",
       dataEntries,
-      "WloKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgUKA2ZvbxISCgNiYXpqC1N0cmluZ1ZhbHVlEiEKA2JhemIaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7VaLwoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCAoDZm9vULAJEgcKA2JhclgB",
+      "YloKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgUKA2ZvbxISCgNiYXJqC1N0cmluZ1ZhbHVlEiEKA2JhemIaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7ViLwoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCAoDZm9vULAJEgcKA2JhclgB",
       ByteStr.empty,
       "534e27c3a787536e18faf844ff217a8f14e5323dfcd3cc5b9ab3a8e261f60cf7",
-      "e24952f7e5ee51450ffedbddb03cbbf116964f207c9621d9c67353a75030ba01"
+      "b1440780a268eeaf9f6bb285a97ee35582cb84382576e84432b2e61b86d64581"
     ),
     (
+      "account script",
       accountScript,
-      "Ui4KIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoEgcGAQaw0U/PGPoB",
+      "Wi4KIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoEgcGAQaw0U/PGPoB",
       ByteStr.empty,
-      "e24952f7e5ee51450ffedbddb03cbbf116964f207c9621d9c67353a75030ba01",
-      "976df303cdd90d3e89b1a9fd11b0b93cfec47107ee51a9c00746b8dc4d4ccf4d"
+      "b1440780a268eeaf9f6bb285a97ee35582cb84382576e84432b2e61b86d64581",
+      "ca42620b03b437e025bec14152c3f7d8ff65b8fb1062b5013363186484176cb7"
     ),
     (
+      "asset script",
       assetScript,
-      "MisKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEgcGAQaw0U/P",
+      "QisKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEgcGAQaw0U/P",
       ByteStr.empty,
-      "976df303cdd90d3e89b1a9fd11b0b93cfec47107ee51a9c00746b8dc4d4ccf4d",
-      "08c68eb3bf3494a0725de020f353b530a4ac5a9db059e23b54f0b98b2a2a4d24"
+      "ca42620b03b437e025bec14152c3f7d8ff65b8fb1062b5013363186484176cb7",
+      "4e9cbb5349a31d2954d57f67d2fc5cf73dd1ce90b508299cf5f92b1b45ca668f"
     ),
     (
+      "new lease",
       newLease,
-      "EiIKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1GICa4uEQEiIKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEICuzb4USmkKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqNqgFECIDyi6gJEiBQx1mvQnelVPDNtCyxR82wU73hEX9bBDsNfUlEuNBgaBoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCo=",
+      "EiIKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1GICa4uEQEiIKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEICuzb4UGmYKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqNEiBQx1mvQnelVPDNtCyxR82wU73hEX9bBDsNfUlEuNBgaBoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoggPKLqAk=",
       ByteStr.empty,
-      "08c68eb3bf3494a0725de020f353b530a4ac5a9db059e23b54f0b98b2a2a4d24",
-      "77bcff83d90592e950527d35e70886eceaab04648e8b0e30dd74c6ec2f722e53"
+      "4e9cbb5349a31d2954d57f67d2fc5cf73dd1ce90b508299cf5f92b1b45ca668f",
+      "8615df0268bcc76e851a9925e07f212a875a1bd047b0cccbc4ad3d842895f16e"
     ),
     (
+      "cancelled lease",
       cancelledLease,
-      "EiIKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1GICo1rkHEhwKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqSiUKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqNsgEA",
+      "EiIKGgFUMCPLqLW81X2Atgaj2KwF9QkaJq47Cev9GICo1rkHEhwKGgFUYSJd8vzI9rq7GdIuDy65JMc8zi497E98IiIKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqN",
       ByteStr.empty,
-      "77bcff83d90592e950527d35e70886eceaab04648e8b0e30dd74c6ec2f722e53",
-      "3c115c2cf9e73ea9b9b97c2c3ac672227814c313a28ee1f3c226501f50ede2db"
+      "8615df0268bcc76e851a9925e07f212a875a1bd047b0cccbc4ad3d842895f16e",
+      "3bb24694ea57c1d6b2eec2c549d5ba591853bd7f21959027d2793d5c0846cc8d"
     ),
     (
+      "sponsorship",
       sponsorship,
-      "YiUKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEPwq",
+      "aiUKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEPwq",
       ByteStr.empty,
-      "3c115c2cf9e73ea9b9b97c2c3ac672227814c313a28ee1f3c226501f50ede2db",
-      "192e86fa9ebb24b5780a053a9b9864518705795647be47523dcb6cba9a67345d"
+      "3bb24694ea57c1d6b2eec2c549d5ba591853bd7f21959027d2793d5c0846cc8d",
+      "4fd2ceeb81d4d9c7ebad4391fbd938cfc40564088d2cc71801d308d56eca9b75"
     ),
     (
+      "alias",
       alias,
-      "OiYKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgh3YXZlc2V2bw==",
+      "SiYKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgh3YXZlc2V2bw==",
       ByteStr.empty,
-      "192e86fa9ebb24b5780a053a9b9864518705795647be47523dcb6cba9a67345d",
-      "8a64e138c63c6f23b657316b9cecbbbb163a30c77caf1111ddecf70428b585b9"
+      "4fd2ceeb81d4d9c7ebad4391fbd938cfc40564088d2cc71801d308d56eca9b75",
+      "0f02911227a9835c1248822f4e500213c4fc4c05a83a5d27680f67d1d1f6a8ee"
     ),
     (
+      "order fill",
       volumeAndFee,
-      "QisKIMkknO8yHpMUT/XKkkdlrbYCG0Dt+qvVgphfgtRbyRDMEICU69wDGNAPQisKIJZ9YwvJObbWItHAD2zhbaFOTFx2zQ4p0Xbo81GXHKeEEICU69wDGNAP",
+      "UisKIMkknO8yHpMUT/XKkkdlrbYCG0Dt+qvVgphfgtRbyRDMEICU69wDGNAPUisKIJZ9YwvJObbWItHAD2zhbaFOTFx2zQ4p0Xbo81GXHKeEEICU69wDGNAP",
       ByteStr.empty,
-      "8a64e138c63c6f23b657316b9cecbbbb163a30c77caf1111ddecf70428b585b9",
-      "2cd2b9115eb62e30904c0bee93d0051c11ab7df99f6ce403bb30dbc8314d8f68"
+      "0f02911227a9835c1248822f4e500213c4fc4c05a83a5d27680f67d1d1f6a8ee",
+      "4d0d2c893b435d1bbc3464c59ceda196961b94a81cfb9bb2c50fe03c06f23d00"
     ),
     (
+      "new asset",
       newAsset,
-      "GkYKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEiDcYGFqY9MotHTpDpskoycN/Mt62bZfPxIC4fpU0ZTBniABGkYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEiDcYGFqY9MotHTpDpskoycN/Mt62bZfPxIC4fpU0ZTBnhgK",
+      "KkYKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEiDcYGFqY9MotHTpDpskoycN/Mt62bZfPxIC4fpU0ZTBniABKkYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEiDcYGFqY9MotHTpDpskoycN/Mt62bZfPxIC4fpU0ZTBnhgIMi8KIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEAEaCQT/////////9jIlCiBeZp+CCmfQiG2HR4zwQ6KseFzHr1XcMc4QdTlL01CiWxoBAQ==",
       ByteStr.empty,
-      "2cd2b9115eb62e30904c0bee93d0051c11ab7df99f6ce403bb30dbc8314d8f68",
-      "3724dfd7fc0a9d756b64a956829a2d2377bb90c852b388a9f85e00fe999c050d"
+      "4d0d2c893b435d1bbc3464c59ceda196961b94a81cfb9bb2c50fe03c06f23d00",
+      "e2baa6d7e863fc1f5f6cec326b01e577c4509e927f3b13ed7818af9075be82c3"
     ),
     (
+      "reissued asset",
       reissuedAsset,
-      "",
+      "MigKIDhvjT3TTlJ+v4Ni205vcYc1m9WWgnQPFovjmJI1H62yGgQ7msoA",
       ByteStr.empty,
-      "3724dfd7fc0a9d756b64a956829a2d2377bb90c852b388a9f85e00fe999c050d",
-      "dd2971ec2c572c5ffea5a6870eea0a5baec8ded08a6ab1e3bb132271646c5924"
+      "e2baa6d7e863fc1f5f6cec326b01e577c4509e927f3b13ed7818af9075be82c3",
+      "a161ea70fa027f6127763cdb946606e3d65445915ec26c369e0ff28b37bee8cd"
     ),
     (
+      "renamed asset",
       renamedAsset,
-      "",
+      "OkMKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEgduZXduYW1lGhZzb21lIGZhbmN5IGRlc2NyaXB0aW9u",
       ByteStr.empty,
-      "dd2971ec2c572c5ffea5a6870eea0a5baec8ded08a6ab1e3bb132271646c5924",
-      "048fb3f170306f8f34c2e0c2841604333529540160d235c11852f5169d1b9a08"
+      "a161ea70fa027f6127763cdb946606e3d65445915ec26c369e0ff28b37bee8cd",
+      "7a43e1fb599e8a921ecb2a83b4b871bd46db4569bf5c4f6c9225479191450a58"
     ),
     (
+      "failed transaction",
       failedTransaction,
-      "",
-      ByteStr.empty,
-      "048fb3f170306f8f34c2e0c2841604333529540160d235c11852f5169d1b9a08",
-      "684262eae7aa1ec68e6adbf0abe528b1d77cb9389b334193236fb2927c4287f1"
+      "CiQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgYQ4PHE1wlwAQ==",
+      ByteStr(fastHash(Ints.toByteArray(0xaabbef20))),
+      "7a43e1fb599e8a921ecb2a83b4b871bd46db4569bf5c4f6c9225479191450a58",
+      "dfa190a84d59edda03428c93c4b1be4c50f12adf3c11528ef0bdd8db1edaf49b"
     ),
     (
+      "elided transaction",
       elidedTransaction,
-      "",
-      ByteStr.empty,
-      "684262eae7aa1ec68e6adbf0abe528b1d77cb9389b334193236fb2927c4287f1",
-      "6fbd5cca3707185cd6004e31521c6f94fab3c75474bda7926862aa3385205200"
+      "cAI=",
+      ByteStr(fastHash(Ints.toByteArray(0xaabbef40))),
+      "dfa190a84d59edda03428c93c4b1be4c50f12adf3c11528ef0bdd8db1edaf49b",
+      "002f4f7f3741668c10a8ba92b4b183680fd6659bafd36037be6f9a636510b128"
     ),
     (
+      "all together",
       all,
-      "CkMKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EiUKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEJBOCkQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEiYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEKCcAQokChoBVGD9UO8g3kVxIH37nIi+fBwviiLHCtiPtRIGEICU69wDCiQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgYQgKjWuQcSIgoaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7UYgJri4RASIgoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoQgK7NvhQSIgoaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7UYgKjWuQcSHAoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoaRgogXmafggpn0Ihth0eM8EOirHhcx69V3DHOEHU5S9NQolsSINxgYWpj0yi0dOkOmySjJw38y3rZtl8/EgLh+lTRlMGeIAEaRgogeJ3AESPVNg9wgq/UtGq4v+i1Fgu/tSbAQ+X8eDpPiU4SINxgYWpj0yi0dOkOmySjJw38y3rZtl8/EgLh+lTRlMGeGAo6JgoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCHdhdmVzZXZvQisKIMkknO8yHpMUT/XKkkdlrbYCG0Dt+qvVgphfgtRbyRDMEICU69wDGNAPQisKIJZ9YwvJObbWItHAD2zhbaFOTFx2zQ4p0Xbo81GXHKeEEICU69wDGNAPSmkKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqNqgFECIDyi6gJEiBQx1mvQnelVPDNtCyxR82wU73hEX9bBDsNfUlEuNBgaBoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCpKJQoguIIzLIWCBbxl3Ysa38C0yvtZan6R9ZvOU33eldmrOo2yAQBSLgogUMdZr0J3pVTwzbQssUfNsFO94RF/WwQ7DX1JRLjQYGgSBwYBBrDRT88Y+gFaWgoaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7USBQoDZm9vEhIKA2JhemoLU3RyaW5nVmFsdWUSIQoDYmF6YhoBVGD9UO8g3kVxIH37nIi+fBwviiLHCtiPtVovChoBVELFyWNz9Q/YE1BgTxwU8qbJJWra/RmwKhIICgNmb29QsAkSBwoDYmFyWAFiJQogeJ3AESPVNg9wgq/UtGq4v+i1Fgu/tSbAQ+X8eDpPiU4Q/Co=",
-      ByteStr.empty,
-      "6fbd5cca3707185cd6004e31521c6f94fab3c75474bda7926862aa3385205200",
-      "f6b2f644c24466b27b05aa187b4a339e732d37b488635403c03f437686f07e46"
+      "CkMKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EiUKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEJBOCkQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEiYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEKCcAQokChoBVGD9UO8g3kVxIH37nIi+fBwviiLHCtiPtRIGEICU69wDCiQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgYQgKjWuQcSIgoaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7UYgJri4RASIgoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoQgK7NvhQSIgoaAVQwI8uotbzVfYC2BqPYrAX1CRomrjsJ6/0YgKjWuQcSHAoaAVRhIl3y/Mj2ursZ0i4PLrkkxzzOLj3sT3waZgoguIIzLIWCBbxl3Ysa38C0yvtZan6R9ZvOU33eldmrOo0SIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoGhoBVELFyWNz9Q/YE1BgTxwU8qbJJWra/RmwKiCA8ouoCSIiCiC4gjMshYIFvGXdixrfwLTK+1lqfpH1m85Tfd6V2as6jSpGCiBeZp+CCmfQiG2HR4zwQ6KseFzHr1XcMc4QdTlL01CiWxIg3GBhamPTKLR06Q6bJKMnDfzLetm2Xz8SAuH6VNGUwZ4gASpGCiB4ncARI9U2D3CCr9S0ari/6LUWC7+1JsBD5fx4Ok+JThIg3GBhamPTKLR06Q6bJKMnDfzLetm2Xz8SAuH6VNGUwZ4YCDIvCiB4ncARI9U2D3CCr9S0ari/6LUWC7+1JsBD5fx4Ok+JThABGgkE//////////YyJQogXmafggpn0Ihth0eM8EOirHhcx69V3DHOEHU5S9NQolsaAQEyKAogOG+NPdNOUn6/g2LbTm9xhzWb1ZaCdA8Wi+OYkjUfrbIaBDuaygA6QwogeJ3AESPVNg9wgq/UtGq4v+i1Fgu/tSbAQ+X8eDpPiU4SB25ld25hbWUaFnNvbWUgZmFuY3kgZGVzY3JpcHRpb25KJgoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCHdhdmVzZXZvUisKIMkknO8yHpMUT/XKkkdlrbYCG0Dt+qvVgphfgtRbyRDMEICU69wDGNAPUisKIJZ9YwvJObbWItHAD2zhbaFOTFx2zQ4p0Xbo81GXHKeEEICU69wDGNAPWi4KIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoEgcGAQaw0U/PGPoBYloKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgUKA2ZvbxISCgNiYXJqC1N0cmluZ1ZhbHVlEiEKA2JhemIaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7ViLwoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCAoDZm9vULAJEgcKA2JhclgBaiUKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEPwqcAE=",
+      ByteStr(fastHash(Ints.toByteArray(0xaabbef50))),
+      "002f4f7f3741668c10a8ba92b4b183680fd6659bafd36037be6f9a636510b128",
+      "a65304008a49f4ae10cd4af0e61c5d59ba048f0766846d9239d0b28275a0184b"
     )
   )
 
   property("correctly create transaction state snapshot hash from snapshot") {
-    forAll(testData) { case (pbSnapshot, b64str, txId, prev, expectedResult) =>
-      val parsedSnapshot = TSS.parseFrom(Base64.decode(b64str))
-      parsedSnapshot shouldEqual pbSnapshot
-      val (snapshot, meta) = PBSnapshots.fromProtobuf(pbSnapshot, txId, 10)
-      val raw = Hex.toHexString(
-        TxStateSnapshotHashBuilder
-          .createHashFromSnapshot(snapshot, Some(TxStateSnapshotHashBuilder.TxStatusInfo(txId, meta)))
-          .createHash(ByteStr.decodeBase64(prev).get)
-          .arr
-      )
+    forAll(testData) { case (clue, pbSnapshot, b64str, txId, prev, expectedResult) =>
+      withClue(clue) {
+        TSS.parseFrom(Base64.decode(b64str)) shouldEqual pbSnapshot
 
-      println(s"\n\t${Base64.encode(pbSnapshot.toByteArray)}\n\t$raw")
-
-      raw shouldEqual expectedResult
+        val (snapshot, meta) = PBSnapshots.fromProtobuf(pbSnapshot, txId, 10)
+        val raw = Hex.toHexString(
+          TxStateSnapshotHashBuilder
+            .createHashFromSnapshot(snapshot, Some(TxStateSnapshotHashBuilder.TxStatusInfo(txId, meta)))
+            .createHash(ByteStr.decodeBase64(prev).get)
+            .arr
+        )
+        PBSnapshots.toProtobuf(snapshot, meta) shouldEqual pbSnapshot
+        raw shouldEqual expectedResult
+      }
     }
   }
 }
