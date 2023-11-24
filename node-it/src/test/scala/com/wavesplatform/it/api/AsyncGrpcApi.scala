@@ -1,17 +1,11 @@
 package com.wavesplatform.it.api
 
 import com.google.common.primitives.{Bytes, Longs}
-
-import java.util.NoSuchElementException
-
-import scala.concurrent.Future
-import scala.concurrent.duration.*
-
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
-import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
+import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
@@ -26,15 +20,18 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
+
+import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 object AsyncGrpcApi {
   implicit class NodeAsyncGrpcApi(val n: Node) {
@@ -211,7 +208,7 @@ object AsyncGrpcApi {
 
     def putData(
         source: KeyPair,
-        data: Seq[DataTransactionData.DataEntry],
+        data: Seq[DataEntry],
         fee: Long,
         version: Int = 1,
         timestamp: Long = System.currentTimeMillis()

@@ -16,6 +16,7 @@ import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction
+import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -131,15 +132,15 @@ package object rocksdb {
         pb.LeaseDetails(
           ByteString.copyFrom(ld.sender.arr),
           Some(PBRecipients.create(ld.recipientAddress)),
-          ld.amount,
+          ld.amount.value,
           ByteString.copyFrom(ld.sourceId.arr),
           ld.height,
           ld.status match {
-            case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+            case LeaseDetails.Status.Active => pb.LeaseDetails.CancelReason.Empty
             case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-              pb.LeaseDetails.Status
+              pb.LeaseDetails.CancelReason
                 .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height))
           }
         ).toByteArray
     )
@@ -150,18 +151,20 @@ package object rocksdb {
       val d = pb.LeaseDetails.parseFrom(data)
       Right(
         LeaseDetails(
+          LeaseStaticInfo(
           d.senderPublicKey.toPublicKey,
-          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          d.amount,
-          d.status match {
-            case pb.LeaseDetails.Status.Active(_)                                   => LeaseDetails.Status.Active
-            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
-            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
+          PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+          TxPositiveAmount.unsafeFrom(d.amount),
+            d.sourceId.toByteStr,
+            d.height
+          ),
+          d.cancelReason match {
+            case pb.LeaseDetails.CancelReason.Empty                                   => LeaseDetails.Status.Active
+            case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+            case pb.LeaseDetails.CancelReason.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
               LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
-            case pb.LeaseDetails.Status.Empty => ???
-          },
-          d.sourceId.toByteStr,
-          d.height
+          }
+
         )
       )
     }

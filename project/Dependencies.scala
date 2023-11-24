@@ -130,7 +130,6 @@ object Dependencies {
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
-      scalapbJson % Test,
     ) ++ test ++ console ++ logDeps  ++ protobuf.value ++ langCompilerPlugins.value
   )
 

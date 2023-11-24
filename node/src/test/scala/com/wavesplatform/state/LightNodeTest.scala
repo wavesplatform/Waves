@@ -12,11 +12,9 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
-import com.wavesplatform.utils.SystemTime
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
