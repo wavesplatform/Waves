@@ -578,6 +578,7 @@ class BlockchainUpdaterImpl(
   }
 
   def shutdown(): Unit = {
+    rocksdb.close()
     internalLastBlockInfo.onComplete()
   }
 

@@ -39,9 +39,8 @@ object RDB extends StrictLogging {
     val dbDir = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions =
-      newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize, isDefault = true)
+    val handles             = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
@@ -89,43 +88,33 @@ object RDB extends StrictLogging {
       blockSize: Long,
       cacheCapacity: Long,
       highPriPoolRatio: Double,
-      writeBufferSize: Long,
-      isDefault: Boolean = false
+      writeBufferSize: Long
   ): OptionsWithResources[ColumnFamilyOptions] = {
     val bloomFilter           = new BloomFilter(bitsPerKey)
     val blockCache            = new LRUCache(cacheCapacity, -1, false, highPriPoolRatio)
     val sstPartitionerFactory = new SstPartitionerFixedPrefixFactory(2)
 
-    val options = {
-      val r = new ColumnFamilyOptions()
-        .setTableFormatConfig(
-          new BlockBasedTableConfig()
-            .setFilterPolicy(bloomFilter)
-            .setOptimizeFiltersForMemory(true)
-            .setCacheIndexAndFilterBlocks(true)
-            .setPinL0FilterAndIndexBlocksInCache(true)
-            .setFormatVersion(5)
-            .setBlockSize(blockSize)
-            .setChecksumType(ChecksumType.kNoChecksum)
-            .setBlockCache(blockCache)
-            .setCacheIndexAndFilterBlocksWithHighPriority(true)
-            .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
-            .setDataBlockHashTableUtilRatio(0.5)
-        )
-        .setWriteBufferSize(writeBufferSize)
-        .setLevelCompactionDynamicLevelBytes(true)
-        .useCappedPrefixExtractor(10)
-        .setMemtablePrefixBloomSizeRatio(0.25)
-        .setCompressionType(CompressionType.LZ4_COMPRESSION)
-        .setSstPartitionerFactory(sstPartitionerFactory)
-
-      if (isDefault)
-        r
-          .setWriteBufferSize(writeBufferSize * 2)
-          .setMaxWriteBufferNumber(3)
-          .setMinWriteBufferNumberToMerge(2)
-      else r
-    }
+    val options = new ColumnFamilyOptions()
+      .setTableFormatConfig(
+        new BlockBasedTableConfig()
+          .setFilterPolicy(bloomFilter)
+          .setOptimizeFiltersForMemory(true)
+          .setCacheIndexAndFilterBlocks(true)
+          .setPinL0FilterAndIndexBlocksInCache(true)
+          .setFormatVersion(5)
+          .setBlockSize(blockSize)
+          .setChecksumType(ChecksumType.kNoChecksum)
+          .setBlockCache(blockCache)
+          .setCacheIndexAndFilterBlocksWithHighPriority(true)
+          .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
+          .setDataBlockHashTableUtilRatio(0.5)
+      )
+      .setWriteBufferSize(writeBufferSize)
+      .setLevelCompactionDynamicLevelBytes(true)
+      .useCappedPrefixExtractor(10)
+      .setMemtablePrefixBloomSizeRatio(0.25)
+      .setCompressionType(CompressionType.LZ4_COMPRESSION)
+      .setSstPartitionerFactory(sstPartitionerFactory)
 
     OptionsWithResources(options, Seq(options, bloomFilter, blockCache, sstPartitionerFactory))
   }
