@@ -300,7 +300,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         smartMatcherFee,
         100L,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + 2.days.toMillis,
         smartMatcherFee
       )
       .explicitGet()
@@ -314,7 +314,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         smartMatcherFee,
         100L,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + 2.days.toMillis,
         smartMatcherFee
       )
       .explicitGet()
@@ -375,7 +375,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           10L,
           100L,
           ts,
-          ts + Order.MaxLiveTime,
+          ts + 2.days.toMillis,
           smartMatcherFee,
           matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
         )
@@ -390,7 +390,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
             10L,
             100L,
             ts,
-            ts + Order.MaxLiveTime,
+            ts + 2.days.toMillis,
             smartMatcherFee,
             matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
           )
