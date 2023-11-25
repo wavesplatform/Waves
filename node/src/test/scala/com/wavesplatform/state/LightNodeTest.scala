@@ -7,7 +7,8 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase}
+import com.wavesplatform.network.{BlockSnapshotResponse, ExtensionBlocks, InvalidBlockStorage, PeerDatabase}
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender}
@@ -134,11 +135,21 @@ class LightNodeTest extends PropSpec with WithDomain {
         val extensionBlocks = ExtensionBlocks(
           currentScore + 1,
           betterBlocks.map(_._1),
-          betterBlocks.collect { case (b, Some(snapshots)) => b.id() -> BlockSnapshot(b.id(), snapshots) }.toMap
+          betterBlocks.collect { case (b, Some(snapshots)) =>
+            b.id() -> BlockSnapshotResponse(b.id(), snapshots.map { case (s, m) => PBSnapshots.toProtobuf(s, m) })
+          }.toMap
         )
 
         val appender =
-          ExtensionAppender(d.blockchain, d.utxPool, d.posSelector, TestTime(extensionBlocks.blocks.last.header.timestamp), InvalidBlockStorage.NoOp, PeerDatabase.NoOp, Scheduler.global)(
+          ExtensionAppender(
+            d.blockchain,
+            d.utxPool,
+            d.posSelector,
+            TestTime(extensionBlocks.blocks.last.header.timestamp),
+            InvalidBlockStorage.NoOp,
+            PeerDatabase.NoOp,
+            Scheduler.global
+          )(
             new EmbeddedChannel(),
             _
           )
@@ -164,7 +175,8 @@ class LightNodeTest extends PropSpec with WithDomain {
 
       val appender = BlockAppender(d.blockchainUpdater, TestTime(challengingBlock.header.timestamp), d.utxPool, d.posSelector, Scheduler.global) _
 
-      appender(challengingBlock, Some(BlockSnapshot(challengingBlock.id(), txSnapshots))).runSyncUnsafe() shouldBe Right(
+      val sr = BlockSnapshotResponse(challengingBlock.id(), txSnapshots.map { case (s, m) => PBSnapshots.toProtobuf(s, m) })
+      appender(challengingBlock, Some(sr)).runSyncUnsafe() shouldBe Right(
         Applied(Seq.empty, d.blockchain.score)
       )
       d.lastBlock shouldBe challengingBlock
