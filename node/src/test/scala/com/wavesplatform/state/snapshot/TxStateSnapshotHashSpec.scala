@@ -1,6 +1,5 @@
 package com.wavesplatform.state.snapshot
 
-import cats.data.Ior
 import com.google.common.primitives.{Ints, Longs, UnsignedBytes}
 import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
@@ -8,14 +7,13 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.*
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.{KeyType, TxStatusInfo}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.invoke
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdLength, TxHelpers}
@@ -37,8 +35,8 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
 
   private val leaseId1      = ByteStr.fill(DigestLength)(6)
   private val leaseId2      = ByteStr.fill(DigestLength)(7)
-  private val leaseDetails1 = LeaseDetails(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active, leaseId1, 2)
-  private val leaseDetails2 = LeaseDetails(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Cancelled(1, None), leaseId2, 2)
+  private val leaseDetails1 = LeaseSnapshot(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active)
+  private val leaseDetails2 = LeaseSnapshot(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Cancelled(1, None))
 
   private val addr1Balance       = 10.waves
   private val addr2Balance       = 20.waves
@@ -92,29 +90,46 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
 
   private val dataEntry = StringDataEntry("key", "value")
 
-  private val diff = Diff(
-    portfolios = Map(address1 -> addr1PortfolioDiff, address2 -> addr2PortfolioDiff),
-    issuedAssets = VectorMap(assetId1 -> assetInfo1, assetId2 -> assetInfo2, assetId3 -> assetInfo3, assetId4 -> assetInfo4),
-    updatedAssets = Map(
-      assetId1 -> Ior.Both(updatedAssetInfo1, updatedAssetVolumeInfo1),
-      assetId2 -> Ior.Left(updatedAssetInfo2),
-      assetId3 -> Ior.Right(updatedAssetVolumeInfo3)
+  private val snapshot = StateSnapshot(
+    balances = VectorMap(
+      (address1, Waves)    -> (addr1PortfolioDiff.balance + addr1Balance),
+      (address2, assetId1) -> addr2PortfolioDiff.assets.head._2
+    ),
+    leaseBalances = Map(address1 -> addr1PortfolioDiff.lease),
+    assetStatics = StateSnapshot.assetStatics(
+      VectorMap(
+        assetId1 -> assetInfo1,
+        assetId2 -> assetInfo2,
+        assetId3 -> assetInfo3,
+        assetId4 -> assetInfo4
+      )
+    ),
+    assetVolumes = VectorMap(
+      assetId1 -> updatedAssetVolumeInfo1,
+      assetId2 -> assetInfo2.volume,
+      assetId3 -> updatedAssetVolumeInfo3,
+      assetId4 -> assetInfo4.volume
+    ),
+    assetNamesAndDescriptions = VectorMap(
+      assetId1 -> updatedAssetInfo1,
+      assetId2 -> updatedAssetInfo2,
+      assetId3 -> assetInfo3.dynamic,
+      assetId4 -> assetInfo4.dynamic
     ),
     aliases = Map(addr1Alias1 -> address1, addr2Alias -> address2, addr1Alias2 -> address1),
     orderFills = Map(orderId -> volumeAndFee),
-    leaseState = Map(leaseId1 -> leaseDetails1, leaseId2 -> leaseDetails2),
-    scripts = Map(TxHelpers.signer(2).publicKey -> Some(accountScriptInfo)),
-    assetScripts = Map(assetId1 -> Some(assetScriptInfo)),
+    leaseStates = Map(leaseId1 -> leaseDetails1, leaseId2 -> leaseDetails2),
+    accountScripts = Map(TxHelpers.signer(2).publicKey -> Some(accountScriptInfo)),
+    assetScripts = Map(assetId1 -> assetScriptInfo),
     accountData = Map(address1 -> Map(dataEntry.key -> dataEntry)),
-    sponsorship = Map(assetId1 -> sponsorship)
+    sponsorships = Map(assetId1 -> sponsorship)
   )
 
   def hash(bs: Seq[Array[Byte]]): ByteStr = ByteStr(com.wavesplatform.crypto.fastHash(bs.reduce(_ ++ _)))
 
   property("correctly create transaction state snapshot hash from snapshot") {
-    withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
-      val snapshot = SnapshotOps.fromDiff(diff, d.blockchain).explicitGet()
-      val tx       = invoke()
+    withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { _ =>
+      val tx = invoke()
       testHash(snapshot, Some(TxStatusInfo(tx.id(), Succeeded)), Array())
       testHash(snapshot, Some(TxStatusInfo(tx.id(), Failed)), tx.id().arr :+ 1)
       testHash(snapshot, Some(TxStatusInfo(tx.id(), Elided)), tx.id().arr :+ 2)

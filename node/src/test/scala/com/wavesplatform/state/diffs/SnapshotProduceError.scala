@@ -1,13 +1,13 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.StateSnapshot
 import org.scalatest.matchers.{MatchResult, Matcher}
 
-class DiffProduceError(errorMessage: String, requireFailed: Boolean) extends Matcher[Either[_, _]] {
+class SnapshotProduceError(errorMessage: String, requireFailed: Boolean) extends Matcher[Either[_, _]] {
   override def apply(ei: Either[_, _]): MatchResult = {
     ei match {
-      case r @ Right(diff: Diff) =>
-        diff.scriptResults.values.find(_.error.exists(_.text.contains(errorMessage))) match {
+      case r @ Right(snapshot: StateSnapshot) =>
+        snapshot.scriptResults.values.find(_.error.exists(_.text.contains(errorMessage))) match {
           case Some(_) => MatchResult(matches = true, "", "", Vector.empty)
           case None    => MatchResult(matches = false, "expecting Left(...{0}...) but got {1}", "got expected error", IndexedSeq(errorMessage, r))
         }
