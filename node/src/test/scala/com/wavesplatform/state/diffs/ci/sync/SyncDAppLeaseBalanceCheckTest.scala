@@ -70,7 +70,7 @@ class SyncDAppLeaseBalanceCheckTest extends PropSpec with WithDomain {
 
         if (bigComplexityDApp1 || bigComplexityDApp2) {
           d.appendBlock(invoke)
-          d.liquidDiff.errorMessage(invoke.txId).get.text should include("Cannot lease more than own: Balance: 0")
+          d.liquidSnapshot.errorMessage(invoke.txId).get.text should include("Cannot lease more than own: Balance: 0")
         } else {
           d.appendBlockE(invoke) should produce("Cannot lease more than own: Balance: 0")
         }

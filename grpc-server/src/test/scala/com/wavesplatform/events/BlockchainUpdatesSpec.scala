@@ -420,7 +420,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       (1 to blocksCount + 1).foreach(_ => d.appendBlock())
 
       val result = Await
-        .result(r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(1, blocksCount)), Duration.Inf)
+        .result(r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(1, blocksCount)), 1.minute)
         .updates
         .map(_.update.append.map(_.getBlock.vrf.toByteStr).filterNot(_.isEmpty))
 
@@ -1215,7 +1215,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
     Await
       .result(
         repo.getBlockUpdate(GetBlockUpdateRequest(height)),
-        Duration.Inf
+        1.minute
       )
       .getUpdate
       .update

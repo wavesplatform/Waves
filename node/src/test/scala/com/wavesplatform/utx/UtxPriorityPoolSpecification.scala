@@ -107,7 +107,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.utxPool.priorityPool.priorityTransactions shouldBe empty
     }
 
-    "continues packing when priority diff contains no valid transactions" in {
+    "continues packing when priority snapshot contains no valid transactions" in {
       val bob = nextKeyPair
       domain.appendBlock(
         TxHelpers.transfer(alice, bob.toAddress, 10.02.waves, fee = 0.001.waves),
