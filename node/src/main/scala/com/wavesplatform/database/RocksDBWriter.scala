@@ -4,6 +4,7 @@ import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
+import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
@@ -31,13 +32,12 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
-import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
 import java.util
-import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -110,8 +110,7 @@ class RocksDBWriter(
     val dbSettings: DBSettings,
     isLightMode: Boolean,
     bfBlockInsertions: Int = 10000
-) extends Caches
-    with AutoCloseable {
+) extends Caches {
   import rdb.db as writableDB
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
@@ -119,24 +118,6 @@ class RocksDBWriter(
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
   import RocksDBWriter.*
-
-  private val cleanupThreadPoolExecutor = new ThreadPoolExecutor(
-    1,
-    3,
-    0,
-    TimeUnit.MILLISECONDS,
-    new LinkedBlockingQueue[Runnable],
-    new DefaultThreadFactory("db-cleanup", true),
-    { (r: Runnable, executor: ThreadPoolExecutor) =>
-      log.error(s"$r has been rejected from $executor")
-      throw new RejectedExecutionException
-    }
-  )
-
-  override def close(): Unit = {
-    cleanupThreadPoolExecutor.shutdown()
-    cleanupThreadPoolExecutor.awaitTermination(10, TimeUnit.MINUTES)
-  }
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
@@ -428,10 +409,13 @@ class RocksDBWriter(
 
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
-        if (newSafeRollbackHeight >= 1) {
-          cleanupThreadPoolExecutor.submit(new Runnable {
-            override def run(): Unit = deleteOldEntries(Height(newSafeRollbackHeight))
-          })
+
+        deleteOldWavesBalanceEntries(Height(newSafeRollbackHeight), rw)
+        if (newSafeRollbackHeight > 1000 && newSafeRollbackHeight % 1000 == 0) {
+          batchDeleteOldEntries(
+            from = Height(newSafeRollbackHeight - 1000 + 1),
+            to = Height(newSafeRollbackHeight)
+          )
         }
       }
 
@@ -653,58 +637,117 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  private def deleteOldEntries(height: Height): Unit = writableDB.withOptions { (ro, wo) =>
-    writableDB.readWriteWithOptions(ro, wo.setLowPri(true)) { rw =>
-      val changedAddressesKey = Keys.changedAddresses(height)
-      val changedAddresses    = rw.get(changedAddressesKey)
+  // Because ChangedAddresses contains addresses those are affected by a transaction or have changed WAVES balance.
+  // In case of sponsor transfers without WAVES an address is affected by a transaction, but WAVES balance still the same.
+  private def deleteOldWavesBalanceEntries(height: Height, rw: RW): Unit = {
+    val changedAddressesKey = Keys.changedAddresses(height)
+    val changedAddresses    = rw.get(changedAddressesKey)
 
-      val wavesAddressIds    = new ArrayBuffer[AddressId](changedAddresses.size)
-      val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]](changedAddresses.size)
-      changedAddresses.foreach { addressId =>
-        wavesAddressIds.addOne(addressId)
-        wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
+    val wavesAddressIds    = new ArrayBuffer[AddressId](changedAddresses.size)
+    val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]](changedAddresses.size)
+    changedAddresses.foreach { addressId =>
+      wavesAddressIds.addOne(addressId)
+      wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
+    }
 
-        // Account data
-        val changedDataKeysAtKey = Keys.changedDataKeys(height, addressId)
-        rw.get(changedDataKeysAtKey).foreach { accountDataKey =>
-          val dataKeyAtKey = Keys.dataAt(addressId, accountDataKey)(height)
-          val dataKeyAt    = rw.get(dataKeyAtKey)
-
-          rw.delete(Keys.dataAt(addressId, accountDataKey)(dataKeyAt.prevHeight))
-        }
-        rw.delete(changedDataKeysAtKey)
+    wavesAddressIds.view
+      .zip(rw.multiGet(wavesBalanceAtKeys, BalanceNode.SizeInBytes))
+      .foreach {
+        // DB won't complain about a non-existed key with height = 0
+        case (addressId, Some(wavesBalanceAt)) => rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
+        case _                                 =>
       }
-      rw.delete(changedAddressesKey)
+  }
 
-      // WAVES balances
-      wavesAddressIds.view
-        .zip(rw.multiGet(wavesBalanceAtKeys, BalanceNode.SizeInBytes))
-        .foreach {
-          // DB won't complain about a non-existed key with height = 0
-          case (addressId, Some(wavesBalanceAt)) => rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
-          case _                                 =>
+  private def batchDeleteOldEntries(from: Height, to: Height): Unit = writableDB.withOptions { (ro, wo) =>
+    writableDB.readWriteWithOptions(ro, wo) { rw =>
+      val assetBalanceAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), TwoHeights]
+
+      val changedDataAddresses = mutable.Set.empty[AddressId]
+      val accountDataAt        = mutable.AnyRefMap.empty[(AddressId, String), TwoHeights]
+
+      // Collecting data
+
+      rw.iterateOverWithSeek(KeyTags.ChangedAddresses.prefixBytes, Keys.changedAddresses(from).keyBytes) { e =>
+        val currHeight          = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+        val changedAddressesKey = Keys.changedAddresses(currHeight)
+
+        changedAddressesKey.parse(e.getValue).foreach { addressId =>
+          // Account data
+          val changedDataKeysAtKey = Keys.changedDataKeys(currHeight, addressId)
+          val changedDataKeys      = rw.get(changedDataKeysAtKey)
+          if (changedDataKeys.nonEmpty) {
+            changedDataAddresses.addOne(addressId)
+            changedDataKeys.foreach { accountDataKey =>
+              accountDataAt.updateWith((addressId, accountDataKey))(TwoHeights.update(_, currHeight))
+            }
+          }
         }
+
+        currHeight < to
+      }
 
       // Asset balances
-      val addressIdAndAssets = new ArrayBuffer[(AddressId, IssuedAsset)]()
-      val assetBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]
+      rw.iterateOverWithSeek(KeyTags.ChangedAssetBalances.prefixBytes, Keys.changedBalancesAtPrefix(from)) { e =>
+        val currHeight = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+        val asset      = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
 
-      rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(height)) { e =>
-        val asset              = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
-        val changedBalancesKey = Keys.changedBalances(height, asset)
-        rw.get(changedBalancesKey).foreach { addressId =>
-          addressIdAndAssets.addOne((addressId, asset))
-          assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, height))
+        val changedBalancesKey = Keys.changedBalances(currHeight, asset)
+        changedBalancesKey.parse(e.getValue).foreach { addressId =>
+          assetBalanceAt.updateWith((addressId, asset))(TwoHeights.update(_, currHeight))
         }
-        rw.delete(changedBalancesKey)
+
+        currHeight < to
       }
 
-      addressIdAndAssets.view
+      // Deleting data
+
+      // Asset balances
+      val assetBalanceAtAids = new ArrayBuffer[(AddressId, IssuedAsset)]()
+      val assetBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
+      assetBalanceAt.foreach { case ((addressId, asset), heights) =>
+        heights.prev match {
+          case Some(prevHeight) =>
+            rw.deleteRange(
+              Keys.assetBalanceAt(addressId, asset, from),
+              Keys.assetBalanceAt(addressId, asset, prevHeight)
+            )
+
+          case None =>
+            assetBalanceAtAids.addOne((addressId, asset))
+            assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, heights.last))
+        }
+      }
+
+      assetBalanceAtAids.view
         .zip(rw.multiGet(assetBalanceAtKeys, BalanceNode.SizeInBytes))
         .foreach {
           case ((addressId, asset), Some(assetBalanceAt)) => rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
           case _                                          =>
         }
+
+      // Account data
+      accountDataAt.foreach { case ((addressId, dataKey), heights) =>
+        heights.prev match {
+          case Some(prevHeight) =>
+            rw.deleteRange(
+              Keys.dataAt(addressId, dataKey)(from),
+              Keys.dataAt(addressId, dataKey)(prevHeight)
+            )
+
+          case None =>
+            val dataKeyAtKey = Keys.dataAt(addressId, dataKey)(heights.last)
+            val dataKeyAt    = rw.get(dataKeyAtKey)
+            rw.delete(Keys.dataAt(addressId, dataKey)(dataKeyAt.prevHeight))
+        }
+      }
+
+      // Changed keys
+      rw.deleteRange(Keys.changedAddresses(from), Keys.changedAddresses(to))
+      rw.deleteRange(Keys.changedBalancesAtPrefix(from), Keys.changedBalancesAtPrefix(to))
+      changedDataAddresses.foreach { addressId =>
+        rw.deleteRange(Keys.changedDataKeys(from, addressId), Keys.changedDataKeys(to, addressId))
+      }
     }
   }
 
@@ -1177,5 +1220,16 @@ class RocksDBWriter(
 
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = {
     readOnly(_.get(Keys.blockStateHash(height)))
+  }
+}
+
+private case class TwoHeights(last: Height, prev: Option[Height] = None) {
+  def update(h: Height): TwoHeights = copy(last = h, prev = Some(last))
+}
+
+private object TwoHeights {
+  def update(orig: Option[TwoHeights], h: Height): Option[TwoHeights] = orig match {
+    case Some(orig) => Some(orig.update(h))
+    case None       => Some(TwoHeights(h))
   }
 }

@@ -54,6 +54,16 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     }
   }
 
+  def iterateOverWithSeek(prefix: Array[Byte], seek: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit =
+    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
+      iter.seek(seek)
+      var continue = true
+      while (iter.isValid && iter.key().startsWith(prefix) && continue) {
+        continue = f(Maps.immutableEntry(iter.key(), iter.value()))
+        if (continue) iter.next()
+      }
+    }
+
   def iterateOver(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
     Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
       iter.seek(prefix)

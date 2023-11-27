@@ -21,6 +21,9 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
   def delete[V](key: Key[V]): Unit =
     batch.delete(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes)
 
+  def deleteRange[V](from: Key[V], to: Key[V]): Unit        = deleteRange(from.keyBytes, to.keyBytes)
+  def deleteRange(from: Array[Byte], to: Array[Byte]): Unit = batch.deleteRange(from, to)
+
   def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
     val newValue = get(key).filterNot(_ == heightToRemove)
     if (newValue.nonEmpty) put(key, newValue)
