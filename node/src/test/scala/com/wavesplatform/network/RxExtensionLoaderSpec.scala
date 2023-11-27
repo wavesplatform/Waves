@@ -92,7 +92,7 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
   "should blacklist GetSignatures timeout" in withExtensionLoader(Seq.tabulate(100)(byteStr), 1.millis) { (_, _, _, ccsw, _) =>
     val ch = new EmbeddedChannel()
     test(for {
-      _ <- send(ccsw)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
+      _ <- send(ccsw, timeout = 1000)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
     } yield {
       ch.isOpen shouldBe false
     })

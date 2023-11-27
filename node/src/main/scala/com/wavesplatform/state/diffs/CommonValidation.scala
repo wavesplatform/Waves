@@ -13,7 +13,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.*
-import com.wavesplatform.transaction.*
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.*
@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.{Asset, *}
 
 import scala.util.{Left, Right}
 
@@ -36,21 +37,25 @@ object CommonValidation {
           feeAmount: Long,
           allowFeeOverdraft: Boolean = false
       ): Either[ValidationError, T] = {
-        val amountDiff = assetId match {
+        val amountPortfolio = assetId match {
           case aid @ IssuedAsset(_) => Portfolio.build(aid -> -amount)
           case Waves                => Portfolio(-amount)
         }
-        val feeDiff = feeAssetId match {
+        val feePortfolio = feeAssetId match {
           case aid @ IssuedAsset(_) => Portfolio.build(aid -> -feeAmount)
           case Waves                => Portfolio(-feeAmount)
         }
 
         val checkedTx = for {
-          spendings <- amountDiff.combine(feeDiff)
+          _ <- assetId match {
+            case IssuedAsset(id) => InvokeDiffsCommon.checkAsset(blockchain, id)
+            case Waves           => Right(())
+          }
+          spendings <- amountPortfolio.combine(feePortfolio)
           oldWavesBalance = blockchain.balance(sender, Waves)
 
           newWavesBalance     <- safeSum(oldWavesBalance, spendings.balance, "Spendings")
-          feeUncheckedBalance <- safeSum(oldWavesBalance, amountDiff.balance, "Transfer amount")
+          feeUncheckedBalance <- safeSum(oldWavesBalance, amountPortfolio.balance, "Transfer amount")
 
           overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
           _ <- Either.cond(
@@ -95,6 +100,7 @@ object CommonValidation {
 
           for {
             address <- blockchain.resolveAlias(citx.dApp)
+            _       <- InvokeDiffsCommon.checkPayments(blockchain, citx.payments)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                                                      => false
