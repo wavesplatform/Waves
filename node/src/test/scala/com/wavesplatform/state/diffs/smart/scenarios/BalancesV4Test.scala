@@ -132,7 +132,7 @@ class BalancesV4Test extends PropSpec with WithState {
            | assetBalance(Address(base58'$acc'), this.id) == $a && assetBalance(Alias("alias"), this.id) == $a
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
-      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
+      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, V4, parsedScript).explicitGet()._1)
         .explicitGet()
     }
 
@@ -194,7 +194,7 @@ class BalancesV4Test extends PropSpec with WithState {
            | wavesBalance(Address(base58'$acc')).regular == $w
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
-      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
+      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, V4, parsedScript).explicitGet()._1)
         .explicitGet()
     }
 

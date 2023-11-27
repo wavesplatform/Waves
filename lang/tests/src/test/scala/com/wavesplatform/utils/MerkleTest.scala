@@ -109,7 +109,7 @@ class MerkleTest extends PropSpec {
     val untyped = Parser.parseExpr(code).get.value
     val ctx     = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), true, true))()
     val evalCtx = ctx.evaluationContext[Id](Common.emptyBlockchainEnvironment())
-    val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
+    val typed   = ExpressionCompiler(ctx.compilerContext, V3, untyped)
     typed.flatMap(v => EvaluatorV2.applyCompleted(evalCtx, v._1, LogExtraInfo(), version, true, true, false)._3.leftMap(_.toString))
   }
 
