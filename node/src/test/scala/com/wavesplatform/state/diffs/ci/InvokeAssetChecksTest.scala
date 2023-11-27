@@ -8,11 +8,8 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.TxMeta.Status
-import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, StateSnapshot}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
@@ -49,71 +46,18 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       activated <- Seq(true, false)
       func      <- Seq("invalidLength", "unexisting")
     } {
-      {
-        val miner       = TxHelpers.signer(0).toAddress
-        val invoker     = TxHelpers.signer(1)
-        val master      = TxHelpers.signer(2)
-        val balances    = AddrWithBalance.enoughBalances(invoker, master)
-        val setScriptTx = TxHelpers.setScript(master, dApp)
-        val invoke      = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
-
-        val dAppAddress = master.toAddress
-
-        def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
-          Vector(
-            NewTransactionInfo(
-              invoke,
-              StateSnapshot.empty,
-              Set(invoke.senderAddress, dAppAddress),
-              if (succeeded) Status.Succeeded else Status.Failed,
-              8
-            )
-          )
-
-        val expectedResult =
-          if (activated) {
-            val expectingMessage =
-              if (func == "invalidLength")
-                lengthError
-              else
-                nonExistentError
-            Diff.withTransactions(
-              invokeInfo(false),
-              portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value),
-                miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
-              ),
-              scriptsComplexity = 8,
-              scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
-            )
-          } else {
-            val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
-            Diff.withTransactions(
-              invokeInfo(true),
-              portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value),
-                miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
-              ),
-              scriptsComplexity = 8,
-              scriptResults = Map(
-                invoke.id() -> InvokeScriptResult(
-                  transfers = Seq(
-                    InvokeScriptResult.Payment(invoke.senderAddress, Waves, 0),
-                    InvokeScriptResult.Payment(invoke.senderAddress, asset, 0)
-                  )
-                )
-              )
-            )
-          }
-
-        def noSnapshot(d: Diff) =
-          d.copy(transactions = d.transactions.map(_.copy(snapshot = StateSnapshot.empty)))
-
-        withDomain(if (activated) RideV5 else RideV4, balances) { d =>
-          d.appendBlock(setScriptTx)
-          d.appendBlock(invoke)
-          noSnapshot(d.liquidDiff) shouldBe expectedResult
-        }
+      val invoker     = TxHelpers.signer(1)
+      val master      = TxHelpers.signer(2)
+      val balances    = AddrWithBalance.enoughBalances(invoker, master)
+      val setScriptTx = TxHelpers.setScript(master, dApp)
+      withDomain(if (activated) RideV5 else RideV4, balances) { d =>
+        d.appendBlock(setScriptTx)
+        val invoke = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
+        if (activated) {
+          val expectingMessage = if (func == "invalidLength") lengthError else nonExistentError
+          d.appendAndAssertFailed(invoke, expectingMessage)
+        } else
+          d.appendAndAssertSucceed(invoke)
       }
     }
   }
@@ -270,7 +214,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       )
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendAndAssertSucceed(invoke(fee = invokeFee(issues = 2)))
-      d.liquidDiff.issuedAssets.size shouldBe 2
+      d.liquidSnapshot.assetStatics.size shouldBe 2
     }
   }
 }

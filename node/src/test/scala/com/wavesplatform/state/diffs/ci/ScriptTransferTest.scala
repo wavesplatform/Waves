@@ -90,7 +90,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
       val invokeTx = invoke()
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include("key not found: asset")
+      d.liquidSnapshot.errorMessage(invokeTx.id()).get.text should include("key not found: asset")
     }
   }
 

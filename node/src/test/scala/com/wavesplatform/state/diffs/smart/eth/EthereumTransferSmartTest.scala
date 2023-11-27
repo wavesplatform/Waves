@@ -10,7 +10,6 @@ import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
 import com.wavesplatform.test.*
@@ -21,7 +20,6 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
-import scala.collection.immutable.VectorMap
 import scala.math.Ordering.Implicits.infixOrderingOps
 
 class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
@@ -95,15 +93,21 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
         d.appendBlock(setVerifier())
         d.appendBlock(ProtoBlockVersion, ethTransfer)
 
-        val transferPortfolio = Portfolio.build(asset, transferAmount)
-        d.liquidDiff.portfolios(recipient.toAddress) shouldBe transferPortfolio
-        d.liquidDiff.portfolios(ethSender) shouldBe Portfolio.waves(-ethTransfer.underlying.getGasLimit.longValue()).minus(transferPortfolio)
+        d.liquidSnapshot.balances((recipient.toAddress, asset)) shouldBe d.rocksDBWriter.balance(recipient.toAddress, asset) + transferAmount
+        if (asset == Waves)
+          d.liquidSnapshot.balances((ethSender, Waves)) shouldBe
+            d.rocksDBWriter.balance(ethSender, Waves) - ethTransfer.underlying.getGasLimit.longValue() - transferAmount
+        else {
+          d.liquidSnapshot.balances((ethSender, Waves)) shouldBe
+            d.rocksDBWriter.balance(ethSender, Waves) - ethTransfer.underlying.getGasLimit.longValue()
+          d.liquidSnapshot.balances((ethSender, asset)) shouldBe d.rocksDBWriter.balance(ethSender, asset) - transferAmount
+        }
 
         d.appendBlock()
 
         if (version >= V6) {
           d.appendBlock(setVerifier()) // just for account script execution
-          d.liquidDiff.scriptsComplexity should be > 0L
+          d.liquidSnapshot.scriptsComplexity should be > 0L
         } else if (version >= V3) {
           (the[Exception] thrownBy d.appendBlock(setVerifier())).getMessage should include(
             "value() called on unit value on function 'transferTransactionById' call"
@@ -137,14 +141,14 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
           d.appendBlock(issue, preTransfer)
           d.appendBlock(ProtoBlockVersion, ethTransfer)
 
-          d.liquidDiff.errorMessage(ethTransfer.id()) shouldBe None
-          d.liquidDiff.portfolios(recipient.toAddress) shouldBe Portfolio.build(asset, transferAmount)
-          d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio(
-            -ethTransfer.underlying.getGasPrice.longValue(),
-            assets = VectorMap(asset -> -transferAmount)
-          )
+          d.liquidSnapshot.errorMessage(ethTransfer.id()) shouldBe None
+          d.liquidSnapshot.scriptsComplexity should be > 0L
 
-          d.liquidDiff.scriptsComplexity should be > 0L
+          d.liquidSnapshot.balances((recipient.toAddress, asset)) shouldBe transferAmount
+          d.liquidSnapshot.balances((ethTransfer.senderAddress(), Waves)) shouldBe
+            d.rocksDBWriter.balance(ethTransfer.senderAddress(), Waves) - ethTransfer.underlying.getGasPrice.longValue()
+          d.liquidSnapshot.balances((ethTransfer.senderAddress(), asset)) shouldBe
+            d.rocksDBWriter.balance(ethTransfer.senderAddress(), asset) - transferAmount
         }
       }
   }

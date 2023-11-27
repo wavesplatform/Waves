@@ -2,15 +2,17 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.RideV3
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 
-class DataTransactionDiffTest extends PropSpec with WithState {
+class DataTransactionDiffTest extends PropSpec with WithDomain {
 
   val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.DataTransaction.id -> 0))
 
@@ -41,34 +43,38 @@ class DataTransactionDiffTest extends PropSpec with WithState {
     }
 
     val (genesisTx, items, txs) = setup
-    val sender                  = txs.head.sender
-    val genesis                 = block(Seq(genesisTx))
-    val blocks                  = txs.map(tx => block(Seq(tx)))
+    val sender                  = txs.head.sender.toAddress
 
     val item1 = items.head
-    assertDiffAndState(Seq(genesis), blocks(0), fs) {
-      case (totalDiff, state) =>
-        assertBalanceInvariant(totalDiff)
-        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs(0).fee.value)
-        state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
+    withDomain(RideV3) { d =>
+      d.appendBlock(genesisTx)
+      d.appendBlock(txs(0))
+      d.liquidSnapshot.balances((sender, Waves)) shouldBe (ENOUGH_AMT - txs(0).fee.value)
+      d.liquidSnapshot.accountData(sender)(item1.key) shouldBe item1
+      val carryFee = -txs(0).fee.value * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
     }
 
     val item2 = items(1)
-    assertDiffAndState(Seq(genesis, blocks(0)), blocks(1), fs) {
-      case (totalDiff, state) =>
-        assertBalanceInvariant(totalDiff)
-        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee.value).sum)
-        state.accountData(sender.toAddress, item1.key) shouldBe Some(item1)
-        state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
+    withDomain(RideV3) { d =>
+      d.appendBlock(genesisTx)
+      d.appendBlock(txs(0), txs(1))
+      d.liquidSnapshot.balances((sender, Waves)) shouldBe (ENOUGH_AMT - txs.take(2).map(_.fee.value).sum)
+      d.liquidSnapshot.accountData(sender)(item1.key) shouldBe item1
+      d.liquidSnapshot.accountData(sender)(item2.key) shouldBe item2
+      val carryFee = -(txs(0).fee.value + txs(1).fee.value) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
     }
 
     val item3 = items(2)
-    assertDiffAndState(Seq(genesis, blocks(0), blocks(1)), blocks(2), fs) {
-      case (totalDiff, state) =>
-        assertBalanceInvariant(totalDiff)
-        state.balance(sender.toAddress) shouldBe (ENOUGH_AMT - txs.map(_.fee.value).sum)
-        state.accountData(sender.toAddress, item1.key) shouldBe Some(item3)
-        state.accountData(sender.toAddress, item2.key) shouldBe Some(item2)
+    withDomain(RideV3) { d =>
+      d.appendBlock(genesisTx)
+      d.appendBlock(txs(0), txs(1), txs(2))
+      d.liquidSnapshot.balances((sender, Waves)) shouldBe (ENOUGH_AMT - txs.map(_.fee.value).sum)
+      d.liquidSnapshot.accountData(sender)(item1.key) shouldBe item3
+      d.liquidSnapshot.accountData(sender)(item2.key) shouldBe item2
+      val carryFee = -(txs(0).fee.value + txs(1).fee.value + txs(2).fee.value) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
     }
   }
 

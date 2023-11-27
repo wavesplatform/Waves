@@ -329,7 +329,7 @@ object StateSnapshot {
       }
       .map(_.toMap)
 
-  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStatic] =
+  def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStatic] =
     issuedAssets.map { case (asset, info) =>
       asset ->
         AssetStatic(

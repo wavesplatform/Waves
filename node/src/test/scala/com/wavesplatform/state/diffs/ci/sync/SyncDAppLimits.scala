@@ -64,8 +64,8 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
         val calls    = complexityLimit / 2000 + 1
         val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
 
-        val diff              = d.createDiffE(invokeTx).value
-        val (_, scriptResult) = diff.scriptResults.headOption.value
+        val snapshot          = d.createDiffE(invokeTx).value
+        val (_, scriptResult) = snapshot.scriptResults.headOption.value
         scriptResult.error.value.text should include(s"Invoke complexity limit = $complexityLimit is exceeded")
 
         d.appendBlock(invokeTx)
@@ -99,8 +99,8 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
       val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(101)), invoker = alice)
 
-      val diff              = d.createDiffE(invokeTx).value
-      val (_, scriptResult) = diff.scriptResults.headOption.value
+      val snapshot          = d.createDiffE(invokeTx).value
+      val (_, scriptResult) = snapshot.scriptResults.headOption.value
       scriptResult.error.value.text should include("DApp calls limit = 100 is exceeded")
 
       d.appendBlock(invokeTx)

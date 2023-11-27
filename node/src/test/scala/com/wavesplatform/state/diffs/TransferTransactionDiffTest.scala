@@ -1,12 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.TestValues
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.settings.RewardsVotingSettings
-import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{TxHelpers, TxValidationError, TxVersion}
@@ -17,13 +14,12 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     val sender    = TxHelpers.secondAddress
     val senderKp  = TxHelpers.secondSigner
     val recipient = TxHelpers.address(2)
-    val feeDiff   = Diff(portfolios = Map(sender -> Portfolio.waves(TestValues.fee)))
 
     withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
-      assertBalanceInvariant(d.createDiff(wavesTransfer).combineF(feeDiff).explicitGet())
-
       d.appendAndAssertSucceed(wavesTransfer)
+      val rewardFee = 6.waves - wavesTransfer.fee.value * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, rewardFee)
       d.blockchain.balance(recipient) shouldBe wavesTransfer.amount.value
       d.blockchain.balance(sender) shouldBe ENOUGH_AMT - wavesTransfer.amount.value - wavesTransfer.fee.value
     }
@@ -31,9 +27,9 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(senderKp)) { d =>
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
-      assertBalanceInvariant(d.createDiff(assetTransfer).combineF(feeDiff).explicitGet())
-
       d.appendAndAssertSucceed(assetTransfer)
+      val rewardAndFee = 6.waves + (1.waves - assetTransfer.fee.value) * 3 / 5
+      assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, rewardAndFee)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, asset) shouldBe 1000L
       d.blockchain.balance(sender) shouldBe ENOUGH_AMT - assetTransfer.fee.value - 1.waves
