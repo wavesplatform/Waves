@@ -535,23 +535,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "script").as[String] shouldBe expectedResult
     }
 
-  routePath("/script/compile") in {
-    Post(routePath("/script/compile"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
-      val json           = responseAs[JsValue]
-      val expectedScript = ExprScript(V2, script).explicitGet()
-
-      Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
-      (json \ "complexity").as[Long] shouldBe 3
-      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
-    }
-
-    Post(routePath("/script/compile"), badScript) ~> route ~> check {
-      val json = responseAs[JsValue]
-      (json \ "error").as[Int] shouldBe 305
-      (json \ "message").as[String] shouldBe "Script estimation was interrupted"
-    }
-  }
-
   routePath("/script/compileCode") in {
     Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
       responseAs[JsValue] should matchJson("""{
@@ -576,10 +559,13 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     Post(routePath("/script/compileCode?compact=true"), bigSizeDApp) ~> route ~> check {
-      (responseAs[JsValue] \ "script").toOption shouldBe defined
-      (responseAs[JsValue] \ "complexity").as[Long] shouldBe 0
-      (responseAs[JsValue] \ "verifierComplexity").as[Long] shouldBe 0
-      (responseAs[JsValue] \ "extraFee").as[Long] shouldBe 400000
+      val r = responseAs[JsValue]
+      withClue(s"json=$r ") {
+        (r \ "script").toOption shouldBe defined
+        (r \ "complexity").as[Long] shouldBe 0
+        (r \ "verifierComplexity").as[Long] shouldBe 0
+        (r \ "extraFee").as[Long] shouldBe 400000
+      }
     }
 
     Post(routePath("/script/compileCode"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {

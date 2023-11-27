@@ -14,7 +14,7 @@ object MakeString_2C extends JsTestBase {
   private val invalidErrorMakeString_2C    = testData.invalidFunctionError("makeString_2C", 2)
 
   val tests: Tests = Tests {
-    test("MakeString_2C functions compiles") {
+    test("RIDE-194. makeString_2C function should compile for valid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       for (
         (data, list, function) <- Seq(
@@ -27,7 +27,7 @@ object MakeString_2C extends JsTestBase {
       }
     }
 
-    test("Invalid MakeString_2C functions") {
+    test("RIDE-195. makeString_2C function should throw a compilation error for invalid data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       for (
         (data, list, function, error) <- Seq(
@@ -41,7 +41,7 @@ object MakeString_2C extends JsTestBase {
       }
     }
 
-    test("Can't find a function MakeString_2C with versions V3 - V5") {
+    test("RIDE-196. Can't find a function makeString_2C for RIDE versions V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (

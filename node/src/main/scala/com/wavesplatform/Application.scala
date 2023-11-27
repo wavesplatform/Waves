@@ -140,7 +140,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
-    if (settings.minerSettings.enable)
+    if (settings.minerSettings.enable && !settings.enableLightMode)
       miner = new MinerImpl(
         allChannels,
         blockchainUpdater,
@@ -156,16 +156,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       )
 
-    val blockChallenger = new BlockChallengerImpl(
-      blockchainUpdater,
-      allChannels,
-      wallet,
-      settings,
-      time,
-      pos,
-      minerScheduler,
-      appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)
-    )
+    val blockChallenger =
+      if (settings.minerSettings.enable && !settings.enableLightMode) {
+        Some(
+          new BlockChallengerImpl(
+            blockchainUpdater,
+            allChannels,
+            wallet,
+            settings,
+            time,
+            pos,
+            appendBlock = BlockAppender(blockchainUpdater, time, utxStorage, pos, appenderScheduler)(_, None)
+          )
+        )
+      } else None
+
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, blockChallenger, appenderScheduler) _
 
@@ -187,7 +192,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, rdb)
+    val history = History(
+      blockchainUpdater,
+      blockchainUpdater.liquidBlock,
+      blockchainUpdater.microBlock,
+      blockchainUpdater.liquidBlockSnapshot,
+      blockchainUpdater.microBlockSnapshot,
+      rdb
+    )
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
@@ -207,7 +219,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxStorage.resetPriorityPool()
         blockchainUpdater.removeAfter(blockId)
       }.executeOn(appenderScheduler)
-        .asyncBoundary
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
@@ -270,7 +281,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
-    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
+    val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions, blockSnapshots, microblockSnapshots) =
+      networkServer.messages
 
     val timeoutSubject: ConcurrentSubject[Channel, Channel] = ConcurrentSubject.publish[Channel]
 
@@ -284,21 +296,26 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       timeoutSubject,
       scoreObserverScheduler
     )
-    val (microblockData, mbSyncCacheSizes) = MicroBlockSynchronizer(
+    val (microblockDataWithSnapshot, mbSyncCacheSizes) = MicroBlockSynchronizer(
       settings.synchronizationSettings.microBlockSynchronizer,
+      settings.enableLightMode,
       peerDatabase,
       lastBlockInfo.map(_.id),
       microblockInvs,
       microblockResponses,
+      microblockSnapshots,
       microblockSynchronizerScheduler
     )
-    val (newBlocks, extLoaderState, _) = RxExtensionLoader(
+    val (newBlocksWithSnapshot, extLoaderState, _) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
+      settings.synchronizationSettings.processedBlocksCacheTimeout,
+      settings.enableLightMode,
       Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
       blocks,
       signatures,
+      blockSnapshots,
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
@@ -317,9 +334,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
 
     Observable(
-      microblockData
+      microblockDataWithSnapshot
         .mapEval(processMicroBlock.tupled),
-      newBlocks
+      newBlocksWithSnapshot
         .mapEval(processBlock.tupled)
     ).merge
       .onErrorHandle(stopOnAppendError.reportFailure)
@@ -357,9 +374,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         else heavyRequestExecutor
       )
 
-      val routeTimeout = new RouteTimeout(
-        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      )(heavyRequestScheduler)
+      val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      val routeTimeout         = new RouteTimeout(serverRequestTimeout)(heavyRequestScheduler)
 
       val apiRoutes = Seq(
         new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
@@ -417,12 +433,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot,
           rocksDB.loadBalanceHistory,
           rocksDB.loadStateHash,
-          () => utxStorage.priorityPool.compositeBlockchain,
+          () => utxStorage.getPriorityPool.map(_.compositeBlockchain),
           routeTimeout,
           heavyRequestScheduler
         ),
         AssetsApiRoute(
           settings.restAPISettings,
+          serverRequestTimeout,
           wallet,
           transactionPublisher,
           blockchainUpdater,
@@ -530,7 +547,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application extends ScorexLogging {
-  private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
+  def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings.*
 
     val maybeExternalConfig = Try(external.map(f => ConfigFactory.parseFile(f.getAbsoluteFile, ConfigParseOptions.defaults().setAllowMissing(false))))
@@ -629,8 +646,9 @@ object Application extends ScorexLogging {
     import com.wavesplatform.settings.Constants
     val settings = loadApplicationConfig(configFile.map(new File(_)))
 
-    val log = LoggerFacade(LoggerFactory.getLogger(getClass))
-    log.info("Starting...")
+    val log      = LoggerFacade(LoggerFactory.getLogger(getClass))
+    val modeInfo = if (settings.enableLightMode) "in light mode" else "in full mode"
+    log.info(s"Starting $modeInfo...")
     sys.addShutdownHook {
       SystemInformationReporter.report(settings.config)
     }

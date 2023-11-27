@@ -5,6 +5,7 @@ import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -13,8 +14,8 @@ import com.wavesplatform.protobuf.ByteStrExt
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{NumericExt, PropSpec}
@@ -36,12 +37,20 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
       val recipient        = recipientSigner.toAddress
       val recipientSigner2 = TxHelpers.signer(3)
       val recipient2       = recipientSigner2.toAddress
+      val reward           = d.blockchain.settings.rewardsSettings.initial
 
       def assertSnapshot(tx: Transaction, expected: StateSnapshot, failed: Boolean = false): Unit = {
+        val expectedSnapshotWithMiner =
+          expected
+            .addBalances(
+              Map(defaultAddress -> Portfolio.waves(CurrentBlockFeePart(tx.fee) + reward + d.carryFee(None))).filter(_ => tx.fee != 0),
+              d.blockchain
+            )
+            .explicitGet()
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expected, status)
+        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
@@ -95,7 +104,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             asset -> AssetInfo(issueTx.name, issueTx.description, Height(d.solidStateHeight + 2))
           ),
           assetScripts = Map(
-            asset -> Some(AssetScriptInfo(script, 0))
+            asset -> AssetScriptInfo(script, 0)
           )
         )
       )
@@ -166,7 +175,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             recipient     -> LeaseBalance(leaseTx.amount.value, 0)
           ),
           leaseStates = Map(
-            leaseTx.id() -> LeaseDetails(sender.publicKey, recipient, leaseTx.amount.value, Active, leaseTx.id(), d.solidStateHeight + 2)
+            leaseTx.id() -> LeaseSnapshot(sender.publicKey, recipient, leaseTx.amount.value, Active)
           )
         )
       )
@@ -184,13 +193,11 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             recipient     -> LeaseBalance(0, 0)
           ),
           leaseStates = Map(
-            leaseTx.id() -> LeaseDetails(
-              sender.publicKey,
-              recipient,
-              leaseTx.amount.value,
-              Cancelled(d.solidStateHeight + 2, Some(leaseCancelTx.id())),
-              leaseTx.id(),
-              d.solidStateHeight
+            leaseTx.id() -> LeaseSnapshot(
+              PublicKey(ByteStr.fill(KeyLength)(0)),
+              Address(Array.fill(Address.HashLength)(0)),
+              0,
+              Cancelled(0, None)
             )
           )
         )
@@ -279,7 +286,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           assetScripts = Map(
-            asset -> Some(AssetScriptInfo(script, 0))
+            asset -> AssetScriptInfo(script, 0)
           )
         )
       )
@@ -323,11 +330,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           assetNamesAndDescriptions = Map(
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
-          assetScripts = Map(
-            dAppAssetId -> None
-          ),
           leaseStates = Map(
-            leaseId -> LeaseDetails(dAppPk, senderAddress, 123, Active, invokeId, height)
+            leaseId -> LeaseSnapshot(dAppPk, senderAddress, 123, Active)
           ),
           accountData = Map(
             dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))

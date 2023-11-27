@@ -27,7 +27,7 @@ trait Blockchain {
   def blockHeader(height: Int): Option[SignedBlockHeader]
   def hitSource(height: Int): Option[ByteStr]
 
-  def carryFee: Long
+  def carryFee(refId: Option[ByteStr]): Long
 
   def heightOf(blockId: ByteStr): Option[Int]
 
@@ -59,7 +59,10 @@ trait Blockchain {
 
   def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+  /**
+    * Retrieves Waves balance snapshot in the [from, to] range (inclusive)
+    * @return Balance snapshots from most recent to oldest.
+    */
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[AccountScriptInfo]
@@ -83,6 +86,8 @@ trait Blockchain {
   def effectiveBalanceBanHeights(address: Address): Seq[Int]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
+
+  def lastStateHash(refId: Option[ByteStr]): ByteStr
 }
 
 object Blockchain {

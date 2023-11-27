@@ -39,7 +39,8 @@ object TransactionParsers {
     SetAssetScriptTransaction,
     InvokeScriptTransaction,
     TransferTransaction,
-    InvokeExpressionTransaction
+    InvokeExpressionTransaction,
+    UpdateAssetInfoTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
@@ -79,4 +80,7 @@ object TransactionParsers {
       tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes
     } yield tx
   }
+
+  def versionIsCorrect(tx: Transaction & VersionedTransaction): Boolean =
+    TransactionParsers.all.contains((tx.tpe.id.toByte, tx.version))
 }

@@ -15,7 +15,7 @@ object Groth16Verify extends JsTestBase {
   private val invalidErrorGroth16Verify         = invalidFunctionError("groth16Verify", 3)
 
   val tests: Tests = Tests {
-    test("groth16Verify function compiles") {
+    test("RIDE-277. groth16Verify function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -30,7 +30,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test("compilation error: groth16Verify - Non-matching types: expected: ByteVector") {
+    test("RIDE-278. groth16Verify function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -47,7 +47,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function groth16Verify") {
+    test("RIDE-279. Can't find a function groth16Verify") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, groth16Verify)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)

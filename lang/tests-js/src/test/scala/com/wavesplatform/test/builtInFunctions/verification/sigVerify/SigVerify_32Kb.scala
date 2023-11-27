@@ -15,7 +15,7 @@ object SigVerify_32Kb extends JsTestBase {
   private val invalidErrorSigVerify_32Kb         = testData.invalidFunctionError("sigVerify_32Kb", 3)
 
   val tests: Tests = Tests {
-    test("sigVerify_32Kb functions compiles") {
+    test("RIDE-256. sigVerify_32Kb function should compile for valid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -30,7 +30,7 @@ object SigVerify_32Kb extends JsTestBase {
       }
     }
 
-    test("invalid functions sigVerify_32Kb") {
+    test("RIDE-257. sigVerify_32Kb function should throw a compilation error for invalid data") {
       for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -47,7 +47,7 @@ object SigVerify_32Kb extends JsTestBase {
       }
     }
 
-    test("compilation error: Can't find a function sigVerify_32Kb for V3") {
+    test("RIDE-258. Can't find a function sigVerify_32Kb for RIDE V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_32Kb)
       assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)

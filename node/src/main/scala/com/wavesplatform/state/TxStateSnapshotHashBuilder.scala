@@ -1,12 +1,21 @@
 package com.wavesplatform.state
 
+import cats.implicits.catsSyntaxSemigroup
+import cats.syntax.either.*
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.TxMeta.Status
+import com.wavesplatform.state.diffs.BlockDiffer.{CurrentBlockFeePart, maybeApplySponsorship}
+import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.utils.byteStrOrdering
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
 import java.nio.charset.StandardCharsets
@@ -25,7 +34,9 @@ object TxStateSnapshotHashBuilder {
       TxStateSnapshotHashBuilder.createHash(Seq(prevHash, txStateSnapshotHash))
   }
 
-  def createHashFromSnapshot(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo]): Result = {
+  case class TxStatusInfo(id: ByteStr, status: TxMeta.Status)
+
+  def createHashFromSnapshot(snapshot: StateSnapshot, txStatusOpt: Option[TxStatusInfo]): Result = {
     val changedKeys = mutable.Map.empty[ByteStr, Array[Byte]]
 
     def addEntry(keyType: KeyType.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -61,12 +72,21 @@ object TxStateSnapshotHashBuilder {
     }
 
     for {
-      (asset, sv) <- snapshot.assetScripts
-      script = sv.map(_.script)
-    } addEntry(KeyType.AssetScript, asset.id.arr)(script.fold(Array.emptyByteArray)(_.bytes().arr))
+      (asset, scriptInfo) <- snapshot.assetScripts
+    } addEntry(KeyType.AssetScript, asset.id.arr)(scriptInfo.script.bytes().arr)
 
     snapshot.leaseStates.foreach { case (leaseId, details) =>
-      addEntry(KeyType.LeaseStatus, leaseId.arr)(booleanToBytes(details.isActive))
+      if (details.isActive)
+        addEntry(KeyType.LeaseStatus, leaseId.arr)(
+          booleanToBytes(true),
+          details.sender.arr,
+          details.recipient.bytes,
+          Longs.toByteArray(details.amount)
+        )
+      else
+        addEntry(KeyType.LeaseStatus, leaseId.arr)(
+          booleanToBytes(false)
+        )
     }
 
     snapshot.sponsorships.foreach { case (asset, sponsorship) =>
@@ -103,10 +123,10 @@ object TxStateSnapshotHashBuilder {
       )
     }
 
-    txInfoOpt.foreach(txInfo =>
+    txStatusOpt.foreach(txInfo =>
       txInfo.status match {
-        case Status.Failed    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(1: Byte))
-        case Status.Elided    => addEntry(KeyType.TransactionStatus, txInfo.transaction.id().arr)(Array(2: Byte))
+        case Status.Failed    => addEntry(KeyType.TransactionStatus, txInfo.id.arr)(Array(1: Byte))
+        case Status.Elided    => addEntry(KeyType.TransactionStatus, txInfo.id.arr)(Array(2: Byte))
         case Status.Succeeded =>
       }
     )
@@ -128,6 +148,56 @@ object TxStateSnapshotHashBuilder {
         }
         ._1
     )
+
+  def computeStateHash(
+      txs: Seq[Transaction],
+      initStateHash: ByteStr,
+      initSnapshot: StateSnapshot,
+      signer: KeyPair,
+      prevBlockTimestamp: Option[Long],
+      currentBlockTimestamp: Long,
+      isChallenging: Boolean,
+      blockchain: Blockchain
+  ): TracedResult[ValidationError, ByteStr] = {
+    val txDiffer = TransactionDiffer(prevBlockTimestamp, currentBlockTimestamp) _
+
+    txs
+      .foldLeft[TracedResult[ValidationError, (ByteStr, StateSnapshot)]](TracedResult.wrapValue(initStateHash -> initSnapshot)) {
+        case (TracedResult(Right((prevStateHash, accSnapshot)), _, _), tx) =>
+          val accBlockchain  = SnapshotBlockchain(blockchain, accSnapshot)
+          val txDifferResult = txDiffer(accBlockchain, tx)
+          txDifferResult.resultE match {
+            case Right(txSnapshot) =>
+              val (feeAsset, feeAmount) =
+                maybeApplySponsorship(accBlockchain, accBlockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain), tx.assetFee)
+              val minerPortfolio = Map(signer.toAddress -> Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart))
+
+              val txSnapshotWithBalances = txSnapshot.addBalances(minerPortfolio, accBlockchain).explicitGet()
+              val txInfo                 = txSnapshot.transactions.head._2
+              val stateHash =
+                TxStateSnapshotHashBuilder
+                  .createHashFromSnapshot(txSnapshotWithBalances, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                  .createHash(prevStateHash)
+
+              txDifferResult.copy(resultE = Right((stateHash, accSnapshot |+| txSnapshotWithBalances)))
+            case Left(_) if isChallenging =>
+              txDifferResult.copy(resultE =
+                Right(
+                  (
+                    TxStateSnapshotHashBuilder
+                      .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(tx.id(), TxMeta.Status.Elided)))
+                      .createHash(prevStateHash),
+                    accSnapshot.bindElidedTransaction(accBlockchain, tx)
+                  )
+                )
+              )
+
+            case Left(err) => txDifferResult.copy(resultE = err.asLeft[(ByteStr, StateSnapshot)])
+          }
+        case (err @ TracedResult(Left(_), _, _), _) => err
+      }
+      .map(_._1)
+  }
 
   private def booleanToBytes(flag: Boolean): Array[Byte] =
     if (flag) Array(1: Byte) else Array(0: Byte)

@@ -1,10 +1,8 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
-import cats.syntax.either.*
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.Version
 import com.wavesplatform.account.{Address, PKKeyPair}
@@ -19,7 +17,7 @@ import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash, TxMeta}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -58,7 +56,7 @@ case class DebugApiRoute(
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () => Blockchain,
+    priorityPoolBlockchain: () => Option[Blockchain],
     routeTimeout: RouteTimeout,
     heavyRequestScheduler: Scheduler
 ) extends ApiRoute
@@ -73,12 +71,11 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
 
-  private[this] val serializer                                               = TransactionJsonSerializer(blockchain, transactionsApi)
-  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private[this] val serializer = TransactionJsonSerializer(blockchain, transactionsApi)
 
   override lazy val route: Route = pathPrefix("debug") {
-    stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
-      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ minerInfo ~ configInfo ~ print
+    balanceHistory ~ stateHash ~ validate ~ withAuth {
+      state ~ info ~ stateWaves ~ rollback ~ blacklist ~ minerInfo ~ configInfo ~ print
     }
   }
 
@@ -179,21 +176,6 @@ case class DebugApiRoute(
     complete(if (full) fullConfig else wavesConfig)
   }
 
-  def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
-    delete {
-      val signatureEi: Either[ValidationError, ByteStr] =
-        ByteStr
-          .decodeBase58(signature)
-          .toEither
-          .leftMap(_ => InvalidRequestSignature)
-      signatureEi
-        .fold(
-          err => complete(ApiError.fromValidationError(err)),
-          sig => complete(rollbackToBlock(sig, returnTransactionsToUtx = false))
-        )
-    }
-  }
-
   def blacklist: Route = (path("blacklist") & post) {
     entity(as[String]) { socketAddressString =>
       try {
@@ -216,14 +198,14 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-      val blockchain = priorityPoolBlockchain()
-      val startTime  = System.nanoTime()
+      val resBlockchain = priorityPoolBlockchain().getOrElse(blockchain)
+      val startTime     = System.nanoTime()
 
       val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedSnapshot = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(blockchain, tx)
+        diff <- TransactionDiffer.forceValidate(resBlockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(resBlockchain, tx)
       } yield (tx, diff)
 
       val error = tracedSnapshot.resultE match {
@@ -237,7 +219,7 @@ case class DebugApiRoute(
         .fold(
           _ => this.serializer,
           { case (_, snapshot) =>
-            val snapshotBlockchain = SnapshotBlockchain(blockchain, snapshot)
+            val snapshotBlockchain = SnapshotBlockchain(resBlockchain, snapshot)
             this.serializer.copy(blockchain = snapshotBlockchain)
           }
         )
@@ -249,8 +231,8 @@ case class DebugApiRoute(
             val meta = tx match {
               case ist: InvokeScriptTransaction =>
                 val result = diff.scriptResults.get(ist.id())
-                TransactionMeta.Invoke(Height(blockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
-              case tx => TransactionMeta.Default(Height(blockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
+                TransactionMeta.Invoke(Height(resBlockchain.height), ist, TxMeta.Status.Succeeded, diff.scriptsComplexity, result)
+              case tx => TransactionMeta.Default(Height(resBlockchain.height), tx, TxMeta.Status.Succeeded, diff.scriptsComplexity)
             }
             serializer.transactionWithMetaJson(meta)
           }
@@ -263,32 +245,13 @@ case class DebugApiRoute(
           case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },
-        "height" -> blockchain.height
+        "height" -> resBlockchain.height
       )
 
       error.fold(response ++ extendedJson)(err =>
         response + ("error" -> JsString(ApiError.fromValidationError(err).message)) + ("transaction" -> transactionJson)
       )
     })
-
-  def stateChanges: Route = stateChangesById ~ stateChangesByAddress
-
-  def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
-    redirect(s"/transactions/info/$id", StatusCodes.MovedPermanently)
-  }
-
-  def stateChangesByAddress: Route =
-    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
-      validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
-        implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
-        routeTimeout.executeStreamed {
-          transactionsApi
-            .transactionsByAddress(address, None, Set.empty, afterOpt)
-            .take(limit)
-            .toListL
-        }(Json.toJsObject(_))
-      }
-    }
 
   def stateHash: Route = (get & pathPrefix("stateHash")) {
     path("last")(stateHashAt(blockchain.height - 1)) ~ path(IntNumber)(stateHashAt)
@@ -299,9 +262,10 @@ case class DebugApiRoute(
       sh <- loadStateHash(height)
       h  <- blockchain.blockHeader(height)
     } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-      "blockId" -> h.id().toString,
-      "height"  -> height,
-      "version" -> Version.VersionString
+      "blockId"    -> h.id().toString,
+      "baseTarget" -> h.header.baseTarget,
+      "height"     -> height,
+      "version"    -> Version.VersionString
     )
 
     result match {

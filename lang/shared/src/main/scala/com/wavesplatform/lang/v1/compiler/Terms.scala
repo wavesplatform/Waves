@@ -1,17 +1,18 @@
 package com.wavesplatform.lang.v1.compiler
 
 import java.nio.charset.StandardCharsets
-
 import cats.Eval
 import cats.instances.list.*
 import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ExecutionError, CommonError}
+import com.wavesplatform.lang.{CommonError, ExecutionError}
 import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
+
+import scala.annotation.nowarn
 
 object Terms {
   val DataTxMaxBytes: Int      = 150 * 1024     // should be the same as DataTransaction.MaxBytes
@@ -242,6 +243,7 @@ object Terms {
   lazy val TRUE: CONST_BOOLEAN  = CONST_BOOLEAN(true)
   lazy val FALSE: CONST_BOOLEAN = CONST_BOOLEAN(false)
 
+  @nowarn // do not warn about private constructor
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)

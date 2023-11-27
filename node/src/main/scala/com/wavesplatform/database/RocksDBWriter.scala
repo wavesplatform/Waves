@@ -7,8 +7,8 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
@@ -17,8 +17,7 @@ import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, Bl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
+import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
@@ -43,6 +42,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
 object RocksDBWriter extends ScorexLogging {
+
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
     * ([10, 7], 5, 11) => [10, 7, 1]
@@ -107,6 +107,7 @@ class RocksDBWriter(
     rdb: RDB,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
+    isLightMode: Boolean,
     bfBlockInsertions: Int = 10000
 ) extends Caches {
   import rdb.db as writableDB
@@ -160,7 +161,7 @@ class RocksDBWriter(
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
-  override def carryFee: Long = writableDB.get(Keys.carryFee(height))
+  override def carryFee(refId: Option[ByteStr]): Long = writableDB.get(Keys.carryFee(height))
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
     writableDB.get(Keys.data(address, key))
@@ -282,7 +283,8 @@ class RocksDBWriter(
     else settings.genesisSettings.initialBalance
 
   override def blockReward(height: Int): Option[Long] =
-    if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
+    if (this.isFeatureActivated(BlockchainFeatures.ConsensusImprovements, height) && height == 1) None
+    else if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
     else None
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[?]): Seq[Array[Byte]] =
@@ -385,6 +387,7 @@ class RocksDBWriter(
       blockMeta: PBBlockMeta,
       snapshot: StateSnapshot,
       carry: Long,
+      computedBlockStateHash: ByteStr,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
@@ -411,7 +414,7 @@ class RocksDBWriter(
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
       blockHeightCache.put(blockMeta.id, Some(height))
 
-      blockMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
+      blockMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
         case Some(addr) =>
           val key          = Keys.maliciousMinerBanHeights(addr.bytes)
           val savedHeights = rw.get(key)
@@ -481,7 +484,14 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for ((id, details) <- snapshot.leaseStates) {
+      val txLeases = for {
+        (_, txInfo) <- snapshot.transactions
+        (id, lease) <- txInfo.snapshot.leaseStates
+      } yield (Some(txInfo.transaction), id, lease)
+      val txLeaseIdSet = txLeases.map(_._2).toSet
+      val allLeases    = txLeases ++ snapshot.leaseStates.collect { case (id, lease) if !txLeaseIdSet.contains(id) => (None, id, lease) }
+      allLeases.foreach { case (txOpt, id, lease) =>
+        val details = lease.toDetails(this, txOpt, leaseDetails(id))
         rw.put(Keys.leaseDetails(id)(height), Some(Right(details)))
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
@@ -493,7 +503,7 @@ class RocksDBWriter(
 
       for ((asset, script) <- snapshot.assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-        if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
+        rw.put(Keys.assetScript(asset)(height), Some(script))
       }
 
       if (height % BlockStep == 1) {
@@ -559,10 +569,10 @@ class RocksDBWriter(
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
-          approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
+          approvedFeaturesCache = newlyApprovedFeatures ++ approvedFeaturesCache
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache).toMap
 
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
@@ -575,6 +585,9 @@ class RocksDBWriter(
 
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
+
+      rw.put(Keys.blockStateHash(height), computedBlockStateHash)
+      expiredKeys += Keys.blockStateHash(threshold - 1).keyBytes
 
       if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactionsWithSize
@@ -622,14 +635,14 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)] = {
+  override protected def doRollback(targetHeight: Int): DiscardedBlocks = {
     val targetBlockId = readOnly(_.get(Keys.blockMetaAt(Height @@ targetHeight)))
       .map(_.id)
       .getOrElse(throw new IllegalArgumentException(s"No block at height $targetHeight"))
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedBlocks: Seq[(Block, ByteStr)] =
+    val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
         val ordersToInvalidate       = Seq.newBuilder[ByteStr]
@@ -746,7 +759,7 @@ class RocksDBWriter(
             rw.delete(Keys.transactionStateSnapshotAt(currentHeight, num, rdb.txSnapshotHandle))
           }
 
-          discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress)) match {
+          discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
             case Some(addr) =>
               val key        = Keys.maliciousMinerBanHeights(addr.bytes)
               val banHeights = rw.get(key)
@@ -759,11 +772,21 @@ class RocksDBWriter(
           rw.delete(Keys.heightOf(discardedMeta.id))
           blockHeightsToInvalidate.addOne(discardedMeta.id)
           rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.blockStateHash(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
+          }
+
+          val disapprovedFeatures = approvedFeaturesCache.collect { case (id, approvalHeight) if approvalHeight > targetHeight => id }
+          if (disapprovedFeatures.nonEmpty) {
+            approvedFeaturesCache --= disapprovedFeatures
+            rw.put(Keys.approvedFeatures, approvedFeaturesCache)
+
+            activatedFeaturesCache --= disapprovedFeatures // We won't activate them in the future
+            rw.put(Keys.activatedFeatures, activatedFeaturesCache)
           }
 
           val block = createBlock(
@@ -774,7 +797,11 @@ class RocksDBWriter(
             blockTxs.map(_._2)
           ).explicitGet()
 
-          (block, Caches.toHitSource(discardedMeta))
+          val snapshot = if (isLightMode) {
+            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb)))
+          } else None
+
+          (block, Caches.toHitSource(discardedMeta), snapshot)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -988,17 +1015,15 @@ class RocksDBWriter(
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
-    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0, isBanned = false))) { addressId =>
+    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
-
-      val banHeights = effectiveBalanceBanHeights(address).toSet
 
       val lastBalance      = balancesCache.get((address, Asset.Waves))
       val lastLeaseBalance = leaseBalanceCache.get(address)
 
       @tailrec
       def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from)
+        if (hh < from || hh <= 0)
           acc :+ hh
         else {
           val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
@@ -1008,7 +1033,7 @@ class RocksDBWriter(
 
       @tailrec
       def collectLeaseBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from)
+        if (hh < from || hh <= 0)
           acc :+ hh
         else {
           val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
@@ -1023,9 +1048,8 @@ class RocksDBWriter(
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
       } yield {
-        val height   = wh.max(lh)
-        val isBanned = banHeights.contains(height)
-        BalanceSnapshot(height, wb.balance, lb.in, lb.out, isBanned)
+        val height = wh.max(lh)
+        BalanceSnapshot(height, wb.balance, lb.in, lb.out)
       }
     }
   }
@@ -1078,4 +1102,8 @@ class RocksDBWriter(
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
+
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = {
+    readOnly(_.get(Keys.blockStateHash(height)))
+  }
 }

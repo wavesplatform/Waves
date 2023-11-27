@@ -1,17 +1,17 @@
 package com.wavesplatform.it.sync.network
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.{DockerBased, Node, NodeConfigs, Nodes}
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest._
+import org.scalatest.*
 
-import scala.concurrent._
-import scala.concurrent.duration._
+import scala.concurrent.*
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 class NetworkUniqueConnectionsTestSuite extends freespec.AnyFreeSpec with matchers.should.Matchers with DockerBased with ScorexLogging with Nodes {
-  import NetworkUniqueConnectionsTestSuite._
+  import NetworkUniqueConnectionsTestSuite.*
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig, autoConnect = false)
@@ -25,8 +25,8 @@ class NetworkUniqueConnectionsTestSuite extends freespec.AnyFreeSpec with matche
       // Helps to do an incoming connection: second -> first (1)
       val peersConfig = ConfigFactory.parseString(
         s"""waves.network.known-peers = [
-             |  "${firstNode.containerNetworkAddress.getHostName}:${firstNode.containerNetworkAddress.getPort}"
-             |]""".stripMargin
+           |  "${firstNode.networkAddress.getHostName}:${firstNode.networkAddress.getPort}"
+           |]""".stripMargin
       )
 
       docker.startNode(peersConfig.withFallback(SecondNodeConfig), autoConnect = false)
@@ -35,7 +35,7 @@ class NetworkUniqueConnectionsTestSuite extends freespec.AnyFreeSpec with matche
     firstNode.waitForPeers(1)
 
     // Outgoing connection: first -> second (2)
-    firstNode.connect(secondNode.containerNetworkAddress)
+    firstNode.connect(secondNode.networkAddress)
 
     withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
       Try(firstNode.waitForPeers(2, 30.seconds)) match {

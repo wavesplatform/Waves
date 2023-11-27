@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import java.io.File
 import java.nio.file.Files
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
@@ -76,11 +75,12 @@ trait BaseState {
     .block
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionSnapshot =
-      BlockDiffer.fromBlock(state, prev, next, MiningConstraint.Unlimited, next.header.generationSignature)
+    val differResult =
+      BlockDiffer
+        .fromBlock(state, prev, next, None, MiningConstraint.Unlimited, next.header.generationSignature)
         .explicitGet()
-        .snapshot
-    state.append(preconditionSnapshot, 0, 0, None, next.header.generationSignature, next)
+
+    state.append(differResult.snapshot, 0, 0, None, next.header.generationSignature, differResult.computedStateHash, next)
   }
 
   def applyBlock(b: Block): Unit = {

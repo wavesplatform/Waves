@@ -237,10 +237,10 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
         }
 
         d.blockchainUpdater.processBlock(block1) should beRight
-        d.blockchainUpdater.processMicroBlock(microBlocks1And2.head) should beRight
-        d.blockchainUpdater.processMicroBlock(microBlocks1And2.last) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlocks1And2.head, None) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlocks1And2.last, None) should beRight
         d.blockchainUpdater.processBlock(block2) should beRight // this should remove previous microblock
-        d.blockchainUpdater.processMicroBlock(microBlock3.head) should beRight
+        d.blockchainUpdater.processMicroBlock(microBlock3.head, None) should beRight
         d.blockchainUpdater.shutdown()
       }
     }
@@ -304,7 +304,9 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
       d.appendBlockE(currentBlock) should beRight
 
-      val appender = BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, Schedulers.singleThread("appender"), verify = false) _
+      val scheduler = Schedulers.singleThread("appender")
+      val appender =
+        BlockAppender(d.blockchainUpdater, SystemTime, d.utxPool, d.posSelector, scheduler, verify = false)(_, None)
 
       appender(worseBlock).runSyncUnsafe(1.minute) shouldBe Left(
         BlockAppendError(
@@ -315,6 +317,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
       appender(betterBlock).runSyncUnsafe(1.minute) should beRight
       d.lastBlock shouldBe betterBlock
+      scheduler.shutdown()
     }
   }
 }

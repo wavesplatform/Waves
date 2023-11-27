@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.RxScoreObserver.ChannelClosedAndSyncWith
@@ -13,14 +13,14 @@ import io.netty.channel.local.LocalChannel
 import io.netty.util
 import monix.eval.{Coeval, Task}
 import monix.reactive.Observable
-import monix.reactive.subjects.{PublishSubject => PS}
+import monix.reactive.subjects.PublishSubject as PS
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
-  import RxExtensionLoaderSpec._
+  import RxExtensionLoaderSpec.*
 
   val MaxRollback = 10
   type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BigInt]]]
@@ -28,23 +28,42 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
 
   override def testSchedulerName: String = "test-rx-extension-loader"
 
-  private def withExtensionLoader(lastBlockIds: Seq[ByteStr] = Seq.empty, timeOut: FiniteDuration = 1.day, applier: Applier = simpleApplier)(
+  private def withExtensionLoader(
+      lastBlockIds: Seq[ByteStr] = Seq.empty,
+      timeOut: FiniteDuration = 1.day,
+      cacheTimeout: FiniteDuration = 3.minute,
+      applier: Applier = simpleApplier
+  )(
       f: (
           InMemoryInvalidBlockStorage,
           PS[(Channel, Block)],
           PS[(Channel, Signatures)],
           PS[ChannelClosedAndSyncWith],
-          Observable[(Channel, Block)]
+          Observable[(Channel, Block, Option[BlockSnapshot])]
       ) => Any
   ) = {
     val blocks          = PS[(Channel, Block)]()
     val sigs            = PS[(Channel, Signatures)]()
     val ccsw            = PS[ChannelClosedAndSyncWith]()
+    val snapshots       = PS[(Channel, BlockSnapshot)]()
     val timeout         = PS[Channel]()
     val op              = PeerDatabase.NoOp
     val invBlockStorage = new InMemoryInvalidBlockStorage
     val (singleBlocks, _, _) =
-      RxExtensionLoader(timeOut, Coeval(lastBlockIds.reverse.take(MaxRollback)), op, invBlockStorage, blocks, sigs, ccsw, testScheduler, timeout)(
+      RxExtensionLoader(
+        timeOut,
+        cacheTimeout,
+        isLightMode = false,
+        Coeval(lastBlockIds.reverse.take(MaxRollback)),
+        op,
+        invBlockStorage,
+        blocks,
+        sigs,
+        snapshots,
+        ccsw,
+        testScheduler,
+        timeout
+      )(
         applier
       )
 
@@ -66,14 +85,14 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
     test(for {
       _ <- send(blocks)((ch, block))
     } yield {
-      newSingleBlocks().last shouldBe ((ch, block))
+      newSingleBlocks().last shouldBe ((ch, block, None))
     })
   }
 
   "should blacklist GetSignatures timeout" in withExtensionLoader(Seq.tabulate(100)(byteStr), 1.millis) { (_, _, _, ccsw, _) =>
     val ch = new EmbeddedChannel()
     test(for {
-      _ <- send(ccsw)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
+      _ <- send(ccsw, timeout = 1000)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
     } yield {
       ch.isOpen shouldBe false
     })
@@ -161,7 +180,7 @@ object RxExtensionLoaderSpec {
   implicit class ChannelExt(val channel: Channel) extends AnyVal {
     def closeF(): Future[Unit] = {
       val closePromise = Promise[Unit]()
-      channel.closeFuture().addListener((future: util.concurrent.Future[_ >: Void]) => closePromise.complete(Try(future.get())))
+      channel.closeFuture().addListener((future: util.concurrent.Future[? >: Void]) => closePromise.complete(Try(future.get())))
       closePromise.future
     }
   }

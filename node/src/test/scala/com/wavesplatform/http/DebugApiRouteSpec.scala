@@ -1,10 +1,8 @@
 package com.wavesplatform.http
 
-import java.util.concurrent.TimeUnit
-
-import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
+import com.wavesplatform.*
 import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -13,7 +11,6 @@ import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout, handleAllExcepti
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -44,12 +41,12 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.*
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -86,6 +83,7 @@ class DebugApiRouteSpec
 
   val block: Block = TestBlock.create(Nil).block
   val testStateHash: StateHash = {
+    import com.wavesplatform.utils.byteStrOrdering
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
     StateHash(randomHash, hashes)
@@ -116,7 +114,7 @@ class DebugApiRouteSpec
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain,
+      () => Some(blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler),
       sharedScheduler
     )
@@ -198,9 +196,10 @@ class DebugApiRouteSpec
         Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.OK
           responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
-            "blockId" -> blockAt2.id().toString,
-            "height"  -> 2,
-            "version" -> Version.VersionString
+            "blockId"    -> blockAt2.id().toString,
+            "baseTarget" -> blockAt2.header.baseTarget,
+            "height"     -> 2,
+            "version"    -> Version.VersionString
           ))
         }
       }
@@ -260,7 +259,9 @@ class DebugApiRouteSpec
       }
       val route = handleAllExceptions(routeWithBlockchain(blockchain))
       validatePost(TxHelpers.invoke()) ~> route ~> check {
-        responseAs[String] shouldBe """{"error":0,"message":"Error is unknown"}"""
+        responseAs[
+          String
+        ] shouldBe """{"error":0,"message":"Error is unknown"}"""
         response.status shouldBe StatusCodes.InternalServerError
       }
     }
@@ -1617,10 +1618,10 @@ class DebugApiRouteSpec
     }
 
     "invoke tx returning leases" in {
-      val dAppPk        = TxHelpers.defaultSigner.publicKey
-      val dAppAddress   = dAppPk.toAddress
-      val invoke        = TxHelpers.invoke(dAppPk.toAddress)
-      val leaseCancelId = ByteStr(bytes32gen.sample.get)
+      val dAppPk          = TxHelpers.defaultSigner.publicKey
+      val dAppAddress     = dAppPk.toAddress
+      val invoke          = TxHelpers.invoke(dAppPk.toAddress)
+      val canceledLeaseId = ByteStr(bytes32gen.sample.get)
 
       val amount1    = 100
       val recipient1 = Recipient.Address(ByteStr.decodeBase58("3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd").get)
@@ -1658,7 +1659,7 @@ class DebugApiRouteSpec
                |      [
                |        Lease(Address(base58'${recipient1.bytes}'), $amount1, $nonce1),
                |        Lease(Alias("${recipient2.name}"), $amount2, $nonce2),
-               |        LeaseCancel(base58'$leaseCancelId')
+               |        LeaseCancel(base58'$canceledLeaseId')
                |      ]
                |    else []
                |}
@@ -1683,13 +1684,13 @@ class DebugApiRouteSpec
         (blockchain.hasAccountScript _).when(*).returns(true)
 
         (blockchain.transactionMeta _)
-          .when(leaseCancelId)
+          .when(canceledLeaseId)
           .returns(Some(TxMeta(Height(1), Status.Succeeded, 0L)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
-          .when(leaseCancelId)
-          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, leaseCancelAmount, LeaseDetails.Status.Active, leaseCancelId, 1)))
+          .when(canceledLeaseId)
+          .returns(Some(LeaseDetails(dAppPk, TxHelpers.defaultAddress, leaseCancelAmount, LeaseDetails.Status.Active, invoke.id(), 1)))
           .anyNumberOfTimes()
 
         (blockchain.leaseDetails _)
@@ -1705,7 +1706,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Some(blockchain)
         )
         .route
 
@@ -1741,8 +1742,8 @@ class DebugApiRouteSpec
                                                                  |    "cancelTransactionId" : null
                                                                  |  } ],
                                                                  |  "leaseCancels" : [ {
-                                                                 |    "id" : "$leaseCancelId",
-                                                                 |    "originTransactionId" : "$leaseCancelId",
+                                                                 |    "id" : "$canceledLeaseId",
+                                                                 |    "originTransactionId" : "${invoke.id()}",
                                                                  |    "sender" : "$dAppAddress",
                                                                  |    "recipient" : "${TxHelpers.defaultAddress}",
                                                                  |    "amount" : $leaseCancelAmount,
@@ -1795,8 +1796,8 @@ class DebugApiRouteSpec
              |      "cancelTransactionId" : null
              |    } ],
              |    "leaseCancels" : [ {
-             |      "id" : "$leaseCancelId",
-             |      "originTransactionId" : "$leaseCancelId",
+             |      "id" : "$canceledLeaseId",
+             |      "originTransactionId" : "${invoke.id()}",
              |      "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |      "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
              |      "amount" : $leaseCancelAmount,
@@ -2005,7 +2006,7 @@ class DebugApiRouteSpec
              |    "type" : "Array",
              |    "value" : [ {
              |      "type" : "ByteVector",
-             |      "value" : "$leaseCancelId"
+             |      "value" : "$canceledLeaseId"
              |    } ]
              |  }, {
              |    "name" : "LeaseCancel.@complexity",
@@ -2023,7 +2024,7 @@ class DebugApiRouteSpec
              |      "value" : {
              |        "leaseId" : {
              |          "type" : "ByteVector",
-             |          "value" : "$leaseCancelId"
+             |          "value" : "$canceledLeaseId"
              |        }
              |      }
              |    }, {
@@ -2069,7 +2070,7 @@ class DebugApiRouteSpec
              |        "value" : {
              |          "leaseId" : {
              |            "type" : "ByteVector",
-             |            "value" : "$leaseCancelId"
+             |            "value" : "$canceledLeaseId"
              |          }
              |        }
              |      } ]
@@ -2134,7 +2135,7 @@ class DebugApiRouteSpec
              |        "value" : {
              |          "leaseId" : {
              |            "type" : "ByteVector",
-             |            "value" : "$leaseCancelId"
+             |            "value" : "$canceledLeaseId"
              |          }
              |        }
              |      } ]
@@ -2187,7 +2188,7 @@ class DebugApiRouteSpec
         d.appendBlock(leaseTx)
         d.appendBlock(setScript(dApp1Kp, dApp1), setScript(dApp2Kp, dApp2))
 
-        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => d.blockchain).route
+        val route   = debugApiRoute.copy(blockchain = d.blockchain, priorityPoolBlockchain = () => Some(d.blockchain)).route
         val invoke  = TxHelpers.invoke(dApp1Kp.toAddress)
         val leaseId = Lease.calculateId(Lease(Address(ByteStr(leaseAddress.bytes)), amount, 0), invoke.id())
 
@@ -2832,7 +2833,7 @@ class DebugApiRouteSpec
       val route = debugApiRoute
         .copy(
           blockchain = blockchain,
-          priorityPoolBlockchain = () => blockchain
+          priorityPoolBlockchain = () => Some(blockchain)
         )
         .route
 
@@ -3484,16 +3485,6 @@ class DebugApiRouteSpec
     }
   }
 
-  routePath("/stateChanges/info/") - {
-    "redirects to /transactions/info method" in {
-      val txId = ByteStr.fill(DigestLength)(1)
-      Get(routePath(s"/stateChanges/info/$txId")) ~> route ~> check {
-        status shouldBe StatusCodes.MovedPermanently
-        header(Location.name).map(_.value) shouldBe Some(s"/transactions/info/$txId")
-      }
-    }
-  }
-
   routePath("/minerInfo") - {
     "returns info from wallet if miner private keys not specified in config" in {
       val acc = wallet.generateNewAccount()
@@ -3516,13 +3507,13 @@ class DebugApiRouteSpec
   }
 
   private def routeWithBlockchain(blockchain: Blockchain & NG) =
-    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => Some(blockchain)).route
 
   private def routeWithBlockchain(d: Domain) =
     debugApiRoute
       .copy(
         blockchain = d.blockchain,
-        priorityPoolBlockchain = () => d.blockchain,
+        priorityPoolBlockchain = () => Some(d.blockchain),
         loadBalanceHistory = d.rocksDBWriter.loadBalanceHistory,
         loadStateHash = d.rocksDBWriter.loadStateHash
       )

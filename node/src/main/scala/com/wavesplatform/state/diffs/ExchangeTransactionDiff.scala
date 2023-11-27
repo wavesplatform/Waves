@@ -294,7 +294,7 @@ object ExchangeTransactionDiff {
   private def checkAttachment(order: Order, blockchain: Blockchain): Either[GenericError, Unit] =
     for {
       _ <- Either.cond(
-        order.attachment.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.TransactionStateSnapshot),
+        order.attachment.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.LightNode),
         (),
         GenericError("Attachment field for orders is not supported yet")
       )

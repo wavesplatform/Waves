@@ -781,7 +781,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
   }
 
   property(
-    s"NODE-1039. Orders should contain attachment field in Ride version >= V8 after ${BlockchainFeatures.TransactionStateSnapshot} activation"
+    s"NODE-1039. Orders should contain attachment field in Ride version >= V8 after ${BlockchainFeatures.LightNode} activation"
   ) {
     val issuer  = TxHelpers.signer(1)
     val buyer   = TxHelpers.signer(2)
@@ -835,7 +835,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         TestCompiler(v).compileExpressionE(script) should produce("Undefined field `attachment` of variable of type `Order`")
 
         withDomain(
-          DomainPresets.BlockRewardDistribution.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> Int.MaxValue),
+          DomainPresets.BlockRewardDistribution.setFeaturesHeight(BlockchainFeatures.LightNode -> Int.MaxValue),
           AddrWithBalance.enoughBalances(issuer, matcher, buyer)
         ) { d =>
           d.appendBlock(issue)
@@ -846,16 +846,16 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       }
 
       withDomain(
-        DomainPresets.BlockRewardDistribution.setFeaturesHeight(BlockchainFeatures.TransactionStateSnapshot -> 4),
+        DomainPresets.BlockRewardDistribution.setFeaturesHeight(BlockchainFeatures.LightNode -> 4),
         AddrWithBalance.enoughBalances(issuer, matcher, buyer)
       ) { d =>
         d.appendBlock(issue)
 
-        d.appendBlockE(TxHelpers.setScript(smartAcc, compiledScript)) should produce("Transaction State Snapshot feature has not been activated yet")
+        d.appendBlockE(TxHelpers.setScript(smartAcc, compiledScript)) should produce("Light Node feature has not been activated yet")
         d.appendBlock()
-        d.appendBlockENoCheck(TxHelpers.setScript(smartAcc, compiledScript)) should beRight
+        d.appendBlockE(TxHelpers.setScript(smartAcc, compiledScript)) should beRight
 
-        d.appendBlockENoCheck(exchange()) should beRight
+        d.appendBlockE(exchange()) should beRight
       }
     }
   }
@@ -871,7 +871,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet(), fixBigScriptField = true)
 
-    val environment = new WavesEnvironment(
+    val environment = WavesEnvironment(
       chainId,
       Coeval(???),
       null,
@@ -902,7 +902,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives, fixBigScriptField = true)
 
-    val env = new WavesEnvironment(
+    val env = WavesEnvironment(
       chainId,
       Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
       null,

@@ -1,673 +1,292 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.TestValues.fee
-import com.wavesplatform.account.{Address, SeedKeyPair}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.fixtures.WavesTxChecks.{checkExchange, *}
-import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
-import org.scalatest.concurrent.ScalaFutures
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, TxHelpers, TxVersion}
+import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 
-class BlockchainUpdatesSubscribeSpec extends FreeSpec with WithBUDomain with ScalaFutures {
-  val currentSettings: WavesSettings = DomainPresets.RideV6
-  val customFee: Long                = 5234000L
-  val customAssetIssueFee            = 234560000L
-  val sender: SeedKeyPair            = TxHelpers.signer(12)
-  val senderAddress: Address         = sender.toAddress
-  val senderBalanceBefore: Long      = 20.waves
-  val testScript: Script = TxHelpers.script(s"""{-# STDLIB_VERSION 6 #-}
-                                               |{-# CONTENT_TYPE DAPP #-}
-                                               |{-# SCRIPT_TYPE ACCOUNT #-}
-                                               |
-                                               |@Verifier(tx)
-                                               |func verify () = match(tx) {
-                                               |    case _ =>
-                                               |      if (
-                                               |        ${(1 to 9).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || \n")}
-                                               |      ) then true else true
-                                               |}""".stripMargin)
-
+class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
   "BlockchainUpdates subscribe tests" - {
     "BU-1. Return correct data for alias" in {
-      val aliasTx                    = TxHelpers.createAlias("test", sender, fee = customFee)
-      val senderBalanceAfterTx: Long = senderBalanceBefore - aliasTx.fee.value
-
+      val aliasTx = TxHelpers.createAlias("test", firstTxParticipant, fee = customFee)
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendMicroBlock(aliasTx)) { updates =>
         val append = updates(1).append
-        checkCreateAlias(append.transactionIds.head, append.transactionAt(0), aliasTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceAfterTx),
-            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
-          )
-        )
+        checkAlias(append, aliasTx)
       }
     }
 
     "BU-28. Return correct data for transfer" in {
-      val amount: Long                   = 1000L
-      val transferSenderBalanceAfter     = senderBalanceBefore - customFee - amount
-      val transferRecipient              = TxHelpers.signer(123)
-      val recipientAddress               = transferRecipient.toAddress
-      val transferRecipientBalanceBefore = 1.waves
-      val transferRecipientBalanceAfter  = transferRecipientBalanceBefore + amount
-      val transferTx                     = TxHelpers.transfer(sender, recipientAddress, amount, Waves, customFee)
-
+      val transferTx = TxHelpers.transfer(firstTxParticipant, secondTxParticipantAddress, amount, Waves, customFee)
       withGenerateSubscription(
         settings = currentSettings,
         balances = Seq(
-          AddrWithBalance(senderAddress, senderBalanceBefore),
-          AddrWithBalance(transferRecipient.toAddress, transferRecipientBalanceBefore)
+          AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipant.toAddress, secondTxParticipantBalanceBefore)
         )
       )(_.appendMicroBlock(transferTx)) { updates =>
         val append = updates(1).append
-        checkTransfer(append.transactionIds.head, append.transactionAt(0), transferTx, recipientAddress.publicKeyHash)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)    -> (senderBalanceBefore, transferSenderBalanceAfter),
-            (recipientAddress, Waves) -> (transferRecipientBalanceBefore, transferRecipientBalanceAfter),
-            (defaultAddress, Waves)   -> (6.waves, 6.waves + customFee * 2 / 5)
-          )
-        )
-      }
-    }
-
-    "Return correct data for several transfers to miner" in {
-      val amount      = 1000
-      val recipient   = TxHelpers.defaultAddress
-      val fee1        = customFee
-      val fee2        = customFee + 12345
-      val fee3        = customFee + 56789
-      val transferTx1 = TxHelpers.transfer(sender, recipient, amount, Waves, fee1)
-      val transferTx2 = TxHelpers.transfer(sender, recipient, amount, Waves, fee2)
-      val transferTx3 = TxHelpers.transfer(sender, recipient, amount, Waves, fee3)
-
-      withGenerateSubscription(
-        settings = currentSettings,
-        balances = Seq(
-          AddrWithBalance(senderAddress, senderBalanceBefore)
-        )
-      )(_.appendMicroBlock(transferTx1, transferTx2, transferTx3)) { updates =>
-        val append = updates(1).append
-        checkTransfer(append.transactionIds(0), append.transactionAt(0), transferTx1, recipient.publicKeyHash)
-        checkTransfer(append.transactionIds(1), append.transactionAt(1), transferTx2, recipient.publicKeyHash)
-        checkTransfer(append.transactionIds(2), append.transactionAt(2), transferTx3, recipient.publicKeyHash)
-
-        val reward = 6.waves
-        checkBalances(
-          append.transactionStateUpdates(0).balances,
-          Map(
-            (senderAddress, Waves) -> (senderBalanceBefore, senderBalanceBefore - (fee1 + amount)),
-            (recipient, Waves)     -> (reward, reward + amount + fee1 / 5 * 2)
-          )
-        )
-        checkBalances(
-          append.transactionStateUpdates(1).balances,
-          Map(
-            (senderAddress, Waves) -> (senderBalanceBefore - (fee1 + amount), senderBalanceBefore - (fee1 + fee2 + 2 * amount)),
-            (recipient, Waves)     -> (reward + amount + fee1 / 5 * 2, reward + 2 * amount + (fee1 + fee2) / 5 * 2)
-          )
-        )
-        checkBalances(
-          append.transactionStateUpdates(2).balances,
-          Map(
-            (senderAddress, Waves) -> (senderBalanceBefore - (fee1 + fee2 + 2 * amount), senderBalanceBefore - (fee1 + fee2 + fee3 + 3 * amount)),
-            (recipient, Waves)     -> (reward + 2 * amount + (fee1 + fee2) / 5 * 2, reward + 3 * amount + (fee1 + fee2 + fee3) / 5 * 2)
-          )
-        )
+        checkTransferTx(append, transferTx)
       }
     }
 
     "BU-9. Return correct data for issue" in {
-      val script              = Option(TxHelpers.script("true"))
-      val amount: Long        = 599000
-      val decimals: Byte      = 8
-      val name: String        = "Test_asset"
-      val description: String = name + "|_|_|_|_|_|" + 5380000
-      val issue               = TxHelpers.issue(sender, amount, decimals, name, description, customAssetIssueFee, script)
-      val issueScript         = issue.script.get.bytes.value().arr
-
+      val issue: IssueTransaction = TxHelpers.issue(
+        firstTxParticipant,
+        amount,
+        decimals = 8,
+        name = "Test_asset",
+        description = "description",
+        customAssetIssueFee,
+        defaultScript
+      )
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendMicroBlock(issue)) { updates =>
-        val append       = updates(1).append
-        val assetDetails = append.transactionStateUpdates.head.assets.head
-
-        checkIssue(append.transactionIds.head, append.transactionAt(0), issue)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)       -> (senderBalanceBefore, senderBalanceBefore - customAssetIssueFee),
-            (senderAddress, issue.asset) -> (0, amount),
-            (defaultAddress, Waves)      -> (6.waves, 6.waves + customAssetIssueFee * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
-        checkAssetsScriptStateUpdates(assetDetails.after.get.scriptInfo, issueScript)
+        val append = updates(1).append
+        checkIssueTx(append, issue, isNft = false)
       }
     }
 
     "BU-11. Return correct data for issue NFT" in {
-      val name: String        = "Nft_test_asset"
-      val description: String = name + "_OVER_9000"
-      val issueNftTx = IssueTransaction
-        .selfSigned(
-          TxVersion.V3,
-          sender,
-          name,
-          description,
-          quantity = 1,
-          decimals = 0,
-          reissuable = false,
-          script = None,
-          0.001.waves,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
-
+      val issueNftTx =
+        TxHelpers.issue(firstTxParticipant, name = "Nft_test_asset", description = "OVER_9000", amount = 1, reissuable = false, script = None)
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.ReduceNFTFee),
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendMicroBlock(issueNftTx)) { updates =>
-        val append       = updates(1).append
-        val assetDetails = append.transactionStateUpdates.head.assets.head
-
-        checkIssue(append.transactionIds.head, append.transactionAt(0), issueNftTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)            -> (senderBalanceBefore, senderBalanceBefore - 0.001.waves),
-            (senderAddress, issueNftTx.asset) -> (0, 1),
-            (defaultAddress, Waves)           -> (6.waves, 6.waves + issueNftTx.fee.value * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.after, issueNftTx, isNft = true, issueNftTx.quantity.value)
+        val append = updates(1).append
+        checkIssueTx(append, issueNftTx, isNft = true)
       }
     }
 
     "BU-19. Return correct data for reissue" in {
-      val amount: Long               = 9000000
-      val amountReissue: Long        = 7500000
-      val issue                      = TxHelpers.issue(sender, amount)
-      val reissueTx                  = TxHelpers.reissue(issue.asset, sender, amountReissue, reissuable = false, customAssetIssueFee)
-      val quantityAfterReissue       = amount + amountReissue
-      val senderBalanceBeforeReissue = senderBalanceBefore - issue.fee.value
-      val senderBalanceAfterReissue  = senderBalanceBeforeReissue - reissueTx.fee.value
-
+      val issue   = TxHelpers.issue(firstTxParticipant, amount)
+      val reissue = TxHelpers.reissue(issue.asset, firstTxParticipant, additionalAmount, reissuable = false, customAssetIssueFee)
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        d.appendMicroBlock(reissueTx)
+        d.appendBlock(reissue)
       } { updates =>
-        val append             = updates(2).append
-        val assetDetails       = append.transactionStateUpdates.head.assets.head
-        val minerBalanceBefore = 12.waves + issue.fee.value * 2 / 5
-
-        checkReissue(append.transactionIds.head, append.transactionAt(0), reissueTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)           -> (senderBalanceBeforeReissue, senderBalanceAfterReissue),
-            (senderAddress, reissueTx.asset) -> (amount, quantityAfterReissue),
-            (defaultAddress, Waves)          -> (minerBalanceBefore, minerBalanceBefore + reissueTx.fee.value * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
-        checkAssetsStateUpdates(assetDetails.after, reissueTx, isNft = false, quantityAfterReissue)
+        val append = updates(2).append
+        checkReissueTx(append, reissue, issue)
       }
     }
 
     "BU-4. Return correct data for burn" in {
-      val amount: Long            = 6000000
-      val amountBurn: Long        = 5000000
-      val issue                   = TxHelpers.issue(sender, amount)
-      val burnTx                  = TxHelpers.burn(issue.asset, amountBurn, sender, customAssetIssueFee)
-      val amountAfterTx           = amount - amountBurn
-      val senderBalanceBeforeBurn = senderBalanceBefore - issue.fee.value
-      val senderBalanceAfterBurn  = senderBalanceBeforeBurn - burnTx.fee.value
-
+      val issue = TxHelpers.issue(firstTxParticipant, amount)
+      val burn  = TxHelpers.burn(issue.asset, additionalAmount, firstTxParticipant, customAssetIssueFee)
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
-        d.appendMicroBlock(burnTx)
+        d.appendBlock(burn)
       } { updates =>
-        val append             = updates(2).append
-        val assetDetails       = append.transactionStateUpdates.head.assets.head
-        val minerBalanceBefore = 12.waves + issue.fee.value * 2 / 5
-        checkBurn(append.transactionIds.head, append.transactionAt(0), burnTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)        -> (senderBalanceBeforeBurn, senderBalanceAfterBurn),
-            (senderAddress, burnTx.asset) -> (amount, amountAfterTx),
-            (defaultAddress, Waves)       -> (minerBalanceBefore, minerBalanceBefore + burnTx.fee.value * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
-        checkAssetsStateUpdates(assetDetails.after, burnTx, isNft = false, amountAfterTx)
+        val append = updates(2).append
+        checkBurnTx(append, burn, issue)
       }
     }
 
     "Exchange transaction subscription tests" - {
-      val buyer                       = TxHelpers.signer(58)
-      val seller                      = TxHelpers.signer(189)
-      val buyerBalanceBefore          = 4.waves
-      val buyerBalanceBeforeExchange  = 3.waves
-      val sellerBalanceBefore         = 4.waves
-      val sellerBalanceBeforeExchange = 3.waves
-      val priceAsset                  = TxHelpers.issue(buyer, 2000000000, 2)
-      val priceAssetQuantity          = priceAsset.quantity.value
-      val amountAsset                 = TxHelpers.issue(seller, 1000000000, 6)
-      val amountAssetQuantity         = amountAsset.quantity.value
-
       "BU-6. Return correct data for order V3, exchange V2" in {
-        val order1 = TxHelpers.order(
-          OrderType.BUY,
-          amountAsset.asset,
-          priceAsset.asset,
-          Waves,
-          50000L,
-          400000000L,
-          fee = customFee,
-          sender = buyer,
-          matcher = buyer,
-          version = Order.V3
-        )
-        val order2 = TxHelpers.order(
-          OrderType.SELL,
-          amountAsset.asset,
-          priceAsset.asset,
-          Waves,
-          amount = 50000L,
-          price = 400000000L,
-          fee = customFee,
-          sender = seller,
-          matcher = buyer,
-          version = Order.V3
-        )
-        val exchangedAssets = order1.price.value * order1.amount.value / 100000000
-        val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V2)
-        addedBlocksAndSubscribe(exchangeTx) { updated =>
-          checkingSubscribeFields(updated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+        val order1          = createOrder(OrderType.BUY, firstTxParticipant, Order.V3)
+        val order2          = createOrder(OrderType.SELL, secondTxParticipant, Order.V3)
+        val normalizedPrice = order1.price.value * order1.amount.value / 100000000
+        val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V2)
+        withAddedBlocksAndSubscribeExchangeTx(exchangeTx) { updated =>
+          val append = updated.apply(3).getAppend
+          checkExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
       }
 
       "BU-120. Return correct data for order V4, exchange V3" in {
-        val order1 = TxHelpers.order(
-          OrderType.BUY,
-          amountAsset.asset,
-          priceAsset.asset,
-          Waves,
-          50000L,
-          400000000L,
-          fee = customFee,
-          sender = buyer,
-          matcher = buyer,
-          version = Order.V4
-        )
-        val order2 = TxHelpers.order(
-          OrderType.SELL,
-          amountAsset.asset,
-          priceAsset.asset,
-          Waves,
-          amount = 50000L,
-          price = 400000000L,
-          fee = customFee,
-          sender = seller,
-          matcher = buyer,
-          version = Order.V4
-        )
-        val exchangedAssets = order1.price.value / 2 / 10000000
-        val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, buyer, version = TxVersion.V3)
-        addedBlocksAndSubscribe(exchangeTx) { updated =>
-          checkingSubscribeFields(updated(3).getAppend, exchangeTx, exchangedAssets, order1.amount.value)
+        val order1          = createOrder(OrderType.BUY, firstTxParticipant, Order.V4)
+        val order2          = createOrder(OrderType.SELL, secondTxParticipant, Order.V4)
+        val normalizedPrice = order1.price.value / 2 / 10000000
+        val exchangeTx      = TxHelpers.exchangeFromOrders(order1, order2, firstTxParticipant, version = TxVersion.V3)
+        withAddedBlocksAndSubscribeExchangeTx(exchangeTx) { updated =>
+          val append = updated.apply(3).getAppend
+          checkExchangeTx(append, exchangeTx, normalizedPrice, order1.amount.value)
         }
-      }
-
-      def addedBlocksAndSubscribe(exchangeTx: ExchangeTransaction)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
-        withGenerateSubscription(
-          settings = currentSettings,
-          balances = Seq(
-            AddrWithBalance(buyer.toAddress, buyerBalanceBefore),
-            AddrWithBalance(seller.toAddress, sellerBalanceBefore)
-          )
-        ) { d =>
-          d.appendBlock(priceAsset)
-          d.appendBlock(amountAsset)
-          d.appendMicroBlock(exchangeTx)
-        }(f)
-      }
-
-      def checkingSubscribeFields(append: Append, exchangeTx: ExchangeTransaction, exchangedAssets: Long, orderAmount: Long): Unit = {
-        val minerBalanceBefore = 18.waves + priceAsset.fee.value + amountAsset.fee.value * 2 / 5
-        checkExchange(append.transactionIds.head, append.transactionAt(0), exchangeTx)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (buyer.toAddress, Waves)              -> (buyerBalanceBeforeExchange, buyerBalanceBeforeExchange - fee + customFee),
-            (seller.toAddress, priceAsset.asset)  -> (0, exchangedAssets),
-            (buyer.toAddress, amountAsset.asset)  -> (0, orderAmount),
-            (seller.toAddress, Waves)             -> (sellerBalanceBeforeExchange, sellerBalanceBeforeExchange - customFee),
-            (buyer.toAddress, priceAsset.asset)   -> (priceAssetQuantity, priceAssetQuantity - exchangedAssets),
-            (seller.toAddress, amountAsset.asset) -> (amountAssetQuantity, amountAssetQuantity - orderAmount),
-            (defaultAddress, Waves)               -> (minerBalanceBefore, minerBalanceBefore + exchangeTx.fee.value * 2 / 5)
-          )
-        )
       }
     }
 
     "BU-12. Return correct data for lease" in {
-      val recipient        = TxHelpers.signer(123)
-      val recipientAddress = recipient.toAddress
-      val amount           = 5.waves
-      val lease            = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseId          = lease.id.value().arr
-
+      val lease = TxHelpers.lease(firstTxParticipant, secondTxParticipantAddress, amount, customFee)
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendMicroBlock(lease)) { updates =>
         val append = updates(1).append
-        checkLease(append.transactionIds.head, append.transactionAt(0), lease, recipientAddress.publicKeyHash)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceBefore - customFee),
-            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
-          )
-        )
-        checkLeasingForAddress(
-          append.transactionStateUpdates.head.leasingForAddress,
-          Map(
-            (senderAddress, 0L, amount)    -> (0L, 0L),
-            (recipientAddress, amount, 0L) -> (0L, 0L)
-          )
-        )
-        checkIndividualLeases(
-          append.transactionStateUpdates.head.individualLeases,
-          Map(
-            (LeaseStatus.Active, amount) -> (leaseId, lease.sender.arr, lease.recipient.bytes, leaseId)
-          )
-        )
+        checkLeaseTx(append, lease)
       }
     }
 
     "BU-14. Return correct data for lease cancel" in {
-      val recipient             = TxHelpers.signer(123)
-      val recipientAddress      = recipient.toAddress
-      val amount                = 5.waves
-      val lease                 = TxHelpers.lease(sender, recipientAddress, amount, customFee)
-      val leaseCancel           = TxHelpers.leaseCancel(lease.id.value(), sender, customFee)
-      val leaseId               = leaseCancel.leaseId.arr
-      val senderBalanceBeforeTx = senderBalanceBefore - lease.fee.value
-      val senderBalanceAfterTx  = senderBalanceBeforeTx - leaseCancel.fee.value
-
+      val lease       = TxHelpers.lease(firstTxParticipant, secondTxParticipantAddress, amount, customFee)
+      val leaseCancel = TxHelpers.leaseCancel(lease.id.value(), firstTxParticipant, customFee)
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(lease)
         d.appendMicroBlock(leaseCancel)
       } { updates =>
-        val append             = updates(2).append
-        val minerBalanceBefore = 12.waves + lease.fee.value * 2 / 5
-        checkLeaseCancel(append.transactionIds.head, append.transactionAt(0), leaseCancel)
-        checkBalances(
-          append.transactionStateUpdates.head.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBeforeTx, senderBalanceAfterTx),
-            (defaultAddress, Waves) -> (minerBalanceBefore, minerBalanceBefore + leaseCancel.fee.value * 2 / 5)
-          )
-        )
-        checkLeasingForAddress(
-          append.transactionStateUpdates.head.leasingForAddress,
-          Map(
-            (senderAddress, 0L, 0L)    -> (0L, amount),
-            (recipientAddress, 0L, 0L) -> (amount, 0L)
-          )
-        )
-        checkIndividualLeases(
-          append.transactionStateUpdates.head.individualLeases,
-          Map(
-            (LeaseStatus.Inactive, amount) -> (leaseId, lease.sender.arr, lease.recipient.bytes, leaseId)
-          )
-        )
+        val append = updates(2).append
+        checkLeaseCancelTx(append, leaseCancel, lease)
       }
     }
 
     "BU-16. Return correct data for massTransfer" in {
-      val massTransferFee           = fee * 6
-      val transferAmount            = 500000L
-      val recipients                = TxHelpers.accountSeqGenerator(100, transferAmount)
-      val issue                     = TxHelpers.issue(sender, 1000000000L)
-      val issuedAsset: Asset        = Asset.fromCompatId(issue.asset.compatId)
-      val massTransfer              = TxHelpers.massTransfer(sender, recipients, issuedAsset, massTransferFee)
-      val senderBalanceBeforeTx     = senderBalanceBefore - issue.fee.value
-      val senderBalanceAfterTx      = senderBalanceBeforeTx - massTransfer.fee.value
-      val senderAssetBalanceAfterTx = issue.quantity.value - transferAmount * recipients.size
+      val massTransferFee = fee * 6
+      val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients, firstToken.asset, massTransferFee)
 
       withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
-        d.appendBlock(issue)
+        d.appendBlock(firstToken)
         d.appendMicroBlock(massTransfer)
       } { updates =>
-        val balancesMap = Map(
-          (senderAddress, Waves)       -> (senderBalanceBeforeTx, senderBalanceAfterTx),
-          (senderAddress, issuedAsset) -> (issue.quantity.value, senderAssetBalanceAfterTx)
-        ) ++ recipients.map(r => (Address.fromBytes(r.address.bytes).explicitGet(), issuedAsset) -> (0L, transferAmount)).toMap
         val append = updates(2).append
-        checkMassTransfer(
-          append.transactionIds.head,
-          append.transactionAt(0),
-          massTransfer,
-          recipients.map(r =>
-            r.address match {
-              case address: Address => Some(address.publicKeyHash).get
-              case _                => fail("not an address")
-            }
-          )
-        )
-        checkMassTransferBalances(append.transactionStateUpdates.head.balances, balancesMap)
+        checkForMassTransferTx(append, massTransfer)
       }
     }
 
-    "BU-5. Return correct data for data" in {
-      val integerDataEntry = IntegerDataEntry.apply("Integer", 3550000L)
-      val booleanDataEntry = BooleanDataEntry.apply("Boolean", value = true)
-      val stringDataEntry  = StringDataEntry.apply("String", "test")
-      val binaryDataEntry  = BinaryDataEntry.apply("Binary", ByteStr.apply(senderAddress.bytes))
-      val entries          = Seq(booleanDataEntry, integerDataEntry, stringDataEntry, binaryDataEntry)
-      val dataTx           = TxHelpers.data(sender, entries, customFee, TxVersion.V2)
-
+    "BU-5. Return correct data for dataTx" in {
+      val data = TxHelpers.data(firstTxParticipant, entries, customFee, TxVersion.V2)
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
-      )(_.appendMicroBlock(dataTx)) { updates =>
-        val append    = updates(1).append
-        val txUpdates = append.transactionStateUpdates.head
-        checkDataTransaction(append.transactionIds.head, append.transactionAt(0), dataTx)
-        checkBalances(
-          txUpdates.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceBefore - customFee),
-            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
-          )
-        )
-        checkDataEntriesStateUpdate(txUpdates.dataEntries, dataTx.data, senderAddress.bytes)
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
+      )(_.appendMicroBlock(data)) { updates =>
+        val append = updates(1).append
+        checkDataTransfer(append, data)
       }
     }
 
     "BU-21. Return correct data for setScript" in {
-      val setScript = TxHelpers.setScript(sender, testScript, customFee)
+      val setScript = TxHelpers.setScript(firstTxParticipant, testScript, customFee)
 
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       )(_.appendMicroBlock(setScript)) { updates =>
-        val append    = updates(1).append
-        val txUpdates = append.transactionStateUpdates.head
-        checkSetScriptTransaction(append.transactionIds.head, append.transactionAt(0), setScript)
-        checkBalances(
-          txUpdates.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBefore, senderBalanceBefore - customFee),
-            (defaultAddress, Waves) -> (6.waves, 6.waves + customFee * 2 / 5)
-          )
-        )
-        checkSetScriptStateUpdate(txUpdates.scripts.head, setScript)
+        val append = updates(1).append
+        checkSetScript(append, setScript)
       }
     }
 
     "Return correct data for sponsorFee" - {
-      val sponsorshipFee                       = Option.apply(3950000L)
-      val issue                                = TxHelpers.issue(sender, 99900000L)
-      val sponsorFee                           = TxHelpers.sponsor(issue.asset, sponsorshipFee, sender)
-      val sponsorFeeCancel                     = TxHelpers.sponsor(issue.asset, None, sender)
-      val senderBalanceBeforeSponsorFeeTx      = senderBalanceBefore - issue.fee.value
+      val sponsorshipFee                       = Option.apply(additionalAmount)
+      val sponsorFee                           = TxHelpers.sponsor(firstToken.asset, sponsorshipFee, firstTxParticipant)
+      val sponsorFeeCancel                     = TxHelpers.sponsor(firstToken.asset, None, firstTxParticipant)
+      val senderBalanceBeforeSponsorFeeTx      = firstTxParticipantBalanceBefore - firstToken.fee.value
       val senderBalanceAfterSponsorFeeTx       = senderBalanceBeforeSponsorFeeTx - sponsorFee.fee.value
-      val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFeeCancel.fee.value
+      val senderBalanceAfterSponsorFeeCancelTx = senderBalanceAfterSponsorFeeTx - sponsorFee.fee.value
 
-      "BU-25. subscribe sponsorFee " in withGenerateSubscription(
+      "BU-25. subscribe sponsorFee" in withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
-        d.appendBlock(issue)
+        d.appendBlock(firstToken)
         d.appendBlock(sponsorFee)
       } { updates =>
-        val append       = updates(2).append
-        val txUpdates    = append.transactionStateUpdates.head
-        val assetDetails = txUpdates.assets.head
-
-        checkSponsorFeeTransaction(append.transactionIds.head, append.transactionAt(0), sponsorFee)
-        val minerBalanceBefore = 18.waves + issue.fee.value
-        checkBalances(
-          txUpdates.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx),
-            (defaultAddress, Waves) -> (minerBalanceBefore, 18.waves + issue.fee.value + sponsorFee.fee.value * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
-        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
+        val append = updates(2).append
+        checkSponsorFee(append, sponsorFee, senderBalanceBeforeSponsorFeeTx, senderBalanceAfterSponsorFeeTx)
       }
 
       "BU-27. subscribe sponsorFee cancel" in withGenerateSubscription(
         settings = currentSettings,
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
-        d.appendBlock(issue)
+        d.appendBlock(firstToken)
         d.appendBlock(sponsorFee)
         d.appendMicroBlock(sponsorFeeCancel)
       } { updates =>
-        val append       = updates(3).append
-        val txUpdates    = append.transactionStateUpdates.head
-        val assetDetails = txUpdates.assets.head
-
-        checkSponsorFeeTransaction(append.transactionIds.head, append.transactionAt(0), sponsorFeeCancel)
-        val minerBalanceBefore = 18.waves + issue.fee.value + sponsorFee.fee.value * 2 / 5
-        checkBalances(
-          txUpdates.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx),
-            (defaultAddress, Waves) -> (minerBalanceBefore, minerBalanceBefore + sponsorFeeCancel.fee.value * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
-        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, issue.quantity.value)
+        val append = updates(3).append
+        checkSponsorFee(append, sponsorFeeCancel, senderBalanceAfterSponsorFeeTx, senderBalanceAfterSponsorFeeCancelTx)
       }
     }
 
     "BU-20. Return correct data for setAssetScript" in {
-      val complexScriptBefore                 = Option.apply(TxHelpers.script("true".stripMargin))
-      val complexScriptAfter                  = TxHelpers.script("false".stripMargin)
-      val issue                               = TxHelpers.issue(sender, 99900000L, script = complexScriptBefore)
-      val setAssetScript                      = TxHelpers.setAssetScript(sender, issue.asset, complexScriptAfter, 1.waves)
-      val quantity                            = issue.quantity.value
-      val senderBalanceBeforeSetAssetScriptTx = senderBalanceBefore - issue.fee.value
-      val senderBalanceAfterSetAssetScriptTx  = senderBalanceBeforeSetAssetScriptTx - setAssetScript.fee.value
-
+      val issue          = TxHelpers.issue(firstTxParticipant, amount, script = complexScriptBefore)
+      val setAssetScript = TxHelpers.setAssetScript(firstTxParticipant, issue.asset, complexScriptAfter, 1.waves)
       withGenerateSubscription(
         settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
         d.appendBlock(issue)
         d.appendMicroBlock(setAssetScript)
       } { updates =>
-        val append             = updates(2).append
-        val txUpdates          = append.transactionStateUpdates.head
-        val assetDetails       = txUpdates.assets.head
-        val minerBalanceBefore = 12.waves + issue.fee.value * 2 / 5
-        checkSetAssetScriptTransaction(append.transactionIds.head, append.transactionAt(0), setAssetScript)
-        checkBalances(
-          txUpdates.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBeforeSetAssetScriptTx, senderBalanceAfterSetAssetScriptTx),
-            (defaultAddress, Waves) -> (minerBalanceBefore, minerBalanceBefore + setAssetScript.fee.value * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, quantity)
-        checkAssetsScriptStateUpdates(assetDetails.before.get.scriptInfo, complexScriptBefore.get.bytes.value().arr)
-        checkAssetsStateUpdates(assetDetails.after, issue, isNft = false, quantity)
-        checkAssetsScriptStateUpdates(assetDetails.after.get.scriptInfo, complexScriptAfter.bytes.value().arr)
+        val append = updates(2).append
+        checkSetAssetScript(append, setAssetScript, issue)
       }
     }
 
     "BU-121. Return correct data for UpdateAssetInfo" in {
-      val newName                              = "new_name"
-      val newDescription                       = "new_description"
-      val issue                                = TxHelpers.issue(sender, 99900000L)
-      val updateAssetInfo                      = TxHelpers.updateAssetInfo(issue.assetId, newName, newDescription, sender)
-      val senderBalanceBeforeUpdateAssetInfoTx = senderBalanceBefore - issue.fee.value
-      val senderBalanceAfterUpdateAssetInfoTx  = senderBalanceBeforeUpdateAssetInfoTx - updateAssetInfo.fee
+      val newName         = "new_name"
+      val newDescription  = "new_description"
+      val updateAssetInfo = TxHelpers.updateAssetInfo(firstTokenAsset.id, newName, newDescription, firstTxParticipant)
 
       withGenerateSubscription(
         settings = currentSettings.configure(_.copy(minAssetInfoUpdateInterval = 1)),
-        balances = Seq(AddrWithBalance(senderAddress, senderBalanceBefore))
+        balances = Seq(AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore))
       ) { d =>
-        d.appendBlock(issue)
+        d.appendBlock(firstToken)
         d.appendBlock()
         d.appendMicroBlock(updateAssetInfo)
       } { updates =>
-        val append       = updates(3).append
-        val txUpdates    = append.transactionStateUpdates.head
-        val assetDetails = txUpdates.assets.head
-        checkUpdateAssetInfoTransaction(append.transactionIds.head, append.transactionAt(0), updateAssetInfo)
-        checkBalances(
-          txUpdates.balances,
-          Map(
-            (senderAddress, Waves)  -> (senderBalanceBeforeUpdateAssetInfoTx, senderBalanceAfterUpdateAssetInfoTx),
-            (defaultAddress, Waves) -> (18.waves + issue.fee.value, 18.waves + issue.fee.value + updateAssetInfo.fee * 2 / 5)
-          )
-        )
-        checkAssetsStateUpdates(assetDetails.before, issue, isNft = false, issue.quantity.value)
-        checkAssetUpdatesStateUpdates(assetDetails.after, updateAssetInfo)
+        val append = updates(3).append
+        checkUpdateAssetInfo(append, updateAssetInfo)
       }
+    }
+
+    "BU-122. Return correct data for EthereumTransfer" in {
+      val ethereumTransfer: EthereumTransaction =
+        EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
+      val ethAddress = ethereumTransfer.senderAddress.value()
+      val transfer   = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
+
+      withGenerateSubscription(
+        settings = currentSettings.addFeatures(BlockchainFeatures.SmartAccounts),
+        balances = Seq(
+          AddrWithBalance(ethAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+        )
+      ) { d =>
+        d.appendKeyBlock()
+        d.appendBlock(secondToken, transfer)
+        d.appendMicroBlock(ethereumTransfer)
+      } { updates =>
+        val append = updates(3).append
+        checkEthereumTransfer(append, ethereumTransfer, ethAddress)
+      }
+    }
+
+    def withAddedBlocksAndSubscribeExchangeTx(exchangeTx: ExchangeTransaction)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
+      withGenerateSubscription(
+        settings = currentSettings,
+        balances = Seq(
+          AddrWithBalance(firstTxParticipantAddress, firstTxParticipantBalanceBefore),
+          AddrWithBalance(secondTxParticipantAddress, secondTxParticipantBalanceBefore)
+        )
+      ) { d =>
+        d.appendBlock(firstToken)
+        d.appendBlock(secondToken)
+        d.appendMicroBlock(exchangeTx)
+      }(f)
     }
   }
 }

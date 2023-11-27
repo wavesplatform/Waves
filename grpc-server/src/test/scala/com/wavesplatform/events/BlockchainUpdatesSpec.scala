@@ -11,6 +11,7 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
+import com.wavesplatform.utils.byteStrOrdering
 import com.wavesplatform.events.StateUpdate.{
   AssetInfo,
   AssetStateUpdate,
@@ -469,13 +470,13 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val reward        = 600000000
       val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
       val genesis       = results.head.getAppend.transactionStateUpdates.head.balances.head
-      genesis.address.toAddress shouldBe TxHelpers.defaultAddress
+      genesis.address.toAddress() shouldBe TxHelpers.defaultAddress
       genesis.getAmountAfter.amount shouldBe genesisAmount
       genesis.amountBefore shouldBe reward
       genesis.getAmountAfter.assetId shouldBe empty
 
       val payment = results.last.getAppend.transactionStateUpdates.last.balances.find { bu =>
-        bu.address.toAddress == TxHelpers.secondAddress
+        bu.address.toAddress() == TxHelpers.secondAddress
       }.get
 
       payment.getAmountAfter.amount shouldBe 100
@@ -860,6 +861,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
           xtnBuybackAddress,
           d.blockchain
         )
+
         append.stateUpdate.get.balances shouldBe Seq(
           PBBalanceUpdate(
             challengingMiner.toAddress.toByteString,

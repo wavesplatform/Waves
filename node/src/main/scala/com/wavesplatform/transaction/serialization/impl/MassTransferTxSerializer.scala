@@ -57,7 +57,7 @@ object MassTransferTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     def parseTransfers(buf: ByteBuffer): Seq[MassTransferTransaction.ParsedTransfer] = {
       def readTransfer(buf: ByteBuffer): ParsedTransfer = {
-        val addressOrAlias = buf.getAddressOrAlias()
+        val addressOrAlias = buf.getAddressOrAlias(None)
         val amount         = TxNonNegativeAmount.unsafeFrom(buf.getLong)
         ParsedTransfer(addressOrAlias, amount)
       }

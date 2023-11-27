@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.compiler
 import cats.implicits.*
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.CommonError
+import com.wavesplatform.lang.{CommonError, StringOps}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V8}
 import com.wavesplatform.lang.hacks.Global
 import com.wavesplatform.lang.v1.compiler.CompilationError.*

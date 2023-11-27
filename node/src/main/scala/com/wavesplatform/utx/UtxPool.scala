@@ -20,6 +20,7 @@ trait UtxPool extends UtxForAppender with AutoCloseable {
   def all: Seq[Transaction]
   def size: Int
   def transactionById(transactionId: ByteStr): Option[Transaction]
+  def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit
   def scheduleCleanup(): Unit
   def packUnconfirmed(
       rest: MultiDimensionalMiningConstraint,
@@ -27,6 +28,9 @@ trait UtxPool extends UtxForAppender with AutoCloseable {
       strategy: PackStrategy = PackStrategy.Unlimited,
       cancelled: () => Boolean = () => false
   ): (Option[Seq[Transaction]], MiningConstraint, Option[ByteStr])
+  def resetPriorityPool(): Unit
+  def cleanUnconfirmed(): Unit
+  def getPriorityPool: Option[UtxPriorityPool]
 }
 
 object UtxPool {

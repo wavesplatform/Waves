@@ -24,7 +24,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
 
   override def settings: WavesSettings = DomainPresets.RideV3
 
-  private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)._1
+  private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited)._1
 
   private def mkHeightSensitiveScript(sender: KeyPair) =
     TxHelpers.setScript(

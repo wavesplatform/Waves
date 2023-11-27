@@ -21,6 +21,7 @@ import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
@@ -633,12 +634,14 @@ package object database {
 
   def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
-    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> (data.transaction match {
-      case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
-      case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
-      case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
-      case _                          => throw new IllegalArgumentException("Illegal transaction data")
-    })
+    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> toVanillaTransaction(data.transaction)
+  }
+
+  def toVanillaTransaction(tx: pb.TransactionData.Transaction): Transaction = tx match {
+    case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
+    case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
+    case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
+    case _                          => throw new IllegalArgumentException("Illegal transaction data")
   }
 
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
@@ -660,6 +663,17 @@ package object database {
     }
     transactions.result()
   }
+
+  def loadTxStateSnapshots(height: Height, rdb: RDB): Seq[TransactionStateSnapshot] = {
+    val txSnapshots = Seq.newBuilder[TransactionStateSnapshot]
+    rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height), Some(rdb.txSnapshotHandle.handle)) { e =>
+      txSnapshots += TransactionStateSnapshot.parseFrom(e.getValue)
+    }
+    txSnapshots.result()
+  }
+
+  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] =
+    loadTxStateSnapshots(height, rdb).map(StateSnapshot.fromProtobuf)
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {

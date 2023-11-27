@@ -20,7 +20,8 @@ case class SnapshotBlockchain(
     maybeSnapshot: Option[StateSnapshot] = None,
     blockMeta: Option[(SignedBlockHeader, ByteStr)] = None,
     carry: Long = 0,
-    reward: Option[Long] = None
+    reward: Option[Long] = None,
+    stateHash: Option[ByteStr] = None
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
   lazy val snapshot: StateSnapshot          = maybeSnapshot.orEmpty
@@ -78,13 +79,23 @@ case class SnapshotBlockchain(
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeSnapshot
       .flatMap(_.assetScripts.get(asset))
-      .getOrElse(inner.assetScript(asset))
+      .orElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
     SnapshotBlockchain.assetDescription(asset, snapshot, height, inner)
 
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
-    snapshot.leaseStates.get(leaseId).orElse(inner.leaseDetails(leaseId))
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
+    lazy val innerDetails = inner.leaseDetails(leaseId)
+    val txOpt =
+      snapshot.transactions
+        .collectFirst {
+          case (_, txInfo) if txInfo.snapshot.leaseStates.contains(leaseId) => txInfo.transaction
+        }
+    snapshot.leaseStates
+      .get(leaseId)
+      .map(_.toDetails(this, txOpt, innerDetails))
+      .orElse(innerDetails)
+  }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     snapshot.transactions
@@ -138,19 +149,22 @@ case class SnapshotBlockchain(
       Some(bs)
     }
 
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeSnapshot.isEmpty || to.exists(!blockMeta.map(_._1.id()).contains(_))) {
-      inner.balanceSnapshots(address, from, to)
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    val from1 = math.max(from, 1)
+
+    if (maybeSnapshot.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
+      inner.balanceSnapshots(address, from1, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease), this.hasBannedEffectiveBalance(address, this.height))
-      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from < this.height
-      if (inner.height > 0 && (from < this.height - 1 || height2Fix))
-        bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain
+      val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
+      val height2Fix = this.height == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
+      if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
+        bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
     }
+  }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
     snapshot.accountScriptsByAddress.get(address) match {
@@ -176,7 +190,7 @@ case class SnapshotBlockchain(
     snapshot.accountData.contains(acc) || inner.hasData(acc)
   }
 
-  override def carryFee: Long = carry
+  override def carryFee(refId: Option[ByteStr]): Long = carry
 
   override def score: BigInt = blockMeta.fold(BigInt(0))(_._1.header.score()) + inner.score
 
@@ -211,6 +225,9 @@ case class SnapshotBlockchain(
     inner
       .resolveERC20Address(address)
       .orElse(snapshot.assetStatics.keys.find(id => ERC20Address(id) == address))
+
+  override def lastStateHash(refId: Option[ByteStr]): BlockId =
+    stateHash.orElse(blockMeta.flatMap(_._1.header.stateHash)).getOrElse(inner.lastStateHash(refId))
 }
 
 object SnapshotBlockchain {
@@ -220,11 +237,12 @@ object SnapshotBlockchain {
       Some(ngState.bestLiquidSnapshot),
       Some(SignedBlockHeader(ngState.bestLiquidBlock.header, ngState.bestLiquidBlock.signature) -> ngState.hitSource),
       ngState.carryFee,
-      ngState.reward
+      ngState.reward,
+      Some(ngState.bestLiquidComputedStateHash)
     )
 
   def apply(inner: Blockchain, reward: Option[Long]): SnapshotBlockchain =
-    new SnapshotBlockchain(inner, carry = inner.carryFee, reward = reward)
+    new SnapshotBlockchain(inner, carry = inner.carryFee(None), reward = reward)
 
   def apply(inner: Blockchain, snapshot: StateSnapshot): SnapshotBlockchain =
     new SnapshotBlockchain(inner, Some(snapshot))
@@ -235,9 +253,10 @@ object SnapshotBlockchain {
       newBlock: Block,
       hitSource: ByteStr,
       carry: Long,
-      reward: Option[Long]
+      reward: Option[Long],
+      stateHash: Option[ByteStr]
   ): SnapshotBlockchain =
-    new SnapshotBlockchain(inner, Some(snapshot), Some(SignedBlockHeader(newBlock.header, newBlock.signature) -> hitSource), carry, reward)
+    new SnapshotBlockchain(inner, Some(snapshot), Some(SignedBlockHeader(newBlock.header, newBlock.signature) -> hitSource), carry, reward, stateHash)
 
   private def assetDescription(
       asset: IssuedAsset,
@@ -261,7 +280,7 @@ object SnapshotBlockchain {
           volume.get.isReissuable,
           volume.get.volume,
           info.get.lastUpdatedAt,
-          script.flatten,
+          script,
           sponsorship.getOrElse(0),
           static.nft,
           assetNum,
@@ -279,7 +298,7 @@ object SnapshotBlockchain {
               description = info.map(_.description).getOrElse(d.description),
               lastUpdatedAt = info.map(_.lastUpdatedAt).getOrElse(d.lastUpdatedAt),
               sponsorship = sponsorship.getOrElse(d.sponsorship),
-              script = script.getOrElse(d.script)
+              script = script.orElse(d.script)
             )
           )
       )

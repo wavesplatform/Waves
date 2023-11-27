@@ -12,7 +12,7 @@ import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.*
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.KeyType
+import com.wavesplatform.state.TxStateSnapshotHashBuilder.{KeyType, TxStatusInfo}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -35,8 +35,10 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
   private val orderId      = ByteStr.fill(DigestLength)(5)
   private val volumeAndFee = VolumeAndFee(11, 2)
 
-  private val leaseId      = ByteStr.fill(DigestLength)(6)
-  private val leaseDetails = LeaseDetails(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active, leaseId, 2)
+  private val leaseId1      = ByteStr.fill(DigestLength)(6)
+  private val leaseId2      = ByteStr.fill(DigestLength)(7)
+  private val leaseDetails1 = LeaseDetails(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active, leaseId1, 2)
+  private val leaseDetails2 = LeaseDetails(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Cancelled(1, None), leaseId2, 2)
 
   private val addr1Balance       = 10.waves
   private val addr2Balance       = 20.waves
@@ -100,7 +102,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
     ),
     aliases = Map(addr1Alias1 -> address1, addr2Alias -> address2, addr1Alias2 -> address1),
     orderFills = Map(orderId -> volumeAndFee),
-    leaseState = Map(leaseId -> leaseDetails),
+    leaseState = Map(leaseId1 -> leaseDetails1, leaseId2 -> leaseDetails2),
     scripts = Map(TxHelpers.signer(2).publicKey -> Some(accountScriptInfo)),
     assetScripts = Map(assetId1 -> Some(assetScriptInfo)),
     accountData = Map(address1 -> Map(dataEntry.key -> dataEntry)),
@@ -113,14 +115,14 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
     withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { d =>
       val snapshot = SnapshotOps.fromDiff(diff, d.blockchain).explicitGet()
       val tx       = invoke()
-      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Succeeded, 123)), Array())
-      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Failed, 123)), tx.id().arr :+ 1)
-      testHash(snapshot, Some(NewTransactionInfo(tx, snapshot, Set(), Elided, 123)), tx.id().arr :+ 2)
+      testHash(snapshot, Some(TxStatusInfo(tx.id(), Succeeded)), Array())
+      testHash(snapshot, Some(TxStatusInfo(tx.id(), Failed)), tx.id().arr :+ 1)
+      testHash(snapshot, Some(TxStatusInfo(tx.id(), Elided)), tx.id().arr :+ 2)
       testHash(snapshot, None, Array())
     }
   }
 
-  private def testHash(snapshot: StateSnapshot, txInfoOpt: Option[NewTransactionInfo], txStatusBytes: Array[Byte]) =
+  private def testHash(snapshot: StateSnapshot, txInfoOpt: Option[TxStatusInfo], txStatusBytes: Array[Byte]) =
     TxStateSnapshotHashBuilder.createHashFromSnapshot(snapshot, txInfoOpt).txStateSnapshotHash shouldBe hash(
       Seq(
         Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),
@@ -132,7 +134,15 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
         Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
           addr1PortfolioDiff.lease.out
         ),
-        Array(KeyType.LeaseStatus.id.toByte) ++ leaseId.arr ++ (if (leaseDetails.isActive) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.LeaseStatus.id.toByte)
+          ++ leaseId1.arr
+          ++ Array(1: Byte)
+          ++ leaseDetails1.sender.arr
+          ++ leaseDetails1.recipient.bytes
+          ++ Longs.toByteArray(leaseDetails1.amount),
+        Array(KeyType.LeaseStatus.id.toByte)
+          ++ leaseId2.arr
+          ++ Array(0: Byte),
         Array(KeyType.Sponsorship.id.toByte) ++ assetId1.id.arr ++ Longs.toByteArray(sponsorship.minFee),
         Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias1.name.getBytes(StandardCharsets.UTF_8),
         Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),

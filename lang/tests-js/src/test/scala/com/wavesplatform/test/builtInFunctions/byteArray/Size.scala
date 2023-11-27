@@ -13,7 +13,7 @@ object Size extends JsTestBase {
   private val invalidSizeArgBeforeFunc = s"callerTestData.size(callerTestData, callerTestData)"
 
   val tests: Tests = Tests {
-    test(" Functions Size compiles") {
+    test("RIDE-54. Size function should compile for valid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -28,7 +28,7 @@ object Size extends JsTestBase {
       }
     }
 
-    test(" DropRight Can't find a function overload") {
+    test("RIDE-55. Size function throws an error for invalid values") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

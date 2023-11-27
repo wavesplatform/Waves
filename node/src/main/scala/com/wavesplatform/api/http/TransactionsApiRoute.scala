@@ -42,7 +42,7 @@ case class TransactionsApiRoute(
   import TransactionsApiRoute.*
 
   private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
-  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
@@ -172,9 +172,9 @@ case class TransactionsApiRoute(
     jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
   }
 
-  def signedBroadcast: Route = path("broadcast")(
+  def signedBroadcast: Route = path("broadcast") {
     broadcast[JsValue](TransactionFactory.fromSignedRequest)
-  )
+  }
 
   def merkleProof: Route = path("merkleProof") {
     anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>

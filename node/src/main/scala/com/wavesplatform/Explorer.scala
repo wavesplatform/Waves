@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
-import com.google.common.math.StatsAccumulator
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
@@ -18,7 +17,6 @@ import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, Tr
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.rocksdb.RocksDB
 import play.api.libs.json.Json
 
@@ -71,7 +69,7 @@ object Explorer extends ScorexLogging {
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val rdb    = RDB.open(settings.dbSettings)
-    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings)
+    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -108,7 +106,7 @@ object Explorer extends ScorexLogging {
             actualTotalReward += Longs.fromByteArray(e.getValue)
           }
 
-          val actualTotalBalance   = balances.values.sum + reader.carryFee
+          val actualTotalBalance   = balances.values.sum + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
           val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 
@@ -123,7 +121,7 @@ object Explorer extends ScorexLogging {
         case "DA" =>
           val addressIds = mutable.Seq[(BigInt, Address)]()
           rdb.db.iterateOver(KeyTags.AddressId) { e =>
-            val address   = Address.fromBytes(e.getKey.drop(2), settings.blockchainSettings.addressSchemeCharacter.toByte)
+            val address   = Address.fromBytes(e.getKey.drop(2))
             val addressId = BigInt(e.getValue)
             addressIds :+ (addressId -> address)
           }
@@ -222,24 +220,28 @@ object Explorer extends ScorexLogging {
 
         case "S" =>
           log.info("Collecting DB stats")
-          val iterator = rdb.db.newIterator()
-          val result   = new util.HashMap[Short, Stats]
-          iterator.seekToFirst()
-          while (iterator.isValid) {
-            val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
-            val valueLength = iterator.value().length
-            val keyLength   = iterator.key().length
-            result.compute(
-              keyPrefix,
-              (_, maybePrev) =>
-                maybePrev match {
-                  case null => Stats(1, keyLength, valueLength)
-                  case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
-                }
-            )
-            iterator.next()
+
+          val result = new util.HashMap[Short, Stats]
+          Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
+            Using(rdb.db.newIterator(cf)) { iterator =>
+              iterator.seekToFirst()
+
+              while (iterator.isValid) {
+                val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
+                val valueLength = iterator.value().length
+                val keyLength   = iterator.key().length
+                result.compute(
+                  keyPrefix,
+                  (_, maybePrev) =>
+                    maybePrev match {
+                      case null => Stats(1, keyLength, valueLength)
+                      case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
+                    }
+                )
+                iterator.next()
+              }
+            }
           }
-          iterator.close()
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
@@ -358,17 +360,6 @@ object Explorer extends ScorexLogging {
           rdb.db.get(Keys.stateHash(targetHeight)).foreach { sh =>
             println(Json.toJson(sh).toString())
           }
-        case "BSD" =>
-          log.info("Collecting block size distribution")
-          val sa = new StatsAccumulator
-          val ds = new DescriptiveStatistics()
-          rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
-            val size = readBlockMeta(e.getValue).size
-            sa.add(size)
-            ds.addValue(size)
-          }
-          log.info(s"${sa.snapshot()}")
-          log.info(s"${ds.toString}")
         case "CTI" =>
           log.info("Counting transaction IDs")
           var counter = 0

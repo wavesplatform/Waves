@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.model.headers._
+import akka.http.scaladsl.model.headers.*
 
 import scala.util.Try
 
@@ -11,9 +11,9 @@ object `X-Api-Key` extends ModeledCustomHeaderCompanion[`X-Api-Key`] {
 }
 
 final class `X-Api-Key`(val value: String) extends ModeledCustomHeader[`X-Api-Key`] {
-  override def companion         = `X-Api-Key`
-  override def renderInRequests  = true
-  override def renderInResponses = false
+  override def companion: ModeledCustomHeaderCompanion[`X-Api-Key`] = `X-Api-Key`
+  override def renderInRequests                                     = true
+  override def renderInResponses                                    = false
 }
 
 object api_key extends ModeledCustomHeaderCompanion[api_key] {
@@ -23,7 +23,7 @@ object api_key extends ModeledCustomHeaderCompanion[api_key] {
 }
 
 final class api_key(val value: String) extends ModeledCustomHeader[api_key] {
-  override def companion         = api_key
-  override def renderInRequests  = true
-  override def renderInResponses = false
+  override def companion: ModeledCustomHeaderCompanion[api_key] = api_key
+  override def renderInRequests                                 = true
+  override def renderInResponses                                = false
 }

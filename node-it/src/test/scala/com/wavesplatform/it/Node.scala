@@ -28,7 +28,7 @@ abstract class Node(val config: Config) extends AutoCloseable {
   )
 
   lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder
-    .forAddress(networkAddress.getHostString, nodeExternalPort(6870))
+    .forAddress(nodeApiEndpoint.getHost, nodeExternalPort(6870))
     .usePlaintext()
     .build()
 
