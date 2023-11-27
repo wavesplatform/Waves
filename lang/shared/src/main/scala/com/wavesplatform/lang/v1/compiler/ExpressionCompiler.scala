@@ -5,7 +5,6 @@ import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.{CommonError, StringOps}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V8}
-import com.wavesplatform.lang.hacks.Global
 import com.wavesplatform.lang.v1.compiler.CompilationError.*
 import com.wavesplatform.lang.v1.compiler.CompilerContext.*
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.*
@@ -39,7 +38,7 @@ class ExpressionCompiler(val version: StdLibVersion) {
 
       def adjustStr(expr: Expressions.CONST_STRING, str: String): Either[CompilationError, CompilationStepResultExpr] =
         CONST_STRING(str)
-          .filterOrElse(_ => allowIllFormedStrings || !Global.isIllFormed(str), CommonError(s"String '$str' contains ill-formed characters"))
+          .filterOrElse(_ => allowIllFormedStrings || str.isWellFormed, CommonError(s"String '$str' contains ill-formed characters"))
           .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
           .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
