@@ -41,6 +41,7 @@ import com.wavesplatform.{TestValues, TestWallet, crypto}
 import org.scalatest.{EitherValues, Inside}
 import org.web3j.crypto.Bip32ECKeyPair
 
+import scala.concurrent.duration.*
 import scala.util.{Random, Try}
 
 class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet with EthHelpers {
@@ -1924,10 +1925,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         defaultSigner.publicKey,
         AssetPair(issue.asset, Waves),
         OrderType.BUY,
-        TxExchangeAmount.unsafeFrom(1),
-        TxOrderPrice.unsafeFrom(1),
+        TxExchangeAmount(1),
+        TxOrderPrice(1),
         System.currentTimeMillis(),
-        System.currentTimeMillis() + 10000,
+        System.currentTimeMillis() + 1.day.toMillis,
         TxMatcherFee.unsafeFrom(0.003.waves)
       )
       val signedBuyOrder = buyOrder.copy(
@@ -1990,8 +1991,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         defaultSigner.publicKey,
         AssetPair(issue.asset, Waves),
         OrderType.BUY,
-        TxExchangeAmount.unsafeFrom(1),
-        TxOrderPrice.unsafeFrom(1),
+        TxExchangeAmount(1),
+        TxOrderPrice(1),
         System.currentTimeMillis(),
         System.currentTimeMillis() + 10000,
         TxMatcherFee.unsafeFrom(0.003.waves)

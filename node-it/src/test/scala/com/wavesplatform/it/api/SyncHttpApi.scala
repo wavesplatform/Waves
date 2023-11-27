@@ -14,7 +14,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistributionPage, DataEntry}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -260,6 +260,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         amountsAsStrings: Boolean = false
     ): AssetDistributionPage =
       sync(async(n).assetDistributionAtHeight(asset, height, limit, maybeAfter, amountsAsStrings))
+
+    def assetDistribution(asset: String): AssetDistribution =
+      sync(async(n).assetDistribution(asset))
 
     def broadcastIssue(
         source: KeyPair,

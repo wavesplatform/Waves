@@ -33,8 +33,10 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
   private val orderId      = ByteStr.fill(DigestLength)(5)
   private val volumeAndFee = VolumeAndFee(11, 2)
 
-  private val leaseId      = ByteStr.fill(DigestLength)(6)
-  private val leaseDetails = LeaseDetails(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active, leaseId, 2)
+  private val leaseId1      = ByteStr.fill(DigestLength)(6)
+  private val leaseId2      = ByteStr.fill(DigestLength)(7)
+  private val leaseDetails1 = LeaseSnapshot(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active)
+  private val leaseDetails2 = LeaseSnapshot(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Cancelled(1, None))
 
   private val addr1Balance       = 10.waves
   private val addr2Balance       = 20.waves
@@ -116,7 +118,7 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
     ),
     aliases = Map(addr1Alias1 -> address1, addr2Alias -> address2, addr1Alias2 -> address1),
     orderFills = Map(orderId -> volumeAndFee),
-    leaseStates = Map(leaseId -> leaseDetails),
+    leaseStates = Map(leaseId1 -> leaseDetails1, leaseId2 -> leaseDetails2),
     accountScripts = Map(TxHelpers.signer(2).publicKey -> Some(accountScriptInfo)),
     assetScripts = Map(assetId1 -> assetScriptInfo),
     accountData = Map(address1 -> Map(dataEntry.key -> dataEntry)),
@@ -147,7 +149,15 @@ class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
         Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
           addr1PortfolioDiff.lease.out
         ),
-        Array(KeyType.LeaseStatus.id.toByte) ++ leaseId.arr ++ (if (leaseDetails.isActive) Array(1: Byte) else Array(0: Byte)),
+        Array(KeyType.LeaseStatus.id.toByte)
+          ++ leaseId1.arr
+          ++ Array(1: Byte)
+          ++ leaseDetails1.sender.arr
+          ++ leaseDetails1.recipient.bytes
+          ++ Longs.toByteArray(leaseDetails1.amount),
+        Array(KeyType.LeaseStatus.id.toByte)
+          ++ leaseId2.arr
+          ++ Array(0: Byte),
         Array(KeyType.Sponsorship.id.toByte) ++ assetId1.id.arr ++ Longs.toByteArray(sponsorship.minFee),
         Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias1.name.getBytes(StandardCharsets.UTF_8),
         Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),

@@ -7,8 +7,8 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
-import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
@@ -17,8 +17,7 @@ import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, Bl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
+import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
@@ -485,7 +484,14 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for ((id, details) <- snapshot.leaseStates) {
+      val txLeases = for {
+        (_, txInfo) <- snapshot.transactions
+        (id, lease) <- txInfo.snapshot.leaseStates
+      } yield (Some(txInfo.transaction), id, lease)
+      val txLeaseIdSet = txLeases.map(_._2).toSet
+      val allLeases    = txLeases ++ snapshot.leaseStates.collect { case (id, lease) if !txLeaseIdSet.contains(id) => (None, id, lease) }
+      allLeases.foreach { case (txOpt, id, lease) =>
+        val details = lease.toDetails(this, txOpt, leaseDetails(id))
         rw.put(Keys.leaseDetails(id)(height), Some(Right(details)))
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
