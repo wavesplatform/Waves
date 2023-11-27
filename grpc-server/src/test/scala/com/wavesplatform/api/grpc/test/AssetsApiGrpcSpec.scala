@@ -3,6 +3,7 @@ package com.wavesplatform.api.grpc.test
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{AssetInfoResponse, AssetsApiGrpcImpl, NFTRequest, NFTResponse}
+import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -52,6 +53,49 @@ class AssetsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
           )
         )
       }
+    }
+  }
+
+  "NODE-999. GetNftList limit should work properly" in withDomain(
+    RideV6.addFeatures(BlockchainFeatures.ReduceNFTFee),
+    AddrWithBalance.enoughBalances(sender)
+  ) { d =>
+    val nftIssues = (1 to 5).map(idx => TxHelpers.issue(sender, 1, name = s"nft$idx", reissuable = false))
+    val limit     = 2
+    val afterId   = 1 // second element
+
+    d.appendBlock()
+    val mb1 = d.appendMicroBlock(nftIssues.take(afterId + 1)*)
+    d.appendMicroBlock(nftIssues.drop(afterId + 1)*)
+
+    // full liquid
+    d.rocksDBWriter.containsTransaction(nftIssues(afterId)) shouldBe false
+    d.rocksDBWriter.containsTransaction(nftIssues(afterId + 1)) shouldBe false
+    check()
+
+    // liquid afterId
+    d.appendBlock(d.createBlock(ProtoBlockVersion, nftIssues.drop(afterId + 1), Some(mb1)))
+    d.rocksDBWriter.containsTransaction(nftIssues(afterId)) shouldBe true
+    d.rocksDBWriter.containsTransaction(nftIssues(afterId + 1)) shouldBe false
+    check()
+
+    // full solid
+    d.appendBlock()
+    d.rocksDBWriter.containsTransaction(nftIssues(afterId)) shouldBe true
+    d.rocksDBWriter.containsTransaction(nftIssues(afterId + 1)) shouldBe true
+    check()
+
+    def check() = {
+      val (observer, result) = createObserver[NFTResponse]
+      val request = NFTRequest.of(
+        ByteString.copyFrom(sender.toAddress.bytes),
+        limit,
+        afterAssetId = ByteString.copyFrom(nftIssues(afterId).asset.id.arr)
+      )
+      getGrpcApi(d).getNFTList(request, observer)
+      val response = result.runSyncUnsafe()
+      response.size shouldBe limit
+      response.map(_.assetInfo.get.name) shouldBe nftIssues.slice(afterId + 1, afterId + limit + 1).map(_.name.toStringUtf8)
     }
   }
 

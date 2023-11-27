@@ -1,14 +1,14 @@
 package com.wavesplatform.state.snapshot
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.Alias
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -60,14 +60,12 @@ class StateSnapshotProtoTest extends PropSpec {
         IssuedAsset(ByteStr.fromBytes(2, 2, 2)) -> SponsorshipValue(0)
       ),
       Map(
-        ByteStr.fromBytes(4, 5, 6) -> LeaseDetails(defaultSigner.publicKey, secondAddress, 123, Status.Active, ByteStr.fromBytes(1, 2, 3), 4),
-        ByteStr.fromBytes(7, 8, 9) -> LeaseDetails(
-          secondSigner.publicKey,
-          defaultAddress,
+        ByteStr.fromBytes(4, 5, 6) -> LeaseSnapshot(defaultSigner.publicKey, secondAddress, 123, Status.Active),
+        ByteStr.fromBytes(7, 8, 9) -> LeaseSnapshot(
+          PublicKey(ByteStr.fill(KeyLength)(0)),
+          Address(Array.fill(Address.HashLength)(0)),
           0,
-          Status.Cancelled(2, Some(ByteStr.fromBytes(5, 5, 5))),
-          ByteStr.fromBytes(1, 2, 3),
-          777777777
+          Status.Cancelled(0, None)
         )
       ),
       Map(

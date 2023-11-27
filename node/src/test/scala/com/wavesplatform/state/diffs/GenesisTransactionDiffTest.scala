@@ -1,13 +1,13 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state.*
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, genesis}
+import org.scalatest.exceptions.TestFailedException
 
 class GenesisTransactionDiffTest extends PropSpec with WithDomain {
   property("fails if height != 1") {
@@ -17,17 +17,16 @@ class GenesisTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("Diff establishes Waves invariant") {
+  property("StateSnapshot establishes Waves invariant") {
     val genesis = (1 to 10).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 10000))
-
     assertDiffAndState(Seq.empty, TestBlock.create(genesis)) { (blockDiff, _) =>
-      val totalPortfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-      totalPortfolio.balance shouldBe genesis.map(_.amount.value).sum
-      totalPortfolio.effectiveBalance(false).explicitGet() shouldBe genesis.map(_.amount.value).sum
-      totalPortfolio.assets shouldBe Map.empty
-
+      blockDiff.balances.collect {
+        case ((_, Waves), amount) => amount
+        case ((_, asset), _)      => throw new TestFailedException(s"unexpected $asset", 0)
+      }.sum shouldBe genesis.map(_.amount.value).sum
+      blockDiff.leaseBalances shouldBe empty
       genesis.foreach { gtx =>
-        blockDiff.portfolios(gtx.recipient).balance shouldBe gtx.amount.value
+        blockDiff.balances((gtx.recipient, Waves)) shouldBe gtx.amount.value
       }
     }
   }

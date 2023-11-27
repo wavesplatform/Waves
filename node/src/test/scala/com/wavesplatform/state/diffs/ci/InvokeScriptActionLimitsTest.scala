@@ -57,8 +57,8 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
         )
 
       assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
-        case (diff, bc) =>
-          diff.scriptResults(invoke1.id()).error shouldBe None
+        case (snapshot, bc) =>
+          snapshot.scriptResults(invoke1.id()).error shouldBe None
           bc.accountData(masterAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
           bc.accountData(serviceAddress1, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
       }
@@ -97,8 +97,8 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
         )
 
       assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
-        case (diff, bc) =>
-          diff.scriptResults(invoke1.id()).error shouldBe None
+        case (snapshot, bc) =>
+          snapshot.scriptResults(invoke1.id()).error shouldBe None
           bc.accountData(masterAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
           bc.accountData(serviceAddress1, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
       }
@@ -133,8 +133,8 @@ class InvokeScriptActionLimitsTest extends PropSpec with WithDomain with DBCache
         assetAndDataActionsServiceContract(V6, ContractLimits.MaxAssetScriptActionsAmountV6, ContractLimits.MaxWriteSetSize / 2)
       )
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features(V6)) { case (diff, bc) =>
-      diff.scriptResults(invoke.id()).error shouldBe None
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features(V6)) { case (snapshot, bc) =>
+      snapshot.scriptResults(invoke.id()).error shouldBe None
       bc.accountData(masterAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
       bc.accountData(serviceAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }

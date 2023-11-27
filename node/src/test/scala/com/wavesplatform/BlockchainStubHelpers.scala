@@ -6,7 +6,6 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.history.SnapshotOps.*
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -148,12 +147,9 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         )
     }
 
-    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Diff] = {
-      val snapshot =
-        if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
-        else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
-      snapshot.map(_.toDiff(blockchain))
-    }
+    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false)(tx: Transaction): TracedResult[ValidationError, StateSnapshot] =
+      if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
+      else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
 
     def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {
       val differ = transactionDiffer(time) _

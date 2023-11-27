@@ -16,18 +16,18 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
-import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, PBSince, Transaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.transaction.{Asset, PBSince, Transaction}
 import com.wavesplatform.utils.EthEncoding
+import play.api.libs.json.*
 import play.api.libs.json.JsonConfiguration.Aux
-import play.api.libs.json.{JsArray, JsBoolean, JsNumber, JsObject, JsString, JsValue, Json, JsonConfiguration, OWrites, OptionHandlers}
 
 final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
 
@@ -525,6 +525,6 @@ object TransactionJsonSerializer {
   object LeaseRef {
     import com.wavesplatform.utils.byteStrFormat
     implicit val config: Aux[Json.MacroOptions] = JsonConfiguration(optionHandlers = OptionHandlers.WritesNull)
-    implicit val jsonWrites: OWrites[LeaseRef] = Json.writes[LeaseRef]
+    implicit val jsonWrites: OWrites[LeaseRef]  = Json.writes[LeaseRef]
   }
 }
