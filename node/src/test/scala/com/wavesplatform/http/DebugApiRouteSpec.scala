@@ -3316,7 +3316,7 @@ class DebugApiRouteSpec
     }
 
     "InvokeExpression" in {
-      def assert(wavesSettings: WavesSettings): Assertion = {
+      def assert(wavesSettings: WavesSettings, error: Option[String]): Assertion = {
         val blockchain = createBlockchainStub { blockchain =>
           val settings = wavesSettings.blockchainSettings.functionalitySettings
           (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
@@ -3337,151 +3337,151 @@ class DebugApiRouteSpec
         val invokeExpression = TxHelpers.invokeExpression(expression)
         jsonPost(routePath("/validate"), invokeExpression.json()) ~> route ~> check {
           val json = responseAs[JsValue]
-          (json \ "expression").as[String] shouldBe expression.bytes.value().base64
-          (json \ "valid").as[Boolean] shouldBe true
-          (json \ "trace").as[JsArray] should matchJson(
-            s"""
-               |[ {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "default",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ ],
-               |    "transfers" : [ ],
-               |    "issues" : [ ],
-               |    "reissues" : [ {
-               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "isReissuable" : true,
-               |      "quantity" : 1
-               |    } ],
-               |    "burns" : [ ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ {
-               |    "name" : "i",
-               |    "type" : "Invocation",
-               |    "value" : {
-               |      "originCaller" : {
-               |        "type" : "Address",
-               |        "value" : {
-               |          "bytes" : {
-               |            "type" : "ByteVector",
-               |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |          }
-               |        }
-               |      },
-               |      "payments" : {
-               |        "type" : "Array",
-               |        "value" : [ ]
-               |      },
-               |      "callerPublicKey" : {
-               |        "type" : "ByteVector",
-               |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
-               |      },
-               |      "feeAssetId" : {
-               |        "type" : "Unit",
-               |        "value" : { }
-               |      },
-               |      "originCallerPublicKey" : {
-               |        "type" : "ByteVector",
-               |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
-               |      },
-               |      "transactionId" : {
-               |        "type" : "ByteVector",
-               |        "value" : "${invokeExpression.id()}"
-               |      },
-               |      "caller" : {
-               |        "type" : "Address",
-               |        "value" : {
-               |          "bytes" : {
-               |            "type" : "ByteVector",
-               |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |          }
-               |        }
-               |      },
-               |      "fee" : {
-               |        "type" : "Int",
-               |        "value" : 1000000
-               |      }
-               |    }
-               |  }, {
-               |    "name" : "default.@args",
-               |    "type" : "Array",
-               |    "value" : [ ]
-               |  }, {
-               |    "name" : "assetId",
-               |    "type" : "ByteVector",
-               |    "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
-               |  }, {
-               |    "name" : "Reissue.@args",
-               |    "type" : "Array",
-               |    "value" : [ {
-               |      "type" : "ByteVector",
-               |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
-               |    }, {
-               |      "type" : "Int",
-               |      "value" : 1
-               |    }, {
-               |      "type" : "Boolean",
-               |      "value" : true
-               |    } ]
-               |  }, {
-               |    "name" : "Reissue.@complexity",
-               |    "type" : "Int",
-               |    "value" : 1
-               |  }, {
-               |    "name" : "@complexityLimit",
-               |    "type" : "Int",
-               |    "value" : 51999
-               |  }, {
-               |    "name" : "cons.@args",
-               |    "type" : "Array",
-               |    "value" : [ {
-               |      "type" : "Reissue",
-               |      "value" : {
-               |        "assetId" : {
-               |          "type" : "ByteVector",
-               |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
-               |        },
-               |        "quantity" : {
-               |          "type" : "Int",
-               |          "value" : 1
-               |        },
-               |        "isReissuable" : {
-               |          "type" : "Boolean",
-               |          "value" : true
-               |        }
-               |      }
-               |    }, {
-               |      "type" : "Array",
-               |      "value" : [ ]
-               |    } ]
-               |  }, {
-               |    "name" : "cons.@complexity",
-               |    "type" : "Int",
-               |    "value" : 1
-               |  }, {
-               |    "name" : "@complexityLimit",
-               |    "type" : "Int",
-               |    "value" : 51998
-               |  } ]
-               |} ]
-               |
-          """.stripMargin
-          )
+          error.fold {
+            (json \ "expression").as[String] shouldBe expression.bytes.value().base64
+            (json \ "valid").as[Boolean] shouldBe true
+            (json \ "trace").as[JsArray] should matchJson(
+              s"""
+                 |[ {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "default",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ ],
+                 |    "transfers" : [ ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ {
+                 |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "isReissuable" : true,
+                 |      "quantity" : 1
+                 |    } ],
+                 |    "burns" : [ ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "originCaller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "originCallerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${invokeExpression.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 1000000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "default.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "assetId",
+                 |    "type" : "ByteVector",
+                 |    "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |  }, {
+                 |    "name" : "Reissue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : true
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Reissue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Reissue",
+                 |      "value" : {
+                 |        "assetId" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        },
+                 |        "isReissuable" : {
+                 |          "type" : "Boolean",
+                 |          "value" : true
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  } ]
+                 |} ]
+                 |
+               """.stripMargin
+            )
+          }(message => (json \ "error").as[String] should include(message))
         }
       }
 
-      assert(ContinuationTransaction)
-      intercept[Exception](assert(RideV6)).getMessage should include(
-        s"${BlockchainFeatures.ContinuationTransaction.description} feature has not been activated yet"
-      )
+      assert(ContinuationTransaction, None)
+      assert(RideV6, Some("Continuation Transaction feature has not been activated yet"))
     }
   }
 
