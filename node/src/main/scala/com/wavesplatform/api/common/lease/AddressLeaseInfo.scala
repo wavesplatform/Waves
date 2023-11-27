@@ -1,8 +1,8 @@
 package com.wavesplatform.api.common.lease
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.LeaseInfo.Status.Active
 import com.wavesplatform.api.common.LeaseInfo
+import com.wavesplatform.api.common.LeaseInfo.Status.Active
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, DBResource, Keys, RDB}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -27,8 +27,9 @@ object AddressLeaseInfo {
 
   private def leasesFromSnapshot(snapshot: StateSnapshot, blockchain: Blockchain, subject: Address): Seq[LeaseInfo] =
     snapshot.leaseStates.collect {
-      case (id, details) if subject == details.sender.toAddress || blockchain.resolveAlias(details.recipient).exists(subject == _) =>
-        LeaseInfo.fromLeaseDetails(id, details, blockchain)
+      case (id, leaseSnapshot)
+          if subject == leaseSnapshot.sender.toAddress || blockchain.resolveAlias(leaseSnapshot.recipient).exists(subject == _) =>
+        LeaseInfo.fromLeaseDetails(id, leaseSnapshot.toDetails(blockchain, None, blockchain.leaseDetails(id)), blockchain)
     }.toSeq
 
   private def leasesFromDb(rdb: RDB, blockchain: Blockchain, subject: Address): Observable[LeaseInfo] =
