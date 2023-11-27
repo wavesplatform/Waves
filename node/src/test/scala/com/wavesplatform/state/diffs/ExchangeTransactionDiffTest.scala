@@ -1928,7 +1928,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         TxExchangeAmount(1),
         TxOrderPrice(1),
         System.currentTimeMillis(),
-        System.currentTimeMillis() + 1.day.toMillis,
+        System.currentTimeMillis() + 10.hours.toMillis,
         TxMatcherFee.unsafeFrom(0.003.waves)
       )
       val signedBuyOrder = buyOrder.copy(
@@ -1994,7 +1994,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         TxExchangeAmount(1),
         TxOrderPrice(1),
         System.currentTimeMillis(),
-        System.currentTimeMillis() + 10000,
+        System.currentTimeMillis() + 10.hours.toMillis,
         TxMatcherFee.unsafeFrom(0.003.waves)
       )
       val signature = EthOrders.signOrder(buyOrder, signer)

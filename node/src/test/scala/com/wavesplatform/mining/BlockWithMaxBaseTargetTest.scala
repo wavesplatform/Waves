@@ -102,7 +102,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           case _: SecurityException =>
             Task.unit
         }
-        Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
+        Await.result(blockAppendTask.runToFuture(scheduler), 1.minute)
 
         signal.tryAcquire(10, TimeUnit.SECONDS)
 
