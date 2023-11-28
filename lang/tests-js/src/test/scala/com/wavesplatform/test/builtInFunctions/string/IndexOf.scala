@@ -14,7 +14,7 @@ object IndexOf extends JsTestBase {
   private val invalidIndexOf                 = "indexOf()"
 
   val tests: Tests = Tests {
-    test("check: indexOf function compiles") {
+    test("RIDE-215. function indexOf should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -31,7 +31,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test("compilation error: indexOf - Non-matching types - Can't find a function overload") {
+    test("RIDE-216. function indexOf - Non-matching types - Can't find a function overload") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

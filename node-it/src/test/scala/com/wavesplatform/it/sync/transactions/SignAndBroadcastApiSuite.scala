@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -59,9 +60,9 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     for (v <- supportedVersions) {
       val json = Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
       val js   = if (Option(v).isDefined) json ++ Json.obj("version" -> v) else json
-      assertSignBadJson(js - "type", "failed to parse json message")
+      assertSignBadJson(js - "type", WrongJson.WrongJsonDataMessage)
       assertSignBadJson(js + ("type" -> JsNumber(-100)), "Bad transaction type")
-      assertSignBadJson(js - "alias", "failed to parse json message")
+      assertSignBadJson(js - "alias", WrongJson.WrongJsonDataMessage)
     }
 
     val obsoleteTx =
@@ -78,7 +79,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
         "fee"        -> 100000,
         "attachment" -> "W" * 524291
       )
-    assertSignBadJson(bigBaseTx, "failed to parse json message")
+    assertSignBadJson(bigBaseTx, WrongJson.WrongJsonDataMessage)
   }
 
   test("/transaction/calculateFee should handle coding size limit") {
@@ -92,7 +93,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
           "amount"          -> 1,
           "assetId"         -> "W" * 524291
         )
-      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "failed to parse json message")
+      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, WrongJson.WrongJsonDataMessage)
     }
   }
 
@@ -137,10 +138,10 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     assertBroadcastBadJson(jsonV2, "Proof doesn't validate")
 
     for (j <- List(jsonV1, jsonV2)) {
-      assertBroadcastBadJson(j - "type", "failed to parse json message")
+      assertBroadcastBadJson(j - "type", WrongJson.WrongJsonDataMessage)
       assertBroadcastBadJson(j - "type" + ("type"       -> Json.toJson(88)), "Bad transaction type")
       assertBroadcastBadJson(j - "chainId" + ("chainId" -> Json.toJson(123)), "Wrong chain-id")
-      assertBroadcastBadJson(j - "alias", "failed to parse json message")
+      assertBroadcastBadJson(j - "alias", WrongJson.WrongJsonDataMessage)
     }
   }
 

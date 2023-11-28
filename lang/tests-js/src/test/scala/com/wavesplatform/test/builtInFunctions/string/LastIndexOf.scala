@@ -14,7 +14,7 @@ object LastIndexOf extends JsTestBase {
   private val invalidLastIndexOf                 = "lastIndexOf()"
 
   val tests: Tests = Tests {
-    test("check: lastIndexOf function compiles") {
+    test("RIDE-217. function lastIndexOf should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -31,7 +31,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test("compilation error: lastIndexOf - Non-matching types - Can't find a function overload") {
+    test("RIDE-218. function lastIndexOf - Non-matching types - Can't find a function overload") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (
@@ -49,5 +49,4 @@ object LastIndexOf extends JsTestBase {
       }
     }
   }
-
 }

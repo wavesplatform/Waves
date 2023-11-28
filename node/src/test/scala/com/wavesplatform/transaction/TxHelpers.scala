@@ -29,22 +29,23 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
+import monix.execution.atomic.AtomicLong
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
   def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
   def address(i: Int): Address    = signer(i).toAddress
 
-  def defaultSigner: SeedKeyPair = signer(0)
-  def defaultAddress: Address    = defaultSigner.toAddress
-  def secondSigner: SeedKeyPair  = signer(1)
-  def secondAddress: Address     = secondSigner.toAddress
+  val defaultSigner: SeedKeyPair = signer(0)
+  val defaultAddress: Address    = defaultSigner.toAddress
+  val secondSigner: SeedKeyPair  = signer(1)
+  val secondAddress: Address     = secondSigner.toAddress
 
-  def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
+  val defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
   def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
     val firstAccountNum = 100
-    val lastAccountNum = firstAccountNum + numberAccounts
+    val lastAccountNum  = firstAccountNum + numberAccounts
     val accountsSeq = (firstAccountNum until lastAccountNum).map { num =>
       val recipient = signer(num).toAddress
       ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
@@ -54,11 +55,8 @@ object TxHelpers {
 
   val matcher: SeedKeyPair = defaultSigner
 
-  private[this] var lastTimestamp = System.currentTimeMillis()
-  def timestamp: Long = {
-    lastTimestamp += 1
-    lastTimestamp
-  }
+  private[this] val lastTimestamp = AtomicLong(System.currentTimeMillis())
+  def timestamp: Long             = lastTimestamp.getAndIncrement()
 
   @throws[IllegalArgumentException]
   def signature(sig: String): Proofs =

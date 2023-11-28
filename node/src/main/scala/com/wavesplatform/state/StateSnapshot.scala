@@ -3,15 +3,16 @@ import cats.data.Ior
 import cats.implicits.{catsSyntaxEitherId, catsSyntaxSemigroup, toBifunctorOps, toTraverseOps}
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
-import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.reader.{LeaseDetails, SnapshotBlockchain}
@@ -30,7 +31,7 @@ case class StateSnapshot(
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
     sponsorships: Map[IssuedAsset, SponsorshipValue] = Map(),
-    leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+    leaseStates: Map[ByteStr, LeaseSnapshot] = Map(),
     aliases: Map[Alias, Address] = Map(),
     orderFills: Map[ByteStr, VolumeAndFee] = Map(),
     accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -63,24 +64,14 @@ case class StateSnapshot(
       orderFills.map { case (orderId, VolumeAndFee(volume, fee)) =>
         S.OrderFill(orderId.toByteString, volume, fee)
       }.toSeq,
-      leaseStates.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, sourceId, height)) =>
+      leaseStates.map { case (leaseId, LeaseSnapshot(sender, recipient, amount, status)) =>
         val pbStatus = status match {
           case Status.Active =>
-            S.LeaseState.Status.Active(S.LeaseState.Active())
-          case Status.Cancelled(cancelHeight, txId) =>
-            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(cancelHeight, txId.fold(ByteString.EMPTY)(_.toByteString)))
-          case Status.Expired(expiredHeight) =>
-            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(expiredHeight))
+            S.LeaseState.Status.Active(S.LeaseState.Active(amount, sender.toByteString, recipient.asInstanceOf[Address].toByteString))
+          case _: Status.Cancelled | _: Status.Expired =>
+            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled())
         }
-        S.LeaseState(
-          leaseId.toByteString,
-          pbStatus,
-          amount,
-          sender.toByteString,
-          ByteString.copyFrom(recipient.asInstanceOf[Address].bytes),
-          sourceId.toByteString,
-          height
-        )
+        S.LeaseState(leaseId.toByteString, pbStatus)
       }.toSeq,
       accountScripts.map { case (publicKey, scriptOpt) =>
         scriptOpt.fold(
@@ -141,11 +132,11 @@ case class StateSnapshot(
 object StateSnapshot {
   def fromProtobuf(pbSnapshot: TransactionStateSnapshot): (StateSnapshot, TxMeta.Status) = {
     val balances: VectorMap[(Address, Asset), Long] =
-      VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress, b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
+      VectorMap() ++ pbSnapshot.balances.map(b => (b.address.toAddress(), b.getAmount.assetId.toAssetId) -> b.getAmount.amount)
 
     val leaseBalances: Map[Address, LeaseBalance] =
       pbSnapshot.leaseBalances
-        .map(b => b.address.toAddress -> LeaseBalance(b.in, b.out))
+        .map(b => b.address.toAddress() -> LeaseBalance(b.in, b.out))
         .toMap
 
     val assetScripts: Map[IssuedAsset, AssetScriptInfo] =
@@ -171,28 +162,29 @@ object StateSnapshot {
         .map(s => s.assetId.toIssuedAssetId -> SponsorshipValue(s.minFee))
         .toMap
 
-    val leaseStates: Map[ByteStr, LeaseDetails] =
-      pbSnapshot.leaseStates
-        .map(ls =>
-          ls.leaseId.toByteStr -> LeaseDetails(
-            ls.sender.toPublicKey,
-            PBRecipients.toAddress(ls.recipient.toByteArray, AddressScheme.current.chainId).explicitGet(),
-            ls.amount,
-            ls.status match {
-              case TransactionStateSnapshot.LeaseState.Status.Cancelled(c) =>
-                LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
-              case _ =>
-                LeaseDetails.Status.Active
-            },
-            ls.originTransactionId.toByteStr,
-            ls.height
-          )
-        )
-        .toMap
+    val leaseStates: Map[ByteStr, LeaseSnapshot] =
+      pbSnapshot.leaseStates.map { ls =>
+        ls.status match {
+          case TransactionStateSnapshot.LeaseState.Status.Active(value) =>
+            ls.leaseId.toByteStr -> LeaseSnapshot(
+              value.sender.toPublicKey,
+              value.recipient.toAddress(),
+              value.amount,
+              LeaseDetails.Status.Active
+            )
+          case _: TransactionStateSnapshot.LeaseState.Status.Cancelled | TransactionStateSnapshot.LeaseState.Status.Empty =>
+            ls.leaseId.toByteStr -> LeaseSnapshot(
+              PublicKey(ByteStr.fill(KeyLength)(0)),
+              Address(Array.fill(Address.HashLength)(0)),
+              0,
+              LeaseDetails.Status.Cancelled(0, None)
+            )
+        }
+      }.toMap
 
     val aliases: Map[Alias, Address] =
       pbSnapshot.aliases
-        .map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress)
+        .map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress())
         .toMap
 
     val orderFills: Map[ByteStr, VolumeAndFee] =
@@ -223,7 +215,7 @@ object StateSnapshot {
             val entry = PBTransactions.toVanillaDataEntry(pbEntry)
             entry.key -> entry
           }.toMap
-        data.address.toAddress -> entries
+        data.address.toAddress() -> entries
       }.toMap
 
     (
@@ -254,7 +246,7 @@ object StateSnapshot {
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
       assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
-      leaseStates: Map[ByteStr, LeaseDetails] = Map(),
+      leaseStates: Map[ByteStr, LeaseSnapshot] = Map(),
       aliases: Map[Alias, Address] = Map(),
       accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
       accountScripts: Map[PublicKey, Option[AccountScriptInfo]] = Map(),
@@ -337,7 +329,7 @@ object StateSnapshot {
       }
       .map(_.toMap)
 
-  private def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStatic] =
+  def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStatic] =
     issuedAssets.map { case (asset, info) =>
       asset ->
         AssetStatic(
@@ -381,9 +373,9 @@ object StateSnapshot {
 
   private def resolvedLeaseStates(
       blockchain: Blockchain,
-      leaseStates: Map[ByteStr, LeaseDetails],
+      leaseStates: Map[ByteStr, LeaseSnapshot],
       aliases: Map[Alias, Address]
-  ): Map[ByteStr, LeaseDetails] =
+  ): Map[ByteStr, LeaseSnapshot] =
     leaseStates.view
       .mapValues(details =>
         details.copy(recipient = details.recipient match {

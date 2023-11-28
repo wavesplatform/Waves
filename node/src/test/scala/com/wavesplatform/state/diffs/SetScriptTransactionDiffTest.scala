@@ -435,7 +435,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       withDomain(domainSettingsWithFS(settings()), balances) { db =>
         val tx = setScript()
         db.appendBlock(tx)
-        db.liquidDiff.errorMessage(tx.id()) shouldBe None
+        db.liquidSnapshot.errorMessage(tx.id()) shouldBe None
       }
 
       withDomain(domainSettingsWithFS(settings(checkNegative = true)), balances) { db =>
@@ -537,7 +537,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
+  property("NODE-242. unions are forbidden as @Callable arguments for RIDE 6 scripts and allowed for RIDE 4 and 5") {
     def checkForExpr(expr: String, version: StdLibVersion): Assertion = {
       val compileVersion = if (version == V6) V5 else version
       val script         = ContractScriptImpl(version, TestCompiler(compileVersion).compile(expr).explicitGet())

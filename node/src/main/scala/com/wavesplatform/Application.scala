@@ -219,7 +219,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         utxStorage.resetPriorityPool()
         blockchainUpdater.removeAfter(blockId)
       }.executeOn(appenderScheduler)
-        .asyncBoundary
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
@@ -375,9 +374,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         else heavyRequestExecutor
       )
 
-      val routeTimeout = new RouteTimeout(
-        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      )(heavyRequestScheduler)
+      val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      val routeTimeout         = new RouteTimeout(serverRequestTimeout)(heavyRequestScheduler)
 
       val apiRoutes = Seq(
         new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
@@ -441,6 +439,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         ),
         AssetsApiRoute(
           settings.restAPISettings,
+          serverRequestTimeout,
           wallet,
           transactionPublisher,
           blockchainUpdater,
@@ -548,7 +547,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 }
 
 object Application extends ScorexLogging {
-  private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
+  def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
     import com.wavesplatform.settings.*
 
     val maybeExternalConfig = Try(external.map(f => ConfigFactory.parseFile(f.getAbsoluteFile, ConfigParseOptions.defaults().setAllowMissing(false))))

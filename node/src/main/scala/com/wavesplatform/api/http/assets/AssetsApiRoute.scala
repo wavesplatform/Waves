@@ -18,7 +18,13 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.StreamSerializerUtils.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsSerializer}
+import com.wavesplatform.api.http.assets.AssetsApiRoute.{
+  AssetDetails,
+  AssetInfo,
+  DistributionParams,
+  assetDetailsSerializer,
+  assetDistributionSerializer
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
@@ -39,9 +45,11 @@ import play.api.libs.json.*
 
 import java.util.concurrent.*
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 case class AssetsApiRoute(
     settings: RestAPISettings,
+    serverRequestTimeout: FiniteDuration,
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
@@ -64,6 +72,8 @@ case class AssetsApiRoute(
       new DefaultThreadFactory("balance-distribution", true)
     )
   )
+
+  private val assetDistRouteTimeout = new RouteTimeout(serverRequestTimeout)(distributionTaskScheduler)
 
   override lazy val route: Route =
     pathPrefix("assets") {
@@ -97,9 +107,10 @@ case class AssetsApiRoute(
         (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
-          (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
-            balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
-          }
+          pathEndOrSingleSlash(balanceDistribution(assetId)) ~
+            (path(IntNumber / "limit" / IntNumber) & parameter("after".?)) { (height, limit, maybeAfter) =>
+              balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
+            }
         }
       }
     }
@@ -179,6 +190,16 @@ case class AssetsApiRoute(
           Future.successful(errMsg.json: ToResponseMarshallable)
       }
     }
+
+  def balanceDistribution(assetId: IssuedAsset): Route = {
+    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[(Address, Long), NotUsed]] =
+      jacksonStreamMarshaller(prefix = "{", suffix = "}")(assetDistributionSerializer)
+
+    assetDistRouteTimeout.executeFromObservable(
+      commonAssetsApi
+        .assetDistribution(assetId, blockchain.height, None)
+    )
+  }
 
   def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route =
     optionalHeaderValueByType(Accept) { accept =>
@@ -509,6 +530,18 @@ object AssetsApiRoute {
           gen.writeStartObject()
           gen.writeStringField("assetId", assetId.assetId)
           gen.writeEndObject()
+      }
+    }
+
+  def assetDistributionSerializer(numbersAsString: Boolean): JsonSerializer[(Address, Long)] =
+    (value: (Address, Long), gen: JsonGenerator, _: SerializerProvider) => {
+      val (address, balance) = value
+      if (numbersAsString) {
+        gen.writeRaw(s"\"${address.toString}\":")
+        gen.writeString(balance.toString)
+      } else {
+        gen.writeRaw(s"\"${address.toString}\":")
+        gen.writeNumber(balance)
       }
     }
 }

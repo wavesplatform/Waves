@@ -84,8 +84,18 @@ case class SnapshotBlockchain(
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
     SnapshotBlockchain.assetDescription(asset, snapshot, height, inner)
 
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
-    snapshot.leaseStates.get(leaseId).orElse(inner.leaseDetails(leaseId))
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
+    lazy val innerDetails = inner.leaseDetails(leaseId)
+    val txOpt =
+      snapshot.transactions
+        .collectFirst {
+          case (_, txInfo) if txInfo.snapshot.leaseStates.contains(leaseId) => txInfo.transaction
+        }
+    snapshot.leaseStates
+      .get(leaseId)
+      .map(_.toDetails(this, txOpt, innerDetails))
+      .orElse(innerDetails)
+  }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     snapshot.transactions
@@ -139,19 +149,22 @@ case class SnapshotBlockchain(
       Some(bs)
     }
 
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeSnapshot.isEmpty || to.exists(!blockMeta.map(_._1.id()).contains(_))) {
-      inner.balanceSnapshots(address, from, to)
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    val from1 = math.max(from, 1)
+
+    if (maybeSnapshot.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
+      inner.balanceSnapshots(address, from1, to)
     } else {
       val balance    = this.balance(address)
       val lease      = this.leaseBalance(address)
-      val bs         = BalanceSnapshot(this.height, Portfolio(balance, lease))
-      val height2Fix = this.height == 2 && inner.isFeatureActivated(RideV6) && from < this.height
-      if (inner.height > 0 && (from < this.height - 1 || height2Fix))
-        bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain
+      val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
+      val height2Fix = this.height == 2 && from1 < 2 && inner.isFeatureActivated(RideV6)
+      if (inner.height > 0 && (from1 < this.height - 1 || height2Fix))
+        bs +: inner.balanceSnapshots(address, from1, to)
       else
         Seq(bs)
     }
+  }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
     snapshot.accountScriptsByAddress.get(address) match {

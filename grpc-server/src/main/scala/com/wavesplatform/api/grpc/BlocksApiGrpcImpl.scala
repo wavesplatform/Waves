@@ -36,7 +36,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 
     responseObserver.completeWith(request.filter match {
       case Filter.GeneratorPublicKey(publicKey) => stream.filter(_.getBlock.getHeader.generator.toPublicKey == publicKey.toPublicKey)
-      case Filter.GeneratorAddress(address)     => stream.filter(_.getBlock.getHeader.generator.toAddress == address.toAddress)
+      case Filter.GeneratorAddress(address)     => stream.filter(_.getBlock.getHeader.generator.toAddress() == address.toAddress())
       case Filter.Empty                         => stream
     })
   }

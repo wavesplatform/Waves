@@ -61,7 +61,7 @@ class InvokeReissueTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invoke(fee = invokeFee(issues = 1)))
-      val asset = d.liquidDiff.issuedAssets.head._1
+      val asset = d.liquidSnapshot.assetStatics.head._1
       d.appendBlock(reissue(asset, secondSigner, 234))
       d.blockchain.assetDescription(asset).get.totalVolume shouldBe 1234
     }

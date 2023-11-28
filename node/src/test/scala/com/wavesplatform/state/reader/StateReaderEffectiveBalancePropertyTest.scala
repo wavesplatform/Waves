@@ -1,6 +1,7 @@
 package com.wavesplatform.state.reader
 
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
@@ -9,7 +10,7 @@ import com.wavesplatform.state.diffs.*
 import com.wavesplatform.state.{BalanceSnapshot, LeaseBalance}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, transfer}
+import com.wavesplatform.transaction.TxHelpers.*
 
 class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -113,5 +114,61 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
 
     assert(RideV5, fixed = false)
     assert(RideV6, fixed = true)
+  }
+
+  property("correct balance snapshots") {
+    val transferTx   = transfer(to = signer(1).toAddress, amount = 3.waves, fee = 0.1.waves)
+    val leaseTx      = lease(recipient = signer(1).toAddress, amount = 2.waves, fee = 0.1.waves)
+    val startBalance = 7.waves
+
+    // 2 txs in 1 a non-genesis block
+    val feeReward = (transferTx.fee.value + leaseTx.fee.value) * 2 / 5
+    val feeCost   = transferTx.fee.value + leaseTx.fee.value
+
+    withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, startBalance))) { d =>
+      d.appendBlock(transferTx, leaseTx)
+      d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe Seq(
+        BalanceSnapshot(
+          height = 2,
+          regularBalance = startBalance + 6.waves + feeReward - feeCost - transferTx.amount.value,
+          leaseIn = 0,
+          leaseOut = leaseTx.amount.value
+        ),
+        BalanceSnapshot(
+          height = 1,
+          regularBalance = startBalance,
+          leaseIn = 0,
+          leaseOut = 0
+        )
+      )
+    }
+
+    // 1 tx in each of 2 non-genesis blocks, from = 0..1
+    (0 to 1).foreach { from =>
+      withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, 7.waves))) { d =>
+        d.appendBlock(transferTx)
+        d.appendBlock(leaseTx)
+        d.blockchain.balanceSnapshots(defaultAddress, from, None) shouldBe Seq(
+          BalanceSnapshot(
+            height = 3,
+            regularBalance = startBalance + 12.waves + leaseTx.fee.value * 2 / 5 - leaseTx.fee.value - transferTx.amount.value,
+            leaseIn = 0, // transfer fee is fully compensated by reward ↑
+            leaseOut = leaseTx.amount.value
+          ),
+          BalanceSnapshot(
+            height = 2,
+            regularBalance = startBalance + 6.waves + transferTx.fee.value * 2 / 5 - transferTx.fee.value - transferTx.amount.value,
+            leaseIn = 0,
+            leaseOut = 0
+          ),
+          BalanceSnapshot(
+            height = 1,
+            regularBalance = startBalance,
+            leaseIn = 0,
+            leaseOut = 0
+          )
+        )
+      }
+    }
   }
 }

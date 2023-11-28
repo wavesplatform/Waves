@@ -50,7 +50,7 @@ class CalculateDelayTest extends PropSpec with WithDomain {
       val minDelays =
         (1 to 200).map { _ =>
           d.appendBlock(invoke())
-          d.liquidDiff.accountData(secondAddress).values.minBy(_.value.asInstanceOf[Long]).key
+          d.liquidSnapshot.accountData(secondAddress).values.minBy(_.value.asInstanceOf[Long]).key
         }
       val lowestIsMiner  = minDelays.count(_ == "lowest")
       val mediumIsMiner  = minDelays.count(_ == "medium")

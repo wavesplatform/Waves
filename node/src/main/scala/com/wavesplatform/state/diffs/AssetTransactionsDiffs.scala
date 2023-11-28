@@ -76,7 +76,7 @@ object AssetTransactionsDiffs {
       _ <-
         if (!blockchain.hasAssetScript(tx.asset)) Left(GenericError("Cannot set script on an asset issued without a script"))
         else checkEstimationOverflow(blockchain, script)
-      _ <- checkSize(blockchain, tx.script)
+      _ <- checkScriptSize(blockchain, tx.script)
       snapshot <- StateSnapshot.build(
         blockchain,
         assetScripts = script.fold(Map[IssuedAsset, AssetScriptInfo]()) { case (script, complexity) =>
@@ -86,7 +86,7 @@ object AssetTransactionsDiffs {
       )
     } yield snapshot
 
-  private def checkSize(b: Blockchain, scriptOpt: Option[Script]): Either[GenericError, Unit] =
+  private def checkScriptSize(b: Blockchain, scriptOpt: Option[Script]): Either[GenericError, Unit] =
     scriptOpt.fold(().asRight[GenericError]) { script =>
       cond(
         !b.isFeatureActivated(BlockRewardDistribution) || script.bytes().size <= MaxExprSizeInBytes,
@@ -117,7 +117,7 @@ object AssetTransactionsDiffs {
     for {
       _      <- cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
       _      <- cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
-      _      <- checkSize(blockchain, tx.script)
+      _      <- checkScriptSize(blockchain, tx.script)
       script <- countVerifierComplexity(tx.script, blockchain, isAsset = true)
       _      <- checkEstimationOverflow(blockchain, script)
       snapshot <- StateSnapshot.build(

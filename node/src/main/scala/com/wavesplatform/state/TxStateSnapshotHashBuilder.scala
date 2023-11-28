@@ -15,6 +15,7 @@ import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.utils.byteStrOrdering
 import org.bouncycastle.crypto.digests.Blake2bDigest
 
 import java.nio.charset.StandardCharsets
@@ -75,7 +76,17 @@ object TxStateSnapshotHashBuilder {
     } addEntry(KeyType.AssetScript, asset.id.arr)(scriptInfo.script.bytes().arr)
 
     snapshot.leaseStates.foreach { case (leaseId, details) =>
-      addEntry(KeyType.LeaseStatus, leaseId.arr)(booleanToBytes(details.isActive))
+      if (details.isActive)
+        addEntry(KeyType.LeaseStatus, leaseId.arr)(
+          booleanToBytes(true),
+          details.sender.arr,
+          details.recipient.bytes,
+          Longs.toByteArray(details.amount)
+        )
+      else
+        addEntry(KeyType.LeaseStatus, leaseId.arr)(
+          booleanToBytes(false)
+        )
     }
 
     snapshot.sponsorships.foreach { case (asset, sponsorship) =>

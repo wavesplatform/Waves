@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,11 +15,12 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.state.LeaseBalance
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
-import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, invoke, lease, secondAddress, secondSigner, setScript}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -481,22 +483,20 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(leaseAmount, out = 0))
-      diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
+    ) { case (snapshot, _) =>
+      snapshot.leaseBalances(invoker) shouldBe LeaseBalance(leaseAmount, out = 0)
+      snapshot.leaseBalances(dAppAcc) shouldBe LeaseBalance(in = 0, leaseAmount)
     }
   }
 
   property(s"Lease action cancelled by LeaseCancelTransaction") {
     val (preparingTxs, invoke, _, dAppAcc, invoker, _, leaseCancelTx) = leasePreconditions(cancelLeaseActionByTx = true)
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs)),
-      TestBlock.create(Seq(invoke, leaseCancelTx)),
-      v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()) shouldBe empty
-      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-      diff.portfolios(dAppAcc) shouldBe Portfolio(-leaseCancelTx.fee.value)
+    withDomain(RideV5) { d =>
+      d.appendBlock(preparingTxs*)
+      d.appendBlock(invoke, leaseCancelTx)
+      d.liquidSnapshot.errorMessage(invoke.id()) shouldBe empty
+      d.liquidSnapshot.balances((invoker, Waves)) shouldBe d.rocksDBWriter.balance(invoker) - invoke.fee.value
+      d.liquidSnapshot.balances((dAppAcc, Waves)) shouldBe d.rocksDBWriter.balance(dAppAcc) - leaseCancelTx.fee.value
     }
   }
 
@@ -506,8 +506,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
     }
   }
 
@@ -517,8 +517,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
     }
   }
 
@@ -531,8 +531,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Bad address checksum)"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Bad address checksum)"
     }
   }
 
@@ -542,8 +542,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exist."
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exist."
     }
   }
 
@@ -553,8 +553,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
     }
   }
 
@@ -564,8 +564,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(0,waves)"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(0,waves)"
     }
   }
 
@@ -599,8 +599,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
     }
   }
 
@@ -613,8 +613,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs.toList ::: leaseTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe
         s"Cannot lease more than own: Balance: ${dAppBalance - leaseFromDApp.fee.value}, already leased: ${leaseFromDApp.amount.value}"
     }
   }
@@ -627,9 +627,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
+    ) { case (snapshot, _) =>
       val id = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
-      diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$id is already in the state"
+      snapshot.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$id is already in the state"
     }
   }
 
@@ -639,8 +639,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
     }
   }
 
@@ -650,8 +650,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
     }
   }
 
@@ -677,11 +677,11 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      ) { case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-        diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount * limit))
-        diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount * limit, out = 0))
+      ) { case (snapshot, _) =>
+        snapshot.errorMessage(invoke.id()) shouldBe empty
+        snapshot.balances((invoker, Waves)) shouldBe ENOUGH_AMT - invoke.fee.value
+        snapshot.leaseBalances(dAppAcc) shouldBe LeaseBalance(in = 0, out = amount * limit)
+        snapshot.leaseBalances(recipient) shouldBe LeaseBalance(in = amount * limit, out = 0)
       }
     }
 
@@ -749,8 +749,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text should include("is already in the state")
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text should include("is already in the state")
     }
   }
 
@@ -763,24 +763,25 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()) shouldBe empty
-      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-      diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount))
-      diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount, 0))
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()) shouldBe empty
+      snapshot.balances((invoker, Waves)) shouldBe ENOUGH_AMT - invoke.fee.value
+      snapshot.leaseBalances(dAppAcc) shouldBe LeaseBalance(in = 0, out = amount)
+      snapshot.leaseBalances(recipient) shouldBe LeaseBalance(in = amount, 0)
     }
   }
 
   property(s"LeaseCancel action for lease performed via LeaseTransaction") {
     val (preparingTxs, invoke, _, dAppAcc, invoker, leaseTxs, _) = leasePreconditions(useLeaseCancelDApp = true)
     val leaseFromDApp                                            = leaseTxs.head
-    assertDiffAndState(
-      Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
-      TestBlock.create(Seq(invoke)),
-      v5Features
-    ) { case (diff, _) =>
-      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(in = -leaseFromDApp.amount.value, 0))
-      diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(0, out = -leaseFromDApp.amount.value))
+    withDomain(RideV5) { d =>
+      d.appendBlock(preparingTxs*)
+      d.appendBlock(leaseTxs*)
+      d.appendAndAssertSucceed(invoke)
+      d.liquidSnapshot
+        .leaseBalances(invoker) shouldBe d.rocksDBWriter.leaseBalance(invoker).combineF[Id](LeaseBalance(in = -leaseFromDApp.amount.value, 0))
+      d.liquidSnapshot
+        .leaseBalances(dAppAcc) shouldBe d.rocksDBWriter.leaseBalance(dAppAcc).combineF[Id](LeaseBalance(0, out = -leaseFromDApp.amount.value))
     }
   }
 
@@ -791,8 +792,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$leaseId not found"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$leaseId not found"
     }
   }
 
@@ -803,8 +804,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
     }
   }
 
@@ -815,8 +816,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs :+ leaseTx)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text should include("LeaseTransaction was leased by other sender")
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text should include("LeaseTransaction was leased by other sender")
     }
   }
 
@@ -828,9 +829,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
+    ) { case (snapshot, _) =>
       val leaseId = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
-      diff.errorMessage(invoke.id()).get.text shouldBe s"Duplicate LeaseCancel id(s): $leaseId"
+      snapshot.errorMessage(invoke.id()).get.text shouldBe s"Duplicate LeaseCancel id(s): $leaseId"
     }
   }
 
@@ -840,8 +841,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs ++ leaseTxs ++ List(leaseCancelTx))),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text shouldBe "Cannot cancel already cancelled lease"
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "Cannot cancel already cancelled lease"
     }
   }
 
@@ -850,14 +851,18 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       val (preparingTxs, invoke, _, dAppAcc, invoker, ltx, _) =
         leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmountBeforeV6(version), version = version)
       val leaseTxs = ltx.init
-      assertDiffAndState(
-        Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
-        TestBlock.create(Seq(invoke)),
-        features(version)
-      ) { case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(in = -leaseTxs.map(_.amount.value).sum, out = 0))
-        diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = -leaseTxs.map(_.amount.value).sum))
+      withDomain(settingsForRide(version)) { d =>
+        d.appendBlock(preparingTxs*)
+        d.appendBlock(leaseTxs*)
+        d.appendAndAssertSucceed(invoke)
+        d.liquidSnapshot.leaseBalances(invoker) shouldBe
+          d.rocksDBWriter
+            .leaseBalance(invoker)
+            .combineF[Id](LeaseBalance(in = -leaseTxs.map(_.amount.value).sum, out = 0))
+        d.liquidSnapshot.leaseBalances(dAppAcc) shouldBe
+          d.rocksDBWriter
+            .leaseBalance(dAppAcc)
+            .combineF[Id](LeaseBalance(in = 0, out = -leaseTxs.map(_.amount.value).sum))
       }
     }
 
@@ -899,11 +904,12 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      ) { case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-        diff.portfolios(dAppAcc) shouldBe Portfolio(-transfersCount, lease = LeaseBalance(in = 0, out = leaseAmount))
-        diff.portfolios(recipient) shouldBe Portfolio(transfersCount, lease = LeaseBalance(in = leaseAmount, out = 0))
+      ) { case (snapshot, _) =>
+        snapshot.errorMessage(invoke.id()) shouldBe empty
+        snapshot.balances((invoker, Waves)) shouldBe ENOUGH_AMT - invoke.fee.value
+        snapshot.leaseBalances.get(invoker) shouldBe None
+        snapshot.leaseBalances(dAppAcc) shouldBe LeaseBalance(in = 0, out = leaseAmount)
+        snapshot.leaseBalances(recipient) shouldBe LeaseBalance(in = leaseAmount, out = 0)
       }
     }
 

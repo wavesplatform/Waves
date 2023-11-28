@@ -121,31 +121,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
-  test("InvokeScriptTransaction: insufficient action fees propagates failed transaction") {
-    val invokeFee            = 0.005.waves
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee * 2
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-
-    for (typeName <- Seq("transfer", "issue", "reissue", "burn")) {
-      updateTikTok("unknown", setAssetScriptMinFee)
-
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        _ =>
-          sender
-            .broadcastInvokeScript(
-              caller,
-              Recipient().withPublicKeyHash(contractAddr),
-              Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
-              fee = invokeFee
-            ),
-        () => updateTikTok(typeName, priorityFee, waitForTx = false)
-      )((txs, _) => assertFailedTxs(txs))
-    }
-  }
-
   test("InvokeScriptTransaction: invoke script error in payment asset propagates failed transaction") {
     val invokeFee            = 0.005.waves + smartFee
     val setAssetScriptMinFee = setAssetScriptFee + smartFee

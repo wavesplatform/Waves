@@ -421,7 +421,7 @@ class TransactionsRouteSpec
 
       val differ          = blockchain.stub.transactionDiffer().andThen(_.resultE.explicitGet())
       val transaction     = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 10, Waves)
-      val diff            = differ(transaction)
+      val snapshot        = differ(transaction)
       val transactionsApi = stub[CommonTransactionsApi]
       (transactionsApi.transactionById _)
         .when(transaction.id())
@@ -432,8 +432,8 @@ class TransactionsRouteSpec
               transaction,
               Status.Succeeded,
               15L,
-              diff.ethereumTransactionMeta.values.headOption,
-              diff.scriptResults.values.headOption
+              snapshot.ethereumTransactionMeta.values.headOption,
+              snapshot.scriptResults.values.headOption
             )
           )
         )
@@ -479,7 +479,7 @@ class TransactionsRouteSpec
 
       val differ          = blockchain.stub.transactionDiffer().andThen(_.resultE.explicitGet())
       val transaction     = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
-      val diff            = differ(transaction)
+      val snapshot        = differ(transaction)
       val transactionsApi = stub[CommonTransactionsApi]
       (transactionsApi.transactionById _)
         .when(transaction.id())
@@ -490,8 +490,8 @@ class TransactionsRouteSpec
               transaction,
               Status.Succeeded,
               15L,
-              diff.ethereumTransactionMeta.values.headOption,
-              diff.scriptResults.values.headOption
+              snapshot.ethereumTransactionMeta.values.headOption,
+              snapshot.scriptResults.values.headOption
             )
           )
         )
@@ -1191,12 +1191,13 @@ class TransactionsRouteSpec
         .signWith(defaultSigner.privateKey)
 
       Post(routePath("/broadcast"), tx.json()) ~> route should produce(
-        WrongJson(errors =
-          Seq(
+        WrongJson(
+          errors = Seq(
             JsPath \ "attachment" -> Seq(
               JsonValidationError(s"base58-encoded string length ($attachmentSizeInSymbols) exceeds maximum length of 192")
             )
-          )
+          ),
+          msg = Some("json data validation error, see validationErrors for details")
         )
       )
     }

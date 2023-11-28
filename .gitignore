@@ -36,6 +36,7 @@ docker/temp
 
 package
 !src/package
+!ride-runner/src/package
 native
 
 !lang/jvm/lib/*.jar

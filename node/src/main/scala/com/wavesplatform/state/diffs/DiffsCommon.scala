@@ -12,11 +12,11 @@ import com.wavesplatform.features.ComplexityCheckPolicyProvider.*
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, Portfolio, SponsorshipValue, StateSnapshot}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, LeaseSnapshot, Portfolio, SponsorshipValue, StateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
@@ -33,12 +33,17 @@ object DiffsCommon {
             !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
 
         val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+        def complexity(estimator: ScriptEstimator) =
+          Script.verifierComplexity(
+            script,
+            estimator,
+            fixEstimateOfVerifier,
+            useContractVerifierLimit = !isAsset && blockchain.useReducedVerifierComplexityLimit
+          )
+
         val cost =
-          if (useV1PreCheck)
-            Script.verifierComplexity(script, ScriptEstimatorV1, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
-              Script.verifierComplexity(script, ScriptEstimatorV2, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit)
-          else
-            Script.verifierComplexity(script, blockchain.estimator, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit)
+          if (useV1PreCheck) complexity(ScriptEstimatorV1) *> complexity(ScriptEstimatorV2)
+          else complexity(blockchain.estimator)
 
         cost.map((script, _))
       }
@@ -161,7 +166,7 @@ object DiffsCommon {
         senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
         recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
       )
-      details = LeaseDetails(sender, recipient, amount, LeaseDetails.Status.Active, txId, blockchain.height)
+      details = LeaseSnapshot(sender, recipient, amount, LeaseDetails.Status.Active)
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolioDiff,
@@ -202,7 +207,7 @@ object DiffsCommon {
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolios,
-        leaseStates = Map(leaseId -> actionInfo)
+        leaseStates = Map(leaseId -> LeaseSnapshot.fromDetails(actionInfo))
       )
     } yield snapshot
   }

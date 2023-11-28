@@ -138,7 +138,15 @@ class LightNodeTest extends PropSpec with WithDomain {
         )
 
         val appender =
-          ExtensionAppender(d.blockchain, d.utxPool, d.posSelector, TestTime(), InvalidBlockStorage.NoOp, PeerDatabase.NoOp, Scheduler.global)(
+          ExtensionAppender(
+            d.blockchain,
+            d.utxPool,
+            d.posSelector,
+            TestTime(extensionBlocks.blocks.last.header.timestamp),
+            InvalidBlockStorage.NoOp,
+            PeerDatabase.NoOp,
+            Scheduler.global
+          )(
             null,
             _
           )
@@ -162,7 +170,7 @@ class LightNodeTest extends PropSpec with WithDomain {
       val challengingBlock = d.createChallengingBlock(challengingMiner, invalidBlock, strictTime = true)
       val txSnapshots      = getTxSnapshots(d, challengingBlock)
 
-      val appender = BlockAppender(d.blockchainUpdater, TestTime(), d.utxPool, d.posSelector, Scheduler.global) _
+      val appender = BlockAppender(d.blockchainUpdater, TestTime(challengingBlock.header.timestamp), d.utxPool, d.posSelector, Scheduler.global) _
 
       appender(challengingBlock, Some(BlockSnapshot(challengingBlock.id(), txSnapshots))).runSyncUnsafe() shouldBe Right(
         Applied(Seq.empty, d.blockchain.score)

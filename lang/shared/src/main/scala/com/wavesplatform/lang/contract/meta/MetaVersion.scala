@@ -8,12 +8,12 @@ sealed trait MetaVersion {
 
 object V1 extends MetaVersion {
   override type Self = V1.type
-  override val strategy = MetaMapperStrategyV1
+  override val strategy: MetaMapperStrategy[Self] = MetaMapperStrategyV1
   override val number: Int = 1
 }
 
 object V2 extends MetaVersion {
   override type Self = V2.type
-  override val strategy = MetaMapperStrategyV2
+  override val strategy: MetaMapperStrategy[Self] = MetaMapperStrategyV2
   override val number: Int = 2
 }

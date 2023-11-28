@@ -882,7 +882,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         evalPure[EVALUATED](
           context.evaluationContext[Id],
           ExpressionCompiler
-            .apply(context.compilerContext, xs)
+            .apply(context.compilerContext, version, xs)
             .explicitGet()
             ._1
         )

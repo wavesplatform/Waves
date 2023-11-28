@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Add debug="true" to debug configuration -->
+<!-- Add scanPeriod="30 seconds" to refresh configuration -->
+<configuration debug="false" scan="false" scanPeriod="30 seconds">
+    <!-- To disable not interesting status logs -->
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
+
+    <!-- To stop LoggerContext properly and flush the logging events from the AsyncAppender queue -->
+    <shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook">
+        <delay>${logback.shutdown-hook-delay:-0}</delay> <!-- milliseconds -->
+    </shutdownHook>
+
+    <property name="default.pattern" value="%date{ISO8601,UTC} %-5level [%.25thread] %logger{26} - %msg%n%ex"/>
+
+    <!-- JRE -->
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
+
+    <!-- Netty -->
+    <logger name="io.grpc" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.grpc.netty" level="ERROR"/>
+    <logger name="io.grpc.Context" level="INFO"/> <!-- To ignore "Storage override doesn't exist. Using default" -->
+    <logger name="org.reflections" level="WARN"/>
+
+    <!-- Process and host metrics -->
+    <logger name="oshi" level="WARN"/>
+    <logger name="kamon" level="ERROR"/>
+
+    <!-- App -->
+    <logger name="com.wavesplatform.ride.runner.caches" level="INFO"/>
+    <logger name="com.wavesplatform.ride.runner.caches.disk" level="INFO"/>
+    <logger name="com.wavesplatform.blockchain" level="INFO"/>
+    <logger name="com.wavesplatform.api" level="INFO"/>
+    <logger name="com.wavesplatform.api.http.CompositeHttpService" level="OFF"/>
+    <logger name="com.wavesplatform.metrics" level="WARN"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <encoder>
+            <pattern>${logback.stdout.pattern:-${default.pattern}}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- https://logback.qos.ch/manual/appenders.html#AsyncAppender -->
+    <appender name="ASYNC-STDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>${logback.stdout.level:-INFO}</level>
+        </filter>
+        <queueSize>2048</queueSize>
+        <appender-ref ref="STDOUT"/>
+        <!-- These options help to prevent loosing of messages -->
+        <discardingThreshold>0</discardingThreshold>
+        <maxFlushTime>4000</maxFlushTime> <!-- milliseconds -->
+    </appender>
+
+    <root level="TRACE">
+        <appender-ref ref="ASYNC-STDOUT"/>
+    </root>
+</configuration>

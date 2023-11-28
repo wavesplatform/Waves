@@ -3,16 +3,17 @@ package com.wavesplatform.state.diffs
 import com.wavesplatform.account.{Address, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.ScriptsAndSponsorship
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 
-class MassTransferTransactionDiffTest extends PropSpec with WithState {
+class MassTransferTransactionDiffTest extends PropSpec with WithDomain {
 
   val fs: FunctionalitySettings =
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0))
@@ -35,42 +36,45 @@ class MassTransferTransactionDiffTest extends PropSpec with WithState {
 
         Seq(Some(issue.id()), None).map { issueIdOpt =>
           val maybeAsset = Asset.fromCompatId(issueIdOpt)
-          val transfer   = TxHelpers.massTransfer(master, transfers, maybeAsset, version = TxVersion.V1)
+          val transfer   = TxHelpers.massTransfer(master, transfers, maybeAsset, fee = 1.waves, version = TxVersion.V1)
 
           (genesis, issue, transfer)
         }
       }
 
-      setup.foreach {
-        case (genesis, issue, transfer) =>
-          assertDiffAndState(Seq(block(Seq(genesis, issue))), block(Seq(transfer)), fs) {
-            case (totalDiff, newState) =>
-              assertBalanceInvariant(totalDiff)
+      setup.foreach { case (genesis, issue, transfer) =>
+        withDomain(ScriptsAndSponsorship) { d =>
+          d.appendBlock(genesis)
+          d.appendBlock(issue)
+          d.appendBlock(transfer)
 
-              val totalAmount = transfer.transfers.map(_.amount.value).sum
-              val fees        = issue.fee.value + transfer.fee.value
+          val carryFee = (issue.fee.value - transfer.fee.value) * 3 / 5
+          assertBalanceInvariant(d.liquidSnapshot, d.rocksDBWriter, carryFee)
+
+          val totalAmount = transfer.transfers.map(_.amount.value).sum
+          val fees        = issue.fee.value + transfer.fee.value
+          transfer.assetId match {
+            case aid @ IssuedAsset(_) =>
+              d.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees
+              d.balance(transfer.sender.toAddress, aid) shouldBe ENOUGH_AMT - totalAmount
+            case Waves =>
+              d.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees - totalAmount
+          }
+          for (ParsedTransfer(recipient, amount) <- transfer.transfers) {
+            if (transfer.sender.toAddress != recipient) {
               transfer.assetId match {
                 case aid @ IssuedAsset(_) =>
-                  newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees
-                  newState.balance(transfer.sender.toAddress, aid) shouldBe ENOUGH_AMT - totalAmount
+                  d.balance(recipient.asInstanceOf[Address], aid) shouldBe amount.value
                 case Waves =>
-                  newState.balance(transfer.sender.toAddress) shouldBe ENOUGH_AMT - fees - totalAmount
+                  d.balance(recipient.asInstanceOf[Address]) shouldBe amount.value
               }
-              for (ParsedTransfer(recipient, amount) <- transfer.transfers) {
-                if (transfer.sender.toAddress != recipient) {
-                  transfer.assetId match {
-                    case aid @ IssuedAsset(_) =>
-                      newState.balance(recipient.asInstanceOf[Address], aid) shouldBe amount.value
-                    case Waves =>
-                      newState.balance(recipient.asInstanceOf[Address]) shouldBe amount.value
-                  }
-                }
-              }
+            }
           }
+        }
       }
     }
 
-    import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount => Max}
+    import com.wavesplatform.transaction.transfer.MassTransferTransaction.MaxTransferCount as Max
     Seq(0, 1, Max) foreach testDiff // test edge cases
     testDiff(5)
   }
@@ -79,7 +83,7 @@ class MassTransferTransactionDiffTest extends PropSpec with WithState {
     val setup = {
       val (genesis, master) = baseSetup
       val recipient         = Alias.create("alias").explicitGet()
-      val transfer          = TxHelpers.massTransfer(master, Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(100000L))), version = TxVersion.V1)
+      val transfer = TxHelpers.massTransfer(master, Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(100000L))), version = TxVersion.V1)
 
       (genesis, transfer)
     }
@@ -120,11 +124,10 @@ class MassTransferTransactionDiffTest extends PropSpec with WithState {
       }
     }
 
-    setup.foreach {
-      case (genesis, transfer) =>
-        assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
-          blockDiffEi should produce("Attempt to transfer unavailable funds")
-        }
+    setup.foreach { case (genesis, transfer) =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
+        blockDiffEi should produce("Attempt to transfer unavailable funds")
+      }
     }
   }
 

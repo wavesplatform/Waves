@@ -26,7 +26,7 @@ import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(
       expr: Terms.EXPR,
@@ -106,7 +106,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
 
   property("estimate script with all functions") {
     def check(version: StdLibVersion, expectedCost: Int) = {
-      val expr = ExpressionCompiler(ctx(version).compilerContext, getAllFuncExpression(version)).explicitGet()._1
+      val expr = ExpressionCompiler(ctx(version).compilerContext, version, getAllFuncExpression(version)).explicitGet()._1
       estimate(expr, ctx(version), utils.functionCosts(version)) shouldBe Right(expectedCost)
     }
 
