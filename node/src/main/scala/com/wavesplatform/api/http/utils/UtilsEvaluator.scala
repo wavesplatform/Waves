@@ -155,7 +155,8 @@ object UtilsEvaluator {
           correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
           newMode = blockchain.newEvaluatorMode,
           checkConstructorArgsTypes = true,
-          enableExecutionLog = true
+          enableExecutionLog = true,
+          fixedThrownError = true
         )
         .value()
         .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }

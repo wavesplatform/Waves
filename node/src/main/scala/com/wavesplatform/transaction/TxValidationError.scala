@@ -32,8 +32,8 @@ object TxValidationError {
   case class BlockFromFuture(blockTs: Long, localTs: Long)   extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
-  case class AliasDoesNotExist(a: Alias) extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
-  case class AliasIsDisabled(a: Alias)   extends ValidationError
+  case class AliasDoesNotExist(a: Alias)                     extends ValidationError { override def toString: String = s"Alias '$a' does not exist." }
+  case class AliasIsDisabled(a: Alias)                       extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class SenderIsBlacklisted(addr: String)               extends ValidationError
   case class Mistiming(err: String)                          extends ValidationError

@@ -49,7 +49,7 @@ class AddressFromRecipientScenarioTest extends PropSpec with WithState {
     val (gen, _, _, transferViaAlias) = preconditionsAndAliasCreations
     assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq())) {
       case (_, state) =>
-        runScript(script, transferViaAlias, state) should produce(" does not exists")
+        runScript(script, transferViaAlias, state) should produce(" does not exist")
     }
   }
 }

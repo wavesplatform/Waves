@@ -8,7 +8,7 @@ import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.BlockchainFeatures.{LightNode, RideV6}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.FunctionCallPolicyProvider.*
@@ -334,7 +334,8 @@ object InvokeScriptTransactionDiff {
         startLimit,
         blockchain.correctFunctionCallScope,
         blockchain.newEvaluatorMode,
-        enableExecutionLog
+        enableExecutionLog,
+        blockchain.isFeatureActivated(LightNode)
       )
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))

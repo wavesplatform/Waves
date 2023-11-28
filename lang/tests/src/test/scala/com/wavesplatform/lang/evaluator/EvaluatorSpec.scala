@@ -75,7 +75,16 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   private def evalExpr(expr: EXPR, version: StdLibVersion, useNewPowPrecision: Boolean): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val ctx     = lazyContexts((DirectiveSet(version, Account, Expression).explicitGet(), useNewPowPrecision, true)).value()
     val evalCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-    EvaluatorV2.applyCompleted(evalCtx, expr, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true, enableExecutionLog = false)
+    EvaluatorV2.applyCompleted(
+      evalCtx,
+      expr,
+      LogExtraInfo(),
+      version,
+      correctFunctionCallScope = true,
+      newMode = true,
+      enableExecutionLog = false,
+      fixedThrownError = true
+    )
   }
 
   private def compile(code: String, version: StdLibVersion): Either[String, EXPR] = {
