@@ -21,7 +21,7 @@ object RealTransactionWrapper {
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
     val v = tx match {
       case _: EthereumTransaction   => 0.toByte
-      case vt: VersionedTransaction => vt.version
+      case vt: Versioned => vt.version
       case _                        => TxVersion.V1
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.fee, tx.timestamp, v)

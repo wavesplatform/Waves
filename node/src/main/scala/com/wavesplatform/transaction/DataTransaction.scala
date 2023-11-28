@@ -23,7 +23,7 @@ case class DataTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.Data)
     with ProvenTransaction
-    with VersionedTransaction.ToV2
+    with Versioned.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {

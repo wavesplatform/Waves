@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import com.wavesplatform.transaction.{PBSince, ProvenTransaction, SigProofsSwitch, Transaction, VersionedTransaction}
+import com.wavesplatform.transaction.{PBSince, ProvenTransaction, SigProofsSwitch, Transaction, Versioned}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 object BaseTxJson {
@@ -12,10 +12,10 @@ object BaseTxJson {
       "feeAssetId" -> tx.assetFee._1.maybeBase58Repr,
       "timestamp"  -> tx.timestamp
     ) ++ (tx match {
-      case v: VersionedTransaction => Json.obj("version" -> v.version)
+      case v: Versioned => Json.obj("version" -> v.version)
       case _                       => Json.obj()
     }) ++ (tx match {
-      case pbs: PBSince with VersionedTransaction if PBSince.affects(pbs) => Json.obj("chainId" -> tx.chainId)
+      case pbs: PBSince with Versioned if PBSince.affects(pbs) => Json.obj("chainId" -> tx.chainId)
       case _                                                              => Json.obj()
     }) ++ (tx match {
       case p: ProvenTransaction =>

@@ -24,7 +24,7 @@ case class SetAssetScriptTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.SetAssetScript, Seq(asset))
-    with VersionedTransaction.ToV2
+    with Versioned.ToV2
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId

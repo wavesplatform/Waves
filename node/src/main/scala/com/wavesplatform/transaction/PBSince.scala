@@ -14,6 +14,6 @@ object PBSince {
       case _: V3 => TxVersion.V3
     }
 
-  def affects(tx: PBSince & VersionedTransaction): Boolean =
+  def affects(tx: PBSince & Versioned): Boolean =
     tx.version >= version(tx)
 }

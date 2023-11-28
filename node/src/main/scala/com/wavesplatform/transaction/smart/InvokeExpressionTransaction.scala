@@ -26,7 +26,7 @@ case class InvokeExpressionTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeExpression, Nil)
     with InvokeTransaction
-    with VersionedTransaction.ConstV1
+    with Versioned.ConstV1
     with PBSince.V1 {
 
   lazy val expressionBytes: ByteStr = expression.bytes.value()

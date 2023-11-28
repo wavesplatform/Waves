@@ -452,7 +452,7 @@ class ProtoVersionTransactionsSpec
       (updateAssetInfoTx.json() \ "version").as[Byte] shouldBe TxVersion.V1
     }
 
-    def checkProofs(response: HttpResponse, tx: VersionedTransaction): (Proofs, JsObject) = {
+    def checkProofs(response: HttpResponse, tx: Versioned): (Proofs, JsObject) = {
       response.status shouldBe StatusCodes.OK
 
       (responseAs[JsObject] \ "version").as[Byte] shouldBe tx.version

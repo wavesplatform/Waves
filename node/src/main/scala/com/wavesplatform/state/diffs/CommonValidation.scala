@@ -16,7 +16,6 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
-import com.wavesplatform.transaction.VersionedTransaction.{ConstV1, ToV2, ToV3}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.*
@@ -172,25 +171,23 @@ object CommonValidation {
 
     }
 
-    def generic1or2Barrier(t: VersionedTransaction): Either[ActivationError, T] = {
+    def generic1or2Barrier(t: Versioned): Either[ActivationError, T] = {
       if (t.version == 1.toByte) Right(tx)
       else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
       else Right(tx)
     }
 
-    def versionIsCorrect(tx: Transaction & VersionedTransaction): Boolean = {
-      val maxVersion = VersionedTransaction.maxVersion(tx)
-      tx.version > 0 && tx.version <= maxVersion
-    }
+    def versionIsCorrect(tx: Versioned): Boolean =
+      tx.version > 0 && tx.version <= Versioned.maxVersion(tx)
 
     val versionsBarrier = tx match {
-      case v: VersionedTransaction if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
+      case v: Versioned if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
-      case p: PBSince with VersionedTransaction if PBSince.affects(p) =>
+      case p: PBSince with Versioned if PBSince.affects(p) =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !versionIsCorrect(v) =>
+      case v: Versioned if !versionIsCorrect(v) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>

@@ -5,7 +5,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 import scala.util.Try
 
 trait TransactionParser {
-  type TransactionT <: Transaction with VersionedTransaction
+  type TransactionT <: Transaction with Versioned
 
   def typeId: TxType
 

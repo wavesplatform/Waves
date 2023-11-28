@@ -35,7 +35,7 @@ case class TransferTransaction(
       }
     )
     with TransferTransactionLike
-    with VersionedTransaction.ToV3
+    with Versioned.ToV3
     with FastHashId
     with SigProofsSwitch
     with TxWithFee.InCustomAsset

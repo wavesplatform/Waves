@@ -24,7 +24,7 @@ final case class CreateAliasTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.CreateAlias)
     with SigProofsSwitch
-    with VersionedTransaction.ToV3
+    with Versioned.ToV3
     with TxWithFee.InWaves
     with PBSince.V3 {
 

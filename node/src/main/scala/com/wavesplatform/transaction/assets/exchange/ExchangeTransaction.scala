@@ -27,7 +27,7 @@ case class ExchangeTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Exchange, order1.assetPair.checkedAssets)
-    with VersionedTransaction.ToV3
+    with Versioned.ToV3
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId

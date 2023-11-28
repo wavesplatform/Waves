@@ -39,7 +39,7 @@ final case class EthereumTransaction(
     override val chainId: Byte
 ) extends Transaction(TransactionType.Ethereum)
     with Authorized
-    with VersionedTransaction.ConstV1
+    with Versioned.ConstV1
     with PBSince.V1 { self =>
   import EthereumTransaction.*
 

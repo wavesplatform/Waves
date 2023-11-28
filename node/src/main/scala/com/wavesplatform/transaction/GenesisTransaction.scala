@@ -15,7 +15,7 @@ import scala.util.Try
 
 case class GenesisTransaction(recipient: Address, amount: TxNonNegativeAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
     extends Transaction(TransactionType.Genesis)
-    with VersionedTransaction.ConstV1 {
+    with Versioned.ConstV1 {
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
 

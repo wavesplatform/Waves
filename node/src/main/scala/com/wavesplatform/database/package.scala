@@ -25,7 +25,7 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers, TxValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers, TxValidationError, Versioned}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -639,7 +639,7 @@ package object database {
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince with VersionedTransaction if PBSince.affects(lps)  => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case lps: PBSince with Versioned if PBSince.affects(lps)  => TD.WavesTransaction(PBTransactions.protobuf(tx))
       case et: EthereumTransaction                                         => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
       case _                                                               => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }

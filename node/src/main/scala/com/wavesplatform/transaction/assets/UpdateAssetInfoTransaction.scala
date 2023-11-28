@@ -26,7 +26,7 @@ case class UpdateAssetInfoTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.UpdateAssetInfo, Seq(assetId))
-    with VersionedTransaction.ConstV1
+    with Versioned.ConstV1
     with FastHashId
     with ProvenTransaction
     with PBSince.V1 { self =>
