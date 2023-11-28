@@ -709,11 +709,13 @@ class RocksDBWriter(
       assetBalanceAt.foreach { case ((addressId, asset), heights) =>
         heights.prev match {
           case Some(prevHeight) =>
+            // TODO return without if?
             if (prevHeight == from) rw.delete(Keys.assetBalanceAt(addressId, asset, from))
-            else if (prevHeight > from) rw.deleteRange(
-              Keys.assetBalanceAt(addressId, asset, from),
-              Keys.assetBalanceAt(addressId, asset, prevHeight)
-            )
+            else if (prevHeight > from)
+              rw.deleteRange(
+                Keys.assetBalanceAt(addressId, asset, from),
+                Keys.assetBalanceAt(addressId, asset, prevHeight)
+              )
 
           case None =>
             assetBalanceAtAids.addOne((addressId, asset))
@@ -733,10 +735,11 @@ class RocksDBWriter(
         heights.prev match {
           case Some(prevHeight) =>
             if (prevHeight == from) rw.delete(Keys.dataAt(addressId, dataKey)(from))
-            else if (prevHeight > from) rw.deleteRange(
-              Keys.dataAt(addressId, dataKey)(from),
-              Keys.dataAt(addressId, dataKey)(prevHeight)
-            )
+            else if (prevHeight > from)
+              rw.deleteRange(
+                Keys.dataAt(addressId, dataKey)(from),
+                Keys.dataAt(addressId, dataKey)(prevHeight)
+              )
 
           case None =>
             val dataKeyAtKey = Keys.dataAt(addressId, dataKey)(heights.last)
@@ -747,7 +750,10 @@ class RocksDBWriter(
 
       // Changed keys
       rw.deleteRange(Keys.changedAddresses(from), Keys.changedAddresses(to))
-      rw.deleteRange(Keys.changedBalancesAtPrefix(from), Keys.changedBalancesAtPrefix(to))
+      // TODO find minmax assetId
+      val minAssetId = IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0)))  // 0 in all bits
+      val maxAssetId = IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(-1))) // 1 in all bits
+      rw.deleteRange(Keys.changedBalances(from, minAssetId), Keys.changedBalances(to, maxAssetId))
       changedDataAddresses.foreach { addressId =>
         rw.deleteRange(Keys.changedDataKeys(from, addressId), Keys.changedDataKeys(to, addressId))
       }
