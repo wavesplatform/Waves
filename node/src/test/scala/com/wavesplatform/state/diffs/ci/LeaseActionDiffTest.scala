@@ -543,7 +543,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke)),
       v5Features
     ) { case (snapshot, _) =>
-      snapshot.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exists."
+      snapshot.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exist."
     }
   }
 
