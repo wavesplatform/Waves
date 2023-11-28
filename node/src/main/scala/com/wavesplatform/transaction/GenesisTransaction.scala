@@ -14,8 +14,7 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class GenesisTransaction(recipient: Address, amount: TxNonNegativeAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
-    extends Transaction(TransactionType.Genesis)
-    with Versioned.ConstV1 {
+    extends Transaction(TransactionType.Genesis) {
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
 

@@ -22,7 +22,6 @@ case class PaymentTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.Payment)
     with ProvenTransaction
-    with Versioned.ConstV1
     with TxWithFee.InWaves {
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.bodyBytes(this))
