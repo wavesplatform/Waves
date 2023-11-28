@@ -1,11 +1,11 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.syntax.semigroup.*
+import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.SnapshotOps
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
@@ -94,13 +94,12 @@ class BalancesV4Test extends PropSpec with WithState {
         Seq(TestBlock.create(b)),
       TestBlock.create(Seq(ci)),
       rideV4Activated
-    ) { case (d, s) =>
+    ) { case (snapshot, blockchain) =>
       val apiBalance =
-        com.wavesplatform.api.common
-          .CommonAccountsApi(() => SnapshotBlockchain(s, SnapshotOps.fromDiff(d, s).explicitGet()), rdb, s)
+        CommonAccountsApi(() => SnapshotBlockchain(blockchain, snapshot), rdb, blockchain)
           .balanceDetails(acc1.toAddress)
           .explicitGet()
-      val data = d.accountData(dapp.toAddress)
+      val data = snapshot.accountData(dapp.toAddress)
       data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
       apiBalance.available shouldBe 16 * Constants.UnitsInWave
       data("regular") shouldBe IntegerDataEntry("regular", apiBalance.regular)
@@ -132,7 +131,7 @@ class BalancesV4Test extends PropSpec with WithState {
            | assetBalance(Address(base58'$acc'), this.id) == $a && assetBalance(Alias("alias"), this.id) == $a
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
-      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
+      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, V4, parsedScript).explicitGet()._1)
         .explicitGet()
     }
 
@@ -194,7 +193,7 @@ class BalancesV4Test extends PropSpec with WithState {
            | wavesBalance(Address(base58'$acc')).regular == $w
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
-      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
+      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, V4, parsedScript).explicitGet()._1)
         .explicitGet()
     }
 

@@ -15,7 +15,6 @@ import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, LightNode, RideV6}
-import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -59,15 +58,14 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   val posSelector: PoSSelector = PoSSelector(blockchainUpdater, None)
 
-  val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
-    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _).map(_.toDiff(blockchain))
+  val transactionDiffer: Transaction => TracedResult[ValidationError, StateSnapshot] =
+    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  val transactionDifferWithLog: Transaction => TracedResult[ValidationError, Diff] =
+  val transactionDifferWithLog: Transaction => TracedResult[ValidationError, StateSnapshot] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis(), enableExecutionLog = true)(blockchain, _)
-      .map(_.toDiff(blockchain))
 
-  def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
-  def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
+  def createDiffE(tx: Transaction): Either[ValidationError, StateSnapshot] = transactionDiffer(tx).resultE
+  def createDiff(tx: Transaction): StateSnapshot                           = createDiffE(tx).explicitGet()
 
   lazy val utxPool: UtxPoolImpl =
     new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
@@ -122,7 +120,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
     def commonTransactionsApi(challenger: Option[BlockChallenger]): CommonTransactionsApi =
       CommonTransactionsApi(
-        blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
         rdb,
         blockchain,
         utxPool,
@@ -174,8 +172,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       .getOrElse(TestBlock.create(Nil).block)
   }
 
-  def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidSnapshot.orEmpty.toDiff(rocksDBWriter)
+  def liquidSnapshot: StateSnapshot =
+    blockchainUpdater.bestLiquidSnapshot.orEmpty
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
@@ -210,7 +208,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     AddressTransactions
       .allAddressTransactions(
         rdb,
-        blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
         address,
         None,
         Set.empty,
@@ -258,7 +256,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def appendAndAssertFailed(tx: Transaction, message: String): Block = {
     appendBlock(tx)
     assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx")
-    liquidDiff.errorMessage(tx.id()).get.text should include(message)
+    liquidSnapshot.errorMessage(tx.id()).get.text should include(message)
     lastBlock
   }
 

@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.evaluator
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V6, V7, V8}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
+import com.wavesplatform.test.produce
 
 class NestedPatternsTest extends EvaluatorSpec {
   implicit val v: StdLibVersion = V6
@@ -125,5 +126,59 @@ class NestedPatternsTest extends EvaluatorSpec {
          | f(("a", "b", "c")) == 3
        """.stripMargin
     ) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("restrictions from V8") {
+    val script1 =
+      s"""
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = f()) => true
+         |   case _                  => false
+         | }
+       """.stripMargin
+    eval(script1)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(true))
+    eval(script1)(V8) should produce("Only constant value could be matched with object field in 63-66")
+
+    val script2 =
+      s"""
+         | func f() = 777
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = f()) => true
+         |   case _                  => false
+         | }
+       """.stripMargin
+    eval(script2)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(true))
+    eval(script2)(V8) should produce("Only constant value could be matched with object field in 79-82")
+
+    val script3 =
+      s"""
+         | func f() = 777
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = {f()}) => true
+         |   case _                    => false
+         | }
+       """.stripMargin
+    eval(script3)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script3)(V8) should produce("Only constant value could be matched with object field in 80-83")
+
+    val script4 =
+      s"""
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = {1 + 2}) => true
+         |   case _                      => false
+         | }
+       """.stripMargin
+    eval(script4)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script4)(V8) should produce("Only constant value could be matched with object field in 64-69")
+
+    val script5 =
+      s"""
+         | match Lease(Address(base58''), 1, 1) {
+         |   case Lease(nonce = {if (true) then 2 else 1}) => true
+         |   case _                                        => false
+         | }
+       """.stripMargin
+    eval(script5)(V7, checkNext = false) shouldBe Right(CONST_BOOLEAN(false))
+    eval(script5)(V8) should produce("Only constant value could be matched with object field in 64-87")
   }
 }

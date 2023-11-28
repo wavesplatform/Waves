@@ -5,12 +5,12 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.transaction.TxHelpers.*
+import org.scalatest.OptionValues
 
-class SyncInvokeLeaseTest extends PropSpec with WithDomain {
+class SyncInvokeLeaseTest extends PropSpec with WithDomain with OptionValues {
   import DomainPresets.*
 
   private val dApp1Signer  = secondSigner
@@ -42,12 +42,12 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       d.appendBlock(setScript(dApp1Signer, twoLeaseDApp(555)))
       d.appendAndAssertSucceed(invoke(dApp1Address))
-      val lease1 = d.liquidDiff.leaseState.head._2
-      lease1.status shouldBe a[Cancelled]
-      lease1.recipientAddress shouldBe dApp2Address
-      lease1.amount.value shouldBe 1
-      val lease2 = d.liquidDiff.leaseState.last._2
-      lease2.status shouldBe Active
+      d.liquidSnapshot.cancelledLeases.size shouldBe 1
+      val cancelledLeaseId = d.liquidSnapshot.cancelledLeases.head._1
+      val cancelledLease   = d.liquidSnapshot.newLeases.get(cancelledLeaseId).value
+      cancelledLease.recipientAddress shouldBe dApp2Address
+      cancelledLease.amount.value shouldBe 1
+      val lease2 = d.liquidSnapshot.newLeases.removed(cancelledLeaseId).head._2
       lease2.recipientAddress shouldBe dApp2Address
       lease2.amount.value shouldBe 555
     }
@@ -57,7 +57,8 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       d.appendBlock(setScript(dApp1Signer, twoLeaseDApp(1)))
       d.appendAndAssertFailed(invoke(dApp1Address), "already in the state")
-      d.liquidDiff.leaseState shouldBe Map()
+      d.liquidSnapshot.newLeases should be(empty)
+      d.liquidSnapshot.cancelledLeases should be(empty)
     }
   }
 
@@ -83,7 +84,8 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(dApp1Signer, dApp))
       d.appendAndAssertFailed(invoke(dApp1Address), "Cannot cancel already cancelled lease")
-      d.liquidDiff.leaseState shouldBe Map()
+      d.liquidSnapshot.newLeases should be(empty)
+      d.liquidSnapshot.cancelledLeases should be(empty)
     }
   }
 

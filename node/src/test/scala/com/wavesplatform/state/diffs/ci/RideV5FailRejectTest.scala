@@ -8,11 +8,11 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.{Portfolio, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{TransactionType, TxHelpers}
@@ -166,19 +166,21 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invokeTx)
       d.blockchain.transactionInfo(invokeTx.id()).get._1.status == Status.Succeeded shouldBe false
-      d.liquidDiff.sponsorship shouldBe Map()
-      d.liquidDiff.leaseState shouldBe Map()
-      d.liquidDiff.issuedAssets shouldBe Map()
-      d.liquidDiff.updatedAssets shouldBe Map()
-      d.liquidDiff.accountData shouldBe Map()
+      d.liquidSnapshot.sponsorships shouldBe Map()
+      d.liquidSnapshot.newLeases shouldBe Map()
+      d.liquidSnapshot.cancelledLeases shouldBe Map()
+      d.liquidSnapshot.assetStatics shouldBe Map()
+      d.liquidSnapshot.assetNamesAndDescriptions shouldBe Map()
+      d.liquidSnapshot.accountData shouldBe Map()
       d.blockchain.accountData(secondAddress, "old").get.value shouldBe "value"
-      d.liquidDiff.portfolios shouldBe {
+      d.liquidSnapshot.balances shouldBe {
         val reward              = d.blockchain.blockReward(d.blockchain.height).get
         val setScriptFee        = FeeConstants(TransactionType.SetScript) * FeeUnit
         val previousBlockReward = (0.6 * setScriptFee).toLong
         val currentBlockReward  = (0.4 * invokeFee).toLong
-        val total               = reward + previousBlockReward + currentBlockReward - invokeFee
-        Map(defaultAddress -> Portfolio.waves(total))
+        val balanceDiff         = reward + previousBlockReward + currentBlockReward - invokeFee
+        val dbBalance           = d.rocksDBWriter.balance(defaultAddress)
+        Map((defaultAddress, Waves) -> (dbBalance + balanceDiff))
       }
     }
   }

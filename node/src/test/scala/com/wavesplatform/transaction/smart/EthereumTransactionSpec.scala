@@ -4,7 +4,6 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.{FlatSpec, TestTime, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -106,9 +105,14 @@ class EthereumTransactionSpec
     val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
-    differ(transfer).combineF(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
-      senderAddress    -> Portfolio.build(-Long.MaxValue, TestAsset, -Long.MaxValue),
-      recipientAddress -> Portfolio.build(LongMaxMinusFee, TestAsset, Long.MaxValue)
+    differ(assetTransfer).balances shouldBe Map(
+      (senderAddress, TestAsset)    -> 0,
+      (senderAddress, Waves)        -> (LongMaxMinusFee + transfer.fee.longValue()),
+      (recipientAddress, TestAsset) -> Long.MaxValue
+    )
+    differ(transfer).balances shouldBe Map(
+      (senderAddress, Waves)    -> transfer.fee.longValue(),
+      (recipientAddress, Waves) -> LongMaxMinusFee
     )
   }
 
@@ -236,23 +240,23 @@ class EthereumTransactionSpec
       ),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "not work with union type" in {
@@ -291,8 +295,8 @@ class EthereumTransactionSpec
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
 
-    val diff = differ(transaction).resultE
-    diff should produce("Function not defined: 1f9773e9")
+    val snapshot = differ(transaction).resultE
+    snapshot should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {
@@ -332,23 +336,23 @@ class EthereumTransactionSpec
       Seq(),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "work with no payments" in {
@@ -382,23 +386,23 @@ class EthereumTransactionSpec
 
     val differ      = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(invokerAccount, dAppAccount.toAddress, "deposit", Seq(), Seq())
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "fail with max+1 payments" in {
@@ -478,23 +482,23 @@ class EthereumTransactionSpec
       Seq(),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "return money in transfers asset+waves" in {
@@ -535,28 +539,28 @@ class EthereumTransactionSpec
       Seq(),
       Nil
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
-                                                                    |  "data" : [ ],
-                                                                    |  "transfers" : [ {
-                                                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                    |    "asset" : null,
-                                                                    |    "amount" : 123
-                                                                    |  },
-                                                                    |   {
-                                                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                    |    "asset" : "$TestAsset",
-                                                                    |    "amount" : 123
-                                                                    |  }],
-                                                                    |  "issues" : [ ],
-                                                                    |  "reissues" : [ ],
-                                                                    |  "burns" : [ ],
-                                                                    |  "sponsorFees" : [ ],
-                                                                    |  "leases" : [ ],
-                                                                    |  "leaseCancels" : [ ],
-                                                                    |  "invokes" : [ ]
-                                                                    |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson(s"""{
+                                                                        |  "data" : [ ],
+                                                                        |  "transfers" : [ {
+                                                                        |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                        |    "asset" : null,
+                                                                        |    "amount" : 123
+                                                                        |  },
+                                                                        |   {
+                                                                        |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                        |    "asset" : "$TestAsset",
+                                                                        |    "amount" : 123
+                                                                        |  }],
+                                                                        |  "issues" : [ ],
+                                                                        |  "reissues" : [ ],
+                                                                        |  "burns" : [ ],
+                                                                        |  "sponsorFees" : [ ],
+                                                                        |  "leases" : [ ],
+                                                                        |  "leaseCancels" : [ ],
+                                                                        |  "invokes" : [ ]
+                                                                        |}""".stripMargin)
   }
 
   it should "test minimum fee" in {
