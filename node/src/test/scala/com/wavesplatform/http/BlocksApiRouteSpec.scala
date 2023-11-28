@@ -75,7 +75,7 @@ class BlocksApiRouteSpec
   (blocksApi.block _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
   (blocksApi.meta _).expects(invalidBlockId).returning(None).anyNumberOfTimes()
 
-  routePath("/last") in {
+  routePath("/last (SAPI-35)") in {
     (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/last")) ~> route ~> check {
@@ -84,7 +84,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/at/{height}") in {
+  routePath("/at/{height} (SAPI-244)") in {
     (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
     Get(routePath("/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -104,7 +104,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/{id}") in {
+  routePath("/{id} (SAPI-37)") in {
     (blocksApi.block _).expects(testBlock1.id()).returning(Some(testBlock1Meta -> Seq.empty)).once()
     (blocksApi.block _).expects(testBlock2.id()).returning(Some(testBlock2Meta -> Seq.empty)).once()
 
@@ -124,7 +124,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/seq/{from}/{to}") in {
+  routePath("/seq/{from}/{to} (SAPI-38)") in {
     (blocksApi
       .blocksRange(_: Int, _: Int))
       .expects(1, 2)
@@ -142,7 +142,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/headers/last") in {
+  routePath("/headers/last (SAPI-39)") in {
     (() => blocksApi.currentHeight).expects().returning(2).once()
     (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
     Get(routePath("/headers/last")) ~> route ~> check {
@@ -151,7 +151,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/headers/{id}") in {
+  routePath("/headers/{id} (SAPI-40)") in {
     (blocksApi.meta _).expects(testBlock1.id()).returning(Some(testBlock1Meta)).once()
     (blocksApi.meta _).expects(testBlock2.id()).returning(Some(testBlock2Meta)).once()
 
@@ -172,7 +172,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/headers/at/{height}") in {
+  routePath("/headers/at/{height} (SAPI-245)") in {
     (blocksApi.metaAtHeight _).expects(1).returning(Some(testBlock1Meta)).once()
     (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
     (blocksApi.metaAtHeight _).expects(3).returning(None).once()
@@ -193,7 +193,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/headers/seq/{from}/{to}") in {
+  routePath("/headers/seq/{from}/{to} (SAPI-42)") in {
     (blocksApi.metaRange _)
       .expects(1, 2)
       .returning(
@@ -210,7 +210,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/delay/{blockId}/{number}") in {
+  routePath("/delay/{blockId}/{number} (SAPI-506)") in {
     val blocks = Vector(
       Block(
         BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, None, None),
@@ -261,7 +261,7 @@ class BlocksApiRouteSpec
     }
   }
 
-  routePath("/heightByTimestamp") - {
+  routePath("/heightByTimestamp (SAPI-43)") - {
     def emulateBlocks(blocks: IndexedSeq[Block]): CommonBlocksApi = {
       require(blocks.nonEmpty)
       val blocksApi = stub[CommonBlocksApi]

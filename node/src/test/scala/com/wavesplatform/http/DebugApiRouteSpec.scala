@@ -120,7 +120,7 @@ class DebugApiRouteSpec
     )
   import debugApiRoute.*
 
-  routePath("/configInfo") - {
+  routePath("/configInfo ") - {
     "requires api-key header" in {
       Get(routePath("/configInfo?full=true")) ~> route should produce(ApiKeyNotValid)
       Get(routePath("/configInfo?full=false")) ~> route should produce(ApiKeyNotValid)

@@ -97,7 +97,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath("/balance") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
+  routePath("/balance (SAPI-315)") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
       addressApiRoute
         .copy(
@@ -197,7 +197,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath(s"/scriptInfo/${allAddresses(1)} (SAPI-15)") in {
+  routePath(s"/scriptInfo/${allAddresses(1)} (SAPI-15)") in {//TODO разделить meta
     val script = ExprScript(TRUE).explicitGet()
 
     (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1).publicKey, script, 123L))).once()
@@ -391,7 +391,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
-  routePath(s"/data/${allAddresses(1)}?matches=regex") in {
+  routePath(s"/data/${allAddresses(1)}?matches=regex (SAPI-25)") in {
     val invalidRegexps = List("[a-z", "([a-z]{0}", "[a-z]{0", "[a-z]{,5}")
     for (regex <- invalidRegexps) {
       Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {

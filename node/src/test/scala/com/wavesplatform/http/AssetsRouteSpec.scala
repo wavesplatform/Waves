@@ -129,7 +129,7 @@ class AssetsRouteSpec
   )
 
   "/balance/{address}" - {
-    "multiple ids" in routeTest() { (d, route) =>
+    "SAPI-271 multiple ids" in routeTest() { (d, route) =>
       val issuer = testWallet.generateNewAccount().get
 
       d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
@@ -193,7 +193,7 @@ class AssetsRouteSpec
     }
   }
 
-  routePath(s"/details/{id} - issued by invoke expression") in routeTest(DomainPresets.ContinuationTransaction) { (d, route) =>
+  routePath(s"/details/{id} - issued by invoke expression (SAPI-44") in routeTest(DomainPresets.ContinuationTransaction) { (d, route) =>
     val tx = TxHelpers.invokeExpression(
       expression = TestCompiler(V6).compileFreeCall(
         s"""
@@ -219,7 +219,7 @@ class AssetsRouteSpec
     checkDetails(d, route, tx, assetId.toString, assetDesc)
   }
 
-  routePath(s"/details/{id} - issued by Ethereum transaction") in routeTest(DomainPresets.RideV6) { (d, route) =>
+  routePath(s"/details/{id} - issued by Ethereum transaction (SAPI-45)") in routeTest(DomainPresets.RideV6) { (d, route) =>
     val tx = EthTxGenerator.generateEthInvoke(
       keyPair = TxHelpers.defaultEthSigner,
       address = defaultSigner.toAddress,
@@ -248,7 +248,7 @@ class AssetsRouteSpec
     checkDetails(d, route, tx, assetId.toString, assetDesc)
   }
 
-  routePath(s"/details/{id} - smart asset") in routeTest() { (d, route) =>
+  routePath(s"/details/{id} - smart asset (SAPI-46)") in routeTest() { (d, route) =>
     val issuer = TxHelpers.signer(1)
     val script = ExprScript(CONST_BOOLEAN(true)).explicitGet()
     val assetDescr = assetDesc.copy(
@@ -270,7 +270,7 @@ class AssetsRouteSpec
     checkDetails(d, route, issue, issue.id().toString, assetDescr)
   }
 
-  routePath(s"/details/{id} - non-smart asset") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
+  routePath(s"/details/{id} - non-smart asset (SAPI-47") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
     val issues = (1 to 10).map(i => (i, issueTransaction())).toMap
 
     d.appendBlock()
@@ -296,7 +296,7 @@ class AssetsRouteSpec
     }
   }
 
-  routePath("/{assetId}/distribution/{height}/limit/{limit}") in routeTest() { (d, route) =>
+  routePath("/{assetId}/distribution/{height}/limit/{limit} (SAPI-48)") in routeTest() { (d, route) =>
     val issuer           = testWallet.generateNewAccount().get
     val issueTransaction = TxHelpers.issue(issuer, 100_0000, 4, "PA_01")
     d.appendBlock(TxHelpers.genesis(issuer.toAddress, 10.waves))
@@ -393,7 +393,7 @@ class AssetsRouteSpec
     }
   }
 
-  routePath(s"/details - handles assets ids limit") in routeTest() { (d, route) =>
+  routePath(s"/details - handles assets ids limit (SAPI-50)") in routeTest() { (d, route) =>
     val inputLimitErrMsg = TooBigArrayAllocation(restAPISettings.assetDetailsLimit).message
     val emptyInputErrMsg = AssetIdNotSpecified.message
 
@@ -461,7 +461,7 @@ class AssetsRouteSpec
     ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
   }
 
-  routePath(s"/details - handles not existed assets error") in routeTest() { (_, route) =>
+  routePath(s"/details - handles not existed assets error (SAPI-264)") in routeTest() { (_, route) =>
     val unexistedAssetIds = Seq(
       ByteStr.fill(AssetIdLength)(1),
       ByteStr.fill(AssetIdLength)(2)
@@ -483,7 +483,7 @@ class AssetsRouteSpec
     ) ~> route ~> check(checkErrorResponse())
   }
 
-  routePath(s"/details - handles invalid asset ids") in routeTest() { (_, route) =>
+  routePath(s"/details - handles invalid asset ids (SAPI-268)") in routeTest() { (_, route) =>
     val invalidAssetIds = Seq(
       ByteStr.fill(AssetIdLength)(1),
       ByteStr.fill(AssetIdLength)(2)
@@ -506,7 +506,7 @@ class AssetsRouteSpec
   }
 
   routePath("/nft/list") - {
-    "NFTs in 1 block" in {
+    "SAPI-851 NFTs in 1 block" in {
       routeTest() { (d, route) =>
         val issuer = testWallet.generateNewAccount().get
         val nfts = Seq.tabulate(5) { i =>
@@ -538,7 +538,7 @@ class AssetsRouteSpec
         }
       }
     }
-    "NFTs in multiple blocks" in {
+    "SAPI-267 NFTs in multiple blocks" in {
       routeTest() { (d, route) =>
         d.appendBlock(genesis(secondAddress, 100.waves))
         val indexes =
