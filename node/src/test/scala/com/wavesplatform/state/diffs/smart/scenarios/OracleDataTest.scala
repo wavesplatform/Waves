@@ -55,7 +55,7 @@ class OracleDataTest extends PropSpec with WithState {
                                    |}""".stripMargin
     val untypedAllFieldsRequiredScript = Parser.parseExpr(allFieldsRequiredScript).get.value
     val typedAllFieldsRequiredScript =
-      ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
+      ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedAllFieldsRequiredScript).explicitGet()._1
     val setScript            = TxHelpers.setScript(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
     val transferFromScripted = TxHelpers.transfer(master, alice.toAddress)
 

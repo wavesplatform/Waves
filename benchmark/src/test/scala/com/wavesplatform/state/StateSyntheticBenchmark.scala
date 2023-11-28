@@ -67,7 +67,7 @@ object StateSyntheticBenchmark {
 
       val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPublicKey)"
       val untypedScript = Parser.parseExpr(textScript).get.value
-      val typedScript   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+      val typedScript   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1
 
       val setScriptBlock = nextBlock(
         Seq(

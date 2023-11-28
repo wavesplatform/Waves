@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.compiler
 
-import java.nio.charset.StandardCharsets
-
 import cats.Show
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{Declaration, PART}
+
+import java.nio.charset.StandardCharsets
 
 sealed trait CompilationError {
   def start: Int
@@ -52,17 +52,10 @@ object CompilationError {
       s"but ${names.map(n => s"`$n`").mkString(", ")} found"
   }
 
-  final case class UnusedCaseVariables(start: Int, end: Int, names: List[String]) extends CompilationError {
-    val message = s"Unused case variable(s) ${names.map(n => s"`$n`").mkString(", ")}"
-  }
-
   final case class AlreadyDefined(start: Int, end: Int, name: String, isFunction: Boolean) extends CompilationError {
     val message =
       if (isFunction) s"Value '$name' can't be defined because function with this name is already defined"
       else s"Value '$name' already defined in the scope"
-  }
-  final case class NonExistingType(start: Int, end: Int, name: String, existing: List[String]) extends CompilationError {
-    val message = s"Value '$name' declared as non-existing type, while all possible types are $existing"
   }
 
   final case class BadFunctionSignatureSameArgNames(start: Int, end: Int, name: String) extends CompilationError {

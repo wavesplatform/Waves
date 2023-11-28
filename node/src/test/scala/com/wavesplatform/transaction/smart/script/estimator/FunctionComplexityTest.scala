@@ -106,7 +106,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
 
   property("estimate script with all functions") {
     def check(version: StdLibVersion, expectedCost: Int) = {
-      val expr = ExpressionCompiler(ctx(version).compilerContext, getAllFuncExpression(version)).explicitGet()._1
+      val expr = ExpressionCompiler(ctx(version).compilerContext, version, getAllFuncExpression(version)).explicitGet()._1
       estimate(expr, ctx(version), utils.functionCosts(version)) shouldBe Right(expectedCost)
     }
 

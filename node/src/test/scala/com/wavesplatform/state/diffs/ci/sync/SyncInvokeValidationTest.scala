@@ -228,7 +228,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2), setScript(dApp3Signer, dApp3))
       d.appendAndAssertSucceed(invoke(dApp1Address))
 
-      d.liquidDiff.transactions.head.affected shouldBe Set(dApp1Address, dApp2Address, dApp3Address, defaultAddress)
+      d.liquidSnapshot.transactions.head._2.affected shouldBe Set(dApp1Address, dApp2Address, dApp3Address, defaultAddress)
     }
   }
 

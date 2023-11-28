@@ -42,11 +42,11 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       d.appendBlock(setScript(dApp1Signer, twoLeaseDApp(555)))
       d.appendAndAssertSucceed(invoke(dApp1Address))
-      val lease1 = d.liquidDiff.leaseState.head._2
+      val lease1 = d.liquidSnapshot.leaseStates.head._2
       lease1.status shouldBe a[Cancelled]
       lease1.recipient shouldBe dApp2Address
       lease1.amount shouldBe 1
-      val lease2 = d.liquidDiff.leaseState.last._2
+      val lease2 = d.liquidSnapshot.leaseStates.last._2
       lease2.status shouldBe Active
       lease2.recipient shouldBe dApp2Address
       lease2.amount shouldBe 555
@@ -57,7 +57,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
       d.appendBlock(setScript(dApp1Signer, twoLeaseDApp(1)))
       d.appendAndAssertFailed(invoke(dApp1Address), "already in the state")
-      d.liquidDiff.leaseState shouldBe Map()
+      d.liquidSnapshot.leaseStates shouldBe Map()
     }
   }
 
@@ -83,7 +83,7 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(dApp1Signer, dApp))
       d.appendAndAssertFailed(invoke(dApp1Address), "Cannot cancel already cancelled lease")
-      d.liquidDiff.leaseState shouldBe Map()
+      d.liquidSnapshot.leaseStates shouldBe Map()
     }
   }
 

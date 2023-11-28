@@ -119,7 +119,8 @@ object ContractEvaluator {
       limit: Int,
       correctFunctionCallScope: Boolean,
       newMode: Boolean,
-      enableExecutionLog: Boolean
+      enableExecutionLog: Boolean,
+      fixedThrownError: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     Coeval
       .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
@@ -134,7 +135,8 @@ object ContractEvaluator {
             limit,
             correctFunctionCallScope,
             newMode,
-            enableExecutionLog
+            enableExecutionLog,
+            fixedThrownError
           )
         case Left(error) => Coeval.now(Left(error))
       }
@@ -148,10 +150,21 @@ object ContractEvaluator {
       limit: Int,
       correctFunctionCallScope: Boolean,
       newMode: Boolean,
-      enableExecutionLog: Boolean
+      enableExecutionLog: Boolean,
+      fixedThrownError: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     EvaluatorV2
-      .applyLimitedCoeval(expr, logExtraInfo, limit, ctx, version, correctFunctionCallScope, newMode, enableExecutionLog = enableExecutionLog)
+      .applyLimitedCoeval(
+        expr,
+        logExtraInfo,
+        limit,
+        ctx,
+        version,
+        correctFunctionCallScope,
+        newMode,
+        enableExecutionLog = enableExecutionLog,
+        fixedThrownError = fixedThrownError
+      )
       .map(_.flatMap { case (expr, unusedComplexity, log) =>
         val result =
           expr match {

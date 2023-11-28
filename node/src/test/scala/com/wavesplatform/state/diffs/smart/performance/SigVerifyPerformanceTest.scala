@@ -34,7 +34,7 @@ class SigVerifyPerformanceTest extends PropSpec with WithState {
   ignore("parallel native signature verification vs sequential scripted signature verification") {
     val textScript    = "sigVerify(tx.bodyBytes,tx.proofs[0],tx.senderPk)"
     val untypedScript = Parser.parseExpr(textScript).get.value
-    val typedScript   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+    val typedScript   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1
 
     val (gen, setScript, transfers, scriptTransfers) = differentTransfers(typedScript)
 
