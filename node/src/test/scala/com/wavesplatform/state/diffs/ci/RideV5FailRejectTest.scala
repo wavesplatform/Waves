@@ -12,14 +12,13 @@ import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.RideV5
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{TransactionType, TxHelpers}
 
 class RideV5FailRejectTest extends PropSpec with WithDomain {
-  import DomainPresets.*
-
   private val assetFailScript = TestCompiler(V5).compileExpression(
     s"""
        | strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
@@ -104,32 +103,6 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
       d.appendBlock(failAssetIssue)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx) should produce("Explicit script termination")
-    }
-  }
-
-  property("invoke is rejected with a lack of funds without execution of ScriptTransfer script only after RideV6") {
-    val issueTx = issue(signer(10), script = Some(assetFailScript))
-    val asset   = IssuedAsset(issueTx.id())
-    val dApp = TestCompiler(V5).compileContract(
-      s"""
-         | @Callable(i)
-         | func default() = [
-         |   ScriptTransfer(i.caller, 1, base58'$asset')
-         | ]
-         """.stripMargin
-    )
-    val invokeTx = invoke()
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
-      d.appendBlock(issueTx)
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendAndAssertFailed(invokeTx, "Transaction is not allowed by script of the asset")
-    }
-
-    // TODO: move test after bug fix NODE-2520
-    withDomain(RideV6, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
-      d.appendBlock(issueTx)
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlockE(invokeTx) should produce("negative asset balance")
     }
   }
 

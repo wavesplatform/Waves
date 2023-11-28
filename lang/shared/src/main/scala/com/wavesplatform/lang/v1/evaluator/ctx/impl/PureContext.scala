@@ -42,7 +42,7 @@ object PureContext {
   val MaxListLengthV4   = 1000
 
   // As an optimization, JVM might throw an ArithmeticException with empty stack trace and null message.
-  // The workaround below retrows an exception with the message explicitly set.
+  // The workaround below rethrows an exception with the message explicitly set.
   lazy val divLong: BaseFunction[NoContext] =
     createTryOp(DIV_OP, LONG, LONG, DIV_LONG) { (a, b) =>
       try Math.floorDiv(a, b)

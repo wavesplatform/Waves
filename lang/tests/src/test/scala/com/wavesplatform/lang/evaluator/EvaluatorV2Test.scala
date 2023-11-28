@@ -32,7 +32,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
         ctx.evaluationContext(environment),
         version,
         correctFunctionCallScope = true,
-        newMode
+        newMode,
+        fixedThrownError = true
       )
       .value()
       .bimap(_._1.message, { case (result, complexity, _) => (result, complexity) })

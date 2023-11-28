@@ -75,7 +75,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         implicitly[StdLibVersion],
         correctFunctionCallScope = true,
         newMode = true,
-        enableExecutionLog = false
+        enableExecutionLog = false,
+        fixedThrownError = true
       )
       ._3
       .asInstanceOf[Either[ExecutionError, T]]
@@ -101,7 +102,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         implicitly[StdLibVersion],
         correctFunctionCallScope = true,
         newMode = true,
-        enableExecutionLog = true
+        enableExecutionLog = true,
+        fixedThrownError = true
       )
 
     evaluatorV2Result shouldBe evaluatorV1Result.bimap(_._1, _._1)
