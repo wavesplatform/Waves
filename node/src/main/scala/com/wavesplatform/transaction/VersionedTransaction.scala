@@ -10,4 +10,11 @@ object VersionedTransaction {
   }
   trait ToV2 extends VersionedTransaction
   trait ToV3 extends VersionedTransaction
+
+  def maxVersion(tx: Transaction): TxVersion =
+    tx match {
+      case _: ConstV1 => TxVersion.V1
+      case _: ToV2    => TxVersion.V2
+      case _: ToV3    => TxVersion.V3
+    }
 }
