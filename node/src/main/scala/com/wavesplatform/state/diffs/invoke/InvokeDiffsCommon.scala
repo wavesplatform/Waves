@@ -8,7 +8,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockRewardDistribution, BlockV5, RideV6, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider.*
 import com.wavesplatform.features.ScriptTransferValidationProvider.*
@@ -514,17 +514,17 @@ object InvokeDiffsCommon {
                           e
                       )
                   )
-              ).flatMap(nextDiff =>
+              ).flatMap(portfolioSnapshot =>
                 blockchain
                   .assetScript(a)
                   .fold {
                     val r = checkAsset(blockchain, id)
-                      .map(_ => nextDiff)
+                      .map(_ => portfolioSnapshot)
                       .leftMap(FailedTransactionError.dAppExecution(_, 0): ValidationError)
                     TracedResult(r)
                   } { case AssetScriptInfo(script, complexity) =>
                     val assetVerifierSnapshot =
-                      if (blockchain.disallowSelfPayment) nextDiff
+                      if (blockchain.disallowSelfPayment) portfolioSnapshot
                       else
                         StateSnapshot
                           .build(
@@ -549,9 +549,11 @@ object InvokeDiffsCommon {
                       tx.timestamp,
                       tx.txId
                     )
-                    val assetValidationDiff = for {
-                      _ <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(assetVerifierSnapshot)
-                      assetValidationDiff <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
+                    val assetValidationSnapshot = for {
+                      _ <- BalanceDiffValidation
+                        .cond(blockchain, _.isFeatureActivated(RideV6))(assetVerifierSnapshot)
+                        .leftMap(e => if (blockchain.isFeatureActivated(LightNode)) FailedTransactionError.asFailedScriptError(e) else e)
+                      snapshot <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
                         pseudoTx,
                         a.id,
                         assetVerifierSnapshot,
@@ -560,10 +562,10 @@ object InvokeDiffsCommon {
                         complexityLimit,
                         enableExecutionLog
                       )
-                    } yield assetValidationDiff
-                    val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+                    } yield snapshot
+                    val errorOpt = assetValidationSnapshot.fold(Some(_), _ => None)
                     TracedResult(
-                      assetValidationDiff.map(d => nextDiff.setScriptsComplexity(d.scriptsComplexity)),
+                      assetValidationSnapshot.map(d => portfolioSnapshot.setScriptsComplexity(d.scriptsComplexity)),
                       List(AssetVerifierTrace(id, errorOpt, AssetContext.Transfer))
                     )
                   }
