@@ -107,7 +107,7 @@ object Keys {
   def changedBalances(height: Int, asset: IssuedAsset): Key[Seq[AddressId]] =
     Key(ChangedAssetBalances, h(height) ++ asset.id.arr, readAddressIds, writeAddressIds)
 
-  def changedBalancesAtPrefix(height: Int): Array[Byte] = KeyTags.ChangedAssetBalances.prefixBytes ++ KeyHelpers.h(height)
+  def changedBalancesAtPrefix(height: Int): Array[Byte] = KeyTags.ChangedAssetBalances.prefixBytes ++ h(height)
 
   def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes, AddressId.fromByteArray, _.toByteArray)
 

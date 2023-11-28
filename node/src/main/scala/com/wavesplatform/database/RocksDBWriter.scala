@@ -677,6 +677,7 @@ class RocksDBWriter(
           val changedDataKeysAtKey = Keys.changedDataKeys(currHeight, addressId)
           val changedDataKeys      = rw.get(changedDataKeysAtKey)
           if (changedDataKeys.nonEmpty) {
+            // TODO collect min-max?
             changedDataAddresses.addOne(addressId)
             changedDataKeys.foreach { accountDataKey =>
               accountDataAt.updateWith((addressId, accountDataKey))(TwoHeights.update(_, currHeight))
@@ -708,7 +709,8 @@ class RocksDBWriter(
       assetBalanceAt.foreach { case ((addressId, asset), heights) =>
         heights.prev match {
           case Some(prevHeight) =>
-            rw.deleteRange(
+            if (prevHeight == from) rw.delete(Keys.assetBalanceAt(addressId, asset, from))
+            else if (prevHeight > from) rw.deleteRange(
               Keys.assetBalanceAt(addressId, asset, from),
               Keys.assetBalanceAt(addressId, asset, prevHeight)
             )
@@ -730,7 +732,8 @@ class RocksDBWriter(
       accountDataAt.foreach { case ((addressId, dataKey), heights) =>
         heights.prev match {
           case Some(prevHeight) =>
-            rw.deleteRange(
+            if (prevHeight == from) rw.delete(Keys.dataAt(addressId, dataKey)(from))
+            else if (prevHeight > from) rw.deleteRange(
               Keys.dataAt(addressId, dataKey)(from),
               Keys.dataAt(addressId, dataKey)(prevHeight)
             )
