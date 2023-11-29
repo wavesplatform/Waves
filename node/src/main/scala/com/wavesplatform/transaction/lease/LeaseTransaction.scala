@@ -23,7 +23,7 @@ final case class LeaseTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.Lease)
     with SigProofsSwitch
-    with VersionedTransaction
+    with Versioned.ToV3
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V3 {
@@ -35,8 +35,7 @@ final case class LeaseTransaction(
 object LeaseTransaction extends TransactionParser {
   type TransactionT = LeaseTransaction
 
-  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  val typeId: TxType                    = 8: Byte
+  val typeId: TxType = 8: Byte
 
   implicit val validator: TxValidator[LeaseTransaction] = LeaseTxValidator
 

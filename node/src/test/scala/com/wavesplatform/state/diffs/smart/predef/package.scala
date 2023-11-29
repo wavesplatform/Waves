@@ -16,7 +16,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, VersionedTransaction}
+import com.wavesplatform.transaction.{Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, Versioned}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -209,7 +209,7 @@ package object predef {
   def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
     val version = t match {
       case _: EthereumTransaction  => 0
-      case v: VersionedTransaction => v.version
+      case v: Versioned => v.version
       case _                       => 1
     }
     val proofs = t match {

@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.transfer
 
-import scala.util.{Either, Try}
 import cats.instances.list.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.*
@@ -17,6 +16,8 @@ import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json, OFormat}
 
+import scala.util.{Either, Try}
+
 case class MassTransferTransaction(
     version: TxVersion,
     sender: PublicKey,
@@ -27,12 +28,15 @@ case class MassTransferTransaction(
     attachment: ByteStr,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.MassTransfer, assetId match {
-      case Waves          => Seq()
-      case a: IssuedAsset => Seq(a)
-    })
+) extends Transaction(
+      TransactionType.MassTransfer,
+      assetId match {
+        case Waves          => Seq()
+        case a: IssuedAsset => Seq(a)
+      }
+    )
     with ProvenTransaction
-    with VersionedTransaction
+    with Versioned.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
@@ -57,8 +61,7 @@ object MassTransferTransaction extends TransactionParser {
 
   val MaxTransferCount = 100
 
-  override val typeId: TxType                    = 11: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val typeId: TxType = 11: Byte
 
   implicit val validator: TxValidator[MassTransferTransaction] = MassTransferTxValidator
 
@@ -121,14 +124,13 @@ object MassTransferTransaction extends TransactionParser {
     signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey, chainId)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] =
-    transfers.traverse {
-      case Transfer(recipient, amount) =>
-        for {
-          addressOrAlias <- AddressOrAlias.fromString(recipient)
-          transferAmount <- TxNonNegativeAmount(amount)(NegativeAmount(amount, "asset"))
-        } yield {
-          ParsedTransfer(addressOrAlias, transferAmount)
-        }
+    transfers.traverse { case Transfer(recipient, amount) =>
+      for {
+        addressOrAlias <- AddressOrAlias.fromString(recipient)
+        transferAmount <- TxNonNegativeAmount(amount)(NegativeAmount(amount, "asset"))
+      } yield {
+        ParsedTransfer(addressOrAlias, transferAmount)
+      }
     }
 
 }

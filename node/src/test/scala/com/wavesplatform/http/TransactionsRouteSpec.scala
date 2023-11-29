@@ -33,7 +33,6 @@ import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues, crypto}
-import org.scalacheck.Gen
 import org.scalacheck.Gen.*
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.*
@@ -773,7 +772,7 @@ class TransactionsRouteSpec
         def invoke(func: JsObject, expectedArgsLength: Int): Unit = {
           val ist = Json.obj(
             "type"       -> InvokeScriptTransaction.typeId,
-            "version"    -> Gen.oneOf(InvokeScriptTransaction.supportedVersions.toSeq).sample.get,
+            "version"    -> 3,
             "sender"     -> acc1.toAddress,
             "dApp"       -> acc2.toAddress,
             "call"       -> func,

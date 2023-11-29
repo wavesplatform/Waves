@@ -3,19 +3,19 @@ package com.wavesplatform.transaction.validation.impl
 import cats.data.ValidatedNel
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.{PBSince, TxVersion}
 
 object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
   override def validate(tx: ExchangeTransaction): ValidatedNel[ValidationError, ExchangeTransaction] = {
-    import tx._
+    import tx.*
 
     V.seq(tx)(
       V.cond(sellMatcherFee <= Order.MaxAmount, GenericError("sellMatcherFee too large")),
       V.cond(buyMatcherFee <= Order.MaxAmount, GenericError("buyMatcherFee too large")),
       V.cond(fee.value <= Order.MaxAmount, GenericError("fee too large")),
-      V.cond(isProtobufVersion || order1.orderType == OrderType.BUY, GenericError("order1 should have OrderType.BUY")),
+      V.cond(PBSince.affects(tx) || order1.orderType == OrderType.BUY, GenericError("order1 should have OrderType.BUY")),
       V.cond(buyOrder.orderType == OrderType.BUY, GenericError("buyOrder should has OrderType.BUY")),
       V.cond(sellOrder.orderType == OrderType.SELL, GenericError("sellOrder should has OrderType.SELL")),
       V.cond(buyOrder.matcherPublicKey == sellOrder.matcherPublicKey, GenericError("buyOrder.matcher should be the same as sellOrder.matcher")),
