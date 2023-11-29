@@ -31,5 +31,14 @@ package object v1 {
       expr: EXPR,
       stdLibVersion: StdLibVersion = StdLibVersion.VersionDic.all.max
   ): (Log[Id], Int, Either[ExecutionError, Terms.EVALUATED]) =
-    EvaluatorV2.applyCompleted(ctx, expr, LogExtraInfo(), stdLibVersion, newMode = true, correctFunctionCallScope = true, enableExecutionLog = false)
+    EvaluatorV2.applyCompleted(
+      ctx,
+      expr,
+      LogExtraInfo(),
+      stdLibVersion,
+      newMode = true,
+      correctFunctionCallScope = true,
+      enableExecutionLog = false,
+      fixedThrownError = true
+    )
 }

@@ -18,10 +18,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
-import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
@@ -298,7 +297,7 @@ class RocksDBWriter(
 
   private def appendBalances(
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
-      assetStatics: Map[IssuedAsset, TransactionStateSnapshot.AssetStatic],
+      assetStatics: Map[IssuedAsset, AssetStaticInfo],
       rw: RW
   ): Unit = {
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
@@ -452,8 +451,8 @@ class RocksDBWriter(
 
       for ((asset, (assetStatic, assetNum)) <- snapshot.indexedAssetStatics) {
         val pbAssetStatic = StaticAssetInfo(
-          assetStatic.sourceTransactionId,
-          assetStatic.issuerPublicKey,
+          assetStatic.source.toByteString,
+          assetStatic.issuer.toByteString,
           assetStatic.decimals,
           assetStatic.nft,
           assetNum,
@@ -484,15 +483,16 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      val txLeases = for {
-        (_, txInfo) <- snapshot.transactions
-        (id, lease) <- txInfo.snapshot.leaseStates
-      } yield (Some(txInfo.transaction), id, lease)
-      val txLeaseIdSet = txLeases.map(_._2).toSet
-      val allLeases    = txLeases ++ snapshot.leaseStates.collect { case (id, lease) if !txLeaseIdSet.contains(id) => (None, id, lease) }
-      allLeases.foreach { case (txOpt, id, lease) =>
-        val details = lease.toDetails(this, txOpt, leaseDetails(id))
-        rw.put(Keys.leaseDetails(id)(height), Some(Right(details)))
+      for ((id, li) <- snapshot.newLeases) {
+        rw.put(Keys.leaseDetails(id)(height), Some(LeaseDetails(li, snapshot.cancelledLeases.getOrElse(id, LeaseDetails.Status.Active))))
+        expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
+      }
+
+      for ((id, status) <- snapshot.cancelledLeases if !snapshot.newLeases.contains(id)) {
+        rw.fromHistory(Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten.foreach { d =>
+          rw.put(Keys.leaseDetails(id)(height), Some(d.copy(status = status)))
+        }
+
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
 
@@ -523,7 +523,10 @@ class RocksDBWriter(
           val txId = TransactionId(id)
 
           val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((meta, tx)))
-          rw.put(Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle), Some(txInfo.snapshot.toProtobuf(txInfo.status)))
+          rw.put(
+            Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle),
+            Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status))
+          )
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
           targetBf.put(id.arr)
 
@@ -829,7 +832,7 @@ class RocksDBWriter(
           ).explicitGet()
 
           val snapshot = if (isLightMode) {
-            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb)))
+            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
           } else None
 
           (block, Caches.toHitSource(discardedMeta), snapshot)
@@ -984,23 +987,8 @@ class RocksDBWriter(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
-      h             <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
-      detailsOrFlag <- db.get(Keys.leaseDetails(leaseId)(h))
-      details <- detailsOrFlag.fold(
-        isActive =>
-          transactionInfo(leaseId, db).collect { case (txm, lt: LeaseTransaction) =>
-            LeaseDetails(
-              lt.sender,
-              lt.recipient,
-              lt.amount.value,
-              if (isActive) LeaseDetails.Status.Active
-              else LeaseDetails.Status.Cancelled(h, None),
-              leaseId,
-              txm.height
-            )
-          },
-        Some(_)
-      )
+      h       <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
+      details <- db.get(Keys.leaseDetails(leaseId)(h))
     } yield details
   }
 

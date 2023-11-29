@@ -1,9 +1,8 @@
 package com.wavesplatform.state.appender
 
-import java.time.Instant
 import cats.data.EitherT
 import cats.syntax.traverse.*
-import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
@@ -23,6 +22,8 @@ import kamon.trace.Span
 import monix.eval.Task
 import monix.execution.Scheduler
 
+import java.time.Instant
+
 object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater & Blockchain,
@@ -32,7 +33,7 @@ object BlockAppender extends ScorexLogging {
       scheduler: Scheduler,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
-  )(newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Either[ValidationError, BlockApplyResult]] =
+  )(newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Either[ValidationError, BlockApplyResult]] =
     Task {
       if (
         blockchainUpdater
@@ -58,7 +59,7 @@ object BlockAppender extends ScorexLogging {
       peerDatabase: PeerDatabase,
       blockChallenger: Option[BlockChallenger],
       scheduler: Scheduler
-  )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshot]): Task[Unit] = {
+  )(ch: Channel, newBlock: Block, snapshot: Option[BlockSnapshotResponse]): Task[Unit] = {
     import metrics.*
     implicit val implicitTime: Time = time
 

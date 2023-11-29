@@ -9,7 +9,6 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils.*
@@ -93,7 +92,7 @@ object Keys {
     Key(LeaseBalance, addressId.toByteArray, readLeaseBalance, writeLeaseBalance)
 
   def leaseDetailsHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseDetailsHistory, leaseId.arr)
-  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =
+  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[LeaseDetails]] =
     Key.opt(LeaseDetailsTag, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
 
   def filledVolumeAndFeeAt(orderId: ByteStr, height: Height): Key[VolumeAndFeeNode] =

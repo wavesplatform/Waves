@@ -1,8 +1,9 @@
-package com.wavesplatform.state.reader
+package com.wavesplatform.state
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.LeaseDetails.Status.*
@@ -14,8 +15,9 @@ object LeaseDetails {
   sealed trait Status
   object Status {
     case object Active                                             extends Status
-    final case class Cancelled(height: Int, txId: Option[ByteStr]) extends Status
-    final case class Expired(height: Int)                          extends Status
+    sealed trait Inactive                                          extends Status
+    final case class Cancelled(height: Int, txId: Option[ByteStr]) extends Inactive
+    final case class Expired(height: Int)                          extends Inactive
 
     implicit class StatusExt(val status: Status) extends AnyVal {
       def cancelHeight: Option[Int] = status match {
@@ -47,8 +49,16 @@ object LeaseDetails {
     )
 }
 
-case class LeaseDetails(sender: PublicKey, recipient: AddressOrAlias, amount: Long, status: LeaseDetails.Status, sourceId: ByteStr, height: Int) {
-  def isActive: Boolean = status == Status.Active
+case class LeaseDetails(
+    static: LeaseStaticInfo,
+    status: LeaseDetails.Status
+) {
+  def isActive: Boolean         = status == LeaseDetails.Status.Active
+  def sender: PublicKey         = static.sender
+  def sourceId: ByteStr         = static.sourceId
+  def amount: TxPositiveAmount  = static.amount
+  def height: Int               = static.height
+  def recipientAddress: Address = static.recipientAddress
 
   def toProtobuf: pb.LeaseDetails =
     pb.LeaseDetails(

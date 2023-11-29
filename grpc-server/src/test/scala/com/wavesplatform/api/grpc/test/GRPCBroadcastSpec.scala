@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc.test
 
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
@@ -91,7 +91,7 @@ class GRPCBroadcastSpec extends FlatSpec with BeforeAndAfterAll with PathMockFac
 
     @throws[StatusException]("on failed broadcast")
     def assertBroadcast(tx: Transaction): Unit = {
-      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), Duration.Inf)
+      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), 10.seconds)
     }
   }
 }

@@ -3,7 +3,7 @@ package com.wavesplatform.utx
 import cats.implicits.toFoldableOps
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}

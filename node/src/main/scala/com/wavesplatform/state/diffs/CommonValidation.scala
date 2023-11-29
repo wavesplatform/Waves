@@ -171,20 +171,23 @@ object CommonValidation {
 
     }
 
-    def generic1or2Barrier(t: VersionedTransaction): Either[ActivationError, T] = {
+    def generic1or2Barrier(t: Versioned): Either[ActivationError, T] = {
       if (t.version == 1.toByte) Right(tx)
       else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
       else Right(tx)
     }
 
+    def versionIsCorrect(tx: Versioned): Boolean =
+      tx.version > 0 && tx.version <= Versioned.maxVersion(tx)
+
     val versionsBarrier = tx match {
-      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
+      case v: Versioned if !versionIsCorrect(v) && blockchain.isFeatureActivated(LightNode) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
-      case p: PBSince if p.isProtobufVersion =>
+      case p: PBSince with Versioned if PBSince.affects(p) =>
         activationBarrier(BlockchainFeatures.BlockV5)
 
-      case v: VersionedTransaction if !TransactionParsers.versionIsCorrect(v) =>
+      case v: Versioned if !versionIsCorrect(v) =>
         Left(UnsupportedTypeAndVersion(v.tpe.id.toByte, v.version))
 
       case _ =>

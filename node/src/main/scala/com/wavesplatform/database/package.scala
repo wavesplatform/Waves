@@ -20,12 +20,12 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt}
+import com.wavesplatform.protobuf.{ByteStringExt, PBSnapshots}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+
+import com.wavesplatform.transaction.{EthereumTransaction,  PBSince,  Transaction, TransactionParsers,TxPositiveAmount, TxValidationError, Versioned}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -216,17 +216,6 @@ package object database {
       volumeInfo.isReissuable,
       ByteString.copyFrom(volumeInfo.volume.toByteArray)
     ).toByteArray
-  }
-
-  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
-    val sai = pb.StaticAssetInfo.parseFrom(bb)
-    AssetStaticInfo(
-      sai.id.toByteStr,
-      TransactionId(sai.sourceId.toByteStr),
-      PublicKey(sai.issuerPublicKey.toByteArray),
-      sai.decimals,
-      sai.isNft
-    )
   }
 
   def writeBlockMeta(data: pb.BlockMeta): Array[Byte] = data.toByteArray
@@ -618,11 +607,9 @@ package object database {
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case lps: PBSince with Versioned if PBSince.affects(lps)  => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case et: EthereumTransaction                                         => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                               => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }
@@ -643,8 +630,8 @@ package object database {
     txSnapshots.result()
   }
 
-  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] =
-    loadTxStateSnapshots(height, rdb).map(StateSnapshot.fromProtobuf)
+  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB, transactions: Seq[Transaction]): Seq[(StateSnapshot, TxMeta.Status)] =
+    loadTxStateSnapshots(height, rdb).zip(transactions).map { case (s, tx) => PBSnapshots.fromProtobuf(s, tx.id(), height) }
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {
@@ -679,16 +666,13 @@ package object database {
       Height(pbStaticInfo.height)
     )
 
-  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = rdb.db.withResource { r =>
+  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
     (for {
-      id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      if details.exists(_.fold(identity, _.isActive))
-      tm <- r.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
-      tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
-    } yield tx).collect {
-      case (ltm, lt: LeaseTransaction) if ltm.status == TxMeta.Status.Succeeded => lt
-    }.toSeq
+      id              <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      maybeNewDetails <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
+      newDetails      <- maybeNewDetails
+      if newDetails.isActive
+    } yield (id, newDetails)).toMap
   }
 
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
@@ -705,7 +689,7 @@ package object database {
     iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
     while (iterator.isValid && keyInRange()) {
       val leaseId = ByteStr(iterator.key().drop(6))
-      if (includeCancelled || readLeaseDetails(iterator.value()).fold(identity, _.isActive))
+      if (includeCancelled || readLeaseDetails(iterator.value()).isActive)
         leaseIds += leaseId
       else
         leaseIds -= leaseId

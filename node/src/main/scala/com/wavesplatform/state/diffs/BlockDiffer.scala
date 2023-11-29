@@ -12,7 +12,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
 import com.wavesplatform.state.patch.*
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction

@@ -9,15 +9,14 @@ import com.wavesplatform.events.fixtures.BlockchainUpdateGrpcMethod.*
 import com.wavesplatform.events.fixtures.InvokeWavesTxCheckers.checkInvokeDoubleNestedBlockchainUpdates
 import com.wavesplatform.events.fixtures.PrepareInvokeTestData.*
 import com.wavesplatform.events.fixtures.WavesTxChecks.*
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, CONST_STRING, EXPR}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, CONST_STRING, EXPR}
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxNonNegativeAmount}
 import com.wavesplatform.transaction.TxHelpers.secondAddress
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
   "Simple invoke transaction" - {
@@ -87,9 +86,9 @@ class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
     val massTx = TxHelpers.massTransfer(
       assetDappAccount,
       Seq(
-        ParsedTransfer(firstTxParticipantAddress, TxNonNegativeAmount.unsafeFrom(amount)),
-        ParsedTransfer(secondAddress, TxNonNegativeAmount.unsafeFrom(amount)),
-        ParsedTransfer(invokerDappAddress, TxNonNegativeAmount.unsafeFrom(amount))
+        firstTxParticipantAddress -> amount,
+        secondAddress             -> amount,
+        invokerDappAddress        -> amount
       ),
       asset,
       fee = 500000
@@ -144,7 +143,8 @@ class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
           append,
           invokeScriptMetadata,
           assetDappAddress,
-          firstTxParticipantAddress, secondAddress,
+          firstTxParticipantAddress,
+          secondAddress,
           issue,
           callerBalancesMap
         )
@@ -159,7 +159,8 @@ class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
           append,
           invokeScriptMetadata,
           assetDappAddress,
-          firstTxParticipantAddress, secondAddress,
+          firstTxParticipantAddress,
+          secondAddress,
           issue,
           callerBalancesMap
         )
@@ -174,7 +175,8 @@ class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
           append,
           invokeScriptMetadata,
           assetDappAddress,
-          firstTxParticipantAddress, secondAddress,
+          firstTxParticipantAddress,
+          secondAddress,
           issue,
           callerBalancesMap
         )
@@ -201,7 +203,15 @@ class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
       doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, GetBlockUpdate) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getInvokeScript
         checkInvokeBase(append, invoke)
-        checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, invokerDappAddress, invokerDappAddress, issue, originalCallerBalancesMap)
+        checkInvokeDoubleNestedBlockchainUpdates(
+          append,
+          invokeScriptMetadata,
+          assetDappAddress,
+          invokerDappAddress,
+          invokerDappAddress,
+          issue,
+          originalCallerBalancesMap
+        )
       }
     }
 
@@ -209,7 +219,15 @@ class BlockchainUpdatesInvokeTxSpec extends BlockchainUpdatesTestBase {
       doubleNestedInvokeTest(assetDappAccount, balancesSeq, issue, invoke, massTx, originCaller, GetBlockUpdateRange) { append =>
         val invokeScriptMetadata = append.transactionsMetadata.head.getInvokeScript
         checkInvokeBase(append, invoke)
-        checkInvokeDoubleNestedBlockchainUpdates(append, invokeScriptMetadata, assetDappAddress, invokerDappAddress, invokerDappAddress, issue, originalCallerBalancesMap)
+        checkInvokeDoubleNestedBlockchainUpdates(
+          append,
+          invokeScriptMetadata,
+          assetDappAddress,
+          invokerDappAddress,
+          invokerDappAddress,
+          issue,
+          originalCallerBalancesMap
+        )
       }
     }
   }

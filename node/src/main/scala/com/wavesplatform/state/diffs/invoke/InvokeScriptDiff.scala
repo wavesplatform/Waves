@@ -8,6 +8,7 @@ import cats.syntax.traverseFilter.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.FunctionCallPolicyProvider.*
@@ -27,7 +28,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
@@ -391,7 +392,8 @@ object InvokeScriptDiff {
         limit,
         blockchain.correctFunctionCallScope,
         blockchain.newEvaluatorMode,
-        enableExecutionLog
+        enableExecutionLog,
+        blockchain.isFeatureActivated(LightNode)
       )
       .map(
         _.leftMap[ValidationError] {
