@@ -413,8 +413,9 @@ class RocksDBWriter(
         deleteOldWavesBalanceEntries(Height(newSafeRollbackHeight), rw)
         if (newSafeRollbackHeight > 1000 && newSafeRollbackHeight % 1000 == 0) {
           batchDeleteOldEntries(
-            from = Height(newSafeRollbackHeight - 1000 + 1),
-            to = Height(newSafeRollbackHeight)
+            fromInclusive = Height(newSafeRollbackHeight - 1000 + 1),
+            toInclusive = Height(newSafeRollbackHeight),
+            rw = rw
           )
         }
       }
@@ -659,19 +660,19 @@ class RocksDBWriter(
       }
   }
 
-  private def batchDeleteOldEntries(from: Height, to: Height): Unit = writableDB.withOptions { (ro, wo) =>
-    writableDB.readWriteWithOptions(ro, wo) { rw =>
-      val assetBalanceAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), TwoHeights]
+  private def batchDeleteOldEntries(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
+    val assetBalanceAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), TwoHeights]
 
-      val changedDataAddresses = mutable.Set.empty[AddressId]
-      val accountDataAt        = mutable.AnyRefMap.empty[(AddressId, String), TwoHeights]
+    val changedDataAddresses = mutable.Set.empty[AddressId]
+    val accountDataAt        = mutable.AnyRefMap.empty[(AddressId, String), TwoHeights]
 
-      // Collecting data
+    // Collecting data
 
-      rw.iterateOverWithSeek(KeyTags.ChangedAddresses.prefixBytes, Keys.changedAddresses(from).keyBytes) { e =>
-        val currHeight          = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
-        val changedAddressesKey = Keys.changedAddresses(currHeight)
-
+    val changedAddressesKey = Keys.changedAddresses(Int.MaxValue) // Doesn't matter, we need this only to parse
+    rw.iterateOverWithSeek(KeyTags.ChangedAddresses.prefixBytes, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+      val continue   = currHeight < toInclusive
+      if (continue || currHeight == toInclusive)
         changedAddressesKey.parse(e.getValue).foreach { addressId =>
           // Account data
           val changedDataKeysAtKey = Keys.changedDataKeys(currHeight, addressId)
@@ -685,78 +686,75 @@ class RocksDBWriter(
           }
         }
 
-        currHeight < to
-      }
+      continue
+    }
 
-      // Asset balances
-      rw.iterateOverWithSeek(KeyTags.ChangedAssetBalances.prefixBytes, Keys.changedBalancesAtPrefix(from)) { e =>
-        val currHeight = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
-        val asset      = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
+    // Asset balances
 
-        val changedBalancesKey = Keys.changedBalances(currHeight, asset)
+    val changedBalancesKey = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
+    rw.iterateOverWithSeek(KeyTags.ChangedAssetBalances.prefixBytes, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+      val continue   = currHeight <= toInclusive
+      if (continue) {
+        val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
         changedBalancesKey.parse(e.getValue).foreach { addressId =>
           assetBalanceAt.updateWith((addressId, asset))(TwoHeights.update(_, currHeight))
         }
+      }
+      continue
+    }
 
-        currHeight < to
+    // Deleting data
+
+    // Asset balances
+    val assetBalanceAtAids = new ArrayBuffer[(AddressId, IssuedAsset)]()
+    val assetBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
+    assetBalanceAt.foreach { case ((addressId, asset), heights) =>
+      heights.prev match {
+        case Some(prevHeight) =>
+          rw.deleteRange(
+            // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
+            // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
+            // But we doesn't know 1900, so we will delete all keys from 1.
+            Keys.assetBalanceAt(addressId, asset, Height(1)),
+            Keys.assetBalanceAt(addressId, asset, Height(prevHeight + 1)) // +1 to [1; prevHeight] instead of [1; prevHeight)
+          )
+
+        case None =>
+          assetBalanceAtAids.addOne((addressId, asset))
+          assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, heights.last))
+      }
+    }
+
+    assetBalanceAtAids.view
+      .zip(rw.multiGet(assetBalanceAtKeys, BalanceNode.SizeInBytes))
+      .foreach {
+        case ((addressId, asset), Some(assetBalanceAt)) => rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
+        case _                                          =>
       }
 
-      // Deleting data
+    // Account data
+    accountDataAt.foreach { case ((addressId, dataKey), heights) =>
+      heights.prev match {
+        case Some(prevHeight) =>
+          rw.deleteRange(
+            Keys.dataAt(addressId, dataKey)(Height(1)),
+            Keys.dataAt(addressId, dataKey)(Height(prevHeight + 1))
+          )
 
-      // Asset balances
-      val assetBalanceAtAids = new ArrayBuffer[(AddressId, IssuedAsset)]()
-      val assetBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
-      assetBalanceAt.foreach { case ((addressId, asset), heights) =>
-        heights.prev match {
-          case Some(prevHeight) =>
-            // TODO return without if?
-            if (prevHeight == from) rw.delete(Keys.assetBalanceAt(addressId, asset, from))
-            else if (prevHeight > from)
-              rw.deleteRange(
-                Keys.assetBalanceAt(addressId, asset, from),
-                Keys.assetBalanceAt(addressId, asset, prevHeight)
-              )
-
-          case None =>
-            assetBalanceAtAids.addOne((addressId, asset))
-            assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, heights.last))
-        }
+        case None =>
+          val dataKeyAtKey = Keys.dataAt(addressId, dataKey)(heights.last)
+          val dataKeyAt    = rw.get(dataKeyAtKey)
+          rw.delete(Keys.dataAt(addressId, dataKey)(dataKeyAt.prevHeight))
       }
+    }
 
-      assetBalanceAtAids.view
-        .zip(rw.multiGet(assetBalanceAtKeys, BalanceNode.SizeInBytes))
-        .foreach {
-          case ((addressId, asset), Some(assetBalanceAt)) => rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
-          case _                                          =>
-        }
-
-      // Account data
-      accountDataAt.foreach { case ((addressId, dataKey), heights) =>
-        heights.prev match {
-          case Some(prevHeight) =>
-            if (prevHeight == from) rw.delete(Keys.dataAt(addressId, dataKey)(from))
-            else if (prevHeight > from)
-              rw.deleteRange(
-                Keys.dataAt(addressId, dataKey)(from),
-                Keys.dataAt(addressId, dataKey)(prevHeight)
-              )
-
-          case None =>
-            val dataKeyAtKey = Keys.dataAt(addressId, dataKey)(heights.last)
-            val dataKeyAt    = rw.get(dataKeyAtKey)
-            rw.delete(Keys.dataAt(addressId, dataKey)(dataKeyAt.prevHeight))
-        }
-      }
-
-      // Changed keys
-      rw.deleteRange(Keys.changedAddresses(from), Keys.changedAddresses(to))
-      // TODO find minmax assetId
-      val minAssetId = IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(0)))  // 0 in all bits
-      val maxAssetId = IssuedAsset(ByteStr(Array.fill[Byte](AssetIdLength)(-1))) // 1 in all bits
-      rw.deleteRange(Keys.changedBalances(from, minAssetId), Keys.changedBalances(to, maxAssetId))
-      changedDataAddresses.foreach { addressId =>
-        rw.deleteRange(Keys.changedDataKeys(from, addressId), Keys.changedDataKeys(to, addressId))
-      }
+    // Changed keys
+    rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toInclusive + 1))
+    // TODO find minmax assetId
+    rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toInclusive + 1))
+    changedDataAddresses.foreach { addressId =>
+      rw.deleteRange(Keys.changedDataKeys(fromInclusive, addressId), Keys.changedDataKeys(toInclusive + 1, addressId))
     }
   }
 

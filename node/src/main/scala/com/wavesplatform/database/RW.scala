@@ -21,8 +21,12 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
   def delete[V](key: Key[V]): Unit =
     batch.delete(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes)
 
-  def deleteRange[V](from: Key[V], to: Key[V]): Unit        = deleteRange(from.keyBytes, to.keyBytes)
-  def deleteRange(from: Array[Byte], to: Array[Byte]): Unit = batch.deleteRange(from, to)
+  def deleteRange[V](fromInclusive: Key[V], toExclusive: Key[V]): Unit = deleteRange(fromInclusive.keyBytes, toExclusive.keyBytes)
+
+  // Deletes in range [from, to)
+  // Keep in mind, that bytes in Java are signed.
+  // So from = [0, ...] removes all keys, but [Byte.MinValue, ...] skips keys like [x, ...], x >= 0
+  def deleteRange(fromInclusive: Array[Byte], toExclusive: Array[Byte]): Unit = batch.deleteRange(fromInclusive, toExclusive)
 
   def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
     val newValue = get(key).filterNot(_ == heightToRemove)
