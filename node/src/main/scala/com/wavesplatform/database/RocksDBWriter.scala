@@ -489,7 +489,7 @@ class RocksDBWriter(
       }
 
       for ((id, status) <- snapshot.cancelledLeases if !snapshot.newLeases.contains(id)) {
-        rw.fromHistory(Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten.foreach { d =>
+        leaseDetails(id).foreach { d =>
           rw.put(Keys.leaseDetails(id)(height), Some(d.copy(status = status)))
         }
 
@@ -553,8 +553,8 @@ class RocksDBWriter(
       if (dbSettings.storeLeaseStatesByAddress) {
         val addressIdWithLeaseIds =
           for {
-            (leaseId, details) <- snapshot.leaseStates.toSeq
-            address            <- resolveAlias(details.recipient).toSeq :+ details.sender.toAddress
+            (leaseId, details) <- snapshot.newLeases.toSeq if !snapshot.cancelledLeases.contains(leaseId)
+            address            <- Seq(details.recipientAddress, details.sender.toAddress)
             addressId = this.addressIdWithFallback(address, newAddresses)
           } yield (addressId, leaseId)
         val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
@@ -729,7 +729,7 @@ class RocksDBWriter(
               val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
               rw.get(leaseSeqKey)
                 .flatMap(_.headOption)
-                .flatMap(id => writableDB.withResource(r => loadLease(r, id)))
+                .flatMap(leaseDetails)
                 .filter(_.height == currentHeight)
                 .foreach { _ =>
                   rw.delete(leaseSeqKey)

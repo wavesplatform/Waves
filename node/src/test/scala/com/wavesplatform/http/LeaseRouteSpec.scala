@@ -17,20 +17,6 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, LeaseDetails, LeaseStaticInfo}
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.EthTxGenerator.Arg
-import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, signer}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, Authorized, EthTxGenerator, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{SharedSchedulerMixin, SystemTime}
-import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
-import org.scalacheck.Gen
-import org.scalamock.scalatest.PathMockFactory
 import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.TxHelpers.signer
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -60,85 +46,31 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
         CommonAccountsApi(() => domain.blockchainUpdater.snapshotBlockchain, domain.rdb, domain.blockchain),
         new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
-class LeaseRouteSpec
-    extends RouteSpec("/leasing")
-    with TransactionGen
-    with RestAPISettingsHelper
-    with NTPTime
-    with WithDomain
-    with TestWallet
-    with PathMockFactory
-    with SharedSchedulerMixin {
-  private def route(d: Domain) =
-    LeaseApiRoute(
-      restAPISettings,
-      testWallet,
-      d.blockchain,
-      (_, _) => Future.successful(TracedResult(Right(true))),
-      ntpTime,
-      CommonAccountsApi(() => d.blockchainUpdater.snapshotBlockchain, d.rdb, d.blockchain),
-      new RouteTimeout(60.seconds)(sharedScheduler)
     )
 
   private val leaseContract = TestCompiler(V5)
-    .compileContract("""
-                       |{-# STDLIB_VERSION 4 #-}
-                       |{-# CONTENT_TYPE DAPP #-}
-                       |{-# SCRIPT_TYPE ACCOUNT #-}
-                       |
-                       |@Callable(inv)
-                       |func leaseTo(recipient: ByteVector, amount: Int) = {
-                       |  let lease = Lease(Address(recipient), amount)
-                       |  [
-                       |    lease,
-                       |    BinaryEntry("leaseId", lease.calculateLeaseId())
-                       |  ]
-                       |}
-                       |
-                       |@Callable(inv)
-                       |func cancelLease(id: ByteVector) = {
-                       |  [
-                       |    LeaseCancel(id)
-                       |  ]
-                       |}
-                       |""".stripMargin)
+    .compileContract(
+      """
+        | @Callable(inv)
+        | func leaseTo(recipient: ByteVector, amount: Int) = {
+        |   let lease = Lease(Address(recipient), amount)
+        |   [
+        |     lease,
+        |     BinaryEntry("leaseId", lease.calculateLeaseId())
+        |   ]
+        | }
+        |
+        | @Callable(inv)
+        | func cancelLease(id: ByteVector) = {
+        |   [
+        |     LeaseCancel(id)
+        |   ]
+        | }
+      """.stripMargin
+    )
 
   private def setScriptTransaction(sender: KeyPair) =
     TxHelpers.setScript(sender, leaseContract)
-  private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(check: (Domain, Route) => Unit): Unit =
-    withDomain(settings, balances) { d =>
-      check(d, route(d).route)
-    }
-
-  private def setScriptTransaction(sender: KeyPair) =
-    SetScriptTransaction
-      .selfSigned(
-        TxVersion.V2,
-        sender,
-        Some(
-          TestCompiler(V5).compileContract(
-            """
-              |@Callable(inv)
-              |func leaseTo(recipient: ByteVector, amount: Int) = {
-              |  let lease = Lease(Address(recipient), amount)
-              |  [
-              |    lease,
-              |    BinaryEntry("leaseId", lease.calculateLeaseId())
-              |  ]
-              |}
-              |
-              |@Callable(inv)
-              |func cancelLease(id: ByteVector) =
-              |  [
-              |    LeaseCancel(id)
-              |  ]
-            """.stripMargin
-          )
-        ),
-        0.01.waves,
-        ntpTime.getTimestamp()
-      )
-      .explicitGet()
 
   private def invokeLeaseCancel(sender: KeyPair, leaseId: ByteStr) =
     TxHelpers.invoke(sender.toAddress, Some("cancelLease"), Seq(CONST_BYTESTR(leaseId).explicitGet()))

@@ -3,12 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.LeaseInfo.Status
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.state.LeaseDetails
 
 object LeaseInfo {
   type Status = Status.Value
@@ -19,13 +14,13 @@ object LeaseInfo {
     val Expired  = Value(2)
   }
 
-  def fromLeaseDetails(id: ByteStr, details: LeaseDetails, blockchain: Blockchain): LeaseInfo =
+  def fromLeaseDetails(id: ByteStr, details: LeaseDetails): LeaseInfo =
     LeaseInfo(
       id,
       details.sourceId,
       details.sender.toAddress,
-      blockchain.resolveAlias(details.recipient).orElse(resolveDisabledAlias(id)).explicitGet(),
-      details.amount,
+      details.recipientAddress,
+      details.amount.value,
       details.height,
       details.status match {
         case LeaseDetails.Status.Active          => LeaseInfo.Status.Active
@@ -35,13 +30,6 @@ object LeaseInfo {
       details.status.cancelHeight,
       details.status.cancelTransactionId
     )
-
-  private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
-    CancelLeasesToDisabledAliases.patchData
-      .get(leaseId)
-      .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) { case (_, recipientAddress) =>
-        Right(recipientAddress)
-      }
 }
 
 case class LeaseInfo(
