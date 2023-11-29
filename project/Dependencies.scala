@@ -128,6 +128,7 @@ object Dependencies {
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "eu.timepit"                 %% "refined-cats"  % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "9.4.0",
+      "org.ehcache"                 % "sizeof"        % "0.4.3", // Weighing caches
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test
@@ -164,7 +165,6 @@ object Dependencies {
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",
       "net.logstash.logback"          % "logstash-logback-encoder" % "7.2" % Runtime,
-      "org.ehcache"                   % "sizeof"                   % "0.4.3", // Weighing caches
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       sttp3,
