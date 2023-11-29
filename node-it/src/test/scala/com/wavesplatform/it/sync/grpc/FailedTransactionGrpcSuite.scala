@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
+import com.wavesplatform.protobuf.transaction.DataEntry
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{BinaryDataEntry, StringDataEntry}
 import com.wavesplatform.test.*

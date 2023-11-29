@@ -289,7 +289,7 @@ class MinerImpl(
 
         def appendTask(block: Block, totalConstraint: MiningConstraint) =
           BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block, None).flatMap {
-            case Left(BlockFromFuture(_)) => // Time was corrected, retry
+            case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)
 
             case Left(err) =>

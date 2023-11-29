@@ -11,13 +11,10 @@ import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
-import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.LeaseDetails.Status
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult, SnapshotBlockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
@@ -176,20 +173,13 @@ object CommonAccountsApi {
       }
     }
 
-    private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
-      CancelLeasesToDisabledAliases.patchData
-        .get(leaseId)
-        .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) { case (_, recipientAddress) =>
-          Right(recipientAddress)
-        }
-
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
       LeaseInfo(
         leaseId,
         ld.sourceId,
         ld.sender.toAddress,
-        blockchain.resolveAlias(ld.recipient).orElse(resolveDisabledAlias(leaseId)).explicitGet(),
-        ld.amount,
+        ld.recipientAddress,
+        ld.amount.value,
         ld.height,
         ld.status match {
           case Status.Active          => LeaseInfo.Status.Active

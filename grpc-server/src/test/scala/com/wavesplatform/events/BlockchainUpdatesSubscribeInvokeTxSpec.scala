@@ -15,10 +15,9 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, script, secondAddress, secondSigner, setScript}
+import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount}
 import org.scalatest.concurrent.ScalaFutures
 
 class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain with ScalaFutures {
@@ -139,9 +138,9 @@ class BlockchainUpdatesSubscribeInvokeTxSpec extends FreeSpec with WithBUDomain 
     val massTx = TxHelpers.massTransfer(
       assetDappAccount,
       Seq(
-        ParsedTransfer(dAppAddress, TxNonNegativeAmount.unsafeFrom(assetTransferAmount)),
-        ParsedTransfer(secondAddress, TxNonNegativeAmount.unsafeFrom(assetTransferAmount)),
-        ParsedTransfer(invokerDappAddress, TxNonNegativeAmount.unsafeFrom(assetTransferAmount))
+        dAppAddress        -> assetTransferAmount,
+        secondAddress      -> assetTransferAmount,
+        invokerDappAddress -> assetTransferAmount
       ),
       asset,
       fee = 500000

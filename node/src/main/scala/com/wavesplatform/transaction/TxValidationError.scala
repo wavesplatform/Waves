@@ -29,7 +29,7 @@ object TxValidationError {
   case object MissingSenderPrivateKey                        extends ValidationError
   case object UnsupportedTransactionType                     extends ValidationError
   case object InvalidRequestSignature                        extends ValidationError
-  case class BlockFromFuture(ts: Long)                       extends ValidationError
+  case class BlockFromFuture(blockTs: Long, localTs: Long)   extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class AliasDoesNotExist(a: Alias)                     extends ValidationError { override def toString: String = s"Alias '$a' does not exist." }

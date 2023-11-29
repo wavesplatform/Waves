@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptRunner

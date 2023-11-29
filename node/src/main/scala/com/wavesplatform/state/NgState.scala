@@ -61,7 +61,7 @@ case class NgState(
 ) {
   def cancelExpiredLeases(snapshot: StateSnapshot): StateSnapshot =
     leasesToCancel
-      .collect { case (id, ld) if snapshot.leaseStates.get(id).forall(_.isActive) => ld }
+      .collect { case (id, ld) if !snapshot.cancelledLeases.contains(id) => ld }
       .toList
       .foldLeft(snapshot)(_ |+| _)
 

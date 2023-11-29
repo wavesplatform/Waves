@@ -10,7 +10,7 @@ import org.scalatest.{BeforeAndAfterEach, Suite}
 trait WithNewDBForEachTest extends BeforeAndAfterEach with DBCacheSettings {
   this: Suite =>
 
-  private val path                   = Files.createTempDirectory("rocks").toAbsolutePath
+  private val path                   = Files.createTempDirectory(s"rocks-${getClass.getSimpleName}").toAbsolutePath
   private var currentDBInstance: RDB = _
 
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop

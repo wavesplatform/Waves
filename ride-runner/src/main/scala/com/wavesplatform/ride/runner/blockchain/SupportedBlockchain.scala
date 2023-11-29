@@ -3,8 +3,7 @@ package com.wavesplatform.ride.runner.blockchain
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetScriptInfo, Blockchain, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{AssetScriptInfo, Blockchain, LeaseDetails, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging

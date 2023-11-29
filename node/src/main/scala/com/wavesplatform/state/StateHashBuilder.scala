@@ -84,9 +84,9 @@ class StateHashBuilder {
     )
   }
 
-  def addLeaseStatus(leaseId: ByteStr, status: Boolean): Unit = {
+  def addLeaseStatus(leaseId: ByteStr, isActive: Boolean): Unit = {
     addEntry(SectionId.LeaseStatus, leaseId.arr)(
-      if (status) Array(1: Byte) else Array(0: Byte)
+      if (isActive) Array(1: Byte) else Array(0: Byte)
     )
   }
 

@@ -6,13 +6,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
-import com.wavesplatform.test.*
 import com.wavesplatform.state.IntegerDataEntry
-import com.wavesplatform.test.{NumericExt, PropSpec}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.Assertions
 import shapeless.Coproduct
 
@@ -43,11 +41,11 @@ class CommonFunctionsTest extends PropSpec {
 
     val result = runScript(
       """
-                                      |match tx {
-                                      | case ttx : TransferTransaction  =>  isDefined(ttx.assetId)
-                                      | case _ => throw()
-                                      | }
-                                      |""".stripMargin,
+        |match tx {
+        | case ttx : TransferTransaction  =>  isDefined(ttx.assetId)
+        | case _ => throw()
+        | }
+        |""".stripMargin,
       Coproduct(transfer)
     )
     result shouldEqual evaluated(transfer.assetId != Waves)
@@ -85,25 +83,25 @@ class CommonFunctionsTest extends PropSpec {
     resultAmount shouldBe evaluated(massTransfer.transfers(0).amount.value)
     val resultAddress = runScript(
       """
-                                                  |match tx {
-                                                  | case mttx : MassTransferTransaction  =>
-                                                  |       match mttx.transfers[0].recipient {
-                                                  |           case address : Address => address.bytes
-                                                  |           case _ => throw()
-                                                  |       }
-                                                  | case _ => throw()
-                                                  | }
-                                                  |""".stripMargin,
+        |match tx {
+        | case mttx : MassTransferTransaction  =>
+        |       match mttx.transfers[0].recipient {
+        |           case address : Address => address.bytes
+        |           case _ => throw()
+        |       }
+        | case _ => throw()
+        | }
+        |""".stripMargin,
       Coproduct(massTransfer)
     )
     resultAddress shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
     val resultLen = runScript(
       """
-                                       |match tx {
-                                       | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
-                                       | case _ => throw()
-                                       | }
-                                       |""".stripMargin,
+        |match tx {
+        | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
+        | case _ => throw()
+        | }
+        |""".stripMargin,
       Coproduct(massTransfer)
     )
     resultLen shouldBe evaluated(massTransfer.transfers.size.toLong)
@@ -206,14 +204,14 @@ class CommonFunctionsTest extends PropSpec {
   property("shadowing of variable considered external") {
     runScript(
       s"""
-           |match {
-           |  let aaa = 1
-           |  tx
-           |} {
-           |     case tx: TransferTransaction => tx == tx
-           |     case _ => throw()
-           | }
-           |""".stripMargin
+         |match {
+         |  let aaa = 1
+         |  tx
+         |} {
+         |     case tx: TransferTransaction => tx == tx
+         |     case _ => throw()
+         | }
+         |""".stripMargin
     ) should produce("already defined")
   }
 
@@ -299,7 +297,7 @@ class CommonFunctionsTest extends PropSpec {
     val recipients = (1 to 10).map(idx => TxHelpers.address(idx + 1))
     TxHelpers.massTransfer(
       from = sender,
-      to = recipients.map(addr => ParsedTransfer(addr, TxNonNegativeAmount.unsafeFrom(1.waves))),
+      to = recipients.map(addr => (addr, 1.waves)),
       version = TxVersion.V1
     )
   }

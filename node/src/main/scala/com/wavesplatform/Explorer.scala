@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
