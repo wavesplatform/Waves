@@ -21,7 +21,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NgState, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
@@ -40,14 +40,14 @@ import scala.concurrent.duration.*
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-  private val path  = Files.createTempDirectory("rocks-temp").toAbsolutePath
+  private val path  = Files.createTempDirectory(s"rocks-temp-${getClass.getSimpleName}").toAbsolutePath
   protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
 
   private val MaxKey = Shorts.toByteArray(KeyTags.maxId.toShort)
   private val MinKey = new Array[Byte](2)
 
   protected def tempDb[A](f: RDB => A): A = {
-    val path = Files.createTempDirectory("rocks-temp").toAbsolutePath
+    val path = Files.createTempDirectory(s"rocks-temp-tmp-${getClass.getSimpleName}").toAbsolutePath
     val rdb  = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     try {
       f(rdb)

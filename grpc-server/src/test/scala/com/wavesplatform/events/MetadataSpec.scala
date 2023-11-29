@@ -1,16 +1,15 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.common.state.ByteStr
-import FakeObserver.*
+import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{Asset, EthTxGenerator, TxExchangeAmount, TxHelpers, TxMatcherFee, TxNonNegativeAmount, TxOrderPrice}
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice}
 
 class MetadataSpec extends FreeSpec with WithBUDomain {
   "BlockchainUpdates returns correct metadata for supported transaction types" in withDomainAndRepo(RideV6) { (d, r) =>
@@ -63,9 +62,9 @@ class MetadataSpec extends FreeSpec with WithBUDomain {
     val massTransfer = TxHelpers.massTransfer(
       genesisAddress,
       Seq(
-        MassTransferTransaction.ParsedTransfer(issuer.toAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
-        MassTransferTransaction.ParsedTransfer(matcher.toAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
-        MassTransferTransaction.ParsedTransfer(ethOrderSender.toWavesAddress, TxNonNegativeAmount.unsafeFrom(100.waves))
+        issuer.toAddress              -> 100.waves,
+        matcher.toAddress             -> 100.waves,
+        ethOrderSender.toWavesAddress -> 100.waves
       ),
       fee = 0.003.waves
     )

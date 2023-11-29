@@ -11,10 +11,9 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
-import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 
-class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfterAll {
+class CancelLeasesToDisabledAliasesSpec extends FlatSpec with WithDomain with BeforeAndAfterAll {
   val MainnetSettings: WavesSettings = {
     import SettingsFromDefaultConfig.blockchainSettings.functionalitySettings as fs
     SettingsFromDefaultConfig.copy(

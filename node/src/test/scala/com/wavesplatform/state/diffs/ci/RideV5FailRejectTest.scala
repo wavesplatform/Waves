@@ -140,7 +140,8 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
       d.appendBlock(invokeTx)
       d.blockchain.transactionInfo(invokeTx.id()).get._1.status == Status.Succeeded shouldBe false
       d.liquidSnapshot.sponsorships shouldBe Map()
-      d.liquidSnapshot.leaseStates shouldBe Map()
+      d.liquidSnapshot.newLeases shouldBe Map()
+      d.liquidSnapshot.cancelledLeases shouldBe Map()
       d.liquidSnapshot.assetStatics shouldBe Map()
       d.liquidSnapshot.assetNamesAndDescriptions shouldBe Map()
       d.liquidSnapshot.accountData shouldBe Map()

@@ -13,8 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*

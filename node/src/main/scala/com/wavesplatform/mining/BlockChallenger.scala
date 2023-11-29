@@ -16,7 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
