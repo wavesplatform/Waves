@@ -53,7 +53,7 @@ class BlockchainUpdaterImpl(
 
   private val lock                     = new ReentrantReadWriteLock(true)
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
-  private def readLock[B](f: => B): B          = inLock(lock.readLock(), f)
+  private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
@@ -431,19 +431,21 @@ class BlockchainUpdaterImpl(
       collectActiveLeases(fromHeight, toHeight)
     } else Map.empty
 
-  private def cancelLeases(leaseTransactions: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
+  private def cancelLeases(leaseDetails: Map[ByteStr, LeaseDetails], height: Int): Map[ByteStr, StateSnapshot] =
     for {
-      (id, lt)  <- leaseTransactions
-      recipient <- rocksdb.resolveAlias(lt.recipientAddress).toSeq
-      portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
+      (id, ld) <- leaseDetails
+    } yield id -> StateSnapshot
+      .build(
+        rocksdb,
+        Map(
+          ld.sender.toAddress -> Portfolio(0, LeaseBalance(0, -ld.amount.value)),
+          ld.recipientAddress -> Portfolio(0, LeaseBalance(-ld.amount.value, 0))
+        ),
+        cancelledLeases = Map(
+          id -> LeaseDetails.Status.Expired(height)
+        )
       )
-      leaseStates = Map(
-        id -> LeaseDetails.Status.Expired(height)
-      )
-      snapshot = StateSnapshot.build(rocksdb, portfolios, cancelledLeases = leaseStates).explicitGet()
-    } yield id -> snapshot
+      .explicitGet()
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks] = writeLock {
     log.info(s"Trying rollback blockchain to $blockId")

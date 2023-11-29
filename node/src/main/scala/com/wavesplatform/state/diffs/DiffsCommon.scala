@@ -184,8 +184,7 @@ object DiffsCommon {
   ): Either[ValidationError, StateSnapshot] = {
     val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
-      lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
-      recipient <- blockchain.resolveAlias(lease.recipientAddress)
+      lease <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
       _ <- Either.cond(
         lease.isActive || time <= allowedTs,
         (),
@@ -200,7 +199,7 @@ object DiffsCommon {
         )
       )
       senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount.value)))
-      recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount.value, 0)))
+      recipientPortfolio = Map(lease.recipientAddress -> Portfolio(0, LeaseBalance(-lease.amount.value, 0)))
       portfolios <- Portfolio.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
       snapshot <- StateSnapshot.build(
         blockchain,
