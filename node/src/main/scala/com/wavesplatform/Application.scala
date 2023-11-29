@@ -374,9 +374,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         else heavyRequestExecutor
       )
 
-      val routeTimeout = new RouteTimeout(
-        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      )(heavyRequestScheduler)
+      val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      val routeTimeout         = new RouteTimeout(serverRequestTimeout)(heavyRequestScheduler)
 
       val apiRoutes = Seq(
         new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
@@ -440,8 +439,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         ),
         AssetsApiRoute(
           settings.restAPISettings,
+          serverRequestTimeout,
           wallet,
-          transactionPublisher,
           blockchainUpdater,
           () => blockchainUpdater.snapshotBlockchain,
           time,

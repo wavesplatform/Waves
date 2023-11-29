@@ -28,7 +28,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
@@ -400,7 +400,8 @@ object InvokeScriptDiff {
         limit,
         blockchain.correctFunctionCallScope,
         blockchain.newEvaluatorMode,
-        enableExecutionLog
+        enableExecutionLog,
+        blockchain.isFeatureActivated(LightNode)
       )
       .map(
         _.leftMap[ValidationError] {

@@ -35,10 +35,10 @@ class SyncDAppGeneratingBalanceTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(defaultSigner, dApp), setScript(secondSigner, dApp))
 
       d.appendAndAssertSucceed(invoke(secondAddress, invoker = secondSigner))
-      d.liquidDiff.accountData.head._2.head._2.value shouldBe 0
+      d.liquidSnapshot.accountData.head._2.head._2.value shouldBe 0
 
       d.appendAndAssertSucceed(invoke(secondAddress, invoker = secondSigner))
-      d.liquidDiff.accountData.head._2.head._2.value shouldBe amount
+      d.liquidSnapshot.accountData.head._2.head._2.value shouldBe amount
     }
   }
 }

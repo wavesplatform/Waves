@@ -4,7 +4,7 @@ import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.LeaseCancelTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.LeaseCancelTxValidator
@@ -23,7 +23,7 @@ final case class LeaseCancelTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.LeaseCancel)
     with SigProofsSwitch
-    with VersionedTransaction
+    with Versioned.ToV3
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V3 {
@@ -35,8 +35,7 @@ final case class LeaseCancelTransaction(
 object LeaseCancelTransaction extends TransactionParser {
   type TransactionT = LeaseCancelTransaction
 
-  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  val typeId: TxType                    = 9: Byte
+  val typeId: TxType = 9: Byte
 
   implicit val validator: TxValidator[LeaseCancelTransaction] = LeaseCancelTxValidator
 

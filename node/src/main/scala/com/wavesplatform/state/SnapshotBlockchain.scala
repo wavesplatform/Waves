@@ -1,4 +1,4 @@
-package com.wavesplatform.state.reader
+package com.wavesplatform.state
 
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -7,9 +7,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -84,8 +82,13 @@ case class SnapshotBlockchain(
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
     SnapshotBlockchain.assetDescription(asset, snapshot, height, inner)
 
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
-    snapshot.leaseStates.get(leaseId).orElse(inner.leaseDetails(leaseId))
+  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
+    val newer = snapshot.newLeases.get(leaseId).map(n => LeaseDetails(n, LeaseDetails.Status.Active)).orElse(inner.leaseDetails(leaseId))
+    snapshot.cancelledLeases.get(leaseId) match {
+      case Some(newStatus) => newer.map(_.copy(status = newStatus))
+      case None            => newer
+    }
+  }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     snapshot.transactions
@@ -262,8 +265,8 @@ object SnapshotBlockchain {
       .get(asset)
       .map { case (static, assetNum) =>
         AssetDescription(
-          static.sourceTransactionId.toByteStr,
-          static.issuerPublicKey.toPublicKey,
+          static.source,
+          static.issuer,
           info.get.name,
           info.get.description,
           static.decimals,

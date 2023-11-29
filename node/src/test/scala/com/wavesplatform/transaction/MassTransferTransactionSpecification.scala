@@ -67,7 +67,7 @@ class MassTransferTransactionSpecification extends PropSpec {
       )
       val bytes = tx.bytes()
       val recovered = {
-        if (tx.isProtobufVersion) PBTransactionSerializer.parseBytes(bytes)
+        if (PBSince.affects(tx)) PBTransactionSerializer.parseBytes(bytes)
         else MassTransferTransaction.parseBytes(bytes)
       }.get
       recovered shouldEqual tx
@@ -125,7 +125,7 @@ class MassTransferTransactionSpecification extends PropSpec {
         proofs = Proofs(proofs),
         chainId = chainId
       )
-      if (!tx.isProtobufVersion && tx.chainId == AddressScheme.current.chainId) {
+      if (!PBSince.affects(tx) && tx.chainId == AddressScheme.current.chainId) {
         val recovered = TransactionParsers.parseBytes(tx.bytes()).get
         recovered.bytes() shouldEqual tx.bytes()
       }

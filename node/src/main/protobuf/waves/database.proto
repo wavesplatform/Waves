@@ -7,7 +7,6 @@ import "waves/transaction.proto";
 import "waves/amount.proto";
 import "waves/recipient.proto";
 import "waves/transaction_state_snapshot.proto";
-import "google/protobuf/empty.proto";
 
 message AssetDetails {
   bytes name = 1;
@@ -112,8 +111,7 @@ message LeaseDetails {
   bytes source_id = 4;
   int32 height = 5;
 
-  oneof status {
-    google.protobuf.Empty active = 10;
+  oneof cancel_reason {
     Cancelled cancelled = 11;
     Expired expired = 12;
   }

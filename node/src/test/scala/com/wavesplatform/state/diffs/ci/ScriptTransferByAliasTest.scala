@@ -103,7 +103,7 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
         """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlockE(invoke()) should produce("Alias 'alias:T:alias' does not exists")
+      d.appendBlockE(invoke()) should produce("Alias 'alias:T:alias' does not exist")
     }
   }
 }

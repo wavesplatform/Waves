@@ -15,9 +15,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.traits.domain.*
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, Portfolio, SponsorshipValue, StateSnapshot}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, LeaseBalance, LeaseDetails, LeaseStaticInfo, Portfolio, SponsorshipValue, StateSnapshot}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxPositiveAmount
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object DiffsCommon {
@@ -134,7 +134,7 @@ object DiffsCommon {
 
   def processLease(
       blockchain: Blockchain,
-      amount: Long,
+      amount: TxPositiveAmount,
       sender: PublicKey,
       recipient: AddressOrAlias,
       fee: Long,
@@ -156,21 +156,20 @@ object DiffsCommon {
       )
       leaseBalance    = blockchain.leaseBalance(senderAddress)
       senderBalance   = blockchain.balance(senderAddress, Waves)
-      requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount + fee else amount
+      requiredBalance = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) amount.value + fee else amount.value
       _ <- Either.cond(
         senderBalance - leaseBalance.out >= requiredBalance,
         (),
         GenericError(s"Cannot lease more than own: Balance: $senderBalance, already leased: ${leaseBalance.out}")
       )
       portfolioDiff = Map(
-        senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount)),
-        recipientAddress -> Portfolio(0, LeaseBalance(amount, 0))
+        senderAddress    -> Portfolio(-fee, LeaseBalance(0, amount.value)),
+        recipientAddress -> Portfolio(0, LeaseBalance(amount.value, 0))
       )
-      details = LeaseDetails(sender, recipient, amount, LeaseDetails.Status.Active, txId, blockchain.height)
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolioDiff,
-        leaseStates = Map(leaseId -> details)
+        newLeases = Map(leaseId -> LeaseStaticInfo(sender, recipientAddress, amount, txId, blockchain.height))
       )
     } yield snapshot
   }
@@ -185,8 +184,7 @@ object DiffsCommon {
   ): Either[ValidationError, StateSnapshot] = {
     val allowedTs = blockchain.settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
     for {
-      lease     <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
-      recipient <- blockchain.resolveAlias(lease.recipient)
+      lease <- blockchain.leaseDetails(leaseId).toRight(GenericError(s"Lease with id=$leaseId not found"))
       _ <- Either.cond(
         lease.isActive || time <= allowedTs,
         (),
@@ -200,14 +198,13 @@ object DiffsCommon {
             s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
       )
-      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
-      recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
-      actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
+      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount.value)))
+      recipientPortfolio = Map(lease.recipientAddress -> Portfolio(0, LeaseBalance(-lease.amount.value, 0)))
       portfolios <- Portfolio.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
       snapshot <- StateSnapshot.build(
         blockchain,
         portfolios = portfolios,
-        leaseStates = Map(leaseId -> actionInfo)
+        cancelledLeases = Map(leaseId -> LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
       )
     } yield snapshot
   }

@@ -26,7 +26,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.validateIntermediateBalances
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order

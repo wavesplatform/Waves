@@ -151,7 +151,7 @@ class BlockchainUpdatesSubscribeSpec extends BlockchainUpdatesTestBase {
 
     "BU-16. Return correct data for massTransfer" in {
       val massTransferFee = fee * 6
-      val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients, firstToken.asset, massTransferFee)
+      val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients.map(r => r.address -> r.amount.value), firstToken.asset, massTransferFee)
 
       withGenerateSubscription(
         settings = currentSettings,

@@ -5,7 +5,7 @@ import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.AddressExt
-import com.wavesplatform.protobuf.transaction.DataTransactionData
+import com.wavesplatform.protobuf.transaction.DataEntry
 
 trait CommonGrpcConverters {
   def toByteString32(xs: Int*): ByteString = {
@@ -17,9 +17,9 @@ trait CommonGrpcConverters {
     StateUpdate.DataEntryUpdate(
       address = address.toByteString,
       dataEntryBefore = valueBefore.map { valueBefore =>
-        DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueBefore))
+        DataEntry(key, DataEntry.Value.IntValue(valueBefore))
       },
-      dataEntry = valueAfter.map { valueAfter => DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueAfter)) }
+      dataEntry = valueAfter.map { valueAfter => DataEntry(key, DataEntry.Value.IntValue(valueAfter)) }
     )
 }
 

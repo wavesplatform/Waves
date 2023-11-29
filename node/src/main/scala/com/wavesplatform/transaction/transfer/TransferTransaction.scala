@@ -1,13 +1,13 @@
 package com.wavesplatform.transaction.transfer
 
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
-import com.wavesplatform.transaction.validation._
+import com.wavesplatform.transaction.validation.*
 import com.wavesplatform.transaction.validation.impl.TransferTxValidator
 import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
@@ -27,12 +27,15 @@ case class TransferTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Transfer, assetId match {
-      case Waves          => Seq()
-      case a: IssuedAsset => Seq(a)
-    })
+) extends Transaction(
+      TransactionType.Transfer,
+      assetId match {
+        case Waves          => Seq()
+        case a: IssuedAsset => Seq(a)
+      }
+    )
     with TransferTransactionLike
-    with VersionedTransaction
+    with Versioned.ToV3
     with FastHashId
     with SigProofsSwitch
     with TxWithFee.InCustomAsset
@@ -57,8 +60,7 @@ object TransferTransaction extends TransactionParser {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  val typeId: TxType                    = 4: Byte
-  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  val typeId: TxType = 4: Byte
 
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
 

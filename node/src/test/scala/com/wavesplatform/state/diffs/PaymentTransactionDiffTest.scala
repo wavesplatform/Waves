@@ -1,10 +1,8 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction, TxHelpers}
 
@@ -23,12 +21,11 @@ class PaymentTransactionDiffTest extends PropSpec with WithState {
 
   val settings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 2)
 
-  property("Diff doesn't break invariant before block version 3") {
-    preconditionsAndPayments.foreach { case ((genesis, paymentV2, _)) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, newState) =>
-        val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-        totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
+  property("StateSnapshot doesn't break invariant before block version 3") {
+    preconditionsAndPayments.foreach { case (genesis, paymentV2, _) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, blockchain) =>
+        blockDiff.balances.map { case ((address, asset), amount) => blockchain.balance(address, asset) - amount }.sum shouldBe 0
+        blockDiff.leaseBalances shouldBe empty
       }
     }
   }

@@ -35,7 +35,7 @@ class ExpressionCompilerV1Test extends PropSpec {
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions.*
-    val v = ExpressionCompiler(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1)))).explicitGet()
+    val v = ExpressionCompiler(compilerContext, V3, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1)))).explicitGet()
     v._2 shouldBe LONG
   }
 
@@ -44,6 +44,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     val v =
       ExpressionCompiler(
         compilerContext,
+        V3,
         FUNCTION_CALL(
           AnyPos,
           PART.VALID(AnyPos, "getElement"),
@@ -59,7 +60,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     }
 
     val expectedResult = Right(LONG)
-    ExpressionCompiler(compilerContext, expr).map(_._2) match {
+    ExpressionCompiler(compilerContext, V3, expr).map(_._2) match {
       case Right(x)    => Right(x) shouldBe expectedResult
       case e @ Left(_) => e shouldBe expectedResult
     }
@@ -68,11 +69,11 @@ class ExpressionCompilerV1Test extends PropSpec {
   property("string limit") {
     val maxString = "a" * Terms.DataEntryValueMax
     val expr      = Parser.parseExpr(s""" "$maxString" """).get.value
-    ExpressionCompiler(compilerContext, expr).map(_._1) shouldBe CONST_STRING(maxString)
+    ExpressionCompiler(compilerContext, V3, expr).map(_._1) shouldBe CONST_STRING(maxString)
 
     val tooBigString = maxString + "a"
     val expr2        = Parser.parseExpr(s""" "$tooBigString" """).get.value
-    ExpressionCompiler(compilerContext, expr2) should produce("String size=32768 exceeds 32767 bytes")
+    ExpressionCompiler(compilerContext, V3, expr2) should produce("String size=32768 exceeds 32767 bytes")
 
   }
 
@@ -94,8 +95,8 @@ class ExpressionCompilerV1Test extends PropSpec {
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
-    ExpressionCompiler(compilerContext, funcExpr) should produce(s"Function '$tooLongName' size = 256 bytes exceeds 255")
-    ExpressionCompiler(compilerContext, letExpr) should produce(s"Let '$tooLongName' size = 256 bytes exceeds 255")
+    ExpressionCompiler(compilerContext, V3, funcExpr) should produce(s"Function '$tooLongName' size = 256 bytes exceeds 255")
+    ExpressionCompiler(compilerContext, V3, letExpr) should produce(s"Let '$tooLongName' size = 256 bytes exceeds 255")
 
   }
 
@@ -117,18 +118,18 @@ class ExpressionCompilerV1Test extends PropSpec {
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
-    ExpressionCompiler(compilerContext, funcExpr) shouldBe Symbol("right")
-    ExpressionCompiler(compilerContext, letExpr) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContext, V3, funcExpr) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContext, V3, letExpr) shouldBe Symbol("right")
   }
 
   property("tuple type checks") {
     val script = """ ("a", true, 123, base58'aaaa')._3 == true  """
     val expr   = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) should produce("Can't match inferred types of T over Int, Boolean")
+    ExpressionCompiler(compilerContextV4, V4, expr) should produce("Can't match inferred types of T over Int, Boolean")
 
     val script2 = """ ("a", true, 123, base58'aaaa') == ("a", true, "b", base58'aaaa') """
     val expr2   = Parser.parseExpr(script2).get.value
-    ExpressionCompiler(compilerContextV4, expr2) should produce(
+    ExpressionCompiler(compilerContextV4, V4, expr2) should produce(
       "Can't match inferred types of T over (String, Boolean, Int, ByteVector), (String, Boolean, String, ByteVector)"
     )
 
@@ -146,7 +147,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | (((v, q), (true, v)), q) == (((1, true), (q, q)), v)
       """.stripMargin
     val expr3 = Parser.parseExpr(script3).get.value
-    ExpressionCompiler(compilerContextV4, expr3) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContextV4, V4, expr3) shouldBe Symbol("right")
 
     val script4 =
       """
@@ -156,7 +157,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | (((v, q), (true, v)), q) == (((1, true), (v, q)), v)
       """.stripMargin
     val expr4 = Parser.parseExpr(script4).get.value
-    ExpressionCompiler(compilerContextV4, expr4) should produce(
+    ExpressionCompiler(compilerContextV4, V4, expr4) should produce(
       "Can't match inferred types of T over " +
         "(((Int|String, Boolean|Int|String), (Boolean, Int|String)), Boolean|Int|String), " +
         "(((Int, Boolean), (Int|String, Boolean|Int|String)), Int|String) in 102-154"
@@ -171,7 +172,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | a1 == b1
       """.stripMargin
     val expr = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContextV4, V4, expr) shouldBe Symbol("right")
   }
 
   property("function with tuple args") {
@@ -189,7 +190,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |
       """.stripMargin
     val expr = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContextV4, V4, expr) shouldBe Symbol("right")
 
     val script2 =
       """
@@ -200,7 +201,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |
       """.stripMargin
     val expr2 = Parser.parseExpr(script2).get.value
-    ExpressionCompiler(compilerContextV4, expr2) should produce(
+    ExpressionCompiler(compilerContextV4, V4, expr2) should produce(
       "Non-matching types: expected: (String, Boolean), actual: Boolean in 69-86"
     )
 
@@ -213,7 +214,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |
       """.stripMargin
     val expr3 = Parser.parseExpr(script3).get.value
-    ExpressionCompiler(compilerContextV4, expr3) should produce(
+    ExpressionCompiler(compilerContextV4, V4, expr3) should produce(
       "Non-matching types: expected: ((Int, String), Boolean)|(Int, String, Boolean), actual: (Int, String) in 73-84"
     )
   }
@@ -237,7 +238,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |
       """.stripMargin
     val expr = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContextV4, expr) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContextV4, V4, expr) shouldBe Symbol("right")
 
     val script2 =
       """
@@ -249,7 +250,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | true
       """.stripMargin
     val expr2 = Parser.parseExpr(script2).get.value
-    ExpressionCompiler(compilerContextV4, expr2) should produce(
+    ExpressionCompiler(compilerContextV4, V4, expr2) should produce(
       "Matching not exhaustive: " +
         "possibleTypes are (Int, String), ((Boolean, Int), ByteVector), " +
         "while matched are (Int, String), (Boolean, Int, ByteVector)"
@@ -274,7 +275,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |
       """.stripMargin
     val expr3 = Parser.parseExpr(script3).get.value
-    ExpressionCompiler(compilerContextV4, expr3) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContextV4, V4, expr3) shouldBe Symbol("right")
 
     val script4 =
       """
@@ -288,7 +289,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |
       """.stripMargin
     val expr4 = Parser.parseExpr(script4).get.value
-    ExpressionCompiler(compilerContextV4, expr4) should produce(
+    ExpressionCompiler(compilerContextV4, V4, expr4) should produce(
       "Matching not exhaustive: " +
         "possibleTypes are (Int, String), (Boolean, String), (ByteVector, Boolean, (String, (Int, Boolean))|Int), " +
         "while matched are (Boolean|Int, String), (ByteVector, Boolean, Int), (ByteVector, Boolean, (String, Int, Boolean)) " +
@@ -303,7 +304,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         | }
       """.stripMargin
     val expr5 = Parser.parseExpr(script5).get.value
-    ExpressionCompiler(compilerContextV4, expr5) shouldBe Symbol("right")
+    ExpressionCompiler(compilerContextV4, V4, expr5) shouldBe Symbol("right")
   }
 
   property("JS API compile limit exceeding error") {
@@ -330,6 +331,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     def checkExtract(version: StdLibVersion) =
       ExpressionCompiler(
         getTestContext(version).compilerContext,
+        version,
         Parser.parseExpr(" extract(1) ").get.value
       )
 
@@ -358,7 +360,7 @@ class ExpressionCompilerV1Test extends PropSpec {
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
-        val result = ExpressionCompiler(getTestContext(version).compilerContext, Parser.parseExpr(expr).get.value)
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, version, Parser.parseExpr(expr).get.value)
         if (version >= V4)
           result shouldBe Symbol("right")
         else
@@ -390,7 +392,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       version    <- DirectiveDictionary[StdLibVersion].all
       scriptType <- DirectiveDictionary[ScriptType].all
     } {
-      val result = ExpressionCompiler(getTestContext(version, scriptType).compilerContext, expr(version, scriptType))
+      val result = ExpressionCompiler(getTestContext(version, scriptType).compilerContext, version, expr(version, scriptType))
       if (version < V5 || scriptType != Account)
         result.swap.getOrElse(???).split("Can't find a function").length shouldBe 9
       else
@@ -415,7 +417,7 @@ class ExpressionCompilerV1Test extends PropSpec {
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
-        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, version, expr(version))
         if (version < V5)
           result should produce(
             "Compilation failed: [" +
@@ -446,7 +448,7 @@ class ExpressionCompilerV1Test extends PropSpec {
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
-        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, version, expr(version))
         if (version < V5)
           result shouldBe Symbol("right")
         else
@@ -484,7 +486,7 @@ class ExpressionCompilerV1Test extends PropSpec {
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
-        ExpressionCompiler(getTestContext(version).compilerContext, expr(version)) shouldBe Symbol("right")
+        ExpressionCompiler(getTestContext(version).compilerContext, version, expr(version)) shouldBe Symbol("right")
       }
   }
 
@@ -512,7 +514,7 @@ class ExpressionCompilerV1Test extends PropSpec {
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
-        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, version, expr(version))
         if (version < V5)
           result shouldBe Symbol("right")
         else {
@@ -542,7 +544,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
       .foreach { version =>
-        val result = ExpressionCompiler(getTestContext(version).compilerContext, expr(version))
+        val result = ExpressionCompiler(getTestContext(version).compilerContext, version, expr(version))
         val error  = result.swap.getOrElse(???)
         error should include("Can't find a function 'invoke'")
         error should include("Can't find a function 'reentrantInvoke'")
@@ -1149,7 +1151,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       propertyName: String
   )(expr: Expressions.EXPR, expectedResult: Either[String, (EXPR, TYPE)] => org.scalatest.compatible.Assertion, ctx: CompilerContext): Unit =
     property(propertyName) {
-      val res = compiler.ExpressionCompiler(ctx, expr)
+      val res = compiler.ExpressionCompiler(ctx, V3, expr)
       expectedResult(res)
     }
 
