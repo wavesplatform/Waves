@@ -61,7 +61,9 @@ object KeyTags extends Enumeration {
   EthereumTransactionMeta,
   NthTransactionStateSnapshotAtHeight,
   MaliciousMinerBanHeights,
-  BlockStateHash = Value
+  BlockStateHash,
+  AddressLeaseInfoSeqNr,
+  AddressLeaseInfoSeq = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)

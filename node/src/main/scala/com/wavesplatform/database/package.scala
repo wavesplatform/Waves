@@ -19,12 +19,11 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.protobuf.{ByteStringExt, PBSnapshots}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.transaction.Asset.IssuedAsset
-
-import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers,TxPositiveAmount, TxValidationError, Versioned}
+import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers, TxPositiveAmount, TxValidationError, Versioned}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -276,6 +275,15 @@ package object database {
 
     ndo.toByteArray
   }
+
+  def readLeaseIdSeq(data: Array[Byte]): Seq[ByteStr] =
+    pb.LeaseIds
+      .parseFrom(data)
+      .ids
+      .map(_.toByteStr)
+
+  def writeLeaseIdSeq(ids: Seq[ByteStr]): Array[Byte] =
+    pb.LeaseIds(ids.map(_.toByteString)).toByteArray
 
   def readStateHash(bs: Array[Byte]): StateHash = {
     val ndi           = newDataInput(bs)
@@ -620,9 +628,9 @@ package object database {
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince with Versioned if PBSince.affects(lps)  => TD.WavesTransaction(PBTransactions.protobuf(tx))
-      case et: EthereumTransaction                                         => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                                               => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case lps: PBSince with Versioned if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case et: EthereumTransaction                             => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                   => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }
@@ -681,16 +689,17 @@ package object database {
 
   def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
     (for {
-      id              <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      maybeNewDetails <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      newDetails      <- maybeNewDetails
+      id         <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      newDetails <- loadLease(r, id)
       if newDetails.isActive
     } yield (id, newDetails)).toMap
   }
 
+  def loadLease(resource: DBResource, id: ByteStr): Option[LeaseDetails] =
+    fromHistory(resource, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten
+
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
-
     val iterator = resource.fullIterator
 
     @inline

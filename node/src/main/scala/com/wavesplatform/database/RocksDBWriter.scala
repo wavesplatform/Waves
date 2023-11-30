@@ -489,7 +489,7 @@ class RocksDBWriter(
       }
 
       for ((id, status) <- snapshot.cancelledLeases if !snapshot.newLeases.contains(id)) {
-        rw.fromHistory(Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten.foreach { d =>
+        leaseDetails(id).foreach { d =>
           rw.put(Keys.leaseDetails(id)(height), Some(d.copy(status = status)))
         }
 
@@ -547,6 +547,23 @@ class RocksDBWriter(
             }.toSeq
             rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
             rw.put(txSeqNrKey, nextSeqNr)
+          }
+      }
+
+      if (dbSettings.storeLeaseStatesByAddress) {
+        val addressIdWithLeaseIds =
+          for {
+            (leaseId, details) <- snapshot.newLeases.toSeq if !snapshot.cancelledLeases.contains(leaseId)
+            address            <- Seq(details.recipientAddress, details.sender.toAddress)
+            addressId = this.addressIdWithFallback(address, newAddresses)
+          } yield (addressId, leaseId)
+        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
+        rw.multiGetInts(leaseIdsByAddressId.keys.map(_._2).toSeq)
+          .zip(leaseIdsByAddressId)
+          .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIds)) =>
+            val nextSeqNr = prevSeqNr.getOrElse(0) + 1
+            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr), Some(leaseIds))
+            rw.put(leaseSeqKey, nextSeqNr)
           }
       }
 
@@ -704,6 +721,20 @@ class RocksDBWriter(
                 rw.delete(kTxHNSeq)
                 rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
               }
+            }
+
+            if (dbSettings.storeLeaseStatesByAddress) {
+              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId)
+              val leaseSeqNr    = rw.get(leaseSeqNrKey)
+              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
+              rw.get(leaseSeqKey)
+                .flatMap(_.headOption)
+                .flatMap(leaseDetails)
+                .filter(_.height == currentHeight)
+                .foreach { _ =>
+                  rw.delete(leaseSeqKey)
+                  rw.put(leaseSeqNrKey, (leaseSeqNr - 1).max(0))
+                }
             }
           }
 

@@ -107,7 +107,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       grpcApi.getActiveLeases(AccountRequest.of(ByteString.copyFrom(recipient.toAddress.bytes)), observer)
 
-      result.runSyncUnsafe() shouldBe List(
+      result.runSyncUnsafe() should contain theSameElementsAs List(
         LeaseResponse.of(
           ByteString.copyFrom(lease3.id().arr),
           ByteString.copyFrom(lease3.id().arr),

@@ -24,7 +24,6 @@ object LeaseDetails {
         case _                         => None
       }
     }
-
   }
 }
 
