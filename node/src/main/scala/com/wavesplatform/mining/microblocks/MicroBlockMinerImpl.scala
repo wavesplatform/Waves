@@ -113,18 +113,15 @@ class MicroBlockMinerImpl(
         for {
           _ <- Task.now(if (delay > Duration.Zero) log.trace(s"Sleeping ${delay.toMillis} ms before applying microBlock"))
           _ <- Task.sleep(delay)
-          _ = log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
-          blocks <- forgeBlocks(account, accumulatedBlock, unconfirmed, stateHash)
-            .leftWiden[Throwable]
-            .liftTo[Task]
-          (signedBlock, microBlock) = blocks
-          blockId <- appendMicroBlock(microBlock)
-          _ = BlockStats.mined(microBlock, blockId)
-          _ <- broadcastMicroBlock(account, microBlock, blockId)
-        } yield {
-          if (updatedTotalConstraint.isFull) Stop
-          else Success(signedBlock, updatedTotalConstraint)
-        }
+          r <-
+            if (blockchainUpdater.lastBlockId.forall(_ == accumulatedBlock.id())) {
+              log.trace(s"Generating microBlock for ${account.toAddress}, constraints: $updatedTotalConstraint")
+              appendAndBroadcastMicroBlock(account, accumulatedBlock, unconfirmed, updatedTotalConstraint, stateHash)
+            } else {
+              log.trace(s"Stopping generating microBlock for ${account.toAddress}, new key block was appended")
+              Task(Stop)
+            }
+        } yield r
 
       case (_, updatedTotalConstraint, _) =>
         if (updatedTotalConstraint.isFull) {
@@ -141,6 +138,24 @@ class MicroBlockMinerImpl(
         }
     }
   }
+
+  private def appendAndBroadcastMicroBlock(
+      account: KeyPair,
+      block: Block,
+      transactions: Seq[Transaction],
+      updatedTotalConstraint: MiningConstraint,
+      stateHash: Option[BlockId]
+  ): Task[MicroBlockMiningResult] =
+    for {
+      (signedBlock, microBlock) <- forgeBlocks(account, block, transactions, stateHash)
+        .leftWiden[Throwable]
+        .liftTo[Task]
+      blockId <- appendMicroBlock(microBlock)
+      _ = BlockStats.mined(microBlock, blockId)
+      _ <- broadcastMicroBlock(account, microBlock, blockId)
+    } yield
+      if (updatedTotalConstraint.isFull) Stop
+      else Success(signedBlock, updatedTotalConstraint)
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
     Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))

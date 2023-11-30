@@ -309,12 +309,8 @@ class MinerImpl(
           }.uncancelable
 
         for {
-          elapsed <- waitBlockAppendedTask.timed.map(_._1)
-          newOffset = (offset - elapsed).max(Duration.Zero)
-
-          _      <- Task(microBlockAttempt := SerialCancelable()).delayExecution(newOffset)
+          _ <- waitBlockAppendedTask
           result <- Task(forgeBlock(account)).executeOn(minerScheduler)
-
           _ <- result match {
             case Right((block, totalConstraint)) =>
               appendTask(block, totalConstraint)
