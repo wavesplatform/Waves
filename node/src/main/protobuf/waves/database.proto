@@ -116,3 +116,7 @@ message LeaseDetails {
     Expired expired = 12;
   }
 }
+
+message LeaseIds {
+  repeated bytes ids = 1;
+}

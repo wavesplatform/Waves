@@ -86,7 +86,6 @@ class BalancesV4Test extends PropSpec with WithState {
   }
 
   property("Waves balance details") {
-
     val (genesis, b, acc1, dapp, ci) = preconditionsAndTransfer
     assertDiffAndState(
       Seq(TestBlock.create(genesis)) ++

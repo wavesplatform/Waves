@@ -49,27 +49,25 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
     )
 
   private val leaseContract = TestCompiler(V5)
-    .compileContract("""
-                       |{-# STDLIB_VERSION 4 #-}
-                       |{-# CONTENT_TYPE DAPP #-}
-                       |{-# SCRIPT_TYPE ACCOUNT #-}
-                       |
-                       |@Callable(inv)
-                       |func leaseTo(recipient: ByteVector, amount: Int) = {
-                       |  let lease = Lease(Address(recipient), amount)
-                       |  [
-                       |    lease,
-                       |    BinaryEntry("leaseId", lease.calculateLeaseId())
-                       |  ]
-                       |}
-                       |
-                       |@Callable(inv)
-                       |func cancelLease(id: ByteVector) = {
-                       |  [
-                       |    LeaseCancel(id)
-                       |  ]
-                       |}
-                       |""".stripMargin)
+    .compileContract(
+      """
+        | @Callable(inv)
+        | func leaseTo(recipient: ByteVector, amount: Int) = {
+        |   let lease = Lease(Address(recipient), amount)
+        |   [
+        |     lease,
+        |     BinaryEntry("leaseId", lease.calculateLeaseId())
+        |   ]
+        | }
+        |
+        | @Callable(inv)
+        | func cancelLease(id: ByteVector) = {
+        |   [
+        |     LeaseCancel(id)
+        |   ]
+        | }
+      """.stripMargin
+    )
 
   private def setScriptTransaction(sender: KeyPair) =
     TxHelpers.setScript(sender, leaseContract)
@@ -407,31 +405,27 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
     val leaseAmount2 = 2
 
     val dAppScript1 = TestCompiler(V5)
-      .compileContract(s"""
-                          |{-# STDLIB_VERSION 5 #-}
-                          |{-# CONTENT_TYPE DAPP #-}
-                          |{-# SCRIPT_TYPE ACCOUNT #-}
-                          |
-                          |@Callable(i)
-                          |func foo() = {
-                          |  strict inv = invoke(Address(base58'${dApp2.toAddress}'), "bar", [], [])
-                          |  let lease = Lease(Address(base58'${leaseRecipient1.toAddress}'), 1)
-                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
-                          |}
-                          |""".stripMargin)
+      .compileContract(
+        s"""
+           |@Callable(i)
+           |func foo() = {
+           |  strict inv = invoke(Address(base58'${dApp2.toAddress}'), "bar", [], [])
+           |  let lease = Lease(Address(base58'${leaseRecipient1.toAddress}'), 1)
+           |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+           |}
+         """.stripMargin
+      )
 
     val dAppScript2 = TestCompiler(V5)
-      .compileContract(s"""
-                          |{-# STDLIB_VERSION 5 #-}
-                          |{-# CONTENT_TYPE DAPP #-}
-                          |{-# SCRIPT_TYPE ACCOUNT #-}
-                          |
-                          |@Callable(i)
-                          |func bar() = {
-                          |  let lease = Lease(Address(base58'${leaseRecipient2.toAddress}'), 2)
-                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
-                          |}
-                          |""".stripMargin)
+      .compileContract(
+        s"""
+           |@Callable(i)
+           |func bar() = {
+           |  let lease = Lease(Address(base58'${leaseRecipient2.toAddress}'), 2)
+           |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+           |}
+         """.stripMargin
+      )
 
     def checkForInvoke(invokeTx: Transaction & Authorized): Unit = {
       def getLeaseId(address: Address) =

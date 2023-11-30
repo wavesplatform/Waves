@@ -24,6 +24,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
+import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.validateIntermediateBalances
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
@@ -475,6 +476,11 @@ class DAppEnvironment(
           invocationTracker,
           wrapDAppEnv
         )(invoke)
+      _ <-
+        if (blockchain.isFeatureActivated(LightNode))
+          validateIntermediateBalances(blockchain, snapshot, totalComplexityLimit - availableComplexity, Nil)
+        else
+          traced(Right(()))
       fixedSnapshot = snapshot
         .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))
     } yield {
