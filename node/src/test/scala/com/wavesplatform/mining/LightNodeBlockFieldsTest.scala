@@ -23,9 +23,9 @@ import monix.reactive.Observable
 import scala.concurrent.duration.DurationInt
 
 class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
-  property("new block fields appear 1000 blocks after LightNode activation") {
+  property("new block fields appear `lightNodeBlockFieldsAbsenceInterval` blocks after LightNode activation") {
     withDomain(
-      TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2),
+      TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2).configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10)),
       AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
     ) { d =>
       withMiner(
@@ -82,31 +82,31 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         block(3).stateHash shouldBe None
         block(3).challengedHeader shouldBe None
 
-        (1 to 998).foreach(_ => appendBlock())
-        d.blockchain.height shouldBe 1001
-        block(1001).stateHash shouldBe None
+        (1 to 8).foreach(_ => appendBlock())
+        d.blockchain.height shouldBe 11
+        block(11).stateHash shouldBe None
 
         appendMicro()
-        block(1001).stateHash shouldBe None
+        block(11).stateHash shouldBe None
 
         appendBlock()
-        d.blockchain.height shouldBe 1002
-        val hash1 = block(1002).stateHash
+        d.blockchain.height shouldBe 12
+        val hash1 = block(12).stateHash
         hash1 shouldBe defined
 
         appendMicro()
-        val hash2 = block(1002).stateHash
+        val hash2 = block(12).stateHash
         hash2 shouldBe defined
         hash2 should not be hash1
 
-        d.rollbackTo(1000)
+        d.rollbackTo(10)
         challengeBlock()
-        block(1001).stateHash shouldBe None
-        block(1001).challengedHeader shouldBe None
+        block(11).stateHash shouldBe None
+        block(11).challengedHeader shouldBe None
 
         challengeBlock()
-        block(1002).stateHash shouldBe defined
-        block(1002).challengedHeader shouldBe defined
+        block(12).stateHash shouldBe defined
+        block(12).challengedHeader shouldBe defined
       }
     }
   }
