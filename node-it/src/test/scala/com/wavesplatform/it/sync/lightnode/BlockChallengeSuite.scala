@@ -18,7 +18,6 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import com.wavesplatform.{TestValues, crypto}
-import com.wavesplatform.{TestValues, crypto}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*
