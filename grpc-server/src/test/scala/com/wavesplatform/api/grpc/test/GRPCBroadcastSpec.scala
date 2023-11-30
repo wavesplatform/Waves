@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc.test
 
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
@@ -14,10 +14,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.{DiffMatchers, EthHelpers}
 import io.grpc.StatusException
 import monix.execution.Scheduler
@@ -92,7 +91,7 @@ class GRPCBroadcastSpec extends FlatSpec with BeforeAndAfterAll with PathMockFac
 
     @throws[StatusException]("on failed broadcast")
     def assertBroadcast(tx: Transaction): Unit = {
-      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), Duration.Inf)
+      Await.result(grpcTxApi.broadcast(PBTransactions.protobuf(tx)), 10.seconds)
     }
   }
 }

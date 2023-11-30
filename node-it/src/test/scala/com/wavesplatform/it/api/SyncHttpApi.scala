@@ -307,10 +307,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       sync(async(n).stateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[StateChanges] = {
-      sync(async(n).debugStateChangesByAddress(address, limit, after))
-    }
-
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       sync(async(n).payment(sourceAddress, recipient, amount, fee))
 
@@ -811,15 +807,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       combinations.foreach { ns =>
         ns.head.connect(ns(1).networkAddress)
       }
-    }
-
-    def rollbackToBlockId(id: String): Unit = {
-      sync(
-        Future.traverse(nodes) { node =>
-          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollbackToBlockId(id)
-        },
-        ConditionAwaitTime
-      )
     }
 
     def waitForHeight(height: Int): Unit = {

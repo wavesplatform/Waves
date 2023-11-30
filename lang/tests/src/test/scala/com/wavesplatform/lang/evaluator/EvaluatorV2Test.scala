@@ -32,7 +32,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
         ctx.evaluationContext(environment),
         version,
         correctFunctionCallScope = true,
-        newMode
+        newMode,
+        fixedThrownError = true
       )
       .value()
       .bimap(_._1.message, { case (result, complexity, _) => (result, complexity) })
@@ -67,7 +68,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
   private def compile(script: String): EXPR = {
     val parsed = Parser.parseExpr(script).get.value
-    ExpressionCompiler(ctx.compilerContext, parsed).explicitGet()._1
+    ExpressionCompiler(ctx.compilerContext, version, parsed).explicitGet()._1
   }
 
   property("multiple lets by step") {

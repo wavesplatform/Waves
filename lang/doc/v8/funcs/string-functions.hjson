@@ -1,0 +1,95 @@
+{
+  funcs: [
+    {
+      name: "contains"
+      params: [ "String", "String" ]
+      doc: "Checks whether the string contains substring"
+      paramsDoc: [ "String to search in.", "String to search for." ]
+      complexity: 3
+    }
+    {
+      name: "drop"
+      params: [ "String", "Int" ]
+      doc: "Drops the first n characters of a string"
+      paramsDoc: [ "The string.", "The number n." ]
+      complexity: 20
+    }
+    {
+      name: "dropRight"
+      params: [ "String", "Int" ]
+      doc: "Drops the last n characters of a string"
+      paramsDoc: [ "The string.", "The number n." ]
+      complexity: 20
+    }
+    {
+      name: "indexOf"
+      params: [ "String", "String" ]
+      doc: "Returns the index of the first occurrence of a substring"
+      paramsDoc: [ "The string.", "The substring." ]
+      complexity: 3
+    }
+    {
+      name: "indexOf"
+      params: [ "String", "String", "Int" ]
+      doc: "Returns the index of the first occurrence of a substring after a certain index"
+      paramsDoc: [ "The string.", "The substring.", "The index." ]
+      complexity: 3
+    }
+    {
+      name: "lastIndexOf"
+      params: [ "String", "String" ]
+      doc: "Returns the index of the last occurrence of a substring"
+      paramsDoc: [ "The string.", "The substring." ]
+      complexity: 3
+    }
+	 {
+      name: "lastIndexOf"
+      params: [ "String", "String", "Int" ]
+      doc: "Returns the index of the last occurrence of a substring after a certain index"
+      paramsDoc: [ "The string.", "The substring.", "The index." ]
+      complexity: 3
+    }
+    {
+      name: "split"
+      params: [ "String", "String" ]
+      doc: "Splits a string delimited by a separator into a list of substrings. Input string size limit = 500 bytes. Output list size limit = 20"
+      paramsDoc: [ "The string.", "The separator." ]
+      complexity: 1
+    }
+    {
+      name: "split_4C"
+      params: [ "String", "String" ]
+      doc: "Splits a string delimited by a separator into a list of substrings. Input string size limit = 6000 bytes. Output list size limit = 100"
+      paramsDoc: [ "The string.", "The separator." ]
+      complexity: 4
+    }
+    {
+      name: "split_51C"
+      params: [ "String", "String" ]
+      doc: "Splits a string delimited by a separator into a list of substrings. Input string size limit = 32767 bytes. Output list size limit = 1000"
+      paramsDoc: [ "The string.", "The separator." ]
+      complexity: 51
+    }
+    {
+      name: "size"
+      params: [ "String" ]
+      doc: "Returns the size of a string"
+      paramsDoc: [ "The string." ]
+      complexity: 1
+    }
+    {
+      name: "take"
+      params: [ "String", "Int" ]
+      doc: "Takes the first n characters from a string"
+      paramsDoc: [ "The string.", "The number n." ]
+      complexity: 20
+    }
+    {
+      name: "takeRight"
+      params: [ "String", "Int" ]
+      doc: "Takes the last n characters from a string"
+      paramsDoc: [ "The string.", "The number n." ]
+      complexity: 20
+    }
+  ]
+}

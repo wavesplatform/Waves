@@ -6,6 +6,7 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.{CompilationError, ContractCompiler}
 import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.test.PropSpec
 
 class ContractCompilerWithParserV2Test extends PropSpec {
@@ -16,7 +17,7 @@ class ContractCompilerWithParserV2Test extends PropSpec {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
       ctx = utils.compilerContext(ds)
-      compResult <- ContractCompiler.compileWithParseResult(script, 0, ctx, ds.stdLibVersion, saveExprContext).leftMap(_._1)
+      compResult <- ContractCompiler.compileWithParseResult(script, NoLibraries, ctx, ds.stdLibVersion, saveExprContext).leftMap(_._1)
     } yield compResult
 
     result

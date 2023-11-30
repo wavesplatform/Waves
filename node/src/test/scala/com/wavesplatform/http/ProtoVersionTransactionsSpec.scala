@@ -13,8 +13,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -22,17 +22,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{
-  Asset,
-  CreateAliasTransaction,
-  DataTransaction,
-  Proofs,
-  Transaction,
-  TxNonNegativeAmount,
-  TxVersion,
-  VersionedTransaction
-}
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -41,7 +31,13 @@ import play.api.libs.json.*
 
 import scala.concurrent.duration.*
 
-class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with OptionValues with TestWallet {
+class ProtoVersionTransactionsSpec
+    extends RouteSpec("/transactions")
+    with RestAPISettingsHelper
+    with MockFactory
+    with OptionValues
+    with TestWallet
+    with SharedSchedulerMixin {
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   private val DataTxFee: Long         = 15000000
@@ -64,11 +60,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       transactionsApi,
       testWallet,
       blockchain,
-      mock[() => CompositeBlockchain],
+      mock[() => SnapshotBlockchain],
       () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,
-      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      new RouteTimeout(60.seconds)(sharedScheduler)
     ).route
 
   "Proto transactions should be able to broadcast " - {
@@ -161,9 +157,9 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       (reissueTx.json() \ "chainId").asOpt[Byte].value shouldBe reissueTx.chainId
       (burnTx.json() \ "chainId").asOpt[Byte].value shouldBe burnTx.chainId
 
-      issueTx.isProtobufVersion shouldBe true
-      reissueTx.isProtobufVersion shouldBe true
-      burnTx.isProtobufVersion shouldBe true
+      PBSince.affects(issueTx) shouldBe true
+      PBSince.affects(reissueTx) shouldBe true
+      PBSince.affects(burnTx) shouldBe true
     }
 
     "DataTransaction" in {
@@ -186,7 +182,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (dataTx.json() \ "chainId").asOpt[Byte].value shouldBe dataTx.chainId
 
-      dataTx.isProtobufVersion shouldBe true
+      PBSince.affects(dataTx) shouldBe true
     }
 
     "ExchangeTransaction" in {
@@ -213,7 +209,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (exchangeTx.json() \ "chainId").asOpt[Byte].value shouldBe exchangeTx.chainId
 
-      exchangeTx.isProtobufVersion shouldBe true
+      PBSince.affects(exchangeTx) shouldBe true
     }
 
     "InvokeScriptTransaction" in {
@@ -250,7 +246,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (invokeScriptTx.json() \ "chainId").asOpt[Byte].value shouldBe invokeScriptTx.chainId
 
-      invokeScriptTx.isProtobufVersion shouldBe true
+      PBSince.affects(invokeScriptTx) shouldBe true
     }
 
     "LeaseTransaction/LeaseCancelTransaction" in {
@@ -290,8 +286,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       (leaseTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseTx.chainId
       (leaseCancelTx.json() \ "chainId").asOpt[Byte].value shouldBe leaseCancelTx.chainId
 
-      leaseTx.isProtobufVersion shouldBe true
-      leaseCancelTx.isProtobufVersion shouldBe true
+      PBSince.affects(leaseTx) shouldBe true
+      PBSince.affects(leaseCancelTx) shouldBe true
     }
 
     "TransferTransaction" in {
@@ -319,7 +315,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (transferTx.json() \ "chainId").asOpt[Byte].value shouldBe transferTx.chainId
 
-      transferTx.isProtobufVersion shouldBe true
+      PBSince.affects(transferTx) shouldBe true
     }
 
     "MassTransferTransaction" in {
@@ -347,7 +343,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (massTransferTx.json() \ "chainId").asOpt[Byte].value shouldBe massTransferTx.chainId
 
-      massTransferTx.isProtobufVersion shouldBe true
+      PBSince.affects(massTransferTx) shouldBe true
     }
 
     "SetScriptTransaction" in {
@@ -392,7 +388,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       decode(base64Str) shouldBe setAssetScriptTx
 
-      setAssetScriptTx.isProtobufVersion shouldBe true
+      PBSince.affects(setAssetScriptTx) shouldBe true
     }
 
     "SponsorshipTransaction" in {
@@ -417,7 +413,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (sponsorshipTx.json() \ "chainId").asOpt[Byte].value shouldBe sponsorshipTx.chainId
 
-      sponsorshipTx.isProtobufVersion shouldBe true
+      PBSince.affects(sponsorshipTx) shouldBe true
     }
 
     "UpdateAssetInfoTransaction" in {
@@ -455,7 +451,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       (updateAssetInfoTx.json() \ "version").as[Byte] shouldBe TxVersion.V1
     }
 
-    def checkProofs(response: HttpResponse, tx: VersionedTransaction): (Proofs, JsObject) = {
+    def checkProofs(response: HttpResponse, tx: Versioned): (Proofs, JsObject) = {
       response.status shouldBe StatusCodes.OK
 
       (responseAs[JsObject] \ "version").as[Byte] shouldBe tx.version

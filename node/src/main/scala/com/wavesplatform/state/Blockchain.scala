@@ -11,7 +11,7 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -27,7 +27,7 @@ trait Blockchain {
   def blockHeader(height: Int): Option[SignedBlockHeader]
   def hitSource(height: Int): Option[ByteStr]
 
-  def carryFee: Long
+  def carryFee(refId: Option[ByteStr]): Long
 
   def heightOf(blockId: ByteStr): Option[Int]
 
@@ -59,7 +59,10 @@ trait Blockchain {
 
   def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+  /**
+    * Retrieves Waves balance snapshot in the [from, to] range (inclusive)
+    * @return Balance snapshots from most recent to oldest.
+    */
   def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[AccountScriptInfo]
@@ -80,7 +83,11 @@ trait Blockchain {
 
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
+  def effectiveBalanceBanHeights(address: Address): Seq[Int]
+
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
+
+  def lastStateHash(refId: Option[ByteStr]): ByteStr
 }
 
 object Blockchain {
@@ -121,7 +128,8 @@ object Blockchain {
       val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
       val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
-      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
+      val isBanned    = blockchain.effectiveBalanceBanHeights(address).exists(h => h >= bottomLimit && h <= blockHeight)
+      if (balances.isEmpty || isBanned) 0L else balances.view.map(_.effectiveBalance).min
     }
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
@@ -209,6 +217,9 @@ object Blockchain {
           case _                                    => false
         })
 
-    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
+    def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.status == TxMeta.Status.Succeeded)
+
+    def hasBannedEffectiveBalance(address: Address, height: Int = blockchain.height): Boolean =
+      blockchain.effectiveBalanceBanHeights(address).contains(height)
   }
 }

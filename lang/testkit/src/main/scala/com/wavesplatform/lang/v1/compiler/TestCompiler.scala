@@ -12,6 +12,8 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 
 import scala.collection.mutable
@@ -25,7 +27,7 @@ class TestCompiler(version: StdLibVersion) {
     (baseCompilerContext |+|
       WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)).compilerContext
 
-  lazy val expressionContext: CTX[Environment] =
+  private lazy val expressionContext: CTX[Environment] =
     WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet(), fixBigScriptField = true)
 
   private lazy val expressionCompilerContext =
@@ -38,12 +40,14 @@ class TestCompiler(version: StdLibVersion) {
 
   def compile(
       script: String,
+      offset: LibrariesOffset = NoLibraries,
       allowIllFormedStrings: Boolean = false,
       compact: Boolean = false,
       removeUnused: Boolean = false
   ): Either[String, DApp] =
     ContractCompiler.compile(
       script,
+      offset,
       compilerContext,
       version,
       allowIllFormedStrings = allowIllFormedStrings,
@@ -51,26 +55,41 @@ class TestCompiler(version: StdLibVersion) {
       removeUnusedCode = removeUnused
     )
 
-  def compileContract(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): ContractScriptImpl =
-    ContractScript(version, compile(script, allowIllFormedStrings, compact).explicitGet()).explicitGet()
+  def compileContract(
+      script: String,
+      offset: LibrariesOffset = NoLibraries,
+      allowIllFormedStrings: Boolean = false,
+      compact: Boolean = false
+  ): ContractScriptImpl =
+    ContractScript(version, compile(script, offset, allowIllFormedStrings, compact).explicitGet()).explicitGet()
 
-  def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): ExprScript =
+  def compileExpression(
+      script: String,
+      offset: LibrariesOffset = NoLibraries,
+      allowIllFormedStrings: Boolean = false,
+      checkSize: Boolean = true
+  ): ExprScript =
     ExprScript(
       version,
-      ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1,
+      ExpressionCompiler.compile(script, offset, expressionCompilerContext, version, allowIllFormedStrings).explicitGet()._1,
       checkSize = checkSize
     ).explicitGet()
 
-  def compileExpressionE(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =
+  def compileExpressionE(
+      script: String,
+      offset: LibrariesOffset = NoLibraries,
+      allowIllFormedStrings: Boolean = false,
+      checkSize: Boolean = true
+  ): Either[String, ExprScript] =
     ExpressionCompiler
-      .compile(script, expressionCompilerContext, allowIllFormedStrings)
+      .compile(script, offset, expressionCompilerContext, version, allowIllFormedStrings)
       .map(s => ExprScript(version, s._1, checkSize = checkSize).explicitGet())
 
-  def compileAsset(script: String): Script =
-    ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()
+  def compileAsset(script: String, offset: LibrariesOffset = NoLibraries): Script =
+    ExprScript(version, ExpressionCompiler.compile(script, offset, assetCompilerContext, version).explicitGet()._1).explicitGet()
 
-  def compileFreeCall(script: String): ExprScript = {
-    val expr = ContractCompiler.compileFreeCall(script, compilerContext, version).explicitGet()
+  def compileFreeCall(script: String, offset: LibrariesOffset = NoLibraries): ExprScript = {
+    val expr = ContractCompiler.compileFreeCall(script, offset, compilerContext, version).explicitGet()
     ExprScript(version, expr, isFreeCall = true).explicitGet()
   }
 }

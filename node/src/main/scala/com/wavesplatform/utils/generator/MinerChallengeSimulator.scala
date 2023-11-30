@@ -12,15 +12,18 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.settings.*
-import com.wavesplatform.state.{BalanceSnapshot, BlockchainUpdaterImpl}
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{BalanceSnapshot, BlockchainUpdaterImpl}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import monix.eval.Task
+import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -31,7 +34,7 @@ import scala.concurrent.duration.*
 import scala.language.reflectiveCalls
 
 object MinerChallengeSimulator {
-  implicit val scheduler = Schedulers.singleThread("miner-challenge-simulator")
+  implicit val scheduler: SchedulerService = Schedulers.singleThread("miner-challenge-simulator")
   sys.addShutdownHook(synchronized {
     scheduler.shutdown()
     scheduler.awaitTermination(10 seconds)
@@ -118,7 +121,7 @@ object MinerChallengeSimulator {
       blockchain: BlockchainUpdaterImpl,
       rdb: RDB,
       miner: MinerImpl,
-      blockAppender: Block => Task[Either[ValidationError, Option[BigInt]]],
+      blockAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]],
       fakeTime: Time & Object { var time: Long },
       isChallenging: Boolean
   ) {
@@ -135,10 +138,10 @@ object MinerChallengeSimulator {
 
       miner.forgeBlock(bestMiner) match {
         case Right((block, _)) =>
-          blockAppender(block).runSyncUnsafe() match {
-            case Right(score) => score
-            case Left(err) =>
-              println(s"Error appending block: $err")
+          blockAppender(block, None).runSyncUnsafe() match {
+            case Right(BlockApplyResult.Applied(_, score)) => Some(score)
+            case other =>
+              println(s"Error appending block: $other")
               quit = true
               Some(0)
           }
@@ -183,7 +186,7 @@ object MinerChallengeSimulator {
       val dbSettings         = wavesSettings.dbSettings.copy(directory = correctBlockchainDbDir)
       val fixedWavesSettings = wavesSettings.copy(dbSettings = dbSettings)
       val rdb                = RDB.open(dbSettings)
-      val rocksDBWriter      = new RocksDBWriter(rdb, fixedWavesSettings.blockchainSettings, fixedWavesSettings.dbSettings)
+      val rocksDBWriter      = new RocksDBWriter(rdb, fixedWavesSettings.blockchainSettings, fixedWavesSettings.dbSettings, false)
       val fakeTime           = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)
       val blockchainUpdater = new BlockchainUpdaterImpl(
         rocksDBWriter,
@@ -224,7 +227,13 @@ object MinerChallengeSimulator {
         fakeTime: Time,
         wavesSettings: WavesSettings,
         wallet: Wallet
-    ): (MinerImpl, Block => Task[Either[ValidationError, Option[BigInt]]]) = {
+    ): (
+        MinerImpl,
+        (
+            com.wavesplatform.block.Block,
+            Option[com.wavesplatform.network.BlockSnapshotResponse]
+        ) => monix.eval.Task[Either[com.wavesplatform.lang.ValidationError, com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult]]
+    ) = {
       val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
       val posSelector = PoSSelector(blockchain, None)
       val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)

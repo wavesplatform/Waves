@@ -1,29 +1,26 @@
 package com.wavesplatform.database
 
-import cats.data.Ior
-import cats.syntax.semigroup.*
+import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.BlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.PBAmounts
+import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
@@ -39,7 +36,6 @@ import org.slf4j.LoggerFactory
 
 import java.util
 import scala.annotation.tailrec
-import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -110,6 +106,7 @@ class RocksDBWriter(
     rdb: RDB,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
+    isLightMode: Boolean,
     bfBlockInsertions: Int = 10000
 ) extends Caches {
   import rdb.db as writableDB
@@ -163,7 +160,7 @@ class RocksDBWriter(
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
-  override def carryFee: Long = writableDB.get(Keys.carryFee(height))
+  override def carryFee(refId: Option[ByteStr]): Long = writableDB.get(Keys.carryFee(height))
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
     writableDB.get(Keys.data(address, key))
@@ -285,7 +282,8 @@ class RocksDBWriter(
     else settings.genesisSettings.initialBalance
 
   override def blockReward(height: Int): Option[Long] =
-    if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
+    if (this.isFeatureActivated(BlockchainFeatures.ConsensusImprovements, height) && height == 1) None
+    else if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
     else None
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[?]): Seq[Array[Byte]] =
@@ -299,7 +297,7 @@ class RocksDBWriter(
 
   private def appendBalances(
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
-      issuedAssets: Map[IssuedAsset, NewAssetInfo],
+      assetStatics: Map[IssuedAsset, AssetStaticInfo],
       rw: RW
   ): Unit = {
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
@@ -315,9 +313,9 @@ class RocksDBWriter(
           rw.put(Keys.assetBalance(addressId, a), currentBalance)
           rw.put(Keys.assetBalanceAt(addressId, a, currentBalance.height), balanceNode)
 
-          val isNFT = currentBalance.balance > 0 && issuedAssets
+          val isNFT = currentBalance.balance > 0 && assetStatics
             .get(a)
-            .map(_.static.nft)
+            .map(_.nft)
             .orElse(assetDescription(a).map(_.nft))
             .getOrElse(false)
           if (currentBalance.prevHeight == Height(0) && isNFT) updatedNftLists.put(addressId.toLong, a)
@@ -384,27 +382,19 @@ class RocksDBWriter(
       writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
     }
 
-  // noinspection ScalaStyle
   override protected def doAppend(
       blockMeta: PBBlockMeta,
+      snapshot: StateSnapshot,
       carry: Long,
+      computedBlockStateHash: ByteStr,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
-      addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
-      leaseStates: Map[ByteStr, LeaseDetails],
-      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
-      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, (CurrentVolumeAndFee, VolumeAndFeeNode)],
-      scripts: Map[AddressId, Option[AccountScriptInfo]],
-      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       data: Map[(Address, String), (CurrentData, DataNode)],
-      aliases: Map[Alias, AddressId],
-      sponsorship: Map[IssuedAsset, Sponsorship],
-      scriptResults: Map[ByteStr, InvokeScriptResult],
-      transactionMeta: Seq[(TxMeta, Transaction)],
-      stateHash: StateHashBuilder.Result,
-      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
+      addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
+      accountScripts: Map[AddressId, Option[AccountScriptInfo]],
+      stateHash: StateHashBuilder.Result
   ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
     readWrite { rw =>
@@ -419,16 +409,19 @@ class RocksDBWriter(
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
       }
 
-      val transactions: Map[TransactionId, (TxMeta, Transaction, TxNum)] = transactionMeta.zipWithIndex.map { case ((tm, tx), idx) =>
-        TransactionId(tx.id()) -> ((tm, tx, TxNum(idx.toShort)))
-      }.toMap
-
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
       blockHeightCache.put(blockMeta.id, Some(height))
 
-      val lastAddressId = loadMaxAddressId() + newAddresses.size
+      blockMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
+        case Some(addr) =>
+          val key          = Keys.maliciousMinerBanHeights(addr.bytes)
+          val savedHeights = rw.get(key)
+          rw.put(key, height +: savedHeights)
+        case _ => ()
+      }
 
+      val lastAddressId = loadMaxAddressId() + newAddresses.size
       rw.put(Keys.lastAddressId, Some(lastAddressId))
 
       for ((address, id) <- newAddresses) {
@@ -439,7 +432,7 @@ class RocksDBWriter(
 
       val threshold = newSafeRollbackHeight
 
-      appendBalances(balances, issuedAssets, rw)
+      appendBalances(balances, snapshot.assetStatics, rw)
       appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
@@ -456,50 +449,61 @@ class RocksDBWriter(
         rw.put(Keys.filledVolumeAndFeeAt(orderId, currentVolumeAndFee.height), volumeAndFeeNode)
       }
 
-      for (((asset, NewAssetInfo(staticInfo, info, volumeInfo)), assetNum) <- issuedAssets.zipWithIndex) {
-        val pbStaticInfo = StaticAssetInfo(
-          ByteString.copyFrom(staticInfo.source.arr),
-          ByteString.copyFrom(staticInfo.issuer.arr),
-          staticInfo.decimals,
-          staticInfo.nft,
-          assetNum + 1,
-          height
+      for ((asset, (assetStatic, assetNum)) <- snapshot.indexedAssetStatics) {
+        val pbAssetStatic = StaticAssetInfo(
+          assetStatic.source.toByteString,
+          assetStatic.issuer.toByteString,
+          assetStatic.decimals,
+          assetStatic.nft,
+          assetNum,
+          height,
+          asset.id.toByteString
         )
-        rw.put(Keys.assetStaticInfo(asset), Some(pbStaticInfo))
-        rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
+        rw.put(Keys.assetStaticInfo(asset), Some(pbAssetStatic))
       }
 
-      for ((asset, infoToUpdate) <- updatedAssets) {
-        rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
-          .orElse(issuedAssets.get(asset).map { case NewAssetInfo(_, i, vi) => (i, vi) })
-          .foreach { case (info, vol) =>
-            val updInfo = infoToUpdate.left
-              .fold(info)(identity)
-
-            val updVol = infoToUpdate.right
-              .fold(vol)(_ |+| vol)
-
-            rw.put(Keys.assetDetails(asset)(height), (updInfo, updVol))
-          }
+      val updatedAssetSet = snapshot.assetVolumes.keySet ++ snapshot.assetNamesAndDescriptions.keySet
+      for (asset <- updatedAssetSet) {
+        lazy val dbInfo = rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+        val volume =
+          snapshot.assetVolumes
+            .get(asset)
+            .map(v => AssetVolumeInfo(v.isReissuable, BigInt(v.volume.toByteArray)))
+            .orElse(dbInfo.map(_._2))
+        val nameAndDescription =
+          snapshot.assetNamesAndDescriptions
+            .get(asset)
+            .map(nd => AssetInfo(nd.name, nd.description, nd.lastUpdatedAt))
+            .orElse(dbInfo.map(_._1))
+        (nameAndDescription, volume).bisequence
+          .foreach(rw.put(Keys.assetDetails(asset)(height), _))
       }
 
-      for (asset <- issuedAssets.keySet ++ updatedAssets.keySet) {
+      for (asset <- snapshot.assetStatics.keySet ++ updatedAssetSet) {
         expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
       }
 
-      for ((leaseId, details) <- leaseStates) {
-        rw.put(Keys.leaseDetails(leaseId)(height), Some(Right(details)))
-        expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(leaseId), threshold, Keys.leaseDetails(leaseId))
+      for ((id, li) <- snapshot.newLeases) {
+        rw.put(Keys.leaseDetails(id)(height), Some(LeaseDetails(li, snapshot.cancelledLeases.getOrElse(id, LeaseDetails.Status.Active))))
+        expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
 
-      for ((addressId, script) <- scripts) {
+      for ((id, status) <- snapshot.cancelledLeases if !snapshot.newLeases.contains(id)) {
+        leaseDetails(id).foreach { d =>
+          rw.put(Keys.leaseDetails(id)(height), Some(d.copy(status = status)))
+        }
+
+        expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
+      }
+
+      for ((addressId, script) <- accountScripts) {
         expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
         if (script.isDefined) rw.put(Keys.addressScript(addressId)(height), script)
       }
 
-      for ((asset, script) <- assetScripts) {
+      for ((asset, script) <- snapshot.assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-        if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
+        rw.put(Keys.assetScript(asset)(height), Some(script))
       }
 
       if (height % BlockStep == 1) {
@@ -509,17 +513,25 @@ class RocksDBWriter(
           bf1 = mkFilter()
         }
       }
-
       val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
-      val txSizes = transactions.map { case (id, (txm, tx, num)) =>
-        val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
+      val transactionsWithSize =
+        snapshot.transactions.zipWithIndex.map { case ((id, txInfo), i) =>
+          val tx   = txInfo.transaction
+          val num  = TxNum(i.toShort)
+          val meta = TxMeta(Height @@ blockMeta.height, txInfo.status, txInfo.spentComplexity)
+          val txId = TransactionId(id)
 
-        targetBf.put(tx.id().arr)
+          val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((meta, tx)))
+          rw.put(
+            Keys.transactionStateSnapshotAt(Height(height), num, rdb.txSnapshotHandle),
+            Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status))
+          )
+          rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
+          targetBf.put(id.arr)
 
-        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
-        id -> size
-      }
+          txId -> (num, tx, size)
+        }.toMap
 
       if (dbSettings.storeTransactionsByAddress) {
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
@@ -530,8 +542,7 @@ class RocksDBWriter(
           .foreach { case (prevSeqNr, (addressId, txIds, txSeqNrKey)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
             val txTypeNumSeq = txIds.asScala.map { txId =>
-              val (_, tx, num) = transactions(txId)
-              val size         = txSizes(txId)
+              val (num, tx, size) = transactionsWithSize(txId)
               (tx.tpe.id.toByte, num, size)
             }.toSeq
             rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
@@ -539,8 +550,32 @@ class RocksDBWriter(
           }
       }
 
-      for ((alias, addressId) <- aliases) {
-        rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
+      if (dbSettings.storeLeaseStatesByAddress) {
+        val addressIdWithLeaseIds =
+          for {
+            (leaseId, details) <- snapshot.newLeases.toSeq if !snapshot.cancelledLeases.contains(leaseId)
+            address            <- Seq(details.recipientAddress, details.sender.toAddress)
+            addressId = this.addressIdWithFallback(address, newAddresses)
+          } yield (addressId, leaseId)
+        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
+        rw.multiGetInts(leaseIdsByAddressId.keys.map(_._2).toSeq)
+          .zip(leaseIdsByAddressId)
+          .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIds)) =>
+            val nextSeqNr = prevSeqNr.getOrElse(0) + 1
+            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr), Some(leaseIds))
+            rw.put(leaseSeqKey, nextSeqNr)
+          }
+      }
+
+      for ((alias, address) <- snapshot.aliases) {
+        val key   = Keys.addressIdOfAlias(alias)
+        val value = addressIdWithFallback(address, newAddresses)
+        rw.put(key, Some(value))
+      }
+
+      for ((assetId, sponsorship) <- snapshot.sponsorships) {
+        rw.put(Keys.sponsorship(assetId)(height), sponsorship)
+        expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(assetId), threshold, Keys.sponsorship(assetId))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -554,36 +589,31 @@ class RocksDBWriter(
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
-          approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
+          approvedFeaturesCache = newlyApprovedFeatures ++ approvedFeaturesCache
           rw.put(Keys.approvedFeatures, approvedFeaturesCache)
 
-          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ rw.get(Keys.activatedFeatures)).toMap
+          val featuresToSave = (newlyApprovedFeatures.view.mapValues(_ + activationWindowSize) ++ activatedFeaturesCache).toMap
 
           activatedFeaturesCache = featuresToSave ++ settings.functionalitySettings.preActivatedFeatures
           rw.put(Keys.activatedFeatures, featuresToSave)
         }
       }
 
-      for (case sp <- sponsorship)
-        sp match {
-          case (asset, value: SponsorshipValue) =>
-            rw.put(Keys.sponsorship(asset)(height), value)
-            expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
-          case _ =>
-        }
-
-      rw.put(Keys.issuedAssets(height), issuedAssets.keySet.toSeq)
-      rw.put(Keys.updatedAssets(height), updatedAssets.keySet.toSeq)
-      rw.put(Keys.sponsorshipAssets(height), sponsorship.keySet.toSeq)
+      rw.put(Keys.issuedAssets(height), snapshot.assetStatics.keySet.toSeq)
+      rw.put(Keys.updatedAssets(height), updatedAssetSet.toSeq)
+      rw.put(Keys.sponsorshipAssets(height), snapshot.sponsorships.keySet.toSeq)
 
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
-      if (dbSettings.storeInvokeScriptResults) scriptResults.foreach { case (txId, result) =>
-        val (txHeight, txNum) = transactions
-          .get(TransactionId(txId))
-          .map { case (_, _, txNum) => (height, txNum) }
-          .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId), rdb.txMetaHandle)).map { tm =>
+      rw.put(Keys.blockStateHash(height), computedBlockStateHash)
+      expiredKeys += Keys.blockStateHash(threshold - 1).keyBytes
+
+      if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
+        val (txHeight, txNum) = transactionsWithSize
+          .get(TransactionId @@ txId)
+          .map { case (txNum, _, _) => (height, txNum) }
+          .orElse(rw.get(Keys.transactionMetaById(TransactionId @@ txId, rdb.txMetaHandle)).map { tm =>
             (tm.height, TxNum(tm.num.toShort))
           })
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
@@ -595,8 +625,10 @@ class RocksDBWriter(
         }
       }
 
-      for ((id, meta) <- ethereumTransactionMeta) {
-        rw.put(Keys.ethereumTransactionMeta(Height(height), transactions(TransactionId(id))._3), Some(meta))
+      for ((txId, pbMeta) <- snapshot.ethereumTransactionMeta) {
+        val txNum = transactionsWithSize(TransactionId @@ txId)._1
+        val key   = Keys.ethereumTransactionMeta(Height(height), txNum)
+        rw.put(key, Some(pbMeta))
       }
 
       expiredKeys.foreach(rw.delete)
@@ -620,18 +652,17 @@ class RocksDBWriter(
         rw.put(Keys.stateHash(height), Some(newStateHash))
       }
     }
-
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)] = {
+  override protected def doRollback(targetHeight: Int): DiscardedBlocks = {
     val targetBlockId = readOnly(_.get(Keys.blockMetaAt(Height @@ targetHeight)))
       .map(_.id)
       .getOrElse(throw new IllegalArgumentException(s"No block at height $targetHeight"))
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedBlocks: Seq[(Block, ByteStr)] =
+    val discardedBlocks: DiscardedBlocks =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
         val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
         val ordersToInvalidate       = Seq.newBuilder[ByteStr]
@@ -691,6 +722,20 @@ class RocksDBWriter(
                 rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
               }
             }
+
+            if (dbSettings.storeLeaseStatesByAddress) {
+              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId)
+              val leaseSeqNr    = rw.get(leaseSeqNrKey)
+              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
+              rw.get(leaseSeqKey)
+                .flatMap(_.headOption)
+                .flatMap(leaseDetails)
+                .filter(_.height == currentHeight)
+                .foreach { _ =>
+                  rw.delete(leaseSeqKey)
+                  rw.put(leaseSeqNrKey, (leaseSeqNr - 1).max(0))
+                }
+            }
           }
 
           writableDB
@@ -745,6 +790,15 @@ class RocksDBWriter(
               rw.delete(Keys.transactionAt(currentHeight, num, rdb.txHandle))
               rw.delete(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle))
             }
+            rw.delete(Keys.transactionStateSnapshotAt(currentHeight, num, rdb.txSnapshotHandle))
+          }
+
+          discardedMeta.header.flatMap(_.challengedHeader.map(_.generator.toAddress())) match {
+            case Some(addr) =>
+              val key        = Keys.maliciousMinerBanHeights(addr.bytes)
+              val banHeights = rw.get(key)
+              if (banHeights.size > 1) rw.put(key, banHeights.tail) else rw.delete(key)
+            case _ => ()
           }
 
           rw.delete(Keys.blockMetaAt(currentHeight))
@@ -752,11 +806,21 @@ class RocksDBWriter(
           rw.delete(Keys.heightOf(discardedMeta.id))
           blockHeightsToInvalidate.addOne(discardedMeta.id)
           rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.blockStateHash(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
+          }
+
+          val disapprovedFeatures = approvedFeaturesCache.collect { case (id, approvalHeight) if approvalHeight > targetHeight => id }
+          if (disapprovedFeatures.nonEmpty) {
+            approvedFeaturesCache --= disapprovedFeatures
+            rw.put(Keys.approvedFeatures, approvedFeaturesCache)
+
+            activatedFeaturesCache --= disapprovedFeatures // We won't activate them in the future
+            rw.put(Keys.activatedFeatures, activatedFeaturesCache)
           }
 
           val block = createBlock(
@@ -767,7 +831,11 @@ class RocksDBWriter(
             blockTxs.map(_._2)
           ).explicitGet()
 
-          (block, Caches.toHitSource(discardedMeta))
+          val snapshot = if (isLightMode) {
+            Some(BlockSnapshot(block.id(), loadTxStateSnapshotsWithStatus(currentHeight, rdb, block.transactionData)))
+          } else None
+
+          (block, Caches.toHitSource(discardedMeta), snapshot)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -867,13 +935,10 @@ class RocksDBWriter(
       tx <- db
         .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
-          case (tm, t: TransferTransaction) if tm.succeeded => t
-          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
-            val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
-            val transfer = meta.payload.transfer.get
-            val tAmount  = transfer.amount.get
-            val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
-            e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
+          case (tm, t: TransferTransaction) if tm.status == TxMeta.Status.Succeeded => t
+          case (m, e @ EthereumTransaction(transfer: Transfer, _, _, _)) if tm.status == PBStatus.SUCCEEDED =>
+            val asset = transfer.tokenAddress.fold[Asset](Waves)(resolveERC20Address(_).get)
+            e.toTransferLike(TxPositiveAmount.unsafeFrom(transfer.amount), transfer.recipient, asset)
         }
     } yield (height, tx)
   }
@@ -898,8 +963,15 @@ class RocksDBWriter(
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = {
     writableDB.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)).map { tm =>
-      TxMeta(Height(tm.height), !tm.failed, tm.spentComplexity)
+      TxMeta(Height(tm.height), TxMeta.Status.fromProtobuf(tm.status), tm.spentComplexity)
     }
+  }
+
+  def transactionSnapshot(id: ByteStr): Option[TransactionStateSnapshot] = readOnly { db =>
+    for {
+      meta     <- db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
+      snapshot <- db.get(Keys.transactionStateSnapshotAt(Height(meta.height), TxNum(meta.num.toShort), rdb.txSnapshotHandle))
+    } yield snapshot
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] =
@@ -915,23 +987,8 @@ class RocksDBWriter(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
-      h             <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
-      detailsOrFlag <- db.get(Keys.leaseDetails(leaseId)(h))
-      details <- detailsOrFlag.fold(
-        isActive =>
-          transactionInfo(leaseId, db).collect { case (txm, lt: LeaseTransaction) =>
-            LeaseDetails(
-              lt.sender,
-              lt.recipient,
-              lt.amount.value,
-              if (isActive) LeaseDetails.Status.Active
-              else LeaseDetails.Status.Cancelled(h, None),
-              leaseId,
-              txm.height
-            )
-          },
-        Some(_)
-      )
+      h       <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
+      details <- db.get(Keys.leaseDetails(leaseId)(h))
     } yield details
   }
 
@@ -985,7 +1042,7 @@ class RocksDBWriter(
 
       @tailrec
       def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from)
+        if (hh < from || hh <= 0)
           acc :+ hh
         else {
           val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
@@ -995,7 +1052,7 @@ class RocksDBWriter(
 
       @tailrec
       def collectLeaseBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
-        if (hh < from)
+        if (hh < from || hh <= 0)
           acc :+ hh
         else {
           val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
@@ -1009,7 +1066,10 @@ class RocksDBWriter(
         (wh, lh) <- merge(wbh, lbh)
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
-      } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
+      } yield {
+        val height = wh.max(lh)
+        BalanceSnapshot(height, wb.balance, lb.in, lb.out)
+      }
     }
   }
 
@@ -1033,8 +1093,9 @@ class RocksDBWriter(
   override def blockRewardVotes(height: Int): Seq[Long] = readOnly { db =>
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
+        val modifyTerm = activatedFeatures.get(BlockchainFeatures.CappedReward.id).exists(_ <= height)
         settings.rewardsSettings
-          .votingWindow(activatedAt, height)
+          .votingWindow(activatedAt, height, modifyTerm)
           .flatMap { h =>
             db.get(Keys.blockMetaAt(Height(h)))
               .flatMap(_.header)
@@ -1055,6 +1116,13 @@ class RocksDBWriter(
     }
   }
 
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] =
+    readOnly(_.get(Keys.maliciousMinerBanHeights(address.bytes)))
+
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
+
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = {
+    readOnly(_.get(Keys.blockStateHash(height)))
+  }
 }

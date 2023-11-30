@@ -16,7 +16,7 @@ object StreamSerializerUtils {
     }
 
     def writeNumberField(key: String, value: Long, numberAsString: Boolean): Unit = {
-      if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
+      if (numberAsString && CustomJson.fieldNamesToTranslate.contains(key)) {
         gen.writeStringField(key, value.toString)
       } else {
         gen.writeNumberField(key, value)
@@ -24,7 +24,7 @@ object StreamSerializerUtils {
     }
 
     def writeNumberField(key: String, value: BigDecimal, numberAsString: Boolean): Unit = {
-      if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
+      if (numberAsString && CustomJson.fieldNamesToTranslate.contains(key)) {
         gen.writeStringField(key, value.bigDecimal.toPlainString)
       } else {
         gen.writeNumberField(key, value.bigDecimal)
@@ -32,7 +32,7 @@ object StreamSerializerUtils {
     }
 
     def writeNumberField(key: String, value: Int, numberAsString: Boolean): Unit = {
-      if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
+      if (numberAsString && CustomJson.fieldNamesToTranslate.contains(key)) {
         gen.writeStringField(key, value.toString)
       } else {
         gen.writeNumberField(key, value)
@@ -40,7 +40,7 @@ object StreamSerializerUtils {
     }
 
     def writeNumberField(key: String, value: Byte, numberAsString: Boolean): Unit = {
-      if (numberAsString && CustomJson.lsfFieldNamesToTranslate.contains(key)) {
+      if (numberAsString && CustomJson.fieldNamesToTranslate.contains(key)) {
         gen.writeStringField(key, value.toString)
       } else {
         gen.writeNumberField(key, value)

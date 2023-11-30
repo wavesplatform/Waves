@@ -29,8 +29,15 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, EthereumTransaction, PaymentTransaction, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{
+  CreateAliasTransaction,
+  DataTransaction,
+  EthTxGenerator,
+  EthereumTransaction,
+  PaymentTransaction,
+  Transaction,
+  TxHelpers
+}
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -94,7 +101,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         generateBlockchain(
           genBlocks,
           settings.dbSettings.copy(directory = dbDirPath.toString),
-          block => IO.exportBlockToBinary(bos, Some(block), legacy = true)
+          block => IO.exportBlock(bos, Some(block), legacy = true)
         )
         log.info(s"Finished exporting $targetHeight blocks")
         FileUtils.deleteDirectory(dbDirPath.toFile)
@@ -118,7 +125,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
         StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
       Using.resource(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)) { utxPool =>
         val pos         = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
-        val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler) _
+        val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler)(_, None)
         val utxEvents   = ConcurrentSubject.publish[UtxEvent]
 
         val miner = new MinerImpl(
@@ -156,7 +163,8 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                     genBlock.signer,
                     block.header.featureVotes,
                     block.header.rewardVote,
-                    None
+                    block.header.stateHash,
+                    block.header.challengedHeader
                   )
                   _ <- Await
                     .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
@@ -180,12 +188,13 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
                   Nil,
                   0,
                   ByteStr.empty,
+                  None,
                   None
                 ),
                 ByteStr.empty,
                 Nil
               )
-              blockchain.processBlock(pseudoBlock, ByteStr.empty, verify = false)
+              blockchain.processBlock(pseudoBlock, ByteStr.empty, None, verify = false)
             }
           case Left(err) => log.error(s"Error appending block: $err")
         }

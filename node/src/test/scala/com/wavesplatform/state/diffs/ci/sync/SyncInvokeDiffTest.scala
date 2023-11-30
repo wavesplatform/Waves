@@ -19,10 +19,10 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.EitherValues
+import org.scalatest.{EitherValues, Inside}
 
-class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues {
-  import DomainPresets._
+class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside {
+  import DomainPresets.*
 
   private val fsWithV5 = RideV5.blockchainSettings.functionalitySettings
 
@@ -37,26 +37,26 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val script =
       TestCompiler(V5).compileContract(
         s"""
-             | @Callable(i)
-             | func default() =
-             |   ([IntegerEntry("bar", 1)], "return")
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let r = invoke(this, unit, [], [])
-             |  if r == "return"
-             |  then
-             |   let data = getIntegerValue(this, "bar")
-             |   if data == 1
-             |   then
-             |    [
-             |     IntegerEntry("key", 1)
-             |    ]
-             |   else
-             |    throw("Bad state")
-             |  else
-             |   throw("Bad returned value")
-             | }
+           | @Callable(i)
+           | func default() =
+           |   ([IntegerEntry("bar", 1)], "return")
+           |
+           | @Callable(i)
+           | func foo() = {
+           |  let r = invoke(this, unit, [], [])
+           |  if r == "return"
+           |  then
+           |   let data = getIntegerValue(this, "bar")
+           |   if data == 1
+           |   then
+           |    [
+           |     IntegerEntry("key", 1)
+           |    ]
+           |   else
+           |    throw("Bad state")
+           |  else
+           |   throw("Bad returned value")
+           | }
            """.stripMargin
       )
 
@@ -68,8 +68,8 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke   = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, payments)
 
     assertDiffAndState(Seq(TestBlock.create(Seq(gTx1, gTx2, ssTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.errorMessage(invoke.id()) shouldBe None
+      case (snapshot, bc) =>
+        snapshot.errorMessage(invoke.id()) shouldBe None
         bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
         bc.accountData(dAppAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
@@ -79,26 +79,26 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val script =
       TestCompiler(V5).compileContract(
         s"""
-             | @Callable(i)
-             | func default() =
-             |   ([IntegerEntry("bar", 1)], "return")
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let r = invoke(this, unit, [], [])
-             |  if r == "return"
-             |  then
-             |   let data = getIntegerValue(this, "bar")
-             |   if data == 1
-             |   then
-             |    [
-             |     IntegerEntry("key", 1)
-             |    ]
-             |   else
-             |    throw("Bad state")
-             |  else
-             |   throw("Bad returned value")
-             | }
+           | @Callable(i)
+           | func default() =
+           |   ([IntegerEntry("bar", 1)], "return")
+           |
+           | @Callable(i)
+           | func foo() = {
+           |  let r = invoke(this, unit, [], [])
+           |  if r == "return"
+           |  then
+           |   let data = getIntegerValue(this, "bar")
+           |   if data == 1
+           |   then
+           |    [
+           |     IntegerEntry("key", 1)
+           |    ]
+           |   else
+           |    throw("Bad state")
+           |  else
+           |   throw("Bad returned value")
+           | }
            """.stripMargin
       )
     val gTx1 = TxHelpers.genesis(dAppAddress)
@@ -109,10 +109,15 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke   = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, payments)
 
     assertDiffAndState(Seq(TestBlock.create(Seq(gTx1, gTx2, ssTx))), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe None
-        diff.scriptsComplexity shouldBe 108
-        diff.scriptsRun shouldBe 2
+      case (snapshot, _) =>
+        snapshot.errorMessage(invoke.id()) shouldBe None
+        snapshot.scriptsComplexity shouldBe 108
+        inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+          inside(call1.invokes) { case Seq(call2) =>
+            call2.stateChanges.error shouldBe empty
+            call2.stateChanges.invokes shouldBe empty
+          }
+        }
     }
   }
 
@@ -120,54 +125,54 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val script =
       TestCompiler(V5).compileContract(
         s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
-             |   then
-             |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0)
-             |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
-             |   else
-             |     throw("Bad caller")
-             | }
+           | @Callable(i)
+           | func bar(a: ByteVector) = {
+           |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
+           |   then
+           |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0)
+           |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+           |   else
+           |     throw("Bad caller")
+           | }
            """.stripMargin
       )
 
     val script1 =
       TestCompiler(V5).compileContract(
         s"""
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Alias("alias"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
-             |     if data == 1
-             |     then
-             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
-             |      then
-             |       let l = Lease(Address(base58'$thirdAddress'), 23)
-             |       [
-             |        IntegerEntry("key", 1),
-             |        Lease(Address(base58'$thirdAddress'), 13),
-             |        l,
-             |        LeaseCancel(l.calculateLeaseId())
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+           | @Callable(i)
+           | func foo() = {
+           |  let b1 = wavesBalance(this)
+           |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+           |  if b1 == b1 && ob1 == ob1
+           |  then
+           |    let r = invoke(Alias("alias"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+           |    if r == 17
+           |    then
+           |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+           |     let b2 = wavesBalance(this)
+           |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+           |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
+           |     if data == 1
+           |     then
+           |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
+           |      then
+           |       let l = Lease(Address(base58'$thirdAddress'), 23)
+           |       [
+           |        IntegerEntry("key", 1),
+           |        Lease(Address(base58'$thirdAddress'), 13),
+           |        l,
+           |        LeaseCancel(l.calculateLeaseId())
+           |       ]
+           |      else
+           |       throw("Balance check failed")
+           |    else
+           |     throw("Bad state")
+           |   else
+           |    throw("Bad returned value")
+           |  else
+           |   throw("Impossible")
+           | }
            """.stripMargin
       )
 
@@ -182,72 +187,71 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, payments, fee = TestValues.invokeFee(issues = 1))
     val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.scriptResults(invoke.id()).error shouldBe None
-        val l  = diff.scriptResults(invoke.id()).leases(0)
-        val l1 = diff.scriptResults(invoke.id()).leases(1)
-        val l2 = diff.scriptResults(invoke.id()).leaseCancels(0)
-        l.amount shouldBe 13
-        l.recipient shouldBe thirdAcc.toAddress
-        l1.amount shouldBe 23
-        l1.recipient shouldBe thirdAcc.toAddress
-        l1.id shouldBe l2.id
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      snapshot.scriptResults(invoke.id()).error shouldBe None
+      val l  = snapshot.scriptResults(invoke.id()).leases(0)
+      val l1 = snapshot.scriptResults(invoke.id()).leases(1)
+      val l2 = snapshot.scriptResults(invoke.id()).leaseCancels(0)
+      l.amount shouldBe 13
+      l.recipient shouldBe thirdAcc.toAddress
+      l1.amount shouldBe 23
+      l1.recipient shouldBe thirdAcc.toAddress
+      l1.id shouldBe l2.id
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
   property("originCaller and originCallerPublicKey fields") {
     val script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector, o: ByteVector) = {
-             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a && i.originCaller.bytes == o && addressFromPublicKey(i.originCallerPublicKey).bytes == o
-             |   then
-             |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0)
-             |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
-             |   else
-             |     throw("Bad caller")
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector, o: ByteVector) = {
+         |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a && i.originCaller.bytes == o && addressFromPublicKey(i.originCallerPublicKey).bytes == o
+         |   then
+         |     let n = Issue("barAsset", "bar asset", 1, 0, false, unit, 0)
+         |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+         |   else
+         |     throw("Bad caller")
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1 && i.caller == i.originCaller && i.callerPublicKey == i.originCallerPublicKey
-             |  then
-             |    let r = invoke(Alias("alias"), "bar", [this.bytes, i.caller.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
-             |     if data == 1
-             |     then
-             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
-             |      then
-             |       let l = Lease(Address(base58'$thirdAddress'), 23)
-             |       [
-             |        IntegerEntry("key", 1),
-             |        Lease(Address(base58'$thirdAddress'), 13),
-             |        l,
-             |        LeaseCancel(l.calculateLeaseId())
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Imposible")
-             | }
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1 && i.caller == i.originCaller && i.callerPublicKey == i.originCallerPublicKey
+         |  then
+         |    let r = invoke(Alias("alias"), "bar", [this.bytes, i.caller.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
+         |     if data == 1
+         |     then
+         |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
+         |      then
+         |       let l = Lease(Address(base58'$thirdAddress'), 23)
+         |       [
+         |        IntegerEntry("key", 1),
+         |        Lease(Address(base58'$thirdAddress'), 13),
+         |        l,
+         |        LeaseCancel(l.calculateLeaseId())
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Imposible")
+         | }
            """.stripMargin
     )
 
@@ -262,68 +266,67 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments, fee = TestValues.invokeFee(issues = 1))
     val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.scriptResults(invoke.id()).error shouldBe None
-        val l  = diff.scriptResults(invoke.id()).leases(0)
-        val l1 = diff.scriptResults(invoke.id()).leases(1)
-        val l2 = diff.scriptResults(invoke.id()).leaseCancels(0)
-        l.amount shouldBe 13
-        l.recipient shouldBe thirdAcc.toAddress
-        l1.amount shouldBe 23
-        l1.recipient shouldBe thirdAcc.toAddress
-        l1.id shouldBe l2.id
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      snapshot.scriptResults(invoke.id()).error shouldBe None
+      val l  = snapshot.scriptResults(invoke.id()).leases(0)
+      val l1 = snapshot.scriptResults(invoke.id()).leases(1)
+      val l2 = snapshot.scriptResults(invoke.id()).leaseCancels(0)
+      l.amount shouldBe 13
+      l.recipient shouldBe thirdAcc.toAddress
+      l1.amount shouldBe 23
+      l1.recipient shouldBe thirdAcc.toAddress
+      l1.id shouldBe l2.id
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
   property("non-NFT issue require extra fee") {
     val script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
-             |   then
-             |     let n = Issue("barAsset", "bar asset", 2, 0, false, unit, 0)
-             |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
-             |   else
-             |     throw("Bad caller")
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
+         |   then
+         |     let n = Issue("barAsset", "bar asset", 2, 0, false, unit, 0)
+         |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+         |   else
+         |     throw("Bad caller")
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Alias("alias"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
-             |     if data == 1
-             |     then
-             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Alias("alias"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
+         |     if data == 1
+         |     then
+         |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -337,61 +340,60 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val payments   = List(Payment(10L, Waves))
     val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments, fee = TestValues.invokeFee(2))
     val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx)
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        val err = diff.scriptResults(invoke.id()).error.get
-        err.code shouldBe FailedTransactionError.Cause.FeeForActions.code
-        bc.accountData(dAppAddress, "key") shouldBe None
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe None
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      val err = snapshot.scriptResults(invoke.id()).error.get
+      err.code shouldBe FailedTransactionError.Cause.FeeForActions.code
+      bc.accountData(dAppAddress, "key") shouldBe None
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe None
     }
   }
 
   property("non-NFT issue work") {
     val script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
-             |   then
-             |     let n = Issue("barAsset", "bar asset", 2, 0, false, unit, 0)
-             |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
-             |   else
-             |     throw("Bad caller")
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   if i.caller.bytes == a && addressFromPublicKey(i.callerPublicKey).bytes == a
+         |   then
+         |     let n = Issue("barAsset", "bar asset", 2, 0, false, unit, 0)
+         |     ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit), BinaryEntry("asset", n.calculateAssetId()), n, ScriptTransfer(Address(a), 1, n.calculateAssetId())], 17)
+         |   else
+         |     throw("Bad caller")
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Alias("alias"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
-             |     if data == 1
-             |     then
-             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Alias("alias"), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     let ab = assetBalance(this, getBinaryValue(Address(base58'$thirdAddress'), "asset"))
+         |     if data == 1
+         |     then
+         |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14 && ab == 1
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -407,64 +409,63 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments, fee = TestValues.invokeFee(issues = 1))
     val genesisTxs = Seq(gTx1, gTx2, gTx3, aliasTx, ssTx1, ssTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
   property("Crosscontract call (two accounts, double call)") {
     val script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     if data == 1
-             |     then
-             |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14
-             |      then
-             |       let r1 = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 18)])
-             |       if r1 == r1
-             |       then
-             |        let b3 = wavesBalance(this)
-             |        let ob3 = wavesBalance(Address(base58'$thirdAddress'))
-             |        if ob2.regular+15 == ob3.regular && b2.regular == b3.regular+15
-             |        then
-             |         [
-             |          IntegerEntry("key", 1)
-             |         ]
-             |        else
-             |         throw("Bad balance after second invoke")
-             |      else
-             |       throw("Impossible")
-             |     else
-             |      throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |  else
-             |   throw("Bad returned value")
-             |   else
-             |    throw("Impossible")
-             | }
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     if data == 1
+         |     then
+         |      if ob1.regular+14 == ob2.regular && b1.regular == b2.regular+14
+         |      then
+         |       let r1 = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 18)])
+         |       if r1 == r1
+         |       then
+         |        let b3 = wavesBalance(this)
+         |        let ob3 = wavesBalance(Address(base58'$thirdAddress'))
+         |        if ob2.regular+15 == ob3.regular && b2.regular == b3.regular+15
+         |        then
+         |         [
+         |          IntegerEntry("key", 1)
+         |         ]
+         |        else
+         |         throw("Bad balance after second invoke")
+         |      else
+         |       throw("Impossible")
+         |     else
+         |      throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |  else
+         |   throw("Bad returned value")
+         |   else
+         |    throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -480,62 +481,61 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     val genesisTxs = Seq(gTx1, gTx2, gTx3, ssTx1, ssTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
   property("Crosscontract nested call (two accounts)") {
     val script = TestCompiler(V5).compileContract(
       s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-#SCRIPT_TYPE ACCOUNT#-}
-             |
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
-             | }
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func back() = {
-             |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
-             | }
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     if data == 1
-             |     then
-             |      if ob1.regular + 14 == ob2.regular && b1.regular == b2.regular + 14
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func back() = {
+         |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
+         | }
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     if data == 1
+         |     then
+         |      if ob1.regular + 14 == ob2.regular && b1.regular == b2.regular + 14
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -550,58 +550,57 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, payments = payments)
     val genesisTxs = Seq(gTx1, gTx2, gTx3, ssTx1, ssTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (_, bc) =>
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (_, bc) =>
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
   property("Crosscontract with payment") {
     val script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, unit)], 17)
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func back() = {
-             |   [ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
-             | }
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     if data == 1
-             |     then
-             |      if ob1.regular + 14 == ob2.regular && b1.regular == b2.regular + 14
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed: " + ob1.regular.toString() + " " + ob2.regular.toString())
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func back() = {
+         |   [ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
+         | }
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     if data == 1
+         |     then
+         |      if ob1.regular + 14 == ob2.regular && b1.regular == b2.regular + 14
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed: " + ob1.regular.toString() + " " + ob2.regular.toString())
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -617,21 +616,20 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     val genesisTxs = Seq(gTx1, gTx2, gTx3, ssTx1, ssTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (_, bc) =>
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (_, bc) =>
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
   property("Infinite recursive crosscontract call") {
     val recursiveContract = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func foo() = {
-             |   strict r = invoke(this, "foo", [], [])
-             |   []
-             | }
+         | @Callable(i)
+         | func foo() = {
+         |   strict r = invoke(this, "foo", [], [])
+         |   []
+         | }
            """.stripMargin
     )
 
@@ -660,49 +658,49 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     def contract(asset: ByteStr): Script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
+         | }
            """.stripMargin
     )
 
     def contract1(asset: ByteStr): Script = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func back() = {
-             |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
-             | }
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     let ab = assetBalance(this, base58'$asset')
-             |     if data == 1
-             |     then
-             |      if ob1.regular + 17 == ob2.regular && b1.regular == b2.regular + 17 && ab == 3
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed " + ob1.regular.toString() + " " + ob2.regular.toString())
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func back() = {
+         |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
+         | }
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     let ab = assetBalance(this, base58'$asset')
+         |     if data == 1
+         |     then
+         |      if ob1.regular + 17 == ob2.regular && b1.regular == b2.regular + 17 && ab == 3
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed " + ob1.regular.toString() + " " + ob2.regular.toString())
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -718,10 +716,9 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val genesisTxs = Seq(gTx1, gTx2, gTx3, ssTx1, ssTx, iTx)
 
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (_, bc) =>
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (_, bc) =>
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
     }
   }
 
@@ -737,49 +734,49 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     def script(asset: ByteStr) = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func back() = {
-             |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
-             | }
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let tdata = getIntegerValue(this, "key")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     if data == 1 && tdata == 0
-             |     then
-             |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func back() = {
+         |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
+         | }
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(unit, 17)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let tdata = getIntegerValue(this, "key")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     if data == 1 && tdata == 0
+         |     then
+         |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -814,54 +811,54 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     val contract = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   let r = invoke(Address(a), "back", [], [])
-             |   if r == r
-             |   then
-             |    ([IntegerEntry("bar", 1)], 17)
-             |   else
-             |    throw("Impossible")
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   let r = invoke(Address(a), "back", [], [])
+         |   if r == r
+         |   then
+         |    ([IntegerEntry("bar", 1)], 17)
+         |   else
+         |    throw("Impossible")
+         | }
            """.stripMargin
     )
 
     def contract1(asset: ByteStr) = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func back() = {
-             |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
-             | }
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(base58'$asset', 1)])
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let tdata = getIntegerValue(this, "key")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     if data == 1 && tdata == 0
-             |     then
-             |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func back() = {
+         |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
+         | }
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], [AttachedPayment(base58'$asset', 1)])
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let tdata = getIntegerValue(this, "key")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     if data == 1 && tdata == 0
+         |     then
+         |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -885,54 +882,54 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
   property("Payment in transaction process after Invoke") {
     def script(asset: ByteStr) = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(a: ByteVector) = {
-             |   let r = invoke(Address(a), "back", [], [])
-             |   if r == r
-             |   then
-             |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
-             |   else
-             |    throw("Impossible")
-             | }
+         | @Callable(i)
+         | func bar(a: ByteVector) = {
+         |   let r = invoke(Address(a), "back", [], [])
+         |   if r == r
+         |   then
+         |    ([IntegerEntry("bar", 1), ScriptTransfer(Address(a), 3, base58'$asset')], 17)
+         |   else
+         |    throw("Impossible")
+         | }
            """.stripMargin
     )
 
     val script1 = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func back() = {
-             |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
-             | }
-             |
-             | @Callable(i)
-             | func foo() = {
-             |  let b1 = wavesBalance(this)
-             |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
-             |  if b1 == b1 && ob1 == ob1
-             |  then
-             |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], i.payments)
-             |    if r == 17
-             |    then
-             |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
-             |     let tdata = getIntegerValue(this, "key")
-             |     let b2 = wavesBalance(this)
-             |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
-             |     if data == 1 && tdata == 0
-             |     then
-             |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
-             |      then
-             |       [
-             |        IntegerEntry("key", 1)
-             |       ]
-             |      else
-             |       throw("Balance check failed")
-             |    else
-             |     throw("Bad state")
-             |   else
-             |    throw("Bad returned value")
-             |  else
-             |   throw("Impossible")
-             | }
+         | @Callable(i)
+         | func back() = {
+         |   [IntegerEntry("key", 0), ScriptTransfer(Address(base58'$thirdAddress'), 2, unit)]
+         | }
+         |
+         | @Callable(i)
+         | func foo() = {
+         |  let b1 = wavesBalance(this)
+         |  let ob1 = wavesBalance(Address(base58'$thirdAddress'))
+         |  if b1 == b1 && ob1 == ob1
+         |  then
+         |    let r = invoke(Address(base58'$thirdAddress'), "bar", [this.bytes], i.payments)
+         |    if r == 17
+         |    then
+         |     let data = getIntegerValue(Address(base58'$thirdAddress'), "bar")
+         |     let tdata = getIntegerValue(this, "key")
+         |     let b2 = wavesBalance(this)
+         |     let ob2 = wavesBalance(Address(base58'$thirdAddress'))
+         |     if data == 1 && tdata == 0
+         |     then
+         |      if ob1.regular+16 == ob2.regular && b1.regular == b2.regular+16
+         |      then
+         |       [
+         |        IntegerEntry("key", 1)
+         |       ]
+         |      else
+         |       throw("Balance check failed")
+         |    else
+         |     throw("Bad state")
+         |   else
+         |    throw("Bad returned value")
+         |  else
+         |   throw("Impossible")
+         | }
            """.stripMargin
     )
 
@@ -997,59 +994,59 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     val serviceDApp = TestCompiler(V5).compileContract(
       s"""
-             | @Callable(i)
-             | func bar(startInvokerBalance: Int, startWavesBalance: Int, startPaymentAssetBalance: Int, paymentAsset: ByteVector) = {
-             |   let resultInvokerBalance = wavesBalance(Address(base58'${invokerAddress.toString}')).regular
-             |   let paymentAssetBalance = assetBalance(i.caller, paymentAsset)
-             |
-             |   if (
-             |     startInvokerBalance == resultInvokerBalance         &&
-             |     startWavesBalance == wavesBalance(i.caller).regular &&
-             |     startPaymentAssetBalance == paymentAssetBalance + i.payments[0].amount
-             |   )
-             |     then
-             |       ([IntegerEntry("bar", 1)], $returnValue)
-             |     else
-             |       throw("Balance check failed")
-             | }
+         | @Callable(i)
+         | func bar(startInvokerBalance: Int, startWavesBalance: Int, startPaymentAssetBalance: Int, paymentAsset: ByteVector) = {
+         |   let resultInvokerBalance = wavesBalance(Address(base58'${invokerAddress.toString}')).regular
+         |   let paymentAssetBalance = assetBalance(i.caller, paymentAsset)
+         |
+         |   if (
+         |     startInvokerBalance == resultInvokerBalance         &&
+         |     startWavesBalance == wavesBalance(i.caller).regular &&
+         |     startPaymentAssetBalance == paymentAssetBalance + i.payments[0].amount
+         |   )
+         |     then
+         |       ([IntegerEntry("bar", 1)], $returnValue)
+         |     else
+         |       throw("Balance check failed")
+         | }
            """.stripMargin
     )
 
     def clientDApp(serviceDAppAddress: Address, transferAsset: ByteStr, paymentAsset: ByteStr) =
       TestCompiler(V5).compileContract {
         s"""
-             | @Callable(i)
-             | func foo() = {
-             |  strict startInvokerBalance = wavesBalance(Address(base58'${invokerAddress.toString}')).regular
-             |  strict startWavesBalance = wavesBalance(this).regular
-             |  strict startPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
-             |
-             |  strict r = invoke(
-             |    Address(base58'$serviceDAppAddress'),
-             |    "bar",
-             |    [startInvokerBalance, startWavesBalance, startPaymentAssetBalance, base58'$paymentAsset'],
-             |    [AttachedPayment(base58'$paymentAsset', $paymentFromClientDAppAmount)]
-             |  )
-             |
-             |  strict resultWavesBalance = wavesBalance(this).regular
-             |  strict resultPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
-             |
-             |  if (
-             |    startWavesBalance == resultWavesBalance &&
-             |    resultPaymentAssetBalance == startPaymentAssetBalance - $paymentFromClientDAppAmount
-             |  )
-             |  then
-             |   [
-             |     BinaryEntry("paymentAsset", base58'$paymentAsset'),
-             |     IntegerEntry("startInvokerBalance", startInvokerBalance),
-             |     IntegerEntry("startWavesBalance", startWavesBalance),
-             |     IntegerEntry("startPaymentAssetBalance", startPaymentAssetBalance),
-             |     ScriptTransfer(Address(base58'$serviceDAppAddress'), $transferAmount, base58'$transferAsset'),
-             |     IntegerEntry("key", 1)
-             |   ]
-             |  else
-             |   throw("Balance check failed")
-             | }
+           | @Callable(i)
+           | func foo() = {
+           |  strict startInvokerBalance = wavesBalance(Address(base58'${invokerAddress.toString}')).regular
+           |  strict startWavesBalance = wavesBalance(this).regular
+           |  strict startPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
+           |
+           |  strict r = invoke(
+           |    Address(base58'$serviceDAppAddress'),
+           |    "bar",
+           |    [startInvokerBalance, startWavesBalance, startPaymentAssetBalance, base58'$paymentAsset'],
+           |    [AttachedPayment(base58'$paymentAsset', $paymentFromClientDAppAmount)]
+           |  )
+           |
+           |  strict resultWavesBalance = wavesBalance(this).regular
+           |  strict resultPaymentAssetBalance = assetBalance(this, base58'$paymentAsset')
+           |
+           |  if (
+           |    startWavesBalance == resultWavesBalance &&
+           |    resultPaymentAssetBalance == startPaymentAssetBalance - $paymentFromClientDAppAmount
+           |  )
+           |  then
+           |   [
+           |     BinaryEntry("paymentAsset", base58'$paymentAsset'),
+           |     IntegerEntry("startInvokerBalance", startInvokerBalance),
+           |     IntegerEntry("startWavesBalance", startWavesBalance),
+           |     IntegerEntry("startPaymentAssetBalance", startPaymentAssetBalance),
+           |     ScriptTransfer(Address(base58'$serviceDAppAddress'), $transferAmount, base58'$transferAsset'),
+           |     IntegerEntry("key", 1)
+           |   ]
+           |  else
+           |   throw("Balance check failed")
+           | }
            """.stripMargin
       }
 
@@ -1067,15 +1064,14 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invoke           = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments, fee = fee)
 
     val genesisTxs = Seq(gTx1, gTx2, gTx3, setServiceDApp, setClientDApp, paymentIssue, transferIssue)
-    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.errorMessage(invoke.id()) shouldBe None
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      snapshot.errorMessage(invoke.id()) shouldBe None
 
-        bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
-        bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+      bc.accountData(dAppAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(thirdAcc.toAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
 
-        bc.balance(dAppAddress, IssuedAsset(transferIssue.id())) shouldBe startBalance - transferAmount
-        bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe 3
+      bc.balance(dAppAddress, IssuedAsset(transferIssue.id())) shouldBe startBalance - transferAmount
+      bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe 3
     }
   }
 
@@ -1086,41 +1082,41 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     val contractMain = TestCompiler(V5).compileContract(
       s"""
-      | @Callable(i)
-      | func foo() = {
-      |    let nextDAppAddr = Address(base58'$thirdAddress')
-      |
-      |    strict invEntry3BeforeIsDefined = isDefined(getString(nextDAppAddr, "$invokeEntry3Key"))
-      |
-      |    strict invResult = invoke(nextDAppAddr, "bar", [], [])
-      |
-      |    let invEntry1ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
-      |    let invEntry2IsNotString = isDefined(getString(nextDAppAddr, "$invokeEntry2Key")) == false
-      |    let invEntry2ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry2Key") == $invokeEntry2NewVal
-      |    let invEntry3AfterIsDeleted = isDefined(getString(nextDAppAddr, "$invokeEntry3Key")) == false
-      |
-      |
-      |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
-      |    then
-      |      ([], unit)
-      |    else
-      |      throw("Internal invoke state update error")
-      | }
+         | @Callable(i)
+         | func foo() = {
+         |    let nextDAppAddr = Address(base58'$thirdAddress')
+         |
+         |    strict invEntry3BeforeIsDefined = isDefined(getString(nextDAppAddr, "$invokeEntry3Key"))
+         |
+         |    strict invResult = invoke(nextDAppAddr, "bar", [], [])
+         |
+         |    let invEntry1ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+         |    let invEntry2IsNotString = isDefined(getString(nextDAppAddr, "$invokeEntry2Key")) == false
+         |    let invEntry2ValIsOK = getIntegerValue(nextDAppAddr, "$invokeEntry2Key") == $invokeEntry2NewVal
+         |    let invEntry3AfterIsDeleted = isDefined(getString(nextDAppAddr, "$invokeEntry3Key")) == false
+         |
+         |
+         |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
+         |    then
+         |      ([], unit)
+         |    else
+         |      throw("Internal invoke state update error")
+         | }
     """.stripMargin
     )
 
     val contractSecond = TestCompiler(V5).compileContract(
       s"""
-      | @Callable(i)
-      | func bar() = {
-      |    (
-      |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
-      |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
-      |       DeleteEntry("$invokeEntry3Key")
-      |      ],
-      |      unit
-      |    )
-      | }
+         | @Callable(i)
+         | func bar() = {
+         |    (
+         |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
+         |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
+         |       DeleteEntry("$invokeEntry3Key")
+         |      ],
+         |      unit
+         |    )
+         | }
     """.stripMargin
     )
 
@@ -1141,11 +1137,10 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeTx     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val preparingTxs = Seq(gTx1, gTx2, gTx3, ssTxMain, ssTxSecond, dataTxSecond, dataTxSecond2)
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.errorMessage(invokeTx.id()) shouldBe None
-        bc.accountData(thirdAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
-        bc.accountData(thirdAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      snapshot.errorMessage(invokeTx.id()) shouldBe None
+      bc.accountData(thirdAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
+      bc.accountData(thirdAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
     }
   }
 
@@ -1155,36 +1150,36 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeEntry3Key                       = "entry3"
 
     val contractMain = TestCompiler(V5).compileContract(s"""
-      | @Callable(i)
-      | func foo() = {
-      |    strict invEntry3BeforeIsDefined = isDefined(getString(this, "$invokeEntry3Key"))
-      |
-      |    strict invResult = invoke(this, "bar", [], [])
-      |
-      |    let invEntry1ValIsOK = getIntegerValue(this, "$invokeEntry1Key") == $invokeEntry1Val
-      |    let invEntry2IsNotString = isDefined(getString(this, "$invokeEntry2Key")) == false
-      |    let invEntry2ValIsOK = getIntegerValue(this, "$invokeEntry2Key") == $invokeEntry2NewVal
-      |    let invEntry3AfterIsDeleted = isDefined(getString(this, "$invokeEntry3Key")) == false
-      |
-      |
-      |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
-      |    then
-      |      ([], unit)
-      |    else
-      |      throw("Internal invoke state update error")
-      | }
-      |
-      | @Callable(i)
-      | func bar() = {
-      |   (
-      |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
-      |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
-      |       DeleteEntry("$invokeEntry3Key")
-      |      ],
-      |      unit
-      |   )
-      | }
-      |""".stripMargin)
+                                                           | @Callable(i)
+                                                           | func foo() = {
+                                                           |    strict invEntry3BeforeIsDefined = isDefined(getString(this, "$invokeEntry3Key"))
+                                                           |
+                                                           |    strict invResult = invoke(this, "bar", [], [])
+                                                           |
+                                                           |    let invEntry1ValIsOK = getIntegerValue(this, "$invokeEntry1Key") == $invokeEntry1Val
+                                                           |    let invEntry2IsNotString = isDefined(getString(this, "$invokeEntry2Key")) == false
+                                                           |    let invEntry2ValIsOK = getIntegerValue(this, "$invokeEntry2Key") == $invokeEntry2NewVal
+                                                           |    let invEntry3AfterIsDeleted = isDefined(getString(this, "$invokeEntry3Key")) == false
+                                                           |
+                                                           |
+                                                           |    if invEntry1ValIsOK && invEntry2IsNotString && invEntry2ValIsOK && invEntry3BeforeIsDefined && invEntry3AfterIsDeleted
+                                                           |    then
+                                                           |      ([], unit)
+                                                           |    else
+                                                           |      throw("Internal invoke state update error")
+                                                           | }
+                                                           |
+                                                           | @Callable(i)
+                                                           | func bar() = {
+                                                           |   (
+                                                           |      [IntegerEntry("$invokeEntry1Key", $invokeEntry1Val),
+                                                           |       IntegerEntry("$invokeEntry2Key", $invokeEntry2NewVal),
+                                                           |       DeleteEntry("$invokeEntry3Key")
+                                                           |      ],
+                                                           |      unit
+                                                           |   )
+                                                           | }
+                                                           |""".stripMargin)
 
     val gTx1 = TxHelpers.genesis(dAppAddress)
     val gTx2 = TxHelpers.genesis(invokerAddress)
@@ -1201,11 +1196,10 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeTx     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val preparingTxs = Seq(gTx1, gTx2, ssTxMain, dataTxMain, dataTxMain2)
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.errorMessage(invokeTx.id()) shouldBe None
-        bc.accountData(dAppAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
-        bc.accountData(dAppAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      snapshot.errorMessage(invokeTx.id()) shouldBe None
+      bc.accountData(dAppAddress, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
+      bc.accountData(dAppAddress, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
     }
   }
 
@@ -1231,63 +1225,63 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
 
     def contractMain(paymentAsset: ByteStr) =
       TestCompiler(V5).compileContract(s"""
-      | @Callable(i)
-      | func foo() = {
-      |    let secondDAppAddr = Address(base58'${fourthAcc.toAddress}')
-      |    let thirdDAppAddr = Address(base58'$thirdAddress')
-      |
-      |    strict invBarResult = invoke(secondDAppAddr, "bar", [], [])
-      |
-      |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
-      |
-      |    strict invAnotherBazResult = invoke(
-      |      thirdDAppAddr,
-      |      "anotherBaz",
-      |      [],
-      |      [AttachedPayment(base58'$paymentAsset', $paymentAssetAmount)])
-      |
-      |    if thirdDAppDataEntryIsOK
-      |    then
-      |      ([], unit)
-      |    else
-      |      throw("Internal invoke chain state update error")
-      | }
+                                          | @Callable(i)
+                                          | func foo() = {
+                                          |    let secondDAppAddr = Address(base58'${fourthAcc.toAddress}')
+                                          |    let thirdDAppAddr = Address(base58'$thirdAddress')
+                                          |
+                                          |    strict invBarResult = invoke(secondDAppAddr, "bar", [], [])
+                                          |
+                                          |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+                                          |
+                                          |    strict invAnotherBazResult = invoke(
+                                          |      thirdDAppAddr,
+                                          |      "anotherBaz",
+                                          |      [],
+                                          |      [AttachedPayment(base58'$paymentAsset', $paymentAssetAmount)])
+                                          |
+                                          |    if thirdDAppDataEntryIsOK
+                                          |    then
+                                          |      ([], unit)
+                                          |    else
+                                          |      throw("Internal invoke chain state update error")
+                                          | }
     """.stripMargin)
 
     def contractSecond(transferAsset: ByteStr): Script =
       TestCompiler(V5).compileContract(s"""
-      | @Callable(i)
-      | func bar() = {
-      |    let thirdDAppAddr = Address(base58'$thirdAddress')
-      |
-      |    strict invBazResult = invoke(thirdDAppAddr, "baz", [], [])
-      |
-      |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
-      |
-      |    if thirdDAppDataEntryIsOK
-      |    then
-      |      ([ScriptTransfer(thirdDAppAddr, $transferAssetAmount, base58'$transferAsset')], unit)
-      |    else
-      |      throw("Internal invoke chain state update error")
-      | }
-      |""".stripMargin)
+                                          | @Callable(i)
+                                          | func bar() = {
+                                          |    let thirdDAppAddr = Address(base58'$thirdAddress')
+                                          |
+                                          |    strict invBazResult = invoke(thirdDAppAddr, "baz", [], [])
+                                          |
+                                          |    let thirdDAppDataEntryIsOK = getIntegerValue(thirdDAppAddr, "$invokeEntry1Key") == $invokeEntry1Val
+                                          |
+                                          |    if thirdDAppDataEntryIsOK
+                                          |    then
+                                          |      ([ScriptTransfer(thirdDAppAddr, $transferAssetAmount, base58'$transferAsset')], unit)
+                                          |    else
+                                          |      throw("Internal invoke chain state update error")
+                                          | }
+                                          |""".stripMargin)
 
     val contractThird =
       TestCompiler(V5).compileContract(s"""
-      | @Callable(i)
-      | func baz() = {
-      |    (
-      |      [
-      |        IntegerEntry("$invokeEntry1Key", $invokeEntry1Val)
-      |      ],
-      |      unit
-      |    )
-      | }
-      |
-      | @Callable(i)
-      | func anotherBaz() = {
-      |    ([], unit)
-      | }
+                                          | @Callable(i)
+                                          | func baz() = {
+                                          |    (
+                                          |      [
+                                          |        IntegerEntry("$invokeEntry1Key", $invokeEntry1Val)
+                                          |      ],
+                                          |      unit
+                                          |    )
+                                          | }
+                                          |
+                                          | @Callable(i)
+                                          | func anotherBaz() = {
+                                          |    ([], unit)
+                                          | }
     """.stripMargin)
 
     val paymentIssue  = TxHelpers.issue(dApp, script = Some(paymentAssetScript))
@@ -1306,11 +1300,10 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     val invokeTx     = TxHelpers.invoke(dAppAddress, Some("foo"), payments = payments)
     val preparingTxs = Seq(gTx1, gTx2, gTx3, gTx4, ssTxMain, ssTxSecond, ssTxThird, paymentIssue, transferIssue)
 
-    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-      case (diff, bc) =>
-        diff.errorMessage(invokeTx.id()) shouldBe None
-        bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe transferAssetAmount
-        bc.balance(thirdAcc.toAddress, IssuedAsset(paymentIssue.id())) shouldBe paymentAssetAmount
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) { case (snapshot, bc) =>
+      snapshot.errorMessage(invokeTx.id()) shouldBe None
+      bc.balance(thirdAcc.toAddress, IssuedAsset(transferIssue.id())) shouldBe transferAssetAmount
+      bc.balance(thirdAcc.toAddress, IssuedAsset(paymentIssue.id())) shouldBe paymentAssetAmount
     }
   }
 }

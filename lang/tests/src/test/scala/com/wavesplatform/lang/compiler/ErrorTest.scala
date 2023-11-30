@@ -3,7 +3,7 @@ package com.wavesplatform.lang.compiler
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{V3, V5}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -158,7 +158,7 @@ class ErrorTest extends PropSpec {
 
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach { case ((label, error), input) =>
     property(s"Error: $label") {
-      ExpressionCompiler(compilerContext, input) should produce(error)
+      ExpressionCompiler(compilerContext, V3, input) should produce(error)
     }
   }
 

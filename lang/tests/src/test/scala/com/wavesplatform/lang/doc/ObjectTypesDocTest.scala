@@ -28,6 +28,7 @@ class ObjectTypesDocTest extends PropSpec {
               getDocFields(name, ds.stdLibVersion).filter(_._1 != "proofs")
             else
               getDocFields(name, ds.stdLibVersion)
+
           if (docFields != codeFields)
             throw new TestFailedException(
               s"For type '$name' in ${ds.stdLibVersion} " +

@@ -58,7 +58,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
                      | }
         """.stripMargin
     val untypedScript = Parser.parseExpr(assetScript).get.value
-    val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+    val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1)
       .explicitGet()
 
     val issue                   = TxHelpers.issue(company, 100, script = Some(typedScript))
@@ -82,13 +82,13 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
 
   private val dummyEvalContext: EvaluationContext[Environment, Id] = {
     val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
-    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, ds, ByteStr.empty)
+    val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, ds, ByteStr.empty)
     lazyContexts((ds, true, true))().evaluationContext(environment)
   }
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).map(_._1)
+    val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untyped).map(_._1)
     typed.flatMap(r => EvaluatorV1().apply[EVALUATED](dummyEvalContext, r).leftMap(_.message))
   }
 

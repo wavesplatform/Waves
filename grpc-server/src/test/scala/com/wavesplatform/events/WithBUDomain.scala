@@ -2,8 +2,9 @@ package com.wavesplatform.events
 
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.events.FakeObserver.*
-import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
+import FakeObserver.*
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateResponse, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
@@ -14,6 +15,7 @@ import monix.execution.Scheduler.Implicits.global
 import org.rocksdb.RocksDB
 import monix.reactive.subjects.PublishToOneSubject
 import org.scalatest.Suite
+import org.scalatest.concurrent.ScalaFutures.convertScalaFuture
 
 trait WithBUDomain extends WithDomain { _: Suite =>
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
@@ -48,17 +50,45 @@ trait WithBUDomain extends WithDomain { _: Suite =>
       }
     }
 
-  def withGenerateSubscription(request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue), settings: WavesSettings)(
-      generateBlocks: Domain => Unit
-  )(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
+  def withGenerateSubscription(
+      request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue),
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+  )(generateBlocks: Domain => Unit)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
     withDomainAndRepo(settings) { (d, repo) =>
-      d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
 
       val subscription = repo.createFakeObserver(request)
       generateBlocks(d)
 
       val result = subscription.fetchAllEvents(d.blockchain, if (request.toHeight > 0) request.toHeight else Int.MaxValue)
       f(result.map(_.getUpdate))
+    }
+  }
+
+  def withGenerateGetBlockUpdate(
+      height: Int = 1,
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+  )(generateBlocks: Domain => Unit)(f: GetBlockUpdateResponse => Unit): Unit = {
+    withDomainAndRepo(settings) { (d, repo) =>
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
+      generateBlocks(d)
+      val getBlockUpdate = repo.getBlockUpdate(height)
+      f(getBlockUpdate)
+    }
+  }
+
+  def withGenerateGetBlockUpdateRange(
+      request: GetBlockUpdatesRangeRequest,
+      settings: WavesSettings,
+      balances: Seq[AddrWithBalance] = Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
+  )(generateBlocks: Domain => Unit)(f: Seq[PBBlockchainUpdated] => Unit): Unit = {
+    withDomainAndRepo(settings) { (d, repo) =>
+      d.appendBlock(balances.map(awb => TxHelpers.genesis(awb.address, awb.balance))*)
+      generateBlocks(d)
+      val getBlockUpdateRange = repo.getBlockUpdatesRange(request).futureValue.updates
+      f(getBlockUpdateRange)
     }
   }
 

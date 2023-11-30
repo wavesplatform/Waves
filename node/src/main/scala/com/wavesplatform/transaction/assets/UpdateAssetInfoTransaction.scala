@@ -4,16 +4,18 @@ import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
-import com.wavesplatform.transaction.validation._
+import com.wavesplatform.transaction.validation.*
 import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
+import scala.util.{Failure, Success, Try}
+
 case class UpdateAssetInfoTransaction(
-    version: TxVersion,
+    override val version: TxVersion,
     sender: PublicKey,
     assetId: IssuedAsset,
     name: String,
@@ -24,7 +26,7 @@ case class UpdateAssetInfoTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.UpdateAssetInfo, Seq(assetId))
-    with VersionedTransaction
+    with Versioned.ConstV1
     with FastHashId
     with ProvenTransaction
     with PBSince.V1 { self =>
@@ -45,8 +47,9 @@ case class UpdateAssetInfoTransaction(
     )
 }
 
-object UpdateAssetInfoTransaction {
-  val supportedVersions: Set[TxVersion] = Set(1)
+object UpdateAssetInfoTransaction extends TransactionParser {
+  type TransactionT = UpdateAssetInfoTransaction
+  override val typeId: TxType = 17: Byte
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
@@ -94,4 +97,12 @@ object UpdateAssetInfoTransaction {
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
     create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId)
       .map(_.signWith(sender.privateKey))
+
+  override def parseBytes(bytes: Array[Byte]): Try[UpdateAssetInfoTransaction] =
+    PBTransactionSerializer
+      .parseBytes(bytes)
+      .flatMap {
+        case tx: UpdateAssetInfoTransaction => Success(tx)
+        case tx: Transaction                => Failure(UnexpectedTransaction(typeId, tx.tpe.id.toByte))
+      }
 }

@@ -2,6 +2,8 @@ package com.wavesplatform.lang.parser
 
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import com.wavesplatform.test.*
@@ -9,11 +11,11 @@ import fastparse.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
 
 class ContractParserTest extends PropSpec with ScriptGenParser {
-  implicit val offset: Int = 0
+  implicit val offset: LibrariesOffset = NoLibraries
 
   private def parse(x: String): DAPP = Parser.parseContract(x) match {
-    case Success(r, _)      => r
-    case f: Failure => throw new TestFailedException(f.msg, 0)
+    case Success(r, _) => r
+    case f: Failure    => throw new TestFailedException(f.msg, 0)
   }
 
   private def cleanOffsets(l: LET): LET =
@@ -25,14 +27,14 @@ class ContractParserTest extends PropSpec with ScriptGenParser {
   }
 
   private def cleanOffsets(expr: EXPR): EXPR = expr match {
-    case x: CONST_LONG                             => x.copy(position = Pos(0, 0))
-    case x: REF                                    => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
-    case x: CONST_STRING                           => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: CONST_BYTESTR                          => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: TRUE                                   => x.copy(position = Pos(0, 0))
-    case x: FALSE                                  => x.copy(position = Pos(0, 0))
-    case x: BINARY_OP                              => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
-    case x: IF                                     => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
+    case x: CONST_LONG    => x.copy(position = Pos(0, 0))
+    case x: REF           => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
+    case x: CONST_STRING  => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: CONST_BYTESTR => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: TRUE          => x.copy(position = Pos(0, 0))
+    case x: FALSE         => x.copy(position = Pos(0, 0))
+    case x: BINARY_OP     => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
+    case x: IF => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
     case x @ BLOCK(_, l: Expressions.LET, _, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
     case x: FUNCTION_CALL                          => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
     case _                                         => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")

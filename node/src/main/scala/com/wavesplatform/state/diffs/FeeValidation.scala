@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.smart.*
-import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 
@@ -83,7 +82,7 @@ object FeeValidation {
           case tx: DataTransaction =>
             val payloadLength =
               if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) DataTxValidator.realUserPayloadSize(tx.data)
-              else if (tx.isProtobufVersion) tx.protoDataPayload.length
+              else if (PBSince.affects(tx)) tx.protoDataPayload.length
               else if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes().length
               else tx.bytes().length
 
@@ -205,27 +204,5 @@ object FeeValidation {
         case FeeInfo(None, reqs, amountInWaves) =>
           FeeDetails(Waves, reqs, amountInWaves, amountInWaves)
       }
-  }
-
-  def calculateInvokeFee(blockchain: Blockchain, tx: InvokeTransaction): Option[FeeDetails] = {
-    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, tx.timestamp, verify = false)(blockchain, _)
-    differ(tx)
-      .attributeOpt[Long](Attribute.MinFee)
-      .map(calculateAssetFee(blockchain, tx.feeAssetId, _))
-  }
-
-  private def calculateAssetFee(blockchain: Blockchain, feeAssetId: Asset, wavesFee: Long): FeeDetails = {
-    val assetFee = feeAssetId match {
-      case asset: Asset.IssuedAsset =>
-        val sponsorship = blockchain
-          .assetDescription(asset)
-          .map(_.sponsorship)
-          .getOrElse(0L)
-        Sponsorship.fromWaves(wavesFee, sponsorship)
-
-      case Asset.Waves => wavesFee
-    }
-
-    FeeDetails(feeAssetId, Chain.empty, assetFee, wavesFee)
   }
 }

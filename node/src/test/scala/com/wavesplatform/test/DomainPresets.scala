@@ -86,9 +86,15 @@ object DomainPresets {
     BlockchainFeatures.BlockV5
   )
 
+  val RideV4WithRewards: WavesSettings = RideV4.addFeatures(BlockchainFeatures.BlockReward)
+
   val RideV5: WavesSettings = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
 
   val RideV6: WavesSettings = RideV5.addFeatures(BlockchainFeatures.RideV6)
+
+  val ConsensusImprovements: WavesSettings = RideV6.addFeatures(BlockchainFeatures.ConsensusImprovements)
+
+  val BlockRewardDistribution: WavesSettings = ConsensusImprovements.addFeatures(BlockchainFeatures.BlockRewardDistribution)
 
   val ContinuationTransaction: WavesSettings = RideV6
     .addFeatures(BlockchainFeatures.ContinuationTransaction)
@@ -96,9 +102,7 @@ object DomainPresets {
       featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-  val ConsensusImprovements: WavesSettings = RideV6.addFeatures(BlockchainFeatures.ConsensusImprovements)
-
-  val TransactionStateSnapshot: WavesSettings = ConsensusImprovements.addFeatures(BlockchainFeatures.TransactionStateSnapshot)
+  val TransactionStateSnapshot: WavesSettings = BlockRewardDistribution.addFeatures(BlockchainFeatures.LightNode)
 
   def settingsForRide(version: StdLibVersion): WavesSettings =
     version match {
@@ -108,6 +112,8 @@ object DomainPresets {
       case V4 => RideV4
       case V5 => RideV5
       case V6 => RideV6
+      case V7 => BlockRewardDistribution
+      case V8 => TransactionStateSnapshot
     }
 
   def mostRecent: WavesSettings = RideV6

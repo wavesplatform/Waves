@@ -127,19 +127,19 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
 
         {
           domain.blockchainUpdater.processBlock(block0) should beRight
-          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee)
+          domain.blockchainUpdater.bestLiquidSnapshotAndFees.map(_._3) should contain(block0TotalFee)
         }
 
         {
-          domain.blockchainUpdater.processMicroBlock(microBlocks(0)) should beRight
-          domain.blockchainUpdater.processMicroBlock(microBlocks(1)) should beRight
+          domain.blockchainUpdater.processMicroBlock(microBlocks(0), None) should beRight
+          domain.blockchainUpdater.processMicroBlock(microBlocks(1), None) should beRight
 
           val microBlocksWavesFee = microBlocks
             .flatMap(_.transactionData)
             .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
             .sum
 
-          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee + microBlocksWavesFee)
+          domain.blockchainUpdater.bestLiquidSnapshotAndFees.map(_._3) should contain(block0TotalFee + microBlocksWavesFee)
         }
     }
   }

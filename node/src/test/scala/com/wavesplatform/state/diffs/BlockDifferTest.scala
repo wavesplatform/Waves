@@ -1,29 +1,33 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.state.diffs.BlockDiffer.InvalidStateHash
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, TxStateSnapshotHashBuilder}
+import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
+import com.wavesplatform.mining.{MinerImpl, MiningConstraint}
+import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state.diffs.BlockDiffer.Result
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.*
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
-
-import scala.concurrent.duration.*
+import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.utils.Schedulers
+import io.netty.channel.group.DefaultChannelGroup
+import monix.reactive.Observable
 
 class BlockDifferTest extends FreeSpec with WithDomain {
   private val TransactionFee = 10
 
   private val signerA, signerB = randomKeyPair()
 
-  private val testChain: Seq[Block] = {
+  private val testChain: Seq[BlockWithSigner] = {
     val master, recipient = randomKeyPair()
     getTwoMinersBlockChain(master, recipient, 9)
   }
@@ -110,7 +114,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           block.header.stateHash shouldBe defined
           BlockDiffer
-            .fromBlock(d.blockchain, None, block, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
+            .fromBlock(d.blockchain, None, block, None, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
         }
 
         withDomain(DomainPresets.RideV6) { d =>
@@ -118,7 +122,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           block.header.stateHash shouldBe None
           BlockDiffer
-            .fromBlock(d.blockchain, None, block, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
+            .fromBlock(d.blockchain, None, block, None, MiningConstraint.Unlimited, block.header.generationSignature) should beRight
         }
       }
 
@@ -129,54 +133,176 @@ class BlockDifferTest extends FreeSpec with WithDomain {
 
           val txs = (1 to 10).map(idx => TxHelpers.transfer(TxHelpers.signer(idx), TxHelpers.address(idx + 1), (100 - idx).waves))
 
-          val blockTs  = txs.map(_.timestamp).max
-          val txDiffer = TransactionDiffer(d.blockchain.lastBlockTimestamp, blockTs) _
-          val blockStateHash = txs
-            .foldLeft(genesis.header.stateHash.get -> Diff.empty) { case ((prevStateHash, accDiff), tx) =>
-              val blockchain = CompositeBlockchain(d.blockchain, accDiff)
-              val txDiff     = txDiffer(blockchain, tx).resultE.explicitGet()
-              val stateHash  = TxStateSnapshotHashBuilder.createHashFromTxDiff(blockchain, txDiff).createHash(prevStateHash)
-              (stateHash, accDiff.combineF(txDiff).explicitGet())
-            }
-            ._1
+          val blockTs    = txs.map(_.timestamp).max
+          val signer     = TxHelpers.signer(2)
+          val blockchain = SnapshotBlockchain(d.blockchain, Some(d.settings.blockchainSettings.rewardsSettings.initial))
+          val initSnapshot = BlockDiffer
+            .createInitialBlockSnapshot(d.blockchain, d.lastBlock.id(), signer.toAddress)
+            .explicitGet()
+          val initStateHash = TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(genesis.header.stateHash.get)
+          val blockStateHash = TxStateSnapshotHashBuilder
+            .computeStateHash(
+              txs,
+              initStateHash,
+              initSnapshot,
+              signer,
+              d.blockchain.lastBlockTimestamp,
+              blockTs,
+              isChallenging = false,
+              blockchain
+            )
+            .resultE
+            .explicitGet()
 
           val correctBlock =
-            TestBlock.create(blockTs, genesis.id(), txs, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
+            TestBlock.create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(blockStateHash))
           BlockDiffer
-            .fromBlock(d.blockchain, Some(genesis), correctBlock, MiningConstraint.Unlimited, correctBlock.header.generationSignature) should beRight
+            .fromBlock(
+              blockchain,
+              Some(genesis),
+              correctBlock.block,
+              None,
+              MiningConstraint.Unlimited,
+              correctBlock.block.header.generationSignature
+            ) should beRight
 
           val incorrectBlock =
-            TestBlock.create(blockTs, genesis.id(), txs, version = Block.ProtoBlockVersion, stateHash = Some(ByteStr.fill(DigestLength)(1)))
+            TestBlock
+              .create(blockTs, genesis.id(), txs, signer, version = Block.ProtoBlockVersion, stateHash = Some(ByteStr.fill(DigestLength)(1)))
+              .block
           BlockDiffer.fromBlock(
-            d.blockchain,
+            blockchain,
             Some(genesis),
             incorrectBlock,
+            None,
             MiningConstraint.Unlimited,
             incorrectBlock.header.generationSignature
-          ) shouldBe Left(InvalidStateHash)
+          ) shouldBe an[Left[InvalidStateHash, Result]]
 
-          val correctMicroblock = d.createMicroBlock(Some(blockStateHash), txs*)
+          d.appendKeyBlock(signer = signer)
+          val correctMicroblock =
+            d.createMicroBlock(
+              Some(
+                TxStateSnapshotHashBuilder
+                  .computeStateHash(
+                    txs,
+                    genesis.header.stateHash.get,
+                    StateSnapshot.empty,
+                    signer,
+                    d.blockchain.lastBlockTimestamp,
+                    blockTs,
+                    isChallenging = false,
+                    blockchain
+                  )
+                  .resultE
+                  .explicitGet()
+              )
+            )(
+              txs*
+            )
           BlockDiffer.fromMicroBlock(
-            d.blockchain,
-            d.blockchain.lastBlockTimestamp,
-            genesis.header.stateHash,
+            blockchain,
+            blockchain.lastBlockTimestamp,
+            genesis.header.stateHash.get,
             correctMicroblock,
+            None,
             MiningConstraint.Unlimited
           ) should beRight
 
-          val incorrectMicroblock = d.createMicroBlock(Some(ByteStr.fill(DigestLength)(1)), txs*)
+          val incorrectMicroblock = d.createMicroBlock(Some(ByteStr.fill(DigestLength)(1)))(txs*)
           BlockDiffer.fromMicroBlock(
-            d.blockchain,
-            d.blockchain.lastBlockTimestamp,
-            genesis.header.stateHash,
+            blockchain,
+            blockchain.lastBlockTimestamp,
+            genesis.header.stateHash.get,
             incorrectMicroblock,
+            None,
             MiningConstraint.Unlimited
-          ) shouldBe Left(InvalidStateHash)
+          ) shouldBe an[Left[InvalidStateHash, Result]]
         }
+    }
+
+    "result of txs validation should be equal the result of snapshot apply" in {
+      val sender = TxHelpers.signer(1)
+      withDomain(DomainPresets.TransactionStateSnapshot, AddrWithBalance.enoughBalances(sender)) { d =>
+        (1 to 5).map { idx =>
+          val (refBlock, refSnapshot, carry, _, refStateHash, _) = d.liquidState.get.snapshotOf(d.lastBlock.id()).get
+          val refBlockchain = SnapshotBlockchain(
+            d.rocksDBWriter,
+            refSnapshot,
+            refBlock,
+            d.liquidState.get.hitSource,
+            carry,
+            d.blockchain.computeNextReward,
+            Some(refStateHash)
+          )
+
+          val block = d.createBlock(Block.ProtoBlockVersion, Seq(TxHelpers.transfer(sender, amount = idx.waves, fee = TestValues.fee * idx)))
+          val hs    = d.posSelector.validateGenerationSignature(block).explicitGet()
+          val txValidationResult = BlockDiffer.fromBlock(refBlockchain, Some(refBlock), block, None, MiningConstraint.Unlimited, hs)
+
+          val txInfo        = txValidationResult.explicitGet().snapshot.transactions.head._2
+          val blockSnapshot = BlockSnapshot(block.id(), Seq(txInfo.snapshot -> txInfo.status))
+
+          val snapshotApplyResult = BlockDiffer.fromBlock(refBlockchain, Some(refBlock), block, Some(blockSnapshot), MiningConstraint.Unlimited, hs)
+
+          // TODO: remove after NODE-2610 fix
+          def clearAffected(r: Result): Result = {
+            r.copy(
+              snapshot = r.snapshot.copy(transactions = r.snapshot.transactions.map { case (id, info) => id -> info.copy(affected = Set.empty) }),
+              keyBlockSnapshot = r.keyBlockSnapshot.copy(transactions = r.keyBlockSnapshot.transactions.map { case (id, info) =>
+                id -> info.copy(affected = Set.empty)
+              })
+            )
+
+          }
+
+          val snapshotApplyResultWithoutAffected = snapshotApplyResult.map(clearAffected)
+          val txValidationResultWithoutAffected  = txValidationResult.map(clearAffected)
+
+          snapshotApplyResultWithoutAffected shouldBe txValidationResultWithoutAffected
+        }
+      }
+    }
+
+    "should be possible to append key block that references non-last microblock (NODE-1172)" in {
+      val sender   = TxHelpers.signer(1)
+      val minerAcc = TxHelpers.signer(2)
+      val settings = DomainPresets.TransactionStateSnapshot
+      withDomain(
+        settings.copy(minerSettings = settings.minerSettings.copy(quorum = 0)),
+        AddrWithBalance.enoughBalances(sender, minerAcc)
+      ) { d =>
+        d.appendBlock()
+        val time = TestTime()
+
+        val miner = new MinerImpl(
+          new DefaultChannelGroup("", null),
+          d.blockchain,
+          d.settings,
+          time,
+          d.utxPool,
+          d.wallet,
+          d.posSelector,
+          Schedulers.singleThread("miner"),
+          Schedulers.singleThread("appender"),
+          Observable.empty
+        )
+
+        val refId = d.appendMicroBlock(TxHelpers.transfer(sender, amount = 1))
+        Thread.sleep(d.settings.minerSettings.minMicroBlockAge.toMillis)
+        d.appendMicroBlock(TxHelpers.transfer(sender, amount = 2))
+
+        time.setTime(System.currentTimeMillis() + 2 * d.settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis)
+        val (block, _) = miner.forgeBlock(minerAcc).explicitGet()
+
+        block.header.reference shouldBe refId
+
+        d.appendBlockE(block) should beRight
+      }
     }
   }
 
-  private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[BlockWithSigner], ngAtHeight: Int)(assertion: (StateSnapshot, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,
@@ -186,7 +312,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
 
-  private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[Block] = {
+  private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[BlockWithSigner] = {
     val genesisTx            = TxHelpers.genesis(from.toAddress, Long.MaxValue - 1)
     val features: Seq[Short] = Seq[Short](2)
 
@@ -198,22 +324,5 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       val signer = if (i % 2 == 0) signerA else signerB
       TestBlock.create(signer, Seq(x), features)
     }
-  }
-
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean): Block = {
-    val timestamp = txs.map(_.timestamp).max
-    val genesisSettings = GenesisSettings(
-      timestamp,
-      timestamp,
-      txs.map(_.amount.value).sum,
-      None,
-      txs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
-      },
-      2L,
-      60.seconds
-    )
-
-    Block.genesis(genesisSettings, rideV6Activated = true, txStateSnapshotActivated).explicitGet()
   }
 }

@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -9,6 +8,7 @@ import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.openjdk.jmh.annotations.*
@@ -123,7 +123,7 @@ class WavesEnvironmentRebenchmark {
   @Benchmark
   def biggestDataEntries(bh: Blackhole, st: St): Unit = {
     val address = Recipient.Address(
-      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf").explicitGet().bytes)
+      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf", None).explicitGet().bytes)
     )
     val checkBinaryOrString = Random.nextBoolean()
     if (checkBinaryOrString) {
@@ -139,7 +139,7 @@ object WavesEnvironmentRebenchmark {
     lazy val allAliases: Vector[Alias] = {
       val builder = Vector.newBuilder[Alias]
       rdb.db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
-        builder += Alias.fromBytes(e.getKey.drop(2)).explicitGet()
+        builder += Alias.fromBytes(e.getKey.drop(2), None).explicitGet()
       }
       builder.result()
     }
@@ -187,7 +187,7 @@ object WavesEnvironmentRebenchmark {
             rdb.db
               .get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort), rdb.txHandle))
               .collect {
-                case (meta, dataTx: DataTransaction) if meta.succeeded && dataTx.data.nonEmpty =>
+                case (meta, dataTx: DataTransaction) if meta.status == Status.Succeeded && dataTx.data.nonEmpty =>
                   (
                     dataTx.data(Random.nextInt(dataTx.data.length)),
                     Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
@@ -208,7 +208,7 @@ object WavesEnvironmentRebenchmark {
           else
             rdb.db
               .get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort), rdb.txHandle))
-              .collect { case (meta, transferTx: TransferTransaction) if meta.succeeded => transferTx.id() }
+              .collect { case (meta, transferTx: TransferTransaction) if meta.status == Status.Succeeded => transferTx.id() }
         }
     }
 

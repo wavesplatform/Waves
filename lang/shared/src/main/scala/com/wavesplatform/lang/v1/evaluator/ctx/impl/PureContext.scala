@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.implicits.*
 import cats.{Id, Monad}
-import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.*
@@ -43,7 +42,7 @@ object PureContext {
   val MaxListLengthV4   = 1000
 
   // As an optimization, JVM might throw an ArithmeticException with empty stack trace and null message.
-  // The workaround below retrows an exception with the message explicitly set.
+  // The workaround below rethrows an exception with the message explicitly set.
   lazy val divLong: BaseFunction[NoContext] =
     createTryOp(DIV_OP, LONG, LONG, DIV_LONG) { (a, b) =>
       try Math.floorDiv(a, b)
@@ -142,7 +141,7 @@ object PureContext {
     }
 
   lazy val stringToBigInt: BaseFunction[NoContext] =
-    NativeFunction("parseBigIntValue", 65, STRING_TO_BIGINT, BIGINT, ("n", STRING)) {
+    NativeFunction("parseBigIntValue", Map(V5 -> 65L, V6 -> 65L, V7 -> 65L, V8 -> 1L), STRING_TO_BIGINT, BIGINT, ("n", STRING)) {
       case CONST_STRING(n) :: Nil =>
         Either
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
@@ -153,7 +152,7 @@ object PureContext {
     }
 
   lazy val stringToBigIntOpt: BaseFunction[NoContext] =
-    NativeFunction("parseBigInt", 65, STRING_TO_BIGINTOPT, UNION(BIGINT, UNIT), ("n", STRING)) {
+    NativeFunction("parseBigInt", Map(V5 -> 65L, V6 -> 65L, V7 -> 65L, V8 -> 1L), STRING_TO_BIGINTOPT, UNION(BIGINT, UNIT), ("n", STRING)) {
       case CONST_STRING(n) :: Nil =>
         Right((if (n.length <= 155) {
                  try {
@@ -173,13 +172,21 @@ object PureContext {
     }
 
   lazy val bigIntToBytes: BaseFunction[NoContext] =
-    NativeFunction("toBytes", 65, BIGINT_TO_BYTES, BYTESTR, ("n", BIGINT)) {
+    NativeFunction("toBytes", Map(V5 -> 65L, V6 -> 65L, V7 -> 65L, V8 -> 1L), BIGINT_TO_BYTES, BYTESTR, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => CONST_BYTESTR(ByteStr(n.toByteArray))
       case xs                     => notImplemented[Id, EVALUATED]("toBytes(n: BigInt)", xs)
     }
 
   lazy val bytesToBigIntLim: BaseFunction[NoContext] =
-    NativeFunction("toBigInt", 65, BYTES_TO_BIGINT_LIM, BIGINT, ("n", BYTESTR), ("off", LONG), ("size", LONG)) {
+    NativeFunction(
+      "toBigInt",
+      Map(V5 -> 65L, V6 -> 65L, V7 -> 65L, V8 -> 1L),
+      BYTES_TO_BIGINT_LIM,
+      BIGINT,
+      ("n", BYTESTR),
+      ("off", LONG),
+      ("size", LONG)
+    ) {
       case CONST_BYTESTR(ByteStr(n)) :: CONST_LONG(off) :: CONST_LONG(s) :: Nil =>
         Either.cond(
           off >= 0 && off <= n.length && s <= 64 && s > 0,
@@ -190,7 +197,7 @@ object PureContext {
     }
 
   lazy val bytesToBigInt: BaseFunction[NoContext] =
-    NativeFunction("toBigInt", 65, BYTES_TO_BIGINT, BIGINT, ("n", BYTESTR)) {
+    NativeFunction("toBigInt", Map(V5 -> 65L, V6 -> 65L, V7 -> 65L, V8 -> 1L), BYTES_TO_BIGINT, BIGINT, ("n", BYTESTR)) {
       case CONST_BYTESTR(ByteStr(n)) :: Nil =>
         Either.cond(n.length <= 64, CONST_BIGINT(BigInt(n)), s"Too big ByteVector for BigInt (${n.length} > 64 bytes)")
       case xs => notImplemented[Id, EVALUATED]("toBigInt(n: ByteStr)", xs)
@@ -220,14 +227,19 @@ object PureContext {
     }
   }
 
-  lazy val sumToBigInt: BaseFunction[NoContext] = bigIntArithmeticOp(SUM_OP, SUM_BIGINT, Map[StdLibVersion, Long](V5 -> 8L)) { _ + _ }
-  lazy val subToBigInt: BaseFunction[NoContext] = bigIntArithmeticOp(SUB_OP, SUB_BIGINT, Map[StdLibVersion, Long](V5 -> 8L)) { _ - _ }
-  lazy val mulToBigInt: BaseFunction[NoContext] = bigIntArithmeticOp(MUL_OP, MUL_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ * _ }
-  lazy val divToBigInt: BaseFunction[NoContext] = bigIntArithmeticOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ / _ }
-  lazy val modToBigInt: BaseFunction[NoContext] = bigIntArithmeticOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 64L)) { _ % _ }
+  lazy val sumToBigInt: BaseFunction[NoContext] =
+    bigIntArithmeticOp(SUM_OP, SUM_BIGINT, Map[StdLibVersion, Long](V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L)) { _ + _ }
+  lazy val subToBigInt: BaseFunction[NoContext] =
+    bigIntArithmeticOp(SUB_OP, SUB_BIGINT, Map[StdLibVersion, Long](V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L)) { _ - _ }
+  lazy val mulToBigInt: BaseFunction[NoContext] =
+    bigIntArithmeticOp(MUL_OP, MUL_BIGINT, Map[StdLibVersion, Long](V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ * _ }
+  lazy val divToBigInt: BaseFunction[NoContext] =
+    bigIntArithmeticOp(DIV_OP, DIV_BIGINT, Map[StdLibVersion, Long](V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ / _ }
+  lazy val modToBigInt: BaseFunction[NoContext] =
+    bigIntArithmeticOp(MOD_OP, MOD_BIGINT, Map[StdLibVersion, Long](V5 -> 64L, V6 -> 64L, V7 -> 64L, V8 -> 1L)) { _ % _ }
 
   lazy val negativeBigInt: BaseFunction[NoContext] =
-    NativeFunction("-", 8, UMINUS_BIGINT, BIGINT, ("n", BIGINT)) {
+    NativeFunction("-", Map(V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L), UMINUS_BIGINT, BIGINT, ("n", BIGINT)) {
       case CONST_BIGINT(n) :: Nil => Either.cond(n != BigIntMin, CONST_BIGINT(-n), s"Positive BigInt overflow")
       case xs                     => notImplemented[Id, EVALUATED]("-(n: BigInt)", xs)
     }
@@ -1023,7 +1035,7 @@ object PureContext {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right {
           val i = m.indexOf(sub)
-          if (!global.isIllFormed(sub) && i != -1)
+          if (sub.isWellFormed && i != -1)
             CONST_LONG(m.codePointCount(0, i).toLong)
           else
             unit
@@ -1067,7 +1079,7 @@ object PureContext {
     ) {
       case CONST_STRING(m) :: CONST_STRING(sub) :: CONST_LONG(off) :: Nil =>
         val l = m.codePointCount(0, m.length)
-        Right(if (!global.isIllFormed(sub) && off >= 0 && off <= l) {
+        Right(if (sub.isWellFormed && off >= 0 && off <= l) {
           val i = m.indexOf(sub, m.offsetByCodePoints(0, off.toInt))
           if (i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
@@ -1113,7 +1125,7 @@ object PureContext {
       case CONST_STRING(m) :: CONST_STRING(sub) :: Nil =>
         Right({
           val i = m.lastIndexOf(sub)
-          if (!global.isIllFormed(sub) && i != -1) {
+          if (sub.isWellFormed && i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
@@ -1161,7 +1173,7 @@ object PureContext {
         Right(if (off >= 0) {
           val offset = Math.min(off, m.codePointCount(0, m.length)).toInt
           val i      = m.lastIndexOf(sub, m.offsetByCodePoints(0, offset))
-          if (!global.isIllFormed(sub) && i != -1) {
+          if (sub.isWellFormed && i != -1) {
             CONST_LONG(m.codePointCount(0, i).toLong)
           } else {
             unit
@@ -1205,7 +1217,7 @@ object PureContext {
 
   private def split(str: String, sep: String, unicode: Boolean): Iterable[CONST_STRING] = {
     if (str == "") listWithEmptyStr
-    else if (unicode && global.isIllFormed(sep)) List(CONST_STRING(str).explicitGet())
+    else if (unicode && !sep.isWellFormed) List(CONST_STRING(str).explicitGet())
     else if (sep == "")
       if (unicode) {
         (1 to str.codePointCount(0, str.length))
@@ -1340,10 +1352,10 @@ object PureContext {
       case xs => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: ${t.toString}, b: ${t.toString})", xs)
     }
 
-  def bigIntConditionOp(op: BinaryOperation, func: Short, complexity: Int = 8)(
+  def bigIntConditionOp(op: BinaryOperation, func: Short)(
       body: (BigInt, BigInt) => Boolean
   ): BaseFunction[NoContext] =
-    NativeFunction(opsToFunctions(op), complexity, func, BOOLEAN, ("a", BIGINT), ("b", BIGINT)) {
+    NativeFunction(opsToFunctions(op), Map(V5 -> 8L, V6 -> 8L, V7 -> 8L, V8 -> 1L), func, BOOLEAN, ("a", BIGINT), ("b", BIGINT)) {
       case CONST_BIGINT(a) :: CONST_BIGINT(b) :: Nil => Try(body(a, b)).toEither.bimap(_.getMessage, CONST_BOOLEAN)
       case xs                                        => notImplemented[Id, EVALUATED](s"${opsToFunctions(op)}(a: BIGINT, b: BIGINT)", xs)
     }
@@ -1396,7 +1408,7 @@ object PureContext {
     }
 
   lazy val listBigIntMax: BaseFunction[NoContext] =
-    NativeFunction("max", 192, MAX_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
+    NativeFunction("max", Map(V5 -> 192L, V6 -> 192L, V7 -> 192L, V8 -> 6L), MAX_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
@@ -1408,7 +1420,7 @@ object PureContext {
     }
 
   lazy val listBigIntMin: BaseFunction[NoContext] =
-    NativeFunction("min", 192, MIN_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
+    NativeFunction("min", Map(V5 -> 192L, V6 -> 192L, V7 -> 192L, V8 -> 6L), MIN_LIST_BIGINT, BIGINT, ("list", PARAMETERIZEDLIST(BIGINT))) {
       case ARR(list) :: Nil =>
         Either.cond(
           list.nonEmpty,
@@ -1452,7 +1464,7 @@ object PureContext {
   lazy val listRemoveByIndex: BaseFunction[NoContext] =
     NativeFunction(
       "removeByIndex",
-      7,
+      Map(V4 -> 7L, V5 -> 7L, V6 -> 7L, V7 -> 7L, V8 -> 4L),
       REMOVE_BY_INDEX_OF_LIST,
       PARAMETERIZEDLIST(TYPEPARAM('T')),
       ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
@@ -1471,7 +1483,29 @@ object PureContext {
         notImplemented[Id, EVALUATED]("removeByIndex(list: List[T], index: Int)", xs)
     }
 
-  @VisibleForTesting
+  private val listReplaceByIndex: BaseFunction[NoContext] =
+    NativeFunction(
+      "replaceByIndex",
+      4,
+      REPLACE_BY_INDEX_OF_LIST,
+      PARAMETERIZEDLIST(TYPEPARAM('T')),
+      ("list", PARAMETERIZEDLIST(TYPEPARAM('T'))),
+      ("index", LONG),
+      ("element", TYPEPARAM('T'))
+    ) {
+      case ARR(list) :: CONST_LONG(index) :: element :: Nil =>
+        if (list.isEmpty)
+          Left("Can't replace an element in empty list")
+        else if (index < 0)
+          Left(s"Index of the replacing element should be positive, but $index was passed")
+        else if (index >= list.size)
+          Left(s"Index of the replacing element should be lower than list size = ${list.length}, but $index was passed")
+        else
+          ARR(list.updated(index.toInt, element), limited = true)
+      case xs =>
+        notImplemented[Id, EVALUATED]("replaceByIndex(list: List[T], index: Int, element: T)", xs)
+    }
+
   private[v1] def genericListIndexOf(
       element: EVALUATED,
       indexOf: EVALUATED => Int,
@@ -1706,7 +1740,13 @@ object PureContext {
     }
 
   val getBigIntListMedian: BaseFunction[NoContext] =
-    NativeFunction("median", 20 * 8, MEDIAN_LISTBIGINT, BIGINT, ("arr", PARAMETERIZEDLIST(BIGINT))) {
+    NativeFunction(
+      "median",
+      Map(V5 -> 20 * 8L, V6 -> 20 * 8L, V7 -> 20 * 8L, V8 -> 35L),
+      MEDIAN_LISTBIGINT,
+      BIGINT,
+      ("arr", PARAMETERIZEDLIST(BIGINT))
+    ) {
       case xs @ ARR(arr) :: Nil =>
         if (arr.headOption.forall(_.isInstanceOf[CONST_BIGINT])) {
           if (arr.nonEmpty)
@@ -2041,12 +2081,20 @@ object PureContext {
       v6Functions
     )
 
+  private[this] val v8Ctx =
+    CTX[NoContext](
+      v5Types,
+      v5Vars,
+      v6Functions :+ listReplaceByIndex
+    )
+
   def build(version: StdLibVersion, useNewPowPrecision: Boolean): CTX[NoContext] =
     version match {
       case V1 | V2 => v1V2Ctx(useNewPowPrecision)
       case V3      => v3Ctx(useNewPowPrecision)
       case V4      => v4Ctx(useNewPowPrecision)
       case V5      => v5Ctx(useNewPowPrecision)
-      case V6      => v6Ctx
+      case V6 | V7 => v6Ctx
+      case V8      => v8Ctx
     }
 }

@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.CreateAliasTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -23,11 +24,11 @@ final case class CreateAliasTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.CreateAlias)
     with SigProofsSwitch
-    with VersionedTransaction
+    with Versioned.ToV3
     with TxWithFee.InWaves
     with PBSince.V3 {
 
-  lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
+  lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId, Some(chainId)).explicitGet()
 
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTxSerializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTxSerializer.toBytes(this))
@@ -44,10 +45,9 @@ final case class CreateAliasTransaction(
 object CreateAliasTransaction extends TransactionParser {
   type TransactionT = CreateAliasTransaction
 
-  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  val typeId: TxType                    = 10: Byte
+  val typeId: TxType = 10: Byte
 
-  implicit val validator = CreateAliasTxValidator
+  implicit val validator: TxValidator[CreateAliasTransaction] = CreateAliasTxValidator
 
   implicit def sign(tx: CreateAliasTransaction, privateKey: PrivateKey): CreateAliasTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

@@ -93,6 +93,9 @@ object WavesContext {
     fromV4Funcs(proofsEnabled, ds.stdLibVersion, typeDefs) ++ v5Funcs ++ dAppFuncs ++ accountFuncs
   }
 
+  private def fromV8Funcs(proofsEnabled: Boolean, ds: DirectiveSet, typeDefs: Map[String, FINAL]) =
+    fromV5Funcs(proofsEnabled, ds, typeDefs) :+ calculateDelay
+
   private def selfCallFunctions(v: StdLibVersion) =
     Array(
       getIntegerFromStateSelfF,
@@ -119,11 +122,11 @@ object WavesContext {
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
-        case V3      => fromV3Funcs(proofsEnabled, version, typeDefs) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version, typeDefs)
-        case V5      => fromV5Funcs(proofsEnabled, ds, typeDefs)
-        case V6      => fromV5Funcs(proofsEnabled, ds, typeDefs)
+        case V1 | V2      => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
+        case V3           => fromV3Funcs(proofsEnabled, version, typeDefs) ++ balanceV123Functions
+        case V4           => fromV4Funcs(proofsEnabled, version, typeDefs)
+        case V5 | V6 | V7 => fromV5Funcs(proofsEnabled, ds, typeDefs)
+        case _            => fromV8Funcs(proofsEnabled, ds, typeDefs)
       }
     commonFuncs ++ versionSpecificFuncs
   }

@@ -6,7 +6,7 @@ import "waves/block.proto";
 import "waves/transaction.proto";
 import "waves/amount.proto";
 import "waves/recipient.proto";
-import "google/protobuf/empty.proto";
+import "waves/transaction_state_snapshot.proto";
 
 message AssetDetails {
   bytes name = 1;
@@ -34,7 +34,7 @@ message TransactionMeta {
   int32 height = 1;
   int32 num = 2;
   int32 type = 3;
-  bool failed = 4;
+  TransactionStatus status = 4;
   int64 spent_complexity = 5;
   int32 size = 6;
 }
@@ -60,7 +60,7 @@ message TransactionData {
     SignedTransaction waves_transaction = 2;
         bytes ethereum_transaction = 5;
   }
-  bool failed = 3;
+  TransactionStatus status = 3;
   int64 spent_complexity = 4;
 }
 
@@ -111,9 +111,12 @@ message LeaseDetails {
   bytes source_id = 4;
   int32 height = 5;
 
-  oneof status {
-    google.protobuf.Empty active = 10;
+  oneof cancel_reason {
     Cancelled cancelled = 11;
     Expired expired = 12;
   }
+}
+
+message LeaseIds {
+  repeated bytes ids = 1;
 }

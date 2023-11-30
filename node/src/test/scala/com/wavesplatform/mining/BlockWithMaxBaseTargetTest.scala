@@ -98,11 +98,11 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           }
         })
 
-        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith[Any] {
+        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock, None).onErrorRecoverWith[Any] {
           case _: SecurityException =>
             Task.unit
         }
-        Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
+        Await.result(blockAppendTask.runToFuture(scheduler), 1.minute)
 
         signal.tryAcquire(10, TimeUnit.SECONDS)
 
@@ -130,7 +130,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
     )
 
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
     val utxPoolStub = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings, settings.maxTxErrorLogSize, settings0.minerSettings.enable)
@@ -145,24 +145,26 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           .map(bs => KeyPair(bs))
           .map { account =>
             val tx           = GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()
-            val genesisBlock = TestBlock.create(ts + 2, List(tx))
-            val secondBlock = TestBlock.create(
-              ts + 3,
-              genesisBlock.id(),
-              Seq.empty,
-              account
-            )
+            val genesisBlock = TestBlock.create(ts + 2, List(tx)).block
+            val secondBlock = TestBlock
+              .create(
+                ts + 3,
+                genesisBlock.id(),
+                Seq.empty,
+                account
+              )
+              .block
             (account, genesisBlock, secondBlock)
           }
           .sample
           .get
 
-      bcu.processBlock(firstBlock, firstBlock.header.generationSignature).explicitGet()
+      bcu.processBlock(firstBlock, firstBlock.header.generationSignature, None).explicitGet()
 
       f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
-
-      bcu.shutdown()
     } finally {
+      schedulerService.shutdown()
+      utxPoolStub.close()
       bcu.shutdown()
     }
   }

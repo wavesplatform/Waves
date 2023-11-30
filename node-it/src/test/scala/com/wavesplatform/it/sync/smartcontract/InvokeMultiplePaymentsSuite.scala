@@ -44,7 +44,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     sender.balance(callerAddress).balance shouldBe callerBalance - smartMinFee
   }
 
-  test("script should sheck if alias not exists") {
+  test("script should sheck if alias not exist") {
     val alias = "unknown"
 
     assertBadRequestAndMessage(

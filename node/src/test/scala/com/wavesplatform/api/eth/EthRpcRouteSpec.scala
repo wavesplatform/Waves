@@ -14,8 +14,8 @@ import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
 import com.wavesplatform.transaction.TxHelpers.issue
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.EthEncoding.toHexString
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import play.api.libs.json.*

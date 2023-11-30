@@ -4,8 +4,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{AddressId, KeyTags}
-import com.wavesplatform.state.{AssetDescription, Blockchain, Diff, Portfolio}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.state.{AssetDescription, Blockchain, StateSnapshot, TxMeta}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
 import org.rocksdb.RocksDB
@@ -25,7 +25,7 @@ trait CommonAssetsApi {
 object CommonAssetsApi {
   final case class AssetInfo(description: AssetDescription, issueTransaction: Option[IssueTransaction], sponsorBalance: Option[Long])
 
-  def apply(diff: () => Diff, db: RocksDB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
+  def apply(snapshot: () => StateSnapshot, db: RocksDB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
     def description(assetId: IssuedAsset): Option[AssetDescription] =
       blockchain.assetDescription(assetId)
 
@@ -35,7 +35,7 @@ object CommonAssetsApi {
         sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(assetInfo.issuer.toAddress).spendableBalance) else None
       } yield AssetInfo(
         assetInfo,
-        blockchain.transactionInfo(assetId.id).collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
+        blockchain.transactionInfo(assetId.id).collect { case (tm, it: IssueTransaction) if tm.status == TxMeta.Status.Succeeded => it },
         sponsorBalance
       )
 
@@ -48,7 +48,7 @@ object CommonAssetsApi {
           blockchain.assetDescription(assetId).map { desc =>
             AssetInfo(
               desc,
-              tx.collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
+              tx.collect { case (tm, it: IssueTransaction) if tm.status == TxMeta.Status.Succeeded => it },
               if (desc.sponsorship != 0) Some(blockchain.wavesPortfolio(desc.issuer.toAddress).spendableBalance) else None
             )
           }
@@ -61,10 +61,10 @@ object CommonAssetsApi {
         db,
         height,
         after,
-        if (height == blockchain.height) diff().portfolios else Map.empty[Address, Portfolio],
+        if (height == blockchain.height) snapshot().balances else Map(),
         KeyTags.WavesBalanceHistory.prefixBytes,
         bs => AddressId.fromByteArray(bs.slice(2, bs.length - 4)),
-        _.balance
+        Waves
       )
 
     override def assetDistribution(asset: IssuedAsset, height: Int, after: Option[Address]): Observable[(Address, Long)] =
@@ -72,10 +72,10 @@ object CommonAssetsApi {
         db,
         height,
         after,
-        if (height == blockchain.height) diff().portfolios else Map.empty[Address, Portfolio],
+        if (height == blockchain.height) snapshot().balances else Map(),
         KeyTags.AssetBalanceHistory.prefixBytes ++ asset.id.arr,
         bs => AddressId.fromByteArray(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
-        _.assets.getOrElse(asset, 0L)
+        asset
       )
   }
 }

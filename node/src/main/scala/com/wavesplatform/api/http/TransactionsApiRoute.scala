@@ -17,22 +17,21 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
-import play.api.libs.json.*
 import monix.reactive.Observable
+import play.api.libs.json.*
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
-    compositeBlockchain: () => CompositeBlockchain,
+    compositeBlockchain: () => Blockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
     time: Time,
@@ -43,7 +42,7 @@ case class TransactionsApiRoute(
   import TransactionsApiRoute.*
 
   private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
-  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
@@ -87,7 +86,7 @@ case class TransactionsApiRoute(
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status.*
     val statusJson = blockchain.transactionInfo(id) match {
-      case Some((tm, tx)) =>
+      case Some((tm, _)) =>
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> JsNumber(tm.height),
@@ -173,9 +172,9 @@ case class TransactionsApiRoute(
     jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
   }
 
-  def signedBroadcast: Route = path("broadcast")(
+  def signedBroadcast: Route = path("broadcast") {
     broadcast[JsValue](TransactionFactory.fromSignedRequest)
-  )
+  }
 
   def merkleProof: Route = path("merkleProof") {
     anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>
@@ -250,6 +249,7 @@ object TransactionsApiRoute {
   object ApplicationStatus {
     val Succeeded             = "succeeded"
     val ScriptExecutionFailed = "script_execution_failed"
+    val Elided                = "elided"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

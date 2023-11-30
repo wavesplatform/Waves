@@ -5,6 +5,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -52,7 +53,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
         val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
         invokeTxMeta.spentComplexity shouldBe complexityLimit
 
-        invokeTxMeta.succeeded shouldBe true
+        invokeTxMeta.status == Status.Succeeded shouldBe true
       }
     }
 
@@ -63,14 +64,14 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
         val calls    = complexityLimit / 2000 + 1
         val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
 
-        val diff              = d.createDiffE(invokeTx).value
-        val (_, scriptResult) = diff.scriptResults.headOption.value
+        val snapshot          = d.createDiffE(invokeTx).value
+        val (_, scriptResult) = snapshot.scriptResults.headOption.value
         scriptResult.error.value.text should include(s"Invoke complexity limit = $complexityLimit is exceeded")
 
         d.appendBlock(invokeTx)
         val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
         invokeTxMeta.spentComplexity shouldBe complexityLimit
-        invokeTxMeta.succeeded shouldBe false
+        invokeTxMeta.status == Status.Succeeded shouldBe false
       }
     }
   }
@@ -98,13 +99,13 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
       val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(101)), invoker = alice)
 
-      val diff              = d.createDiffE(invokeTx).value
-      val (_, scriptResult) = diff.scriptResults.headOption.value
+      val snapshot          = d.createDiffE(invokeTx).value
+      val (_, scriptResult) = snapshot.scriptResults.headOption.value
       scriptResult.error.value.text should include("DApp calls limit = 100 is exceeded")
 
       d.appendBlock(invokeTx)
       val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
-      invokeTxMeta.succeeded shouldBe false
+      invokeTxMeta.status == Status.Succeeded shouldBe false
     }
   }
 
@@ -136,7 +137,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
       d.appendBlock(invokeTx)
 
       val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
-      invokeTxMeta.succeeded shouldBe true
+      invokeTxMeta.status == Status.Succeeded shouldBe true
     }
   }
 

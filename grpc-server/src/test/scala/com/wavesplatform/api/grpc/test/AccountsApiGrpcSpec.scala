@@ -2,34 +2,32 @@ package com.wavesplatform.api.grpc.test
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{
-  AccountRequest,
-  AccountsApiGrpcImpl,
-  BalanceResponse,
-  BalancesRequest,
-  DataEntryResponse,
-  DataRequest,
-  LeaseResponse
-}
+import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.api.grpc.*
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.{DataTransactionData, Recipient}
-import com.wavesplatform.state.{EmptyDataEntry, IntegerDataEntry}
-import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.protobuf.transaction.{DataEntry, Recipient}
+import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
+import org.scalatest.{Assertion, BeforeAndAfterAll}
 
-import org.scalatest.BeforeAndAfterAll
+import scala.concurrent.Await
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
 
-  val sender: KeyPair    = TxHelpers.signer(1)
-  val recipient: KeyPair = TxHelpers.signer(2)
+  val sender: KeyPair         = TxHelpers.signer(1)
+  val recipient: KeyPair      = TxHelpers.signer(2)
+  val timeout: FiniteDuration = 2.minutes
 
   "GetBalances should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
@@ -71,6 +69,28 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
     }
   }
 
+  "GetScript should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
+    val grpcApi = getGrpcApi(d)
+
+    val script = TxHelpers.script(
+      s"""{-# STDLIB_VERSION 6 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |@Callable(i)
+         |func foo(a: Int) = { ([], a == 42) }""".stripMargin
+    )
+
+    d.appendBlock(TxHelpers.setScript(sender, script))
+
+    val r = Await.result(
+      grpcApi.getScript(AccountRequest.of(ByteString.copyFrom(sender.toAddress.bytes))),
+      timeout
+    )
+
+    r.scriptBytes shouldBe ByteString.copyFrom(script.bytes().arr)
+    r.publicKey shouldBe ByteString.copyFrom(sender.publicKey.arr)
+  }
+
   "GetActiveLeases should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
 
@@ -87,7 +107,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       grpcApi.getActiveLeases(AccountRequest.of(ByteString.copyFrom(recipient.toAddress.bytes)), observer)
 
-      result.runSyncUnsafe() shouldBe List(
+      result.runSyncUnsafe() should contain theSameElementsAs List(
         LeaseResponse.of(
           ByteString.copyFrom(lease3.id().arr),
           ByteString.copyFrom(lease3.id().arr),
@@ -123,7 +143,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       result1.runSyncUnsafe() shouldBe List(
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key2", DataTransactionData.DataEntry.Value.IntValue(456)))
+          Some(DataEntry.of("key2", DataEntry.Value.IntValue(456)))
         )
       )
 
@@ -132,16 +152,104 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       result2.runSyncUnsafe() shouldBe List(
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key2", DataTransactionData.DataEntry.Value.IntValue(456)))
+          Some(DataEntry.of("key2", DataEntry.Value.IntValue(456)))
         ),
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key3", DataTransactionData.DataEntry.Value.IntValue(789)))
+          Some(DataEntry.of("key3", DataEntry.Value.IntValue(789)))
         )
       )
     }
   }
 
+  "NODE-922. GetBalances should return correct balances for challenged and challenging miners" in {
+    def checkBalances(
+        address: Address,
+        expectedRegular: Long,
+        expectedEffective: Long,
+        expectedGenerating: Long,
+        grpcApi: AccountsApiGrpcImpl
+    ): Assertion = {
+      val expectedResult = List(
+        BalanceResponse.of(
+          BalanceResponse.Balance.Waves(BalanceResponse.WavesBalances(expectedRegular, expectedGenerating, expectedRegular, expectedEffective))
+        )
+      )
+
+      val (observer, result) = createObserver[BalanceResponse]
+      grpcApi.getBalances(
+        BalancesRequest.of(ByteString.copyFrom(address.bytes), Seq.empty),
+        observer
+      )
+      result.runSyncUnsafe() shouldBe expectedResult
+    }
+
+    val sender          = TxHelpers.signer(1)
+    val challengedMiner = TxHelpers.signer(2)
+    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+      val grpcApi = getGrpcApi(d)
+
+      val challengingMiner = d.wallet.generateNewAccount().get
+
+      val initChallengingBalance = 1000.waves
+      val initChallengedBalance  = 2000.waves
+
+      d.appendBlock(
+        TxHelpers.transfer(sender, challengingMiner.toAddress, initChallengingBalance),
+        TxHelpers.transfer(sender, challengedMiner.toAddress, initChallengedBalance)
+      )
+
+      (1 to 999).foreach(_ => d.appendBlock())
+
+      val invalidStateHash = ByteStr.fill(DigestLength)(1)
+      val originalBlock = d.createBlock(
+        Block.ProtoBlockVersion,
+        Seq.empty,
+        strictTime = true,
+        generator = challengedMiner,
+        stateHash = Some(Some(invalidStateHash))
+      )
+      val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+
+      checkBalances(challengingMiner.toAddress, initChallengingBalance, initChallengingBalance, initChallengingBalance, grpcApi)
+      checkBalances(challengedMiner.toAddress, initChallengedBalance, initChallengedBalance, initChallengedBalance, grpcApi)
+
+      d.appendBlockE(challengingBlock) should beRight
+
+      checkBalances(
+        challengingMiner.toAddress,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance,
+        grpcApi
+      )
+      checkBalances(challengedMiner.toAddress, initChallengedBalance, 0, 0, grpcApi)
+
+      d.appendBlock()
+
+      checkBalances(
+        challengingMiner.toAddress,
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance + getLastBlockMinerReward(d),
+        initChallengingBalance,
+        grpcApi
+      )
+      checkBalances(challengedMiner.toAddress, initChallengedBalance, initChallengedBalance, 0, grpcApi)
+
+    }
+  }
+
   private def getGrpcApi(d: Domain) =
     new AccountsApiGrpcImpl(d.accountsApi)
+
+  private def getLastBlockMinerReward(d: Domain): Long =
+    BlockRewardCalculator
+      .getBlockRewardShares(
+        d.blockchain.height,
+        d.blockchain.settings.rewardsSettings.initial,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten,
+        d.blockchain
+      )
+      .miner
 }

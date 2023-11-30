@@ -4,25 +4,20 @@ import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{
-  AssetInfo,
-  AssetStateUpdate,
-  BalanceUpdate,
-  DataEntryUpdate,
-  LeaseUpdate,
-  LeasingBalanceUpdate,
-  ScriptUpdate
-}
-import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdatesRangeRequest, SubscribeRequest}
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
+import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.events.protobuf.StateUpdate.BalanceUpdate as PBBalanceUpdate
 import com.wavesplatform.events.protobuf.serde.*
-import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated}
+import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated, StateUpdate as PBStateUpdate}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockReward
 import com.wavesplatform.history.Domain
@@ -32,21 +27,21 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.InvokeScriptResult
+import com.wavesplatform.protobuf.transaction.{DataEntry, InvokeScriptResult}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
-import com.wavesplatform.state.{AssetDescription, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
+import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.assets.exchange.OrderType
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, TxHelpers}
+import com.wavesplatform.utils.byteStrOrdering
 import io.grpc.StatusException
 import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
@@ -65,7 +60,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
   val lease: LeaseTransaction             = TxHelpers.lease(fee = TestValues.fee)
   val issue: IssueTransaction             = TxHelpers.issue(amount = 1000)
   val reissue: ReissueTransaction         = TxHelpers.reissue(issue.asset)
-  val data: DataTransaction               = TxHelpers.dataSingle()
+  val data: DataTransaction               = TxHelpers.dataSingle(fee = TestValues.fee * 3) // for compatibility with expected values
   val createAlias: CreateAliasTransaction = TxHelpers.createAlias("alias")
   val setScript1: SetScriptTransaction = TxHelpers.setScript(
     TxHelpers.defaultSigner,
@@ -166,7 +161,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       d.appendMicroBlock(TxHelpers.transfer())
 
       val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-      d.appendKeyBlock(Some(keyBlockId))
+      d.appendKeyBlock(ref = Some(keyBlockId))
 
       subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should (
         matchPattern {
@@ -367,7 +362,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
           repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
 
           // micro rollback
-          d.appendKeyBlock(Some(block.id()))
+          d.appendKeyBlock(ref = Some(block.id()))
           d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
           repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
 
@@ -416,7 +411,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       (1 to blocksCount + 1).foreach(_ => d.appendBlock())
 
       val result = Await
-        .result(r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(1, blocksCount)), Duration.Inf)
+        .result(r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(1, blocksCount)), 1.minute)
         .updates
         .map(_.update.append.map(_.getBlock.vrf.toByteStr).filterNot(_.isEmpty))
 
@@ -466,13 +461,13 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val reward        = 600000000
       val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
       val genesis       = results.head.getAppend.transactionStateUpdates.head.balances.head
-      genesis.address.toAddress shouldBe TxHelpers.defaultAddress
+      genesis.address.toAddress() shouldBe TxHelpers.defaultAddress
       genesis.getAmountAfter.amount shouldBe genesisAmount
       genesis.amountBefore shouldBe reward
       genesis.getAmountAfter.assetId shouldBe empty
 
       val payment = results.last.getAppend.transactionStateUpdates.last.balances.find { bu =>
-        bu.address.toAddress == TxHelpers.secondAddress
+        bu.address.toAddress() == TxHelpers.secondAddress
       }.get
 
       payment.getAmountAfter.amount shouldBe 100
@@ -564,7 +559,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         d.appendMicroBlock(transfer, lease, issue, reissue, data, createAlias, setScript1)
         sendUpdate()
 
-        d.appendKeyBlock(Some(firstMicroId))
+        d.appendKeyBlock(ref = Some(firstMicroId))
         sendUpdate()
         sendUpdate()
 
@@ -601,7 +596,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(keyBlockId))
+        d.appendKeyBlock(ref = Some(keyBlockId))
 
         sendUpdate()
         sendUpdate()
@@ -623,7 +618,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         val microBlockId = d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(microBlockId))
+        d.appendKeyBlock(ref = Some(microBlockId))
 
         (1 to 3).foreach(_ => sendUpdate())
 
@@ -646,7 +641,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(keyBlockId))
+        d.appendKeyBlock(ref = Some(keyBlockId))
         sendUpdate()
 
         subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
@@ -669,7 +664,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         sendUpdate()
 
         d.appendMicroBlock(TxHelpers.transfer())
-        d.appendKeyBlock(Some(keyBlockId))
+        d.appendKeyBlock(ref = Some(keyBlockId))
 
         (1 to 3).foreach(_ => sendUpdate())
 
@@ -802,6 +797,302 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         invokeResult.invokes.head.stateChanges.get.transfers shouldBe payment(TxHelpers.signer(2).toAddress)
       }
     }
+
+    "should return correct data for challenged block (NODE-921)" in {
+      val challengedMiner = TxHelpers.signer(2)
+      val sender          = TxHelpers.signer(3)
+      val recipient       = TxHelpers.signer(4)
+
+      withDomainAndRepo(settings = DomainPresets.TransactionStateSnapshot) { case (d, repo) =>
+        val challengingMiner = d.wallet.generateNewAccount().get
+
+        val initSenderBalance      = 100000.waves
+        val initChallengingBalance = 1000.waves
+        val initChallengedBalance  = 2000.waves
+
+        val genesis = d.appendBlock(
+          TxHelpers.genesis(challengingMiner.toAddress, initChallengingBalance),
+          TxHelpers.genesis(challengedMiner.toAddress, initChallengedBalance),
+          TxHelpers.genesis(sender.toAddress, initSenderBalance)
+        )
+
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        val txTimestamp      = genesis.header.timestamp + 1
+        val invalidStateHash = ByteStr.fill(DigestLength)(1)
+        val txs = Seq(
+          TxHelpers.transfer(sender, recipient.toAddress, 1.waves, timestamp = txTimestamp),
+          TxHelpers.transfer(sender, recipient.toAddress, 2.waves, timestamp = txTimestamp + 1)
+        )
+        val originalBlock = d.createBlock(
+          Block.ProtoBlockVersion,
+          txs,
+          generator = challengedMiner,
+          stateHash = Some(Some(invalidStateHash))
+        )
+        val challengingBlock = d.createChallengingBlock(challengingMiner, originalBlock)
+
+        d.appendBlock(challengingBlock)
+        d.appendBlock()
+
+        val update = subscription.fetchAllEvents(d.blockchain)(1).getUpdate
+        update.id.toByteStr shouldBe challengingBlock.id()
+        update.height shouldBe 2
+
+        val append = update.update.append.get
+        PBBlocks.vanilla(append.body.block.get.block.get).get shouldBe challengingBlock
+        append.transactionIds.map(_.toByteStr).toSet shouldBe txs.map(_.id()).toSet
+
+        val daoAddress        = d.settings.blockchainSettings.functionalitySettings.daoAddressParsed.toOption.flatten
+        val xtnBuybackAddress = d.settings.blockchainSettings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+        val blockRewards = BlockRewardCalculator.getBlockRewardShares(
+          2,
+          d.settings.blockchainSettings.rewardsSettings.initial,
+          daoAddress,
+          xtnBuybackAddress,
+          d.blockchain
+        )
+
+        append.stateUpdate.get.balances shouldBe Seq(
+          PBBalanceUpdate(
+            challengingMiner.toAddress.toByteString,
+            Some(Amount(amount = initChallengingBalance + blockRewards.miner)),
+            initChallengingBalance
+          )
+        ) ++
+          daoAddress.map { addr =>
+            protobuf.StateUpdate.BalanceUpdate(
+              addr.toByteString,
+              Some(
+                Amount(amount = blockRewards.daoAddress)
+              )
+            )
+          } ++
+          xtnBuybackAddress.map { addr =>
+            protobuf.StateUpdate.BalanceUpdate(
+              addr.toByteString,
+              Some(
+                Amount(amount = blockRewards.xtnBuybackAddress)
+              )
+            )
+          }
+        val challengingMinerAddress = challengingMiner.toAddress.toByteString
+        val challengingMinerBalance = initChallengingBalance + blockRewards.miner
+        val balanceAfterTransfer1   = initSenderBalance - TestValues.fee - 1.waves
+        val balanceAfterTransfer2   = initSenderBalance - 2 * TestValues.fee - 3.waves
+        append.transactionStateUpdates.map(_.balances.toSet) shouldBe Seq(
+          Set(
+            PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer1)), initSenderBalance),
+            PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 1.waves))),
+            PBBalanceUpdate(
+              challengingMinerAddress,
+              Some(Amount(amount = challengingMinerBalance + TestValues.fee * 2 / 5)),
+              challengingMinerBalance
+            )
+          ),
+          Set(
+            PBBalanceUpdate(sender.toAddress.toByteString, Some(Amount(amount = balanceAfterTransfer2)), balanceAfterTransfer1),
+            PBBalanceUpdate(recipient.toAddress.toByteString, Some(Amount(amount = 3.waves)), 1.waves),
+            PBBalanceUpdate(
+              challengingMinerAddress,
+              Some(Amount(amount = challengingMinerBalance + TestValues.fee * 4 / 5)),
+              challengingMinerBalance + TestValues.fee * 2 / 5
+            )
+          )
+        )
+      }
+    }
+
+    s"should contain block mining rewards for daoAddress and xtnBuybackAddress after ${BlockchainFeatures.BlockRewardDistribution.description} activation" in {
+      val daoAddress        = TxHelpers.address(100)
+      val xtnBuybackAddress = TxHelpers.address(101)
+
+      val settings = RideV6
+        .copy(blockchainSettings =
+          RideV6.blockchainSettings.copy(functionalitySettings =
+            RideV6.blockchainSettings.functionalitySettings
+              .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString))
+          )
+        )
+        .setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 2)
+
+      withDomainAndRepo(settings) { case (d, repo) =>
+        val blockReward         = d.blockchain.settings.rewardsSettings.initial
+        val configAddressReward = blockReward / 3
+
+        val miner        = d.appendBlock().sender.toAddress
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        d.appendBlock()
+        d.appendBlock()
+
+        subscription.fetchAllEvents(d.blockchain).flatMap(_.getUpdate.update.append.flatMap(_.stateUpdate)).map(_.balances.toSet) shouldBe
+          Seq(
+            Set(PBStateUpdate.BalanceUpdate(miner.toByteString, Some(Amount(ByteString.EMPTY, blockReward)))),
+            Set(
+              PBStateUpdate
+                .BalanceUpdate(miner.toByteString, Some(Amount(ByteString.EMPTY, 2 * blockReward - 2 * configAddressReward)), blockReward),
+              PBStateUpdate
+                .BalanceUpdate(daoAddress.toByteString, Some(Amount(ByteString.EMPTY, configAddressReward))),
+              PBStateUpdate
+                .BalanceUpdate(xtnBuybackAddress.toByteString, Some(Amount(ByteString.EMPTY, configAddressReward)))
+            ),
+            Set(
+              PBStateUpdate
+                .BalanceUpdate(
+                  miner.toByteString,
+                  Some(Amount(ByteString.EMPTY, 3 * blockReward - 4 * configAddressReward)),
+                  2 * blockReward - 2 * configAddressReward
+                ),
+              PBStateUpdate
+                .BalanceUpdate(daoAddress.toByteString, Some(Amount(ByteString.EMPTY, 2 * configAddressReward)), configAddressReward),
+              PBStateUpdate
+                .BalanceUpdate(xtnBuybackAddress.toByteString, Some(Amount(ByteString.EMPTY, 2 * configAddressReward)), configAddressReward)
+            )
+          )
+      }
+    }
+
+    "should return correct rewardShares for GetBlockUpdate (NODE-838)" in {
+      blockUpdatesRewardSharesTestCase { case (miner, daoAddress, xtnBuybackAddress, d, r) =>
+        // reward distribution features not activated
+        checkBlockUpdateRewards(
+          2,
+          Seq(RewardShare(ByteString.copyFrom(miner.bytes), d.blockchain.settings.rewardsSettings.initial))
+        )(r)
+
+        // BlockRewardDistribution activated
+        val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+        val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+        checkBlockUpdateRewards(
+          3,
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward3),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward3),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward3)
+          ).sortBy(_.address.toByteStr)
+        )(r)
+
+        // CappedReward activated
+        val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+        val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+        checkBlockUpdateRewards(
+          4,
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward4),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward4),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward4)
+          ).sortBy(_.address.toByteStr)
+        )(r)
+
+        // CeaseXTNBuyback activated with expired XTN buyback reward period
+        val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+        val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+        checkBlockUpdateRewards(
+          5,
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward5),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
+          ).sortBy(_.address.toByteStr)
+        )(r)
+      }
+    }
+
+    "should return correct rewardShares for GetBlockUpdatesRange (NODE-839)" in {
+      blockUpdatesRewardSharesTestCase { case (miner, daoAddress, xtnBuybackAddress, d, r) =>
+        val updates = r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(2, 5)).futureValue.updates
+
+        // reward distribution features not activated
+        checkBlockUpdateRewards(updates.head, Seq(RewardShare(ByteString.copyFrom(miner.bytes), d.blockchain.settings.rewardsSettings.initial)))
+
+        // BlockRewardDistribution activated
+        val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+        val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+        checkBlockUpdateRewards(
+          updates(1),
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward3),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward3),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward3)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CappedReward activated
+        val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+        val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+        checkBlockUpdateRewards(
+          updates(2),
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward4),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward4),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward4)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CeaseXTNBuyback activated with expired XTN buyback reward period
+        val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+        val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+        checkBlockUpdateRewards(
+          updates(3),
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward5),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
+          ).sortBy(_.address.toByteStr)
+        )
+      }
+    }
+
+    "should return correct rewardShares for Subscribe (NODE-840)" in {
+      blockUpdatesRewardSharesTestCase { case (miner, daoAddress, xtnBuybackAddress, d, r) =>
+        val subscription = r.createFakeObserver(SubscribeRequest.of(2, 0))
+
+        val rewardShares = subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.getAppend.body.block.map(_.rewardShares))
+
+        // reward distribution features not activated
+        rewardShares.head shouldBe Some(Seq(RewardShare(ByteString.copyFrom(miner.bytes), d.blockchain.settings.rewardsSettings.initial)))
+
+        // BlockRewardDistribution activated
+        val configAddrReward3 = d.blockchain.settings.rewardsSettings.initial / 3
+        val minerReward3      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward3
+
+        rewardShares(1) shouldBe Some(
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward3),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward3),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward3)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CappedReward activated
+        val configAddrReward4 = BlockRewardCalculator.MaxAddressReward
+        val minerReward4      = d.blockchain.settings.rewardsSettings.initial - 2 * configAddrReward4
+
+        rewardShares(2) shouldBe Some(
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward4),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward4),
+            RewardShare(ByteString.copyFrom(xtnBuybackAddress.bytes), configAddrReward4)
+          ).sortBy(_.address.toByteStr)
+        )
+
+        // CeaseXTNBuyback activated with expired XTN buyback reward period
+        val configAddrReward5 = BlockRewardCalculator.MaxAddressReward
+        val minerReward5      = d.blockchain.settings.rewardsSettings.initial - configAddrReward5
+
+        rewardShares(3) shouldBe Some(
+          Seq(
+            RewardShare(ByteString.copyFrom(miner.bytes), minerReward5),
+            RewardShare(ByteString.copyFrom(daoAddress.bytes), configAddrReward5)
+          ).sortBy(_.address.toByteStr)
+        )
+      }
+    }
   }
 
   private def assertCommon(rollback: RollbackResult): Assertion = {
@@ -838,7 +1129,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
         startRead.lock()
 
-        val subscription = Future(repo.createSubscriptionObserver(SubscribeRequest.of(1, toHeight)))
+        val subscription = Future(repo.createFakeObserver(SubscribeRequest.of(1, toHeight)))
 
         appendExtraBlocks(d)
 
@@ -881,4 +1172,47 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     case _ => throw new IllegalArgumentException("Not a microblock rollback")
   }
+
+  private def blockUpdatesRewardSharesTestCase(checks: (Address, Address, Address, Domain, Repo) => Unit): Unit = {
+    val daoAddress        = TxHelpers.address(3)
+    val xtnBuybackAddress = TxHelpers.address(4)
+
+    val settings = DomainPresets.ConsensusImprovements
+    val settingsWithFeatures = settings
+      .copy(blockchainSettings =
+        settings.blockchainSettings.copy(
+          functionalitySettings = settings.blockchainSettings.functionalitySettings
+            .copy(daoAddress = Some(daoAddress.toString), xtnBuybackAddress = Some(xtnBuybackAddress.toString), xtnBuybackRewardPeriod = 1),
+          rewardsSettings = settings.blockchainSettings.rewardsSettings.copy(initial = BlockRewardCalculator.FullRewardInit + 1.waves)
+        )
+      )
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 3,
+        BlockchainFeatures.CappedReward            -> 4,
+        BlockchainFeatures.CeaseXtnBuyback         -> 5
+      )
+
+    withDomainAndRepo(settingsWithFeatures) { case (d, r) =>
+      val miner = d.appendBlock().sender.toAddress
+      d.appendBlock()
+      (3 to 5).foreach(_ => d.appendBlock())
+      d.appendBlock()
+
+      checks(miner, daoAddress, xtnBuybackAddress, d, r)
+    }
+  }
+
+  private def checkBlockUpdateRewards(height: Int, expected: Seq[RewardShare])(repo: Repo): Assertion =
+    Await
+      .result(
+        repo.getBlockUpdate(GetBlockUpdateRequest(height)),
+        1.minute
+      )
+      .getUpdate
+      .update
+      .append
+      .flatMap(_.body.block.map(_.rewardShares)) shouldBe Some(expected)
+
+  private def checkBlockUpdateRewards(bu: protobuf.BlockchainUpdated, expected: Seq[RewardShare]): Assertion =
+    bu.getAppend.body.block.map(_.rewardShares) shouldBe Some(expected)
 }

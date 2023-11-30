@@ -3,7 +3,6 @@ package com.wavesplatform.lang.script.v1
 import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.flatMap._
-import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
@@ -29,7 +28,6 @@ object ExprScript {
       s"Script is too large: ${bs.length} bytes > $limit bytes"
     )
   }
-  @VisibleForTesting
   def apply(x: EXPR): Either[String, Script] = apply(V1, x)
 
   def apply(version: StdLibVersion, x: EXPR, isFreeCall: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =

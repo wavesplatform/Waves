@@ -15,13 +15,13 @@ package object utils {
 
   def addressTransactions(
       rdb: RDB,
-      diff: => Option[(Height, Diff)],
+      snapshot: => Option[(Height, StateSnapshot)],
       address: Address,
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   )(implicit s: Scheduler): Seq[(Height, Transaction)] =
     AddressTransactions
-      .allAddressTransactions(rdb, diff, address, None, types, fromId)
+      .allAddressTransactions(rdb, snapshot, address, None, types, fromId)
       .map { case (tm, tx, _) => tm.height -> tx }
       .toListL
       .runSyncUnsafe()

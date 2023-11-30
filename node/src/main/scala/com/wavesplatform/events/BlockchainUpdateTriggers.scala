@@ -2,22 +2,20 @@ package com.wavesplatform.events
 
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 
 trait BlockchainUpdateTriggers {
   def onProcessBlock(
       block: Block,
-      diff: DetailedDiff,
-      minerReward: Option[Long],
+      snapshot: StateSnapshot,
+      reward: Option[Long],
       hitSource: ByteStr,
-      blockchainBeforeWithMinerReward: Blockchain
+      blockchainBeforeWithReward: Blockchain
   ): Unit
   def onProcessMicroBlock(
       microBlock: MicroBlock,
-      diff: DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      snapshot: StateSnapshot,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
   ): Unit
@@ -29,15 +27,15 @@ object BlockchainUpdateTriggers {
   def noop: BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
     override def onProcessBlock(
         block: Block,
-        diff: DetailedDiff,
-        minerReward: Option[Long],
+        snapshot: StateSnapshot,
+        reward: Option[Long],
         hitSource: ByteStr,
-        blockchainBeforeWithMinerReward: Blockchain
+        blockchainBeforeWithReward: Blockchain
     ): Unit = {}
     override def onProcessMicroBlock(
         microBlock: MicroBlock,
-        diff: DetailedDiff,
-        blockchainBeforeWithMinerReward: Blockchain,
+        snapshot: StateSnapshot,
+        blockchainBeforeWithReward: Blockchain,
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
     ): Unit = {}
@@ -48,21 +46,21 @@ object BlockchainUpdateTriggers {
   def combined(triggers: => Seq[BlockchainUpdateTriggers]): BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
     override def onProcessBlock(
         block: Block,
-        diff: BlockDiffer.DetailedDiff,
-        minerReward: Option[Long],
+        snapshot: StateSnapshot,
+        reward: Option[Long],
         hitSource: ByteStr,
-        blockchainBeforeWithMinerReward: Blockchain
+        blockchainBeforeWithReward: Blockchain
     ): Unit =
-      triggers.foreach(_.onProcessBlock(block, diff, minerReward, hitSource, blockchainBeforeWithMinerReward))
+      triggers.foreach(_.onProcessBlock(block, snapshot, reward, hitSource, blockchainBeforeWithReward))
 
     override def onProcessMicroBlock(
         microBlock: MicroBlock,
-        diff: BlockDiffer.DetailedDiff,
-        blockchainBeforeWithMinerReward: Blockchain,
+        snapshot: StateSnapshot,
+        blockchainBeforeWithReward: Blockchain,
         totalBlockId: ByteStr,
         totalTransactionsRoot: ByteStr
     ): Unit =
-      triggers.foreach(_.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot))
+      triggers.foreach(_.onProcessMicroBlock(microBlock, snapshot, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot))
 
     override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
       triggers.foreach(_.onRollback(blockchainBefore, toBlockId, toHeight))

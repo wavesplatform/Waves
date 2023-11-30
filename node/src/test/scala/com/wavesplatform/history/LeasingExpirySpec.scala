@@ -43,14 +43,16 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
     transfer     <- transferGeneratorP(ntpTime.getTimestamp(), lessor, aliasRecipient.toAddress, maxFeeAmount)
     alias        <- aliasGen
     createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount.value, ntpTime.getTimestamp())
-    genesisBlock = TestBlock.create(
-      ts,
-      Seq(
-        GenesisTransaction.create(lessor.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
-        transfer,
-        createAlias
+    genesisBlock = TestBlock
+      .create(
+        ts,
+        Seq(
+          GenesisTransaction.create(lessor.toAddress, Constants.TotalWaves * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+          transfer,
+          createAlias
+        )
       )
-    )
+      .block
 
   } yield (lessor, alias, genesisBlock)
 
@@ -72,7 +74,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       addressRecipient <- accountGen
       l1               <- lease(lessor, addressRecipient.toAddress)
       l2               <- lease(lessor, alias)
-    } yield TestBlock.create(ntpTime.getTimestamp(), ref, Seq(l1, l2))
+    } yield TestBlock.create(ntpTime.getTimestamp(), ref, Seq(l1, l2)).block
 
   private def ensureNoLeases(b: Blockchain, addresses: Set[AddressOrAlias])(implicit pos: Position): Unit = {
     for (aoa <- addresses) {
@@ -83,7 +85,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
   private def ensureEffectiveBalance(b: Blockchain, address: KeyPair, amount: Long)(implicit pos: Position): Unit =
     b.effectiveBalance(address.toAddress, 0) shouldBe amount
 
-  private def mkEmptyBlock(ref: ByteStr): Block = TestBlock.create(ntpNow, ref, Seq.empty)
+  private def mkEmptyBlock(ref: ByteStr): Block = TestBlock.create(ntpNow, ref, Seq.empty).block
 
   private def leaseRecipients(blocks: Seq[Block]): Set[AddressOrAlias] =
     blocks
@@ -135,9 +137,9 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.getTimestamp())
       recipient                     <- accountGen
       (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.getTimestamp())
-      b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2))
+      b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2)).block
       b3 = mkEmptyBlock(b2.id())
-      b4 = TestBlock.create(ntpNow, b3.id(), Seq(c1, c2))
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(c1, c2)).block
       b5 = mkEmptyBlock(b4.id())
     } yield Seq(genesisBlock, b2, b3, b4, b5)
 
@@ -158,10 +160,10 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.getTimestamp())
       recipient                     <- accountGen
       (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.getTimestamp())
-      b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2))
+      b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2)).block
       b3 = mkEmptyBlock(b2.id())
       b4 = mkEmptyBlock(b3.id())
-      b5 = TestBlock.create(ntpNow, b4.id(), Seq(c1, c2))
+      b5 = TestBlock.create(ntpNow, b4.id(), Seq(c1, c2)).block
     } yield Seq(genesisBlock, b2, b3, b4, b5)
 
     "is rejected after lease is cancelled" in forAll(invalidCancel) { blocks =>
@@ -183,8 +185,8 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       l2                        <- lease(lessor, alias.toAddress, amount / 2)
       b2 = mkEmptyBlock(genesisBlock.id())
       b3 = mkEmptyBlock(b2.id())
-      b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1))
-      b5 = TestBlock.create(ntpNow, b4.id(), Seq(l2))
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1)).block
+      b5 = TestBlock.create(ntpNow, b4.id(), Seq(l2)).block
       b6 = mkEmptyBlock(b5.id())
       b7 = mkEmptyBlock(b6.id())
     } yield (alias, Seq(genesisBlock, b2, b3, b4, b5, b6, b7))
@@ -226,9 +228,9 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       l2                        <- lease(lessor, miner.toAddress, amount)
       b2 = mkEmptyBlock(genesisBlock.id())
       b3 = mkEmptyBlock(b2.id())
-      b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1))
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1)).block
       b5 = mkEmptyBlock(b4.id())
-      b6 = TestBlock.create(ntpNow, b5.id(), Seq(l2))
+      b6 = TestBlock.create(ntpNow, b5.id(), Seq(l2)).block
       b7 = mkEmptyBlock(b6.id())
     } yield (miner, lessor, Seq(genesisBlock, b2, b3, b4, b5, b6, b7))
 
@@ -265,7 +267,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
       lease                     <- lease(lessor, miner.toAddress, amount)
       b2 = mkEmptyBlock(genesisBlock.id())
       b3 = mkEmptyBlock(b2.id())
-      b4 = TestBlock.create(ntpNow, b3.id(), Seq(lease))
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(lease)).block
       b5 = mkEmptyBlock(b4.id())
       b6 = mkEmptyBlock(b5.id())
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5, b6))

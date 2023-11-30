@@ -33,57 +33,56 @@ class ABIConverterSpecification extends PropSpec with JsonMatchers {
         |) = []
         |""".stripMargin
     val script = TestCompiler(V5).compileContract(dApp)
-    ABIConverter(script).jsonABI should matchJson(
-      """
-        |[
-        |  {
-        |    "name": "allowedArgs",
-        |    "type": "function",
-        |    "constant": false,
-        |    "payable": false,
-        |    "stateMutability": "nonpayable",
-        |    "inputs": [
-        |      {
-        |        "name": "a",
-        |        "type": "bool"
-        |      }, {
-        |        "name": "b",
-        |        "type": "bytes"
-        |      }, {
-        |        "name": "c",
-        |        "type": "int64"
-        |      }, {
-        |        "name": "d",
-        |        "type": "string"
-        |      }, {
-        |        "name": "e",
-        |        "type": "bool[]"
-        |      }, {
-        |        "name": "f",
-        |        "type": "bytes[]"
-        |      }, {
-        |        "name": "g",
-        |        "type": "int64[]"
-        |      }, {
-        |        "name": "h",
-        |        "type": "string[]"
-        |      }, {
-        |        "name": "payments",
-        |        "type": "tuple[]",
-        |        "components": [
-        |          {
-        |            "name": "assetId",
-        |            "type":"bytes32"
-        |          }, {
-        |            "name": "amount",
-        |            "type": "int64"
-        |          }
-        |        ]
-        |      }
-        |    ],
-        |    "outputs": []
-        |  }
-        |]
-        |""".stripMargin)
+    EthABIConverter(script).jsonABI should matchJson("""
+                                                       |[
+                                                       |  {
+                                                       |    "name": "allowedArgs",
+                                                       |    "type": "function",
+                                                       |    "constant": false,
+                                                       |    "payable": false,
+                                                       |    "stateMutability": "nonpayable",
+                                                       |    "inputs": [
+                                                       |      {
+                                                       |        "name": "a",
+                                                       |        "type": "bool"
+                                                       |      }, {
+                                                       |        "name": "b",
+                                                       |        "type": "bytes"
+                                                       |      }, {
+                                                       |        "name": "c",
+                                                       |        "type": "int64"
+                                                       |      }, {
+                                                       |        "name": "d",
+                                                       |        "type": "string"
+                                                       |      }, {
+                                                       |        "name": "e",
+                                                       |        "type": "bool[]"
+                                                       |      }, {
+                                                       |        "name": "f",
+                                                       |        "type": "bytes[]"
+                                                       |      }, {
+                                                       |        "name": "g",
+                                                       |        "type": "int64[]"
+                                                       |      }, {
+                                                       |        "name": "h",
+                                                       |        "type": "string[]"
+                                                       |      }, {
+                                                       |        "name": "payments",
+                                                       |        "type": "tuple[]",
+                                                       |        "components": [
+                                                       |          {
+                                                       |            "name": "assetId",
+                                                       |            "type":"bytes32"
+                                                       |          }, {
+                                                       |            "name": "amount",
+                                                       |            "type": "int64"
+                                                       |          }
+                                                       |        ]
+                                                       |      }
+                                                       |    ],
+                                                       |    "outputs": []
+                                                       |  }
+                                                       |]
+                                                       |""".stripMargin)
   }
 }

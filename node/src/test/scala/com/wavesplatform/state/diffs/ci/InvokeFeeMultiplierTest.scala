@@ -4,17 +4,15 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
-import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import org.scalatest.EitherValues
 
 class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettings with WithDomain with EitherValues {
@@ -33,9 +31,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     Script.fromBase64String(base64).explicitGet()
   }
 
-  private def paymentPreconditions(
-      dApp: Script
-  ): (Seq[AddrWithBalance], List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction) = {
+  private def paymentPreconditions(dApp: Script) = {
     val invoker  = TxHelpers.signer(0)
     val master   = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(invoker, master)
@@ -51,7 +47,7 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
       StringDataEntry(s"lenders_of_${invoker.toAddress}", invoker.toAddress.toString)
     )
     val data1 = TxHelpers.data(master, initData)
-    val data2 = TxHelpers.data(master, initData)
+    val data2 = () => TxHelpers.data(master, initData)
     val issue = TxHelpers.issue(invoker, ENOUGH_AMT, script = None)
     val initArgs =
       List(
@@ -68,29 +64,23 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
       )
     val payment    = Seq(Payment(1, IssuedAsset(issue.id())))
     val initInvoke = TxHelpers.invoke(master.toAddress, Some("init"), initArgs, invoker = master, fee = TestValues.fee, version = TxVersion.V1)
-    val invoke1    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, invoker = invoker, version = TxVersion.V1)
-    val invoke2    = TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, invoker = invoker, version = TxVersion.V1)
-    (balances, List(setDApp, issue, data1, initInvoke), invoke1, data2, invoke2)
+    val invoke     = () => TxHelpers.invoke(master.toAddress, Some("buyBack"), Nil, payment, invoker = invoker, version = TxVersion.V1)
+    (balances, List(setDApp, issue, data1, initInvoke), invoke, data2)
   }
 
-  property(s"fee multiplier is disabled after activation ${BlockchainFeatures.SynchronousCalls}") {
-    val (balances, preparingTxs, invoke1, data2, invoke2) = paymentPreconditions(lambordini)
+  property(s"fee multiplier is always fixed after transaction snapshot implementation") {
+    val (balances, preparingTxs, invoke, data) = paymentPreconditions(lambordini)
     withDomain(fsWithV5, balances) { d =>
       d.appendBlock(preparingTxs*)
-      d.appendBlock(invoke1)
+      d.appendAndAssertSucceed(invoke())
 
-      d.appendBlock(data2)
+      d.appendBlock(data())
       d.blockchainUpdater.height shouldBe estimatorV3ActivationHeight
+      d.appendAndAssertSucceed(invoke())
 
-      d.appendBlockE(invoke2) should produce(
-        s"Fee in WAVES for InvokeScriptTransaction (${invoke2.fee} in WAVES) with 3 invocation steps does not exceed minimal value of 1500000 WAVES"
-      )
-
-      d.appendBlock()
-      d.appendBlock()
+      d.appendBlock(data())
       d.blockchainUpdater.height shouldBe fixActivationHeight
-
-      d.appendBlock(invoke2)
+      d.appendAndAssertSucceed(invoke())
     }
   }
 }

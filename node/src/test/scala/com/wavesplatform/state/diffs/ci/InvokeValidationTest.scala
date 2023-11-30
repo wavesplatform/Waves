@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account.Alias
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -23,7 +22,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
 
   property("invoke by alias with wrong chainId") {
     withDomain(RideV5) { d =>
-      val alias = Alias.fromString("alias:X:alias").explicitGet()
+      val alias = Alias.fromString("alias:X:alias", Some('X'.toByte)).explicitGet()
       d.appendBlockE(invoke(alias)) should produce("Address belongs to another network: expected: 84(T), actual: 88(X)")
     }
   }
@@ -37,7 +36,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
         """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, script))
-      d.appendBlockE(invoke(func = Some("g"))) should produce("Cannot find callable function `g`")
+      d.appendBlockE(invoke(func = Some("g"))) should produce("@Callable function 'g' doesn't exist in the script")
     }
   }
 
@@ -124,16 +123,5 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     def tooBigTxV2 = invoke(defaultAddress, Some("f"), Seq(array(565)), version = V2)
     PBTransactions.toPBInvokeScriptData(txV2.dApp, txV2.funcCallOpt, txV2.payments).toByteArray.length shouldBe 5120
     (the[Exception] thrownBy tooBigTxV2).getMessage shouldBe "GenericError(InvokeScriptTransaction bytes length = 5129 exceeds limit = 5120)"
-  }
-
-  property("unexisting payment asset") {
-    withDomain(RideV5) { d =>
-      val asset = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
-      d.appendBlockE(invoke(defaultAddress, payments = Seq(Payment(1, asset)))) should produce(
-        "Attempt to transfer unavailable funds: " +
-          s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, " +
-          "current balance is 0, spends equals -1, result is -1"
-      )
-    }
   }
 }

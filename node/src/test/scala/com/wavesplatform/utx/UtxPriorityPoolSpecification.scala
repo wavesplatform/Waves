@@ -24,7 +24,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
 
   override def settings: WavesSettings = DomainPresets.RideV3
 
-  private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, None, PackStrategy.Unlimited)._1
+  private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.Unlimited, None, PackStrategy.Unlimited)._1
 
   private def mkHeightSensitiveScript(sender: KeyPair) =
     TxHelpers.setScript(
@@ -46,7 +46,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
 
       domain.appendMicroBlock(t1)
       domain.appendMicroBlock(t2)
-      domain.appendKeyBlock(Some(id))
+      domain.appendKeyBlock(ref = Some(id))
 
       val expectedTransactions = Seq(t1, t2)
       domain.utxPool.priorityPool.priorityTransactions shouldBe expectedTransactions
@@ -59,7 +59,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       val transfer1 = TxHelpers.transfer(alice, bob.toAddress, 10.001.waves, fee = 0.001.waves)
 
       domain.appendMicroBlock(transfer1)
-      domain.appendKeyBlock(Some(id))
+      domain.appendKeyBlock(ref = Some(id))
 
       domain.utxPool.priorityPool.priorityTransactions shouldBe Seq(transfer1)
 
@@ -79,7 +79,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
         TxHelpers.transfer(alice, TxHelpers.signer(300 + i).toAddress)
       }*)
 
-      domain.appendKeyBlock(Some(ref))
+      domain.appendKeyBlock(ref = Some(ref))
       // priority pool contains two microblocks, 5 txs each
       domain.utxPool.priorityPool.nextMicroBlockSize(3) shouldBe 5
       domain.utxPool.priorityPool.nextMicroBlockSize(5) shouldBe 5
@@ -100,14 +100,14 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       val transferToCarol = TxHelpers.transfer(bob, carol.toAddress, 10.waves, fee = 0.005.waves)
       domain.appendMicroBlock(transferToCarol)
 
-      domain.appendKeyBlock(Some(rollbackTarget))
+      domain.appendKeyBlock(ref = Some(rollbackTarget))
       domain.utxPool.cleanUnconfirmed()
       domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transferToCarol)
       pack() shouldBe None
       domain.utxPool.priorityPool.priorityTransactions shouldBe empty
     }
 
-    "continues packing when priority diff contains no valid transactions" in {
+    "continues packing when priority snapshot contains no valid transactions" in {
       val bob = nextKeyPair
       domain.appendBlock(
         TxHelpers.transfer(alice, bob.toAddress, 10.02.waves, fee = 0.001.waves),
@@ -116,7 +116,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       val ref       = domain.appendKeyBlock().id()
       val transfer1 = TxHelpers.transfer(bob, nextKeyPair.toAddress, 10.waves, fee = 0.005.waves)
       domain.appendMicroBlock(transfer1)
-      domain.appendKeyBlock(Some(ref))
+      domain.appendKeyBlock(ref = Some(ref))
       domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transfer1)
 
       val createAlias = TxHelpers.createAlias("0xbob", bob, 0.005.waves)
@@ -137,7 +137,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.blockchain.transactionInfo(issue.id()) shouldBe defined
       domain.utxPool.priorityPool.priorityTransactions shouldBe Nil
 
-      domain.appendKeyBlock(Some(blockId))
+      domain.appendKeyBlock(ref = Some(blockId))
       domain.blockchain.transactionInfo(issue.id()) shouldBe None
       domain.utxPool.priorityPool.priorityTransactions shouldBe Seq(issue)
 

@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.utils.SharedSchedulerMixin
 import com.wavesplatform.{BlockGen, TestWallet}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
@@ -30,7 +30,8 @@ class SpentComplexitySpec
     with OptionValues
     with TestWallet
     with WithDomain
-    with ApiMarshallers {
+    with ApiMarshallers
+    with SharedSchedulerMixin {
   private val contract = TestCompiler(V5)
     .compileContract("""{-# STDLIB_VERSION 5 #-}
                        |{-# CONTENT_TYPE DAPP #-}
@@ -72,11 +73,11 @@ class SpentComplexitySpec
         d.transactionsApi,
         testWallet,
         d.blockchain,
-        () => d.blockchain.getCompositeBlockchain,
+        () => d.blockchain.snapshotBlockchain,
         () => 0,
         DummyTransactionPublisher.accepting,
         ntpTime,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+        new RouteTimeout(60.seconds)(sharedScheduler)
       ).route
     )
 

@@ -7,9 +7,9 @@ import com.wavesplatform.{BlockGen, RxScheduler}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.reactive.Observable
-import monix.reactive.subjects.{PublishSubject => PS}
+import monix.reactive.subjects.PublishSubject as PS
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen {
   override def testSchedulerName: String = "test-microblock-synchronizer"
@@ -21,20 +21,22 @@ class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen
           PS[ByteStr],
           PS[(Channel, MicroBlockInv)],
           PS[(Channel, MicroBlockResponse)],
-          Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]
+          Observable[(Channel, MicroBlockSynchronizer.MicroblockData, Option[(Channel, MicroBlockSnapshotResponse)])]
       ) => Any
   ) = {
     val peers          = PeerDatabase.NoOp
     val lastBlockIds   = PS[ByteStr]()
     val microInvs      = PS[(Channel, MicroBlockInv)]()
     val microResponses = PS[(Channel, MicroBlockResponse)]()
-    val (r, _)         = MicroBlockSynchronizer(defaultSettings, peers, lastBlockIds, microInvs, microResponses, testScheduler)
+    val microSnapshots = PS[(Channel, MicroBlockSnapshotResponse)]()
+    val (r, _)         = MicroBlockSynchronizer(defaultSettings, false, peers, lastBlockIds, microInvs, microResponses, microSnapshots, testScheduler)
     try {
       f(lastBlockIds, microInvs, microResponses, r)
     } finally {
       lastBlockIds.onComplete()
       microInvs.onComplete()
       microResponses.onComplete()
+      microSnapshots.onComplete()
     }
   }
 

@@ -12,11 +12,11 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
-import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
@@ -168,56 +168,63 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
   ): Unit = {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
       scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression)
-    assertDiffEi(
-      Seq(TestBlock.create(preparingTxs), TestBlock.create(Seq.empty)),
-      TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
-      features(invokeExpression)
-    ) { diffE =>
-      if (reject) {
-        diffE shouldBe Symbol("left")
-        diffE should produce("Error raised")
-      } else {
-        val diff = diffE.explicitGet()
-        diff.scriptsComplexity shouldBe complexity
-        if (exceeding)
-          diff.errorMessage(invokeTx.id()).get.text should include("Invoke complexity limit = 26000 is exceeded")
-        else if (raiseError)
-          diff.errorMessage(invokeTx.id()).get.text should include("Error raised")
-        else
-          diff.errorMessage(invokeTx.id()) shouldBe None
+    withTestState(features(invokeExpression)) { (bu, db) =>
+      assertDiffEi(
+        Seq(TestBlock.create(preparingTxs), TestBlock.create(Seq.empty)),
+        TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
+        bu,
+        db,
+        enableExecutionLog = false
+      ) { diffE =>
+        if (reject) {
+          diffE shouldBe Symbol("left")
+          diffE should produce("Error raised")
+        } else {
+          val snapshot = diffE.explicitGet()
+          snapshot.scriptsComplexity shouldBe complexity
+          if (exceeding)
+            snapshot.errorMessage(invokeTx.id()).get.text should include("Invoke complexity limit = 26000 is exceeded")
+          else if (raiseError)
+            snapshot.errorMessage(invokeTx.id()).get.text should include("Error raised")
+          else
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
-        val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
-        val basePortfolios =
-          Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee.value))) |+|
-            Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee.value))
-        val paymentsPortfolios =
-          Map(invokeTx.sender.toAddress -> Portfolio.build(asset, -1)) |+|
-            Map(dAppAddress             -> Portfolio.build(asset, 1))
-        val throughTransfersPortfolios =
-          Map(invokeTx.sender.toAddress -> Portfolio.build(asset, 1)) |+|
-            Map(lastCallingDApp         -> Portfolio.build(asset, -1))
-        val throughPaymentsPortfolios =
-          Map(lastCallingDApp -> Portfolio.build(asset, 1)) |+|
-            Map(dAppAddress   -> Portfolio.build(asset, -1))
+          val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
+          val basePortfolios =
+            Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee.value))) |+|
+              Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee.value))
+          val paymentsPortfolios =
+            Map(invokeTx.sender.toAddress -> Portfolio.build(asset, -1)) |+|
+              Map(dAppAddress             -> Portfolio.build(asset, 1))
+          val throughTransfersPortfolios =
+            Map(invokeTx.sender.toAddress -> Portfolio.build(asset, 1)) |+|
+              Map(lastCallingDApp         -> Portfolio.build(asset, -1))
+          val throughPaymentsPortfolios =
+            Map(lastCallingDApp -> Portfolio.build(asset, 1)) |+|
+              Map(dAppAddress   -> Portfolio.build(asset, -1))
 
-        val overlappedPortfolio = Portfolio.build(asset, 0)
-        val emptyPortfolios     = Map.empty[Address, Portfolio]
+          val emptyPortfolios = Map.empty[Address, Portfolio]
+          val additionalPortfolios =
+            (if (withPayment) paymentsPortfolios else emptyPortfolios) |+|
+              (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios) |+|
+              (if (withThroughTransfer) throughTransfersPortfolios else emptyPortfolios)
 
-        val additionalPortfolios =
-          (if (withPayment) paymentsPortfolios else emptyPortfolios) |+|
-            (if (withThroughPayment) throughPaymentsPortfolios else emptyPortfolios) |+|
-            (if (withThroughTransfer) throughTransfersPortfolios else emptyPortfolios)
-
-        val totalPortfolios = if (exceeding || raiseError) basePortfolios else basePortfolios |+| additionalPortfolios
-
-        diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
+          val expectedPortfolios = if (exceeding || raiseError) basePortfolios else basePortfolios |+| additionalPortfolios
+          expectedPortfolios
+            .foreach { case (address, expectedPortfolio) =>
+              expectedPortfolio.balance shouldBe snapshot.balances.get((address, Waves)).map(_ - db.balance(address)).getOrElse(0)
+              expectedPortfolio.assets.foreach { case (asset, balance) =>
+                balance shouldBe snapshot.balances.get((address, asset)).map(_ - db.balance(address, asset)).getOrElse(0)
+              }
+            }
+        }
       }
     }
   }
 
   private implicit class Ops(m: Map[Address, Portfolio]) {
     def |+|(m2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-      Diff.combine(m, m2).explicitGet()
+      Portfolio.combine(m, m2).explicitGet()
   }
 
   property("complexity border") {

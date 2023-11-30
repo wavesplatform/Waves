@@ -9,6 +9,7 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
+import org.scalactic.source.Position
 
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
@@ -16,12 +17,13 @@ import scala.util.Try
 
 class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
 
-  private val ApprovalPeriod = 100
+  private val ApprovalPeriod      = 100
+  private val BlocksForActivation = (ApprovalPeriod * 0.9).toInt
 
   private val WavesSettings = history.DefaultWavesSettings.copy(
     blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(
       functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings
-        .copy(featureCheckBlocksPeriod = ApprovalPeriod, blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt, preActivatedFeatures = Map.empty)
+        .copy(featureCheckBlocksPeriod = ApprovalPeriod, blocksForFeatureActivation = BlocksForActivation, preActivatedFeatures = Map.empty)
     ),
     featuresSettings = history.DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
@@ -65,7 +67,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureStatus(3, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq()))
+      b.processBlock(getNextTestBlock(b))
     }
 
     b.height shouldBe 3 * ApprovalPeriod
@@ -128,7 +130,208 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
   }
 
-  "feature activation height is not overriden with further periods" in withDomain(WavesSettings) { domain =>
+  "multiple features activation: one after another" - {
+    def appendBlocks(b: BlockchainUpdaterImpl, blocks: Int, votes: Short*): Unit = (1 to blocks).foreach { _ =>
+      b.processBlock(getNextTestBlockWithVotes(b, votes)) should beRight
+    }
+
+    def check(
+        b: BlockchainUpdaterImpl,
+        height: Int,
+        approvedFeatures: Map[Int, Int] = Map.empty,
+        activatedFeatures: Map[Int, Int] = Map.empty
+    )(implicit pos: Position): Unit = {
+      b.height shouldBe height
+      withClue("approved:") {
+        b.approvedFeatures shouldBe approvedFeatures
+      }
+      withClue("activated:") {
+        b.activatedFeatures shouldBe activatedFeatures
+      }
+    }
+
+    "without votes for already activated feature" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
+
+      check(b, 1)
+
+      markup("Approving the first feature")
+      appendBlocks(b, blocks = ApprovalPeriod - 1, votes = 1)
+      check(
+        b,
+        ApprovalPeriod,
+        approvedFeatures = Map(1 -> ApprovalPeriod),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2)
+      )
+
+      markup("Approving the second feature without voting for first feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 2)
+      check(
+        b,
+        ApprovalPeriod * 2,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+
+      markup("Activating the second feature")
+      appendBlocks(b, blocks = ApprovalPeriod)
+      check(
+        b,
+        ApprovalPeriod * 3,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+    }
+
+    "with votes for already activated feature" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
+
+      markup("Approving the first feature")
+      appendBlocks(b, blocks = ApprovalPeriod - 1, votes = 1)
+
+      markup("Approving the second feature, still voting for first feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 1, 2)
+      check(
+        b,
+        ApprovalPeriod * 2,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+
+      markup("Activating the second feature")
+      appendBlocks(b, blocks = ApprovalPeriod)
+      check(
+        b,
+        ApprovalPeriod * 3,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+    }
+
+    "with multiple voting periods rollback" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
+
+      markup("Approving the first feature")
+      appendBlocks(b, blocks = ApprovalPeriod - 1, votes = 1)
+
+      markup("Approving the second feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 2)
+
+      markup("Approving the third feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 3)
+
+      markup("Approving the fourth feature")
+      appendBlocks(b, blocks = ApprovalPeriod, votes = 4)
+      check(
+        b,
+        ApprovalPeriod * 4,
+        approvedFeatures = Map(
+          1 -> ApprovalPeriod,
+          2 -> ApprovalPeriod * 2,
+          3 -> ApprovalPeriod * 3,
+          4 -> ApprovalPeriod * 4
+        ),
+        activatedFeatures = Map(
+          1 -> ApprovalPeriod * 2,
+          2 -> ApprovalPeriod * 3,
+          3 -> ApprovalPeriod * 4,
+          4 -> ApprovalPeriod * 5 // Actually, it is not activated, because we haven't reach this height
+        )
+      )
+
+      markup("Rollback")
+      val rollbackHeight = ApprovalPeriod * 2 + 1
+      b.removeAfter(b.blockHeader(rollbackHeight).get.id()).explicitGet()
+      check(
+        b,
+        rollbackHeight,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+
+      markup("Appending blocks without votes to reach the previous height")
+      appendBlocks(b, blocks = ApprovalPeriod * 2 - 1)
+      check(
+        b,
+        ApprovalPeriod * 4,
+        approvedFeatures = Map(1 -> ApprovalPeriod, 2 -> ApprovalPeriod * 2),
+        activatedFeatures = Map(1 -> ApprovalPeriod * 2, 2 -> ApprovalPeriod * 3)
+      )
+    }
+  }
+
+  "features activation after rollback and appending blocks" - {
+    def appendAndRollback(b: BlockchainUpdaterImpl, rollbackToHeight: Int): Unit = {
+      b.processBlock(genesisBlock)
+
+      markup("Approving the feature")
+      b.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+      (1 until ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
+      }
+
+      b.height shouldBe ApprovalPeriod
+      b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+
+      markup("Appending blocks without votes after approval")
+      (1 to 2).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+
+      markup("Rollback before approval height")
+      b.removeAfter(b.blockHeader(rollbackToHeight).get.id()).explicitGet()
+      b.featureStatus(1, rollbackToHeight) shouldBe BlockchainFeatureStatus.Undefined
+    }
+
+    "when not enough votes after rollback - should not approve and activate the feature" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      appendAndRollback(b, BlocksForActivation) // 1st blocks is genesis, BlocksForActivation - 1 votes
+
+      markup("Appending blocks to reach ApprovalPeriod height")
+      (b.height until ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+
+      b.height shouldBe ApprovalPeriod
+      b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+
+      markup("Appending blocks to reach ApprovalPeriod * 2")
+      (1 to ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+
+      val newHeight = ApprovalPeriod * 2
+      b.height shouldBe newHeight
+      b.featureStatus(1, newHeight) shouldBe BlockchainFeatureStatus.Undefined
+    }
+
+    "when enough votes after rollback - should approve and activate the feature" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      appendAndRollback(b, BlocksForActivation + 1) // 1st blocks is genesis, BlocksForActivation - 1 + 1 votes
+
+      markup("Appending blocks to reach ApprovalPeriod height")
+      (b.height until ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+
+      b.height shouldBe ApprovalPeriod
+      b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+
+      markup("Appending blocks to reach ApprovalPeriod * 2")
+      (1 to ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+
+      val activationHeight = ApprovalPeriod * 2
+      b.height shouldBe activationHeight
+      b.featureStatus(1, activationHeight) shouldBe BlockchainFeatureStatus.Activated
+    }
+  }
+
+  "feature activation height is not overridden with further periods" in withDomain(WavesSettings) { domain =>
     val b = domain.blockchainUpdater
 
     b.processBlock(genesisBlock)
@@ -150,27 +353,42 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
-  "feature activated only by 90% of blocks" in withDomain(WavesSettings) { domain =>
-    val b = domain.blockchainUpdater
+  "feature activated only by 90% of blocks" - {
+    "negative with insufficient votes" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
 
-    b.processBlock(genesisBlock)
+      (1 until BlocksForActivation).foreach { _ =>
+        b.processBlock(getNextTestBlockWithVotes(b, Seq(1))) should beRight
+      }
 
-    b.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+      (BlocksForActivation to ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
 
-    (1 until ApprovalPeriod).foreach { i =>
-      b.processBlock(getNextTestBlockWithVotes(b, if (i % 2 == 0) Seq(1) else Seq())) should beRight
+      b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+
+      (1 to ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+
+      b.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Undefined
     }
-    b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
-    (1 to ApprovalPeriod).foreach { i =>
-      b.processBlock(getNextTestBlockWithVotes(b, if (i % 10 == 0) Seq() else Seq(1))) should beRight
-    }
-    b.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Approved
+    "positive" in withDomain(WavesSettings) { domain =>
+      val b = domain.blockchainUpdater
+      b.processBlock(genesisBlock)
 
-    (1 to ApprovalPeriod).foreach { i =>
-      b.processBlock(getNextTestBlock(b)) should beRight
+      (1 to ApprovalPeriod).foreach { i =>
+        b.processBlock(getNextTestBlockWithVotes(b, if (i % 10 == 0) Seq() else Seq(1))) should beRight
+      }
+      b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
+
+      (1 to ApprovalPeriod).foreach { _ =>
+        b.processBlock(getNextTestBlock(b)) should beRight
+      }
+      b.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Activated
     }
-    b.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
   }
 
   "features votes resets when voting window changes" in withDomain(WavesSettings) { domain =>
@@ -256,15 +474,15 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+    b.processBlock(getNextTestBlock(b)) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Activated)
 
     (0 until ApprovalPeriod * 2).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
@@ -275,10 +493,10 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+    b.processBlock(getNextTestBlock(b)) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 
@@ -305,10 +523,10 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
 
     // 300 blocks passed, the activation period should be doubled now
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+    b.processBlock(getNextTestBlock(b)) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 
@@ -326,15 +544,15 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
 
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+    b.processBlock(getNextTestBlock(b)) should beRight
     b.featureStatus(1, b.height) should be(BlockchainFeatureStatus.Activated)
 
     (0 until ApprovalPeriod * 2).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
 
     (0 until ApprovalPeriod * 2 - 1).foreach { _ =>
@@ -345,10 +563,10 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
 
     (0 until ApprovalPeriod * 2 - 1).foreach { _ =>
-      b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+      b.processBlock(getNextTestBlock(b)) should beRight
     }
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Approved)
-    b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
+    b.processBlock(getNextTestBlock(b)) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
 

@@ -2,21 +2,24 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.SmartAccounts
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.utils.addressTransactions
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.test.DomainPresets.{NG, RideV3, WavesSettingsOps}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, TransactionType, TxHelpers, TxVersion}
 import monix.execution.Scheduler.Implicits.global
 
-class CreateAliasTransactionDiffTest extends PropSpec with WithState {
+class CreateAliasTransactionDiffTest extends PropSpec with WithDomain {
 
   val fs: FunctionalitySettings =
     TestFunctionalitySettings.Enabled.copy(
@@ -38,16 +41,16 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
       TxHelpers.createAlias(alias.name, master, fee = fee, version = TxVersion.V1)
     )
     val sameAliasTxs = Seq(
-      TxHelpers.createAlias(alias.name, master, fee = fee + 1),
-      TxHelpers.createAlias(alias.name, master, fee = fee + 1, version = TxVersion.V1)
+      TxHelpers.createAlias(alias.name, master, fee = fee + 100),
+      TxHelpers.createAlias(alias.name, master, fee = fee + 100, version = TxVersion.V1)
     )
     val sameAliasOtherSenderTxs = Seq(
-      TxHelpers.createAlias(alias.name, other, fee = fee + 2),
-      TxHelpers.createAlias(alias.name, other, fee = fee + 2, version = TxVersion.V1)
+      TxHelpers.createAlias(alias.name, other, fee = fee + 200),
+      TxHelpers.createAlias(alias.name, other, fee = fee + 200, version = TxVersion.V1)
     )
     val anotherAliasTxs = Seq(
-      TxHelpers.createAlias(alias2.name, master, fee = fee + 3),
-      TxHelpers.createAlias(alias2.name, master, fee = fee + 3, version = TxVersion.V1)
+      TxHelpers.createAlias(alias2.name, master, fee = fee + 300),
+      TxHelpers.createAlias(alias2.name, master, fee = fee + 300, version = TxVersion.V1)
     )
 
     for {
@@ -60,22 +63,28 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
   property("can create and resolve aliases preserving waves invariant") {
     preconditionsAndAliasCreations.foreach { case (gen, aliasTx, _, _, anotherAliasTx) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx)), fs) { case (blockDiff, newState) =>
-        val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-        totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
-
+      withDomain(RideV3) { d =>
+        d.appendBlock(gen)
+        d.appendBlock(aliasTx)
+        d.appendBlock(anotherAliasTx)
+        d.liquidSnapshot.balances.collect {
+          case ((`defaultAddress`, Waves), balance) =>
+            val carryFee = (anotherAliasTx.fee.value - aliasTx.fee.value) / 5 * 3
+            balance - d.rocksDBWriter.balance(defaultAddress) + carryFee
+          case ((address, Waves), balance) =>
+            balance - d.rocksDBWriter.balance(address)
+        }.sum shouldBe 0
         val senderAcc = anotherAliasTx.sender.toAddress
-        blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
-
-        addressTransactions(rdb, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(TransactionType.CreateAlias), None).collect {
-          case (_, cat: CreateAliasTransaction) => cat.alias
-        }.toSet shouldBe Set(
-          anotherAliasTx.alias,
-          aliasTx.alias
-        )
-        newState.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
-        newState.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
+        d.liquidSnapshot.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
+        addressTransactions(
+          rdb,
+          Some(Height(d.blockchain.height + 1) -> d.liquidSnapshot),
+          senderAcc,
+          Set(TransactionType.CreateAlias),
+          None
+        ).collect { case (_, cat: CreateAliasTransaction) => cat.alias }.toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
+        d.blockchain.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
+        d.blockchain.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
       }
     }
   }
@@ -85,7 +94,6 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
       assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx)), fs) { blockDiffEi =>
         blockDiffEi should produce("AlreadyInTheState")
       }
-
       assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasOtherSenderTx)), fs) { blockDiffEi =>
         blockDiffEi should produce("AlreadyInTheState")
       }
@@ -122,13 +130,13 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
   property("Can transfer to alias") {
     preconditionsTransferLease.foreach { case (genesis, issue1, issue2, aliasTx, transfer, _) =>
-      assertDiffAndState(Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ aliasTx)), TestBlock.create(Seq(transfer))) { case (blockDiff, _) =>
+      withDomain(NG.addFeatures(SmartAccounts)) { d =>
+        d.appendBlock(genesis*)
+        d.appendBlock(issue1, issue2, aliasTx)
+        d.appendBlock(transfer)
         if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
-          val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender.toAddress)
-          transfer.assetId match {
-            case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio.build(aid, transfer.amount.value)
-            case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount.value)
-          }
+          d.liquidSnapshot.balances((aliasTx.sender.toAddress, transfer.assetId)) shouldBe
+            transfer.amount.value + d.rocksDBWriter.balance(aliasTx.sender.toAddress, transfer.assetId)
         }
       }
     }
@@ -138,8 +146,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
     preconditionsTransferLease.foreach { case (genesis, issue1, issue2, aliasTx, _, lease) =>
       assertDiffEi(Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ aliasTx)), TestBlock.create(Seq(lease))) { blockDiffEi =>
         if (lease.sender.toAddress != aliasTx.sender.toAddress) {
-          val recipientPortfolioDiff = blockDiffEi.explicitGet().portfolios(aliasTx.sender.toAddress)
-          recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount.value, 0))
+          blockDiffEi.explicitGet().balances.get((aliasTx.sender.toAddress, Waves)) shouldBe None
+          blockDiffEi.explicitGet().leaseBalances(aliasTx.sender.toAddress) shouldBe LeaseBalance(lease.amount.value, 0)
         } else {
           blockDiffEi should produce("Cannot lease to self")
         }

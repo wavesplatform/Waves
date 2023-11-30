@@ -3,13 +3,14 @@ package com.wavesplatform.state.diffs.ci.sync
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.{PropSpec, produce}
-import com.wavesplatform.transaction.TxHelpers._
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.*
 
 class SyncInvokeActionsTest extends PropSpec with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
   private val dApp1Signer  = secondSigner
   private val dApp1Address = secondAddress
@@ -68,9 +69,9 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
       d.appendAndAssertSucceed(invoke(dApp1Address, fee = invokeFee(issues = 1)))
-      d.liquidDiff.portfolios(dApp1Address).assets.head._2 shouldBe 0
-      d.liquidDiff.portfolios(dApp2Address).assets.head._2 shouldBe 0
-      d.liquidDiff.portfolios(defaultAddress).assets.head._2 shouldBe 1000
+      d.liquidSnapshot.balances.get((dApp1Address, Waves)) shouldBe empty
+      d.liquidSnapshot.balances.get((dApp2Address, Waves)) shouldBe empty
+      d.liquidSnapshot.balances.collect { case ((address, asset), amount) if address == defaultAddress && asset != Waves => amount}.head shouldBe 1000
     }
   }
 

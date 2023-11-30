@@ -6,19 +6,19 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.*
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
+import com.wavesplatform.lang.v1.compiler.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
-import com.wavesplatform.lang.v1.compiler.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation.NE_OP
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
 import org.scalatest.Assertion
@@ -34,7 +34,7 @@ class DecompilerTest extends PropSpec {
   val decompilerContextV4 = getTestContext(V4).decompilerContext
 
   private def assertDecompile(script: String, decompiled: String, version: StdLibVersion): Assertion = {
-    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
+    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr
     val result = Decompiler(expr, getDecompilerContext(version, Expression))
     result shouldBe decompiled.stripMargin.trim
   }
@@ -561,7 +561,7 @@ class DecompilerTest extends PropSpec {
 
   def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, untyped)
+    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, v, untyped)
     typed
   }
 
@@ -1032,14 +1032,14 @@ class DecompilerTest extends PropSpec {
 
   property("BigInt unary minus") {
     assertDecompile(
-      s"""
-         |let a = -toBigInt(1)
-         |true
-       """,
-      s"""
-         |let a = -(toBigInt(1))
-         |true
-       """,
+      """
+        |let a = -toBigInt(1)
+        |true
+      """,
+      """
+        |let a = -(toBigInt(1))
+        |true
+      """,
       V5
     )
   }
@@ -1115,5 +1115,25 @@ class DecompilerTest extends PropSpec {
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V6)
       .foreach(assertDecompile(script, decompiledV6, _))
+  }
+
+  property("calculateDelay()") {
+    val script = "calculateDelay(base58'aaa', 123, Address(base58'bbb'), 456)"
+    assertDecompile(script, script, V8)
+  }
+
+  property("replaceByIndex()") {
+    val script = """replaceByIndex(["a", "b", "c"], 1, "x")"""
+    assertDecompile(script, script, V8)
+  }
+
+  property("escaping characters in string") {
+    val script =
+      s"""
+         |let a = "aaa\\"qqq\\"aaa"
+         |let b = "aaa\\\\qqq\\\\aaa"
+         |true
+       """
+    assertDecompile(script, script, V6)
   }
 }

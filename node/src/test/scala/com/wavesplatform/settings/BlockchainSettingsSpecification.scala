@@ -8,48 +8,53 @@ import scala.concurrent.duration._
 
 class BlockchainSettingsSpecification extends FlatSpec {
   "BlockchainSettings" should "read custom values" in {
-    val config   = loadConfig(ConfigFactory.parseString("""waves {
-        |  directory = "/waves"
-        |  data-directory = "/waves/data"
-        |  blockchain {
-        |    type = CUSTOM
-        |    custom {
-        |      address-scheme-character = "C"
-        |      functionality {
-        |        feature-check-blocks-period = 10000
-        |        blocks-for-feature-activation = 9000
-        |        generation-balance-depth-from-50-to-1000-after-height = 4
-        |        block-version-3-after-height = 18
-        |        pre-activated-features {
-        |          19 = 100
-        |          20 = 200
-        |        }
-        |        double-features-periods-after-height = 21
-        |        max-transaction-time-back-offset = 55s
-        |        max-transaction-time-forward-offset = 12d
-        |        lease-expiration = 1000000
-        |      }
-        |      rewards {
-        |        term = 100000
-        |        initial = 600000000
-        |        min-increment = 50000000
-        |        voting-interval = 10000
-        |      }
-        |      genesis {
-        |        timestamp = 1460678400000
-        |        block-timestamp = 1460678400000
-        |        signature = "BASE58BLKSGNATURE"
-        |        initial-balance = 100000000000000
-        |        initial-base-target = 153722867
-        |        average-block-delay = 60s
-        |        transactions = [
-        |          {recipient = "BASE58ADDRESS1", amount = 50000000000001},
-        |          {recipient = "BASE58ADDRESS2", amount = 49999999999999}
-        |        ]
-        |      }
-        |    }
-        |  }
-        |}""".stripMargin))
+    val config = loadConfig(
+      ConfigFactory.parseString(
+        """waves {
+          |  directory = "/waves"
+          |  data-directory = "/waves/data"
+          |  blockchain {
+          |    type = CUSTOM
+          |    custom {
+          |      address-scheme-character = "C"
+          |      functionality {
+          |        feature-check-blocks-period = 10000
+          |        blocks-for-feature-activation = 9000
+          |        generation-balance-depth-from-50-to-1000-after-height = 4
+          |        block-version-3-after-height = 18
+          |        pre-activated-features {
+          |          19 = 100
+          |          20 = 200
+          |        }
+          |        double-features-periods-after-height = 21
+          |        max-transaction-time-back-offset = 55s
+          |        max-transaction-time-forward-offset = 12d
+          |        lease-expiration = 1000000
+          |      }
+          |      rewards {
+          |        term = 100000
+          |        term-after-capped-reward-feature = 50000
+          |        initial = 600000000
+          |        min-increment = 50000000
+          |        voting-interval = 10000
+          |      }
+          |      genesis {
+          |        timestamp = 1460678400000
+          |        block-timestamp = 1460678400000
+          |        signature = "BASE58BLKSGNATURE"
+          |        initial-balance = 100000000000000
+          |        initial-base-target = 153722867
+          |        average-block-delay = 60s
+          |        transactions = [
+          |          {recipient = "BASE58ADDRESS1", amount = 50000000000001},
+          |          {recipient = "BASE58ADDRESS2", amount = 49999999999999}
+          |        ]
+          |      }
+          |    }
+          |  }
+          |}""".stripMargin
+      )
+    )
     val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('C')
@@ -64,6 +69,7 @@ class BlockchainSettingsSpecification extends FlatSpec {
     settings.rewardsSettings.initial should be(600000000)
     settings.rewardsSettings.minIncrement should be(50000000)
     settings.rewardsSettings.term should be(100000)
+    settings.rewardsSettings.termAfterCappedRewardFeature should be(50000)
     settings.rewardsSettings.votingInterval should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
@@ -77,13 +83,17 @@ class BlockchainSettingsSpecification extends FlatSpec {
   }
 
   it should "read testnet settings" in {
-    val config   = loadConfig(ConfigFactory.parseString("""waves {
-        |  directory = "/waves"
-        |  data-directory = "/waves/data"
-        |  blockchain {
-        |    type = TESTNET
-        |  }
-        |}""".stripMargin))
+    val config = loadConfig(
+      ConfigFactory.parseString(
+        """waves {
+          |  directory = "/waves"
+          |  data-directory = "/waves/data"
+          |  blockchain {
+          |    type = TESTNET
+          |  }
+          |}""".stripMargin
+      )
+    )
     val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('T')
@@ -94,6 +104,7 @@ class BlockchainSettingsSpecification extends FlatSpec {
     settings.rewardsSettings.initial should be(600000000)
     settings.rewardsSettings.minIncrement should be(50000000)
     settings.rewardsSettings.term should be(100000)
+    settings.rewardsSettings.termAfterCappedRewardFeature should be(50000)
     settings.rewardsSettings.votingInterval should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1478000000000L)
@@ -114,13 +125,17 @@ class BlockchainSettingsSpecification extends FlatSpec {
   }
 
   it should "read mainnet settings" in {
-    val config   = loadConfig(ConfigFactory.parseString("""waves {
-        |  directory = "/waves"
-        |  data-directory = "/waves/data"
-        |  blockchain {
-        |    type = MAINNET
-        |  }
-        |}""".stripMargin))
+    val config = loadConfig(
+      ConfigFactory.parseString(
+        """waves {
+          |  directory = "/waves"
+          |  data-directory = "/waves/data"
+          |  blockchain {
+          |    type = MAINNET
+          |  }
+          |}""".stripMargin
+      )
+    )
     val settings = BlockchainSettings.fromRootConfig(config)
 
     settings.addressSchemeCharacter should be('W')
@@ -130,6 +145,7 @@ class BlockchainSettingsSpecification extends FlatSpec {
     settings.rewardsSettings.initial should be(600000000)
     settings.rewardsSettings.minIncrement should be(50000000)
     settings.rewardsSettings.term should be(100000)
+    settings.rewardsSettings.termAfterCappedRewardFeature should be(50000)
     settings.rewardsSettings.votingInterval should be(10000)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)

@@ -603,9 +603,6 @@ object AsyncHttpApi extends Assertions {
     def stateChanges(invokeScriptTransactionId: String, amountsAsStrings: Boolean): Future[StateChanges] =
       transactionInfo[StateChanges](invokeScriptTransactionId, amountsAsStrings)
 
-    def debugStateChangesByAddress(address: String, limit: Int = 10000, after: Option[String] = None): Future[Seq[StateChanges]] =
-      get(s"/debug/stateChanges/address/$address/limit/$limit${after.fold("")(a => s"?after=$a")}").as[Seq[StateChanges]]
-
     def assetBalance(address: String, asset: String, amountsAsStrings: Boolean = false): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset", amountsAsStrings).as[AssetBalance](amountsAsStrings)
 
@@ -646,12 +643,6 @@ object AsyncHttpApi extends Assertions {
 
     def cancelSponsorship(sender: KeyPair, assetId: String, fee: Long, version: Byte = 1): Future[Transaction] =
       sponsorAsset(sender, assetId, None, fee, version)
-
-    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-      postJson(
-        "/assets/transfer",
-        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee)
-      ).as[Transaction]
 
     def massTransfer(
         sender: KeyPair,
@@ -808,8 +799,6 @@ object AsyncHttpApi extends Assertions {
 
     def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
       postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
-
-    def rollbackToBlockId(id: String): Future[Unit] = delete(s"/debug/rollback-to/$id").map(_ => ())
 
     def ensureTxDoesntExist(txId: String): Future[Unit] =
       utx()

@@ -2,8 +2,8 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.metrics.Metrics
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -24,6 +24,7 @@ case class WavesSettings(
     featuresSettings: FeaturesSettings,
     rewardsSettings: RewardsVotingSettings,
     metrics: Metrics.Settings,
+    enableLightMode: Boolean,
     config: Config
 )
 
@@ -32,6 +33,7 @@ object WavesSettings extends CustomValueReaders {
     val waves = rootConfig.getConfig("waves")
 
     val directory                 = waves.as[String]("directory")
+    val enableLightMode           = waves.as[Boolean]("enable-light-mode")
     val ntpServer                 = waves.as[String]("ntp-server")
     val maxTxErrorLogSize         = waves.as[Int]("max-tx-error-log-size")
     val dbSettings                = waves.as[DBSettings]("db")
@@ -65,6 +67,7 @@ object WavesSettings extends CustomValueReaders {
       featuresSettings,
       rewardsSettings,
       metrics,
+      enableLightMode,
       rootConfig
     )
   }

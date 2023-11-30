@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, Types, UtilityFunct
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 
 sealed trait CompileAndParseResult
 
@@ -106,7 +107,7 @@ object API {
   private def parseAndCompileScript(
       ds: DirectiveSet,
       input: String,
-      offset: Int,
+      offset: LibrariesOffset,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean
@@ -129,14 +130,13 @@ object API {
         ).map { case (bytes, (verifierComplexity, callableComplexities), dapp, errors) =>
           CompileAndParseResult.Contract(bytes, verifierComplexity, callableComplexities, dapp, errors.toSeq)
         }
-
     }
   }
 
   private def parseAndCompileExpression(
       ds: DirectiveSet,
       input: String,
-      offset: Int,
+      offset: LibrariesOffset,
       estimator: ScriptEstimator,
       stdLibVer: StdLibVersion
   ): Either[String, CompileAndParseResult.Expression] =
@@ -161,10 +161,10 @@ object API {
       allowFreeCall: Boolean = true
   ): Either[String, CompileResult] =
     for {
-      directives       <- DirectiveParser(input)
-      ds               <- extractDirectives(directives, defaultStdLib)
-      (linkedInput, _) <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled         <- compileScript(ds, linkedInput, estimator, needCompaction, removeUnusedCode, allowFreeCall)
+      directives            <- DirectiveParser(input)
+      ds                    <- extractDirectives(directives, defaultStdLib)
+      (linkedInput, offset) <- ScriptPreprocessor(input, libraries, ds.imports)
+      compiled              <- compileScript(ds, linkedInput, offset, estimator, needCompaction, removeUnusedCode, allowFreeCall)
     } yield compiled
 
   def estimatorByVersion(version: Int): Either[String, ScriptEstimator] =
@@ -179,6 +179,7 @@ object API {
   private def compileScript(
       ds: DirectiveSet,
       input: String,
+      offset: LibrariesOffset,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean,
@@ -188,7 +189,7 @@ object API {
     val ctx     = utils.compilerContext(ds)
     (ds.contentType, ds.scriptType) match {
       case (Expression, Call) if allowFreeCall =>
-        G.compileFreeCall(input, ctx, version, ds.scriptType, estimator)
+        G.compileFreeCall(input, offset, ctx, version, ds.scriptType, estimator)
           .map { case (bytes, expr, complexity) =>
             val check = G.checkExpr(expr, complexity, version, ds.scriptType, estimator)
             CompileResult.Expression(version, bytes, complexity, expr, check, isFreeCall = true)
@@ -196,19 +197,19 @@ object API {
       case (Expression, Call) =>
         Left("Invoke Expression Transaction is not activated yet")
       case (Expression, _) =>
-        G.compileExpression(input, ctx, version, ds.scriptType, estimator)
+        G.compileExpression(input, offset, ctx, version, ds.scriptType, estimator)
           .map { case (bytes, expr, complexity) =>
             val check = G.checkExpr(expr, complexity, version, ds.scriptType, estimator)
             CompileResult.Expression(version, bytes, complexity, expr, check, isFreeCall = false)
           }
       case (Library, _) =>
-        G.compileDecls(input, ctx, version, ds.scriptType, estimator)
+        G.compileDecls(input, offset, ctx, version, ds.scriptType, estimator)
           .map { case (bytes, expr, complexity) =>
             CompileResult.Library(version, bytes, complexity, expr)
           }
       case (DAppType, _) =>
         // Just ignore stdlib version here
-        G.compileContract(input, ctx, version, estimator, needCompaction, removeUnusedCode)
+        G.compileContract(input, offset, ctx, version, estimator, needCompaction, removeUnusedCode)
           .flatMap { di =>
             val check = G.checkContract(version, di.dApp, di.maxComplexity, di.annotatedComplexities, estimator)
             G.dAppFuncTypes(di.dApp).bimap(_.m, CompileResult.DApp(version, di, _, check))

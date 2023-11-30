@@ -10,8 +10,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.issue
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{TransactionType, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.{TransactionType, TxHelpers}
 
 class OverflowTest extends PropSpec with WithDomain {
   import DomainPresets.*
@@ -43,7 +42,7 @@ class OverflowTest extends PropSpec with WithDomain {
     numPairs(massTransferFee).foreach { case (recipientBalance, transferAmount) =>
       val balances = Seq(AddrWithBalance(sender.toAddress, Long.MaxValue), AddrWithBalance(recipient, recipientBalance))
       withDomain(RideV5, balances) { d =>
-        d.appendBlockE(TxHelpers.massTransfer(sender, Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(transferAmount))), fee = massTransferFee)) should produce(
+        d.appendBlockE(TxHelpers.massTransfer(sender, Seq(recipient -> transferAmount), fee = massTransferFee)) should produce(
           "Waves balance sum overflow"
         )
       }
@@ -55,8 +54,8 @@ class OverflowTest extends PropSpec with WithDomain {
       (the[Exception] thrownBy TxHelpers.massTransfer(
         sender,
         Seq(
-          ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(balance1)),
-          ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(balance2))
+          recipient -> balance1,
+          recipient -> balance2
         )
       )).getMessage shouldBe "OverflowError"
     }
@@ -115,35 +114,33 @@ class OverflowTest extends PropSpec with WithDomain {
          |   ]
        """.stripMargin
     )
-    numPairs(0).foreach {
-      case (amount1, amount2) =>
-        withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
-          d.appendBlock(TxHelpers.setScript(recipientKp, dApp(amount1, amount2)))
-          val invoke = TxHelpers.invoke(recipient, invoker = sender)
-          d.appendAndAssertFailed(invoke, "ScriptTransfer overflow")
-        }
+    numPairs(0).foreach { case (amount1, amount2) =>
+      withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
+        d.appendBlock(TxHelpers.setScript(recipientKp, dApp(amount1, amount2)))
+        val invoke = TxHelpers.invoke(recipient, invoker = sender)
+        d.appendAndAssertFailed(invoke, "ScriptTransfer overflow")
+      }
     }
   }
 
   property("invoke Reissue overflow") {
-    numPairs(0).foreach {
-      case (amount1, amount2) =>
-        withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
-          val issueTx = issue(recipientKp, amount = amount1)
-          val asset   = IssuedAsset(issueTx.id())
-          val dApp = TestCompiler(V5).compileContract(
-            s"""
-               | @Callable(i)
-               | func default() =
-               |   [
-               |     Reissue(base58'$asset', $amount2, false)
-               |   ]
+    numPairs(0).foreach { case (amount1, amount2) =>
+      withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
+        val issueTx = issue(recipientKp, amount = amount1)
+        val asset   = IssuedAsset(issueTx.id())
+        val dApp = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() =
+             |   [
+             |     Reissue(base58'$asset', $amount2, false)
+             |   ]
              """.stripMargin
-          )
-          val invoke = TxHelpers.invoke(recipient, invoker = sender)
-          d.appendBlock(issueTx, TxHelpers.setScript(recipientKp, dApp))
-          d.appendAndAssertFailed(invoke, "Asset total value overflow")
-        }
+        )
+        val invoke = TxHelpers.invoke(recipient, invoker = sender)
+        d.appendBlock(issueTx, TxHelpers.setScript(recipientKp, dApp))
+        d.appendAndAssertFailed(invoke, "Asset total value overflow")
+      }
     }
   }
 }

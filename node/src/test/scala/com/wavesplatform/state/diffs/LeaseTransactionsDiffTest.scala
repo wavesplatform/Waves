@@ -12,9 +12,12 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.*
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
+
+import scala.collection.immutable.VectorMap
 
 class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
 
@@ -25,33 +28,33 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
   def total(l: LeaseBalance): Long = l.in - l.out
 
   property("can lease/cancel lease preserving waves invariant") {
-
-    val sunnyDayLeaseLeaseCancel: Seq[(GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] = {
-      val master    = TxHelpers.signer(1)
-      val recipient = TxHelpers.signer(2)
-
-      val genesis = TxHelpers.genesis(master.toAddress)
-      for {
-        lease       <- Seq(TxHelpers.lease(master, recipient.toAddress), TxHelpers.lease(master, recipient.toAddress, version = TxVersion.V1))
-        leaseCancel <- Seq(TxHelpers.leaseCancel(lease.id(), master), TxHelpers.leaseCancel(lease.id(), master, version = TxVersion.V1))
-      } yield (genesis, lease, leaseCancel)
-    }
-
-    sunnyDayLeaseLeaseCancel.foreach { case (genesis, lease, leaseCancel) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(lease))) { case (totalDiff, _) =>
-        val totalPortfolioDiff = totalDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-        totalPortfolioDiff.balance shouldBe 0
-        total(totalPortfolioDiff.lease) shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
-        totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
+    val sender    = TxHelpers.signer(1)
+    val recipient = TxHelpers.signer(2)
+    val miner     = TestBlock.defaultSigner.toAddress
+    val genesis   = TxHelpers.genesis(sender.toAddress)
+    for {
+      lease       <- Seq(TxHelpers.lease(sender, recipient.toAddress), TxHelpers.lease(sender, recipient.toAddress, version = TxVersion.V1))
+      leaseCancel <- Seq(TxHelpers.leaseCancel(lease.id(), sender), TxHelpers.leaseCancel(lease.id(), sender, version = TxVersion.V1))
+    } {
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(lease))) { case (snapshot, _) =>
+        snapshot.balances shouldBe VectorMap(
+          (sender.toAddress, Waves) -> (genesis.amount.value - lease.fee.value),
+          (miner, Waves)            -> lease.fee.value
+        )
+        snapshot.leaseBalances shouldBe Map(
+          sender.toAddress    -> LeaseBalance(0, lease.amount.value),
+          recipient.toAddress -> LeaseBalance(lease.amount.value, 0)
+        )
       }
-
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis, lease))), TestBlock.create(Seq(leaseCancel))) { case (totalDiff, _) =>
-        val totalPortfolioDiff = totalDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-        totalPortfolioDiff.balance shouldBe 0
-        total(totalPortfolioDiff.lease) shouldBe 0
-        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
-        totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis, lease))), TestBlock.create(Seq(leaseCancel))) { case (snapshot, _) =>
+        snapshot.balances shouldBe VectorMap(
+          (miner, Waves)            -> (lease.fee.value + leaseCancel.fee.value),
+          (sender.toAddress, Waves) -> (genesis.amount.value - lease.fee.value - leaseCancel.fee.value)
+        )
+        snapshot.leaseBalances shouldBe Map(
+          sender.toAddress    -> LeaseBalance.empty,
+          recipient.toAddress -> LeaseBalance.empty
+        )
       }
     }
   }
@@ -96,8 +99,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
 
   property("cannot cancel lease twice after allowMultipleLeaseCancelTransactionUntilTimestamp") {
     disallowCancelTwice.foreach { case (preconditions, block) =>
-      assertDiffEi(preconditions, block, settings) { totalDiffEi =>
-        totalDiffEi should produce("Cannot cancel already cancelled lease")
+      assertDiffEi(preconditions, block, settings) { snapshotEi =>
+        snapshotEi should produce("Cannot cancel already cancelled lease")
       }
     }
   }
@@ -112,8 +115,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
 
   property("can cancel lease twice before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     allowCancelTwice.foreach { case (preconditions, block) =>
-      assertDiffEi(preconditions, block, settings) { totalDiffEi =>
-        totalDiffEi.explicitGet()
+      assertDiffEi(preconditions, block, settings) { snapshotEi =>
+        snapshotEi.explicitGet()
       }
     }
   }
@@ -133,8 +136,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
     }
 
     setup.foreach { case (genesis, lease, leaseForward, ts) =>
-      assertDiffEi(Seq(TestBlock.create(ts, Seq(genesis, lease))), TestBlock.create(ts, Seq(leaseForward)), settings) { totalDiffEi =>
-        totalDiffEi should produce("Cannot lease more than own")
+      assertDiffEi(Seq(TestBlock.create(ts, Seq(genesis, lease))), TestBlock.create(ts, Seq(leaseForward)), settings) { snapshotEi =>
+        snapshotEi should produce("Cannot lease more than own")
       }
     }
   }
@@ -171,18 +174,23 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
         Seq(TestBlock.create(blockTime, genesis :+ lease)),
         TestBlock.create(blockTime, Seq(unleaseOtherOrRecipient)),
         settings
-      ) { totalDiffEi =>
-        totalDiffEi should produce("LeaseTransaction was leased by other sender")
+      ) { snapshotEi =>
+        snapshotEi should produce("LeaseTransaction was leased by other sender")
       }
     }
   }
 
   property("can cancel lease of another sender and acquire leasing power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     cancelLeaseOfAnotherSender(unleaseByRecipient = false, repeatedCancelAllowed).foreach { case (genesis, lease, unleaseOther, blockTime) =>
-      assertDiffAndState(Seq(TestBlock.create(genesis :+ lease)), TestBlock.create(blockTime, Seq(unleaseOther)), settings) { case (totalDiff, _) =>
-        totalDiff.portfolios.get(lease.sender.toAddress) shouldBe None
-        total(totalDiff.portfolios(lease.recipient.asInstanceOf[Address]).lease) shouldBe -lease.amount.value
-        total(totalDiff.portfolios(unleaseOther.sender.toAddress).lease) shouldBe lease.amount.value
+      withDomain(ScriptsAndSponsorship.configure(_.copy(lastTimeBasedForkParameter = allowMultipleLeaseCancelTransactionUntilTimestamp))) { d =>
+        d.appendBlock(genesis*)
+        d.appendBlock(lease)
+        d.appendBlock(TestBlock.create(blockTime, d.lastBlockId, Seq(unleaseOther)).block)
+        d.liquidSnapshot.balances.get((lease.sender.toAddress, Waves)) shouldBe None
+        val recipient = lease.recipient.asInstanceOf[Address]
+        val unleaser  = unleaseOther.sender.toAddress
+        total(d.liquidSnapshot.leaseBalances(recipient)) shouldBe total(d.rocksDBWriter.leaseBalance(recipient)) - lease.amount.value
+        total(d.liquidSnapshot.leaseBalances(unleaser)) shouldBe total(d.rocksDBWriter.leaseBalance(unleaser)) + lease.amount.value
       }
     }
   }
@@ -191,13 +199,13 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
     "if recipient cancels lease, it doesn't change leasing component of mining power before allowMultipleLeaseCancelTransactionUntilTimestamp"
   ) {
     cancelLeaseOfAnotherSender(unleaseByRecipient = true, repeatedCancelAllowed).foreach { case (genesis, lease, unleaseRecipient, blockTime) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(blockTime, genesis :+ lease)),
-        TestBlock.create(blockTime, Seq(unleaseRecipient)),
-        settings
-      ) { case (totalDiff, _) =>
-        totalDiff.portfolios.get(lease.sender.toAddress) shouldBe None
-        total(totalDiff.portfolios(unleaseRecipient.sender.toAddress).lease) shouldBe 0
+      withDomain(ScriptsAndSponsorship.configure(_.copy(lastTimeBasedForkParameter = allowMultipleLeaseCancelTransactionUntilTimestamp))) { d =>
+        d.appendBlock(genesis*)
+        d.appendBlock(lease)
+        d.appendBlock(TestBlock.create(blockTime, d.lastBlockId, Seq(unleaseRecipient)).block)
+        d.liquidSnapshot.balances.get((lease.sender.toAddress, Waves)) shouldBe None
+        val unleaser = unleaseRecipient.sender.toAddress
+        total(d.liquidSnapshot.leaseBalances(unleaser)) shouldBe total(d.rocksDBWriter.leaseBalance(unleaser))
       }
     }
   }

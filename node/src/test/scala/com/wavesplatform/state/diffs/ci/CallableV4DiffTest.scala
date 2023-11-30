@@ -106,7 +106,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     }
   }
 
-  property("diff contains delete entries") {
+  property("snapshot contains delete entries") {
     val deleteEntryDApp = dApp(
       """
         | [
@@ -131,8 +131,8 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       Seq(TestBlock.create(genesis :+ setScript)),
       TestBlock.create(Seq(invoke)),
       features
-    ) { case (diff, _) =>
-      diff.accountData(master.toAddress) shouldBe
+    ) { case (snapshot, _) =>
+      snapshot.accountData(master.toAddress) shouldBe
         Map(
           "key1" -> EmptyDataEntry("key1"),
           "key2" -> EmptyDataEntry("key2")
@@ -363,17 +363,18 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
   property("issue action results state") {
     val (setScript, invoke, master, invoker, amount) = issuePreconditions(1.005.waves)
     withDomain(balances = AddrWithBalance.enoughBalances(invoker, master)) { d =>
-      val tb1 = TestBlock.create(System.currentTimeMillis(), d.blockchain.lastBlockId.get, Seq(setScript))
-      d.blockchainUpdater.processBlock(tb1, ByteStr(new Array[Byte](32)), verify = false).explicitGet()
-      val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
-      d.blockchainUpdater.processBlock(tb2, ByteStr(new Array[Byte](32)), verify = false).explicitGet()
+      val tb1 = TestBlock.create(System.currentTimeMillis(), d.blockchain.lastBlockId.get, Seq(setScript)).block
+      d.blockchainUpdater.processBlock(tb1, ByteStr(new Array[Byte](32)), None, verify = false).explicitGet()
+      val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke)).block
+      d.blockchainUpdater.processBlock(tb2, ByteStr(new Array[Byte](32)), None, verify = false).explicitGet()
 
       d.portfolio(master.toAddress).map(_._2) shouldEqual Seq(amount)
       d.portfolio(invoker.toAddress) shouldEqual Seq()
 
       d.blockchainUpdater.processBlock(
-        TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty),
+        TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty).block,
         ByteStr(new Array[Byte](32)),
+        None,
         verify = false
       )
 
@@ -388,9 +389,9 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       Seq(TestBlock.create(genesis :+ setScript)),
       TestBlock.create(Seq(invoke)),
       features
-    ) { case (diff, blockchain) =>
-      val asset = diff.issuedAssets.head._1
-      diff.sponsorship shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
+    ) { case (snapshot, blockchain) =>
+      val asset = snapshot.assetStatics.head._1
+      snapshot.sponsorships shouldBe Map(asset -> SponsorshipValue(minSponsoredAssetFee))
       blockchain.assetDescription(asset).map(_.sponsorship) shouldBe Some(minSponsoredAssetFee)
     }
   }

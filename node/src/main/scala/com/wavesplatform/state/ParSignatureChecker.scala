@@ -26,11 +26,11 @@ object ParSignatureChecker {
       .executeOn(sigverify)
       .runAsyncAndForget
 
-  def checkBlockAndTxSignatures(block: Block, rideV6Activated: Boolean): Unit = {
+  def checkBlockAndTxSignatures(block: Block, checkTxSignatures: Boolean, rideV6Activated: Boolean): Unit = {
     val verifiedObjects: Seq[Any] = (block +: block.transactionData)
     verifiedObjects
       .parTraverse {
-        case tx: ProvenTransaction =>
+        case tx: ProvenTransaction if checkTxSignatures =>
           Task {
             if (rideV6Activated) {
               tx.firstProofIsValidSignatureAfterV6

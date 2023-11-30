@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.syntax.semigroup.*
+import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -19,10 +20,9 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.*
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.*
 
 class BalancesV4Test extends PropSpec with WithState {
 
@@ -86,7 +86,6 @@ class BalancesV4Test extends PropSpec with WithState {
   }
 
   property("Waves balance details") {
-
     val (genesis, b, acc1, dapp, ci) = preconditionsAndTransfer
     assertDiffAndState(
       Seq(TestBlock.create(genesis)) ++
@@ -94,10 +93,12 @@ class BalancesV4Test extends PropSpec with WithState {
         Seq(TestBlock.create(b)),
       TestBlock.create(Seq(ci)),
       rideV4Activated
-    ) { case (d, s) =>
+    ) { case (snapshot, blockchain) =>
       val apiBalance =
-        com.wavesplatform.api.common.CommonAccountsApi(() => CompositeBlockchain(s, d), rdb, s).balanceDetails(acc1.toAddress).explicitGet()
-      val data = d.accountData(dapp.toAddress)
+        CommonAccountsApi(() => SnapshotBlockchain(blockchain, snapshot), rdb, blockchain)
+          .balanceDetails(acc1.toAddress)
+          .explicitGet()
+      val data = snapshot.accountData(dapp.toAddress)
       data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
       apiBalance.available shouldBe 16 * Constants.UnitsInWave
       data("regular") shouldBe IntegerDataEntry("regular", apiBalance.regular)
@@ -129,7 +130,7 @@ class BalancesV4Test extends PropSpec with WithState {
            | assetBalance(Address(base58'$acc'), this.id) == $a && assetBalance(Alias("alias"), this.id) == $a
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
-      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
+      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, V4, parsedScript).explicitGet()._1)
         .explicitGet()
     }
 
@@ -191,7 +192,7 @@ class BalancesV4Test extends PropSpec with WithState {
            | wavesBalance(Address(base58'$acc')).regular == $w
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
-      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
+      ExprScript(V4, ExpressionCompiler(ctx.compilerContext, V4, parsedScript).explicitGet()._1)
         .explicitGet()
     }
 

@@ -10,10 +10,11 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.{Constants, TestFunctionalitySettings}
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.StateSnapshot
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.*
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -33,19 +34,14 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
         features
-      ) { case (diff, blockchain) =>
-        val assetBalance = issues
-          .map(_.id())
-          .map(IssuedAsset(_))
-          .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
-          .filter(_._2 != 0)
-          .toMap
-
-        diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
-        diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
-        diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
+      ) { case (snapshot, blockchain) =>
+        issues.foreach { tx =>
+          val asset = IssuedAsset(tx.id())
+          blockchain.balance(dAppAcc.toAddress, asset) shouldBe snapshot.balances((dAppAcc.toAddress, asset))
+        }
+        snapshot.balances((dAppAcc.toAddress, Waves)) shouldBe ENOUGH_AMT - setDApp.fee.value - wavesTransfer
+        snapshot.balances((invoker.toAddress, Waves)) shouldBe ENOUGH_AMT - setVerifier.fee.value - issues.map(_.fee.value).sum - fee + wavesTransfer
       }
-
     }
   }
 
@@ -60,15 +56,11 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
         features
-      ) { case (diff, blockchain) =>
-        val assetBalance = issues
-          .map(_.id())
-          .map(IssuedAsset(_))
-          .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
-          .filter(_._2 != 0)
-          .toMap
-
-        diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+      ) { case (snapshot, blockchain) =>
+        issues.foreach { tx =>
+          val asset = IssuedAsset(tx.id())
+          blockchain.balance(dAppAcc.toAddress, asset) shouldBe snapshot.balances((dAppAcc.toAddress, asset))
+        }
       }
     }
   }
@@ -90,7 +82,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         TestBlock.create(Seq(ci)),
         features
       )(_ should matchPattern {
-        case Right(diff: Diff) if diff.transactions.exists(!_.applied) =>
+        case Right(snapshot: StateSnapshot) if snapshot.transactions.exists(_._2.status != Status.Succeeded) =>
       })
     }
   }
@@ -144,17 +136,13 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
         features
-      ) { case (diff, blockchain) =>
-        val assetBalance = issues
-          .map(_.id())
-          .map(IssuedAsset(_))
-          .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
-          .filter(_._2 != 0)
-          .toMap
-
-        diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
-        diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
-        diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
+      ) { case (snapshot, blockchain) =>
+        issues.foreach { tx =>
+          val asset = IssuedAsset(tx.id())
+          snapshot.balances((dAppAcc.toAddress, asset)) shouldBe blockchain.balance(dAppAcc.toAddress, asset)
+        }
+        snapshot.balances((dAppAcc.toAddress, Waves)) shouldBe ENOUGH_AMT - setDApp.fee.value - wavesTransfer
+        snapshot.balances((invoker.toAddress, Waves)) shouldBe ENOUGH_AMT - setVerifier.fee.value - issues.map(_.fee.value).sum - fee + wavesTransfer
       }
     }
   }
@@ -185,8 +173,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
   ): Seq[
     (Seq[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)
   ] = {
-    val master  = TxHelpers.signer(0)
-    val invoker = TxHelpers.signer(1)
+    val master  = TxHelpers.signer(1)
+    val invoker = TxHelpers.signer(2)
 
     val fee = if (withEnoughFee) TxHelpers.ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else TxHelpers.ciFee(1)
 
@@ -255,8 +243,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         TestBlock.create(Seq(ci)),
         features
       ) {
-        case Right(diff: Diff) =>
-          val errMsg = diff.scriptResults(diff.transactions.head.transaction.id()).error.get.text
+        case Right(snapshot: StateSnapshot) =>
+          val errMsg = snapshot.scriptResults(snapshot.transactions.head._2.transaction.id()).error.get.text
           message(oldVersion.id, maybeFailedAssetId).r.findFirstIn(errMsg) shouldBe defined
 
         case l @ Left(_) =>

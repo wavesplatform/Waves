@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Proofs, Transaction}
+import com.wavesplatform.transaction.{Proofs, Transaction, TxPositiveAmount}
 
 import scala.util.Random
 
@@ -40,9 +40,9 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         bank.publicKey,
         owners(1).toAddress,
         Waves,
-        totalAmountOnNewAccount - 2 * enoughFee - i,
+        TxPositiveAmount.unsafeFrom(totalAmountOnNewAccount - 2 * enoughFee - i),
         Waves,
-        enoughFee,
+        TxPositiveAmount.unsafeFrom(enoughFee),
         ByteStr.empty,
         now + i,
         Proofs.empty,
@@ -72,8 +72,8 @@ object MultisigTransactionGenerator {
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
       s"""
-        | transactions = ${x.transactions}
-        | firstRun = ${x.firstRun}
+         | transactions = ${x.transactions}
+         | firstRun = ${x.firstRun}
       """.stripMargin
     }
   }

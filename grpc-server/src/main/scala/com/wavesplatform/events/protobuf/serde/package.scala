@@ -2,6 +2,8 @@ package com.wavesplatform.events.protobuf
 
 import cats.Monoid
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.Address
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.StateUpdate.AssetInfo
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
@@ -27,6 +29,7 @@ package object serde {
               updatedWavesAmount,
               vrf,
               activatedFeatures,
+              rewardShares,
               blockStateUpdate,
               transactionStateUpdates,
               transactionsMetadata,
@@ -49,7 +52,8 @@ package object serde {
                     block = Some(PBBlocks.protobuf(block)),
                     updatedWavesAmount = updatedWavesAmount,
                     activatedFeatures = activatedFeatures,
-                    vrf = vrf.fold(ByteString.EMPTY)(_.toByteString)
+                    vrf = vrf.fold(ByteString.EMPTY)(_.toByteString),
+                    rewardShares = rewardShares.map { case (addr, reward) => RewardShare(ByteString.copyFrom(addr.bytes), reward) }
                   )
                 )
               )
@@ -138,6 +142,7 @@ package object serde {
                 updatedWavesAmount = body.updatedWavesAmount,
                 vrf = Option.unless(body.vrf.isEmpty)(body.vrf.toByteStr),
                 activatedFeatures = body.activatedFeatures,
+                rewardShares = body.rewardShares.map { rs => (Address.fromBytes(rs.address.toByteArray).explicitGet(), rs.reward) },
                 blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                 transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
                 transactionMetadata = append.transactionsMetadata,

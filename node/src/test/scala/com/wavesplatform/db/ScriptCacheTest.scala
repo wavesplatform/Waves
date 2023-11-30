@@ -58,7 +58,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
                 .explicitGet()
             }
 
-        val genesisBlock = TestBlock.create(genesisTxs)
+        val genesisBlock = TestBlock.create(genesisTxs).block
 
         val nextBlock =
           TestBlock
@@ -67,6 +67,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
               ref = genesisBlock.id(),
               txs = setScriptTxs
             )
+            .block
 
         (accounts, genesisBlock +: nextBlock +: Nil)
       }
@@ -115,9 +116,10 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
             ref = lastBlockHeader.id(),
             txs = Seq(newScriptTx)
           )
+          .block
 
         bcu
-          .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature)
+          .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature, None)
           .explicitGet()
 
         bcu.accountScript(account.toAddress) shouldEqual None
@@ -136,12 +138,12 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
       TestFunctionalitySettings.Stub
     )
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature) should beRight
+        bcu.processBlock(block, block.header.generationSignature, None) should beRight
       }
 
       f(accounts, bcu)

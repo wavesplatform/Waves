@@ -55,7 +55,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
   }
 
   it should "generate valid empty block of version 4 after block of version 3" in {
-    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion))) {
+    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion).block)) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
         val oldBalance    = blockchain.balance(account.toAddress)
@@ -78,7 +78,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
       val tx2 = TransferTransaction
         .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
         .explicitGet()
-      TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
+      TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion).block
     })
 
     val txs: Seq[TransactionProducer] = Seq((ts, account) => {
@@ -120,18 +120,20 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
         miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler, Observable.empty)
         account      = createAccount
         ts           = ntpTime.correctedTime() - 60000
-        genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()))
-        _ <- Task(blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature))
+        genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet())).block
+        _ <- Task(blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, None))
         blocks = bps.foldLeft {
           (ts + 1, Seq[Block](genesisBlock))
         } { case ((ts, chain), bp) =>
           (ts + 3, bp(ts + 3, chain.head.id(), account) +: chain)
         }._2
-        added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b, b.header.generationSignature)))
+        added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b, b.header.generationSignature, None)))
         _   = added.foreach(_.explicitGet())
         _   = txs.foreach(tx => utxPool.putIfNew(tx(ts + 6, account)).resultE.explicitGet())
         env = Env(blocks, account, miner, blockchainUpdater)
         r <- f(env)
+        _ = scheduler.shutdown()
+        _ = utxPool.close()
       } yield r
     }
 

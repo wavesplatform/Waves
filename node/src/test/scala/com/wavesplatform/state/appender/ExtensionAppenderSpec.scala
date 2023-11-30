@@ -25,9 +25,10 @@ class ExtensionAppenderSpec extends FlatSpec with WithDomain {
       utx.all shouldBe Seq(tx)
 
       time.setTime(block1.header.timestamp)
-      extensionAppender(ExtensionBlocks(d.blockchain.score + block1.blockScore(), Seq(block1))).runSyncUnsafe().explicitGet()
+      extensionAppender(ExtensionBlocks(d.blockchain.score + block1.blockScore(), Seq(block1), Map.empty)).runSyncUnsafe().explicitGet()
       d.blockchain.height shouldBe 2
       utx.all shouldBe Nil
+      utx.close()
     }
 
 }
