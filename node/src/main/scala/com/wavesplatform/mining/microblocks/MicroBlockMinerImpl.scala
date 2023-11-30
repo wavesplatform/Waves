@@ -143,19 +143,17 @@ class MicroBlockMinerImpl(
       account: KeyPair,
       block: Block,
       transactions: Seq[Transaction],
-      updatedTotalConstraint: MiningConstraint,
+      constraint: MiningConstraint,
       stateHash: Option[BlockId]
   ): Task[MicroBlockMiningResult] =
     for {
-      (signedBlock, microBlock) <- forgeBlocks(account, block, transactions, stateHash)
-        .leftWiden[Throwable]
-        .liftTo[Task]
-      blockId <- appendMicroBlock(microBlock)
+      (signedBlock, microBlock) <- forgeBlocks(account, block, transactions, stateHash).leftWiden[Throwable].liftTo[Task]
+      blockId                   <- appendMicroBlock(microBlock)
       _ = BlockStats.mined(microBlock, blockId)
       _ <- broadcastMicroBlock(account, microBlock, blockId)
     } yield
-      if (updatedTotalConstraint.isFull) Stop
-      else Success(signedBlock, updatedTotalConstraint)
+      if (constraint.isFull) Stop
+      else Success(signedBlock, constraint)
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
     Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
