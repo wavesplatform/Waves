@@ -23,7 +23,7 @@ object TestValues {
   def invokeFee(scripts: Int = 0, issues: Int = 0): Long =
     invokeFee + scripts * ScriptExtraFee + issues * FeeConstants(TransactionType.Issue) * FeeUnit
 
-  val (script, scriptComplexity) = ScriptCompiler
+  lazy val (script, scriptComplexity) = ScriptCompiler
     .compile(
       """
       |{-# STDLIB_VERSION 2 #-}
@@ -35,7 +35,7 @@ object TestValues {
     )
     .explicitGet()
 
-  val (assetScript, assetScriptComplexity) = ScriptCompiler
+  lazy val (assetScript, assetScriptComplexity) = ScriptCompiler
     .compile(
       """
       |{-# STDLIB_VERSION 2 #-}
@@ -47,7 +47,7 @@ object TestValues {
     )
     .explicitGet()
 
-  val (rejectAssetScript, rejectAssetScriptComplexity) = ScriptCompiler
+  lazy val (rejectAssetScript, rejectAssetScriptComplexity) = ScriptCompiler
     .compile(
       """
       |{-# STDLIB_VERSION 2 #-}

@@ -30,7 +30,7 @@ class ScriptVersionsTest extends FreeSpec {
   ): Either[String, EVALUATED] = {
     val expr = Parser.parseExpr(script).get.value
     for {
-      compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
+      compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), version, expr)
       (typedExpr, _) = compileResult
       s <- ExprScript(version, typedExpr, checkSize = false)
       r <- eval(s, tx, blockchain)

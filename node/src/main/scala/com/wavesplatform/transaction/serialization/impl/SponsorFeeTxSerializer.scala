@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.transaction.{TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{PBSince, TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -38,7 +38,7 @@ object SponsorFeeTxSerializer {
   }
 
   def toBytes(tx: SponsorFeeTransaction): Array[Byte] = {
-    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    if (PBSince.affects(tx)) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(Array(0: Byte, tx.tpe.id.toByte, tx.version), this.bodyBytes(tx), tx.proofs.bytes()) // [typeId, version] appears twice
   }
 

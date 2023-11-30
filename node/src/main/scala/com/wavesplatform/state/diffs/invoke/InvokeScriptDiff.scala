@@ -8,6 +8,7 @@ import cats.syntax.traverseFilter.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.features.FunctionCallPolicyProvider.*
@@ -27,7 +28,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
@@ -241,7 +242,11 @@ object InvokeScriptDiff {
             _               = invocationRoot.setLog(log)
             spentComplexity = remainingComplexity - scriptResult.unusedComplexity.max(0)
 
-            _ <- validateIntermediateBalances(blockchain, resultSnapshot, spentComplexity, log)
+            _ <-
+              if (blockchain.isFeatureActivated(LightNode))
+                traced(Right(()))
+              else
+                validateIntermediateBalances(blockchain, resultSnapshot, spentComplexity, log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = complexityAfterPayments - unusedComplexity
@@ -349,7 +354,11 @@ object InvokeScriptDiff {
             resultSnapshot <- traced(
               (resultSnapshot.setScriptsComplexity(0) |+| actionsSnapshot.addScriptsComplexity(paymentsComplexity)).asRight
             )
-            _ <- validateIntermediateBalances(blockchain, resultSnapshot, resultSnapshot.scriptsComplexity, log)
+            _ <-
+              if (blockchain.isFeatureActivated(LightNode))
+                traced(Right(()))
+              else
+                validateIntermediateBalances(blockchain, resultSnapshot, resultSnapshot.scriptsComplexity, log)
             _ = invocationRoot.setResult(scriptResult)
           } yield (
             resultSnapshot,
@@ -391,7 +400,8 @@ object InvokeScriptDiff {
         limit,
         blockchain.correctFunctionCallScope,
         blockchain.newEvaluatorMode,
-        enableExecutionLog
+        enableExecutionLog,
+        blockchain.isFeatureActivated(LightNode)
       )
       .map(
         _.leftMap[ValidationError] {
@@ -421,30 +431,31 @@ object InvokeScriptDiff {
       )
   }
 
-  private def validateIntermediateBalances(blockchain: Blockchain, snapshot: StateSnapshot, spentComplexity: Long, log: Log[Id]) = traced(
-    if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
-      BalanceDiffValidation(blockchain)(snapshot)
-        .leftMap { be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log) }
-    } else if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
-      // reject transaction if any balance is negative
-      snapshot.balances.view
-        .flatMap {
-          case ((address, asset), balance) if balance < 0 => Some(address -> asset)
-          case _                                          => None
-        }
-        .headOption
-        .fold[Either[ValidationError, Unit]](Right(())) { case (address, asset) =>
-          val msg = asset match {
-            case Waves =>
-              s"$address: Negative waves balance: old = ${blockchain.balance(address)}, new = ${snapshot.balances((address, Waves))}"
-            case ia: IssuedAsset =>
-              s"$address: Negative asset $ia balance: old = ${blockchain.balance(address, ia)}, new = ${snapshot.balances((address, ia))}"
+  def validateIntermediateBalances(blockchain: Blockchain, snapshot: StateSnapshot, spentComplexity: Long, log: Log[Id]): CoevalR[Any] =
+    traced(
+      if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
+        BalanceDiffValidation(blockchain)(snapshot)
+          .leftMap { be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log) }
+      } else if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
+        // reject transaction if any balance is negative
+        snapshot.balances.view
+          .flatMap {
+            case ((address, asset), balance) if balance < 0 => Some(address -> asset)
+            case _                                          => None
           }
-          Left(FailOrRejectError(msg))
-        }
+          .headOption
+          .fold[Either[ValidationError, Unit]](Right(())) { case (address, asset) =>
+            val msg = asset match {
+              case Waves =>
+                s"$address: Negative waves balance: old = ${blockchain.balance(address)}, new = ${snapshot.balances((address, Waves))}"
+              case ia: IssuedAsset =>
+                s"$address: Negative asset $ia balance: old = ${blockchain.balance(address, ia)}, new = ${snapshot.balances((address, ia))}"
+            }
+            Left(FailOrRejectError(msg))
+          }
 
-    } else Right(())
-  )
+      } else Right(())
+    )
 
   private def ensurePaymentsAreNotNegative(blockchain: Blockchain, tx: InvokeScript, invoker: Address, dAppAddress: Address) = traced {
     tx.payments.collectFirst {

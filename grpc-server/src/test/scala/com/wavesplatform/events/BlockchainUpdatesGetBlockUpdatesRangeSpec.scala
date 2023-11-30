@@ -178,7 +178,7 @@ class BlockchainUpdatesGetBlockUpdatesRangeSpec extends BlockchainUpdatesTestBas
 
     "BU-165. Return correct data for massTransfer" in {
       val massTransferFee = fee * 6
-      val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients, firstToken.asset, massTransferFee)
+      val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients.map(v => v.address -> v.amount.value), firstToken.asset, massTransferFee)
       withGenerateGetBlockUpdateRange(
         GetBlockUpdatesRangeRequest.of(1, 3),
         settings = currentSettings,

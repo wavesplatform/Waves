@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.repl
 import cats.Monad
 import cats.data.EitherT
 import cats.implicits.*
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
@@ -20,13 +21,14 @@ class ReplEngine[F[_]: Monad] {
 
   def eval(
       expr: String,
+      version: StdLibVersion,
       compileCtx: CompilerContext,
       evalCtx: EvaluationContext[Environment, F]
   ): F[Either[String, (String, (CompilerContext, EvaluationContext[Environment, F]))]] = {
     val r =
       for {
         parsed                              <- EitherT.fromEither[F](parse(expr))
-        (newCompileCtx, compiled, exprType) <- EitherT.fromEither[F](ExpressionCompiler.applyWithCtx(compileCtx, parsed))
+        (newCompileCtx, compiled, exprType) <- EitherT.fromEither[F](ExpressionCompiler.applyWithCtx(compileCtx, version, parsed))
         evaluated <- EitherT(evaluator.applyWithCtx(evalCtx, compiled)).leftMap(error =>
           if (error.message.isEmpty) "Evaluation error" else error.message
         )

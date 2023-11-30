@@ -8,6 +8,6 @@ import com.wavesplatform.state.{Blockchain, StateSnapshot}
 case object CancelLeaseOverflow extends PatchAtHeight('W' -> 795000) {
   def apply(blockchain: Blockchain): StateSnapshot = {
     val patch = readPatchData[CancelledLeases]()
-    StateSnapshot.ofLeaseBalances(patch.balances, blockchain).explicitGet() |+| StateSnapshot(leaseStates = patch.leaseStates)
+    StateSnapshot.ofLeaseBalances(patch.balances, blockchain).explicitGet() |+| StateSnapshot(cancelledLeases = patch.leaseStates)
   }
 }

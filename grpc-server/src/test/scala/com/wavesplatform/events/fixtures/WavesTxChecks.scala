@@ -8,10 +8,10 @@ import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.AssetScriptInfo
 import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingUpdate, ScriptUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
-import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.order.Order
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.*
@@ -277,7 +277,7 @@ object WavesTxChecks extends Matchers with OptionValues {
     expectedValues.zip(actualArguments).foreach(item => item._1 shouldBe item._2)
   }
 
-  def checkInvokeScriptResultData(result: Seq[DataTransactionData.DataEntry], actualData: Seq[(String, Any)])(implicit pos: Position): Unit = {
+  def checkInvokeScriptResultData(result: Seq[transaction.DataEntry], actualData: Seq[(String, Any)])(implicit pos: Position): Unit = {
     if (result.length != actualData.length) {
       throw new IllegalArgumentException("Number of expected values does not match the number of actual data arguments.")
     }

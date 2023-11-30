@@ -26,7 +26,7 @@ import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, InvokeScriptResult, Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TransactionType.InvokeScript
@@ -155,7 +155,8 @@ object UtilsEvaluator {
           correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
           newMode = blockchain.newEvaluatorMode,
           checkConstructorArgsTypes = true,
-          enableExecutionLog = true
+          enableExecutionLog = true,
+          fixedThrownError = true
         )
         .value()
         .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }

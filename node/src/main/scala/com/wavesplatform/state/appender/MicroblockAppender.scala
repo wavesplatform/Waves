@@ -9,6 +9,7 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.network.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{InvalidSignature, InvalidStateHash}
@@ -52,12 +53,20 @@ object MicroblockAppender extends ScorexLogging {
       peerDatabase: PeerDatabase,
       blockChallenger: Option[BlockChallenger],
       scheduler: Scheduler
-  )(ch: Channel, md: MicroblockData, snapshot: Option[(Channel, MicroBlockSnapshot)]): Task[Unit] = {
+  )(ch: Channel, md: MicroblockData, snapshot: Option[(Channel, MicroBlockSnapshotResponse)]): Task[Unit] = {
     import md.microBlock
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
-      _       <- EitherT(Task.now(microBlock.signaturesValid()))
-      blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock, snapshot.map(_._2)))
+      _ <- EitherT(Task.now(microBlock.signaturesValid()))
+      microBlockSnapshot = snapshot
+        .map { case (_, mbs) =>
+          microBlock.transactionData.zip(mbs.snapshots).map { case (tx, pbs) =>
+            PBSnapshots.fromProtobuf(pbs, tx.id(), blockchainUpdater.height)
+          }
+        }
+        .map(ss => MicroBlockSnapshot(microblockTotalResBlockSig, ss))
+
+      blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock, microBlockSnapshot))
     } yield blockId).value.flatMap {
       case Right(blockId) =>
         Task {

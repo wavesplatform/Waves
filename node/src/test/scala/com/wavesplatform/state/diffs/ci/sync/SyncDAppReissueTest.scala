@@ -102,7 +102,7 @@ class SyncDAppReissueTest extends PropSpec with WithDomain {
 
         if (bigComplexityDApp1 || bigComplexityDApp2) {
           d.appendBlock(invoke)
-          d.liquidDiff.errorMessage(invoke.txId).get.text should include("Asset was issued by other address")
+          d.liquidSnapshot.errorMessage(invoke.txId).get.text should include("Asset was issued by other address")
         } else {
           d.appendBlockE(invoke) should produce("Asset was issued by other address")
         }
