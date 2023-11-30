@@ -1,12 +1,13 @@
 package com.wavesplatform.api.grpc
 
+import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
-import com.wavesplatform.protobuf._
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.TxMeta
 import com.wavesplatform.transaction.Transaction
@@ -16,7 +17,7 @@ import monix.execution.Scheduler
 import scala.concurrent.Future
 
 class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
-  import BlocksApiGrpcImpl._
+  import BlocksApiGrpcImpl.*
 
   override def getCurrentHeight(request: Empty): Future[Int] = {
     Future.successful(commonApi.currentHeight)
@@ -31,13 +32,11 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
       else
         commonApi
           .metaRange(request.fromHeight, request.toHeight)
-          .map { meta =>
-            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString)), meta.height)
-          }
+          .map(toBlockWithHeight)
 
     responseObserver.completeWith(request.filter match {
       case Filter.GeneratorPublicKey(publicKey) => stream.filter(_.getBlock.getHeader.generator.toPublicKey == publicKey.toPublicKey)
-      case Filter.GeneratorAddress(address)     => stream.filter(_.getBlock.getHeader.generator.toAddress == address.toAddress)
+      case Filter.GeneratorAddress(address)     => stream.filter(_.getBlock.getHeader.generator.toAddress() == address.toAddress())
       case Filter.Empty                         => stream
     })
   }
@@ -66,9 +65,22 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 }
 
 object BlocksApiGrpcImpl {
-  private def toBlockWithHeight(v: (BlockMeta, Seq[(TxMeta, Transaction)])) =
-    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toByteString, v._2.map(_._2.toPB))), v._1.height)
+  private def toBlockWithHeight(v: (BlockMeta, Seq[(TxMeta, Transaction)])) = {
+    val (blockMeta, txs) = v
+
+    BlockWithHeight(
+      Some(PBBlock(Some(blockMeta.header.toPBHeader), blockMeta.signature.toByteString, txs.map(_._2.toPB))),
+      blockMeta.height,
+      blockMeta.vrf.fold(ByteString.EMPTY)(_.toByteString),
+      blockMeta.rewardShares.map { case (addr, reward) => RewardShare(ByteString.copyFrom(addr.bytes), reward) }
+    )
+  }
 
   private def toBlockWithHeight(m: BlockMeta) =
-    BlockWithHeight(Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)), m.height)
+    BlockWithHeight(
+      Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)),
+      m.height,
+      m.vrf.fold(ByteString.EMPTY)(_.toByteString),
+      m.rewardShares.map { case (addr, reward) => RewardShare(ByteString.copyFrom(addr.bytes), reward) }
+    )
 }

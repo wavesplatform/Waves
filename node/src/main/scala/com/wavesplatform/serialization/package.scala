@@ -1,15 +1,16 @@
 package com.wavesplatform
 
-import java.nio.ByteBuffer
 import com.google.common.primitives.Shorts
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, Proofs}
+
+import java.nio.ByteBuffer
 
 package object serialization {
   implicit class ByteBufferOps(private val buf: ByteBuffer) extends AnyVal {
@@ -28,19 +29,19 @@ package object serialization {
       case b => throw new IllegalArgumentException(s"Invalid asset id prefix: $b")
     }
 
-    def getAddressOrAlias(chainId: Byte = AddressScheme.current.chainId): AddressOrAlias = {
+    def getAddressOrAlias(chainId: Option[Byte]): AddressOrAlias = {
       val prefix = buf.get(buf.position())
       prefix match {
         case Address.AddressVersion =>
           getAddress(chainId)
         case Alias.AddressVersion =>
           val length = buf.getShort(buf.position() + 2)
-          Alias.fromBytes(getByteArray(length + 4)).explicitGet()
+          Alias.fromBytes(getByteArray(length + 4), chainId).explicitGet()
         case _ => throw new IllegalArgumentException(s"Invalid address or alias prefix: $prefix")
       }
     }
 
-    def getAddress(chainId: Byte = AddressScheme.current.chainId): Address = {
+    def getAddress(chainId: Option[Byte]): Address = {
       Address.fromBytes(getByteArray(Address.AddressLength), chainId).explicitGet()
     }
 
@@ -55,9 +56,18 @@ package object serialization {
     }
 
     def getByteArray(size: Int): Array[Byte] = {
+      require(size < (10 << 20), s"requested array size $size exceeds 10MB limit")
       val result = new Array[Byte](size)
       buf.get(result)
       result
+    }
+
+    def getByteArrayOpt(size: Int): Option[Array[Byte]] = {
+      if (buf.remaining() >= size) {
+        Some(getByteArray(size))
+      } else {
+        None
+      }
     }
 
     def getShortArray(size: Int): Array[Short] = {
@@ -75,7 +85,7 @@ package object serialization {
 
     def getScript: Option[Script] = Deser.parseByteArrayOptionWithLength(buf).map(ScriptReader.fromBytes(_).explicitGet())
 
-    def getAlias: Alias = Alias.fromBytes(buf.getByteArrayWithLength).explicitGet()
+    def getAlias: Alias = Alias.fromBytes(buf.getByteArrayWithLength, Some(AddressScheme.current.chainId)).explicitGet()
 
     def getVersionedOrder: Order = {
       val length  = buf.getInt

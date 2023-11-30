@@ -6,7 +6,6 @@ enablePlugins(
   UniversalDeployPlugin,
   JDebPackaging,
   SystemdPlugin,
-  GitVersioning,
   VersionObject,
   JavaAgent
 )
@@ -105,7 +104,8 @@ inConfig(Universal)(
       "-J-XX:+ParallelRefProcEnabled",
       "-J-XX:+UseStringDeduplication",
       // JVM default charset for proper and deterministic getBytes behaviour
-      "-J-Dfile.encoding=UTF-8"
+      "-J-Dfile.encoding=UTF-8",
+      "-J--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
     )
   )
 )

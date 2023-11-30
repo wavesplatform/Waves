@@ -1,11 +1,11 @@
 package com.wavesplatform.state.patch
 
-import scala.io.Source
-
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.features.BlockchainFeature
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import play.api.libs.json.{Json, Reads}
+
+import scala.io.Source
 
 trait PatchDataLoader {
   protected def readPatchData[T: Reads](): T =
@@ -18,7 +18,7 @@ trait PatchDataLoader {
       .as[T]
 }
 
-trait DiffPatchFactory extends PartialFunction[Blockchain, Diff]
+trait DiffPatchFactory extends PartialFunction[Blockchain, StateSnapshot]
 
 abstract class PatchAtHeight(chainIdToHeight: (Char, Int)*) extends PatchDataLoader with DiffPatchFactory {
   private[this] val chainIdToHeightMap   = chainIdToHeight.toMap

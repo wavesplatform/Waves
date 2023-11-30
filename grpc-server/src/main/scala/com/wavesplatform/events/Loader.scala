@@ -2,28 +2,29 @@ package com.wavesplatform.events
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.grpc._
+import com.wavesplatform.api.grpc.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database.{DBExt, DBResource}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
-import com.wavesplatform.protobuf._
+import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.utils.ScorexLogging
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
 
-class Loader(db: DB, blocksApi: CommonBlocksApi, target: Option[(Int, ByteStr)], streamId: String) extends ScorexLogging {
+class Loader(db: RocksDB, blocksApi: CommonBlocksApi, target: Option[(Int, ByteStr)], streamId: String) extends ScorexLogging {
   private def loadBatch(res: DBResource, fromHeight: Int): Try[Seq[PBBlockchainUpdated]] = Try {
-    res.iterator.seek(Ints.toByteArray(fromHeight))
+    res.fullIterator.seek(Ints.toByteArray(fromHeight))
     val buffer = ArrayBuffer[PBBlockchainUpdated]()
 
-    while (res.iterator.hasNext && buffer.size < 100 && target.forall { case (h, _) => fromHeight + buffer.size <= h }) {
-      buffer.append(Loader.parseUpdate(res.iterator.next().getValue, blocksApi, fromHeight + buffer.size))
+    while (res.fullIterator.isValid && buffer.size < 100 && target.forall { case (h, _) => fromHeight + buffer.size <= h }) {
+      buffer.append(Loader.parseUpdate(res.fullIterator.value(), blocksApi, fromHeight + buffer.size))
+      res.fullIterator.next()
     }
 
     for ((h, id) <- target if h == fromHeight + buffer.size - 1; u <- buffer.lastOption) {
@@ -59,8 +60,8 @@ object Loader {
         _.append.update(
           _.body.modify {
             case Body.Block(value) =>
-              Body.Block(value.copy(block = blocksApi.blockAtHeight(height).map {
-                case (meta, txs) => PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString, txs.map(_._2.toPB))
+              Body.Block(value.copy(block = blocksApi.blockAtHeight(height).map { case (meta, txs) =>
+                PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString, txs.map(_._2.toPB))
               }))
             case other => other
           }

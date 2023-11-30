@@ -1,42 +1,37 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.account.Address
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, loadActiveLeases}
+import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
-import monix.reactive.Observer
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 5
+  private val StorageVersion = 1
 
   def apply(
       settings: WavesSettings,
-      db: DB,
+      rdb: RDB,
       time: Time,
-      spendableBalanceChanged: Observer[(Address, Asset)],
       blockchainUpdateTriggers: BlockchainUpdateTriggers,
       miner: Miner = _ => ()
-  ): (BlockchainUpdaterImpl, LevelDBWriter & AutoCloseable) = {
-    checkVersion(db)
-    val levelDBWriter = LevelDBWriter(db, spendableBalanceChanged, settings)
+  ): (BlockchainUpdaterImpl, RocksDBWriter) = {
+    checkVersion(rdb.db)
+    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
     val bui = new BlockchainUpdaterImpl(
-      levelDBWriter,
-      spendableBalanceChanged,
+      rocksDBWriter,
       settings,
       time,
       blockchainUpdateTriggers,
-      (minHeight, maxHeight) => loadActiveLeases(db, minHeight, maxHeight),
+      (minHeight, maxHeight) => loadActiveLeases(rdb, minHeight, maxHeight),
       miner
     )
-    (bui, levelDBWriter)
+    (bui, rocksDBWriter)
   }
 
-  private def checkVersion(db: DB): Unit = db.readWrite { rw =>
+  private def checkVersion(db: RocksDB): Unit = db.readWrite { rw =>
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {

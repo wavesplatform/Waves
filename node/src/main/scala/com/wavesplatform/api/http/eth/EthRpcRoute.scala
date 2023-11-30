@@ -11,10 +11,10 @@ import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{ABIConverter, ERC20Address, EthereumTransaction}
+import com.wavesplatform.transaction.{EthABIConverter, ERC20Address, EthereumTransaction}
 import com.wavesplatform.utils.EthEncoding.*
 import com.wavesplatform.utils.{EthEncoding, Time}
 import org.web3j.abi.*
@@ -54,7 +54,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           complete(jsons.sequence.leftMap(CustomValidationError(_)).map(JsArray(_))) // TODO: Only first error is displayed
       }
     } ~ (get & path("abi" / AddrSegment)) { addr =>
-      complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
+      complete(blockchain.accountScript(addr).map(as => EthABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
       val id = (jso \ "id").getOrElse(JsNull)
       (jso \ "method").asOpt[String] match {
@@ -71,8 +71,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               case "latest"   => Some(blockchain.height).asRight
               case "pending"  => None.asRight
               case _ =>
-                Try(Some(Integer.parseInt(str.drop(2), 16)))
-                  .toEither
+                Try(Some(Integer.parseInt(str.drop(2), 16))).toEither
                   .leftMap(_ => GenericError("Request parameter is not number nor supported tag"))
             }
             blockNumberOpt.fold(
@@ -141,7 +140,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                       "contractAddress"   -> JsNull,
                       "logs"              -> Json.arr(),
                       "logsBloom"         -> toHexString(new Array[Byte](32)),
-                      "status"            -> (if (tm.succeeded) "0x1" else "0x0")
+                      "status"            -> (if (tm.status == TxMeta.Status.Succeeded) "0x1" else "0x0")
                     )
                   case _ => JsNull
                 }

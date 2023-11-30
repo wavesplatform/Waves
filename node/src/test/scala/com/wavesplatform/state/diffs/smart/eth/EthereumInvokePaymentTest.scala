@@ -6,11 +6,11 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthTxGenerator
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumInvokePaymentTest extends PropSpec with WithDomain with EthHelpers {

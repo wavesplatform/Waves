@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.test.*
 
 import scala.collection.immutable.ArraySeq
@@ -63,11 +64,11 @@ class ScriptEstimatorV3Test
       cost(cond) = cost(h) + cost(f) + cost(g) + 2 = 15
       cost(then) = cost(h) + cost(f) + cost(g) + 2 = 15
       cost(else) = cost(h) + cost(f) + cost(g) + 3 = 16
-    */
+     */
     estimateNoOverhead(script) shouldBe Right(
-      15 /* cond */  +
-      16 /* else */  +
-      1  /* b    */
+      15 /* cond */ +
+        16 /* else */ +
+        1 /* b    */
     )
   }
 
@@ -105,13 +106,13 @@ class ScriptEstimatorV3Test
 
     estimateNoOverhead(script) shouldBe Right(
       1 /* a == b    condition               */ +
-      2 /* d + y + 1 expr inside else block  */ +
-      0 /* let y     decl inside else block  */ +
-      1 /* let a     decl used in condition  */ +
-      0 /* let b     decl used in condition  */ +
-      3 /* let c     decl used in then       */ +
-      0 /* let d     decl used in else       */ +
-      0 /* let e     unused decl             */
+        2 /* d + y + 1 expr inside else block  */ +
+        0 /* let y     decl inside else block  */ +
+        1 /* let a     decl used in condition  */ +
+        0 /* let b     decl used in condition  */ +
+        3 /* let c     decl used in then       */ +
+        0 /* let d     decl used in else       */ +
+        0 /* let e     unused decl             */
     )
   }
 
@@ -119,9 +120,9 @@ class ScriptEstimatorV3Test
     val n = 750
     val script =
       s"""
-        | func f0() = 0
-        | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n")}
-        | f$n()
+         | func f0() = 0
+         | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n")}
+         | f$n()
       """.stripMargin
 
     /*
@@ -129,13 +130,13 @@ class ScriptEstimatorV3Test
       cost(f1) = cost(cond) + cost(true) + cost(f0) = 1 + 1 + 1 = 1 * 2 + 1
       cost(f2) = cost(cond) + cost(true) + cost(f1) = 1 + 1 + 3 = 2 * 2 + 1
       cost(fn) = n * 2 + 1
-   */
+     */
     estimate(script) shouldBe Right(n * 2 + 1)
 
     /*
       cost(f0) = 1
       cost(fn) = 1
-    */
+     */
     estimateNoOverhead(script) shouldBe Right(1)
   }
 
@@ -186,7 +187,7 @@ class ScriptEstimatorV3Test
     )
 
     estimateNoOverhead(script) shouldBe Right(
-        0 /* let a                      */ +
+      0 /* let a                      */ +
         0 /* let b                      */ +
         1 /* a == 1         condition   */ +
         1 /* a > 1          condition   */ +
@@ -239,8 +240,8 @@ class ScriptEstimatorV3Test
       List(
         CaseObj(CASETYPEREF("Address", Nil), Map()),
         CONST_STRING("default").explicitGet(),
-        REF("nil"),
-        REF("nil")
+        REF(GlobalValNames.Nil),
+        REF(GlobalValNames.Nil)
       )
     )
     estimate(functionCosts(V5), expr(FunctionIds.CALLDAPP)) should produce("not found")

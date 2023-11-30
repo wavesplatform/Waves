@@ -7,7 +7,7 @@ import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals}
 import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
-import com.wavesplatform.utils.EthEncoding
+import com.wavesplatform.utils.{EthEncoding, byteStrFormat}
 import play.api.libs.json.*
 
 import scala.util.{Failure, Success}
@@ -96,7 +96,8 @@ object OrderJson {
       version: TxVersion,
       matcherFeeAssetId: Asset,
       eip712Signature: Option[Array[Byte]],
-      priceMode: OrderPriceMode
+      priceMode: OrderPriceMode,
+      attachment: Option[ByteStr]
   ): Order = {
     val senderCredentials = eip712Signature match {
       case Some(value) =>
@@ -126,19 +127,12 @@ object OrderJson {
       expiration,
       matcherFee,
       matcherFeeAssetId,
-      priceMode
+      priceMode,
+      attachment
     )
   }
 
-  private val assetReads: Reads[Asset] = {
-    case JsNull | JsString("") => JsSuccess(Waves)
-    case JsString(s) =>
-      AssetPair.extractAssetId(s) match {
-        case Failure(_)       => JsError(JsPath, JsonValidationError("error.incorrect.base58"))
-        case Success(assetId) => JsSuccess(assetId)
-      }
-    case _ => JsError(JsPath, JsonValidationError("error.expected.jsstring"))
-  }
+  val assetReads: Reads[Asset] = Asset.assetReads(true)
 
   implicit val assetPairReads: Reads[AssetPair] = {
     val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(assetReads) and
@@ -203,14 +197,13 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").read[Byte] and
-      (JsPath \ "matcherFeeAssetId")
-        .readNullable[Array[Byte]]
-        .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_)))) and
+      (JsPath \ "matcherFeeAssetId").readNullable[Asset].map(_.getOrElse(Waves)) and
       (JsPath \ "eip712Signature")
         .readNullable[String]
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
-        .readWithDefault[OrderPriceMode](OrderPriceMode.Default)
+        .readWithDefault[OrderPriceMode](OrderPriceMode.Default) and
+      (JsPath \ "attachment").readNullable[ByteStr]
     r(readOrderV3V4 _)
   }
 

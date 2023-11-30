@@ -6,12 +6,13 @@ import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{GlobalValNames, PureContext}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.test.{PropSpec, *}
 
 class UnderscoreTest extends PropSpec {
   private def compile(script: String): Either[String, EXPR] =
-    ExpressionCompiler.compile(script, compilerContext(V5, Expression, false)).map(_._1)
+    ExpressionCompiler.compile(script, NoLibraries, compilerContext(V5, Expression, false), V5).map(_._1)
 
   private def assert(a: String, f: String, x: String): Either[String, EXPR] = {
     val script =
@@ -103,7 +104,7 @@ class UnderscoreTest extends PropSpec {
                       Native(1100),
                       List(
                         CONST_LONG(3),
-                        FUNCTION_CALL(Native(1100), List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF("nil")))))
+                        FUNCTION_CALL(Native(1100), List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF(GlobalValNames.Nil)))))
                       )
                     )
                   )

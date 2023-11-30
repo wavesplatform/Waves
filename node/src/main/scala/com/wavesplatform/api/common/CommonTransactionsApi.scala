@@ -6,16 +6,17 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.RDB
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.mining.BlockChallenger
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
 
 import scala.concurrent.Future
 
@@ -45,14 +46,16 @@ trait CommonTransactionsApi {
 
 object CommonTransactionsApi {
   def apply(
-      maybeDiff: => Option[(Height, Diff)],
-      db: DB,
+      maybeDiff: => Option[(Height, StateSnapshot)],
+      rdb: RDB,
       blockchain: Blockchain,
       utx: UtxPool,
+      blockChallenger: Option[BlockChallenger],
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
-    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
+    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] =
+      common.aliasesOfAddress(rdb, maybeDiff, address)
 
     override def transactionsByAddress(
         subject: Address,
@@ -60,22 +63,22 @@ object CommonTransactionsApi {
         transactionTypes: Set[TransactionType],
         fromId: Option[ByteStr] = None
     ): Observable[TransactionMeta] =
-      common.addressTransactions(db, maybeDiff, subject, sender, transactionTypes, fromId)
+      common.addressTransactions(rdb, maybeDiff, subject, sender, transactionTypes, fromId)
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
-      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff))
+      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(rdb, maybeDiff))
 
-    override def unconfirmedTransactions: Seq[Transaction] = utx.all
+    override def unconfirmedTransactions: Seq[Transaction] =
+      utx.all ++ blockChallenger.fold(Seq.empty[Transaction])(_.allProcessingTxs)
 
     override def unconfirmedTransactionById(transactionId: ByteStr): Option[Transaction] =
-      utx.transactionById(transactionId)
+      utx.transactionById(transactionId).orElse(blockChallenger.flatMap(_.getProcessingTx(transactionId)))
 
     override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
       FeeValidation
         .getMinFee(blockchain, tx)
-        .map {
-          case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
-            (asset, feeInAsset, feeInWaves)
+        .map { case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+          (asset, feeInAsset, feeInWaves)
         }
 
     override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)

@@ -1,15 +1,19 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits.catsSyntaxSemigroup
+import cats.Id
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
@@ -17,13 +21,17 @@ import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
+import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.validateIntermediateBalances
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
-import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
@@ -36,6 +44,16 @@ import scala.util.Try
 
 object WavesEnvironment {
   type In = TransactionBase :+: Order :+: PseudoTx :+: CNil
+
+  def apply(
+      nByte: Byte,
+      in: Coeval[Environment.InputEntity],
+      h: Coeval[Int],
+      blockchain: Blockchain,
+      tthis: Environment.Tthis,
+      ds: DirectiveSet,
+      txId: ByteStr
+  ): WavesEnvironment = new WavesEnvironment(nByte, in, h, blockchain, tthis, ds, txId, blockchain)
 }
 
 class WavesEnvironment(
@@ -45,23 +63,24 @@ class WavesEnvironment(
     blockchain: Blockchain,
     val tthis: Environment.Tthis,
     ds: DirectiveSet,
-    override val txId: ByteStr
+    override val txId: ByteStr,
+    blockchainForRuntime: Blockchain
 ) extends Environment[Id] {
   import com.wavesplatform.lang.v1.traits.Environment.*
 
-  def currentBlockchain(): Blockchain = blockchain
+  def currentBlockchain(): Blockchain = blockchainForRuntime
 
   override def height: Long = h()
 
-  override def multiPaymentAllowed: Boolean = blockchain.allowsMultiPayment
+  override def multiPaymentAllowed: Boolean = blockchainForRuntime.allowsMultiPayment
 
   override def transactionById(id: Array[Byte]): Option[Tx] =
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._1.succeeded)
+      .filter(_._1.status == TxMeta.Status.Succeeded)
       .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
-      .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
+      .map(tx => RealTransactionWrapper(tx, blockchainForRuntime, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity = in()
 
@@ -106,7 +125,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr, chainId)
+            .fromBytes(bytes.arr, Some(chainId))
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
@@ -140,25 +159,29 @@ class WavesEnvironment(
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
-    val addressE: Either[ValidationError, account.Address] = addressOrAlias match {
+    val addressE = addressOrAlias match {
       case Address(bytes) => account.Address.fromBytes(bytes.arr)
       case Alias(name)    => account.Alias.create(name).flatMap(a => blockchain.resolveAlias(a))
     }
     for {
       address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
-      effectiveBalance <- portfolio.effectiveBalance
+      isBanned  = currentBlockchain().hasBannedEffectiveBalance(address)
+      effectiveBalance <- portfolio.effectiveBalance(isBanned)
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
-      blockchain.generatingBalance(address),
+      if (blockchain.isFeatureActivated(LightNode))
+        currentBlockchain().generatingBalance(address)
+      else
+        blockchain.generatingBalance(address),
       effectiveBalance
     )
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.succeeded => tm.height.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.status == TxMeta.Status.Succeeded => tm.height.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -199,7 +222,10 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = ByteStr(blockH.generator.toAddress.bytes),
       generatorPublicKey = blockH.generator,
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
+      if (blockchainForRuntime.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution))
+        getRewards(blockH.generator, bHeight)
+      else List.empty
     )
   }
 
@@ -241,6 +267,35 @@ class WavesEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
+
+  override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = {
+    val hit = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
+    FairPoSCalculator.V2.calculateDelay(BigInt(1, hit), baseTarget, balance)
+  }
+
+  private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
+    if (blockchain.isFeatureActivated(BlockchainFeatures.CappedReward)) {
+      val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, generator.toAddress, blockchain)
+
+      rewardShares.map { case (addr, reward) =>
+        Address(ByteStr(addr.bytes)) -> reward
+      }
+    } else {
+      val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
+      val xtnBuybackAddress = blockchain.settings.functionalitySettings.xtnBuybackAddressParsed.toOption.flatten
+
+      blockchain.blockReward(height).fold(Seq.empty[(Address, Long)]) { fullBlockReward =>
+        val configAddressesReward =
+          (daoAddress.toSeq ++ xtnBuybackAddress).map { addr =>
+            Address(ByteStr(addr.bytes)) -> CurrentBlockRewardPart.apply(fullBlockReward)
+          }
+        val minerReward = Address(ByteStr(generator.toAddress.bytes)) -> (fullBlockReward - configAddressesReward.map(_._2).sum)
+
+        import com.wavesplatform.utils.byteStrOrdering
+        (configAddressesReward :+ minerReward).sortBy(_._1.bytes)
+      }
+    }
+  }
 }
 
 object DAppEnvironment {
@@ -305,8 +360,35 @@ object DAppEnvironment {
       call: FUNCTION_CALL,
       payments: Seq[InvokeScriptTransaction.Payment]
   )
+
+  case class ActionLimits(
+      nonDataActions: Int,
+      balanceActions: Int,
+      assetActions: Int,
+      data: Int,
+      dataSize: Int
+  ) {
+    def decrease(nonDataActionsCount: Int, balanceActionsCount: Int, assetActionsCount: Int, dataCount: Int, dataSize: Int): ActionLimits =
+      ActionLimits(
+        nonDataActions - nonDataActionsCount,
+        balanceActions - balanceActionsCount,
+        assetActions - assetActionsCount,
+        data - dataCount,
+        this.dataSize - dataSize
+      )
+  }
 }
 
+trait DAppEnvironmentInterface extends Environment[Id] {
+  def ds: DirectiveSet
+  def remainingCalls: Int
+  def availableActions: ActionLimits
+  def availablePayments: Int
+  def currentSnapshot: StateSnapshot
+  def invocationRoot: DAppEnvironment.InvocationTreeTracker
+}
+
+// todo move to separate class
 // Not thread safe
 class DAppEnvironment(
     nByte: Byte,
@@ -314,27 +396,27 @@ class DAppEnvironment(
     h: Coeval[Int],
     blockchain: Blockchain,
     tthis: Environment.Tthis,
-    ds: DirectiveSet,
+    val ds: DirectiveSet,
+    rootVersion: StdLibVersion,
     tx: InvokeScriptTransactionLike,
     currentDApp: com.wavesplatform.account.Address,
     currentDAppPk: com.wavesplatform.account.PublicKey,
     calledAddresses: Set[com.wavesplatform.account.Address],
     limitedExecution: Boolean,
+    enableExecutionLog: Boolean,
     totalComplexityLimit: Int,
     var remainingCalls: Int,
-    var availableActions: Int,
-    var availableBalanceActions: Int,
-    var availableAssetActions: Int,
+    var availableActions: ActionLimits,
     var availablePayments: Int,
-    var availableData: Int,
-    var availableDataSize: Int,
-    var currentDiff: Diff,
-    val invocationRoot: DAppEnvironment.InvocationTreeTracker
-) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id()) {
+    var currentSnapshot: StateSnapshot,
+    val invocationRoot: DAppEnvironment.InvocationTreeTracker,
+    wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
+) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.id(), blockchain)
+    with DAppEnvironmentInterface {
 
-  private[this] var mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+  private[this] var mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
 
-  override def currentBlockchain(): CompositeBlockchain = this.mutableBlockchain
+  override def currentBlockchain(): SnapshotBlockchain = this.mutableBlockchain
 
   override def callScript(
       dApp: Address,
@@ -373,38 +455,45 @@ class DAppEnvironment(
         payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
         InvokeScriptResult.empty
       )
-      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingPayments, remainingData, remainingDataSize) <-
+      (
+        snapshot,
+        evaluated,
+        remainingActions,
+        remainingPayments
+      ) <-
         InvokeScriptDiff( // This is a recursive call
           mutableBlockchain,
           blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+          rootVersion,
           limitedExecution,
+          enableExecutionLog,
           totalComplexityLimit,
           availableComplexity,
           remainingCalls,
           availableActions,
-          availableBalanceActions,
-          availableAssetActions,
           availablePayments,
-          availableData,
-          availableDataSize,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
-          invocationTracker
+          invocationTracker,
+          wrapDAppEnv
         )(invoke)
-      fixedDiff = diff
-        .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))
-        .withScriptRuns(diff.scriptsRun + 1)
-      newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
+      _ <-
+        if (blockchain.isFeatureActivated(LightNode))
+          validateIntermediateBalances(blockchain, snapshot, totalComplexityLimit - availableComplexity, Nil)
+        else
+          traced(Right(()))
+      fixedSnapshot = snapshot
+        .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))
     } yield {
-      currentDiff = newCurrentDiff
-      mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
+      currentSnapshot = (currentSnapshot: StateSnapshot) |+| fixedSnapshot
+      mutableBlockchain = SnapshotBlockchain(blockchain, currentSnapshot)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
-      availableBalanceActions = remainingBalanceActions
-      availableAssetActions = remainingAssetActions
       availablePayments = remainingPayments
-      availableData = remainingData
-      availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
+      (
+        evaluated,
+        snapshot.scriptsComplexity.toInt,
+        if (enableExecutionLog) DiffToLogConverter.convert(snapshot, tx.id(), func, availableComplexity) else List.empty
+      )
     }
 
     r.v.map {

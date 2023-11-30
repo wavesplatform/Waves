@@ -8,26 +8,22 @@ import com.wavesplatform.db.{DBCacheSettings, WithDomain, WithState}
 import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Portfolio}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
-
-import scala.collection.immutable.VectorMap
 
 class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets.*
 
   private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
-  private val nonExistentAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
+  private val nonExistentAsset   = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
 
-  private val lengthError     = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
+  private val lengthError      = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
   private val nonExistentError = s"Transfer error: asset '$nonExistentAsset' is not found on the blockchain"
 
-  property("invoke asset checks") {
+  property("invoke transfer checks") {
     val dApp = TestCompiler(V4).compileContract(
       s"""
          |@Callable(i)
@@ -48,64 +44,20 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
     for {
       activated <- Seq(true, false)
-      func <- Seq("invalidLength", "unexisting")
+      func      <- Seq("invalidLength", "unexisting")
     } {
-      tempDb { _ =>
-        val miner = TxHelpers.signer(0).toAddress
-        val invoker = TxHelpers.signer(1)
-        val master = TxHelpers.signer(2)
-        val balances = AddrWithBalance.enoughBalances(invoker, master)
-        val setScriptTx = TxHelpers.setScript(master, dApp)
+      val invoker     = TxHelpers.signer(1)
+      val master      = TxHelpers.signer(2)
+      val balances    = AddrWithBalance.enoughBalances(invoker, master)
+      val setScriptTx = TxHelpers.setScript(master, dApp)
+      withDomain(if (activated) RideV5 else RideV4, balances) { d =>
+        d.appendBlock(setScriptTx)
         val invoke = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
-
-        val dAppAddress = master.toAddress
-
-        def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
-          Vector(NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
-
-        val expectedResult =
-          if (activated) {
-            val expectingMessage =
-              if (func == "invalidLength")
-                lengthError
-              else
-                nonExistentError
-            Diff.withTransactions(
-              invokeInfo(false),
-              portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value),
-                miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
-              ),
-              scriptsComplexity = 8,
-              scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
-            )
-          } else {
-            val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
-            Diff.withTransactions(
-              invokeInfo(true),
-              portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = VectorMap(asset -> 0)),
-                dAppAddress -> Portfolio.build(asset, 0),
-                miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
-              ),
-              scriptsRun = 1,
-              scriptsComplexity = 18,
-              scriptResults = Map(
-                invoke.id() -> InvokeScriptResult(
-                  transfers = Seq(
-                    InvokeScriptResult.Payment(invoke.senderAddress, Waves, 0),
-                    InvokeScriptResult.Payment(invoke.senderAddress, asset, 0)
-                  )
-                )
-              )
-            )
-          }
-
-        withDomain(if (activated) RideV5 else RideV4, balances) { d =>
-          d.appendBlock(setScriptTx)
-          d.appendBlock(invoke)
-          d.liquidDiff shouldBe expectedResult
-        }
+        if (activated) {
+          val expectingMessage = if (func == "invalidLength") lengthError else nonExistentError
+          d.appendAndAssertFailed(invoke, expectingMessage)
+        } else
+          d.appendAndAssertSucceed(invoke)
       }
     }
   }
@@ -196,11 +148,11 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} """
         def dApp(name: String = "name", description: String = "") = TestCompiler(V5).compileContract(
           s"""
-           | @Callable(i)
-           | func default() = [
-           |   ${if (complex) sigVerify else ""}
-           |   Issue("$name", "$description", 1000, 4, true, unit, 0)
-           | ]
+             | @Callable(i)
+             | func default() = [
+             |   ${if (complex) sigVerify else ""}
+             |   Issue("$name", "$description", 1000, 4, true, unit, 0)
+             | ]
          """.stripMargin
         )
 
@@ -262,7 +214,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       )
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendAndAssertSucceed(invoke(fee = invokeFee(issues = 2)))
-      d.liquidDiff.issuedAssets.size shouldBe 2
+      d.liquidSnapshot.assetStatics.size shouldBe 2
     }
   }
 }

@@ -2,14 +2,14 @@ package com.wavesplatform
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
-
 import cats.data.NonEmptyList
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigValueType}
+import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.common.state.ByteStr
 import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
-import org.apache.commons.lang3.SystemUtils
+import supertagged.TaggedType
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
@@ -47,9 +47,18 @@ package object settings {
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
+  implicit val privateKeyReader: ValueReader[PrivateKey] = byteStrReader.map(PrivateKey(_))
+
   implicit def nonEmptyListReader[T: ValueReader]: ValueReader[NonEmptyList[T]] = implicitly[ValueReader[List[T]]].map {
     case Nil     => throw new IllegalArgumentException("Expected at least one element")
     case x :: xs => NonEmptyList(x, xs)
+  }
+
+  object SizeInBytes extends TaggedType[Long]
+  type SizeInBytes = SizeInBytes.Type
+
+  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = {(cfg: Config, path: String) =>
+    SizeInBytes(cfg.getBytes(path).toLong)
   }
 
   def loadConfig(userConfig: Config): Config = {
@@ -109,9 +118,10 @@ package object settings {
       s"waves-$suffix"
     }
 
+    val osName = sys.props.get("os.name").map(_.toLowerCase)
     val parent =
-      if (SystemUtils.IS_OS_WINDOWS) winDefaultDirectory
-      else if (SystemUtils.IS_OS_MAC) osxDefaultDirectory
+      if (osName.exists(_.contains("win"))) winDefaultDirectory
+      else if (osName.exists(_.contains("mac"))) osxDefaultDirectory
       else nixDefaultDirectory
 
     s"$parent/${withNetwork(config)}"

@@ -1,15 +1,14 @@
 package com.wavesplatform.it.sync
 
 import java.net.URLDecoder
-
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.TxVersion
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.Random
 

@@ -1,28 +1,26 @@
 package com.wavesplatform.network
 
-import java.util
-
 import com.google.common.cache.CacheBuilder
+
+import java.util
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
-import com.wavesplatform.network.message.Message._
+import com.wavesplatform.network.message.Message.*
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.Unpooled._
+import io.netty.buffer.Unpooled.*
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.{ByteToMessageCodec, DecoderException}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration)
-    extends ByteToMessageCodec[Any]
-    with ScorexLogging {
+class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: FiniteDuration) extends ByteToMessageCodec[Any] with ScorexLogging {
 
   import BasicMessagesRepo.specsByCodes
-  import LegacyFrameCodec._
+  import LegacyFrameCodec.*
 
   private val receivedTxsCache = CacheBuilder
     .newBuilder()

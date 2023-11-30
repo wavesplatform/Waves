@@ -13,7 +13,7 @@ import scala.util.Try
 
 object IssueTxSerializer {
   def toJson(tx: IssueTransaction): JsObject = {
-    import tx._
+    import tx.*
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"     -> id().toString,
       "name"        -> name.toStringUtf8,
@@ -22,7 +22,7 @@ object IssueTxSerializer {
       "decimals"    -> decimals.value,
       "description" -> description.toStringUtf8
     ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
-      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainId) else JsObject.empty)
+      (if (version == TxVersion.V2) Json.obj("chainId" -> chainId) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {

@@ -5,23 +5,14 @@ import akka.http.scaladsl.model.MediaTypes.`application/json`
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.DefaultBlockchainSettings
-import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
-import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.{NTPTime, TestWallet}
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.http.{ApiErrorMatchers, DummyTransactionPublisher, RestAPISettingsHelper}
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalactic.source.Position
-import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
 import scala.concurrent.duration.DurationInt
@@ -30,23 +21,17 @@ import scala.reflect.ClassTag
 class CustomJsonMarshallerSpec
     extends PropSpec
     with RestAPISettingsHelper
-    with PathMockFactory
-    with TestWallet
-    with NTPTime
     with ScalatestRouteTest
     with ApiErrorMatchers
-    with ApiMarshallers {
-  private val blockchain      = mock[Blockchain]
-  private val utx             = mock[UtxPool]
-  private val publisher       = mock[TransactionPublisher]
-  private val transactionsApi = mock[CommonTransactionsApi]
-  private val accountsApi     = mock[CommonAccountsApi]
-  private val assetsApi       = mock[CommonAssetsApi]
+    with ApiMarshallers
+    with SharedDomain
+      with SharedSchedulerMixin {
 
   private val numberFormat = Accept(`application/json`.withParams(Map("large-significand-format" -> "string")))
+  private val richAccount  = TxHelpers.signer(55)
 
-  (() => blockchain.activatedFeatures).expects().returning(BlockchainFeatures.implemented.map(_ -> 0).toMap).anyNumberOfTimes()
-  (() => blockchain.settings).expects().returning(DefaultBlockchainSettings).anyNumberOfTimes()
+  override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAccount.toAddress, 50000.waves))
+  override def settings: WavesSettings               = DomainPresets.BlockRewardDistribution
 
   private def ensureFieldsAre[A: ClassTag](v: JsObject, fields: String*)(implicit pos: Position): Unit =
     for (f <- fields) (v \ f).get shouldBe a[A]
@@ -64,46 +49,32 @@ class CustomJsonMarshallerSpec
   private val transactionsRoute =
     TransactionsApiRoute(
       restAPISettings,
-      transactionsApi,
-      testWallet,
-      blockchain,
-      () => utx.size,
-      publisher,
+      domain.transactionsApi,
+      domain.wallet,
+      domain.blockchain,
+      () => domain.blockchain,
+      () => domain.utxPool.size,
+      DummyTransactionPublisher.accepting,
       ntpTime,
-      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      new RouteTimeout(60.seconds)(sharedScheduler)
     ).route
 
   property("/transactions/info/{id}") {
-    forAll(leaseGen) { lt =>
-      val height: Height = Height(1)
-      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = true, 0L))).twice()
-      (blockchain.leaseDetails _)
-        .expects(lt.id())
-        .returning(Some(LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)))
-        .twice()
-      checkRoute(Get(s"/transactions/info/${lt.id()}"), transactionsRoute, "amount")
-    }
+    // todo: add other transaction types
+    val leaseTx = TxHelpers.lease(sender = richAccount, TxHelpers.address(80), 25.waves)
+    domain.appendBlock(leaseTx)
+    checkRoute(Get(s"/transactions/info/${leaseTx.id()}"), transactionsRoute, "amount")
   }
 
   property("/transactions/calculateFee") {
-    (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
-    (blockchain.assetScript _).expects(*).returning(None).anyNumberOfTimes()
-
-    forAll(transferV2Gen) { tx =>
-      (transactionsApi.calculateFee _).expects(*).returning(Right((Asset.Waves, 1, 1))).twice()
-      checkRoute(Post("/transactions/calculateFee", tx.json()), transactionsRoute, "feeAmount")
-    }
+    val tx = TxHelpers.transfer(richAccount, TxHelpers.address(81), 5.waves)
+    checkRoute(Post("/transactions/calculateFee", tx.json()), transactionsRoute, "feeAmount")
   }
 
-  private val rewardRoute = RewardApiRoute(blockchain).route
+  private val rewardRoute = RewardApiRoute(domain.blockchain).route
 
   property("/blockchain/rewards") {
-    (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
-    (blockchain.blockReward _).expects(*).returning(Some(1000)).twice()
-    (blockchain.wavesAmount _).expects(*).returning(BigInt(10000000)).twice()
-    (blockchain.blockRewardVotes _).expects(1000).returning(Seq(100L)).twice()
-
-    checkRoute(Get("/blockchain/rewards/1000"), rewardRoute, "totalWavesAmount", "currentReward", "minIncrement")
+    checkRoute(Get("/blockchain/rewards/2"), rewardRoute, "totalWavesAmount", "currentReward", "minIncrement")
   }
 
   property("/debug/stateWaves") {
@@ -112,14 +83,15 @@ class CustomJsonMarshallerSpec
 
   private val assetsRoute = AssetsApiRoute(
     restAPISettings,
-    testWallet,
-    publisher,
-    blockchain,
+    60.seconds,
+    domain.wallet,
+    domain.blockchain,
+    () => domain.blockchain,
     ntpTime,
-    accountsApi,
-    assetsApi,
+    domain.accountsApi,
+    domain.assetsApi,
     1000,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   ).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {
@@ -127,9 +99,8 @@ class CustomJsonMarshallerSpec
   }
 
   property("/assets/balance/{address}/{assetId}") {
-    forAll(accountGen, bytes32gen.map(b => IssuedAsset(ByteStr(b)))) { case (keyPair, assetId) =>
-      (blockchain.balance _).expects(keyPair.toAddress, assetId).returning(1000L).twice()
-      checkRoute(Get(s"/assets/balance/${keyPair.publicKey.toAddress}/${assetId.id}"), assetsRoute, "balance")
-    }
+    val issue = TxHelpers.issue(richAccount, 100000_00, 2.toByte)
+    domain.appendBlock(issue)
+    checkRoute(Get(s"/assets/balance/${richAccount.toAddress}/${issue.id()}"), assetsRoute, "balance")
   }
 }

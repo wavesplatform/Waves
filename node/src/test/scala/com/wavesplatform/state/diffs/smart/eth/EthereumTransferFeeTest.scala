@@ -7,12 +7,11 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, EthTxGenerator}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TransactionType.Transfer
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumTransferFeeTest extends PropSpec with WithDomain with EthHelpers {

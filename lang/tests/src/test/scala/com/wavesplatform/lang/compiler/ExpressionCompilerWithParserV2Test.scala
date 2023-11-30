@@ -2,6 +2,7 @@ package com.wavesplatform.lang.compiler
 
 import cats.implicits.toBifunctorOps
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -9,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.test.PropSpec
 
 class ExpressionCompilerWithParserV2Test extends PropSpec {
@@ -19,7 +21,9 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
       ctx = utils.compilerContext(ds)
-      compResult <- ExpressionCompiler.compileWithParseResult(script, 0, ctx, saveExprContext).leftMap(_._1)
+      compResult <- ExpressionCompiler
+        .compileWithParseResult(script, NoLibraries, ctx, StdLibVersion.VersionDic.all.last, saveExprContext)
+        .leftMap(_._1)
     } yield compResult
 
     result.map(_._2.expr)
@@ -169,7 +173,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
                         PART.VALID(AnyPos, "cons"),
                         List(
                           CONST_BYTESTR(AnyPos, PART.VALID(AnyPos, ByteStr(Array())), Some(BYTESTR), None),
-                          REF(AnyPos, PART.VALID(AnyPos, "nil"), Some(LIST(NOTHING)), None)
+                          REF(AnyPos, PART.VALID(AnyPos, GlobalValNames.Nil), Some(LIST(NOTHING)), None)
                         ),
                         Some(LIST(BYTESTR)),
                         None

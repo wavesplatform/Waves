@@ -1,6 +1,9 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, Alias, KeyPair, PublicKey}
+import com.wavesplatform.api.common.LeaseInfo
+import com.wavesplatform.api.common.LeaseInfo.Status.Active
+import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -8,7 +11,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.*
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.history
-import com.wavesplatform.history.Domain
+import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
@@ -18,14 +21,15 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxPositiveAmount, TxVersion}
+import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, Assertions}
 
 class RollbackSpec extends FreeSpec with WithDomain {
@@ -33,7 +37,6 @@ class RollbackSpec extends FreeSpec with WithDomain {
   private def nextTs = time.getTimestamp()
 
   private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
-    import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
         val lease       = TxHelpers.lease(sender, recipient, amount, fee = 100000L, timestamp = nextTs, version = TxVersion.V1)
@@ -43,7 +46,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
         List(
           TxHelpers.massTransfer(
             sender,
-            Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount)), ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))),
+            Seq(
+              recipient -> amount,
+              recipient -> amount
+            ),
             fee = 10000,
             timestamp = nextTs,
             version = TxVersion.V1
@@ -54,7 +60,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
     }
   }
 
-  "Rollback resets" - {
+  "NODE-1143, NODE-1144. Rollback resets" - {
     "Rollback save dropped blocks order" in {
       val sender         = TxHelpers.signer(1)
       val initialBalance = 100.waves
@@ -66,7 +72,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           if (i == blocksCount) {
             Nil
           } else {
-            val block = TestBlock.create(nextTs + i, d.lastBlockId, Seq())
+            val block = TestBlock.create(nextTs + i, d.lastBlockId, Seq()).block
             d.appendBlock(block)
             block.id() :: newBlocks(i + 1)
           }
@@ -76,7 +82,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val droppedBlocks = d.rollbackTo(genesisSignature).map(_._1)
         droppedBlocks(0).header.reference shouldBe genesisSignature
         droppedBlocks.map(_.id()).toList shouldBe blocks
-        droppedBlocks foreach d.appendBlock
+        droppedBlocks.foreach { block =>
+          d.appendBlockE(block) should beRight
+        }
       }
     }
 
@@ -93,11 +101,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         for (transfer <- transfers) {
           d.appendBlock(
-            TestBlock.create(
-              nextTs,
-              d.lastBlockId,
-              transfer
-            )
+            TestBlock
+              .create(
+                nextTs,
+                d.lastBlockId,
+                transfer
+              )
+              .block
           )
         }
 
@@ -108,11 +118,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         for (transfer <- transfers) {
           d.appendBlock(
-            TestBlock.create(
-              nextTs,
-              d.lastBlockId,
-              transfer
-            )
+            TestBlock
+              .create(
+                nextTs,
+                d.lastBlockId,
+                transfer
+              )
+              .block
           )
         }
 
@@ -141,11 +153,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         for (tc <- txCount) {
           d.appendBlock(
-            TestBlock.create(
-              nextTs,
-              d.lastBlockId,
-              Seq.fill(tc)(TxHelpers.transfer(sender, recipient.toAddress, transferAmount, fee = fee, version = TxVersion.V1))
-            )
+            TestBlock
+              .create(
+                nextTs,
+                d.lastBlockId,
+                Seq.fill(tc)(TxHelpers.transfer(sender, recipient.toAddress, transferAmount, fee = fee, version = TxVersion.V1))
+              )
+              .block
           )
         }
 
@@ -169,31 +183,29 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         val leaseAmount = initialBalance - 2
         val lt          = TxHelpers.lease(sender, recipient.toAddress, leaseAmount, version = TxVersion.V1)
-        d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)))
+        d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)).block)
         d.blockchainUpdater.height shouldBe 2
         val blockWithLeaseId = d.lastBlockId
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
+          LeaseDetails(LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, lt.id(), 2), LeaseDetails.Status.Active)
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
 
         val leaseCancel = TxHelpers.leaseCancel(lt.id(), sender, version = TxVersion.V1)
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            blockWithLeaseId,
-            Seq(leaseCancel)
-          )
+          TestBlock
+            .create(
+              nextTs,
+              blockWithLeaseId,
+              Seq(leaseCancel)
+            )
+            .block
         )
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
           LeaseDetails(
-            sender.publicKey,
-            recipient.toAddress,
-            leaseAmount,
-            LeaseDetails.Status.Cancelled(d.blockchain.height, Some(leaseCancel.id())),
-            lt.id(),
-            2
+            LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, lt.id(), 2),
+            LeaseDetails.Status.Cancelled(d.blockchain.height, Some(leaseCancel.id()))
           )
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
@@ -201,7 +213,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         d.rollbackTo(blockWithLeaseId)
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
+          LeaseDetails(LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, lt.id(), 2), LeaseDetails.Status.Active)
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -223,11 +235,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val issueTransaction = TxHelpers.issue(sender, assetAmount, version = TxVersion.V1)
 
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            genesisBlockId,
-            Seq(issueTransaction)
-          )
+          TestBlock
+            .create(
+              nextTs,
+              genesisBlockId,
+              Seq(issueTransaction)
+            )
+            .block
         )
 
         val blockIdWithIssue = d.lastBlockId
@@ -236,15 +250,17 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.balance(recipient.toAddress, IssuedAsset(issueTransaction.id())) shouldBe 0
 
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            d.lastBlockId,
-            Seq(
-              TransferTransaction
-                .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty, nextTs)
-                .explicitGet()
+          TestBlock
+            .create(
+              nextTs,
+              d.lastBlockId,
+              Seq(
+                TransferTransaction
+                  .selfSigned(1.toByte, sender, recipient.toAddress, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, ByteStr.empty, nextTs)
+                  .explicitGet()
+              )
             )
-          )
+            .block
         )
 
         d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual 0
@@ -267,11 +283,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe empty
 
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            genesisBlockId,
-            Seq(issueTransaction)
-          )
+          TestBlock
+            .create(
+              nextTs,
+              genesisBlockId,
+              Seq(issueTransaction)
+            )
+            .block
         )
 
         val blockIdWithIssue = d.lastBlockId
@@ -290,16 +308,20 @@ class RollbackSpec extends FreeSpec with WithDomain {
           Height @@ 2,
           None,
           0,
-          false
+          false,
+          1,
+          Height(2)
         )
         actualDesc shouldBe Some(desc1)
 
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            blockIdWithIssue,
-            Seq(TxHelpers.reissue(issueTransaction.asset, sender, 2000, reissuable = false, version = TxVersion.V1))
-          )
+          TestBlock
+            .create(
+              nextTs,
+              blockIdWithIssue,
+              Seq(TxHelpers.reissue(issueTransaction.asset, sender, 2000, reissuable = false, version = TxVersion.V1))
+            )
+            .block
         )
 
         d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
@@ -314,7 +336,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
             Height @@ 2,
             None,
             0,
-            false
+            false,
+            1,
+            Height(2)
           )
         )
 
@@ -331,7 +355,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
             Height @@ 2,
             None,
             0,
-            false
+            false,
+            1,
+            Height(2)
           )
         )
 
@@ -349,11 +375,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         d.blockchainUpdater.resolveAlias(alias) shouldBe Left(AliasDoesNotExist(alias))
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            genesisBlockId,
-            Seq(TxHelpers.createAlias(alias.name, sender))
-          )
+          TestBlock
+            .create(
+              nextTs,
+              genesisBlockId,
+              Seq(TxHelpers.createAlias(alias.name, sender))
+            )
+            .block
         )
 
         d.blockchainUpdater.resolveAlias(alias) shouldBe Right(sender.toAddress)
@@ -366,22 +394,27 @@ class RollbackSpec extends FreeSpec with WithDomain {
     "data transaction" in {
       val sender         = TxHelpers.signer(1)
       val initialBalance = 100.waves
-      val dataEntry      = StringDataEntry("str", "test")
+      val dataEntry      = StringDataEntry("str", "test-1")
       withDomain(createSettings(BlockchainFeatures.DataTransaction -> 0), Seq(AddrWithBalance(sender.toAddress, initialBalance))) { d =>
         val genesisBlockId = d.lastBlockId
 
-        d.appendBlock(
-          TestBlock.create(
+        val firstBlock = TestBlock
+          .create(
             nextTs,
             genesisBlockId,
             Seq(TxHelpers.dataEntry(sender, dataEntry))
           )
-        )
-
+          .block
+        d.appendBlock(firstBlock)
         d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) should contain(dataEntry)
 
-        d.rollbackTo(genesisBlockId)
-        d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) shouldBe empty
+        val secondEntry = StringDataEntry("str", "test-2")
+        d.appendBlock(TxHelpers.data(sender, Seq(secondEntry)))
+        d.appendBlock()
+        d.blockchain.accountData(sender.toAddress, "str") shouldEqual Some(secondEntry)
+
+        d.rollbackTo(firstBlock.id())
+        d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) shouldEqual Some(dataEntry)
       }
     }
 
@@ -459,7 +492,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         )
 
       def getAsset(d: Domain, txId: ByteStr): IssuedAsset = {
-        val sr = d.blockchainUpdater.bestLiquidDiff.get.scriptResults(txId)
+        val sr = d.blockchainUpdater.bestLiquidSnapshot.get.scriptResults(txId)
         sr.error shouldBe empty
         IssuedAsset(sr.issues.head.id)
       }
@@ -663,7 +696,12 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val (leaseAmount, leaseFc) = leaseFunctionCall(leaseRecipientAddress.toAddress)
 
             def leaseDetails(invokeId: ByteStr) =
-              Some(LeaseDetails(checkPk, leaseRecipientAddress.toAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 3))
+              Some(
+                LeaseDetails(
+                  LeaseStaticInfo(checkPk, leaseRecipientAddress.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount), invokeId, 3),
+                  LeaseDetails.Status.Active
+                )
+              )
 
             // liquid block rollback
             val invokeId1 = append(d.lastBlockId, leaseFc)
@@ -672,16 +710,16 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
             d.blockchain.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
-            d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId1) shouldBe None
             d.appendBlock()
-            d.levelDBWriter.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
+            d.rocksDBWriter.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
 
             d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseDetails(leaseId1) shouldBe None
-            d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId1) shouldBe None
 
             // hardened block rollback
             val beforeInvoke2 = d.lastBlockId
@@ -691,9 +729,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
             d.blockchain.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
-            d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId2) shouldBe None
             d.appendBlock()
-            d.levelDBWriter.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
+            d.rocksDBWriter.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
 
             d.appendBlock()
             d.blockchain.removeAfter(beforeInvoke2).explicitGet()
@@ -701,7 +739,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseDetails(leaseId2) shouldBe None
-            d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId2) shouldBe None
           }
         }
       }
@@ -727,13 +765,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         def leaseDetails(leaseHeight: Int, cancelHeight: Int = 0, cancelId: ByteStr = ByteStr.empty) =
           Some(
             LeaseDetails(
-              checkPk,
-              leaseRecipientAddress,
-              leaseAmount,
+              LeaseStaticInfo(checkPk, leaseRecipientAddress, TxPositiveAmount.unsafeFrom(leaseAmount), sourceId, leaseHeight),
               if (cancelId.isEmpty) LeaseDetails.Status.Active
-              else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId)),
-              sourceId,
-              leaseHeight
+              else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId))
             )
           )
 
@@ -744,16 +778,16 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId)
 
         d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(0, out = leaseAmount)
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
 
         // hardened block rollback
         val beforeInvoke2  = d.lastBlockId
@@ -762,9 +796,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId1)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId1)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId1)
 
         d.appendBlock()
         d.blockchain.removeAfter(beforeInvoke2).explicitGet()
@@ -772,7 +806,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(0, out = leaseAmount)
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
       }
 
       "leaseCancel with lease tx" in {
@@ -876,11 +910,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val genesisBlockId = d.lastBlockId
         d.blockchainUpdater.accountScript(sender.toAddress) shouldBe empty
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            genesisBlockId,
-            Seq(TxHelpers.setScript(sender, script, fee = 400000))
-          )
+          TestBlock
+            .create(
+              nextTs,
+              genesisBlockId,
+              Seq(TxHelpers.setScript(sender, script, fee = 400000))
+            )
+            .block
         )
 
         val blockWithScriptId = d.lastBlockId
@@ -888,11 +924,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.accountScript(sender.toAddress) should contain(AccountScriptInfo(sender.publicKey, script, 1))
 
         d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            blockWithScriptId,
-            Seq(SetScriptTransaction.selfSigned(1.toByte, sender, None, 800000, nextTs).explicitGet())
-          )
+          TestBlock
+            .create(
+              nextTs,
+              blockWithScriptId,
+              Seq(SetScriptTransaction.selfSigned(1.toByte, sender, None, 800000, nextTs).explicitGet())
+            )
+            .block
         )
 
         d.blockchainUpdater.accountScript(sender.toAddress) shouldBe empty
@@ -917,21 +955,25 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val genesisBlockId = d.lastBlockId
 
         d.appendBlock(
-          TestBlock.create(
-            ts,
-            genesisBlockId,
-            Seq(issueTransaction)
-          )
+          TestBlock
+            .create(
+              ts,
+              genesisBlockId,
+              Seq(issueTransaction)
+            )
+            .block
         )
 
         val blockIdWithIssue = d.lastBlockId
 
         d.appendBlock(
-          TestBlock.create(
-            ts + 2,
-            d.lastBlockId,
-            Seq(sponsor1)
-          )
+          TestBlock
+            .create(
+              ts + 2,
+              d.lastBlockId,
+              Seq(sponsor1)
+            )
+            .block
         )
 
         val blockIdWithSponsor = d.lastBlockId
@@ -940,11 +982,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity.value
 
         d.appendBlock(
-          TestBlock.create(
-            ts + 2,
-            d.lastBlockId,
-            Seq(cancel)
-          )
+          TestBlock
+            .create(
+              ts + 2,
+              d.lastBlockId,
+              Seq(cancel)
+            )
+            .block
         )
 
         d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe 0
@@ -955,11 +999,13 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity.value
 
         d.appendBlock(
-          TestBlock.create(
-            ts + 2,
-            d.lastBlockId,
-            Seq(sponsor2)
-          )
+          TestBlock
+            .create(
+              ts + 2,
+              d.lastBlockId,
+              Seq(sponsor2)
+            )
+            .block
         )
 
         d.balance(sender.toAddress, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity.value
@@ -982,37 +1028,37 @@ class RollbackSpec extends FreeSpec with WithDomain {
         val ts = issue.timestamp
 
         def appendBlock(tx: Transaction): ByteStr = {
-          d.appendBlock(TestBlock.create(ts, d.lastBlockId, Seq(tx)))
+          d.appendBlock(TestBlock.create(ts, d.lastBlockId, Seq(tx)).block)
           d.lastBlockId
         }
 
         def carry(fee: Long): Long = fee - fee / 5 * 2
 
-        d.carryFee shouldBe carry(0)
+        d.carryFee(None) shouldBe carry(0)
 
         val issueBlockId = appendBlock(issue)
-        d.carryFee shouldBe carry(issue.fee.value)
+        d.carryFee(None) shouldBe carry(issue.fee.value)
 
         val sponsorBlockId = appendBlock(sponsor1)
-        d.carryFee shouldBe carry(sponsor1.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor1.fee.value)
 
         appendBlock(transfer)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
 
         d.rollbackTo(sponsorBlockId)
-        d.carryFee shouldBe carry(sponsor1.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor1.fee.value)
 
         d.rollbackTo(issueBlockId)
-        d.carryFee shouldBe carry(issue.fee.value)
+        d.carryFee(None) shouldBe carry(issue.fee.value)
 
         val transferBlockId = appendBlock(transfer)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
 
         appendBlock(sponsor2)
-        d.carryFee shouldBe carry(sponsor2.fee.value)
+        d.carryFee(None) shouldBe carry(sponsor2.fee.value)
 
         d.rollbackTo(transferBlockId)
-        d.carryFee shouldBe carry(transfer.fee.value)
+        d.carryFee(None) shouldBe carry(transfer.fee.value)
       }
     }
 
@@ -1034,7 +1080,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         val blocks = for ((transfer, i) <- transfers.zipWithIndex) yield {
           val tsb   = ts + interval * i
-          val block = TestBlock.create(tsb, d.lastBlockId, transfer)
+          val block = TestBlock.create(tsb, d.lastBlockId, transfer).block
           d.appendBlock(block)
           (d.lastBlockId, tsb)
         }
@@ -1045,16 +1091,55 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         try {
           d.appendBlock(
-            TestBlock.create(
-              middleBlock._2 + 10,
-              middleBlock._1,
-              transfers(0)
-            )
+            TestBlock
+              .create(
+                middleBlock._2 + 10,
+                middleBlock._1,
+                transfers(0)
+              )
+              .block
           )
           throw new Exception("Duplicate transaction wasn't checked")
         } catch {
           case e: Throwable => Assertions.assert(e.getMessage.contains("AlreadyInTheState"))
         }
+      }
+    }
+
+    "active leases by address" in {
+      withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
+        def leases(address: Address) = d.accountsApi.activeLeases(address).toListL.runSyncUnsafe()
+
+        val leaseTxs = Seq.fill(5)(lease(defaultSigner, secondAddress)) ++ Seq.fill(5)(lease(secondSigner, defaultAddress))
+        val info =
+          leaseTxs.map(tx => LeaseInfo(tx.id(), tx.id(), tx.sender.toAddress, tx.recipient.asInstanceOf[Address], tx.amount.value, 2, Active))
+
+        val b1 = d.appendBlock(leaseTxs*)
+        leases(defaultAddress) should contain theSameElementsAs info
+        leases(secondAddress) should contain theSameElementsAs info
+
+        val b2 = d.appendBlock(leaseCancel(leaseTxs.head.id()))
+        leases(defaultAddress) should contain theSameElementsAs info.tail
+        leases(secondAddress) should contain theSameElementsAs info.tail
+
+        d.appendMicroBlock(leaseCancel(leaseTxs.last.id(), secondSigner))
+        leases(defaultAddress) should contain theSameElementsAs info.slice(1, 9)
+        leases(secondAddress) should contain theSameElementsAs info.slice(1, 9)
+
+        d.appendBlock(d.createBlock(ProtoBlockVersion, Nil, Some(b2.id())))
+        leases(defaultAddress) should contain theSameElementsAs info.tail
+        leases(secondAddress) should contain theSameElementsAs info.tail
+
+        d.appendBlock(transfer(defaultSigner, secondAddress), transfer(secondSigner, defaultAddress))
+        // to check that rolling back this block will not affect active leases from previous block
+
+        d.rollbackTo(b1.id())
+        leases(defaultAddress) should contain theSameElementsAs info
+        leases(secondAddress) should contain theSameElementsAs info
+
+        d.rollbackTo(1)
+        leases(defaultAddress) shouldBe empty
+        leases(secondAddress) shouldBe empty
       }
     }
   }

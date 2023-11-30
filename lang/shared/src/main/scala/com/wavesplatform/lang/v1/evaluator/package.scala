@@ -2,15 +2,15 @@ package com.wavesplatform.lang.v1
 
 import cats.Eval
 import cats.data.EitherT
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
+import com.wavesplatform.lang.v1.evaluator.ctx.EnabledLogEvaluationContext
 import com.wavesplatform.lang.v1.task.TaskMT
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 package object evaluator {
-  type EvalM[F[_], C[_[_]], A] = TaskMT[F, LoggedEvaluationContext[C, F], ExecutionError, A]
+  type EvalM[F[_], C[_[_]], A] = TaskMT[F, EnabledLogEvaluationContext[C, F], ExecutionError, A]
 
   implicit class EvalMOps[F[_], C[_[_]], A](ev: EvalM[F, C, A]) {
-    def ter(ctx: LoggedEvaluationContext[C, F]): TrampolinedExecResult[F, A] =
+    def ter(ctx: EnabledLogEvaluationContext[C, F]): TrampolinedExecResult[F, A] =
       EitherT[EvalF[F, *], ExecutionError, A](ev.run(ctx).map(_._2))
   }
 

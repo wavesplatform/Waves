@@ -24,10 +24,10 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
 
   def test[A](f: => Future[A]): A = Await.result(f, 10.seconds)
 
-  def send[A](p: Observer[A])(a: A): Future[Ack] =
+  def send[A](p: Observer[A], timeout: Int = 500)(a: A): Future[Ack] =
     p.onNext(a)
       .map(ack => {
-        Thread.sleep(500)
+        Thread.sleep(timeout)
         ack
       })
 
@@ -35,11 +35,11 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
 
   val signer: KeyPair = TestBlock.defaultSigner
 
-  def block(id: Int): Block = TestBlock.create(Seq.empty).copy(signature = byteStr(id))
+  def block(id: Int): Block = TestBlock.create(Seq.empty).block.copy(signature = byteStr(id))
 
   def microBlock(total: Int, prev: Int): MicroBlock = {
     val tx = TransferTransaction.selfSigned(1.toByte, signer, signer.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 1).explicitGet()
-    MicroBlock.buildAndSign(3.toByte, signer, Seq(tx), byteStr(prev), byteStr(total)).explicitGet()
+    MicroBlock.buildAndSign(3.toByte, signer, Seq(tx), byteStr(prev), byteStr(total), None).explicitGet()
   }
 
   override protected def afterAll(): Unit = {

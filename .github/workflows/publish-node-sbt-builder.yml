@@ -23,6 +23,7 @@ jobs:
           context: ./docker
           file: ./docker/node-sbt-builder.Dockerfile
           push: true
+          pull: true
           tags: wavesplatform/node-sbt-builder:${{ steps.extract-versions.outputs.waves-version }}
           build-args: |
             WAVES_VERSION=${{ steps.extract-versions.outputs.waves-version }}

@@ -38,7 +38,7 @@ object Proofs {
     validate(proofs) map { _ =>
       new Proofs(proofs) {
         override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-          val proofsLength = 3 + proofs.map(_.arr.length + 2).sum
+          val proofsLength = 3 + this.proofs.map(_.arr.length + 2).sum
           if (parsedBytes.length == proofsLength) parsedBytes else parsedBytes.take(proofsLength)
         }
       }

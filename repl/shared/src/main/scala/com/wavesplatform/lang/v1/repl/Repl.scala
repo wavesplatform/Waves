@@ -51,13 +51,13 @@ case class Repl(
       currentState,
       view,
       (oldCtx: (CompilerContext, EvaluationContext[Environment, Future])) =>
-        engine.eval(expr, oldCtx._1, oldCtx._2).map {
+        engine.eval(expr, version, oldCtx._1, oldCtx._2).map {
           case Left(e)            => (Left(e), oldCtx)
           case Right((r, newCtx)) => (Right(r), newCtx)
         }: Future[(Either[String, String], (CompilerContext, EvaluationContext[Environment, Future]))]
     )
 
-  def initLibraries(): Unit = {
+  private def initLibraries(): Unit = {
     val libraryState = state(
       (
         initialCtx.compilerContext,
@@ -72,7 +72,7 @@ case class Repl(
       view,
       oldCtx =>
         new ReplEngine[Id]()
-          .eval(libraries.mkString("\n"), oldCtx._1, oldCtx._2)
+          .eval(libraries.mkString("\n"), version, oldCtx._1, oldCtx._2)
           .fold(
             e => throw new RuntimeException(e),
             { case (r, ctx @ (compilerCtx, evaluationCtx)) =>

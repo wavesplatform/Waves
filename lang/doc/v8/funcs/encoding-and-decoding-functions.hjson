@@ -1,0 +1,176 @@
+{
+  funcs: [
+    {
+      name: "keccak256"
+      params: [ "ByteVector" ]
+      doc: "[Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash function."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 195
+    }
+    {
+      name: "keccak256_16Kb"
+      params: [ "ByteVector" ]
+      doc: "[Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash function. For array with size <= 16Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 20
+    }
+    {
+      name: "keccak256_32Kb"
+      params: [ "ByteVector" ]
+      doc: "[Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash function. For array with size <= 32Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 39
+    }
+    {
+      name: "keccak256_64Kb"
+      params: [ "ByteVector" ]
+      doc: "[Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash function. For array with size <= 64Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 74
+    }
+    {
+      name: "keccak256_128Kb"
+      params: [ "ByteVector" ]
+      doc: "[Keccak-256](https://keccak.team/files/Keccak-submission-3.pdf) hash function. For array with size <= 128Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 147
+    }
+    {
+      name: "blake2b256"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 136
+    }
+    {
+      name: "blake2b256_16Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 16Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 13
+    }
+    {
+      name: "blake2b256_32Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 32Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 29
+    }
+    {
+      name: "blake2b256_64Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 64Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 58
+    }
+    {
+      name: "blake2b256_128Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 128Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 115
+    }
+    {
+      name: "sha256"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 118
+    }
+    {
+      name: "sha256_16Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 16Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 12
+    }
+    {
+      name: "sha256_32Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 32Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 23
+    }
+    {
+      name: "sha256_64Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 64Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 47
+    }
+    {
+      name: "sha256_128Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 128Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 93
+    }
+    {
+      name: "toBase16String"
+      params: [ "ByteVector" ]
+      doc: "Encodes array of bytes to [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 10
+    }
+    {
+      name: "toBase58String"
+      params: [ "ByteVector" ]
+      doc: "Encodes array of bytes to [Base58](https://en.wikipedia.org/wiki/Base58) string."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 3
+    }
+    {
+      name: "toBase64String"
+      params: [ "ByteVector" ]
+      doc: "Encodes array of bytes to [Base64](https://en.wikipedia.org/wiki/Base64) string."
+      paramsDoc: [ "The array of bytes to encode." ]
+      complexity: 35
+    }
+    {
+      name: "fromBase16String"
+      params: [ "String" ]
+      doc: "Decodes [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string to an array of bytes."
+      paramsDoc: [ "The string to decode." ]
+      complexity: 10
+    }
+    {
+      name: "fromBase58String"
+      params: [ "String" ]
+      doc: "Decodes [Base58](https://en.wikipedia.org/wiki/Base58) string to an array of bytes."
+      paramsDoc: [ "The string to decode." ]
+      complexity: 1
+    }
+    {
+      name: "fromBase64String"
+      params: [ "String" ]
+      doc: "Decodes [Base64](https://en.wikipedia.org/wiki/Base64) string to an array of bytes."
+      paramsDoc: [ "The string to decode." ]
+      complexity: 40
+    }
+    {
+      name: "addressFromString"
+      params: [ "String" ]
+      doc: "Decodes address from [Base58](https://en.wikipedia.org/wiki/Base58) string."
+      paramsDoc: [ "The string to decode." ]
+      complexity: 1
+    }
+    {
+      name: "addressFromStringValue"
+      params: [ "String" ]
+      doc:
+        '''
+        Decodes address from [Base58](https://en.wikipedia.org/wiki/Base58) string.
+        Raises an exception if the address cannot be decoded.
+        '''
+      paramsDoc: [ "The string to decode." ]
+      complexity: 1
+    }
+    {
+      name: "ecrecover"
+      params: [ "ByteVector", "ByteVector" ]
+      doc: "Recovers the public key from hash of ECDSA-encoded message and signature."
+      paramsDoc: [ "The hash of encoded message.", "The signature." ]
+      complexity: 70
+    }
+  ]
+}

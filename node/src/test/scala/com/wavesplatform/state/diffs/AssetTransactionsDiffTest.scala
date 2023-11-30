@@ -13,21 +13,26 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.*
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
+import com.wavesplatform.lang.v1.ContractLimits.MaxExprSizeInBytes
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import fastparse.Parsed
+import monix.eval.Coeval
 
 class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers with WithDomain {
 
@@ -38,7 +43,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val issue   = TxHelpers.issue(master, 100, reissuable = isReissuable, version = TxVersion.V1)
     val asset   = IssuedAsset(issue.id())
-    val reissue = TxHelpers.reissue(asset, master, 50, version = TxVersion.V1)
+    val reissue = TxHelpers.reissue(asset, master, 50, version = TxVersion.V1, fee = 1.waves)
     val burn    = TxHelpers.burn(asset, 10, master, version = TxVersion.V1)
 
     ((genesis, issue), (reissue, burn))
@@ -46,15 +51,27 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
     val ((gen, issue), (reissue, burn)) = issueReissueBurnTxs(isReissuable = true)
-    assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) { case (blockDiff, newState) =>
-      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-
-      totalPortfolioDiff.balance shouldBe 0
-      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
-      totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity.value - burn.quantity.value))
-
-      val totalAssetVolume = issue.quantity.value + reissue.quantity.value - burn.quantity.value
-      newState.balance(issue.sender.toAddress, reissue.asset) shouldEqual totalAssetVolume
+    withDomain(RideV3) { d =>
+      d.appendBlock(gen)
+      d.appendBlock(issue)
+      d.appendBlock(reissue, burn)
+      val assetQuantityDiff = reissue.quantity.value - burn.quantity.value
+      d.liquidSnapshot.balances.toSeq
+        .map {
+          case ((`defaultAddress`, Waves), amount) =>
+            val carryFee = (-issue.fee.value + reissue.fee.value + burn.fee.value) / 5 * 3
+            Waves -> (amount - d.rocksDBWriter.balance(defaultAddress, Waves) + carryFee)
+          case ((address, asset), amount) =>
+            asset -> (amount - d.rocksDBWriter.balance(address, asset))
+        }
+        .groupMap(_._1)(_._2)
+        .foreach {
+          case (asset, Seq(balanceDiff)) if asset == reissue.asset => balanceDiff shouldBe assetQuantityDiff
+          case (_, balanceDiff)                                    => balanceDiff.sum shouldBe 0
+        }
+      val resultQuantity = issue.quantity.value + assetQuantityDiff
+      d.liquidSnapshot.assetVolumes.view.mapValues(_.volume).toMap shouldBe Map(reissue.asset -> resultQuantity)
+      d.balance(issue.sender.toAddress, reissue.asset) shouldEqual resultQuantity
     }
   }
 
@@ -156,7 +173,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val (_, _, genesis, issue, reissue) = setup
     assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(reissue)), fs) { ei =>
-      ei should produce("negative asset balance")
+      ei should produce("Asset balance sum overflow")
     }
   }
 
@@ -201,7 +218,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
   private def createScript(code: String, version: StdLibVersion) = {
     val Parsed.Success(expr, _) = Parser.parseExpr(code).get
-    ExprScript(version, ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
+    ExprScript(version, ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), version, expr).explicitGet()._1).explicitGet()
   }
 
   def genesisIssueTransferReissue(
@@ -226,40 +243,35 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val genesis = TxHelpers.genesis(acc.toAddress)
     val issue   = TxHelpers.issue(acc, 100, script = Some(ExprScript(CONST_BOOLEAN(true)).explicitGet()))
 
-    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), smartEnabledFS) { case (blockDiff, newState) =>
-      newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
-        AssetDescription(
-          issue.assetId,
-          issue.sender,
-          issue.name,
-          issue.description,
-          issue.decimals.value,
-          issue.reissuable,
-          BigInt(issue.quantity.value),
-          Height @@ 2,
-          issue.script.map(s =>
-            AssetScriptInfo(
-              s,
-              Script
-                .estimate(s, ScriptEstimatorV1, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
-                .explicitGet()
-            )
-          ),
-          0L,
-          issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), RideV6.blockchainSettings.functionalitySettings) {
+      case (blockDiff, newState) =>
+        newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
+          AssetDescription(
+            issue.assetId,
+            issue.sender,
+            issue.name,
+            issue.description,
+            issue.decimals.value,
+            issue.reissuable,
+            BigInt(issue.quantity.value),
+            Height @@ 2,
+            issue.script.map(AssetScriptInfo(_, 0)),
+            0L,
+            issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
+            1,
+            Height @@ 2
+          )
         )
-      )
-      blockDiff.transaction(issue.id()) shouldBe defined
-      newState.transactionInfo(issue.id()).isDefined shouldBe true
-      newState.transactionInfo(issue.id()).isDefined shouldEqual true
+        blockDiff.transactions.get(issue.id()) shouldBe defined
+        newState.transactionInfo(issue.id()).isDefined shouldBe true
     }
   }
 
   property("Can transfer when script evaluates to TRUE") {
     val (gen, issue, transfer, _, _) = genesisIssueTransferReissue("true")
     assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) { case (blockDiff, newState) =>
-      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-      totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity.value
+      val asset = IssuedAsset(issue.id())
+      blockDiff.balances.collect { case ((_, `asset`), quantity) => quantity }.sum shouldEqual issue.quantity.value
       newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount.value
     }
   }
@@ -321,12 +333,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       )
 
     assertDiffEi(blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
-      val info = ei
-        .explicitGet()
-        .updatedAssets(update.assetId)
-        .left
-        .get
-
+      val info = ei.explicitGet().assetNamesAndDescriptions(update.assetId)
       info.name.toStringUtf8 shouldEqual update.name
       info.description.toStringUtf8 shouldEqual update.description
     }
@@ -336,7 +343,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val (gen, issues, _, update1) = genesisIssueUpdateWithSecondAsset
     withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
       val blockchain   = d.blockchainUpdater
-      val genesisBlock = TestBlock.create(gen ++ issues)
+      val genesisBlock = TestBlock.create(gen ++ issues).block
       d.appendBlock(genesisBlock)
 
       d.appendBlock()
@@ -404,8 +411,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val (genesis1, issue1, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)
     assertDiffAndState(Seq(TestBlock.create(genesis1)), TestBlock.create(Seq(issue1)), rideV4Activated) { case (blockDiff, _) =>
-      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-      totalPortfolioDiff.assets(IssuedAsset(issue1.id())) shouldEqual issue1.quantity.value
+      val asset = IssuedAsset(issue1.id())
+      blockDiff.balances.collect { case ((_, `asset`), quantity) => quantity }.sum shouldEqual issue1.quantity.value
     }
 
     val (genesis2, issue2, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)
@@ -468,7 +475,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         db.appendBlock(preparingTxs*)
         val tx = scriptedTx()
         db.appendBlock(tx)
-        db.liquidDiff.errorMessage(tx.id()) shouldBe None
+        db.liquidSnapshot.errorMessage(tx.id()) shouldBe None
       }
 
       withDomain(domainSettingsWithFS(settings(checkNegative = true))) { db =>
@@ -556,6 +563,56 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     }
   }
 
+  property(
+    s"Asset script size should be less than $MaxExprSizeInBytes after ${BlockchainFeatures.BlockRewardDistribution} activation"
+  ) {
+    def scriptWithSize(size: Int): Script = new ExprScript {
+      val stdLibVersion: StdLibVersion     = V6
+      val isFreeCall: Boolean              = false
+      val expr: EXPR                       = TxHelpers.exprScript(V6)("true").expr
+      val bytes: Coeval[ByteStr]           = Coeval(ByteStr(new Array[Byte](size)))
+      val containsBlockV2: Coeval[Boolean] = Coeval(false)
+      val containsArray: Boolean           = false
+    }
+
+    val issuer = TxHelpers.signer(1)
+
+    withDomain(
+      ConsensusImprovements.setFeaturesHeight(BlockchainFeatures.BlockRewardDistribution -> 5),
+      AddrWithBalance.enoughBalances(issuer)
+    ) { d =>
+      val issue = TxHelpers.issue(issuer, name = "asset1", script = Some(TestCompiler(V6).compileAsset("true")))
+
+      val issueWithBigScript: String => IssueTransaction =
+        name => TxHelpers.issue(issuer, name = name, script = Some(scriptWithSize(MaxExprSizeInBytes + 1)))
+      val updateWithBigScript = () => TxHelpers.setAssetScript(issuer, issue.asset, scriptWithSize(MaxExprSizeInBytes + 1))
+
+      d.appendBlock(issue)
+      d.appendAndAssertSucceed(issueWithBigScript("asset2"))
+      d.appendAndAssertSucceed(updateWithBigScript())
+
+      d.blockchain.isFeatureActivated(BlockchainFeatures.BlockRewardDistribution, d.blockchain.height + 1) shouldBe true
+
+      val errorMsg = s"Script is too large: ${MaxExprSizeInBytes + 1} bytes > $MaxExprSizeInBytes bytes"
+
+      // activation height
+      val invalidIssue = issueWithBigScript("asset3")
+      d.appendAndCatchError(invalidIssue) shouldBe TransactionValidationError(
+        GenericError(errorMsg),
+        invalidIssue
+      )
+      val invalidSetAssetScript = updateWithBigScript()
+      d.appendAndCatchError(invalidSetAssetScript) shouldBe TransactionValidationError(
+        GenericError(errorMsg),
+        invalidSetAssetScript
+      )
+      d.appendAndAssertSucceed(
+        TxHelpers.issue(issuer, name = "asset3", script = Some(scriptWithSize(MaxExprSizeInBytes))),
+        TxHelpers.setAssetScript(issuer, issue.asset, scriptWithSize(MaxExprSizeInBytes))
+      )
+    }
+  }
+
   private def getScriptWithSyncCall(syncCall: String): ExprScript = {
     val expr =
       s"""
@@ -564,7 +621,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
          |""".stripMargin
 
     ExpressionCompiler
-      .compileBoolean(expr, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()))
+      .compileBoolean(expr, NoLibraries, compilerContext(DirectiveSet(V5, Call, Expression).explicitGet()), V5)
       .flatMap(ExprScript(V5, _))
       .explicitGet()
   }

@@ -21,6 +21,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
@@ -88,11 +89,20 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val compiled = ExpressionCompiler.compile(code, ctx.compilerContext)
+    val compiled = ExpressionCompiler.compile(code, NoLibraries, ctx.compilerContext, StdLibVersion.VersionDic.all.last)
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
       EvaluatorV2
-        .applyCompleted(evalCtx, v._1, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true)
+        .applyCompleted(
+          evalCtx,
+          v._1,
+          LogExtraInfo(),
+          version,
+          correctFunctionCallScope = true,
+          newMode = true,
+          enableExecutionLog = false,
+          fixedThrownError = true
+        )
         ._3
         .bimap(_.message, _.asInstanceOf[T])
     )
@@ -286,7 +296,7 @@ class IntegrationTest extends PropSpec with Inside {
   }
 
   def compile(script: String): Either[String, Terms.EXPR] =
-    ExpressionCompiler.compileBoolean(script, CTX.empty.compilerContext)
+    ExpressionCompiler.compileBoolean(script, NoLibraries, CTX.empty.compilerContext, StdLibVersion.VersionDic.all.last)
 
   property("wrong script return type") {
     compile("1") should produce("should return boolean")
@@ -1603,7 +1613,7 @@ class IntegrationTest extends PropSpec with Inside {
         ("true", "Boolean"),
         ("123", "Int"),
         ("base58'aaaa'", "ByteVector"),
-        ("unit", "Unit")
+        (GlobalValNames.Unit, "Unit")
       ) #::: getElement
 
     /*  Example for size = 2

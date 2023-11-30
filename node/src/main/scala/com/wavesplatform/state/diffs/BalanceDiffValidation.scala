@@ -1,75 +1,84 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.state.{Blockchain, LeaseBalance, StateSnapshot}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation {
-  def cond(b: Blockchain, cond: Blockchain => Boolean)(d: Diff): Either[AccountBalanceError, Diff] = {
-    if (cond(b)) apply(b)(d)
-    else Right(d)
+  def cond(b: Blockchain, cond: Blockchain => Boolean)(s: StateSnapshot): Either[AccountBalanceError, StateSnapshot] = {
+    if (cond(b)) apply(b)(s)
+    else Right(s)
   }
 
-  def apply(b: Blockchain)(d: Diff): Either[AccountBalanceError, Diff] = {
-    def check(acc: Address, portfolio: Portfolio): Either[(Address, String), Unit] = {
-      val balance  = portfolio.balance
-      val oldWaves = b.balance(acc, Waves)
-      val oldLease = b.leaseBalance(acc)
+  def apply(b: Blockchain)(snapshot: StateSnapshot): Either[AccountBalanceError, StateSnapshot] = {
+    def checkWaves(
+        acc: Address,
+        newWaves: Long,
+        newLease: LeaseBalance
+    ): Either[(Address, String), Unit] = {
+      val oldWaves     = b.balance(acc)
+      val oldLease     = b.leaseBalance(acc)
+      val wavesDiff    = newWaves - oldWaves
+      val leaseOutDiff = newLease.out - oldLease.out
 
-      def negativeBalanceCheck(newLease: LeaseBalance, newWaves: Long): Either[(Address, String), Unit] =
-        if (balance < 0) {
-          if (newWaves < 0) {
-            Left(acc -> s"negative waves balance: $acc, old: $oldWaves, new: $newWaves")
-          } else if (newWaves < newLease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
-            Left(acc -> (if (newWaves + newLease.in - newLease.out < 0) {
-                           s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
-                         } else if (portfolio.lease.out == 0) {
-                           s"$acc trying to spend leased money"
-                         } else {
-                           s"leased being more than own: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
-                         }))
-          } else {
-            Right(())
-          }
+      if (wavesDiff < 0) {
+        if (newWaves < 0) {
+          Left(acc -> s"negative waves balance: $acc, old: $oldWaves, new: $newWaves")
+        } else if (newWaves < newLease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
+          val errorMessage =
+            if (newWaves + newLease.in - newLease.out < 0)
+              s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
+            else if (leaseOutDiff == 0)
+              s"$acc trying to spend leased money"
+            else
+              s"leased being more than own: $acc, old: ${(oldWaves, oldLease)}, new: ${(newWaves, newLease)}"
+          Left(acc -> errorMessage)
         } else {
           Right(())
         }
-
-      // Tokens it can produce overflow are exist.
-      lazy val assetsCheck =
-        portfolio.assets
-          .collectFirst {
-            case (asset, diffAmount) if b.balance(acc, asset) + diffAmount < 0 =>
-              Left(acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(b, acc, portfolio)}")
-          }
-          .getOrElse(Right(()))
-
-      for {
-        newLease <- oldLease.combineF[Either[String, *]](portfolio.lease).leftMap((acc, _))
-        newWaves <- state.safeSum(oldWaves, balance, "Waves balance").leftMap((acc, _))
-        _        <- negativeBalanceCheck(newLease, newWaves)
-        _        <- assetsCheck
-      } yield ()
+      } else {
+        Right(())
+      }
     }
 
+    val wavesCheck =
+      snapshot.balances
+        .flatMap {
+          case ((address, Waves), balance) =>
+            val currentLeaseBalance = snapshot.leaseBalances.getOrElse(address, b.leaseBalance(address))
+            checkWaves(address, balance, currentLeaseBalance).fold(error => List(error), _ => Nil)
+          case _ =>
+            Nil
+        }
+
+    val assetsCheck =
+      snapshot.balances
+        .collectFirst {
+          case ((address, asset), balance) if asset != Waves && balance < 0 =>
+            Map(address -> s"negative asset balance: $address, new portfolio: ${negativeAssetsInfo(address, snapshot)}")
+        }
+        .getOrElse(Map())
+
     val positiveBalanceErrors =
-      d.portfolios.flatMap { case (acc, p) => check(acc, p).fold(error => List(error), _ => Nil) }
+      wavesCheck ++ assetsCheck
 
     if (positiveBalanceErrors.isEmpty) {
-      Right(d)
+      Right(snapshot)
     } else {
       Left(AccountBalanceError(positiveBalanceErrors))
     }
   }
 
-  private def negativeAssetsInfo(b: Blockchain, acc: Address, diff: Portfolio): Map[ByteStr, Long] =
-    diff.assets
-      .map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
-      .filter(_._2 < 0)
+  private def negativeAssetsInfo(
+      address: Address,
+      snapshot: StateSnapshot
+  ): Map[ByteStr, Long] =
+    snapshot.balances
+      .collect {
+        case ((`address`, assetId: IssuedAsset), balance) if balance < 0 => (assetId.id, balance)
+      }
 }

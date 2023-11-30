@@ -1,12 +1,13 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.lang.v1.parser.Expressions.*
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import fastparse.*
 
 sealed abstract class UnaryOperation {
   val func: String
   def parser[A: P]: P[Any]
-  def expr(start: Int, end: Int, op: EXPR)(implicit offset: Int): EXPR
+  def expr(start: Int, end: Int, op: EXPR)(implicit offset: LibrariesOffset): EXPR
 }
 
 object UnaryOperation {
@@ -21,7 +22,7 @@ object UnaryOperation {
   case object POSITIVE_OP extends UnaryOperation {
     val func                          = "+"
     override def parser[A: P]: P[Any] = P("+" ~ !CharIn("0-9"))
-    override def expr(start: Int, end: Int, op: EXPR)(implicit offset: Int): EXPR = {
+    override def expr(start: Int, end: Int, op: EXPR)(implicit offset: LibrariesOffset): EXPR = {
       FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "+"), List(op))
     }
   }
@@ -29,7 +30,7 @@ object UnaryOperation {
   case object NEGATIVE_OP extends UnaryOperation {
     val func                          = "-"
     override def parser[A: P]: P[Any] = P("-" ~ !CharIn("0-9"))
-    override def expr(start: Int, end: Int, op: EXPR)(implicit offset: Int): EXPR = {
+    override def expr(start: Int, end: Int, op: EXPR)(implicit offset: LibrariesOffset): EXPR = {
       FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "-"), List(op))
     }
   }
@@ -37,7 +38,7 @@ object UnaryOperation {
   case object NOT_OP extends UnaryOperation {
     val func                          = "!"
     override def parser[A: P]: P[Any] = P("!")
-    override def expr(start: Int, end: Int, op: EXPR)(implicit offset: Int): EXPR = {
+    override def expr(start: Int, end: Int, op: EXPR)(implicit offset: LibrariesOffset): EXPR = {
       FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "!"), List(op))
     }
   }

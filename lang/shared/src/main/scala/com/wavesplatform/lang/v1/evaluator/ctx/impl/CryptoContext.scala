@@ -1,26 +1,27 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.implicits._
+import cats.implicits.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{ExecutionError, CommonError}
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.{CommonError, ExecutionError, ThrownError}
 
 import scala.collection.mutable
+import scala.util.Try
 
 object CryptoContext {
 
-  private val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
+  val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
 
   private def rsaHashAlgs(v: StdLibVersion) = {
     rsaTypeNames.map(CASETYPEREF(_, List.empty, v > V3))
@@ -30,7 +31,7 @@ object CryptoContext {
     UNION.create(rsaHashAlgs(v), if (v > V3 && v < V6) Some("RsaDigestAlgs") else None)
 
   private val rsaHashLib = {
-    import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
+    import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.*
     rsaTypeNames.zip(List(NONE, MD5, SHA1, SHA224, SHA256, SHA384, SHA512, SHA3224, SHA3256, SHA3384, SHA3512)).toMap
   }
 
@@ -370,16 +371,16 @@ object CryptoContext {
         ("index", LONG)
       ) {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
-          val filteredProofs = proof.collect {
-            case bs@CONST_BYTESTR(v) if v.size == 32 => bs
-          }
-
-          if (value.size == 32 && proof.length <= 16 && filteredProofs.size == proof.size) {
-            CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), filteredProofs.reverse.map(_.bs.arr))))
+          val sizeCheckedProofs = proof.collect { case bs @ CONST_BYTESTR(v) if v.size == 32 => bs }
+          if (value.size == 32 && proof.length <= 16 && sizeCheckedProofs.size == proof.size) {
+            Try(createRoot(value.arr, Math.toIntExact(index), sizeCheckedProofs.reverse.map(_.bs.arr)))
+              .toEither
+              .leftMap(e => ThrownError(if (e.getMessage != null) e.getMessage else "error"))
+              .flatMap(r => CONST_BYTESTR(ByteStr(r)))
           } else {
-            notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
+            notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector, index: Int)", xs)
           }
-        case xs => notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
+        case xs => notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector, index: Int)", xs)
       }
 
     def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {

@@ -3,12 +3,13 @@ package com.wavesplatform.lang.compiler
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.multiplierFunction
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.directives.values.{V3, V5}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class ErrorTest extends PropSpec {
 
@@ -17,7 +18,7 @@ class ErrorTest extends PropSpec {
   errorTests(
     "can't define LET with the same name as predefined constant" -> "already defined in the scope" -> BLOCK(
       AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "unit"), CONST_LONG(AnyPos, 2)),
+      LET(AnyPos, PART.VALID(AnyPos, GlobalValNames.Unit), CONST_LONG(AnyPos, 2)),
       TRUE(AnyPos)
     ),
     "can't define LET with the same name as predefined function" -> "function with this name is already defined" -> BLOCK(
@@ -31,7 +32,7 @@ class ErrorTest extends PropSpec {
       SUM_OP,
       CONST_LONG(AnyPos, 1)
     ),
-    "IF clause must be boolean"                    -> "Unexpected type, required: Boolean" -> IF(AnyPos, CONST_LONG(AnyPos, 0), TRUE(AnyPos), FALSE(AnyPos)),
+    "IF clause must be boolean" -> "Unexpected type, required: Boolean" -> IF(AnyPos, CONST_LONG(AnyPos, 0), TRUE(AnyPos), FALSE(AnyPos)),
     "FUNCTION_CALL with wrong amount of arguments" -> "requires 2 arguments" -> FUNCTION_CALL(
       AnyPos,
       PART.VALID(AnyPos, multiplierFunction.name),
@@ -129,9 +130,8 @@ class ErrorTest extends PropSpec {
       "List[Any] | List[Any]"
     )
 
-    invalidPatternsWithError.foreach {
-      case (pattern, expectedError) =>
-        createPatternMatchScript(pattern) shouldBe Left(expectedError)
+    invalidPatternsWithError.foreach { case (pattern, expectedError) =>
+      createPatternMatchScript(pattern) shouldBe Left(expectedError)
     }
 
     validPatterns.foreach { pattern =>
@@ -156,11 +156,10 @@ class ErrorTest extends PropSpec {
          |""".stripMargin
     )
 
-  private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {
-    case ((label, error), input) =>
-      property(s"Error: $label") {
-        ExpressionCompiler(compilerContext, input) should produce(error)
-      }
+  private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach { case ((label, error), input) =>
+    property(s"Error: $label") {
+      ExpressionCompiler(compilerContext, V3, input) should produce(error)
+    }
   }
 
 }

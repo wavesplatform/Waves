@@ -29,7 +29,16 @@ package object v1 {
   def eval(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
-      stdLibVersion: StdLibVersion
+      stdLibVersion: StdLibVersion = StdLibVersion.VersionDic.all.max
   ): (Log[Id], Int, Either[ExecutionError, Terms.EVALUATED]) =
-    EvaluatorV2.applyCompleted(ctx, expr, LogExtraInfo(), stdLibVersion, newMode = true, correctFunctionCallScope = true)
+    EvaluatorV2.applyCompleted(
+      ctx,
+      expr,
+      LogExtraInfo(),
+      stdLibVersion,
+      newMode = true,
+      correctFunctionCallScope = true,
+      enableExecutionLog = false,
+      fixedThrownError = true
+    )
 }

@@ -5,12 +5,15 @@ import cats.instances.list.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V8}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Parser.*
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.parser.UnaryOperation.*
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import fastparse.*
@@ -19,13 +22,14 @@ import fastparse.Parsed.Failure
 
 import scala.annotation.tailrec
 
-class Parser(implicit offset: Int) {
+class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  val keywords       = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   val excludeInError = Set('(', ')', ':', ']', '[', '=', ',', ';')
+
+  val keywords: Set[String] = if (stdLibVersion >= V8) keywordsBeforeV8 ++ additionalV8Keywords else keywordsBeforeV8
 
   def lowerChar[A: P]            = CharIn("a-z")
   def upperChar[A: P]            = CharIn("A-Z")
@@ -100,11 +104,6 @@ class Parser(implicit offset: Int) {
       }
       .map(posAndVal => CONST_STRING(posAndVal._1, posAndVal._2))
 
-  def correctVarName[A: P]: P[PART[String]] =
-    (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
-      .filter { case (_, x, _) => !keywords.contains(x) }
-      .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
-
   def declNameP[A: P](check: Boolean = false): P[Unit] = {
     def symbolsForError   = CharPred(c => !c.isWhitespace && !excludeInError.contains(c))
     def checkedUnderscore = ("_" ~~/ !"_".repX(1)).opaque("not more than 1 underscore in a row")
@@ -158,7 +157,7 @@ class Parser(implicit offset: Int) {
   def curlyBracesP[A: P]: P[EXPR] = P("{" ~ comment ~ baseExpr ~ comment ~/ "}")
 
   def lfunP[A: P]: P[REF] = P(correctLFunName).map { x =>
-    REF(Pos(x.position.start, x.position.end), x)
+    REF(Pos(x.position), x)
   }
 
   def ifP[A: P]: P[IF] = {
@@ -240,13 +239,13 @@ class Parser(implicit offset: Int) {
       .map(Union(_))
 
   def tupleTypeP[A: P]: P[Tuple] =
-    ("(" ~
+    ("(" ~ comment ~
       P(unionTypeP).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
       )
-      ~/ ")")
+      ~ comment ~/ ")")
       .map(Tuple)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
@@ -258,7 +257,7 @@ class Parser(implicit offset: Int) {
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
     def noKeyword = {
       def noArgs      = "(" ~ comment ~ ")" ~ comment
-      def validName   = NoCut(funcName).filter(_.isInstanceOf[VALID[_]])
+      def validName   = NoCut(funcName).filter(_.isInstanceOf[VALID[?]])
       def argsOrEqual = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
       (validName ~ comment ~ argsOrEqual ~/ funcBody.? ~~ Fail)
         .asInstanceOf[P[Nothing]]
@@ -310,10 +309,11 @@ class Parser(implicit offset: Int) {
           })
       ).?.map(_.getOrElse(Union(Seq())))
 
+    val objPatMin = if (stdLibVersion >= V8) 1 else 0
     def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
       (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
         (Index ~ "(" ~ pattern.rep(min = 2, sep = ",") ~/ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
-        (Index ~ anyVarName() ~ "(" ~ (anyVarName() ~ "=" ~ pattern).rep(sep = ",") ~ ")" ~ Index)
+        (Index ~ anyVarName() ~ "(" ~ (anyVarName() ~ "=" ~ pattern).rep(min = objPatMin, sep = ",") ~ ")" ~ Index)
           .map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
         (Index ~ baseExpr.rep(min = 1, sep = "|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
 
@@ -347,11 +347,11 @@ class Parser(implicit offset: Int) {
           error => MATCH_CASE(error.position, pattern = p, expr = error),
           { pos =>
             val cPos      = Pos(caseStart, end)
-            val exprStart = pos.fold(caseStart)(_.end)
+            val exprStart = pos.fold(offset.shiftStart(caseStart))(_.end)
             MATCH_CASE(
               cPos,
               pattern = p,
-              expr = e.getOrElse(INVALID(Pos(exprStart, end), "expected expression"))
+              expr = e.getOrElse(INVALID(Pos.fromShifted(exprStart, offset.shiftEnd(end)), "expected expression"))
             )
           }
         )
@@ -359,7 +359,12 @@ class Parser(implicit offset: Int) {
   }
 
   def matchP[A: P]: P[EXPR] =
-    P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(0, comment) ~ comment ~ "}" ~~ Index)
+    P(
+      Index ~~ "match" ~~ &(border) ~/ baseExpr.opaque("expression to match") ~ "{" ~ comment ~ matchCaseP.rep(
+        0,
+        comment
+      ) ~ comment ~ "}" ~~ Index
+    )
       .map {
         case (start, _, Nil, end)   => INVALID(Pos(start, end), "pattern matching requires case branches")
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
@@ -432,7 +437,7 @@ class Parser(implicit offset: Int) {
   def variableDefP[A: P](key: String): P[Seq[LET]] = {
     def letNames      = destructuredTupleValuesP | letNameP
     def letKWAndNames = key ~~ ((&(spacesAndNewLinesOpt) ~ comment ~ letNames ~ comment) | (&(spacesAndNewLinesOpt) ~~/ Fail).opaque("variable name"))
-    def noKeyword     = NoCut(letNames).filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~~ !"=" ~/ baseExpr ~~ Fail
+    def noKeyword     = NoCut(letNames).filter(_.exists(_._2.isInstanceOf[VALID[?]])) ~ "=" ~~ !"=" ~/ baseExpr ~~ Fail
     def noKeywordP    = noKeyword.opaque(""""let" or "strict" keyword""").asInstanceOf[P[Nothing]]
     def correctLets   = P(Index ~~ letKWAndNames ~/ ("=" ~ baseExpr | "=" ~/ Fail.opaque("let body")) ~~ Index)
     (correctLets | noKeywordP)
@@ -543,7 +548,9 @@ class Parser(implicit offset: Int) {
         def error(implicit c: fastparse.P[Any])    = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
         val parser = P(Index ~~ operand ~~ P(!(newLines ~~ spacesOpt ~~ numberP) ~ operator ~ (NoCut(operand) | error)).rep)
         parser.map { case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end + offset, acc, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) =>
+            currKind.expr(offset.shiftStart(start), currOperand.position.end, acc, currOperand)
+          }
         }
       case Right(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
@@ -562,7 +569,9 @@ class Parser(implicit offset: Int) {
         P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
             val (ops, s) = revp(left, r)
-            ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end + offset, currOperand, acc) }
+            ops.foldLeft(s) { case (acc, (currOperand, currKind)) =>
+              currKind.expr(offset.shiftStart(start), currOperand.position.end, currOperand, acc)
+            }
         }
     }
   }
@@ -583,7 +592,7 @@ class Parser(implicit offset: Int) {
   }
 
   def parseReplExpr(str: String): Parsed[EXPR] = {
-    def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, "unit")))
+    def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, GlobalValNames.Unit)))
     def replAtom[A: P] = baseAtom(block(Some(unit))(_))
     def replExpr[A: P] = binaryOp(baseAtom(replAtom(_))(_), opsByPriority)
     parse(str, replExpr(_), verboseFailures = true)
@@ -597,7 +606,7 @@ class Parser(implicit offset: Int) {
         }
 
     parse(str, contract(_), verboseFailures = true) match {
-      case Parsed.Success((s, t), _) if (t.nonEmpty) =>
+      case Parsed.Success((_, t), _) if t.nonEmpty =>
         def contract[A: P] = P(Start ~ unusedText ~ declaration.rep ~ comment ~ annotatedFunc.rep ~ !declaration.rep(1) ~ End ~~ Index)
         parse(str, contract(_)) match {
           case Parsed.Failure(_, o, e) =>
@@ -688,14 +697,14 @@ class Parser(implicit offset: Int) {
         else
           input.indexWhere(_.isWhitespace, f.index)
       val correctedEnd = if (end <= 0) f.index else end
-      (f.index - offset, correctedEnd - offset)
+      (offset.shiftStart(f.index), offset.shiftEnd(correctedEnd))
     } else {
       val start =
         if (input(f.index - 1).isWhitespace)
           input.lastIndexWhere(!_.isWhitespace, f.index - 1)
         else
           input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
-      (start - offset, f.index - offset)
+      (offset.shiftStart(start), offset.shiftEnd(f.index))
     }
 
   private def errorWithPosition(input: String, f: Failure): (String, Int, Int) = {
@@ -713,15 +722,21 @@ class Parser(implicit offset: Int) {
 }
 
 object Parser {
-  private val defaultParser                       = new Parser()(0)
-  def parseExpr(str: String): Parsed[EXPR]        = defaultParser.parseExpr(str)
-  def parseReplExpr(str: String): Parsed[EXPR]    = defaultParser.parseReplExpr(str)
-  def parseContract(str: String): Parsed[DAPP]    = defaultParser.parseContract(str)
-  def toString(input: String, f: Failure): String = defaultParser.toString(input, f)
-  def parseExpressionWithErrorRecovery(str: String): Either[(String, Int, Int), (SCRIPT, Option[Pos])] =
-    defaultParser.parseExpressionWithErrorRecovery(str)
-  def parseDAPPWithErrorRecovery(str: String): Either[(String, Int, Int), (DAPP, Option[Pos])] =
-    defaultParser.parseDAPPWithErrorRecovery(str)
+  private def parser(version: StdLibVersion)                                                                  = new Parser(version)(NoLibraries)
+  def parseExpr(str: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Parsed[EXPR]        = parser(version).parseExpr(str)
+  def parseReplExpr(str: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Parsed[EXPR]    = parser(version).parseReplExpr(str)
+  def parseContract(str: String, version: StdLibVersion = StdLibVersion.VersionDic.all.last): Parsed[DAPP]    = parser(version).parseContract(str)
+  def toString(input: String, f: Failure, version: StdLibVersion = StdLibVersion.VersionDic.all.last): String = parser(version).toString(input, f)
+  def parseExpressionWithErrorRecovery(
+      str: String,
+      version: StdLibVersion = StdLibVersion.VersionDic.all.last
+  ): Either[(String, Int, Int), (SCRIPT, Option[Pos])] =
+    parser(version).parseExpressionWithErrorRecovery(str)
+  def parseDAPPWithErrorRecovery(
+      str: String,
+      version: StdLibVersion = StdLibVersion.VersionDic.all.last
+  ): Either[(String, Int, Int), (DAPP, Option[Pos])] =
+    parser(version).parseDAPPWithErrorRecovery(str)
 
   sealed trait Accessor
   case class Method(name: PART[String], args: Seq[EXPR])     extends Accessor
@@ -735,5 +750,23 @@ object Parser {
     val KnownMethods: Set[String] = Set(ExactAs, As)
   }
 
-  val keywords = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val keywordsBeforeV8     = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val additionalV8Keywords = Set("base16", "FOLD")
+
+  sealed trait LibrariesOffset {
+    def shiftStart(idx: Int): Int = idx
+    def shiftEnd(idx: Int): Int   = idx
+  }
+  object LibrariesOffset {
+    case class Defined(importStart: Int, importEnd: Int, offset: Int) extends LibrariesOffset {
+      override def shiftStart(idx: Int): Int = shift(idx, importStart)
+      override def shiftEnd(idx: Int): Int   = shift(idx, importEnd)
+      private def shift(idx: Int, importBound: Int): Int = {
+        if (idx < importStart) idx
+        else if (idx - offset < importEnd) importBound
+        else idx - offset
+      }
+    }
+    case object NoLibraries extends LibrariesOffset
+  }
 }

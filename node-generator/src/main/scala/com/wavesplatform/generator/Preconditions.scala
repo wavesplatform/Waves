@@ -44,59 +44,58 @@ object Preconditions {
   def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction], List[Transaction]) = {
     val (holder, headTransactions) = settings.actions
       .sortBy(_.priority)(Ordering[Int].reverse)
-      .foldLeft((UniverseHolder(), List.empty[Transaction])) {
-        case ((uni, txs), action) =>
-          action match {
-            case LeaseP(from, to, amount, repeat) =>
-              val newTxs = (1 to repeat.getOrElse(1)).map { _ =>
-                LeaseTransaction
-                  .selfSigned(2.toByte, from, to, amount, Fee, time.correctedTime())
-                  .explicitGet()
-              }.toList
-              (uni.copy(leases = newTxs ::: uni.leases), newTxs ::: txs)
-
-            case IssueP(assetName, issuer, assetDescription, amount, decimals, reissuable, scriptFile) =>
-              val script = Option(scriptFile)
-                .filter(_.nonEmpty)
-                .map(file => ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(file))), estimator))
-                .flatMap(_.toOption)
-                .map(_._1)
-
-              val tx = IssueTransaction
-                .selfSigned(
-                  TxVersion.V2,
-                  issuer,
-                  assetName,
-                  assetDescription,
-                  amount,
-                  decimals.toByte,
-                  reissuable,
-                  script,
-                  100000000 + Fee,
-                  time.correctedTime()
-                )
+      .foldLeft((UniverseHolder(), List.empty[Transaction])) { case ((uni, txs), action) =>
+        action match {
+          case LeaseP(from, to, amount, repeat) =>
+            val newTxs = (1 to repeat.getOrElse(1)).map { _ =>
+              LeaseTransaction
+                .selfSigned(2.toByte, from, to, amount, Fee, time.correctedTime())
                 .explicitGet()
-              (uni.copy(issuedAssets = tx :: uni.issuedAssets), tx :: txs)
+            }.toList
+            (uni.copy(leases = newTxs ::: uni.leases), newTxs ::: txs)
 
-            case CreateAccountP(seed, balance, scriptOption) =>
-              val acc = GeneratorSettings.toKeyPair(seed)
-              val transferTx = TransferTransaction
-                .selfSigned(2.toByte, settings.faucet, acc.toAddress, Waves, balance, Waves, Fee, ByteStr.empty, time.correctedTime())
-                .explicitGet()
-              val scriptAndTx = scriptOption.map { file =>
-                val scriptText = new String(Files.readAllBytes(Paths.get(file)))
-                val script     = ScriptCompiler.compile(scriptText, estimator).explicitGet()._1
-                val tx         = SetScriptTransaction.selfSigned(1.toByte, acc, Some(script), Fee, time.correctedTime()).explicitGet()
-                (script, tx)
-              }
+          case IssueP(assetName, issuer, assetDescription, amount, decimals, reissuable, scriptFile) =>
+            val script = Option(scriptFile)
+              .filter(_.nonEmpty)
+              .map(file => ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(file))), estimator))
+              .flatMap(_.toOption)
+              .map(_._1)
 
-              val addTxs = List(transferTx) ++ scriptAndTx.map(_._2)
-              (uni.copy(accounts = CreatedAccount(acc, balance, scriptAndTx.map(_._1)) :: uni.accounts), addTxs ::: txs)
-          }
+            val tx = IssueTransaction
+              .selfSigned(
+                TxVersion.V2,
+                issuer,
+                assetName,
+                assetDescription,
+                amount,
+                decimals.toByte,
+                reissuable,
+                script,
+                100000000 + Fee,
+                time.correctedTime()
+              )
+              .explicitGet()
+            (uni.copy(issuedAssets = tx :: uni.issuedAssets), tx :: txs)
+
+          case CreateAccountP(seed, balance, scriptOption) =>
+            val acc = GeneratorSettings.toKeyPair(seed)
+            val transferTx = TransferTransaction
+              .selfSigned(2.toByte, settings.faucet, acc.toAddress, Waves, balance, Waves, Fee, ByteStr.empty, time.correctedTime())
+              .explicitGet()
+            val scriptAndTx = scriptOption.map { file =>
+              val scriptText = new String(Files.readAllBytes(Paths.get(file)))
+              val script     = ScriptCompiler.compile(scriptText, estimator).explicitGet()._1
+              val tx         = SetScriptTransaction.selfSigned(1.toByte, acc, Some(script), Fee, time.correctedTime()).explicitGet()
+              (script, tx)
+            }
+
+            val addTxs = List(transferTx) ++ scriptAndTx.map(_._2)
+            (uni.copy(accounts = CreatedAccount(acc, balance, scriptAndTx.map(_._1)) :: uni.accounts), addTxs ::: txs)
+        }
       }
 
     val tailTransactions = holder.issuedAssets.flatMap { issuedAsset =>
-      val balance = issuedAsset.quantity / holder.accounts.size
+      val balance = issuedAsset.quantity.value / holder.accounts.size
       holder.accounts.map { acc =>
         TransferTransaction
           .selfSigned(

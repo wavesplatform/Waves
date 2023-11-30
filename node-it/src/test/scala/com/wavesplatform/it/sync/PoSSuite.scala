@@ -285,24 +285,24 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
       .overrideBase(
         _.raw(
           s"""
-          |waves {
-          |  blockchain {
-          |    custom {
-          |      functionality {
-          |        pre-activated-features = {
-          |          2 = 0
-          |          3 = 0
-          |          4 = 0
-          |          5 = 0
-          |          6 = 0
-          |          7 = 0
-          |          8 = 0
-          |          15 = $vrfActivationHeight
-          |        }
-          |      }
-          |    }
-          |  }
-          |}
+             |waves {
+             |  blockchain {
+             |    custom {
+             |      functionality {
+             |        pre-activated-features = {
+             |          2 = 0
+             |          3 = 0
+             |          4 = 0
+             |          5 = 0
+             |          6 = 0
+             |          7 = 0
+             |          8 = 0
+             |          15 = $vrfActivationHeight
+             |        }
+             |      }
+             |    }
+             |  }
+             |}
         """.stripMargin
         )
       )
@@ -378,7 +378,9 @@ class PoSSuite extends BaseFunSuite with WaitForHeight2 {
         txs = Nil,
         signer = signerPK,
         featureVotes = Seq.empty,
-        rewardVote = -1L
+        rewardVote = -1L,
+        stateHash = None,
+        challengedHeader = None
       )
       .explicitGet()
   }

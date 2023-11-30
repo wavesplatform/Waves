@@ -46,19 +46,18 @@ class GenericRideActivationTest extends PropSpec with WithDomain with EitherValu
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
       .zip(DirectiveDictionary[StdLibVersion].all.filter(_ >= V4).map(Some(_)).toList :+ None) // (V3, V4), (V4, V5), ..., (Vn, None)
-      .foreach {
-        case (currentVersion, nextVersion) =>
-          val (genesisTxs, setScriptTxs, invoke) = scenario(currentVersion).sample.get
-          withDomain(settingsForRide(currentVersion)) { d =>
-            d.appendBlock(genesisTxs*)
-            d.appendBlock(setScriptTxs*)
-            d.appendBlock(invoke)
-            d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
-            nextVersion.foreach { v =>
-              val (_, setScriptTxs, _) = scenario(v).sample.get
-              (the[RuntimeException] thrownBy d.appendBlock(setScriptTxs*)).getMessage should include("ActivationError")
-            }
+      .foreach { case (currentVersion, nextVersion) =>
+        val (genesisTxs, setScriptTxs, invoke) = scenario(currentVersion).sample.get
+        withDomain(settingsForRide(currentVersion)) { d =>
+          d.appendBlock(genesisTxs*)
+          d.appendBlock(setScriptTxs*)
+          d.appendBlock(invoke)
+          d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
+          nextVersion.foreach { v =>
+            val (_, setScriptTxs, _) = scenario(v).sample.get
+            (the[RuntimeException] thrownBy d.appendBlock(setScriptTxs*)).getMessage should include("ActivationError")
           }
+        }
       }
   }
 }

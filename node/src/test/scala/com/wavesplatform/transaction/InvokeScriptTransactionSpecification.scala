@@ -40,8 +40,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     deser.timestamp shouldEqual transaction.timestamp
     deser.proofs shouldEqual transaction.proofs
     bytes shouldEqual deser.bytes()
-    Verifier.verifyAsEllipticCurveSignature(transaction, checkWeakPk = false) should beRight
-    Verifier.verifyAsEllipticCurveSignature(deser, checkWeakPk = false) should beRight // !!!!!!!!!!!!!!!
+    Verifier.verifyAsEllipticCurveSignature(transaction, isRideV6Activated = false) should beRight
+    Verifier.verifyAsEllipticCurveSignature(deser, isRideV6Activated = false) should beRight // !!!!!!!!!!!!!!!
   }
 
   property("protobuf roundtrip") {
@@ -223,7 +223,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     req.toTx.explicitGet()
   }
 
-  property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
+  property(s"NODE-237, NODE-238. can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(22)(CONST_LONG(0))).funcCallOpt.get.args.length shouldBe 22
     (the[Exception] thrownBy TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(23)(CONST_LONG(0)))).getMessage should include(
       "InvokeScript can't have more than 22 arguments"
@@ -274,7 +274,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ) should produce("is unsupported")
   }
 
-  property(s"can't call a func with non native(simple) args - BigInt") {
+  property(s"NODE-97. can't call a func with non native(simple) args - BigInt") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,

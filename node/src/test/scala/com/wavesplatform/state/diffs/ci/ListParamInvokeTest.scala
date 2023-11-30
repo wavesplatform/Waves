@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.{PropSpec, produce}
@@ -47,7 +48,7 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
                         User("DataEntry"),
                         List(CONST_STRING("entry2").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(1))))
                       ),
-                      REF("nil")
+                      REF(GlobalValNames.Nil)
                     )
                   )
                 )
@@ -66,10 +67,9 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
 
   property("pass list args") {
     val (genesis, setScript, invoke, dAppAddress) = paymentPreconditions(dApp(V4))
-    assertDiffAndState(Seq(TestBlock.create(genesis :+ setScript)), TestBlock.create(Seq(invoke)), features(withV4 = true)) {
-      case (_, blockchain) =>
-        blockchain.accountData(dAppAddress, "entry1").get.value shouldBe "value1"
-        blockchain.accountData(dAppAddress, "entry2").get.value shouldBe "value2"
+    assertDiffAndState(Seq(TestBlock.create(genesis :+ setScript)), TestBlock.create(Seq(invoke)), features(withV4 = true)) { case (_, blockchain) =>
+      blockchain.accountData(dAppAddress, "entry1").get.value shouldBe "value1"
+      blockchain.accountData(dAppAddress, "entry2").get.value shouldBe "value2"
     }
   }
 

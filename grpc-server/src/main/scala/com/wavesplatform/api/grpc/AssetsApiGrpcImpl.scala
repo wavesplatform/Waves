@@ -3,7 +3,7 @@ package com.wavesplatform.api.grpc
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
-import com.wavesplatform.protobuf._
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -25,16 +25,16 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
   }
 
   override def getNFTList(request: NFTRequest, responseObserver: StreamObserver[NFTResponse]): Unit = responseObserver.interceptErrors {
-    val addressOption: Option[Address]    = if (request.address.isEmpty) None else Some(request.address.toAddress)
+    val addressOption: Option[Address]    = if (request.address.isEmpty) None else Some(request.address.toAddress())
     val afterAssetId: Option[IssuedAsset] = if (request.afterAssetId.isEmpty) None else Some(IssuedAsset(request.afterAssetId.toByteStr))
 
     val responseStream = addressOption match {
       case Some(address) =>
         accountsApi
           .nftList(address, afterAssetId)
-          .map {
-            case (a, d) => NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
-          }
+          .concatMapIterable(_.map { case (a, d) =>
+            NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
+          })
           .take(request.limit)
       case _ => Observable.empty
     }
@@ -50,14 +50,15 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
       d.decimals,
       d.reissuable,
       d.totalVolume.longValue,
-      d.script.map {
-        case AssetScriptInfo(script, complexity) =>
-          ScriptData(
-            PBTransactions.toPBScript(Some(script)),
-            script.expr.toString,
-            complexity
-          )
+      d.script.map { case AssetScriptInfo(script, complexity) =>
+        ScriptData(
+          PBTransactions.toPBScript(Some(script)),
+          script.expr.toString,
+          complexity
+        )
       },
-      d.sponsorship
+      d.sponsorship,
+      sequenceInBlock = d.sequenceInBlock,
+      issueHeight = d.issueHeight
     )
 }

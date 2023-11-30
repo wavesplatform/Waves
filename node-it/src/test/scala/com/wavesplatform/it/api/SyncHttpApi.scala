@@ -3,7 +3,7 @@ package com.wavesplatform.it.api
 import java.net.InetSocketAddress
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.account.{AddressOrAlias, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
@@ -307,10 +307,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       sync(async(n).stateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[StateChanges] = {
-      sync(async(n).debugStateChangesByAddress(address, limit, after))
-    }
-
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       sync(async(n).payment(sourceAddress, recipient, amount, fee))
 
@@ -590,7 +586,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def ensureTxDoesntExist(txId: String): Unit =
       sync(async(n).ensureTxDoesntExist(txId))
 
-    def createKeyPair(): KeyPair = sync(async(n).createKeyPair())
+    def createKeyPair(): SeedKeyPair = sync(async(n).createKeyPair())
 
     def createKeyPairServerSide(): KeyPair = sync(async(n).createKeyPairServerSide())
 
@@ -811,15 +807,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       combinations.foreach { ns =>
         ns.head.connect(ns(1).networkAddress)
       }
-    }
-
-    def rollbackToBlockId(id: String): Unit = {
-      sync(
-        Future.traverse(nodes) { node =>
-          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollbackToBlockId(id)
-        },
-        ConditionAwaitTime
-      )
     }
 
     def waitForHeight(height: Int): Unit = {

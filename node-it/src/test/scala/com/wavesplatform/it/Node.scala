@@ -1,11 +1,9 @@
 package com.wavesplatform.it
 
 import java.net.{InetSocketAddress, URL}
-
 import scala.concurrent.duration.FiniteDuration
-
 import com.typesafe.config.Config
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.{KeyPair, PublicKey, SeedKeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
@@ -14,8 +12,8 @@ import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.utils.LoggerFacade
 import com.wavesplatform.wallet.Wallet
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
-import org.asynchttpclient._
-import org.asynchttpclient.Dsl.{config => clientConfig, _}
+import org.asynchttpclient.*
+import org.asynchttpclient.Dsl.{config as clientConfig, *}
 import org.slf4j.LoggerFactory
 
 abstract class Node(val config: Config) extends AutoCloseable {
@@ -30,14 +28,14 @@ abstract class Node(val config: Config) extends AutoCloseable {
   )
 
   lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder
-    .forAddress(networkAddress.getHostString, nodeExternalPort(6870))
+    .forAddress(nodeApiEndpoint.getHost, nodeExternalPort(6870))
     .usePlaintext()
     .build()
 
   private[this] val wallet = Wallet(settings.walletSettings.copy(file = None))
   wallet.generateNewAccounts(1)
 
-  def generateKeyPair(): KeyPair = wallet.synchronized {
+  def generateKeyPair(): SeedKeyPair = wallet.synchronized {
     wallet.generateNewAccount().get
   }
 

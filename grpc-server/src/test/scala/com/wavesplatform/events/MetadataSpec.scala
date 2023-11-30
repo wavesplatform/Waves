@@ -8,19 +8,17 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxHelpers, TxMatcherFee, TxNonNegativeAmount, TxOrderPrice}
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice}
 
 class MetadataSpec extends FreeSpec with WithBUDomain {
-  "BlockchainUpdates returns correct metadata for supported transaction types" in withDomainAndRepo(RideV6){ (d, r) =>
+  "BlockchainUpdates returns correct metadata for supported transaction types" in withDomainAndRepo(RideV6) { (d, r) =>
     val genesisAddress = TxHelpers.signer(100)
 
     d.appendBlock(TxHelpers.genesis(genesisAddress.toAddress, 100000.waves))
 
     val issuer = TxHelpers.signer(50)
-    val issue = TxHelpers.issue(issuer, decimals = 2)
+    val issue  = TxHelpers.issue(issuer, decimals = 2)
 
     val matcher = TxHelpers.signer(200)
 
@@ -61,13 +59,12 @@ class MetadataSpec extends FreeSpec with WithBUDomain {
       version = 3.toByte
     )
 
-
     val massTransfer = TxHelpers.massTransfer(
       genesisAddress,
       Seq(
-        MassTransferTransaction.ParsedTransfer(issuer.toAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
-        MassTransferTransaction.ParsedTransfer(matcher.toAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
-        MassTransferTransaction.ParsedTransfer(ethOrderSender.toWavesAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
+        issuer.toAddress              -> 100.waves,
+        matcher.toAddress             -> 100.waves,
+        ethOrderSender.toWavesAddress -> 100.waves
       ),
       fee = 0.003.waves
     )
@@ -87,7 +84,8 @@ class MetadataSpec extends FreeSpec with WithBUDomain {
       ethTransfer
     )
 
-    val txMetadata = r.createFakeObserver(SubscribeRequest.of(1, 2))
+    val txMetadata = r
+      .createFakeObserver(SubscribeRequest.of(1, 2))
       .fetchAllEvents(d.blockchain, 2)
       .map(_.getUpdate.getAppend.transactionsMetadata)
 
@@ -98,36 +96,43 @@ class MetadataSpec extends FreeSpec with WithBUDomain {
       Seq(
         TransactionMetadata(
           genesisAddress.toAddress.toByteString,
-          TransactionMetadata.Metadata.MassTransfer(TransactionMetadata.MassTransferMetadata(
-            Seq(issuer.toAddress, matcher.toAddress, ethOrderSender.toWavesAddress).map(_.toByteString)
-          ))
+          TransactionMetadata.Metadata.MassTransfer(
+            TransactionMetadata.MassTransferMetadata(
+              Seq(issuer.toAddress, matcher.toAddress, ethOrderSender.toWavesAddress).map(_.toByteString)
+            )
+          )
         ),
         TransactionMetadata(
           issuer.toAddress.toByteString
         ),
         TransactionMetadata(
           matcher.toAddress.toByteString,
-          TransactionMetadata.Metadata.Exchange(TransactionMetadata.ExchangeMetadata(
-            Seq(exchange.order1.id().toByteString, exchange.order2.id().toByteString),
-            Seq(exchange.order1.senderAddress.toByteString, exchange.order2.senderAddress.toByteString),
-            Seq(exchange.order1.senderPublicKey.toByteString, exchange.order2.senderPublicKey.toByteString)
-          ))
+          TransactionMetadata.Metadata.Exchange(
+            TransactionMetadata.ExchangeMetadata(
+              Seq(exchange.order1.id().toByteString, exchange.order2.id().toByteString),
+              Seq(exchange.order1.senderAddress.toByteString, exchange.order2.senderAddress.toByteString),
+              Seq(exchange.order1.senderPublicKey.toByteString, exchange.order2.senderPublicKey.toByteString)
+            )
+          )
         ),
         TransactionMetadata(
           ethOrderSender.toWavesAddress.toByteString,
-          TransactionMetadata.Metadata.Ethereum(TransactionMetadata.EthereumMetadata(
-            ethTransfer.timestamp,
-            ethTransfer.fee,
-            ethTransfer.sender.toByteString,
-            TransactionMetadata.EthereumMetadata.Action.Transfer(TransactionMetadata.EthereumTransferMetadata(
-              matcher.toAddress.toByteString,
-              Some(Amount(issue.assetId.toByteString, 10))
-            ))
-          ))
+          TransactionMetadata.Metadata.Ethereum(
+            TransactionMetadata.EthereumMetadata(
+              ethTransfer.timestamp,
+              ethTransfer.fee,
+              ethTransfer.sender.toByteString,
+              TransactionMetadata.EthereumMetadata.Action.Transfer(
+                TransactionMetadata.EthereumTransferMetadata(
+                  matcher.toAddress.toByteString,
+                  Some(Amount(issue.assetId.toByteString, 10))
+                )
+              )
+            )
+          )
         )
       )
     )
   }
-
 
 }

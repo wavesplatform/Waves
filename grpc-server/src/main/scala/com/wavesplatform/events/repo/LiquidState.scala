@@ -11,7 +11,7 @@ case class LiquidState(
   def solidify(): BlockAppended = LiquidState.solidify(keyBlock, microBlocks)
 
   def toSeq: Seq[BlockchainUpdated] = Seq(keyBlock) ++ microBlocks
-  def totalBlockId: ByteStr = microBlocks.lastOption.fold(keyBlock.id)(_.id)
+  def totalBlockId: ByteStr         = microBlocks.lastOption.fold(keyBlock.id)(_.id)
 }
 
 object LiquidState {
@@ -35,6 +35,9 @@ object LiquidState {
         transactionData = transactionData
       ),
       updatedWavesAmount = keyBlock.updatedWavesAmount,
+      vrf = keyBlock.vrf,
+      activatedFeatures = keyBlock.activatedFeatures,
+      rewardShares = keyBlock.rewardShares,
       blockStateUpdate = blockStateUpdate,
       transactionStateUpdates = transactionStateUpdates,
       transactionMetadata = transactionMetadata,

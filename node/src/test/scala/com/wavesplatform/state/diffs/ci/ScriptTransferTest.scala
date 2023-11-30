@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNC, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.*
@@ -79,9 +80,9 @@ class ScriptTransferTest extends PropSpec with WithDomain {
         List(
           FUNCTION_CALL(
             User("ScriptTransfer"),
-            List(FUNCTION_CALL(User("Alias"), List(CONST_STRING("alias").explicitGet())), REF("unit"))
+            List(FUNCTION_CALL(User("Alias"), List(CONST_STRING("alias").explicitGet())), REF(GlobalValNames.Unit))
           ),
-          REF("nil")
+          REF(GlobalValNames.Nil)
         )
       )
       val dApp =
@@ -89,7 +90,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
       val invokeTx = invoke()
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include("key not found: asset")
+      d.liquidSnapshot.errorMessage(invokeTx.id()).get.text should include("key not found: asset")
     }
   }
 

@@ -7,14 +7,11 @@ import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
 import cats.instances.option.*
 import cats.syntax.traverse.*
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.*
-import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.crypto
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.FunctionSignatures
@@ -26,13 +23,13 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, DataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{Asset, TransactionFactory}
-import com.wavesplatform.utils.{Time, *}
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
 import play.api.libs.json.*
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 case class AddressApiRoute(
     settings: RestAPISettings,
@@ -45,7 +42,6 @@ case class AddressApiRoute(
     commonAccountsApi: CommonAccountsApi,
     maxBalanceDepth: Int
 ) extends ApiRoute
-    with BroadcastRoute
     with AuthRoute
     with TimeLimitedRoute {
 
@@ -55,8 +51,8 @@ case class AddressApiRoute(
 
   override lazy val route: Route =
     pathPrefix("addresses") {
-      balanceDetails ~ validate ~ seed ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData ~ scriptInfo ~ scriptMeta
+      balanceDetails ~ validate ~ seed ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ deleteAddress ~
+        seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
@@ -84,7 +80,8 @@ case class AddressApiRoute(
         "complexity"           -> maxComplexity,
         "verifierComplexity"   -> verifierComplexity,
         "callableComplexities" -> callableComplexities,
-        "extraFee"             -> (if (blockchain.hasPaidVerifier(address)) FeeValidation.ScriptExtraFee else 0L)
+        "extraFee"             -> (if (blockchain.hasPaidVerifier(address)) FeeValidation.ScriptExtraFee else 0L),
+        "publicKey"            -> scriptInfoOpt.map(_.publicKey.toString)
       )
     }
   }
@@ -96,22 +93,6 @@ case class AddressApiRoute(
   def deleteAddress: Route = (delete & withAuth & path(AddrSegment)) { address =>
     val deleted = wallet.privateKeyAccount(address).exists(account => wallet.deleteAccount(account))
     complete(Json.obj("deleted" -> deleted))
-  }
-
-  def sign: Route = path("sign" / AddrSegment) { address =>
-    signPath(address, encode = true)
-  }
-
-  def signText: Route = path("signText" / AddrSegment) { address =>
-    signPath(address, encode = false)
-  }
-
-  def verify: Route = path("verify" / AddrSegment) { address =>
-    verifyPath(address, decode = true)
-  }
-
-  def verifyText: Route = path("verifyText" / AddrSegment) { address =>
-    verifyPath(address, decode = false)
   }
 
   def balance: Route = (path("balance" / AddrSegment) & get) { address =>
@@ -190,14 +171,10 @@ case class AddressApiRoute(
     complete(Json.obj("address" -> addressBytes, "valid" -> Address.fromString(addressBytes).isRight))
   }
 
-  // TODO: Remove from API
-  def postData: Route = (path("data") & withAuth) {
-    broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
-  }
-
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[DataEntry[?], NotUsed]] =
+        jacksonStreamMarshaller()(DataEntry.dataEntrySerializer)
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
@@ -209,7 +186,7 @@ case class AddressApiRoute(
                 log.trace(s"Error compiling regex $matches: ${e.getMessage}")
                 complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
               },
-              _ => accountData(address, Some(matches))
+              _ => accountData(address, matches)
             )
         } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
           extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
@@ -286,54 +263,30 @@ case class AddressApiRoute(
       pass
   }
 
-  private def accountData(address: Address, regex: Option[String] = None)(implicit m: ToResponseMarshaller[Source[JsValue, NotUsed]]) = {
-    routeTimeout.execute(
+  private def accountData(address: Address)(implicit m: ToResponseMarshaller[Source[DataEntry[?], NotUsed]]) = {
+    routeTimeout.executeFromObservable(
       commonAccountsApi
-        .dataStream(address, regex)
-        .toListL
-        .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
-    )(_.runAsyncLogErr(_))
+        .dataStream(address, None)
+    )
   }
+
+  private def accountData(addr: Address, regex: String)(implicit m: ToResponseMarshaller[Source[DataEntry[?], NotUsed]]) =
+    routeTimeout.executeFromObservable(
+      commonAccountsApi
+        .dataStream(addr, Some(regex))
+    )
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
-    commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
+    commonAccountsApi
+      .data(address, key)
+      .toRight(DataKeyDoesNotExist)
 
   private def accountDataList(address: Address, keys: String*) =
-    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[?]]))
-
-  private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
-    withAuth {
-      val res = wallet
-        .privateKeyAccount(address)
-        .map(pk => {
-          val messageBytes = message.utf8Bytes
-          val signature    = crypto.sign(pk.privateKey, messageBytes)
-          val msg          = if (encode) Base58.encode(messageBytes) else message
-          Signed(msg, Base58.encode(pk.publicKey.arr), signature.toString)
-        })
-      complete(res)
-    }
-  }
-
-  private def verifyPath(address: Address, decode: Boolean): Route = withAuth {
-    jsonPost[Signed] { m =>
-      val msg: Try[Array[Byte]] =
-        if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
-        else Success(m.message.utf8Bytes)
-      verifySigned(msg, m.signature, m.publicKey, address)
-    }
-  }
-
-  private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: Address) = {
-    (msg, ByteStr.decodeBase58(signature), Base58.tryDecodeWithLimit(publicKey)) match {
-      case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-        val account = PublicKey(pubKeyBytes)
-        val isValid = account.toAddress == address &&
-          crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes), blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
-        Right(Json.obj("valid" -> isValid))
-      case _ => Left(InvalidMessage)
-    }
-  }
+    Source.fromIterator(() =>
+      keys
+        .flatMap(commonAccountsApi.data(address, _))
+        .iterator
+    )
 
   def publicKey: Route = (path("publicKey" / PublicKeySegment) & get) { publicKey =>
     complete(Json.obj("address" -> Address.fromPublicKey(publicKey).toString))

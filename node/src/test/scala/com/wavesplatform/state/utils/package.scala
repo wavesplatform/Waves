@@ -3,37 +3,38 @@ package com.wavesplatform.state
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressTransactions
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{RDB, RocksDBWriter, TestStorageFactory}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.settings.TestSettings._
+import com.wavesplatform.settings.TestSettings.*
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings, TestSettings}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.SystemTime
-import monix.reactive.Observer
-import org.iq80.leveldb.DB
+import monix.execution.Scheduler
 
 package object utils {
 
   def addressTransactions(
-      db: DB,
-      diff: => Option[(Height, Diff)],
+      rdb: RDB,
+      snapshot: => Option[(Height, StateSnapshot)],
       address: Address,
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Seq[(Height, Transaction)] =
-    AddressTransactions.allAddressTransactions(db, diff, address, None, types, fromId).map { case (tm, tx) => tm.height -> tx }.toSeq
+  )(implicit s: Scheduler): Seq[(Height, Transaction)] =
+    AddressTransactions
+      .allAddressTransactions(rdb, snapshot, address, None, types, fromId)
+      .map { case (tm, tx, _) => tm.height -> tx }
+      .toListL
+      .runSyncUnsafe()
 
-  object TestLevelDB {
+  object TestRocksDB {
     def withFunctionalitySettings(
-        writableDB: DB,
-        spendableBalanceChanged: Observer[(Address, Asset)],
+        rdb: RDB,
         fs: FunctionalitySettings
-    ): LevelDBWriter =
+    ): RocksDBWriter =
       TestStorageFactory(
         TestSettings.Default.withFunctionalitySettings(fs),
-        writableDB,
+        rdb,
         SystemTime,
-        spendableBalanceChanged,
         BlockchainUpdateTriggers.noop
       )._2
 

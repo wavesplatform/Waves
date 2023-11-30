@@ -5,14 +5,13 @@ import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transaction, TransactionInfo}
 import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import org.scalatest.{Assertion, CancelAfterFailure}
 
 class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -48,14 +47,14 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, lastBlock.height))
 
     val stateChanges          = sender.stateChanges(id).stateChanges
-    val stateChangesByAddress = sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
+    val stateChangesByAddress = sender.transactionsByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
     List(stateChanges, stateChangesByAddress).foreach(checkStateChanges)
 
     sender.getDataByKey(firstAddress, "check").value shouldBe true
   }
 
   test("reject on illegal fields") {
-    val unsupportedVersion = InvokeExpressionTransaction.supportedVersions.max + 1
+    val unsupportedVersion = 4
     assertApiError(
       sender.invokeExpression(firstKeyPair, expr, version = unsupportedVersion.toByte),
       AssertiveApiError(StateCheckFailed.Id, s"Transaction version $unsupportedVersion has not been activated yet", matchMessage = true)

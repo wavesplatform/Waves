@@ -31,8 +31,8 @@ trait NS {
 }
 
 object NetworkServer extends ScorexLogging {
+  val MaxFrameLength: Int                  = 100 * 1024 * 1024
   private[this] val AverageHandshakePeriod = 1.second
-  private[this] val MaxFrameLength         = 100 * 1024 * 1024
   private[this] val LengthFieldSize        = 4
 
   def apply(
@@ -87,9 +87,9 @@ object NetworkServer extends ScorexLogging {
 
     val (messageObserver, networkMessages)            = MessageObserver()
     val (channelClosedHandler, closedChannelsSubject) = ChannelClosedHandler()
-    val discardingHandler                             = new DiscardingHandler(lastBlockInfos.map(_.ready))
+    val discardingHandler                             = new DiscardingHandler(lastBlockInfos.map(_.ready), settings.enableLightMode)
     val peerConnectionsMap                            = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
-    val serverHandshakeHandler                        = new HandshakeHandler.Server(handshake, peerInfo, peerConnectionsMap, peerDatabase, allChannels)
+    val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnectionsMap, peerDatabase, allChannels)
 
     def peerSynchronizer: ChannelHandlerAdapter = {
       if (settings.networkSettings.enablePeersExchange) {

@@ -18,14 +18,14 @@ import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
-import com.wavesplatform.{WithDB, crypto}
+import com.wavesplatform.{WithNewDBForEachTest, crypto}
 import org.scalatest.EitherValues
 import play.api.libs.json.Json
 
-class IssueTransactionV2Specification extends PropSpec with WithDB with HistoryTest with EitherValues {
+class IssueTransactionV2Specification extends PropSpec with WithNewDBForEachTest with HistoryTest with EitherValues {
 
   property("IssueV2 serialization roundtrip") {
-    forAll(issueV2TransactionGen()) { tx: IssueTransaction =>
+    forAll(issueV2TransactionGen()) { (tx: IssueTransaction) =>
       val recovered = IssueTransaction.parseBytes(tx.bytes()).get
 
       tx.sender shouldEqual recovered.sender

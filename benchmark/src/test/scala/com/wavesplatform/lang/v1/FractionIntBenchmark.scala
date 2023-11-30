@@ -20,22 +20,22 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class FractionIntBenchmark {
   @Benchmark
-  def fraction1(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, LogExtraInfo(), V5, true, true))
+  def fraction1(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction2(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2, LogExtraInfo(), V5, true, true))
+  def fraction2(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction3(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3, LogExtraInfo(), V5, true, true))
+  def fraction3(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction1Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1Round, LogExtraInfo(), V5, true, true))
+  def fraction1Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1Round, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction2Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2Round, LogExtraInfo(), V5, true, true))
+  def fraction2Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2Round, LogExtraInfo(), V5, true, true, false, true))
 
   @Benchmark
-  def fraction3Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3Round, LogExtraInfo(), V5, true, true))
+  def fraction3Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3Round, LogExtraInfo(), V5, true, true, false, true))
 }
 
 @State(Scope.Benchmark)

@@ -1,0 +1,75 @@
+{
+  "vars" : [ {
+    "name" : "CEILING",
+    "doc" : "'CEILING' rounding mode"
+  }, {
+    "name" : "HALFUP",
+    "doc" : "'HALF_UP' rounding mode"
+  }, {
+    "name" : "this",
+    "doc" : "Script address"
+  }, {
+    "name" : "SHA3256",
+    "doc" : "SHA3-256 digest algorithm"
+  }, {
+    "name" : "SHA512",
+    "doc" : "SHA512 digest algorithm"
+  }, {
+    "name" : "lastBlock",
+    "doc" : "Last block info"
+  }, {
+    "name" : "NOALG",
+    "doc" : "NONE digest algorithm"
+  }, {
+    "name" : "SHA3224",
+    "doc" : "SHA3-224 digest algorithm"
+  }, {
+    "name" : "height",
+    "doc" : "Current blockchain height"
+  }, {
+    "name" : "Buy",
+    "doc" : "Buy OrderType"
+  }, {
+    "name" : "nil",
+    "doc" : "empty list of any type"
+  }, {
+    "name" : "SHA256",
+    "doc" : "SHA256 digest algorithm"
+  }, {
+    "name" : "MD5",
+    "doc" : "MD5 digest algorithm"
+  }, {
+    "name" : "SHA3512",
+    "doc" : "SHA3-512 digest algorithm"
+  }, {
+    "name" : "HALFEVEN",
+    "doc" : "'HALF_EVEN' rounding mode"
+  }, {
+    "name" : "SHA384",
+    "doc" : "SHA384 digest algorithm"
+  }, {
+    "name" : "SHA3384",
+    "doc" : "SHA3-384 digest algorithm"
+  }, {
+    "name" : "unit",
+    "doc" : "Single instance value"
+  }, {
+    "name" : "FLOOR",
+    "doc" : "'FLOOR' rounding mode"
+  }, {
+    "name" : "DOWN",
+    "doc" : "'DOWN' rounding mode"
+  }, {
+    "name" : "SHA224",
+    "doc" : "SHA224 digest algorithm"
+  }, {
+    "name" : "SHA1",
+    "doc" : "SHA1 digest algorithm"
+  }, {
+    "name" : "tx",
+    "doc" : "Processing transaction"
+  }, {
+    "name" : "Sell",
+    "doc" : "Sell OrderType"
+  } ]
+}

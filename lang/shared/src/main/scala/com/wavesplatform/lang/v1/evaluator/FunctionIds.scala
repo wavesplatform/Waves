@@ -71,12 +71,13 @@ object FunctionIds {
   val STRING_TO_BIGINTOPT: Short = 424
   val MEDIAN_LISTBIGINT: Short   = 425
 
-  val CREATE_LIST: Short             = 1100
-  val APPEND_LIST: Short             = 1101
-  val CONCAT_LIST: Short             = 1102
-  val INDEX_OF_LIST: Short           = 1103
-  val LAST_INDEX_OF_LIST: Short      = 1104
-  val REMOVE_BY_INDEX_OF_LIST: Short = 1105
+  val CREATE_LIST: Short              = 1100
+  val APPEND_LIST: Short              = 1101
+  val CONCAT_LIST: Short              = 1102
+  val INDEX_OF_LIST: Short            = 1103
+  val LAST_INDEX_OF_LIST: Short       = 1104
+  val REMOVE_BY_INDEX_OF_LIST: Short  = 1105
+  val REPLACE_BY_INDEX_OF_LIST: Short = 1106
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201
@@ -117,7 +118,8 @@ object FunctionIds {
   val BLS12_GROTH16_VERIFY: Short = 800
   val BN256_GROTH16_VERIFY: Short = 801
 
-  val ECRECOVER: Short = 900
+  val ECRECOVER: Short       = 900
+  val CALCULATE_DELAY: Short = 901
 
   val BLS12_GROTH16_VERIFY_LIM: Short = 2400 // Reserved n id for generated limited functions
   val BN256_GROTH16_VERIFY_LIM: Short = 2450 // Reserved n id for generated limited functions
@@ -172,20 +174,4 @@ object FunctionIds {
   val DETAILED_ISSUE_ACTION_CONSTRUCTOR: Short   = 1091
   val SIMPLIFIED_LEASE_ACTION_CONSTRUCTOR: Short = 1092
   val DETAILED_LEASE_ACTION_CONSTRUCTOR: Short   = 1093
-
-  val ExternalFunctionIds =
-    Set(
-      GETTRANSACTIONBYID,
-      TRANSACTIONHEIGHTBYID,
-      ACCOUNTASSETBALANCE,
-      GETASSETINFOBYID,
-      BLOCKINFOBYHEIGHT,
-      TRANSFERTRANSACTIONBYID,
-      ACCOUNTWAVESBALANCE,
-      ACCOUNTASSETONLYBALANCE,
-      DATA_LONG_FROM_STATE,
-      DATA_BOOLEAN_FROM_STATE,
-      DATA_BYTES_FROM_STATE,
-      DATA_STRING_FROM_STATE
-    )
 }

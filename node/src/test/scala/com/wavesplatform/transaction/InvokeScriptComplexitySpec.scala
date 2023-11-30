@@ -13,39 +13,40 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
-  private[this] val dApp1 = TestCompiler(V5).compileContract("""
-      |{-# STDLIB_VERSION 5 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |@Callable(i)
-      |func call(k: String, childAddress: ByteVector, assetId: ByteVector) = {
-      |    let key = takeRight(toBase58String(keccak256_16Kb((k+"x").toBytes())), 15)
-      |    let payment = AttachedPayment(assetId, 1)
-      |    strict z = invoke(Address(childAddress), "call", [key, assetId],[payment])
-      |    let val1 = match (z) {
-      |        case t:String => takeRight(toBase58String(sha256_16Kb(("x" + t).toBytes())), 50)
-      |        case _ => "2"
-      |      }
-      |    ([StringEntry(key, val1)], val1)
-      |}
-      |""".stripMargin)
+  private[this] val dApp1 =
+    TestCompiler(V5).compileContract("""
+                                       |{-# STDLIB_VERSION 5 #-}
+                                       |{-# CONTENT_TYPE DAPP #-}
+                                       |{-# SCRIPT_TYPE ACCOUNT #-}
+                                       |
+                                       |@Callable(i)
+                                       |func call(k: String, childAddress: ByteVector, assetId: ByteVector) = {
+                                       |    let key = takeRight(toBase58String(keccak256_16Kb((k+"x").toBytes())), 15)
+                                       |    let payment = AttachedPayment(assetId, 1)
+                                       |    strict z = invoke(Address(childAddress), "call", [key, assetId],[payment])
+                                       |    let val1 = match (z) {
+                                       |        case t:String => takeRight(toBase58String(sha256_16Kb(("x" + t).toBytes())), 50)
+                                       |        case _ => "2"
+                                       |      }
+                                       |    ([StringEntry(key, val1)], val1)
+                                       |}
+                                       |""".stripMargin)
 
   private[this] val dApp0 = TestCompiler(V5).compileContract("""
-      |{-# STDLIB_VERSION 5 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |@Callable(i)
-      |func call(k: String, assetId:ByteVector) = {
-      |
-      |    ([
-      |      StringEntry(k, k),
-      |      BinaryEntry("asset", assetId)
-      |    ], k
-      |    )
-      |}
-      |""".stripMargin)
+                                                               |{-# STDLIB_VERSION 5 #-}
+                                                               |{-# CONTENT_TYPE DAPP #-}
+                                                               |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                               |
+                                                               |@Callable(i)
+                                                               |func call(k: String, assetId:ByteVector) = {
+                                                               |
+                                                               |    ([
+                                                               |      StringEntry(k, k),
+                                                               |      BinaryEntry("asset", assetId)
+                                                               |    ], k
+                                                               |    )
+                                                               |}
+                                                               |""".stripMargin)
 
   private[this] val smartAssetScript =
     TestCompiler(V4).compileAsset(
@@ -62,11 +63,16 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
     )
 
   private[this] val settings = domainSettingsWithFS(
-    SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = BlockchainFeatures.implemented.map {
-      case v @ BlockchainFeatures.FeeSponsorship.id =>
-        v -> -SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod
-      case f => f -> 0
-    }.toMap)
+    SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures =
+      BlockchainFeatures.implemented
+        .excl(BlockchainFeatures.LightNode.id)
+        .map {
+          case v @ BlockchainFeatures.FeeSponsorship.id =>
+            v -> -SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod
+          case f => f -> 0
+        }
+        .toMap
+    )
   )
 
   "correctly estimates complexity when child dApp invocation involves payment in smart asset" in {

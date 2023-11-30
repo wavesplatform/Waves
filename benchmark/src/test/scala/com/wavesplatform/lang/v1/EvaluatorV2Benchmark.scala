@@ -1,26 +1,24 @@
 package com.wavesplatform.lang.v1
 
-import java.util.concurrent.TimeUnit
-
-import cats.Id
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.values.{V1, V3}
 import com.wavesplatform.lang.v1.EvaluatorV2Benchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, IF, TRUE}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
+import com.wavesplatform.lang.v1.evaluator.ctx.DisabledLogEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.Environment
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 
 object EvaluatorV2Benchmark {
-  val pureContext: CTX[Environment]                       = PureContext.build(V1, useNewPowPrecision = true).withEnvironment[Environment]
-  val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
-  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1, true, true)
+  val pureContext     = PureContext.build(V1, useNewPowPrecision = true).withEnvironment[Environment]
+  val pureEvalContext = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
+  val evaluatorV2     = new EvaluatorV2(DisabledLogEvaluationContext(pureEvalContext), V1, Int.MaxValue, true, false, true, true, true)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

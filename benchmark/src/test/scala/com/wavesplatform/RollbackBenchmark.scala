@@ -1,29 +1,28 @@
 package com.wavesplatform
 
-import java.io.File
 import com.google.common.primitives.Ints
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.{Diff, Portfolio}
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
+import com.wavesplatform.state.{Portfolio, StateSnapshot}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
 import com.wavesplatform.utils.{NTP, ScorexLogging}
-import monix.reactive.Observer
 
+import java.io.File
 import scala.collection.immutable.VectorMap
 
 object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
-    val db            = openDB(settings.dbSettings.directory)
+    val rdb           = RDB.open(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val levelDBWriter = LevelDBWriter(db, Observer.stopped, settings)
+    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val issuer = KeyPair(new Array[Byte](32))
 
@@ -63,7 +62,9 @@ object RollbackBenchmark extends ScorexLogging {
         GenesisTransaction.create(issuer.publicKey.toAddress, 100000e8.toLong, time.getTimestamp()).explicitGet() +: assets,
         issuer,
         Seq.empty,
-        -1
+        -1,
+        None,
+        None
       )
       .explicitGet()
 
@@ -73,29 +74,43 @@ object RollbackBenchmark extends ScorexLogging {
     } yield address -> Portfolio(assets = map)
 
     log.info("Appending genesis block")
-    levelDBWriter.append(
-      Diff(portfolios = portfolios.toMap),
+    rocksDBWriter.append(
+      StateSnapshot.build(rocksDBWriter, portfolios.toMap).explicitGet(),
       0,
       0,
       None,
       genesisBlock.header.generationSignature,
+      ByteStr.empty,
       genesisBlock
     )
 
     val nextBlock =
       Block
-        .buildAndSign(2.toByte, time.getTimestamp(), genesisBlock.id(), 1000, Block.GenesisGenerationSignature, Seq.empty, issuer, Seq.empty, -1)
+        .buildAndSign(
+          2.toByte,
+          time.getTimestamp(),
+          genesisBlock.id(),
+          1000,
+          Block.GenesisGenerationSignature,
+          Seq.empty,
+          issuer,
+          Seq.empty,
+          -1,
+          None,
+          None
+        )
         .explicitGet()
-    val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L))).toMap)
+    val portfolios2  = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L)))
+    val nextSnapshot = StateSnapshot.build(rocksDBWriter, portfolios2.toMap).explicitGet()
 
     log.info("Appending next block")
-    levelDBWriter.append(nextDiff, 0, 0, None, ByteStr.empty, nextBlock)
+    rocksDBWriter.append(nextSnapshot, 0, 0, None, ByteStr.empty, ByteStr.empty, nextBlock)
 
     log.info("Rolling back")
     val start = System.nanoTime()
-    levelDBWriter.rollbackTo(1)
+    rocksDBWriter.rollbackTo(1)
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
-    levelDBWriter.close()
+    rdb.close()
   }
 }

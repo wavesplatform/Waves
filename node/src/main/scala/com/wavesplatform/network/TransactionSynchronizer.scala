@@ -12,7 +12,7 @@ import monix.reactive.{Observable, OverflowStrategy}
 object TransactionSynchronizer extends LazyLogging {
   def apply(
       settings: UtxSynchronizerSettings,
-      lastHeight: Observable[Int],
+      lastBlockId: Observable[ByteStr],
       transactions: Observable[(Channel, Transaction)],
       transactionValidator: TransactionPublisher
   )(implicit scheduler: Scheduler): Cancelable = {
@@ -22,26 +22,29 @@ object TransactionSynchronizer extends LazyLogging {
       .maximumSize(settings.networkTxCacheSize)
       .build[ByteStr, Object]
 
-    lastHeight.foreach { h =>
-      logger.trace(s"Invalidating known transactions at height $h")
+    lastBlockId.foreach { id =>
+      logger.trace(s"Invalidating known transactions for block id $id")
       knownTransactions.invalidateAll()
     }
 
     def transactionIsNew(txId: ByteStr): Boolean = {
       var isNew = false
-      knownTransactions.get(txId, { () =>
-        isNew = true; dummy
-      })
+      knownTransactions.get(
+        txId,
+        { () =>
+          isNew = true; dummy
+        }
+      )
       isNew
     }
 
     transactions
-      .filter {
-        case (_, tx) => transactionIsNew(tx.id())
+      .filter { case (_, tx) =>
+        transactionIsNew(tx.id())
       }
       .whileBusyBuffer(OverflowStrategy.DropNew(settings.maxQueueSize))
-      .mapParallelUnorderedF(settings.maxThreads) {
-        case (channel, tx) => transactionValidator.validateAndBroadcast(tx, Some(channel))
+      .mapParallelUnorderedF(settings.maxThreads) { case (channel, tx) =>
+        transactionValidator.validateAndBroadcast(tx, Some(channel))
       }
       .subscribe()
   }

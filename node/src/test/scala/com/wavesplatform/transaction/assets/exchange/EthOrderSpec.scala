@@ -10,8 +10,8 @@ import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.BeforeAndAfterAll
-import play.api.libs.json.{JsObject, Json}
+import org.scalatest.{Assertion, BeforeAndAfterAll}
+import play.api.libs.json.{JsArray, JsObject, Json}
 
 class EthOrderSpec
     extends FlatSpec
@@ -127,13 +127,22 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(ethBuyOrder.senderAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress  -> Long.MaxValue / 3
+          )
+        )
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(100))
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "work in exchange transaction with an old order" in {
@@ -141,6 +150,9 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -162,8 +174,8 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "recover valid ids of exchange tx" in {
@@ -282,6 +294,9 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, TestEthOrdersPublicKey.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -306,6 +321,9 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
 
       // TODO: something more smart ?
       val script = TxHelpers.script("""
@@ -335,8 +353,8 @@ class EthOrderSpec
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
   }
 
   it should "work in exchange transaction with matcher script" in {
@@ -345,6 +363,15 @@ class EthOrderSpec
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(ethBuyOrder.senderAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress  -> Long.MaxValue / 3
+          )
+        )
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -363,10 +390,86 @@ class EthOrderSpec
       sh.setScript(TxHelpers.matcher.toAddress, script)
     }
 
-    val differ      = blockchain.stub.transactionDiffer(TestTime(100))
+    val differ      = blockchain.stub.transactionDiffer(TestTime(100)) _
     val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+  }
+
+  it should "be serialized correctly to EIP-712 json with and without attachment (NODE-996)" in {
+    val signer = TxHelpers.defaultEthSigner
+
+    def checkOrderJson(json: JsObject, version: Int, attachment: Option[ByteStr]): Assertion = {
+      (json \ "domain" \ "version").as[String] shouldBe version.toString
+      (json \ "types" \ "Order")
+        .as[JsArray]
+        .value
+        .exists(_.as[JsObject].fields.map { case (name, value) =>
+          name -> value.as[String]
+        } == Seq("name" -> "attachment", "type" -> "string")) shouldBe attachment.isDefined
+      (json \ "message" \ "attachment").asOpt[String] shouldBe attachment.map(_.toString)
+    }
+
+    def testOrder(attachment: Option[ByteStr]): Order = {
+      val order = Order
+        .buy(
+          Order.V4,
+          TxHelpers.defaultSigner,
+          TxHelpers.secondSigner.publicKey,
+          AssetPair(Waves, IssuedAsset(ByteStr.fill(32)(1))),
+          100,
+          100,
+          100,
+          100,
+          100,
+          attachment = attachment
+        )
+        .explicitGet()
+
+      order.copy(orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(order, signer))))
+    }
+
+    val attachment             = Some(ByteStr.fill(32)(1))
+    val orderWithoutAttachment = testOrder(None)
+    val orderWithAttachment    = testOrder(attachment)
+
+    val jsonWithoutAttachment = EthOrders.toEip712Json(orderWithoutAttachment)
+    checkOrderJson(jsonWithoutAttachment, 1, None)
+
+    val jsonWithAttachment = EthOrders.toEip712Json(orderWithAttachment)
+    checkOrderJson(jsonWithAttachment, 2, attachment)
+  }
+
+  it should "recover signer public key for order with and without attachment correctly (NODE-997)" in {
+    val signer = TxHelpers.defaultEthSigner
+
+    def testOrder(attachment: Option[ByteStr]): Order = {
+      val order = Order
+        .buy(
+          Order.V4,
+          TxHelpers.defaultSigner,
+          TxHelpers.secondSigner.publicKey,
+          AssetPair(Waves, IssuedAsset(ByteStr.fill(32)(1))),
+          100,
+          100,
+          100,
+          100,
+          100,
+          attachment = attachment
+        )
+        .explicitGet()
+
+      order.copy(orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(order, signer))))
+    }
+
+    val orderWithoutAttachment = testOrder(None)
+    val orderWithAttachment    = testOrder(Some(ByteStr.fill(32)(1)))
+
+    val expectedPk = PublicKey(EthEncoding.toBytes(signer.getPublicKey.toString(16)))
+
+    EthOrders.recoverEthSignerKey(orderWithoutAttachment, orderWithoutAttachment.eip712Signature.get.arr) shouldBe expectedPk
+
+    EthOrders.recoverEthSignerKey(orderWithAttachment, orderWithAttachment.eip712Signature.get.arr) shouldBe expectedPk
   }
 }
 

@@ -17,7 +17,7 @@ class CommonValidationTimeTest extends PropSpec with WithState {
 
     val transfer = TxHelpers.transfer(master, recipient.toAddress, timestamp = prevBlockTs - Enabled.maxTransactionTimeBackOffset.toMillis - 1)
 
-    withLevelDBWriter(Enabled) { blockchain: Blockchain =>
+    withRocksDBWriter(Enabled) { (blockchain: Blockchain) =>
       val result = TransactionDiffer(Some(prevBlockTs), blockTs)(blockchain, transfer).resultE
       result should produce("in the past relative to previous block timestamp")
     }
@@ -33,7 +33,7 @@ class CommonValidationTimeTest extends PropSpec with WithState {
     val transfer = TxHelpers.transfer(master, recipient.toAddress, timestamp = blockTs + Enabled.maxTransactionTimeForwardOffset.toMillis + 1)
 
     val functionalitySettings = Enabled.copy(lastTimeBasedForkParameter = blockTs - 1)
-    withLevelDBWriter(functionalitySettings) { blockchain: Blockchain =>
+    withRocksDBWriter(functionalitySettings) { (blockchain: Blockchain) =>
       TransactionDiffer(Some(prevBlockTs), blockTs)(blockchain, transfer).resultE should
         produce("in the future relative to block timestamp")
     }

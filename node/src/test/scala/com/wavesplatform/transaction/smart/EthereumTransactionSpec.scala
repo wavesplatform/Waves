@@ -4,23 +4,19 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.{FlatSpec, TestTime, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthTxGenerator.Arg
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
+import com.wavesplatform.transaction.{ERC20Address, EthTxGenerator, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
-import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
+import org.web3j.crypto.*
 import play.api.libs.json.Json
-
-import scala.concurrent.duration.*
 
 class EthereumTransactionSpec
     extends FlatSpec
@@ -100,6 +96,7 @@ class EthereumTransactionSpec
       b.stub.issueAsset(TestAsset.id)
       b.stub.creditBalance(senderAddress, Waves, Long.MaxValue)
       b.stub.creditBalance(senderAddress, TestAsset, Long.MaxValue)
+      (b.wavesBalances _).when(*).returns(Map(senderAddress -> Long.MaxValue))
       (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
     }
     val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis())).andThen(_.resultE.explicitGet())
@@ -108,9 +105,14 @@ class EthereumTransactionSpec
     val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
-    differ(transfer).combineF(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
-      senderAddress    -> Portfolio.build(-Long.MaxValue, TestAsset, -Long.MaxValue),
-      recipientAddress -> Portfolio.build(LongMaxMinusFee, TestAsset, Long.MaxValue)
+    differ(assetTransfer).balances shouldBe Map(
+      (senderAddress, TestAsset)    -> 0,
+      (senderAddress, Waves)        -> (LongMaxMinusFee + transfer.fee.longValue()),
+      (recipientAddress, TestAsset) -> Long.MaxValue
+    )
+    differ(transfer).balances shouldBe Map(
+      (senderAddress, Waves)    -> transfer.fee.longValue(),
+      (recipientAddress, Waves) -> LongMaxMinusFee
     )
   }
 
@@ -123,9 +125,9 @@ class EthereumTransactionSpec
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+    a[RuntimeException] should be thrownBy EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
       rawTransaction
-    ))
+    )
   }
 
   it should "fail with invalid to field" in {
@@ -137,29 +139,9 @@ class EthereumTransactionSpec
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+    a[RuntimeException] should be thrownBy EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
       rawTransaction
-    ))
-  }
-
-  it should "use chainId in signer key recovery" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val senderAddress    = TxHelpers.defaultSigner.toEthWavesAddress
-    val recipientAddress = TxHelpers.secondSigner.toAddress('W'.toByte) // Other network
-
-    val blockchain = createBlockchainStub { b =>
-      b.stub.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
-      b.stub.creditBalance(senderAddress, Waves)
-      b.stub.creditBalance(senderAddress, TestAsset)
-      (b.resolveERC20Address _).when(ERC20Address(TestAsset.id.take(20))).returning(Some(TestAsset))
-    }
-    val differ = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis())).andThen(_.resultE.explicitGet())
-
-    val transfer      = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, 1, Waves)
-    val assetTransfer = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, 1, TestAsset)
-
-    intercept[RuntimeException](differ(transfer)).toString should include("Address belongs to another network")
-    intercept[RuntimeException](differ(assetTransfer)).toString should include("Address belongs to another network")
+    )
   }
 
   it should "not accept zero transfers" in {
@@ -197,84 +179,6 @@ class EthereumTransactionSpec
     )
   }
 
-  it should "not accept fee < 100k" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val recipientAddress = TxHelpers.secondSigner.toAddress
-
-    val differ = createBlockchainStub { b =>
-      (() => b.height).when().returning(3001)
-      b.stub.activateAllFeatures()
-      b.stub.creditBalance(senderAccount.toWavesAddress, *)
-    }.stub.transactionDiffer().andThen(_.resultE.explicitGet())
-
-    val transaction = EthTxGenerator.signRawTransaction(senderAccount, recipientAddress.chainId)(
-      RawTransaction.createTransaction(
-        BigInt(System.currentTimeMillis()).bigInteger,
-        EthereumTransaction.GasPrice,
-        BigInt(99999).bigInteger, // fee
-        EthEncoding.toHexString(recipientAddress.publicKeyHash),
-        (BigInt(100) * EthereumTransaction.AmountMultiplier).bigInteger,
-        ""
-      )
-    )
-    intercept[RuntimeException](differ(transaction)).toString should include(
-      "Fee for EthereumTransaction (99999 in WAVES) does not exceed minimal value of 100000 WAVES"
-    )
-  }
-
-  it should "not accept bad time" in {
-    val senderAccount    = TxHelpers.defaultSigner.toEthKeyPair
-    val recipientAddress = TxHelpers.secondSigner.toAddress
-
-    val differ = createBlockchainStub { b =>
-      (() => b.height).when().returning(3001)
-      b.stub.activateAllFeatures()
-      b.stub.creditBalance(senderAccount.toWavesAddress, *)
-    }.stub.transactionDiffer().andThen(_.resultE.explicitGet())
-
-    val transactionFromFuture = EthTxGenerator.signRawTransaction(senderAccount, recipientAddress.chainId)(
-      RawTransaction.createTransaction(
-        BigInt(System.currentTimeMillis() + 1.6.hours.toMillis).bigInteger,
-        EthereumTransaction.GasPrice,
-        BigInt(100000).bigInteger, // fee
-        EthEncoding.toHexString(recipientAddress.publicKeyHash),
-        (BigInt(100) * EthereumTransaction.AmountMultiplier).bigInteger,
-        ""
-      )
-    )
-    intercept[RuntimeException](differ(transactionFromFuture)).toString should include(
-      "is more than 5400000ms in the future"
-    )
-
-    val transactionFromPast = EthTxGenerator.signRawTransaction(senderAccount, recipientAddress.chainId)(
-      RawTransaction.createTransaction(
-        BigInt(System.currentTimeMillis() - 3.hours.toMillis).bigInteger,
-        EthereumTransaction.GasPrice,
-        BigInt(100000).bigInteger, // fee
-        EthEncoding.toHexString(recipientAddress.publicKeyHash),
-        (BigInt(100) * EthereumTransaction.AmountMultiplier).bigInteger,
-        ""
-      )
-    )
-    intercept[RuntimeException](differ(transactionFromPast)).toString should include(
-      "is more than 7200000ms in the past"
-    )
-  }
-
-  it should "not be accepted before RideV6 activation" in {
-    val blockchain = createBlockchainStub { blockchain =>
-      // Activate all features except ride v6
-      val features = BlockchainFeatures.implemented.collect {
-        case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id)
-      }.flatten
-      blockchain.stub.activateFeatures(features.toSeq*)
-    }
-    val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
-
-    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 123, Waves)
-    differ(transaction) should produceRejectOrFailedDiff(s"${BlockchainFeatures.RideV6.description} feature has not been activated yet")
-  }
-
   "Ethereum invoke" should "recover correct key" in {
     val senderAccount = TxHelpers.defaultSigner.toEthKeyPair
     val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
@@ -301,6 +205,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -333,23 +240,23 @@ class EthereumTransactionSpec
       ),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "not work with union type" in {
@@ -360,6 +267,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -385,8 +295,8 @@ class EthereumTransactionSpec
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
 
-    val diff = differ(transaction).resultE
-    diff should produce("Function not defined: 1f9773e9")
+    val snapshot = differ(transaction).resultE
+    snapshot should produce("Function not defined: 1f9773e9")
   }
 
   it should "work with no arguments" in {
@@ -397,6 +307,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -423,23 +336,23 @@ class EthereumTransactionSpec
       Seq(),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "work with no payments" in {
@@ -450,6 +363,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -470,23 +386,23 @@ class EthereumTransactionSpec
 
     val differ      = blockchain.stub.transactionDiffer(TestTime(System.currentTimeMillis()))
     val transaction = EthTxGenerator.generateEthInvoke(invokerAccount, dAppAccount.toAddress, "deposit", Seq(), Seq())
-    val diff        = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot    = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "fail with max+1 payments" in {
@@ -497,6 +413,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -534,6 +453,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(
@@ -560,23 +482,23 @@ class EthereumTransactionSpec
       Seq(),
       Seq(Payment(321, IssuedAsset(ByteStr(EthStubBytes32))))
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson("""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  } ],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson("""{
+                                                                       |  "data" : [ ],
+                                                                       |  "transfers" : [ {
+                                                                       |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                       |    "asset" : null,
+                                                                       |    "amount" : 123
+                                                                       |  } ],
+                                                                       |  "issues" : [ ],
+                                                                       |  "reissues" : [ ],
+                                                                       |  "burns" : [ ],
+                                                                       |  "sponsorFees" : [ ],
+                                                                       |  "leases" : [ ],
+                                                                       |  "leaseCancels" : [ ],
+                                                                       |  "invokes" : [ ]
+                                                                       |}""".stripMargin)
   }
 
   it should "return money in transfers asset+waves" in {
@@ -587,6 +509,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(TestAsset.id)
 
       val script = TxHelpers.script(
@@ -614,28 +539,28 @@ class EthereumTransactionSpec
       Seq(),
       Nil
     )
-    val diff = differ(transaction).resultE.explicitGet()
-    diff should containAppliedTx(transaction.id())
-    Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
-                                                                    |  "data" : [ ],
-                                                                    |  "transfers" : [ {
-                                                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                    |    "asset" : null,
-                                                                    |    "amount" : 123
-                                                                    |  },
-                                                                    |   {
-                                                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                    |    "asset" : "$TestAsset",
-                                                                    |    "amount" : 123
-                                                                    |  }],
-                                                                    |  "issues" : [ ],
-                                                                    |  "reissues" : [ ],
-                                                                    |  "burns" : [ ],
-                                                                    |  "sponsorFees" : [ ],
-                                                                    |  "leases" : [ ],
-                                                                    |  "leaseCancels" : [ ],
-                                                                    |  "invokes" : [ ]
-                                                                    |}""".stripMargin)
+    val snapshot = differ(transaction).resultE.explicitGet()
+    snapshot should containAppliedTx(transaction.id())
+    Json.toJson(snapshot.scriptResults.values.head) should matchJson(s"""{
+                                                                        |  "data" : [ ],
+                                                                        |  "transfers" : [ {
+                                                                        |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                        |    "asset" : null,
+                                                                        |    "amount" : 123
+                                                                        |  },
+                                                                        |   {
+                                                                        |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                        |    "asset" : "$TestAsset",
+                                                                        |    "amount" : 123
+                                                                        |  }],
+                                                                        |  "issues" : [ ],
+                                                                        |  "reissues" : [ ],
+                                                                        |  "burns" : [ ],
+                                                                        |  "sponsorFees" : [ ],
+                                                                        |  "leases" : [ ],
+                                                                        |  "leaseCancels" : [ ],
+                                                                        |  "invokes" : [ ]
+                                                                        |}""".stripMargin)
   }
 
   it should "test minimum fee" in {
@@ -646,6 +571,9 @@ class EthereumTransactionSpec
       sh.activateFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)
       sh.creditBalance(invokerAccount.toWavesAddress, *)
       sh.creditBalance(dAppAccount.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(invokerAccount.toWavesAddress -> Long.MaxValue / 3, dAppAccount.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(TestAsset.id)
 
       val script = TxHelpers.script(

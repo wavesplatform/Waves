@@ -2,9 +2,10 @@ package com.wavesplatform.mining
 
 import java.time.LocalTime
 import cats.syntax.either.*
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair, PKKeyPair}
 import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
@@ -14,12 +15,14 @@ import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -52,7 +55,7 @@ class MinerImpl(
     blockchainUpdater: Blockchain & BlockchainUpdater & NG,
     settings: WavesSettings,
     timeService: Time,
-    utx: UtxPoolImpl,
+    utx: UtxPool,
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
@@ -81,7 +84,7 @@ class MinerImpl(
     minerScheduler,
     appenderScheduler,
     transactionAdded,
-    utx.priorityPool.nextMicroBlockSize
+    utx.getPriorityPool.map(p => p.nextMicroBlockSize(_)).getOrElse(identity)
   )
 
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
@@ -90,8 +93,14 @@ class MinerImpl(
   def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
     Miner.blockMiningStarted.increment()
 
+    val accounts = if (settings.minerSettings.privateKeys.nonEmpty) {
+      settings.minerSettings.privateKeys.map(PKKeyPair(_))
+    } else {
+      wallet.privateKeyAccounts
+    }
+
     val hasAllowedForMiningScriptsAccounts =
-      wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
+      accounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
     scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block", err))
@@ -131,17 +140,28 @@ class MinerImpl(
       )
       .leftMap(_.toString)
 
-  private def packTransactionsForKeyBlock(): (Seq[Transaction], MiningConstraint) = {
-    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total)
+  private def packTransactionsForKeyBlock(
+      miner: Address,
+      reference: ByteStr,
+      prevStateHash: Option[ByteStr]
+  ): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
+    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, settings.enableLightMode, Some(minerSettings))
+    val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
+      BlockDiffer
+        .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
+        .toOption
+        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
+    }
+
+    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)
     else {
       val mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      val (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
+      val (maybeUnconfirmed, updatedMdConstraint, stateHash) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
+        utx.packUnconfirmed(mdConstraint, keyBlockStateHash, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
       )
       val unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      (unconfirmed, updatedMdConstraint.constraints.head)
+      (unconfirmed, updatedMdConstraint.head, stateHash)
     }
   }
 
@@ -171,7 +191,11 @@ class MinerImpl(
         s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = ${appender.MaxTimeDrift}"
       )
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
-      (unconfirmed, totalConstraint) = packTransactionsForKeyBlock()
+      prevStateHash =
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode, blockchainUpdater.height + 1))
+          Some(blockchainUpdater.lastStateHash(Some(reference)))
+        else None
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
       block <- Block
         .buildAndSign(
           version,
@@ -182,7 +206,9 @@ class MinerImpl(
           unconfirmed,
           account,
           blockFeatures(version),
-          blockRewardVote(version)
+          blockRewardVote(version),
+          stateHash,
+          None
         )
         .leftMap(_.err)
     } yield (block, totalConstraint))
@@ -262,21 +288,23 @@ class MinerImpl(
         }
 
         def appendTask(block: Block, totalConstraint: MiningConstraint) =
-          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block).flatMap {
-            case Left(BlockFromFuture(_)) => // Time was corrected, retry
+          BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block, None).flatMap {
+            case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)
 
             case Left(err) =>
               Task.raiseError(new RuntimeException(err.toString))
 
-            case Right(Some(score)) =>
+            case Right(Applied(_, score)) =>
               log.debug(s"Forged and applied $block with cumulative score $score")
               BlockStats.mined(block, blockchainUpdater.height)
-              allChannels.broadcast(BlockForged(block))
-              if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+              if (blockchainUpdater.isLastBlockId(block.id())) {
+                allChannels.broadcast(BlockForged(block))
+                if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, totalConstraint)
+              }
               Task.unit
 
-            case Right(None) =>
+            case Right(Ignored) =>
               Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
           }.uncancelable
 

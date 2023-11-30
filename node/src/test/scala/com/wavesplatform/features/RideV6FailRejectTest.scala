@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -17,8 +18,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.{EthereumTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, EthereumTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.{EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets
@@ -888,14 +888,14 @@ class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues wi
             def failTxTest(invoke: Transaction): Unit = {
               val complexity = ContractLimits.FailFreeInvokeComplexity + 1
               test(complexity) { d =>
-                val diff              = d.createDiffE(invoke).value
-                val (_, scriptResult) = diff.scriptResults.headOption.value
+                val snapshot              = d.createDiffE(invoke).value
+                val (_, scriptResult) = snapshot.scriptResults.headOption.value
                 scriptResult.error.value.text should include(testCase.rejectError)
 
                 d.appendBlock(invoke)
                 val invokeTxMeta = d.transactionsApi.transactionById(invoke.id()).value
                 invokeTxMeta.spentComplexity shouldBe complexity
-                invokeTxMeta.succeeded shouldBe false
+                invokeTxMeta.status == Status.Succeeded shouldBe false
               }
             }
           }

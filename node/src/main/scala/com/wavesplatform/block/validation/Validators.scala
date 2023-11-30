@@ -1,10 +1,10 @@
 package com.wavesplatform.block.validation
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.block.Block.{GenerationSignatureLength, GenerationVRFSignatureLength, MaxFeaturesInBlock, ProtoBlockVersion}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.KeyLength
+import com.wavesplatform.crypto.{DigestLength, KeyLength}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.GenesisTransaction
@@ -27,6 +27,7 @@ object Validators {
       _ <- Either.cond(b.header.featureVotes.distinct.size == b.header.featureVotes.size, (), s"Duplicates in feature votes")
       _ <- Either.cond(b.header.version < ProtoBlockVersion || b.header.featureVotes.sorted == b.header.featureVotes, (), s"Unsorted feature votes")
       _ <- Either.cond(b.header.featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
+      _ <- Either.cond(b.header.stateHash.forall(_.size == DigestLength), (), "Incorrect block state hash")
     } yield b).leftMap(GenericError(_))
 
   def validateGenesisBlock(block: Block, genesisSettings: GenesisSettings, rideV6Activated: Boolean): Validation[Block] =

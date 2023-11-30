@@ -63,6 +63,9 @@ package object state {
   object TxNum extends TaggedType[Short]
   type TxNum = TxNum.Type
 
+  object AssetNum extends TaggedType[Int]
+  type AssetNum = AssetNum.Type
+
   object TransactionId extends TaggedType[ByteStr]
   type TransactionId = TransactionId.Type
 }

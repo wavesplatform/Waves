@@ -5,35 +5,32 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test._
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.state.diffs.*
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.transfer.*
 import org.scalacheck.Gen
 
 class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends PropSpec with DomainScenarioDrivenPropertyCheck {
 
-  import BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest._
+  import BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest.*
 
   type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
 
   property("resulting miner balance should not depend on tx distribution among blocks and microblocks") {
-    forAll(g(100, 5)) {
-      case (gen, rest) =>
-        val finalMinerBalances = rest.map {
-          case (bmb: BlockAndMicroblockSequence, last: Block) =>
-            withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-              d.blockchainUpdater.processBlock(gen) should beRight
-              bmb.foreach {
-                case (b, mbs) =>
-                  d.blockchainUpdater.processBlock(b) should beRight
-                  mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb) should beRight)
-              }
-              d.blockchainUpdater.processBlock(last)
-              d.balance(last.header.generator.toAddress)
-            }
+    forAll(g(100, 5)) { case (gen, rest) =>
+      val finalMinerBalances = rest.map { case (bmb: BlockAndMicroblockSequence, last: Block) =>
+        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+          d.blockchainUpdater.processBlock(gen) should beRight
+          bmb.foreach { case (b, mbs) =>
+            d.blockchainUpdater.processBlock(b) should beRight
+            mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb, None) should beRight)
+          }
+          d.blockchainUpdater.processBlock(last)
+          d.balance(last.header.generator.toAddress)
         }
-        finalMinerBalances.toSet.size shouldBe 1
+      }
+      finalMinerBalances.toSet.size shouldBe 1
     }
   }
 
@@ -47,18 +44,17 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
       genesis: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       payment: TransferTransaction = createWavesTransfer(master, master.toAddress, amt, fee, ts).explicitGet()
     } yield (miner, genesis, payment, ts)
-    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
-      case (domain, (miner, genesis, payment, ts)) =>
-        val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
-        val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, Seq(Seq(payment)), miner, 3, ts)
-        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
-        domain.blockchainUpdater.processBlock(genBlock) should beRight
-        domain.blockchainUpdater.processBlock(base) should beRight
-        domain.blockchainUpdater.processMicroBlock(micros.head) should beRight
-        domain.blockchainUpdater.processBlock(emptyBlock) should beRight
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (miner, genesis, payment, ts)) =>
+      val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
+      val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, Seq(Seq(payment)), miner, 3, ts)
+      val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
+      domain.blockchainUpdater.processBlock(genBlock) should beRight
+      domain.blockchainUpdater.processBlock(base) should beRight
+      domain.blockchainUpdater.processMicroBlock(micros.head, None) should beRight
+      domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
-        domain.balance(miner.toAddress) shouldBe payment.fee.value
-        domain.balance(genesis.recipient) shouldBe (genesis.amount.value - payment.fee.value)
+      domain.balance(miner.toAddress) shouldBe payment.fee.value
+      domain.balance(genesis.recipient) shouldBe (genesis.amount.value - payment.fee.value)
     }
   }
 
@@ -78,17 +74,16 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
           .grouped(microBlockCount)
           .toSeq
       } yield (miner, genesis, microBlockTxs, ts)
-    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
-      case (domain, (miner, genesis, microBlockTxs, ts)) =>
-        val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
-        val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, microBlockTxs, miner, 3, ts)
-        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
-        domain.blockchainUpdater.processBlock(genBlock) should beRight
-        domain.blockchainUpdater.processBlock(base) should beRight
-        micros.foreach(domain.blockchainUpdater.processMicroBlock(_) should beRight)
-        domain.blockchainUpdater.processBlock(emptyBlock) should beRight
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (miner, genesis, microBlockTxs, ts)) =>
+      val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
+      val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, microBlockTxs, miner, 3, ts)
+      val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
+      domain.blockchainUpdater.processBlock(genBlock) should beRight
+      domain.blockchainUpdater.processBlock(base) should beRight
+      micros.foreach(domain.blockchainUpdater.processMicroBlock(_, None) should beRight)
+      domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
-        domain.levelDBWriter.lastBlock.get.transactionData shouldBe microBlockTxs.flatten
+      domain.rocksDBWriter.lastBlock.get.transactionData shouldBe microBlockTxs.flatten
     }
   }
 
@@ -181,10 +176,9 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
   def take(txs: Seq[Transaction], sizes: BlockAndMicroblockSize): ((Seq[Transaction], Seq[Seq[Transaction]]), Seq[Transaction]) = {
     val (blockAmt, microsAmts) = sizes
     val (blockTxs, rest)       = txs.splitAt(blockAmt)
-    val (reversedMicroblockTxs, res) = microsAmts.foldLeft((Seq.empty[Seq[Transaction]], rest)) {
-      case ((acc, pool), amt) =>
-        val (step, next) = pool.splitAt(amt)
-        (step +: acc, next)
+    val (reversedMicroblockTxs, res) = microsAmts.foldLeft((Seq.empty[Seq[Transaction]], rest)) { case ((acc, pool), amt) =>
+      val (step, next) = pool.splitAt(amt)
+      (step +: acc, next)
     }
     ((blockTxs, reversedMicroblockTxs.reverse), res)
   }
@@ -215,11 +209,10 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       timestamp: Long
   ): BlockAndMicroblockSequence = {
     sizes
-      .foldLeft((Seq.empty[BlockAndMicroblocks], txs)) {
-        case ((acc, rest), s) =>
-          val prev         = acc.headOption.map(bestRef).getOrElse(initial)
-          val (step, next) = stepR(rest, s, prev, signer, version, timestamp)
-          (step +: acc, next)
+      .foldLeft((Seq.empty[BlockAndMicroblocks], txs)) { case ((acc, rest), s) =>
+        val prev         = acc.headOption.map(bestRef).getOrElse(initial)
+        val (step, next) = stepR(rest, s, prev, signer, version, timestamp)
+        (step +: acc, next)
       }
       ._1
       .reverse

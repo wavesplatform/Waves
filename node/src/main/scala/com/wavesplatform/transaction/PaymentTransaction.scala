@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction
 
-import scala.util.Try
-
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -12,6 +10,8 @@ import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
+import scala.util.Try
+
 case class PaymentTransaction(
     sender: PublicKey,
     recipient: Address,
@@ -21,15 +21,12 @@ case class PaymentTransaction(
     signature: ByteStr,
     chainId: Byte
 ) extends Transaction(TransactionType.Payment)
-    with Signed
     with ProvenTransaction
     with TxWithFee.InWaves {
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.bodyBytes(this))
 
   def proofs: Proofs = Proofs(signature)
-
-  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 
@@ -40,8 +37,7 @@ case class PaymentTransaction(
 object PaymentTransaction extends TransactionParser {
   type TransactionT = PaymentTransaction
 
-  override val typeId: TxType                    = 2: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val typeId: TxType = 2: Byte
 
   override def parseBytes(bytes: Array[TxVersion]): Try[PaymentTransaction] =
     PaymentTxSerializer.parseBytes(bytes)

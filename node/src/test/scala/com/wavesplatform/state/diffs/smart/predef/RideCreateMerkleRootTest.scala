@@ -42,7 +42,7 @@ class RideCreateMerkleRootTest extends PropSpec with WithDomain {
               val invokeTx = invoke(func = Some("merkle"), args = Seq(digests, id, index))
               d.appendBlock(d.createBlock(blockVersion, Seq(invokeTx)))
 
-              d.liquidDiff.scriptResults.head._2.error shouldBe None
+              d.liquidSnapshot.scriptResults.head._2.error shouldBe None
               d.blockchain.accountData(secondAddress, "root").get.value shouldBe root
             }
         }

@@ -132,11 +132,12 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
 
       d.appendBlock()
       d.blockchain.height shouldBe activationHeight
-      d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe 0
+      d.blockchain.bestLiquidSnapshot.get.scriptsComplexity shouldBe 0
 
       notEnoughPaidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
       d.appendAndAssertSucceed(freeVerifierTxs.map(_())*)
-      d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe freeVerifierTxs.size
+      d.liquidSnapshot.scriptsComplexity should be > 0L
+      d.liquidSnapshot.scriptResults.size shouldBe 2
     }
   }
 }

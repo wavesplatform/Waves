@@ -9,7 +9,10 @@ import com.wavesplatform.test.*
 import com.wavesplatform.utils.JsonMatchers
 import play.api.libs.json.Json
 
+import scala.concurrent.duration.DurationInt
+
 abstract class RouteSpec(basePath: String) extends FreeSpec with ScalatestRouteTest with ApiErrorMatchers with JsonMatchers with ApiMarshallers {
+  protected implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(10 second)
   protected implicit val exceptionHandler: ExceptionHandler = http.uncaughtExceptionHandler
   protected def seal(route: Route): Route                   = Route.seal(route)
 

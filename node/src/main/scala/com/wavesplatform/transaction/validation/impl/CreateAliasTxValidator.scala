@@ -7,9 +7,9 @@ import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 
 object CreateAliasTxValidator extends TxValidator[CreateAliasTransaction] {
   override def validate(tx: CreateAliasTransaction): ValidatedV[CreateAliasTransaction] = {
-    import tx._
+    import tx.*
     V.seq(tx)(
-      Validated.fromEither(Alias.createWithChainId(aliasName, chainId)).toValidatedNel.map((_: Alias) => tx)
+      Validated.fromEither(Alias.createWithChainId(aliasName, chainId, Some(chainId))).toValidatedNel.map((_: Alias) => tx)
     )
   }
 }

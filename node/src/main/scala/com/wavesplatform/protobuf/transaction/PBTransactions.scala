@@ -25,7 +25,16 @@ import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{EthereumTransaction, Proofs, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxPositiveAmount, TxValidationError}
+import com.wavesplatform.transaction.{
+  EthereumTransaction,
+  Proofs,
+  TxDecimals,
+  TxExchangeAmount,
+  TxExchangePrice,
+  TxNonNegativeAmount,
+  TxPositiveAmount,
+  TxValidationError
+}
 import com.wavesplatform.utils.StringBytes
 import scalapb.UnknownFieldSet.empty
 
@@ -74,33 +83,34 @@ object PBTransactions {
           .map(pk => PublicKey(pk.toByteArray))
           .orNull
         for {
-          tx <- if (unsafe)
-            Right(
-              createVanillaUnsafe(
-                parsedTx.version,
-                parsedTx.chainId.toByte,
-                sender,
-                feeAmount,
-                feeAsset,
-                parsedTx.timestamp,
-                Proofs(signedTx.proofs.map(_.toByteStr)),
-                parsedTx.data
+          tx <-
+            if (unsafe)
+              Right(
+                createVanillaUnsafe(
+                  parsedTx.version,
+                  parsedTx.chainId.toByte,
+                  sender,
+                  feeAmount,
+                  feeAsset,
+                  parsedTx.timestamp,
+                  Proofs(signedTx.proofs.map(_.toByteStr)),
+                  parsedTx.data
+                )
               )
-            )
-          else
-            for {
-              proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
-              tx <- createVanilla(
-                parsedTx.version,
-                parsedTx.chainId.toByte,
-                sender,
-                feeAmount,
-                feeAsset,
-                parsedTx.timestamp,
-                proofs,
-                parsedTx.data
-              )
-            } yield tx
+            else
+              for {
+                proofs <- Proofs.create(signedTx.proofs.map(_.toByteStr))
+                tx <- createVanilla(
+                  parsedTx.version,
+                  parsedTx.chainId.toByte,
+                  sender,
+                  feeAmount,
+                  feeAsset,
+                  parsedTx.timestamp,
+                  proofs,
+                  parsedTx.data
+                )
+              } yield tx
         } yield tx
     }
 
@@ -237,12 +247,12 @@ object PBTransactions {
 
       case Data.MassTransfer(mt) =>
         for {
-          parsedTransfers <- mt.transfers.flatMap { t =>
-            t.getRecipient.toAddressOrAlias(chainId).toOption.map { addressOrAlias =>
+          parsedTransfers <- mt.transfers.traverse { t =>
+            t.getRecipient.toAddressOrAlias(chainId).flatMap { addressOrAlias =>
               TxNonNegativeAmount(t.amount)(NegativeAmount(t.amount, "asset"))
                 .map(ParsedTransfer(addressOrAlias, _))
             }
-          }.sequence
+          }
           tx <- vt.transfer.MassTransferTransaction.create(
             version.toByte,
             sender,
@@ -668,7 +678,7 @@ object PBTransactions {
         val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
         PBTransactions.create(sender, chainId, fee.value, feeAssetId, timestamp, version, proofs, data)
 
-      case tx @ vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, fee, feeAssetId, proofs, chainId) =>
+      case vt.assets.UpdateAssetInfoTransaction(version, sender, assetId, name, description, timestamp, fee, feeAssetId, proofs, chainId) =>
         val data = UpdateAssetInfoTransactionData()
           .withAssetId(assetId.id.toByteString)
           .withName(name)
@@ -696,8 +706,8 @@ object PBTransactions {
     )
   }
 
-  def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[?] = {
-    import DataTransactionData.DataEntry.Value as DEV
+  def toVanillaDataEntry(de: DataEntry): com.wavesplatform.state.DataEntry[?] = {
+    import DataEntry.Value as DEV
 
     de.value match {
       case DEV.IntValue(num)      => IntegerDataEntry(de.key, num)
@@ -708,15 +718,15 @@ object PBTransactions {
     }
   }
 
-  def toPBDataEntry(de: com.wavesplatform.state.DataEntry[?]): DataTransactionData.DataEntry = {
-    DataTransactionData.DataEntry(
+  def toPBDataEntry(de: com.wavesplatform.state.DataEntry[?]): DataEntry = {
+    DataEntry(
       de.key,
       de match {
-        case IntegerDataEntry(_, value) => DataTransactionData.DataEntry.Value.IntValue(value)
-        case BooleanDataEntry(_, value) => DataTransactionData.DataEntry.Value.BoolValue(value)
-        case BinaryDataEntry(_, value)  => DataTransactionData.DataEntry.Value.BinaryValue(value.toByteString)
-        case StringDataEntry(_, value)  => DataTransactionData.DataEntry.Value.StringValue(value)
-        case EmptyDataEntry(_)          => DataTransactionData.DataEntry.Value.Empty
+        case IntegerDataEntry(_, value) => DataEntry.Value.IntValue(value)
+        case BooleanDataEntry(_, value) => DataEntry.Value.BoolValue(value)
+        case BinaryDataEntry(_, value)  => DataEntry.Value.BinaryValue(value.toByteString)
+        case StringDataEntry(_, value)  => DataEntry.Value.StringValue(value)
+        case EmptyDataEntry(_)          => DataEntry.Value.Empty
       }
     )
   }

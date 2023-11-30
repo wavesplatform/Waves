@@ -4,7 +4,6 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 
-
 object DomainPresets {
   implicit class WavesSettingsOps(val ws: WavesSettings) extends AnyVal {
     def configure(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
@@ -55,8 +54,8 @@ object DomainPresets {
       .blockchainSettings
       .functionalitySettings
 
-    domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map {
-      case (f, h) => f.id -> h
+    domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map { case (f, h) =>
+      f.id -> h
     }.toMap))
   }
 
@@ -65,16 +64,18 @@ object DomainPresets {
     BlockchainFeatures.NG
   )
 
-  val ScriptsAndSponsorship: WavesSettings = NG.addFeatures(
-    BlockchainFeatures.SmartAccounts,
-    BlockchainFeatures.SmartAccountTrading,
-    BlockchainFeatures.OrderV3,
-    BlockchainFeatures.FeeSponsorship,
-    BlockchainFeatures.DataTransaction,
-    BlockchainFeatures.SmartAssets
-  ).setFeaturesHeight(
-    BlockchainFeatures.FeeSponsorship -> -NG.blockchainSettings.functionalitySettings.activationWindowSize(1)
-  )
+  val ScriptsAndSponsorship: WavesSettings = NG
+    .addFeatures(
+      BlockchainFeatures.SmartAccounts,
+      BlockchainFeatures.SmartAccountTrading,
+      BlockchainFeatures.OrderV3,
+      BlockchainFeatures.FeeSponsorship,
+      BlockchainFeatures.DataTransaction,
+      BlockchainFeatures.SmartAssets
+    )
+    .setFeaturesHeight(
+      BlockchainFeatures.FeeSponsorship -> -NG.blockchainSettings.functionalitySettings.activationWindowSize(1)
+    )
 
   val RideV3: WavesSettings = ScriptsAndSponsorship.addFeatures(
     BlockchainFeatures.Ride4DApps
@@ -85,13 +86,23 @@ object DomainPresets {
     BlockchainFeatures.BlockV5
   )
 
+  val RideV4WithRewards: WavesSettings = RideV4.addFeatures(BlockchainFeatures.BlockReward)
+
   val RideV5: WavesSettings = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
 
   val RideV6: WavesSettings = RideV5.addFeatures(BlockchainFeatures.RideV6)
 
-  val ContinuationTransaction: WavesSettings = RideV6.addFeatures(BlockchainFeatures.ContinuationTransaction).copy(
-    featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
-  )
+  val ConsensusImprovements: WavesSettings = RideV6.addFeatures(BlockchainFeatures.ConsensusImprovements)
+
+  val BlockRewardDistribution: WavesSettings = ConsensusImprovements.addFeatures(BlockchainFeatures.BlockRewardDistribution)
+
+  val ContinuationTransaction: WavesSettings = RideV6
+    .addFeatures(BlockchainFeatures.ContinuationTransaction)
+    .copy(
+      featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
+    )
+
+  val TransactionStateSnapshot: WavesSettings = BlockRewardDistribution.addFeatures(BlockchainFeatures.LightNode)
 
   def settingsForRide(version: StdLibVersion): WavesSettings =
     version match {
@@ -101,6 +112,8 @@ object DomainPresets {
       case V4 => RideV4
       case V5 => RideV5
       case V6 => RideV6
+      case V7 => BlockRewardDistribution
+      case V8 => TransactionStateSnapshot
     }
 
   def mostRecent: WavesSettings = RideV6

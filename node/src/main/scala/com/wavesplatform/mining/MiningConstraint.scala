@@ -1,20 +1,21 @@
 package com.wavesplatform.mining
 
 import cats.data.NonEmptyList
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.transaction.Transaction
 
 trait MiningConstraint {
   def isFull: Boolean
   def isOverfilled: Boolean
-  def put(blockchain: Blockchain, x: Transaction, diff: Diff): MiningConstraint
+  def put(blockchain: Blockchain, x: Transaction, snapshot: StateSnapshot): MiningConstraint
+  def head: MiningConstraint = this
 }
 
 object MiningConstraint {
   case object Unlimited extends MiningConstraint {
-    override def isFull: Boolean                                                           = false
-    override def isOverfilled: Boolean                                                     = false
-    override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MiningConstraint = this
+    override def isFull: Boolean                                                                        = false
+    override def isOverfilled: Boolean                                                                  = false
+    override def put(blockchain: Blockchain, x: Transaction, snapshot: StateSnapshot): MiningConstraint = this
   }
 }
 
@@ -25,7 +26,9 @@ case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn
   override def isOverfilled: Boolean = {
     rest < 0
   }
-  override def put(blockchain: Blockchain, x: Transaction, diff: Diff): OneDimensionalMiningConstraint = put(estimator(blockchain, x, diff))
+  override def put(blockchain: Blockchain, x: Transaction, snapshot: StateSnapshot): OneDimensionalMiningConstraint =
+    put(estimator(blockchain, x, snapshot))
+
   private def put(x: Long): OneDimensionalMiningConstraint = {
     copy(rest = this.rest - x)
   }
@@ -38,14 +41,14 @@ case class OneDimensionalMiningConstraint(rest: Long, estimator: TxEstimators.Fn
 case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningConstraint]) extends MiningConstraint {
   override def isFull: Boolean       = constraints.exists(_.isFull)
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
-  override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MultiDimensionalMiningConstraint =
-    MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, diff)))
-
-  override def toString: String = s"Constraint([${constraints.head}${constraints.tail.mkString(",", ",", "")}])"
+  override def put(blockchain: Blockchain, x: Transaction, snapshot: StateSnapshot): MultiDimensionalMiningConstraint =
+    MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, snapshot)))
+  override def head: MiningConstraint = constraints.head
+  override def toString: String       = s"Constraint([${constraints.head}${constraints.tail.mkString(",", ",", "")}])"
 }
 
 object MultiDimensionalMiningConstraint {
-  val unlimited = MultiDimensionalMiningConstraint(NonEmptyList.of(MiningConstraint.Unlimited))
+  val Unlimited: MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(NonEmptyList.of(MiningConstraint.Unlimited))
 
   def apply(constraint1: MiningConstraint, constraint2: MiningConstraint): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(NonEmptyList.of(constraint1, constraint2))

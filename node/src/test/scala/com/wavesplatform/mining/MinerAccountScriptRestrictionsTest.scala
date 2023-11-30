@@ -1,6 +1,6 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -26,6 +26,7 @@ import DomainPresets.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.appender.BlockAppender
 import monix.eval.Task
 
@@ -33,10 +34,10 @@ import scala.concurrent.duration.*
 
 class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
-  type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
+  type Appender = Block => Task[Either[ValidationError, BlockApplyResult]]
 
   val time: TestTime            = TestTime()
-  val minerAcc: KeyPair         = TxHelpers.signer(1)
+  val minerAcc: SeedKeyPair     = TxHelpers.signer(1)
   val invoker: KeyPair          = TxHelpers.signer(2)
   val allowedRecipient: KeyPair = TxHelpers.signer(3)
 
@@ -114,9 +115,12 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
       Observable.empty
     )
 
-    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, appenderScheduler) _
+    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, appenderScheduler)(_, None)
 
     f(miner, appender, appenderScheduler)
+
+    appenderScheduler.shutdown()
+    utx.close()
   }
 
   private def forgeAndAppendBlock(d: Domain, miner: MinerImpl, appender: Appender)(implicit scheduler: Scheduler) = {

@@ -21,7 +21,8 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
 
   private val activationHeight = 4
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
+    preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -30,7 +31,9 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
       BlockchainFeatures.BlockReward.id      -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> activationHeight
-    ), estimatorPreCheckHeight = Int.MaxValue)
+    ),
+    estimatorPreCheckHeight = Int.MaxValue
+  )
 
   // ~1900 complexity
   val groth: String =
@@ -57,23 +60,23 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
 
   private def dApp(asset: IssuedAsset): Script = TestCompiler(V4).compileContract(
     s"""
-         | {-# STDLIB_VERSION 4       #-}
-         | {-# CONTENT_TYPE   DAPP    #-}
-         | {-# SCRIPT_TYPE    ACCOUNT #-}
-         |
-         | @Callable(i)
-         | func default() = {
-         |   strict cond =
-         |     if (true)
-         |       then true
-         |       else ($groth)
-         |
-         |   [
-         |     ScriptTransfer(i.caller, 1, base58'$asset'),
-         |     Burn(base58'$asset', 1),
-         |     Reissue(base58'$asset', 1, true)
-         |   ]
-         | }
+       | {-# STDLIB_VERSION 4       #-}
+       | {-# CONTENT_TYPE   DAPP    #-}
+       | {-# SCRIPT_TYPE    ACCOUNT #-}
+       |
+       | @Callable(i)
+       | func default() = {
+       |   strict cond =
+       |     if (true)
+       |       then true
+       |       else ($groth)
+       |
+       |   [
+       |     ScriptTransfer(i.caller, 1, base58'$asset'),
+       |     Burn(base58'$asset', 1),
+       |     Reissue(base58'$asset', 1, true)
+       |   ]
+       | }
        """.stripMargin
   )
 
@@ -95,23 +98,24 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
     (balances, Seq(issue, transfer1, setVerifier, setDApp), invokeFromScripted)
   }
 
-  property(s"evaluated complexity is used for diff instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
+  property(s"evaluated complexity is used instead of estimated one after activation ${BlockchainFeatures.SynchronousCalls}") {
     val (balances, preparingTxs, invoke) = paymentPreconditions
     withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendBlock(invoke1)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.id()) shouldBe empty
-      d.blockchain.bestLiquidDiff.get.scriptsComplexity shouldBe 13382 // dApp + 3 actions + 2 payments + verifier = 7 * 1900 = 13300
+      d.liquidSnapshot.errorMessage(invoke1.id()) shouldBe empty
+      d.liquidSnapshot.scriptsComplexity shouldBe 11459 // 3 actions + 2 payments + verifier = 6 * 1900 = 11400
+      // for dApp evaluated complexity is always used after implementation of the snapshots
 
       d.appendBlock()
       d.blockchainUpdater.height shouldBe activationHeight
 
       val invoke2 = invoke()
       d.appendBlock(invoke2)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id()) shouldBe empty
-      d.blockchain.bestLiquidDiff.get.scriptsComplexity shouldBe 17
+      d.liquidSnapshot.errorMessage(invoke2.id()) shouldBe empty
+      d.liquidSnapshot.scriptsComplexity shouldBe 17
     }
   }
 }

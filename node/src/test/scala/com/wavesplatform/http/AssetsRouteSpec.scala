@@ -8,10 +8,10 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{AssetIdNotSpecified, AssetsDoesNotExist, InvalidIds, TooBigArrayAllocation}
 import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.AssetsApiRoute
-import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.lang.directives.values.V6
@@ -28,36 +28,44 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.utils.EthTxGenerator
-import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
-import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.transaction.EthTxGenerator.Arg
+import com.wavesplatform.transaction.{AssetIdLength, EthTxGenerator, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.utils.SharedSchedulerMixin
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
 import scala.concurrent.duration.*
 
-class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
-
+class AssetsRouteSpec
+    extends RouteSpec("/assets")
+    with Eventually
+    with RestAPISettingsHelper
+    with WithDomain
+    with TestWallet
+    with SharedSchedulerMixin {
   private val MaxDistributionDepth = 1
 
-  def routeTest[A](settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee))(f: (Domain, Route) => A): A =
-    withDomain(settings) { d =>
+  def routeTest[A](
+      settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee),
+      balances: Seq[AddrWithBalance] = Seq.empty
+  )(f: (Domain, Route) => A): A =
+    withDomain(settings, balances) { d =>
       f(
         d,
         seal(
           AssetsApiRoute(
             restAPISettings,
+            60.seconds,
             testWallet,
-            DummyTransactionPublisher.accepting,
             d.blockchain,
+            () => d.blockchain.snapshotBlockchain,
             TestTime(),
             d.accountsApi,
             d.assetsApi,
             MaxDistributionDepth,
-            new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+            new RouteTimeout(60.seconds)(sharedScheduler)
           ).route
         )
       )
@@ -114,7 +122,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     lastUpdatedAt = Height(1),
     script = None,
     sponsorship = 0,
-    nft = false
+    nft = false,
+    1,
+    Height(1)
   )
 
   "/balance/{address}" - {
@@ -179,56 +189,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
 
         allBalances shouldEqual balancesAfterIssue
       })
-    }
-  }
-
-  "/transfer" - {
-    def posting[A: Writes](route: Route, v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
-
-    "accepts TransferRequest" in routeTest() { (_, route) =>
-      val sender    = testWallet.generateNewAccount().get
-      val recipient = testWallet.generateNewAccount().get
-      val req = TransferV1Request(
-        assetId = None,
-        feeAssetId = None,
-        amount = 1.waves,
-        fee = 0.3.waves,
-        sender = sender.toAddress.toString,
-        attachment = Some("attachment"),
-        recipient = recipient.toAddress.toString,
-        timestamp = Some(System.currentTimeMillis())
-      )
-
-      posting(route, req) ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[TransferTransaction]
-      }
-    }
-
-    "accepts VersionedTransferRequest" in routeTest() { (_, route) =>
-      val sender    = testWallet.generateNewAccount().get
-      val recipient = testWallet.generateNewAccount().get
-      val req = TransferV2Request(
-        assetId = None,
-        amount = 1.waves,
-        feeAssetId = None,
-        fee = 0.3.waves,
-        sender = sender.toAddress.toString,
-        attachment = None,
-        recipient = recipient.toAddress.toString,
-        timestamp = Some(System.currentTimeMillis())
-      )
-
-      posting(route, req) ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[TransferV2Request]
-      }
-    }
-
-    "returns a error if it is not a transfer request" in routeTest() { (_, route) =>
-      posting(route, Json.obj("key" -> "value")) ~> check {
-        status shouldBe StatusCodes.BadRequest
-      }
     }
   }
 
@@ -309,13 +269,30 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     checkDetails(d, route, issue, issue.id().toString, assetDescr)
   }
 
-  routePath(s"/details/{id} - non-smart asset") in routeTest() { (d, route) =>
-    val tx = issueTransaction()
+  routePath(s"/details/{id} - non-smart asset") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
+    val issues = (1 to 10).map(i => (i, issueTransaction())).toMap
 
-    d.appendBlock(TxHelpers.genesis(tx.sender.toAddress))
-    d.appendBlock(tx)
+    d.appendBlock()
+    d.appendMicroBlock(issues(1))
+    checkDetails(route, issues(1), issues(1).id().toString, assetDesc)
 
-    checkDetails(d, route, tx, tx.id().toString, assetDesc)
+    (2 to 6).foreach { i =>
+      d.appendMicroBlock(issues(i))
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
+    }
+
+    d.appendKeyBlock()
+    (1 to 6).foreach { i =>
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
+    }
+
+    d.appendBlock((7 to 10).map(issues) *)
+    (1 to 6).foreach { i =>
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
+    }
+    (7 to 10).foreach { i =>
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i - 6, issueHeight = Height @@ 2))
+    }
   }
 
   routePath("/{assetId}/distribution/{height}/limit/{limit}") in routeTest() { (d, route) =>
@@ -404,7 +381,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             Height(d.blockchain.height),
             script.map(s => AssetScriptInfo(s, 1L)),
             0L,
-            nft = false
+            nft = false,
+            1,
+            Height(1)
           ),
           issueTransaction.id().toString,
           responseAs[Seq[JsObject]].head
@@ -442,7 +421,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
                                  |  "quantity" : ${issueTx.quantity.value},
                                  |  "scripted" : false,
                                  |  "minSponsoredAssetFee" : null,
-                                 |  "originTransactionId" : "${issueTx.id()}"
+                                 |  "originTransactionId" : "${issueTx.id()}",
+                                 |  "sequenceInBlock" : 1
                                  |}
                                  |""".stripMargin)
       }
@@ -568,7 +548,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
               val tx2 = issue(secondSigner, 1, name = s"NFT$i", reissuable = false)
               (i, Seq(tx1, tx2))
             }
-            d.appendBlock(txs.flatMap(_._2): _*)
+            d.appendBlock(txs.flatMap(_._2)*)
             txs.map(_._1)
           }
         Seq(defaultAddress, secondAddress).foreach { address =>
@@ -584,18 +564,22 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
 
   private def checkDetails(domain: Domain, route: Route, tx: Transaction, assetId: String, assetDesc: AssetDescription): Unit = {
     domain.liquidAndSolidAssert { () =>
-      Get(routePath(s"/details/$assetId")) ~> route ~> check {
-        val response = responseAs[JsObject]
-        checkResponse(tx, assetDesc, assetId, response)
-      }
-      Get(routePath(s"/details?id=$assetId")) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
-      }
-      Post(routePath("/details"), Json.obj("ids" -> List(s"$assetId"))) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
-      }
+      checkDetails(route, tx, assetId, assetDesc)
+    }
+  }
+
+  private def checkDetails(route: Route, tx: Transaction, assetId: String, assetDesc: AssetDescription): Unit = {
+    Get(routePath(s"/details/$assetId")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      checkResponse(tx, assetDesc, assetId, response)
+    }
+    Get(routePath(s"/details?id=$assetId")) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
+    }
+    Post(routePath("/details"), Json.obj("ids" -> List(s"$assetId"))) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
     }
   }
 
@@ -610,5 +594,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     (response \ "originTransactionId").as[String] shouldBe tx.id().toString
+    (response \ "sequenceInBlock").as[Int] shouldBe desc.sequenceInBlock
   }
 }

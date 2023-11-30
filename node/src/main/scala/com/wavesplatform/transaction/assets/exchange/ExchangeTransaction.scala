@@ -6,11 +6,13 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
 import scala.util.Try
+import scala.util.chaining.scalaUtilChainingOps
 
 case class ExchangeTransaction(
     version: TxVersion,
@@ -25,7 +27,7 @@ case class ExchangeTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Exchange, order1.assetPair.checkedAssets)
-    with VersionedTransaction
+    with Versioned.ToV3
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
@@ -33,6 +35,17 @@ case class ExchangeTransaction(
     with PBSince.V3 {
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
+
+  override protected def verifyFirstProof(isRideV6Activated: Boolean): Either[GenericError, Unit] =
+    super.verifyFirstProof(isRideV6Activated).tap { _ =>
+      if (isRideV6Activated) {
+        order1.firstProofIsValidSignatureAfterV6
+        order2.firstProofIsValidSignatureAfterV6
+      } else {
+        order1.firstProofIsValidSignatureBeforeV6
+        order2.firstProofIsValidSignatureBeforeV6
+      }
+    }
 
   override val sender: PublicKey = buyOrder.matcherPublicKey
 
@@ -44,15 +57,13 @@ case class ExchangeTransaction(
 object ExchangeTransaction extends TransactionParser {
   type TransactionT = ExchangeTransaction
 
-  implicit val validator = ExchangeTxValidator
+  implicit val validator: TxValidator[ExchangeTransaction] = ExchangeTxValidator
 
   implicit def sign(tx: ExchangeTransaction, privateKey: PrivateKey): ExchangeTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[ExchangeTransaction] =
     ExchangeTxSerializer.parseBytes(bytes)
-
-  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val typeId: TxType = 7: Byte
 

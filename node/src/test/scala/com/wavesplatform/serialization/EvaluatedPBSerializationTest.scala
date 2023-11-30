@@ -15,11 +15,11 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils.{JsonMatchers, Schedulers}
+import com.wavesplatform.utils.{JsonMatchers, SharedSchedulerMixin}
 import play.api.libs.json.*
 
-import scala.concurrent.duration.*
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class EvaluatedPBSerializationTest
     extends PropSpec
@@ -27,7 +27,8 @@ class EvaluatedPBSerializationTest
     with RestAPISettingsHelper
     with ScalatestRouteTest
     with JsonMatchers
-    with ApiMarshallers {
+    with ApiMarshallers
+    with SharedSchedulerMixin {
 
   property("correctly serialize/deserialize EVALUATED args for callable functions") {
     val masterDApp  = TxHelpers.signer(1)
@@ -115,9 +116,10 @@ class EvaluatedPBSerializationTest
     d.transactionsApi,
     d.wallet,
     d.blockchain,
+    () => d.blockchain.snapshotBlockchain,
     () => d.utxPool.size,
     (_, _) => Future.successful(TracedResult(Right(true))),
     ntpTime,
-    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    new RouteTimeout(60.seconds)(sharedScheduler)
   )
 }

@@ -16,14 +16,16 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNC, FUNCTION_CALL, REF}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, TxHelpers}
+import org.scalatest.Inside
 
-class SyncDAppTransferTest extends PropSpec with WithDomain {
+class SyncDAppTransferTest extends PropSpec with WithDomain with Inside {
 
   property("negative transfer amount") {
     for {
@@ -106,10 +108,10 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
   }
 
   property("invoking ScriptTransfer in sync call results in accounts state") {
-    val invoker     = TxHelpers.signer(0)
-    val invokerDApp = TxHelpers.signer(1)
-    val senderDApp  = TxHelpers.signer(2)
-    val recipient   = TxHelpers.signer(3)
+    val invoker     = TxHelpers.signer(1)
+    val invokerDApp = TxHelpers.signer(2)
+    val senderDApp  = TxHelpers.signer(3)
+    val recipient   = TxHelpers.signer(4)
 
     val transferAmount = 10.waves
 
@@ -123,18 +125,23 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      blockDiff.scriptsRun shouldBe 2
-      blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
-      blockDiff.portfolios(senderDApp.toAddress).balance shouldBe -transferAmount
-      blockDiff.transaction(invoke.id()) shouldBe defined
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
+        }
+      }
+      blockDiff.balances((recipient.toAddress, Waves)) shouldBe transferAmount
+      blockDiff.balances((senderDApp.toAddress, Waves)) shouldBe ENOUGH_AMT - setSenderScript.fee.value - transferAmount
+      blockDiff.transactions.get(invoke.id()) shouldBe defined
     }
   }
 
   property("invoking default func ScriptTransfer in sync call results in accounts state") {
-    val invoker     = TxHelpers.signer(0)
-    val invokerDApp = TxHelpers.signer(1)
-    val senderDApp  = TxHelpers.signer(2)
-    val recipient   = TxHelpers.signer(3)
+    val invoker     = TxHelpers.signer(1)
+    val invokerDApp = TxHelpers.signer(2)
+    val senderDApp  = TxHelpers.signer(3)
+    val recipient   = TxHelpers.signer(4)
 
     val transferAmount = 10.waves
 
@@ -148,10 +155,15 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      blockDiff.scriptsRun shouldBe 2
-      blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
-      blockDiff.portfolios(senderDApp.toAddress).balance shouldBe -transferAmount
-      blockDiff.transaction(invoke.id()) shouldBe defined
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
+        }
+      }
+      blockDiff.balances((recipient.toAddress, Waves)) shouldBe transferAmount
+      blockDiff.balances((senderDApp.toAddress, Waves)) shouldBe ENOUGH_AMT - setSenderScript.fee.value - transferAmount
+      blockDiff.transactions.get(invoke.id()) shouldBe defined
     }
   }
 
@@ -172,10 +184,10 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
   }
 
   property("ScriptTransfer in sync call is allowed if funds were received from attached payment") {
-    val invoker     = TxHelpers.signer(0)
-    val invokerDApp = TxHelpers.signer(1)
-    val senderDApp  = TxHelpers.signer(2)
-    val recipient   = TxHelpers.signer(3)
+    val invoker     = TxHelpers.signer(1)
+    val invokerDApp = TxHelpers.signer(2)
+    val senderDApp  = TxHelpers.signer(3)
+    val recipient   = TxHelpers.signer(4)
 
     val transferAmount = 10.waves
 
@@ -192,10 +204,15 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
       RideV5.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
-      blockDiff.scriptsRun shouldBe 2
-      blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
-      blockDiff.portfolios(invokerDApp.toAddress).balance shouldBe -transferAmount
-      blockDiff.transaction(invoke.id()) shouldBe defined
+      inside(blockDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
+        }
+      }
+      blockDiff.balances((recipient.toAddress, Waves)) shouldBe transferAmount
+      blockDiff.balances((invokerDApp.toAddress, Waves)) shouldBe ENOUGH_AMT - setSenderScript.fee.value - transferAmount
+      blockDiff.transactions.get(invoke.id()) shouldBe defined
     }
   }
 
@@ -262,7 +279,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
          | @Callable(i)
          | func bar() = {
          |   ${sigVerify(bigComplexity)}
-         |   let asset = ${asset.fold("unit")(a => s"base58'$a'")}
+         |   let asset = ${asset.fold(GlobalValNames.Unit)(a => s"base58'$a'")}
          |   [
          |     ScriptTransfer(${recipient.map(addr => s"Address(base58'$addr')").getOrElse("i.caller")}, $amount, asset)
          |   ]
@@ -271,7 +288,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
          | @Callable(i)
          | func default() = {
          |   ${sigVerify(bigComplexity)}
-         |   let asset = ${asset.fold("unit")(a => s"base58'$a'")}
+         |   let asset = ${asset.fold(GlobalValNames.Unit)(a => s"base58'$a'")}
          |   [
          |     ScriptTransfer(${recipient.map(addr => s"Address(base58'$addr')").getOrElse("i.caller")}, $amount, asset)
          |   ]
@@ -285,9 +302,9 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       List(
         FUNCTION_CALL(
           User("ScriptTransfer"),
-          List(FUNCTION_CALL(User("Alias"), List(CONST_STRING("alias").explicitGet())), REF("unit"))
+          List(FUNCTION_CALL(User("Alias"), List(CONST_STRING("alias").explicitGet())), REF(GlobalValNames.Unit))
         ),
-        REF("nil")
+        REF(GlobalValNames.Nil)
       )
     )
 

@@ -3,7 +3,8 @@ enablePlugins(JmhPlugin)
 Jmh / version := "1.33"
 
 libraryDependencies ++= Seq(
-  "org.scodec" %% "scodec-core" % "1.11.10"
+  "org.scodec" %% "scodec-core" % "1.11.10",
+  "org.eclipse.collections"                % "eclipse-collections"   % "11.1.0"
 ) ++ Dependencies.logDeps
 
 // https://github.com/ktoso/sbt-jmh#adding-to-your-project

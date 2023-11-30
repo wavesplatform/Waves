@@ -1,80 +1,122 @@
 package com.wavesplatform.api.common
 
-import cats.syntax.semigroup.*
 import com.google.common.collect.AbstractIterator
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.NFTIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.database.{AddressId, DBResource, KeyTags, Keys, readIntSeq}
-import com.wavesplatform.state.{AssetDescription, Diff, Portfolio}
+import com.wavesplatform.database.{AddressId, CurrentBalance, DBResource, Key, KeyTags, Keys, readCurrentBalance}
+import com.wavesplatform.state.{AssetDescription, StateSnapshot}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.annotation.tailrec
+import java.nio.ByteBuffer
+import scala.collection.immutable.VectorMap
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
 class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
-    extends AbstractIterator[(IssuedAsset, Long)]
+    extends AbstractIterator[Seq[(IssuedAsset, Long)]]
     with ScorexLogging {
-  private val prefixBytes = KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray
+  private val prefixBytes: Array[Byte] = KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray
 
-  resource.iterator.seek(prefixBytes)
+  resource.withSafePrefixIterator { dbIterator =>
+    dbIterator.seek(prefixBytes)
 
-  for (after <- maybeAfter) {
-    @inline
-    def skipEntry(key: Array[Byte]): Boolean =
-      key.startsWith(prefixBytes) && !key.endsWith(after.id.arr)
+    for (after <- maybeAfter) {
+      @inline
+      def skipEntry(key: Array[Byte]): Boolean =
+        !key.endsWith(after.id.arr)
 
-    while (resource.iterator.hasNext && skipEntry(resource.iterator.next().getKey)) {}
-  }
+      while (dbIterator.isValid && skipEntry(dbIterator.key()))
+        dbIterator.next()
+      if (dbIterator.isValid && !skipEntry(dbIterator.key()))
+        dbIterator.next()
+    }
+  }(())
 
-  override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(prefixBytes)) {
-      val assetId = IssuedAsset(ByteStr(resource.iterator.next().getKey.takeRight(crypto.DigestLength)))
-      assetId -> (for {
-        lastChange <- resource.get(Keys.assetBalanceHistory(addressId, assetId)).headOption
-      } yield resource.get(Keys.assetBalance(addressId, assetId)(lastChange))).getOrElse(0L)
-    } else endOfData()
+  override def computeNext(): Seq[(IssuedAsset, Long)] =
+    resource.withSafePrefixIterator { dbIterator =>
+      val keysBuffer   = new ArrayBuffer[Key[CurrentBalance]]()
+      val assetsBuffer = new ArrayBuffer[IssuedAsset]()
+      while (dbIterator.isValid && keysBuffer.length < BatchSize) {
+        val assetId = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
+        keysBuffer.addOne(Keys.assetBalance(addressId, assetId))
+        assetsBuffer.addOne(assetId)
+        dbIterator.next()
+      }
+      if (keysBuffer.nonEmpty) {
+        resource
+          .multiGet(keysBuffer, 16)
+          .zip(assetsBuffer)
+          .map { case (curBalance, asset) =>
+            asset -> curBalance.balance
+          }
+          .toSeq
+      } else endOfData()
+    }(endOfData())
 }
 
-class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[(IssuedAsset, Long)] {
-  private val prefixBytes = KeyTags.AssetBalanceHistory.prefixBytes ++ addressId.toByteArray
+object NFTIterator {
+  val BatchSize = 1000
+}
 
-  resource.iterator.seek(prefixBytes)
+class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
+  private val prefixBytes: Array[Byte] = KeyTags.AssetBalance.prefixBytes ++ addressId.toByteArray
 
-  private def stillSameAddress(k: Array[Byte]): Boolean =
-    (k.length == (prefixBytes.length + crypto.DigestLength)) && k.startsWith(prefixBytes)
+  resource.withSafePrefixIterator(_.seek(prefixBytes))(())
 
-  override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && stillSameAddress(resource.iterator.peekNext().getKey)) {
-      val currentEntry = resource.iterator.next()
-      val assetId      = IssuedAsset(ByteStr(currentEntry.getKey.takeRight(crypto.DigestLength)))
-      val history      = readIntSeq(currentEntry.getValue)
-      val balance      = resource.get(Keys.assetBalance(addressId, assetId)(history.headOption.getOrElse(0)))
-      assetId -> balance
-    } else endOfData()
+  override def computeNext(): Seq[(IssuedAsset, Long)] =
+    resource.withSafePrefixIterator { dbIterator =>
+      if (dbIterator.isValid) {
+        val assetId = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
+        val balance = readCurrentBalance(dbIterator.value()).balance
+        dbIterator.next()
+        Seq((assetId, balance))
+      } else endOfData()
+    }(endOfData())
+}
+
+class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[(Int, Long)] {
+  private val prefixBytes: Array[Byte] = KeyTags.WavesBalanceHistory.prefixBytes ++ addressId.toByteArray
+  private val lastHeight: Int          = resource.get(Keys.wavesBalance(addressId)).height.toInt
+
+  resource.withSafePrefixIterator(_.seekForPrev(prefixBytes ++ Ints.toByteArray(lastHeight)))(())
+
+  override def computeNext(): (Int, Long) =
+    resource.withSafePrefixIterator { dbIterator =>
+      if (dbIterator.isValid) {
+        val h       = ByteBuffer.wrap(dbIterator.key().drop(prefixBytes.length)).getInt
+        val balance = ByteBuffer.wrap(dbIterator.value()).getLong
+        dbIterator.prev()
+        h -> balance
+      } else endOfData()
+    }(endOfData())
 }
 
 class BalanceIterator(
-    underlying: Iterator[(IssuedAsset, Long)],
-    includeAsset: IssuedAsset => Boolean,
-    private var pendingOverrides: Map[IssuedAsset, Long]
-) extends AbstractIterator[(IssuedAsset, Long)] {
-
-  @tailrec private def nextOverride(): (IssuedAsset, Long) =
+    address: Address,
+    underlying: Iterator[Seq[(IssuedAsset, Long)]],
+    private var pendingOverrides: VectorMap[(Address, Asset), Long]
+) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
+  private def nextOverride(): Seq[(IssuedAsset, Long)] =
     if (pendingOverrides.isEmpty) endOfData()
     else {
-      val head @ (asset, _) = pendingOverrides.head
-      pendingOverrides -= asset
-      if (includeAsset(asset)) head else nextOverride()
+      val assetsWithBalances = pendingOverrides.collect { case ((`address`, asset: IssuedAsset), balance) => asset -> balance }.toSeq
+      pendingOverrides = VectorMap.empty
+      assetsWithBalances
     }
 
-  override def computeNext(): (IssuedAsset, Long) =
+  override def computeNext(): Seq[(IssuedAsset, Long)] =
     if (underlying.hasNext) {
-      val (asset, balanceFromHistory) = underlying.next()
-      val balanceFromDiff             = pendingOverrides.getOrElse(asset, 0L)
-      pendingOverrides -= asset
-      asset -> (balanceFromDiff |+| balanceFromHistory)
+      underlying.next().map { case (asset, dbBalance) =>
+        val key     = (address, asset)
+        val balance = pendingOverrides.getOrElse(key, dbBalance)
+        pendingOverrides -= key
+        asset -> balance
+      }
     } else nextOverride()
 }
 
@@ -82,33 +124,39 @@ object AddressPortfolio {
   def nftIterator(
       resource: DBResource,
       address: Address,
-      diff: Diff,
+      snapshot: StateSnapshot,
       maybeAfter: Option[IssuedAsset],
       loadAssetDescription: IssuedAsset => Option[AssetDescription]
-  ): Iterator[(IssuedAsset, AssetDescription)] =
+  ): Iterator[Seq[(IssuedAsset, AssetDescription)]] =
     new BalanceIterator(
+      address,
       resource
         .get(Keys.addressId(address))
-        .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
-      asset => loadAssetDescription(asset).exists(_.nft),
-      diff.portfolios.getOrElse(address, Portfolio.empty).assets
+        .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
+      snapshot.balances
     ).asScala
-      .collect { case (asset, balance) if balance > 0 => asset }
-      .flatMap(a => loadAssetDescription(a).map(a -> _))
+      .map { assets =>
+        maybeAfter
+          .filter(after => assets.exists(_._1 == after))
+          .fold(assets)(after => assets.dropWhile(_._1 != after).drop(1))
+          .collect { case (asset, balance) if balance > 0 => asset }
+          .flatMap(asset => loadAssetDescription(asset).collect { case description if description.nft => asset -> description })
+      }
 
   def assetBalanceIterator(
       resource: DBResource,
       address: Address,
-      diff: Diff,
+      snapshot: StateSnapshot,
       includeAsset: IssuedAsset => Boolean
-  ): Iterator[(IssuedAsset, Long)] =
+  ): Iterator[Seq[(IssuedAsset, Long)]] =
     new BalanceIterator(
+      address,
       resource
         .get(Keys.addressId(address))
-        .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new AssetBalanceIterator(addressId, resource).asScala),
-      includeAsset,
-      diff.portfolios.getOrElse(address, Portfolio.empty).assets
-    ).asScala.filter {
-      case (asset, balance) => includeAsset(asset) && balance > 0
-    }
+        .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new AssetBalanceIterator(addressId, resource).asScala),
+      snapshot.balances
+    ).asScala
+      .map(
+        _.filter { case (asset, balance) => includeAsset(asset) && balance > 0 }
+      )
 }

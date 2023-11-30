@@ -1,30 +1,32 @@
 package com.wavesplatform
 
-import scala.concurrent.Future
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.utils.{SystemTime, Time}
 import io.netty.channel.Channel
-import com.wavesplatform.common.utils._
 import org.scalamock.MockFactoryBase
 import org.scalamock.matchers.MockParameter
 
+import scala.concurrent.Future
+
 trait BlockchainStubHelpers { self: MockFactoryBase =>
-  def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain with NG = {
+  def createBlockchainStub(f: Blockchain => Unit = _ => ()): Blockchain & NG = {
     trait Blockchain1 extends Blockchain with NG
     val blockchain = stub[Blockchain1]
     f(blockchain) // Overrides
@@ -45,17 +47,21 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     (blockchain.leaseBalance _).when(*).returns(LeaseBalance.empty)
     (() => blockchain.height).when().returns(1)
     (blockchain.blockHeader _).when(*).returns {
-      val block = TestBlock.create(System.currentTimeMillis(), Nil)
+      val block = TestBlock.create(System.currentTimeMillis(), Nil).block
       Some(SignedBlockHeader(block.header, block.signature))
     }
     (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)
     (blockchain.assetDescription _).when(*).returns(None)
     (blockchain.balance _).when(TxHelpers.defaultAddress, Waves).returns(Long.MaxValue / 3)
+    (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue / 3))
     blockchain
   }
 
-  def createTxPublisherStub(blockchain: Blockchain): TransactionPublisher = { (transaction, _) =>
-    Future.successful(TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, transaction).map(_ => true))
+  def createTxPublisherStub(blockchain: Blockchain, enableExecutionLog: Boolean): TransactionPublisher = { (transaction, _) =>
+    Future.successful(
+      TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis(), enableExecutionLog = enableExecutionLog)(blockchain, transaction)
+        .map(_ => true)
+    )
   }
 
   implicit class BlockchainStubOps(blockchain: Blockchain) {
@@ -91,7 +97,9 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
               Height(1),
               script.map(script => AssetScriptInfo(script, 1L)),
               0L,
-              nft = false
+              nft = false,
+              0,
+              Height(1)
             )
           )
         )
@@ -102,7 +110,7 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         .returns(
           Some(
             (
-              TxMeta(Height(1), true, 0), // height
+              TxMeta(Height(1), Status.Succeeded, 0), // height
               IssueTransaction
                 .selfSigned(2.toByte, TestValues.keyPair, "test", "test", 10000, 8, reissuable = true, script, 500000L, 123L)
                 .explicitGet()
@@ -139,13 +147,12 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
         )
     }
 
-    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false): Transaction => TracedResult[ValidationError, Diff] = {
-      if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
-      else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, _)
-    }
+    def transactionDiffer(time: Time = SystemTime, withFailed: Boolean = false)(tx: Transaction): TracedResult[ValidationError, StateSnapshot] =
+      if (withFailed) TransactionDiffer(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
+      else TransactionDiffer.forceValidate(Some(time.correctedTime()), time.correctedTime())(blockchain, tx)
 
     def transactionPublisher(time: Time = SystemTime): TransactionPublisher = (tx: Transaction, _: Option[Channel]) => {
-      val differ = transactionDiffer(time)
+      val differ = transactionDiffer(time) _
       Future.successful(differ(tx).map(_ => true))
     }
   }

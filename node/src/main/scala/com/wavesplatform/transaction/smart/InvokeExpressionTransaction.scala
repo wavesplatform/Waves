@@ -16,7 +16,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Failure, Success, Try}
 
 case class InvokeExpressionTransaction(
-    version: TxVersion,
+    override val version: TxVersion,
     sender: PublicKey,
     expression: ExprScript,
     fee: TxPositiveAmount,
@@ -26,6 +26,7 @@ case class InvokeExpressionTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeExpression, Nil)
     with InvokeTransaction
+    with Versioned.ConstV1
     with PBSince.V1 {
 
   lazy val expressionBytes: ByteStr = expression.bytes.value()
@@ -50,8 +51,7 @@ case class InvokeExpressionTransaction(
 object InvokeExpressionTransaction extends TransactionParser {
   type TransactionT = InvokeExpressionTransaction
 
-  override val typeId: TxType                    = 18: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val typeId: TxType = 18: Byte
 
   implicit def sign(tx: InvokeExpressionTransaction, privateKey: PrivateKey): InvokeExpressionTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

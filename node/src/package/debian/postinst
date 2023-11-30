@@ -18,19 +18,19 @@ if [ "$1" = configure ]; then
         adduser $quiet ${{app_name}} ${{app_name}}
     fi
 
-    # ensure home directory ownership
-    mkdir -p /var/lib/${{app_name}}
-    chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
-    chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
-
-    # nicer log directory permissions
-    mkdir -p /var/log/${{app_name}}
-    chmod 770 /var/log/${{app_name}}
-    chown root:${{app_name}} /var/log/${{app_name}}
-
-    if [ -f /etc/${{app_name}}/waves.json ]; then
-        mv /etc/${{app_name}}/waves.json /etc/${{app_name}}/waves.json.bak
+    if [ ! -d /var/lib/${{app_name}} ] ; then
+        # ensure home directory ownership
+        mkdir -p /var/lib/${{app_name}}
+        chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
     fi
+
+    if [ ! -d /var/log/${{app_name}} ] ; then
+        # nicer log directory permissions
+        mkdir -p /var/log/${{app_name}}
+        chmod 770 /var/log/${{app_name}}
+        chown root:${{app_name}} /var/log/${{app_name}}
+    fi
+    chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
 
     if [ ! -f "$config_file" ]; then
         echo Creating default config file ...

@@ -6,7 +6,7 @@ import "waves/block.proto";
 import "waves/transaction.proto";
 import "waves/amount.proto";
 import "waves/recipient.proto";
-import "google/protobuf/empty.proto";
+import "waves/transaction_state_snapshot.proto";
 
 message AssetDetails {
   bytes name = 1;
@@ -26,14 +26,17 @@ message BlockMeta {
   int64 total_fee_in_waves = 7;
   int64 reward = 8;
   bytes vrf = 9;
+  bytes total_score = 10;
+  int64 total_waves_amount = 11;
 }
 
 message TransactionMeta {
   int32 height = 1;
   int32 num = 2;
   int32 type = 3;
-  bool failed = 4;
+  TransactionStatus status = 4;
   int64 spent_complexity = 5;
+  int32 size = 6;
 }
 
 message EthereumTransactionMeta {
@@ -57,7 +60,7 @@ message TransactionData {
     SignedTransaction waves_transaction = 2;
         bytes ethereum_transaction = 5;
   }
-  bool failed = 3;
+  TransactionStatus status = 3;
   int64 spent_complexity = 4;
 }
 
@@ -78,6 +81,9 @@ message StaticAssetInfo {
   bytes issuer_public_key = 2;
   int32 decimals = 3;
   bool is_nft = 4;
+  int32 sequence_in_block = 5;
+  int32 height = 6;
+  bytes id = 7;
 }
 
 message DataEntry {
@@ -105,9 +111,12 @@ message LeaseDetails {
   bytes source_id = 4;
   int32 height = 5;
 
-  oneof status {
-    google.protobuf.Empty active = 10;
+  oneof cancel_reason {
     Cancelled cancelled = 11;
     Expired expired = 12;
   }
+}
+
+message LeaseIds {
+  repeated bytes ids = 1;
 }

@@ -1,13 +1,14 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
-import com.wavesplatform.settings.SynchronizationSettings._
+import com.wavesplatform.settings.SynchronizationSettings.*
 
 import scala.concurrent.duration.FiniteDuration
 
 case class SynchronizationSettings(
     maxRollback: Int,
     synchronizationTimeout: FiniteDuration,
+    processedBlocksCacheTimeout: FiniteDuration,
     scoreTTL: FiniteDuration,
     maxBaseTarget: Option[Long],
     invalidBlocksStorage: InvalidBlockStorageSettings,

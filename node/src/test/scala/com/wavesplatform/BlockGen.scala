@@ -11,7 +11,7 @@ import org.scalatest.Suite
 
 trait BlockGen extends TransactionGen { _: Suite =>
 
-  import BlockGen._
+  import BlockGen.*
 
   val blockParamGen: Gen[(Seq[Transaction], KeyPair)] = for {
     count        <- Gen.choose(minTransactionsInBlockCount, maxTransactionsInBlockCount)
@@ -37,7 +37,9 @@ trait BlockGen extends TransactionGen { _: Suite =>
         txs,
         signer,
         Seq.empty,
-        -1L
+        -1L,
+        None,
+        None
       )
       .explicitGet()
 

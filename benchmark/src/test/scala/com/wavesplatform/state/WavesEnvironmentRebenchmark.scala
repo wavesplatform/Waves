@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -9,9 +8,10 @@ import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.lang.v1.traits.DataType.{Boolean, ByteArray, Long}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random
@@ -23,7 +23,7 @@ import scala.util.Random
 @Warmup(iterations = 100)
 @Measurement(iterations = 100)
 class WavesEnvironmentRebenchmark {
-  import WavesEnvironmentRebenchmark._
+  import WavesEnvironmentRebenchmark.*
 
   @Benchmark
   def resolveAlias(bh: Blackhole, st: St): Unit = {
@@ -50,7 +50,7 @@ class WavesEnvironmentRebenchmark {
   @Benchmark
   def assetBalanceOf(bh: Blackhole, st: St): Unit = {
     val useUnexisting = Random.nextBoolean()
-    val addressNr = Random.nextInt(st.allAddresses.size)
+    val addressNr     = Random.nextInt(st.allAddresses.size)
     if (useUnexisting) {
       bh.consume(st.environment.accountBalanceOf(st.allAddresses(addressNr), Some(Array[Byte](1, 2, 3))))
     } else {
@@ -123,7 +123,7 @@ class WavesEnvironmentRebenchmark {
   @Benchmark
   def biggestDataEntries(bh: Blackhole, st: St): Unit = {
     val address = Recipient.Address(
-      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf").explicitGet().bytes)
+      ByteStr(Address.fromString("3PFfUN4dRAyMN4nxYayES1CRZHJjS8JVCHf", None).explicitGet().bytes)
     )
     val checkBinaryOrString = Random.nextBoolean()
     if (checkBinaryOrString) {
@@ -138,15 +138,15 @@ object WavesEnvironmentRebenchmark {
   class St extends DBState {
     lazy val allAliases: Vector[Alias] = {
       val builder = Vector.newBuilder[Alias]
-      db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
-        builder += Alias.fromBytes(e.getKey.drop(2)).explicitGet()
+      rdb.db.iterateOver(KeyTags.AddressIdOfAlias) { e =>
+        builder += Alias.fromBytes(e.getKey.drop(2), None).explicitGet()
       }
       builder.result()
     }
 
     lazy val allAssets: Vector[Array[Byte]] = {
       val builder = Vector.newBuilder[Array[Byte]]
-      db.iterateOver(KeyTags.AssetDetailsHistory) { e =>
+      rdb.db.iterateOver(KeyTags.AssetDetailsHistory) { e =>
         builder += e.getKey.drop(2)
       }
       builder.result()
@@ -154,7 +154,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val allAddresses: IndexedSeq[Recipient.Address] = {
       val builder = Vector.newBuilder[Recipient.Address]
-      db.iterateOver(KeyTags.AddressId) { entry =>
+      rdb.db.iterateOver(KeyTags.AddressId) { entry =>
         builder += Recipient.Address(ByteStr(entry.getKey.drop(2)))
       }
       builder.result()
@@ -162,7 +162,7 @@ object WavesEnvironmentRebenchmark {
 
     lazy val allTransactions: IndexedSeq[Array[Byte]] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
       1.to(environment.height.toInt, 100)
         .flatMap { h =>
@@ -170,13 +170,13 @@ object WavesEnvironmentRebenchmark {
           if (txCount == 0)
             None
           else
-            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort))).map(_._2.id().arr)
+            rdb.db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort), rdb.txHandle)).map(_._2.id().arr)
         }
     }
 
-    lazy val dataEntries: IndexedSeq[(DataEntry[_], Recipient.Address)] = {
+    lazy val dataEntries: IndexedSeq[(DataEntry[?], Recipient.Address)] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
       1.to(environment.height.toInt, 10)
         .flatMap { h =>
@@ -184,19 +184,21 @@ object WavesEnvironmentRebenchmark {
           if (txCount == 0)
             None
           else
-            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case (meta, dataTx: DataTransaction) if meta.succeeded && dataTx.data.nonEmpty =>
-                (
-                  dataTx.data(Random.nextInt(dataTx.data.length)),
-                  Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
-                )
+            rdb.db
+              .get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort), rdb.txHandle))
+              .collect {
+                case (meta, dataTx: DataTransaction) if meta.status == Status.Succeeded && dataTx.data.nonEmpty =>
+                  (
+                    dataTx.data(Random.nextInt(dataTx.data.length)),
+                    Recipient.Address(ByteStr(dataTx.sender.toAddress.bytes))
+                  )
               }
         }
     }
 
     lazy val transferTransactions: IndexedSeq[ByteStr] = {
       val txCountAtHeight =
-        Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
+        Map.empty[Int, Int].withDefault(h => rdb.db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
       1.to(environment.height.toInt, 100)
         .flatMap { h =>
@@ -204,8 +206,9 @@ object WavesEnvironmentRebenchmark {
           if (txCount == 0)
             None
           else
-            db.get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort)))
-              .collect { case (meta, transferTx: TransferTransaction) if meta.succeeded => transferTx.id() }
+            rdb.db
+              .get(Keys.transactionAt(Height(h), TxNum(Random.nextInt(txCount).toShort), rdb.txHandle))
+              .collect { case (meta, transferTx: TransferTransaction) if meta.status == Status.Succeeded => transferTx.id() }
         }
     }
 

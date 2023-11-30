@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.TO_BIGINT
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
@@ -40,7 +41,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
                 Nil,
                 FUNCTION_CALL(
                   FunctionHeader.Native(FunctionIds.CREATE_LIST),
-                  List(action(FUNCTION_CALL(Native(TO_BIGINT), List(CONST_LONG(bigIntValue)))), REF("nil"))
+                  List(action(FUNCTION_CALL(Native(TO_BIGINT), List(CONST_LONG(bigIntValue)))), REF(GlobalValNames.Nil))
                 )
               )
             )
@@ -54,13 +55,12 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
       val dAppAcc = TxHelpers.signer(0)
       val invoker = TxHelpers.signer(1)
 
-      testDomain(AddrWithBalance.enoughBalances(dAppAcc, invoker), from = V5) {
-        case (version, d) =>
-          val setScript = TxHelpers.setScript(dAppAcc, dApp(action, version))
-          val invoke    = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
+      testDomain(AddrWithBalance.enoughBalances(dAppAcc, invoker), from = V5) { case (version, d) =>
+        val setScript = TxHelpers.setScript(dAppAcc, dApp(action, version))
+        val invoke    = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
 
-          d.appendBlock(setScript)
-          d.appendBlockE(invoke) should produce(message)
+        d.appendBlock(setScript)
+        d.appendBlockE(invoke) should produce(message)
       }
     }
 
@@ -81,7 +81,7 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
     val transfer: EXPR => FUNCTION_CALL = { expr =>
       FUNCTION_CALL(
         FunctionHeader.User("ScriptTransfer"),
-        List(FUNCTION_CALL(FunctionHeader.User("Address"), List(CONST_BYTESTR(ByteStr.empty).explicitGet())), expr, REF("unit"))
+        List(FUNCTION_CALL(FunctionHeader.User("Address"), List(CONST_BYTESTR(ByteStr.empty).explicitGet())), expr, REF(GlobalValNames.Unit))
       )
     }
 
@@ -136,21 +136,25 @@ class BigIntInvokeTest extends PropSpec with Inside with WithState with DBCacheS
 
     val invoke = TxHelpers.invoke(dAppAcc1.toAddress, func = Some("default"), invoker = dAppAcc1)
 
-    testDomain(from = V5) {
-      case (version, d) =>
-        val preparingTxs = Seq(
-          TxHelpers.genesis(dAppAcc1.toAddress),
-          TxHelpers.genesis(dAppAcc2.toAddress),
-          TxHelpers.setScript(dAppAcc1, dApp1(dAppAcc2.toAddress, version)),
-          TxHelpers.setScript(dAppAcc2, dApp2(version))
-        )
+    testDomain(from = V5) { case (version, d) =>
+      val preparingTxs = Seq(
+        TxHelpers.genesis(dAppAcc1.toAddress),
+        TxHelpers.genesis(dAppAcc2.toAddress),
+        TxHelpers.setScript(dAppAcc1, dApp1(dAppAcc2.toAddress, version)),
+        TxHelpers.setScript(dAppAcc2, dApp2(version))
+      )
 
-        d.appendBlock(preparingTxs*)
-        d.appendBlock(invoke)
+      d.appendBlock(preparingTxs*)
+      d.appendBlock(invoke)
 
-        d.liquidDiff.errorMessage(invoke.id()) shouldBe None
-        d.liquidDiff.scriptsRun shouldBe 2
-        d.liquidDiff.accountData.head._2.data("key").value shouldBe 1
+      d.liquidSnapshot.errorMessage(invoke.id()) shouldBe None
+      inside(d.liquidSnapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          call2.stateChanges.error shouldBe empty
+          call2.stateChanges.invokes shouldBe empty
+        }
+      }
+      d.liquidSnapshot.accountData.head._2("key").value shouldBe 1
     }
   }
 }

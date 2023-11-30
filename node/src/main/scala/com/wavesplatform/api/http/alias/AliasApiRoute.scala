@@ -5,8 +5,7 @@ import akka.http.scaladsl.server.Route
 import cats.syntax.either.*
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.requests.CreateAliasRequest
-import com.wavesplatform.api.http.{BroadcastRoute, *}
+import com.wavesplatform.api.http.*
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
@@ -24,19 +23,11 @@ case class AliasApiRoute(
     blockchain: Blockchain,
     routeTimeout: RouteTimeout
 ) extends ApiRoute
-    with BroadcastRoute
     with AuthRoute {
 
   override val route: Route = pathPrefix("alias") {
-    addressOfAlias ~ aliasOfAddress ~ deprecatedRoute
+    addressOfAlias ~ aliasOfAddress
   }
-
-  private def deprecatedRoute: Route =
-    path("broadcast" / "create") {
-      broadcast[CreateAliasRequest](_.toTx)
-    } ~ (path("create") & withAuth) {
-      broadcast[CreateAliasRequest](TransactionFactory.createAlias(_, wallet, time))
-    }
 
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     complete {
@@ -51,11 +42,10 @@ case class AliasApiRoute(
   private implicit val ess: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
-    routeTimeout.executeStreamed {
+    routeTimeout.executeFromObservable {
       commonApi
         .aliasesOfAddress(address)
         .map { case (_, tx) => JsString(tx.alias.toString) }
-        .toListL
-    }(identity)
+    }
   }
 }

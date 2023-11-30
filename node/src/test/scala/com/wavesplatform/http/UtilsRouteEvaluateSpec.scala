@@ -1,27 +1,32 @@
 package com.wavesplatform.http
-import com.wavesplatform.account.Address
+
+import akka.http.scaladsl.model.headers.Accept
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
+import com.wavesplatform.api.http.CustomJson
 import com.wavesplatform.api.http.utils.{UtilsApiRoute, UtilsInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.directives.values.V6
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.test.NumericExt
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
+import com.wavesplatform.transaction.{Asset, AssetIdLength, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
+import monix.execution.schedulers.SchedulerService
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks as PropertyChecks
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import play.api.libs.json.*
 
 import scala.concurrent.duration.DurationInt
 
@@ -32,6 +37,12 @@ class UtilsRouteEvaluateSpec
     with PathMockFactory
     with Inside
     with WithDomain {
+  private val timeBounded: SchedulerService = Schedulers.timeBoundedFixedPool(
+    new HashedWheelTimer(),
+    5.seconds,
+    1,
+    "rest-time-limited"
+  )
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
     new Time {
       def correctedTime(): Long = System.currentTimeMillis()
@@ -40,21 +51,22 @@ class UtilsRouteEvaluateSpec
     restAPISettings,
     Int.MaxValue,
     () => ScriptEstimatorV3.latest,
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-time-limited"
-    ),
+    timeBounded,
     stub[Blockchain]("globalBlockchain")
   )
 
+  override def afterAll(): Unit = {
+    timeBounded.shutdown()
+    super.afterAll()
+  }
+
   routePath("/script/evaluate/{address}") - {
-    val letFromContract = 1000
+    val xFromContract = 1000
     val testScript = TxHelpers.scriptV5(
       s"""
-         |let letFromContract = $letFromContract
+         |let x = $xFromContract
          |
+         |func any(value: Any) = value
          |func test(i: Int) = i * 10
          |func testB() = true
          |func testBS() = base58'MATCHER'
@@ -97,15 +109,10 @@ class UtilsRouteEvaluateSpec
     )
 
     val dAppAccount = TxHelpers.defaultSigner
-    val dAppAddress = TxHelpers.defaultSigner.toAddress
+    val dAppAddress = dAppAccount.toAddress
 
     def evalScript(text: String, address: Address = dAppAddress) =
       Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
-
-    def evalBin(expr: EXPR) = {
-      val serialized = ByteStr(SerdeV1.serialize(expr))
-      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
-    }
 
     def responseJson: JsObject = {
       val fullJson = responseAs[JsObject]
@@ -115,7 +122,7 @@ class UtilsRouteEvaluateSpec
     }
 
     "simple expression" in {
-      withDomain(RideV5) { d =>
+      withDomain(RideV5, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
         val blockchain = d.blockchain
         val api        = utilsApi.copy(blockchain = blockchain, settings = utilsApi.settings.copy(evaluateScriptComplexityLimit = 26000))
         val route      = seal(api.route)
@@ -124,7 +131,6 @@ class UtilsRouteEvaluateSpec
           responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
         }
 
-        d.helpers.creditWavesToDefaultSigner()
         d.helpers.setScript(dAppAccount, testScript)
 
         evalScript("testListArg([\"test\", 111, base64'dGVzdA==', false], \"test\", base58'aaa')") ~> route ~> check {
@@ -146,7 +152,7 @@ class UtilsRouteEvaluateSpec
               |        },
               |        "value" : {
               |          "type" : "ByteVector",
-              |          "value" : "11111111111111111111111111"
+              |          "value" : "3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e"
               |        }
               |      }
               |    } ]
@@ -159,7 +165,7 @@ class UtilsRouteEvaluateSpec
           (result \ "stateChanges").as[JsObject] shouldBe Json.parse(
             """
               |{
-              |    "data" : [ {"key":"test","type":"binary","value":"base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="} ],
+              |    "data" : [ {"key":"test","type":"binary","value":"base64:AVQ7/yyDy88aPjf+qhzZz/b3yDC2lXyJwWk="} ],
               |    "transfers" : [ ],
               |    "issues" : [ ],
               |    "reissues" : [ ],
@@ -205,10 +211,6 @@ class UtilsRouteEvaluateSpec
           responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
         }
 
-        evalBin(FUNCTION_CALL(FunctionHeader.User("test"), List(CONST_LONG(123)))) ~> route ~> check {
-          responseJson shouldBe Json.obj("type" -> "Int", "value" -> 1230)
-        }
-
         evalScript("testS()") ~> route ~> check {
           responseJson shouldBe Json.obj("type" -> "String", "value" -> "Test")
         }
@@ -241,8 +243,17 @@ class UtilsRouteEvaluateSpec
           responseJson shouldBe Json.obj("type" -> "Boolean", "value" -> true)
         }
 
-        evalScript("letFromContract - 1") ~> route ~> check {
-          responseJson shouldBe Json.obj("type" -> "Int", "value" -> (letFromContract - 1))
+        evalScript("x") ~> route ~> check {
+          responseJson.validate[JsObject] shouldBe JsSuccess(
+            Json.obj(
+              "type"  -> "Int",
+              "value" -> xFromContract
+            )
+          )
+        }
+
+        evalScript("x - 1") ~> route ~> check {
+          responseJson shouldBe Json.obj("type" -> "Int", "value" -> (xFromContract - 1))
         }
 
         (() => utilsApi.blockchain.settings)
@@ -270,7 +281,7 @@ class UtilsRouteEvaluateSpec
               |        },
               |        "value" : {
               |          "type" : "ByteVector",
-              |          "value" : "11111111111111111111111111"
+              |          "value" : "3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e"
               |        }
               |      }
               |    } ]
@@ -287,7 +298,7 @@ class UtilsRouteEvaluateSpec
               |  "data" : [ {
               |    "key" : "testSyncInvoke",
               |    "type" : "binary",
-              |    "value" : "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+              |    "value" : "base64:AVQ7/yyDy88aPjf+qhzZz/b3yDC2lXyJwWk="
               |  } ],
               |  "transfers" : [ ],
               |  "issues" : [ ],
@@ -329,7 +340,7 @@ class UtilsRouteEvaluateSpec
         evalScript(""" testSyncCallComplexityExcess() """) ~> customApi.route ~> check {
           val response = responseAs[JsValue]
           val message =
-            "InvokeRejectError(error = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded), log = \n\ttestSyncCallComplexityExcess.@args = []\n\tinvoke.@args = [\n\t\tAddress(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t),\n\t\t\"testSyncCallComplexityExcess\",\n\t\t[],\n\t\t[]\n\t]\n\tinvoke.@complexity = 75\n\t@complexityLimit = 122\n\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t@invokedDApp = Address(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t)\n\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\ti = Invocation(\n\t\t\toriginCaller = Address(\n\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t)\n\t\t\tpayments = []\n\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\tfeeAssetId = Unit\n\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\ttransactionId = base58''\n\t\t\tcaller = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\tfee = 0\n\t\t)\n\t\ttestSyncCallComplexityExcess.@args = []\n\t\tinvoke.@args = [\n\t\t\tAddress(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t),\n\t\t\t\"testSyncCallComplexityExcess\",\n\t\t\t[],\n\t\t\t[]\n\t\t]\n\t\tinvoke.@complexity = 75\n\t\t@complexityLimit = 44\n\t\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t\t@invokedDApp = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\t\ti = Invocation(\n\t\t\t\toriginCaller = Address(\n\t\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t\t)\n\t\t\t\tpayments = []\n\t\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\t\tfeeAssetId = Unit\n\t\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\t\ttransactionId = base58''\n\t\t\t\tcaller = Address(\n\t\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t\t)\n\t\t\t\tfee = 0\n\t\t\t)\n\t\t\ttestSyncCallComplexityExcess.@args = []\n\t\t)\n\t)\n)"
+            "InvokeRejectError(error = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded), log = \n\ttestSyncCallComplexityExcess.@args = []\n\tinvoke.@args = [\n\t\tAddress(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t),\n\t\t\"testSyncCallComplexityExcess\",\n\t\t[],\n\t\t[]\n\t]\n\tinvoke.@complexity = 75\n\t@complexityLimit = 122\n\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t@invokedDApp = Address(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t)\n\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\ti = Invocation(\n\t\t\toriginCaller = Address(\n\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t)\n\t\t\tpayments = []\n\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\tfeeAssetId = Unit\n\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\ttransactionId = base58''\n\t\t\tcaller = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\tfee = 2000000\n\t\t)\n\t\ttestSyncCallComplexityExcess.@args = []\n\t\tinvoke.@args = [\n\t\t\tAddress(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t),\n\t\t\t\"testSyncCallComplexityExcess\",\n\t\t\t[],\n\t\t\t[]\n\t\t]\n\t\tinvoke.@complexity = 75\n\t\t@complexityLimit = 44\n\t\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t\t@invokedDApp = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\t\ti = Invocation(\n\t\t\t\toriginCaller = Address(\n\t\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t\t)\n\t\t\t\tpayments = []\n\t\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\t\tfeeAssetId = Unit\n\t\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\t\ttransactionId = base58''\n\t\t\t\tcaller = Address(\n\t\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t\t)\n\t\t\t\tfee = 2000000\n\t\t\t)\n\t\t\ttestSyncCallComplexityExcess.@args = []\n\t\t)\n\t)\n)"
           (response \ "message").as[String] shouldBe message
           (response \ "error").as[Int] shouldBe ScriptExecutionError.Id
         }
@@ -350,6 +361,17 @@ class UtilsRouteEvaluateSpec
             s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
+        evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          (responseAs[JsObject] - "stateChanges") should matchJson(s"""{
+            "result":{
+              "type":"BigInt",
+              "value":"${PureContext.BigIntMax.toString()}"
+            },
+            "complexity":65,
+            "expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")",
+            "address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+            }""")
+        }
 
         val dAppAccount2 = TxHelpers.secondSigner
         val dAppAddress2 = TxHelpers.secondAddress
@@ -366,7 +388,7 @@ class UtilsRouteEvaluateSpec
 
         evalScript(""" callable() """, dAppAddress2) ~> route ~> check {
           (responseAs[JsObject] - "stateChanges") should matchJson(
-            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
+            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
           )
         }
 
@@ -380,6 +402,16 @@ class UtilsRouteEvaluateSpec
 
         evalScript(s"nestedCalls([(\"$dAppAddress2\", \"call\", [123, \"abc\"]), (\"$dAppAddress\", \"getValue\", [])])") ~> route ~> check {
           (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
+        }
+
+        evalScript(s"any(${Long.MaxValue})") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          responseJson shouldBe Json.obj("type" -> "Int", "value" -> s"${Long.MaxValue}")
+        }
+
+        evalScript(s"any([${Long.MaxValue}, 0, ${Long.MinValue}])") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          (responseJson \ "type").as[String] shouldBe "Array"
+          (responseJson \ "value").get.toString shouldBe
+            s"""[{"type":"Int","value":"${Long.MaxValue}"},{"type":"Int","value":"0"},{"type":"Int","value":"${Long.MinValue}"}]"""
         }
       }
     }
@@ -413,676 +445,1341 @@ class UtilsRouteEvaluateSpec
       }
     }
 
-    "invocation" - {
-      withDomain(RideV6) { d =>
-        def dApp(caller: Address) = TestCompiler(V6).compileContract(
+    "invocation" in {
+      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))) { d =>
+        val route   = utilsApi.copy(blockchain = d.blockchain).route
+        val issueTx = issue()
+        val asset   = IssuedAsset(issueTx.id())
+        d.appendBlock(issueTx, sponsor(asset, Some(1)), transfer(asset = asset, amount = 12345678))
+        d.appendBlock(setScript(defaultSigner, dApp(caller = secondAddress, secondSigner.publicKey, asset)))
+
+        // successful result
+        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(asset)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").isEmpty shouldBe true
+          json.as[UtilsInvocationRequest] shouldBe invocation(asset).as[UtilsInvocationRequest]
+        }
+
+        // trace
+        Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation(asset)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").as[JsArray] shouldBe expectedTrace(asset)
+        }
+
+        // all fields are empty (empty request body)
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 12
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+        }
+
+        // conflicting request structure
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation(asset)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
+          (json \ "error").as[Int] shouldBe 198
+        }
+
+        // wrong invocation format
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("call" -> Json.obj("function" -> 1))) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "message").as[String] shouldBe "failed to parse json message"
+          (json \ "validationErrors") match {
+            case JsDefined(validationErrors) =>
+              validationErrors should matchJson("""{
+                  "obj.call": [
+                    {
+                      "msg": ["Unexpected call function name format"],
+                      "args": []
+                    }
+                  ]
+                }""")
+            case _: JsUndefined => fail("No validation errors")
+          }
+        }
+
+        // sender address can be calculated from PK
+        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(asset, None)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").isEmpty shouldBe true
+          json.as[UtilsInvocationRequest] shouldBe invocation(asset, None).as[UtilsInvocationRequest]
+        }
+
+        // invocation sender address can differ from PK address
+        d.appendBlock(setScript(defaultSigner, dApp(caller = signer(2).toAddress, signer(2).publicKey, asset)))
+        d.appendBlock(transfer(defaultSigner, signer(2).toAddress, 1234567, asset))
+        val request = invocation(asset, Some(signer(2).toAddress), signer(2).publicKey)
+        Post(routePath(s"/script/evaluate/$defaultAddress"), request) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").isEmpty shouldBe true
+          json.as[UtilsInvocationRequest] shouldBe request.as[UtilsInvocationRequest]
+        }
+      }
+    }
+
+    "with state" - {
+      val callerKeyPair = signer(1)
+      val callerAddress = callerKeyPair.toAddress
+
+      val scriptTransferReceiver        = signer(2)
+      val scriptTransferReceiverAddress = scriptTransferReceiver.toAddress
+
+      val assetIssuer        = signer(3)
+      val assetIssuerAddress = assetIssuer.toAddress
+
+      val dAppAccount = signer(4) // Should be different from default signer, because we're checking balances
+      val dAppAddress = dAppAccount.toAddress
+
+      val issueTx = issue(issuer = assetIssuer)
+      val asset   = IssuedAsset(issueTx.id())
+
+      def toRide(asset: Asset) = asset.fold("unit")(id => s"base58'$id'")
+
+      def dAppWithTransfer(assetAndAmounts: (Asset, Long)*): Script = {
+        def toScriptTransfer(asset: Asset, amount: Long): String = s"ScriptTransfer(receiver, $amount, ${toRide(asset)})"
+
+        val scriptText =
           s"""
              | @Callable(i)
-             | func f(arg1: Int, arg2: String) = {
-             |   let check =
-             |     this                    == Address(base58'$defaultAddress')            &&
-             |     i.caller                == Address(base58'$caller')                    &&
-             |     i.originCaller          == Address(base58'$caller')                    &&
-             |     i.callerPublicKey       == base58'${secondSigner.publicKey}'           &&
-             |     i.originCallerPublicKey == base58'${secondSigner.publicKey}'           &&
-             |     i.fee                   == 123456                                      &&
-             |     i.payments              == [AttachedPayment(unit, 1)]                  &&
-             |     i.transactionId         == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' &&
-             |     i.feeAssetId            == base58'abcd'                                &&
-             |     arg1 == 123 && arg2 == "abc"
-             |   if (check) then [] else throw("wrong")
-             | }
-             |
-             | @Callable(i)
              | func default() = {
-             |   let check =
-             |     this                    == Address(base58'$defaultAddress')            &&
-             |     i.caller                == Address(base58'${"1" * 26}')                &&
-             |     i.originCaller          == Address(base58'${"1" * 26}')                &&
-             |     i.callerPublicKey       == base58'${"1" * 32}'                         &&
-             |     i.originCallerPublicKey == base58'${"1" * 32}'                         &&
-             |     i.fee                   == 500000                                      &&
-             |     i.payments              == []                                          &&
-             |     i.transactionId         == base58'${"1" * 32}'                         &&
-             |     i.feeAssetId            == unit
-             |   if (check) then [] else throw("wrong")
-             | }
-           """.stripMargin
-        )
-        d.appendBlock(setScript(defaultSigner, dApp(caller = secondAddress)))
+             |   let receiver = Address(base58'$scriptTransferReceiverAddress')
+             |   [ ${assetAndAmounts.map(Function.tupled(toScriptTransfer)).mkString(", ")} ]
+             | }""".stripMargin
 
-        val route = utilsApi.copy(blockchain = d.blockchain).route
-        def invocation(senderAddress: Option[Address] = Some(secondAddress)) =
+        TestCompiler(V6).compileContract(
+          scriptText
+        )
+      }
+
+      def mkSetScriptTx(transferAssetAmounts: (Asset, Long)*) = setScript(dAppAccount, dAppWithTransfer(transferAssetAmounts*))
+
+      "expr" - {
+        def mkExprJson(state: JsObject): JsObject =
           Json
             .parse(
-              s"""
-                 | {
-                 |  "call": {
-                 |    "function": "f",
-                 |    "args": [
-                 |      {
-                 |        "type": "integer",
-                 |        "value": 123
-                 |      },
-                 |      {
-                 |        "type": "string",
-                 |        "value": "abc"
-                 |      }
-                 |    ]
-                 |  },
-                 |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
-                 |  "fee": 123456,
-                 |  "feeAssetId": "abcd",
-                 |  ${senderAddress.fold("")(a => s""""sender": "$a",""")}
-                 |  "senderPublicKey": "${secondSigner.publicKey}",
-                 |  "payment": [
-                 |    {
-                 |      "amount": 1,
-                 |      "assetId": null
-                 |    }
-                 |  ]
-                 | }
-               """.stripMargin
+              s""" {
+                 |  "expr": "default()",
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
             )
             .as[JsObject]
 
-        val expectedTrace =
-          Json.parse(
-            s"""
-               | [
-               |  {
-               |    "name": "f.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Int",
-               |        "value": 123
-               |      },
-               |      {
-               |        "type": "String",
-               |        "value": "abc"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51999
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |          }
-               |        }
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51998
-               |  },
-               |  {
-               |    "name": "i",
-               |    "type": "Invocation",
-               |    "value": {
-               |      "originCaller": {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      "payments": {
-               |        "type": "Array",
-               |        "value": [
-               |          {
-               |            "type": "AttachedPayment",
-               |            "value": {
-               |              "amount": {
-               |                "type": "Int",
-               |                "value": 1
-               |              },
-               |              "assetId": {
-               |                "type": "Unit",
-               |                "value": {}
-               |              }
-               |            }
-               |          }
-               |        ]
-               |      },
-               |      "callerPublicKey": {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      "feeAssetId": {
-               |        "type": "ByteVector",
-               |        "value": "abcd"
-               |      },
-               |      "originCallerPublicKey": {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      "transactionId": {
-               |        "type": "ByteVector",
-               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
-               |      },
-               |      "caller": {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      "fee": {
-               |        "type": "Int",
-               |        "value": 123456
-               |      }
-               |    }
-               |  },
-               |  {
-               |    "name": "Address.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51997
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51996
-               |  },
-               |  {
-               |    "name": "Address.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51995
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51994
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51993
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51992
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Int",
-               |        "value": 123456
-               |      },
-               |      {
-               |        "type": "Int",
-               |        "value": 123456
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51991
-               |  },
-               |  {
-               |    "name": "AttachedPayment.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Unit",
-               |        "value": {}
-               |      },
-               |      {
-               |        "type": "Int",
-               |        "value": 1
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "AttachedPayment.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51990
-               |  },
-               |  {
-               |    "name": "cons.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "AttachedPayment",
-               |        "value": {
-               |          "assetId": {
-               |            "type": "Unit",
-               |            "value": {}
-               |          },
-               |          "amount": {
-               |            "type": "Int",
-               |            "value": 1
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Array",
-               |        "value": []
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "cons.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51989
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Array",
-               |        "value": [
-               |          {
-               |            "type": "AttachedPayment",
-               |            "value": {
-               |              "amount": {
-               |                "type": "Int",
-               |                "value": 1
-               |              },
-               |              "assetId": {
-               |                "type": "Unit",
-               |                "value": {}
-               |              }
-               |            }
-               |          }
-               |        ]
-               |      },
-               |      {
-               |        "type": "Array",
-               |        "value": [
-               |          {
-               |            "type": "AttachedPayment",
-               |            "value": {
-               |              "assetId": {
-               |                "type": "Unit",
-               |                "value": {}
-               |              },
-               |              "amount": {
-               |                "type": "Int",
-               |                "value": 1
-               |              }
-               |            }
-               |          }
-               |        ]
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51988
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51987
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "abcd"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "abcd"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51986
-               |  },
-               |  {
-               |    "name": "arg1",
-               |    "type": "Int",
-               |    "value": 123
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Int",
-               |        "value": 123
-               |      },
-               |      {
-               |        "type": "Int",
-               |        "value": 123
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51985
-               |  },
-               |  {
-               |    "name": "arg2",
-               |    "type": "String",
-               |    "value": "abc"
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "String",
-               |        "value": "abc"
-               |      },
-               |      {
-               |        "type": "String",
-               |        "value": "abc"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51984
-               |  },
-               |  {
-               |    "name": "check",
-               |    "type": "Boolean",
-               |    "value": true
-               |  }
-               |]
-             """.stripMargin
+        "negative" in {
+          val exprTests = Table[Seq[(Asset, Long)]](
+            "paymentAssetWithAmounts",
+            Seq(Asset.Waves -> 3),
+            Seq(asset       -> 3),
+            Seq(Asset.Waves -> 3, asset -> 3)
           )
 
-        "successful result" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation().as[UtilsInvocationRequest]
+          forAll(exprTests) { paymentAssetWithAmounts =>
+            val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
+
+            val hasWavesAsset  = paymentAssetWithAmounts.exists { case (a, _) => a == Asset.Waves }
+            val hasIssuedAsset = paymentAssetWithAmounts.exists { case (a, _) => a == asset }
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+
+              // -1 to test insufficient funds
+              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum - 1
+
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  dAppAddress.toString -> Json
+                    .obj()
+                    .deepMerge {
+                      if (hasWavesAsset) Json.obj("regularBalance" -> collectLessBalance(Asset.Waves))
+                      else Json.obj()
+                    }
+                    .deepMerge {
+                      if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> collectLessBalance(asset)))
+                      else Json.obj()
+                    }
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkExprJson(blockchainOverrides)
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").asOpt[Int] shouldBe Some(199)
+                  withClue("message: ") {
+                    (json \ "message").as[String] should include regex """negative \w+ balance.+ -1"""
+                  }
+                }
+              }
+            }
           }
         }
 
-        "trace" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").as[JsArray] shouldBe expectedTrace
+        "positive" in {
+          val exprTests = Table[Seq[(Asset, Long)]](
+            "paymentAssetWithAmounts",
+            Seq(Asset.Waves -> 1),
+            Seq(asset       -> 1),
+            Seq(Asset.Waves -> 1, asset -> 2)
+          )
+
+          forAll(exprTests) { paymentAssetWithAmounts =>
+            val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
+
+            val hasIssuedAsset = paymentAssetWithAmounts.exists { case (a, _) => a == asset }
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+
+              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  dAppAddress.toString -> Json
+                    .obj("regularBalance" -> collectBalance(Asset.Waves))
+                    .deepMerge {
+                      if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> collectBalance(asset)))
+                      else Json.obj()
+                    }
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkExprJson(blockchainOverrides)
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").toOption shouldBe empty
+                  withClue("stateChanges: ") {
+                    (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
+                      paymentAssetWithAmounts.map { case (asset, amount) =>
+                        Json.obj(
+                          "address" -> scriptTransferReceiverAddress.toString,
+                          "asset"   -> Json.toJson(asset),
+                          "amount"  -> amount
+                        )
+                      }
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      val defaultInvocationFee = 1234567
+      "invocation" - {
+        "negative" in {
+          val sponsorshipTx = sponsor(asset, Some(100000), assetIssuer)
+
+          def toPaymentJson(asset: Asset, amount: Long): String =
+            s""" {
+               |   "assetId": ${Json.toJson(asset)},
+               |   "amount": $amount
+               | }"""
+
+          def mkInvocationWithPaymentJson(feeAsset: Asset, state: JsObject, paymentAssetWithAmounts: Seq[(Asset, Long)]): JsObject = Json
+            .parse(
+              s""" {
+                 |  "call": {
+                 |    "function": "default"
+                 |  },
+                 |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+                 |  "fee": $defaultInvocationFee,
+                 |  "feeAssetId": ${Json.toJson(feeAsset)},
+                 |  "sender": "$callerAddress",
+                 |  "senderPublicKey": "${callerKeyPair.publicKey}",
+                 |  "payment": [
+                 |    ${paymentAssetWithAmounts.map(Function.tupled(toPaymentJson)).mkString(",\n")}
+                 |  ],
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
+            )
+            .as[JsObject]
+
+          val invocationTests = Table[Asset, Seq[(Asset, Long)]](
+            ("feeAsset", "paymentAssetWithAmounts"),
+            (Asset.Waves, Seq(Asset.Waves -> 1)),
+            (Asset.Waves, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1)),
+            (asset, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1, asset -> 2)),
+            (Asset.Waves, Seq(Asset.Waves -> 1, asset -> 2))
+          )
+
+          forAll(invocationTests) { case (feeAsset, paymentAssetWithAmounts) =>
+            val setScriptTx = mkSetScriptTx(paymentAssetWithAmounts*)
+
+            val hasWavesAsset  = paymentAssetWithAmounts.exists { case (a, _) => a == Asset.Waves }
+            val hasIssuedAsset = (paymentAssetWithAmounts.map(_._1) :+ feeAsset).contains(asset)
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                val sponsoredExtra = if (feeAsset == asset) sponsorshipTx.fee.value + defaultInvocationFee else 0
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value + sponsoredExtra))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+              if (feeAsset == asset) d.appendBlock(sponsorshipTx)
+
+              val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
+
+              // -1 to test insufficient funds
+              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum - 1
+
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  callerAddress.toString -> Json
+                    .obj()
+                    .deepMerge {
+                      if (hasWavesAsset) Json.obj("regularBalance" -> (invocationFeeInWaves + collectLessBalance(Asset.Waves)))
+                      else Json.obj()
+                    }
+                    .deepMerge {
+                      if (hasIssuedAsset) Json.obj("assetBalances" -> Json.obj(asset.toString -> (invocationFeeInAsset + collectLessBalance(asset))))
+                      else Json.obj()
+                    }
+                )
+              )
+
+              val invJsonObj = mkInvocationWithPaymentJson(
+                feeAsset = feeAsset,
+                state = blockchainOverrides,
+                paymentAssetWithAmounts = paymentAssetWithAmounts
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                invJsonObj
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").asOpt[Int] shouldBe Some(402)
+                  withClue("details: ") {
+                    (json \ "details").toString should include regex """negative \w+ balance.+ -1"""
+                  }
+                }
+              }
+            }
           }
         }
 
-        "all fields are empty (empty request body)" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 12
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+        "positive" in {
+          val sponsorshipTx = sponsor(asset, Some(100000), assetIssuer)
+
+          def toPaymentJson(asset: Asset, amount: Long): String =
+            s""" {
+               |   "assetId": ${Json.toJson(asset)},
+               |   "amount": $amount
+               | }"""
+
+          def mkInvocationWithPaymentJson(feeAsset: Asset, state: JsObject, paymentAssetWithAmounts: Seq[(Asset, Long)]): JsObject = Json
+            .parse(
+              s""" {
+                 |  "call": {
+                 |    "function": "default"
+                 |  },
+                 |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+                 |  "fee": $defaultInvocationFee,
+                 |  "feeAssetId": ${Json.toJson(feeAsset)},
+                 |  "sender": "$callerAddress",
+                 |  "senderPublicKey": "${callerKeyPair.publicKey}",
+                 |  "payment": [
+                 |    ${paymentAssetWithAmounts.map(Function.tupled(toPaymentJson)).mkString(",\n")}
+                 |  ],
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
+            )
+            .as[JsObject]
+
+          val invocationTests = Table[Asset, Seq[(Asset, Long)]](
+            ("feeAsset", "paymentAssetWithAmounts"),
+            (Asset.Waves, Seq(Asset.Waves -> 1)),
+            (Asset.Waves, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1)),
+            (asset, Seq(asset -> 1)),
+            (asset, Seq(Asset.Waves -> 1, asset -> 2)),
+            (Asset.Waves, Seq(Asset.Waves -> 1, asset -> 2))
+          )
+
+          forAll(invocationTests) { case (feeAsset, paymentAssetWithAmounts) =>
+            val setScriptTx    = mkSetScriptTx(paymentAssetWithAmounts*)
+            val hasIssuedAsset = (paymentAssetWithAmounts.map(_._1) :+ feeAsset).contains(asset)
+            withDomain(
+              RideV6,
+              Seq(AddrWithBalance(dAppAddress, setScriptTx.fee.value)) ++ {
+                val sponsoredExtra = if (feeAsset == asset) sponsorshipTx.fee.value + defaultInvocationFee else 0
+                if (hasIssuedAsset) Seq(AddrWithBalance(assetIssuerAddress, issueTx.fee.value + sponsoredExtra))
+                else Seq()
+              }
+            ) { d =>
+              d.appendBlock(setScriptTx)
+              if (hasIssuedAsset) d.appendBlock(issueTx)
+              if (feeAsset == asset) d.appendBlock(sponsorshipTx)
+
+              val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
+
+              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+
+              val callerWavesBalance = invocationFeeInWaves + collectBalance(Asset.Waves)
+              val callerAssetBalance = invocationFeeInAsset + collectBalance(asset)
+              val blockchainOverrides = Json.obj(
+                "accounts" -> Json.obj(
+                  callerAddress.toString -> Json
+                    .obj(
+                      "regularBalance" -> callerWavesBalance,
+                      "assetBalances"  -> Json.obj(asset.toString -> callerAssetBalance)
+                    )
+                )
+              )
+
+              Post(
+                routePath(s"/script/evaluate/$dAppAddress"),
+                mkInvocationWithPaymentJson(
+                  feeAsset = feeAsset,
+                  state = blockchainOverrides,
+                  paymentAssetWithAmounts = paymentAssetWithAmounts
+                )
+              ) ~> utilsApi.copy(blockchain = d.blockchain).route ~> check {
+                val json = responseAs[JsValue]
+                withClue(s"${Json.prettyPrint(json)}: ") {
+                  (json \ "error").toOption shouldBe empty
+                  withClue("stateChanges: ") {
+                    (json \ "stateChanges" \ "transfers").as[JsArray] shouldBe JsArray(
+                      paymentAssetWithAmounts.map { case (asset, amount) =>
+                        Json.obj(
+                          "address" -> scriptTransferReceiverAddress.toString,
+                          "asset"   -> Json.toJson(asset),
+                          "amount"  -> amount
+                        )
+                      }
+                    )
+                  }
+                }
+              }
+            }
           }
         }
+      }
 
-        "conflicting request structure" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation()) ~> route ~> check {
+      "waves balances" in {
+        val miner        = scriptTransferReceiver
+        val minerAddress = miner.toAddress
+
+        val script = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = ([], wavesBalance(Address(base58'$minerAddress')))
+             | """.stripMargin
+        )
+        val setScriptTx = setScript(dAppAccount, script)
+
+        def invocation(state: JsObject) =
+          Json
+            .parse(
+              s""" {
+                 |  "expr": "default()",
+                 |  "state": ${Json.prettyPrint(state)}
+                 | }""".stripMargin
+            )
+            .as[JsObject]
+
+        val minerInitialWavesBalance = 10001
+        val leasingTx                = lease(miner, dAppAddress, 333)
+
+        withDomain(
+          RideV6,
+          Seq(
+            AddrWithBalance(dAppAddress, setScriptTx.fee.value),
+            AddrWithBalance(minerAddress, minerInitialWavesBalance + leasingTx.fee.value)
+          )
+        ) { d =>
+          d.appendBlock(setScriptTx, leasingTx)
+          val route = utilsApi.copy(blockchain = d.blockchain).route
+
+          markup("without overrides")
+          Post(
+            routePath(s"/script/evaluate/$dAppAddress"),
+            invocation(Json.obj())
+          ) ~> route ~> check {
             val json = responseAs[JsValue]
-            (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
-            (json \ "error").as[Int] shouldBe 198
+            withClue(s"${Json.prettyPrint(json)}: ") {
+              (json \ "error").toOption shouldBe empty
+              withClue("result: ") {
+                def check(tpe: String, expected: Long): Unit = withClue(s"$tpe: ") {
+                  (json \ "result" \ "value" \ "_2" \ "value" \ tpe \ "value").asOpt[Long] shouldBe Some(expected)
+                }
+
+                check("available", minerInitialWavesBalance - leasingTx.amount.value)
+                check("regular", minerInitialWavesBalance)
+                check("generating", minerInitialWavesBalance - leasingTx.amount.value)
+                check("effective", minerInitialWavesBalance - leasingTx.amount.value)
+              }
+            }
           }
-        }
 
-        "sender address can be calculated from PK" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(None)) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation(None).as[UtilsInvocationRequest]
-          }
-        }
+          markup("with overrides")
+          forAll(Table("regularBalanceDiff", -1000, 0, 1000)) { regularBalanceDiff =>
+            val minerOverriddenWavesBalance = minerInitialWavesBalance + regularBalanceDiff
+            Post(
+              routePath(s"/script/evaluate/$dAppAddress"),
+              invocation(
+                Json.obj(
+                  "accounts" -> Json.obj(
+                    minerAddress.toString -> Json.obj("regularBalance" -> minerOverriddenWavesBalance)
+                  )
+                )
+              )
+            ) ~> route ~> check {
+              val json = responseAs[JsValue]
+              withClue(s"${Json.prettyPrint(json)}: ") {
+                (json \ "error").toOption shouldBe empty
+                withClue("result: ") {
+                  def check(tpe: String, expected: Long): Unit = withClue(s"$tpe: ") {
+                    (json \ "result" \ "value" \ "_2" \ "value" \ tpe \ "value").asOpt[Long] shouldBe Some(expected)
+                  }
 
-        "sender address can differ from PK address" in withDomain(RideV6) { d =>
-          val customSender = signer(2).toAddress
-          val route        = utilsApi.copy(blockchain = d.blockchain).route
-          d.appendBlock(setScript(defaultSigner, dApp(caller = customSender)))
-
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(Some(customSender))) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation(Some(customSender)).as[UtilsInvocationRequest]
+                  check("available", minerOverriddenWavesBalance - leasingTx.amount.value)
+                  check("regular", minerOverriddenWavesBalance)
+                  check("generating", math.min(minerInitialWavesBalance, minerOverriddenWavesBalance) - leasingTx.amount.value)
+                  check("effective", minerOverriddenWavesBalance - leasingTx.amount.value)
+                }
+              }
+            }
           }
         }
       }
     }
+
+    "validation of root call" in {
+      withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 0.01 waves))) { d =>
+        val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+        val dApp = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func action() = [ ScriptTransfer(Address(base58'$defaultAddress'), 1, unit) ]
+             |
+             | @Callable(i)
+             | func default() = []
+             |
+             | @Callable(i)
+             | func issueAndTransfer() = {
+             |   let issue = Issue("name", "description", 1000, 4, true, unit, 0)
+             |   [
+             |     issue,
+             |     ScriptTransfer(Address(base58'$defaultAddress'), 1, calculateAssetId(issue))
+             |   ]
+             | }
+             |
+             | @Callable(i)
+             | func syncCallWithPayment() = {
+             |   strict r = Address(base58'$defaultAddress').invoke("default", [], [AttachedPayment(unit, 100)])
+             |   []
+             | }
+           """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp))
+
+        // negative balance after applying action
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("expr" -> "action()")) ~> route ~> check {
+          responseAs[String] should include("AccountBalanceError")
+        }
+
+        // negative fee
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("fee" -> -1)) ~> route ~> check {
+          responseAs[String] should include("error = Fee in WAVES for InvokeScriptTransaction (-1 in WAVES)")
+        }
+
+        // illegal fee asset id
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("feeAssetId" -> "xxxxx")) ~> route ~> check {
+          responseAs[String] should include("Asset xxxxx does not exist, cannot be used to pay fees")
+        }
+
+        // negative payment
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.parse("""{"payment":[{"amount":-1,"assetId":null}]}""")) ~> route ~> check {
+          responseAs[String] should include("non-positive amount: -1 of Waves")
+        }
+
+        // illegal payment asset id
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse(s"""{"payment":[{"amount":1,"assetId":"${ByteStr.fill(AssetIdLength)(1)}"}]}""")
+        ) ~> route ~> check {
+          responseAs[String] should include("Accounts balance errors")
+        }
+
+        // issue and transfer
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.obj("fee" -> 100500000, "call" -> Json.obj("function" -> "issueAndTransfer"))
+        ) ~> route ~> check {
+          val actions = responseAs[JsObject] \ "result" \ "value"
+          (actions \ 0 \ "type").as[String] shouldBe "Issue"
+          (actions \ 1 \ "type").as[String] shouldBe "ScriptTransfer"
+        }
+
+        // transaction payment attached to sync call
+        d.appendBlock(setScript(defaultSigner, dApp))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"syncCallWithPayment"}, "payment":[{"amount":100,"assetId":null}]}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "payment" \ 0 \ "amount").as[Int] shouldBe 100
+          (responseAs[JsObject] \ "stateChanges" \ "invokes" \ 0 \ "payment" \ 0 \ "amount").as[Int] shouldBe 100
+        }
+
+        // not enough payment amount to attach to sync call
+        d.appendBlock(setScript(defaultSigner, dApp))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"syncCallWithPayment"}, "payment":[{"amount":99,"assetId":null}]}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "payment" \ 0 \ "amount").as[Int] shouldBe 99
+          (responseAs[JsObject] \ "message").as[String] should include("negative waves balance")
+        }
+      }
+    }
+
+    "taking into account sync call transfers" in {
+      val thirdAddress = signer(2).toAddress
+      withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 0.01 waves), AddrWithBalance(thirdAddress, 1 waves))) { d =>
+        val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+        val dApp1 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func call1() = {
+             |   strict r = Address(base58'$thirdAddress').invoke("call2", [], [])
+             |   [ ScriptTransfer(Address(base58'$defaultAddress'), 100, unit) ]
+             | }
+           """.stripMargin
+        )
+        val dApp2 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func call2() = [ ScriptTransfer(i.caller, 100, unit) ]
+           """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp1))
+        d.appendBlock(setScript(signer(2), dApp2))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"call1"}}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "message").asOpt[String] should not be defined
+          (responseAs[JsObject] \ "result").asOpt[JsObject] shouldBe defined
+          (responseAs[JsObject] \ "call").asOpt[JsObject] shouldBe defined
+        }
+      }
+    }
+
+    "taking into account sync call payments" in {
+      val thirdAddress = signer(2).toAddress
+      withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 1 waves), AddrWithBalance(thirdAddress, 0.01 waves))) { d =>
+        val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+        val dApp1 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func call1() = {
+             |   strict r = Address(base58'$thirdAddress').invoke("call2", [], [AttachedPayment(unit, 100)])
+             |   []
+             | }
+           """.stripMargin
+        )
+        val dApp2 = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func call2() = [ ScriptTransfer(Address(base58'$defaultAddress'), 100, unit) ]
+           """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp1))
+        d.appendBlock(setScript(signer(2), dApp2))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"call1"}}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "message").asOpt[String] should not be defined
+          (responseAs[JsObject] \ "result").asOpt[JsObject] shouldBe defined
+          (responseAs[JsObject] \ "call").asOpt[JsObject] shouldBe defined
+        }
+      }
+    }
   }
+
+  "SAPI-833. correctly sent chainId when sender is not set" in {
+    val dappAccount    = TxHelpers.signer(224)
+    val anotherAccount = TxHelpers.signer(224)
+    withDomain(RideV6, Seq(AddrWithBalance(dappAccount.toAddress, 20.waves))) { d =>
+      val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+      d.appendBlock(
+        TxHelpers.setScript(
+          dappAccount,
+          TestCompiler(V6).compileContract("""@Callable(i)
+                                             |func returnCallerData() = {
+                                             |  ([], i.caller.toString() + i.callerPublicKey.toBase58String())
+                                             |}
+                                             |""".stripMargin)
+        )
+      )
+
+      import UtilsApiRoute.{DefaultAddress, DefaultPublicKey}
+
+      val callerData = Table(
+        ("senderPublicKey", "sender", "expectedResult"),
+        (JsNull, JsNull, s"$DefaultAddress$DefaultPublicKey"),
+        (JsString(DefaultPublicKey.toString), JsNull, s"$DefaultAddress$DefaultPublicKey"),
+        (JsNull, JsString(DefaultAddress.toString), s"$DefaultAddress$DefaultPublicKey"),
+        (JsString(dappAccount.publicKey.toString), JsNull, s"${dappAccount.toAddress}${dappAccount.publicKey}"),
+        (JsNull, JsString(dappAccount.toAddress.toString), s"${dappAccount.toAddress}$DefaultPublicKey"),
+        (
+          JsString(dappAccount.publicKey.toString),
+          JsString(anotherAccount.toAddress.toString),
+          s"${anotherAccount.toAddress}${dappAccount.publicKey}"
+        )
+      )
+
+      forAll(callerData) { case (senderPublicKey, sender, resultStr) =>
+        Post(
+          routePath(s"/script/evaluate/${dappAccount.toAddress}"),
+          Json.obj("sender" -> sender, "senderPublicKey" -> senderPublicKey, "call" -> Json.obj("function" -> JsString("returnCallerData")))
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "message").asOpt[String] should not be defined
+          (responseAs[JsObject] \ "result" \ "value" \ "_2" \ "value").as[String] shouldBe resultStr
+          (responseAs[JsObject] \ "call").asOpt[JsObject] shouldBe defined
+        }
+      }
+
+    }
+  }
+
+  private def dApp(caller: Address, callerPk: PublicKey, asset: IssuedAsset) =
+    TestCompiler(V6).compileContract(
+      s"""
+         | @Callable(i)
+         | func f(arg1: Int, arg2: String) = {
+         |   let check =
+         |     this                    == Address(base58'$defaultAddress')            &&
+         |     i.caller                == Address(base58'$caller')                    &&
+         |     i.originCaller          == Address(base58'$caller')                    &&
+         |     i.callerPublicKey       == base58'$callerPk'                           &&
+         |     i.originCallerPublicKey == base58'$callerPk'                           &&
+         |     i.fee                   == 1234567                                     &&
+         |     i.payments              == [AttachedPayment(unit, 1)]                  &&
+         |     i.transactionId         == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' &&
+         |     i.feeAssetId            == base58'$asset'                              &&
+         |     arg1 == 123 && arg2 == "abc"
+         |   if (check) then [] else throw("wrong " + i.caller.toString() + " " + Address(base58'$caller').toString())
+         | }
+         |
+         | @Callable(i)
+         | func default() = {
+         |   let check =
+         |     this                    == Address(base58'$defaultAddress')                 &&
+         |     i.caller                == Address(base58'${UtilsApiRoute.DefaultAddress}') &&
+         |     i.originCaller          == Address(base58'${UtilsApiRoute.DefaultAddress}') &&
+         |     i.callerPublicKey       == base58'${"1" * 32}'                              &&
+         |     i.originCallerPublicKey == base58'${"1" * 32}'                              &&
+         |     i.fee                   == 500000                                           &&
+         |     i.payments              == []                                               &&
+         |     i.transactionId         == base58'${"1" * 32}'                              &&
+         |     i.feeAssetId            == unit
+         |   if (check) then [] else throw("wrong")
+         | }
+       """.stripMargin
+    )
+
+  private def invocation(feeAsset: Asset, senderAddress: Option[Address] = Some(secondAddress), senderPk: PublicKey = secondSigner.publicKey) =
+    Json
+      .parse(
+        s"""
+           | {
+           |  "call": {
+           |    "function": "f",
+           |    "args": [
+           |      {
+           |        "type": "integer",
+           |        "value": 123
+           |      },
+           |      {
+           |        "type": "string",
+           |        "value": "abc"
+           |      }
+           |    ]
+           |  },
+           |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+           |  "fee": 1234567,
+           |  "feeAssetId": "$feeAsset",
+           |  ${senderAddress.fold("")(a => s""""sender": "$a",""")}
+           |  "senderPublicKey": "$senderPk",
+           |  "payment": [
+           |    {
+           |      "amount": 1,
+           |      "assetId": null
+           |    }
+           |  ]
+           | }
+         """.stripMargin
+      )
+      .as[JsObject]
+
+  private def expectedTrace(feeAsset: Asset) =
+    Json.parse(
+      s"""
+         | [
+         |  {
+         |    "name": "f.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Int",
+         |        "value": 123
+         |      },
+         |      {
+         |        "type": "String",
+         |        "value": "abc"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51999
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+         |          }
+         |        }
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51998
+         |  },
+         |  {
+         |    "name": "i",
+         |    "type": "Invocation",
+         |    "value": {
+         |      "originCaller": {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      "payments": {
+         |        "type": "Array",
+         |        "value": [
+         |          {
+         |            "type": "AttachedPayment",
+         |            "value": {
+         |              "amount": {
+         |                "type": "Int",
+         |                "value": 1
+         |              },
+         |              "assetId": {
+         |                "type": "Unit",
+         |                "value": {}
+         |              }
+         |            }
+         |          }
+         |        ]
+         |      },
+         |      "callerPublicKey": {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      "feeAssetId": {
+         |        "type": "ByteVector",
+         |        "value": "$feeAsset"
+         |      },
+         |      "originCallerPublicKey": {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      "transactionId": {
+         |        "type": "ByteVector",
+         |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+         |      },
+         |      "caller": {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      "fee": {
+         |        "type": "Int",
+         |        "value": 1234567
+         |      }
+         |    }
+         |  },
+         |  {
+         |    "name": "Address.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51997
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51996
+         |  },
+         |  {
+         |    "name": "Address.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51995
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51994
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51993
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51992
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Int",
+         |        "value": 1234567
+         |      },
+         |      {
+         |        "type": "Int",
+         |        "value": 1234567
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51991
+         |  },
+         |  {
+         |    "name": "AttachedPayment.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Unit",
+         |        "value": {}
+         |      },
+         |      {
+         |        "type": "Int",
+         |        "value": 1
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "AttachedPayment.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51990
+         |  },
+         |  {
+         |    "name": "cons.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "AttachedPayment",
+         |        "value": {
+         |          "assetId": {
+         |            "type": "Unit",
+         |            "value": {}
+         |          },
+         |          "amount": {
+         |            "type": "Int",
+         |            "value": 1
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Array",
+         |        "value": []
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "cons.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51989
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Array",
+         |        "value": [
+         |          {
+         |            "type": "AttachedPayment",
+         |            "value": {
+         |              "amount": {
+         |                "type": "Int",
+         |                "value": 1
+         |              },
+         |              "assetId": {
+         |                "type": "Unit",
+         |                "value": {}
+         |              }
+         |            }
+         |          }
+         |        ]
+         |      },
+         |      {
+         |        "type": "Array",
+         |        "value": [
+         |          {
+         |            "type": "AttachedPayment",
+         |            "value": {
+         |              "assetId": {
+         |                "type": "Unit",
+         |                "value": {}
+         |              },
+         |              "amount": {
+         |                "type": "Int",
+         |                "value": 1
+         |              }
+         |            }
+         |          }
+         |        ]
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51988
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51987
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "$feeAsset"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "$feeAsset"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51986
+         |  },
+         |  {
+         |    "name": "arg1",
+         |    "type": "Int",
+         |    "value": 123
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Int",
+         |        "value": 123
+         |      },
+         |      {
+         |        "type": "Int",
+         |        "value": 123
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51985
+         |  },
+         |  {
+         |    "name": "arg2",
+         |    "type": "String",
+         |    "value": "abc"
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "String",
+         |        "value": "abc"
+         |      },
+         |      {
+         |        "type": "String",
+         |        "value": "abc"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51984
+         |  },
+         |  {
+         |    "name": "check",
+         |    "type": "Boolean",
+         |    "value": true
+         |  }
+         |]
+       """.stripMargin
+    )
 }

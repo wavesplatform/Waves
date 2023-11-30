@@ -14,8 +14,8 @@ import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
 import com.wavesplatform.transaction.TxHelpers.issue
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, EthTxGenerator, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.EthEncoding.toHexString
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import play.api.libs.json.*
@@ -289,7 +289,8 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
                                                 |  "quantity" : 100000,
                                                 |  "scripted" : false,
                                                 |  "minSponsoredAssetFee" : null,
-                                                |  "originTransactionId" : "${issue1.id()}"
+                                                |  "originTransactionId" : "${issue1.id()}",
+                                                |  "sequenceInBlock" : 1
                                                 |}, {
                                                 |  "assetId" : "${issue2.id()}",
                                                 |  "issueHeight" : 2,
@@ -303,7 +304,8 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
                                                 |  "quantity" : 1,
                                                 |  "scripted" : false,
                                                 |  "minSponsoredAssetFee" : null,
-                                                |  "originTransactionId" : "${issue2.id()}"
+                                                |  "originTransactionId" : "${issue2.id()}",
+                                                |  "sequenceInBlock" : 2
                                                 |}, {
                                                 |  "assetId" : "$issue3",
                                                 |  "issueHeight" : 2,
@@ -317,7 +319,8 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
                                                 |  "quantity" : 10000,
                                                 |  "scripted" : false,
                                                 |  "minSponsoredAssetFee" : null,
-                                                |  "originTransactionId" : "${invoke.id()}"
+                                                |  "originTransactionId" : "${invoke.id()}",
+                                                |  "sequenceInBlock" : 3
                                                 |} ]""".stripMargin)
       }
   }

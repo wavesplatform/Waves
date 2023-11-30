@@ -2,36 +2,35 @@ package com.wavesplatform.state
 
 import java.io.File
 import java.nio.file.Files
-
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
-import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
 
 trait BaseState {
-  import BaseState._
+  import BaseState.*
 
+  val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
+  val wavesSettings: WavesSettings = {
+    val config = loadConfig(ConfigFactory.parseFile(new File(benchSettings.networkConfigFile)))
+    WavesSettings.fromRootConfig(config)
+  }
   private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
-  private val db: DB = {
-    val dir     = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-    val options = new Options()
-    options.createIfMissing(true)
-    LevelDBFactory.factory.open(new File(dir), options)
+  private val rdb: RDB = {
+    val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
+    RDB.open(wavesSettings.dbSettings.copy(directory = dir))
   }
 
-  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
+  val state: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -52,29 +51,36 @@ trait BaseState {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
         txGenP(sender, base.header.timestamp + i)
       })
-    } yield
-      TestBlock.create(
+    } yield TestBlock
+      .create(
         time = transferTxs.last.timestamp,
         ref = base.id(),
         txs = transferTxs
       )
+      .block
 
   private val initGen: Gen[(KeyPair, Block)] = for {
     rich <- accountGen
   } yield {
     val genesisTx = GenesisTransaction.create(rich.toAddress, waves(100000000L), System.currentTimeMillis() - 10000).explicitGet()
-    (rich, TestBlock.create(time = genesisTx.timestamp, Seq(genesisTx)))
+    (rich, TestBlock.create(time = genesisTx.timestamp, Seq(genesisTx)).block)
   }
 
-  protected def nextBlock(txs: Seq[Transaction]): Block = TestBlock.create(
-    time = txs.last.timestamp,
-    ref = lastBlock.id(),
-    txs = txs
-  )
+  protected def nextBlock(txs: Seq[Transaction]): Block = TestBlock
+    .create(
+      time = txs.last.timestamp,
+      ref = lastBlock.id(),
+      txs = txs
+    )
+    .block
 
   private def append(prev: Option[Block], next: Block): Unit = {
-    val preconditionDiff = BlockDiffer.fromBlock(state, prev, next, MiningConstraint.Unlimited, next.header.generationSignature).explicitGet().diff
-    state.append(preconditionDiff, 0, 0, None, next.header.generationSignature, next)
+    val differResult =
+      BlockDiffer
+        .fromBlock(state, prev, next, None, MiningConstraint.Unlimited, next.header.generationSignature)
+        .explicitGet()
+
+    state.append(differResult.snapshot, 0, 0, None, next.header.generationSignature, differResult.computedStateHash, next)
   }
 
   def applyBlock(b: Block): Unit = {
@@ -98,7 +104,7 @@ trait BaseState {
 
   @TearDown
   def close(): Unit = {
-    db.close()
+    rdb.close()
   }
 }
 

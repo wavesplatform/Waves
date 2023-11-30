@@ -6,8 +6,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state._
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
@@ -24,7 +23,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def hitSource(height: Int): Option[ByteStr] = None
 
-  override def carryFee: Long = 0
+  override def carryFee(refId: Option[ByteStr]): Long = 0
 
   override def heightOf(blockId: ByteStr): Option[Int] = None
 
@@ -45,6 +44,8 @@ trait EmptyBlockchain extends Blockchain {
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = None
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = None
+
+  override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = Seq.empty
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = None
 
@@ -68,15 +69,25 @@ trait EmptyBlockchain extends Blockchain {
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = None
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = None
 
   override def hasData(acc: Address): Boolean = false
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = Map.empty
+
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = Map.empty
+
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = Seq.empty
+
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = Map.empty
+
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
+
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr = TxStateSnapshotHashBuilder.InitStateHash
 }
 
 object EmptyBlockchain extends EmptyBlockchain

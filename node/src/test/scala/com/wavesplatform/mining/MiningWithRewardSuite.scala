@@ -1,21 +1,20 @@
 package com.wavesplatform.mining
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
-
+import scala.concurrent.duration.*
 import cats.effect.Resource
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{TransactionGen, WithDB}
+import com.wavesplatform.{TransactionGen, WithNewDBForEachTest}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{Keys, TestStorageFactory}
+import com.wavesplatform.database.{RDB, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings._
+import com.wavesplatform.settings.*
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
@@ -28,14 +27,13 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
-  import MiningWithRewardSuite._
+class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBForEachTest with TransactionGen with DBCacheSettings {
+  import MiningWithRewardSuite.*
 
   behavior of "Miner with activated reward feature"
 
@@ -57,7 +55,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   }
 
   it should "generate valid empty block of version 4 after block of version 3" in {
-    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion))) {
+    withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion).block)) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
         val oldBalance    = blockchain.balance(account.toAddress)
@@ -80,7 +78,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       val tx2 = TransferTransaction
         .selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, ByteStr.empty, ts)
         .explicitGet()
-      TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
+      TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion).block
     })
 
     val txs: Seq[TransactionProducer] = Seq((ts, account) => {
@@ -122,18 +120,20 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler, Observable.empty)
         account      = createAccount
         ts           = ntpTime.correctedTime() - 60000
-        genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet()))
-        _ <- Task(blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature))
+        genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account.toAddress, ENOUGH_AMT, ts + 1).explicitGet())).block
+        _ <- Task(blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature, None))
         blocks = bps.foldLeft {
           (ts + 1, Seq[Block](genesisBlock))
         } { case ((ts, chain), bp) =>
           (ts + 3, bp(ts + 3, chain.head.id(), account) +: chain)
         }._2
-        added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b, b.header.generationSignature)))
+        added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b, b.header.generationSignature, None)))
         _   = added.foreach(_.explicitGet())
         _   = txs.foreach(tx => utxPool.putIfNew(tx(ts + 6, account)).resultE.explicitGet())
         env = Env(blocks, account, miner, blockchainUpdater)
         r <- f(env)
+        _ = scheduler.shutdown()
+        _ = utxPool.close()
       } yield r
     }
 
@@ -141,13 +141,11 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
 
-  private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, DB)] =
+  private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, RDB)] =
     Resource.make {
-      val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
-      import com.wavesplatform.database.DBExt
-      db.readWrite(_.put(Keys.blockReward(0), Some(settings.blockchainSettings.rewardsSettings.initial)))
+      val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreBlockchainUpdateTriggers)
       Task.now((bcu, db))
-    } { case (blockchainUpdater, db) =>
+    } { case (blockchainUpdater, _) =>
       Task {
         blockchainUpdater.shutdown()
       }
@@ -161,7 +159,7 @@ object MiningWithRewardSuite {
   type BlockProducer       = (Long, ByteStr, KeyPair) => Block
   type TransactionProducer = (Long, KeyPair) => Transaction
 
-  case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: Blockchain with BlockchainUpdater with NG)
+  case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: Blockchain & BlockchainUpdater & NG)
 
   val settings: WavesSettings = {
     val commonSettings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))

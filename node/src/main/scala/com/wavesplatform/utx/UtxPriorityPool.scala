@@ -1,42 +1,39 @@
 package com.wavesplatform.utx
 
-import java.time.Duration
-import java.time.temporal.ChronoUnit
-
+import cats.implicits.toFoldableOps
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.SnapshotBlockchain
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 import scala.annotation.tailrec
 
 final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool.*
 
-  private[this] case class PriorityData(diff: Diff, isValid: Boolean = true)
+  private[this] case class PriorityData(diff: StateSnapshot, isValid: Boolean = true)
 
   @volatile private[this] var priorityDiffs         = Seq.empty[PriorityData]
-  @volatile private[this] var priorityDiffsCombined = Diff.empty
+  @volatile private[this] var priorityDiffsCombined = StateSnapshot.empty
 
-  def validPriorityDiffs: Seq[Diff]          = priorityDiffs.takeWhile(_.isValid).map(_.diff)
+  def validPriorityDiffs: Seq[StateSnapshot] = priorityDiffs.takeWhile(_.isValid).map(_.diff)
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
   def compositeBlockchain: Blockchain =
     if (priorityDiffs.isEmpty) realBlockchain
-    else CompositeBlockchain(realBlockchain, priorityDiffsCombined)
-
-  def lockedWrite[T](f: => T): T =
-    this.writeLock(f)
+    else SnapshotBlockchain(realBlockchain, priorityDiffsCombined)
 
   def optimisticRead[T](f: => T)(shouldRecheck: T => Boolean): T =
     this.readLockCond(f)(shouldRecheck)
 
-  private[utx] def setPriorityDiffs(discDiffs: Seq[Diff]): Set[Transaction] =
+  private[utx] def setPriorityDiffs(discDiffs: Seq[StateSnapshot]): Set[Transaction] =
     if (discDiffs.isEmpty) {
       clear()
       Set.empty
@@ -51,8 +48,8 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   private[utx] def invalidateTxs(removed: Set[ByteStr]): Unit =
     updateDiffs(_.map { pd =>
       if (pd.diff.transactionIds.exists(removed)) {
-        val keep = pd.diff.transactions.filterNot(nti => removed(nti.transaction.id()))
-        pd.copy(Diff.withTransactions(keep), isValid = false)
+        val keep = pd.diff.transactions.filterNot(nti => removed(nti._2.transaction.id()))
+        pd.copy(StateSnapshot.empty.copy(keep), isValid = false)
       } else pd
     })
 
@@ -87,13 +84,13 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   }
 
   def transactionById(txId: ByteStr): Option[Transaction] =
-    priorityDiffsCombined.transaction(txId).map(_.transaction)
+    priorityDiffsCombined.transactions.get(txId).map(_.transaction)
 
   def contains(txId: ByteStr): Boolean = transactionById(txId).nonEmpty
 
   def nextMicroBlockSize(limit: Int): Int = {
     @tailrec
-    def nextMicroBlockSizeRec(last: Int, diffs: Seq[Diff]): Int = (diffs: @unchecked) match {
+    def nextMicroBlockSizeRec(last: Int, diffs: Seq[StateSnapshot]): Int = (diffs: @unchecked) match {
       case Nil => last.max(limit)
       case diff +: _ if last + diff.transactions.size > limit =>
         if (last == 0) diff.transactions.size // First micro
@@ -113,7 +110,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     val oldTxs = priorityTransactions.toSet
 
     priorityDiffs = f(priorityDiffs).filterNot(_.diff.transactions.isEmpty)
-    priorityDiffsCombined = validPriorityDiffs.fold(Diff())(_.combineF(_).getOrElse(Diff.empty))
+    priorityDiffsCombined = validPriorityDiffs.combineAll
 
     val newTxs = priorityTransactions.toSet
 
@@ -147,9 +144,9 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
 }
 
 private object UtxPriorityPool {
-  implicit class DiffExt(private val diff: Diff) extends AnyVal {
-    def contains(txId: ByteStr): Boolean        = diff.transaction(txId).isDefined
-    def transactionsValues: Seq[Transaction]    = diff.transactions.map(_.transaction)
+  implicit class DiffExt(private val snapshot: StateSnapshot) extends AnyVal {
+    def contains(txId: ByteStr): Boolean        = snapshot.transactions.contains(txId)
+    def transactionsValues: Seq[Transaction]    = snapshot.transactions.map(_._2.transaction).toSeq
     def transactionIds: collection.Set[ByteStr] = transactionsValues.map(_.id()).toSet
   }
 }

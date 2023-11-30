@@ -17,7 +17,7 @@ object GeneratingBalanceProvider {
     (!activated && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) || (activated && effectiveBalance >= MinimalEffectiveBalanceForGenerator2)
   }
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   def isEffectiveBalanceValid(blockchain: Blockchain, height: Int, block: Block, effectiveBalance: Long): Boolean =
     block.header.timestamp < blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter || (block.header.timestamp >= blockchain.settings.functionalitySettings.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
       blockchain.activatedFeatures
@@ -27,6 +27,8 @@ object GeneratingBalanceProvider {
   def balance(blockchain: Blockchain, account: Address, blockId: Option[BlockId] = None): Long = {
     val height = blockId.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
     val depth  = if (height >= blockchain.settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
-    blockchain.effectiveBalance(account, depth, blockId)
+
+    val maybeChallengedMiner = blockchain.blockHeader(height + 1).flatMap(_.header.challengedHeader).map(_.generator.toAddress)
+    blockchain.effectiveBalance(account, depth, blockId) + maybeChallengedMiner.map(blockchain.effectiveBalance(_, depth, blockId)).getOrElse(0L)
   }
 }

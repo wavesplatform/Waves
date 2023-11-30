@@ -7,15 +7,16 @@ import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 
 object DataTransactionDiff {
-  def apply(blockchain: Blockchain)(tx: DataTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain)(tx: DataTransaction): Either[ValidationError, StateSnapshot] = {
     val sender = tx.sender.toAddress
     for {
       // Validate data size
       _ <- DataTxValidator.payloadSizeValidation(blockchain, tx).toEither.leftMap(_.head)
-    } yield Diff(
-      portfolios = Map(sender -> Portfolio(-tx.fee.value)),
-      accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap)),
-      scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-    )
+      snapshot <- StateSnapshot.build(
+        blockchain,
+        portfolios = Map(sender -> Portfolio(-tx.fee.value)),
+        accountData = Map(sender -> tx.data.map(item => item.key -> item).toMap)
+      )
+    } yield snapshot
   }
 }

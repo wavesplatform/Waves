@@ -120,9 +120,8 @@ object Global extends BaseGlobal {
       if (value.toLong.toDouble == value && value - 1 < Long.MaxValue) BD.valueOf(value.toLong)
       else BD.valueOf(value)
 
-    Right(BigInt(decimal
-      .setScale(scale.toInt, round.mode)
-      .unscaledValue))
+    val scaled = decimal.setScale(scale.toInt, round.mode).unscaledValue
+    Right(BigInt(scaled))
   }
 
   implicit class BigIntOps(val v: BigInteger) extends AnyVal {
@@ -143,7 +142,4 @@ object Global extends BaseGlobal {
 
   override def ecrecover(messageHash: Array[Byte], signature: Array[Byte]): Array[Byte] =
     ???
-
-  override def isIllFormed(s: String): Boolean =
-    false
 }

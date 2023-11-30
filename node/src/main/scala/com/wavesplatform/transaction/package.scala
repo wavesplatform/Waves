@@ -2,10 +2,10 @@ package com.wavesplatform
 
 import cats.data.ValidatedNel
 import com.wavesplatform.account.PrivateKey
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.Diff
+import com.wavesplatform.state.StateSnapshot
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.{EthEncoding, base58Length}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
-import play.api.libs.json.{Format, Reads, Writes}
+import play.api.libs.json.*
 import supertagged.*
 import supertagged.postfix.*
 
@@ -21,8 +21,8 @@ package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
-  type DiscardedBlocks       = Seq[(Block, ByteStr)]
-  type DiscardedMicroBlocks  = Seq[(MicroBlock, Diff)]
+  type DiscardedBlocks       = Seq[(Block, ByteStr, Option[BlockSnapshot])]
+  type DiscardedMicroBlocks  = Seq[(MicroBlock, StateSnapshot)]
   type AuthorizedTransaction = Authorized & Transaction
 
   type TxType = Byte
@@ -40,7 +40,32 @@ package object transaction {
   object TxPositiveAmount extends RefinedTypeOps[TxPositiveAmount, Long]
 
   type TxNonNegativeAmount = Long Refined NonNegative
-  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long]
+  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long] {
+    private val LongStringMaxLength = 20 // Long.MaxValue.toString.length
+
+    implicit val reads: Reads[TxNonNegativeAmount] = Reads { json =>
+      val r = json match {
+        case JsString(s) =>
+          if (s.length > LongStringMaxLength) JsError("error.expected.numberdigitlimit")
+          else
+            s.toLongOption match {
+              case None    => JsError(JsonValidationError("error.expected.numberformatexception"))
+              case Some(r) => JsSuccess(r)
+            }
+
+        case JsNumber(r) =>
+          if (r.isValidLong) JsSuccess(r.toLongExact)
+          else JsError(JsonValidationError("error.invalid.long"))
+
+        case _ => JsError(JsonValidationError("error.expected.jsnumberorjsstring"))
+      }
+
+      r.flatMap { r =>
+        if (r >= 0) JsSuccess(TxNonNegativeAmount.unsafeFrom(r))
+        else JsError(JsonValidationError("error.expected.txnonnegativeamount"))
+      }
+    }
+  }
 
   type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type]
   object TxDecimals extends RefinedTypeOps[TxDecimals, Byte] {

@@ -1,14 +1,15 @@
 package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.WithDB
+import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings._
-import com.wavesplatform.state.{BalanceSnapshot, Blockchain, BlockMinerInfo, NG}
+import com.wavesplatform.settings.*
+import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
+import com.wavesplatform.state.{BalanceSnapshot, BlockMinerInfo, Blockchain, NG}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.BlockchainUpdater
@@ -23,7 +24,7 @@ import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 
-class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
+class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBForEachTest {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
   behavior of "Miner"
@@ -52,7 +53,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
       bs.copy(functionalitySettings = fs.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(2.toShort -> 0)))
     }
 
-    val miner = {
+    val (miner, appenderScheduler) = {
       val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
@@ -70,10 +71,10 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
         scheduler,
         scheduler,
         Observable.empty
-      )
+      ) -> scheduler
     }
 
-    val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
+    val genesis = TestBlock.create(System.currentTimeMillis(), Nil).block
     (blockchainUpdater.isLastBlockId _).when(genesis.id()).returning(true)
     (blockchainUpdater.heightOf _).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
     (blockchainUpdater.heightOf _).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()
@@ -83,6 +84,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
     (() => blockchainUpdater.activatedFeatures).when().returning(Map.empty)
     (() => blockchainUpdater.approvedFeatures).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(ByteStr(new Array[Byte](32))))
+    (blockchainUpdater.effectiveBalanceBanHeights _).when(*).returns(Seq.empty)
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
       .returning(
@@ -97,12 +99,12 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
       )
 
     var minedBlock: Block = null
-    (blockchainUpdater.processBlock _).when(*, *, *).returning(Left(BlockFromFuture(100))).repeated(10)
+    (blockchainUpdater.processBlock _).when(*, *, *, *, *, *).returning(Left(BlockFromFuture(100, 100))).repeated(10)
     (blockchainUpdater.processBlock _)
-      .when(*, *, *)
-      .onCall { (block, _, _) =>
+      .when(*, *, *, *, *, *)
+      .onCall { (block, _, _, _, _, _) =>
         minedBlock = block
-        Right(Nil)
+        Right(Applied(Nil, 0))
       }
       .once()
     (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
@@ -111,6 +113,7 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
     val generateBlock = generateBlockTask(miner)(account)
     generateBlock.runSyncUnsafe() shouldBe ((): Unit)
     minedBlock.header.featureVotes shouldBe empty
+    appenderScheduler.shutdown()
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =

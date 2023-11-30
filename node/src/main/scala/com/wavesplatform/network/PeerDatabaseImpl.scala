@@ -10,8 +10,8 @@ import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
 
-import scala.jdk.CollectionConverters._
-import scala.collection._
+import scala.jdk.CollectionConverters.*
+import scala.collection.*
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -80,7 +80,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
         unverifiedPeers.removeIf { x =>
-          Option(x.getAddress).contains(inetAddress.getAddress)
+          Option(x.getAddress).contains(inetAddress)
         }
         blacklist.put(inetAddress, System.currentTimeMillis())
         reasons.put(inetAddress, reason)

@@ -1,10 +1,10 @@
 package com.wavesplatform.utils
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
-
 import com.google.common.base.Ticker
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.utils.ObservedLoadingCacheSpecification.FakeTicker
 import monix.execution.Ack
@@ -13,7 +13,7 @@ import org.scalamock.scalatest.MockFactory
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
   private val ExpiringTime = 10.minutes
@@ -22,41 +22,41 @@ class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
     "on refresh" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
 
-      loadingCache.refresh("foo")
+        loadingCache.refresh("foo")
     }
 
     "on put" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
 
-      loadingCache.put("foo", 10)
+        loadingCache.put("foo", 10)
     }
 
     "on putAll" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
       (changes.onNext _).expects("bar").returning(Future.successful(Ack.Continue)).once()
 
-      loadingCache.putAll(Map[String, Integer]("foo" -> 10, "bar" -> 11).asJava)
+        loadingCache.putAll(Map[String, Integer]("foo" -> 10, "bar" -> 11).asJava)
     }
 
     "on invalidate" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
 
-      loadingCache.invalidate("foo")
+        loadingCache.invalidate("foo")
     }
 
     "on invalidateAll" in test { (loadingCache, changes, _) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
       (changes.onNext _).expects("bar").returning(Future.successful(Ack.Continue)).once()
 
-      loadingCache.invalidateAll(Seq("foo", "bar").asJava)
+        loadingCache.invalidateAll(Seq("foo", "bar").asJava)
     }
   }
 
   "don't notify" - {
     "on cache expiration" in test { (loadingCache, changes, ticker) =>
       (changes.onNext _).expects("foo").returning(Future.successful(Ack.Continue)).once()
-      loadingCache.put("foo", 1)
-      ticker.advance(ExpiringTime.toMillis + 100, TimeUnit.MILLISECONDS)
+        loadingCache.put("foo", 1)
+        ticker.advance(ExpiringTime.toMillis + 100, TimeUnit.MILLISECONDS)
     }
   }
 
@@ -68,11 +68,12 @@ class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
       .newBuilder()
       .expireAfterWrite(ExpiringTime.toMillis, TimeUnit.MILLISECONDS)
       .ticker(ticker)
-      .build(new CacheLoader[String, Integer] {
+      .build[String, Integer](new CacheLoader[String, Integer] {
         override def load(key: String): Integer = key.length
       })
 
     val loadingCache = new ObservedLoadingCache(delegate, changes)
+
     f(loadingCache, changes, ticker)
   }
 }

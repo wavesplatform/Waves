@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -67,7 +67,7 @@ object GenesisBlockGenerator {
       accountPrivateKey: ByteStr,
       accountPublicKey: ByteStr,
       accountAddress: Address,
-      account: KeyPair,
+      account: SeedKeyPair,
       miner: Boolean
   )
 
@@ -178,7 +178,9 @@ object GenesisBlockGenerator {
           txs = genesisTxs,
           signer = genesisSigner,
           featureVotes = Seq.empty,
-          rewardVote = -1L
+          rewardVote = -1L,
+          stateHash = None,
+          challengedHeader = None
         )
         .explicitGet()
 

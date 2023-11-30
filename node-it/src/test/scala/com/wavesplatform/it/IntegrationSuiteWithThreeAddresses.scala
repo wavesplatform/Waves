@@ -1,22 +1,22 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, SeedKeyPair}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.test.NumericExt
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
-  this: TestSuite with Nodes =>
+  this: TestSuite & Nodes =>
 
-  protected lazy val firstKeyPair: KeyPair = sender.createKeyPair()
-  protected lazy val firstAddress: String  = firstKeyPair.toAddress.toString
+  protected lazy val firstKeyPair: SeedKeyPair = sender.createKeyPair()
+  protected lazy val firstAddress: String      = firstKeyPair.toAddress.toString
 
   protected lazy val secondKeyPair: KeyPair = sender.createKeyPair()
   protected lazy val secondAddress: String  = secondKeyPair.toAddress.toString
@@ -61,8 +61,8 @@ trait IntegrationSuiteWithThreeAddresses extends BaseSuite with ScalaFutures wit
 
   def setContracts(contracts: (Option[String], KeyPair)*): Unit = {
     contracts
-      .map {
-        case (src, acc) => setContract(src, acc)
+      .map { case (src, acc) =>
+        setContract(src, acc)
       }
       .foreach(id => sender.waitForTransaction(id))
     nodes.waitForHeightArise()

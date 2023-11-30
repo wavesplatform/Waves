@@ -9,30 +9,34 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import org.scalatest.Inside
 
-class SyncDAppRecursionTest extends PropSpec with WithDomain {
+class SyncDAppRecursionTest extends PropSpec with WithDomain with Inside {
   import DomainPresets.*
 
   private val fc = Some(FUNCTION_CALL(User("default"), (1 to 4).map(_ => CONST_BOOLEAN(false)).toList))
 
   def dApp(
-            nextDApp: Address,
-            sendEnd: Boolean = false,
-            reentrant: Boolean = false,
-            secondNextDApp: Option[Address] = None,
-            sendEndToNext: Boolean = false,
-            sendChangeDApp: Boolean = false,
-            sendForceInvoke: Boolean = false,
-            sendForceReentrant: Boolean = false,
-            secondReentrantInvoke: Option[Address] = None,
-            invokeExpression: Boolean = false
-          ): Script = {
-    val func    = if (reentrant) "reentrantInvoke" else "invoke"
-    val args    = s"[sendEnd, $sendChangeDApp, $sendForceInvoke, $sendForceReentrant]"
-    val compile = if (invokeExpression) TestCompiler(V5).compileFreeCall(_) else TestCompiler(V5).compileContract(_, allowIllFormedStrings = false, compact = false)
+      nextDApp: Address,
+      sendEnd: Boolean = false,
+      reentrant: Boolean = false,
+      secondNextDApp: Option[Address] = None,
+      sendEndToNext: Boolean = false,
+      sendChangeDApp: Boolean = false,
+      sendForceInvoke: Boolean = false,
+      sendForceReentrant: Boolean = false,
+      secondReentrantInvoke: Option[Address] = None,
+      invokeExpression: Boolean = false
+  ): Script = {
+    val func = if (reentrant) "reentrantInvoke" else "invoke"
+    val args = s"[sendEnd, $sendChangeDApp, $sendForceInvoke, $sendForceReentrant]"
+    val compile =
+      if (invokeExpression) TestCompiler(V5).compileFreeCall(_, offset = NoLibraries)
+      else TestCompiler(V5).compileContract(_, offset = NoLibraries, allowIllFormedStrings = false, compact = false)
     val prefix =
       if (invokeExpression)
         "let (end, useSecondAddress, forceInvoke, forceReentrant) = (false, false, false, false)"
@@ -80,13 +84,20 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
 
       val fee = TxHelpers.ciFee(freeCall = invokeExpression)
 
-      val genesis = Seq(dApp1, dApp2).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp2.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp2.toAddress, sendEnd = true))
       val invoke = if (invokeExpression) {
         TxHelpers.invokeExpression(dApp(dApp2.toAddress, invokeExpression = invokeExpression).asInstanceOf[ExprScript], dApp1, fee = fee)
       } else {
-        TxHelpers.invoke(dApp1.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, fee = fee, version = TxVersion.V1)
+        TxHelpers.invoke(
+          dApp1.toAddress,
+          func = fc.map(_.function.funcName),
+          args = fc.map(_.args).toList.flatten,
+          invoker = dApp1,
+          fee = fee,
+          version = TxVersion.V1
+        )
       }
 
       (genesis :+ setDApp1 :+ setDApp2, invoke)
@@ -98,10 +109,16 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(invokeExpression)
-      ) {
-        case (diff, _) =>
-          diff.errorMessage(invoke.id()) shouldBe None
-          diff.scriptsRun shouldBe 3
+      ) { case (snapshot, _) =>
+        snapshot.errorMessage(invoke.id()) shouldBe None
+        inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+          inside(call1.invokes) { case Seq(call2) =>
+            inside(call2.stateChanges.invokes) { case Seq(call3) =>
+              call3.stateChanges.error shouldBe empty
+              call3.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
       }
     }
   }
@@ -115,14 +132,21 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
 
       val fee = TxHelpers.ciFee(freeCall = invokeExpression)
 
-      val genesis = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp1.toAddress))
       val invoke = if (invokeExpression) {
         TxHelpers.invokeExpression(dApp(dApp2.toAddress, invokeExpression = invokeExpression).asInstanceOf[ExprScript], dApp1, fee = fee)
       } else {
-        TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, fee = fee, version = TxVersion.V1)
+        TxHelpers.invoke(
+          dApp2.toAddress,
+          func = fc.map(_.function.funcName),
+          args = fc.map(_.args).toList.flatten,
+          invoker = dApp1,
+          fee = fee,
+          version = TxVersion.V1
+        )
       }
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3, invoke)
@@ -154,11 +178,17 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
         val dApp2 = TxHelpers.signer(2)
         val dApp3 = TxHelpers.signer(3)
 
-        val genesis = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
+        val genesis  = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
         val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
         val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress))
         val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp2.toAddress))
-        val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+        val invoke = TxHelpers.invoke(
+          dApp2.toAddress,
+          func = fc.map(_.function.funcName),
+          args = fc.map(_.args).toList.flatten,
+          invoker = dApp1,
+          version = TxVersion.V1
+        )
 
         (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3, invoke)
       }
@@ -185,11 +215,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp2 = TxHelpers.signer(2)
       val dApp3 = TxHelpers.signer(3)
 
-      val genesis = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
-      val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp2.toAddress, secondNextDApp = Some(dApp3.toAddress), sendChangeDApp = true, sendForceReentrant = true))
+      val setDApp2 =
+        TxHelpers.setScript(dApp2, dApp(dApp2.toAddress, secondNextDApp = Some(dApp3.toAddress), sendChangeDApp = true, sendForceReentrant = true))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp2.toAddress, reentrant = true, sendEnd = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3, invoke)
     }
@@ -214,12 +251,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp3 = TxHelpers.signer(3)
       val dApp4 = TxHelpers.signer(4)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp3.toAddress))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4, setDApp3, invoke)
     }
@@ -244,12 +287,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp3 = TxHelpers.signer(3)
       val dApp4 = TxHelpers.signer(4)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress, reentrant = true))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp3.toAddress, sendEnd = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4, invoke)
     }
@@ -259,10 +308,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features()
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id.value()) shouldBe None
-        diff.scriptsRun shouldBe 4
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id.value()) shouldBe None
+      inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              call4.stateChanges.error shouldBe empty
+              call4.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 
@@ -274,12 +331,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp3 = TxHelpers.signer(3)
       val dApp4 = TxHelpers.signer(4)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress, reentrant = true))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp2.toAddress, sendEnd = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4, invoke)
     }
@@ -289,10 +352,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features()
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id.value()) shouldBe None
-        diff.scriptsRun shouldBe 4
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id.value()) shouldBe None
+      inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              call4.stateChanges.error shouldBe empty
+              call4.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 
@@ -303,11 +374,17 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp2 = TxHelpers.signer(2)
       val dApp3 = TxHelpers.signer(3)
 
-      val genesis = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp2.toAddress), sendEndToNext = true))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp2.toAddress, sendChangeDApp = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3, invoke)
     }
@@ -317,10 +394,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features()
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id.value()) shouldBe None
-        diff.scriptsRun shouldBe 4
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id.value()) shouldBe None
+      inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              call4.stateChanges.error shouldBe empty
+              call4.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 
@@ -332,12 +417,18 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp3 = TxHelpers.signer(3)
       val dApp4 = TxHelpers.signer(4)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress, reentrant = true))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp3.toAddress, sendEnd = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4, invoke, dApp3.toAddress)
     }
@@ -363,13 +454,19 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp4 = TxHelpers.signer(4)
       val dApp5 = TxHelpers.signer(5)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4, dApp5).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4, dApp5).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp5.toAddress)))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp2.toAddress, sendChangeDApp = true))
       val setDApp5 = TxHelpers.setScript(dApp5, dApp(dApp2.toAddress, sendEnd = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4 :+ setDApp5, invoke)
     }
@@ -379,10 +476,22 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features()
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id.value()) shouldBe None
-        diff.scriptsRun shouldBe 6
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id.value()) shouldBe None
+      inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call2) =>
+          inside(call2.stateChanges.invokes) { case Seq(call3) =>
+            inside(call3.stateChanges.invokes) { case Seq(call4) =>
+              inside(call4.stateChanges.invokes) { case Seq(sync5) =>
+                inside(sync5.stateChanges.invokes) { case Seq(sync6) =>
+                  sync6.stateChanges.error shouldBe empty
+                  sync6.stateChanges.invokes shouldBe empty
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -395,13 +504,19 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp4 = TxHelpers.signer(4)
       val dApp5 = TxHelpers.signer(5)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4, dApp5).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4, dApp5).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress, reentrant = true, secondNextDApp = Some(dApp5.toAddress)))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp2.toAddress, sendChangeDApp = true, sendForceInvoke = true))
       val setDApp5 = TxHelpers.setScript(dApp5, dApp(dApp2.toAddress, sendEnd = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4 :+ setDApp5, invoke, dApp2.toAddress)
     }
@@ -428,13 +543,19 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       val dApp4 = TxHelpers.signer(4)
       val dApp5 = TxHelpers.signer(5)
 
-      val genesis = Seq(dApp1, dApp2, dApp3, dApp4, dApp5).map(acc => TxHelpers.genesis(acc.toAddress))
+      val genesis  = Seq(dApp1, dApp2, dApp3, dApp4, dApp5).map(acc => TxHelpers.genesis(acc.toAddress))
       val setDApp1 = TxHelpers.setScript(dApp1, dApp(dApp1.toAddress))
       val setDApp2 = TxHelpers.setScript(dApp2, dApp(dApp3.toAddress, secondReentrantInvoke = Some(dApp5.toAddress)))
       val setDApp3 = TxHelpers.setScript(dApp3, dApp(dApp4.toAddress, sendEnd = true, secondNextDApp = Some(dApp2.toAddress)))
       val setDApp4 = TxHelpers.setScript(dApp4, dApp(dApp2.toAddress))
       val setDApp5 = TxHelpers.setScript(dApp5, dApp(dApp3.toAddress, sendChangeDApp = true))
-      val invoke = TxHelpers.invoke(dApp2.toAddress, func = fc.map(_.function.funcName), args = fc.map(_.args).toList.flatten, invoker = dApp1, version = TxVersion.V1)
+      val invoke = TxHelpers.invoke(
+        dApp2.toAddress,
+        func = fc.map(_.function.funcName),
+        args = fc.map(_.args).toList.flatten,
+        invoker = dApp1,
+        version = TxVersion.V1
+      )
 
       (genesis :+ setDApp1 :+ setDApp2 :+ setDApp3 :+ setDApp4 :+ setDApp5, invoke)
     }
@@ -444,10 +565,22 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       features()
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id.value()) shouldBe None
-        diff.scriptsRun shouldBe 6
+    ) { case (snapshot, _) =>
+      snapshot.errorMessage(invoke.id.value()) shouldBe None
+      inside(snapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
+        inside(call1.invokes) { case Seq(call21, call22) =>
+          inside(call21.stateChanges.invokes) { case Seq(call31) =>
+            call31.stateChanges.error shouldBe empty
+            call31.stateChanges.invokes shouldBe empty
+          }
+          inside(call22.stateChanges.invokes) { case Seq(call32) =>
+            inside(call32.stateChanges.invokes) { case Seq(call42) =>
+              call42.stateChanges.error shouldBe empty
+              call42.stateChanges.invokes shouldBe empty
+            }
+          }
+        }
+      }
     }
   }
 

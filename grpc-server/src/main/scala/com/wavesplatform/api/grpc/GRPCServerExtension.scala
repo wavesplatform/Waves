@@ -1,17 +1,16 @@
 package com.wavesplatform.api.grpc
 
 import java.net.InetSocketAddress
-
 import scala.concurrent.Future
-
-import com.wavesplatform.extensions.{Extension, Context => ExtensionContext}
+import com.wavesplatform.extensions.{Extension, Context as ExtensionContext}
 import com.wavesplatform.settings.GRPCSettings
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.Server
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.protobuf.services.ProtoReflectionService
 import monix.execution.Scheduler
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 
 class GRPCServerExtension(context: ExtensionContext) extends Extension with ScorexLogging {
   private implicit val apiScheduler: Scheduler = Scheduler(context.actorSystem.dispatcher)
@@ -24,6 +23,7 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
     .addService(AccountsApiGrpc.bindService(new AccountsApiGrpcImpl(context.accountsApi), apiScheduler))
     .addService(AssetsApiGrpc.bindService(new AssetsApiGrpcImpl(context.assetsApi, context.accountsApi), apiScheduler))
     .addService(BlockchainApiGrpc.bindService(new BlockchainApiGrpcImpl(context.blockchain, context.settings.featuresSettings), apiScheduler))
+    .addService(ProtoReflectionService.newInstance())
     .build()
 
   override def start(): Unit = {

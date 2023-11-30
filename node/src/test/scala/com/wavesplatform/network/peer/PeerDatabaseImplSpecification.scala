@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.{PeerDatabase, PeerDatabaseImpl}
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.test.FreeSpec
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 
 class PeerDatabaseImplSpecification extends FreeSpec {
 
@@ -17,26 +17,35 @@ class PeerDatabaseImplSpecification extends FreeSpec {
   val address1 = new InetSocketAddress(host1, 1)
   val address2 = new InetSocketAddress(host2, 2)
 
-  private val config1   = ConfigFactory.parseString("""waves.network {
-      |  file = null
-      |  known-peers = []
-      |  peers-data-residence-time: 2s
-      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val config1 = ConfigFactory
+    .parseString("""waves.network {
+                   |  file = null
+                   |  known-peers = []
+                   |  peers-data-residence-time: 2s
+                   |}""".stripMargin)
+    .withFallback(ConfigFactory.load())
+    .resolve()
   private val settings1 = config1.as[NetworkSettings]("waves.network")
 
-  private val config2   = ConfigFactory.parseString("""waves.network {
-      |  file = null
-      |  known-peers = []
-      |  peers-data-residence-time = 10s
-      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val config2 = ConfigFactory
+    .parseString("""waves.network {
+                   |  file = null
+                   |  known-peers = []
+                   |  peers-data-residence-time = 10s
+                   |}""".stripMargin)
+    .withFallback(ConfigFactory.load())
+    .resolve()
   private val settings2 = config2.as[NetworkSettings]("waves.network")
 
-  private val config3   = ConfigFactory.parseString(s"""waves.network {
-                                                      |  file = null
-                                                      |  known-peers = ["$host1:1"]
-                                                      |  peers-data-residence-time = 2s
-                                                      |  enable-peers-exchange = no
-                                                      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val config3 = ConfigFactory
+    .parseString(s"""waves.network {
+                    |  file = null
+                    |  known-peers = ["$host1:1"]
+                    |  peers-data-residence-time = 2s
+                    |  enable-peers-exchange = no
+                    |}""".stripMargin)
+    .withFallback(ConfigFactory.load())
+    .resolve()
   private val settings3 = config3.as[NetworkSettings]("waves.network")
 
   private def withDatabase(settings: NetworkSettings)(f: PeerDatabase => Unit): Unit = {
@@ -132,22 +141,28 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       "should clear blacklist at start" in {
         val databaseFile = Files.createTempFile("waves-tests", "PeerDatabaseImplSpecification-blacklisting-clear").toAbsolutePath.toString
         val path         = if (File.separatorChar == '\\') databaseFile.replace('\\', '/') else databaseFile
-        val prevConfig   = ConfigFactory.parseString(s"""waves.network {
-             |  file = "$path"
-             |  known-peers = []
-             |  peers-data-residence-time = 100s
-             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val prevConfig = ConfigFactory
+          .parseString(s"""waves.network {
+                          |  file = "$path"
+                          |  known-peers = []
+                          |  peers-data-residence-time = 100s
+                          |}""".stripMargin)
+          .withFallback(ConfigFactory.load())
+          .resolve()
         val prevSettings = prevConfig.as[NetworkSettings]("waves.network")
         val prevDatabase = new PeerDatabaseImpl(prevSettings)
         prevDatabase.blacklist(address1.getAddress, "I don't like it")
         prevDatabase.close()
 
-        val config   = ConfigFactory.parseString(s"""waves.network {
-             |  file = "$path"
-             |  known-peers = []
-             |  peers-data-residence-time = 100s
-             |  enable-blacklisting = no
-             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val config = ConfigFactory
+          .parseString(s"""waves.network {
+                          |  file = "$path"
+                          |  known-peers = []
+                          |  peers-data-residence-time = 100s
+                          |  enable-blacklisting = no
+                          |}""".stripMargin)
+          .withFallback(ConfigFactory.load())
+          .resolve()
         val settings = config.as[NetworkSettings]("waves.network")
         val database = new PeerDatabaseImpl(settings)
 
@@ -155,12 +170,15 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       }
 
       "should not add nodes to the blacklist" in {
-        val config   = ConfigFactory.parseString(s"""waves.network {
-             |  file = null
-             |  known-peers = []
-             |  peers-data-residence-time = 100s
-             |  enable-blacklisting = no
-             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val config = ConfigFactory
+          .parseString(s"""waves.network {
+                          |  file = null
+                          |  known-peers = []
+                          |  peers-data-residence-time = 100s
+                          |  enable-blacklisting = no
+                          |}""".stripMargin)
+          .withFallback(ConfigFactory.load())
+          .resolve()
         val settings = config.as[NetworkSettings]("waves.network")
         val database = new PeerDatabaseImpl(settings)
         database.blacklist(address1.getAddress, "I don't like it")

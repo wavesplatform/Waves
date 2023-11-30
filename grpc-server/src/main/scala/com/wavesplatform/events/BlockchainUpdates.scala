@@ -1,25 +1,24 @@
 package com.wavesplatform.events
 
-import java.net.InetSocketAddress
-import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.diffs.BlockDiffer
+import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.netty.NettyServerBuilder
+import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 
+import java.net.InetSocketAddress
+import java.util.concurrent.TimeUnit
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Try
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
@@ -32,28 +31,29 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   )
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  private[this] val db       = openDB(context.settings.directory + "/blockchain-updates")
-  private[this] val repo     = new Repo(db, context.blocksApi)
+  // todo: no need to open column families here
+  private[this] val rdb  = RDB.open(context.settings.dbSettings.copy(directory = context.settings.directory + "/blockchain-updates"))
+  private[this] val repo = new Repo(rdb.db, context.blocksApi)
 
   private[this] val grpcServer: Server = NettyServerBuilder
     .forAddress(new InetSocketAddress("0.0.0.0", settings.grpcPort))
     .permitKeepAliveTime(settings.minKeepAlive.toNanos, TimeUnit.NANOSECONDS)
-    .addStreamTracerFactory(
-      (fullMethodName: String, headers: Metadata) =>
-        new ServerStreamTracer {
-          private[this] var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
-          private[this] def callId   = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
+    .addStreamTracerFactory((fullMethodName: String, headers: Metadata) =>
+      new ServerStreamTracer {
+        private[this] var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[?, ?]]
+        private[this] def callId   = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
 
-          override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
-            this.callInfo = Some(callInfo)
-            log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
-          }
+        override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[?, ?]): Unit = {
+          this.callInfo = Some(callInfo)
+          log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
+        }
 
-          override def streamClosed(status: Status): Unit =
-            log.trace(s"[$callId] gRPC call closed with status: $status")
+        override def streamClosed(status: Status): Unit =
+          log.trace(s"[$callId] gRPC call closed with status: $status")
       }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
+    .addService(ProtoReflectionService.newInstance())
     .build()
 
   override def start(): Unit = {
@@ -90,22 +90,24 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       scheduler.shutdown()
       scheduler.awaitTermination(10 seconds)
       repo.shutdown()
+      rdb.close()
     }(Scheduler.global)
 
   override def onProcessBlock(
       block: Block,
-      diff: BlockDiffer.DetailedDiff,
-      minerReward: Option[Long],
-      blockchainBeforeWithMinerReward: Blockchain
-  ): Unit = repo.onProcessBlock(block, diff, minerReward, blockchainBeforeWithMinerReward)
+      snapshot: StateSnapshot,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      blockchainBeforeWithReward: Blockchain
+  ): Unit = repo.onProcessBlock(block, snapshot, reward, hitSource, blockchainBeforeWithReward)
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,
-      diff: BlockDiffer.DetailedDiff,
-      blockchainBeforeWithMinerReward: Blockchain,
+      snapshot: StateSnapshot,
+      blockchainBeforeWithReward: Blockchain,
       totalBlockId: ByteStr,
       totalTransactionsRoot: ByteStr
-  ): Unit = repo.onProcessMicroBlock(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
+  ): Unit = repo.onProcessMicroBlock(microBlock, snapshot, blockchainBeforeWithReward, totalBlockId, totalTransactionsRoot)
 
   override def onRollback(blockchainBefore: Blockchain, toBlockId: ByteStr, toHeight: Int): Unit =
     repo.onRollback(blockchainBefore, toBlockId, toHeight)

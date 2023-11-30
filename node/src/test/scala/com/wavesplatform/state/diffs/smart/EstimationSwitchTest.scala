@@ -47,13 +47,13 @@ class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenB
       d.appendBlock(genesis1, genesis2)
 
       d.appendBlock(setScript(), invoke())
-      d.liquidDiff.scripts.head._2.get.complexitiesByEstimator(3)("default") shouldBe 5
-      d.liquidDiff.scriptsComplexity shouldBe 7
+      d.liquidSnapshot.accountScripts.head._2.get.complexitiesByEstimator(3)("default") shouldBe 5
+      d.liquidSnapshot.scriptsComplexity shouldBe 7
       // bigger than estimator because of ignoring predefined user function complexities
 
       d.appendBlock(setScript(), invoke())
-      d.liquidDiff.scripts.head._2.get.complexitiesByEstimator(3)("default") shouldBe 1
-      d.liquidDiff.scriptsComplexity shouldBe 1
+      d.liquidSnapshot.accountScripts.head._2.get.complexitiesByEstimator(3)("default") shouldBe 1
+      d.liquidSnapshot.scriptsComplexity shouldBe 1
     // condition decreased by 1,
     // accessing to ref ([] = nil) decreased by 1,
     // != decreased by 4 (because of using predefined user function complexities)
@@ -70,7 +70,7 @@ class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenB
           |   let a = groth16Verify(base58'', base58'', base58'')
           |   if (f(true)) then [] else []
           | }
-          | 
+          |
           | @Callable(i)
           | func redundantOverheadCase() = {
           |   let a = sigVerify(base58'', base58'', base58'')

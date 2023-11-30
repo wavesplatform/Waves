@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.TestValues
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.directives.values.*
@@ -29,26 +29,34 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
+import monix.execution.atomic.AtomicLong
 import org.web3j.crypto.ECKeyPair
 
 object TxHelpers {
-  def signer(i: Int): KeyPair  = KeyPair(Ints.toByteArray(i))
-  def address(i: Int): Address = signer(i).toAddress
+  def signer(i: Int): SeedKeyPair = KeyPair(Ints.toByteArray(i))
+  def address(i: Int): Address    = signer(i).toAddress
 
-  def defaultSigner: KeyPair  = signer(0)
-  def defaultAddress: Address = defaultSigner.toAddress
-  def secondSigner: KeyPair   = signer(1)
-  def secondAddress: Address  = secondSigner.toAddress
+  val defaultSigner: SeedKeyPair = signer(0)
+  val defaultAddress: Address    = defaultSigner.toAddress
+  val secondSigner: SeedKeyPair  = signer(1)
+  val secondAddress: Address     = secondSigner.toAddress
 
-  def defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
+  val defaultEthSigner: ECKeyPair = defaultSigner.toEthKeyPair
 
-  val matcher: KeyPair = defaultSigner
-
-  private[this] var lastTimestamp = System.currentTimeMillis()
-  def timestamp: Long = {
-    lastTimestamp += 1
-    lastTimestamp
+  def accountSeqGenerator(numberAccounts: Int, amount: Long): Seq[ParsedTransfer] = {
+    val firstAccountNum = 100
+    val lastAccountNum  = firstAccountNum + numberAccounts
+    val accountsSeq = (firstAccountNum until lastAccountNum).map { num =>
+      val recipient = signer(num).toAddress
+      ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
+    }
+    accountsSeq
   }
+
+  val matcher: SeedKeyPair = defaultSigner
+
+  private[this] val lastTimestamp = AtomicLong(System.currentTimeMillis())
+  def timestamp: Long             = lastTimestamp.getAndIncrement()
 
   @throws[IllegalArgumentException]
   def signature(sig: String): Proofs =
@@ -99,14 +107,16 @@ object TxHelpers {
 
   def massTransfer(
       from: KeyPair = defaultSigner,
-      to: Seq[ParsedTransfer] = Seq(ParsedTransfer(secondAddress, TxNonNegativeAmount.unsafeFrom(1.waves))),
+      to: Seq[(AddressOrAlias, Long)] = Seq(secondAddress -> 1.waves),
       asset: Asset = Waves,
       fee: Long = FeeConstants(TransactionType.MassTransfer) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: Byte = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
   ): MassTransferTransaction =
-    MassTransferTransaction.selfSigned(version, from, asset, to, fee, timestamp, ByteStr.empty, chainId).explicitGet()
+    MassTransferTransaction.selfSigned(version, from, asset,
+      to.map { case (r, a) => MassTransferTransaction.ParsedTransfer(r, TxNonNegativeAmount.unsafeFrom(a)) },
+      fee, timestamp, ByteStr.empty, chainId).explicitGet()
 
   def issue(
       issuer: KeyPair = defaultSigner,
@@ -141,8 +151,8 @@ object TxHelpers {
   def dataEntry(account: KeyPair, value: DataEntry[?]): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
 
-  def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
-    data(account, Seq(StringDataEntry(key, value)))
+  def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test", fee: Long = TestValues.fee): DataTransaction =
+    data(account, Seq(StringDataEntry(key, value)), fee)
 
   def data(account: KeyPair, entries: Seq[DataEntry[?]], fee: Long = TestValues.fee * 3, version: TxVersion = TxVersion.V1): DataTransaction =
     DataTransaction.selfSigned(version, account, entries, fee, timestamp).explicitGet()
@@ -180,12 +190,9 @@ object TxHelpers {
   ): UpdateAssetInfoTransaction =
     UpdateAssetInfoTransaction.selfSigned(version, sender, assetId, name, desc, timestamp, fee, feeAsset, chainId).explicitGet()
 
-  def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
+  def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset = Waves): Order = {
     order(orderType, asset, Waves, feeAsset)
   }
-
-  def orderV3(orderType: OrderType, asset: Asset): Order =
-    orderV3(orderType, asset, Waves)
 
   def order(
       orderType: OrderType,
@@ -200,7 +207,8 @@ object TxHelpers {
       matcher: KeyPair = defaultSigner,
       timestamp: TxTimestamp = timestamp,
       expiration: TxTimestamp = timestamp + 100000,
-      version: TxVersion = Order.V3
+      version: TxVersion = Order.V3,
+      attachment: Option[ByteStr] = None
   ): Order = {
     Order
       .selfSigned(
@@ -215,7 +223,8 @@ object TxHelpers {
         expiration,
         fee,
         feeAsset,
-        priceMode
+        priceMode,
+        attachment
       )
       .explicitGet()
   }
@@ -354,7 +363,7 @@ object TxHelpers {
       acc: KeyPair,
       asset: IssuedAsset,
       script: Script,
-      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit,
+      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit + ScriptExtraFee,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId

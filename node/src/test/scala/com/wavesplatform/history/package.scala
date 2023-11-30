@@ -70,7 +70,9 @@ package object history {
         txs = txs,
         signer = signer,
         Seq.empty,
-        -1L
+        -1L,
+        None,
+        None
       )
       .explicitGet()
 
@@ -89,7 +91,8 @@ package object history {
         generator = signer,
         transactionData = txs,
         reference = prevTotal.id(),
-        totalResBlockSig = newTotalBlock.signature
+        totalResBlockSig = newTotalBlock.signature,
+        newTotalBlock.header.stateHash
       )
       .explicitGet()
     (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.id()))
@@ -103,7 +106,8 @@ package object history {
         generator = signer,
         transactionData = txs,
         reference = prevTotal.id(),
-        totalResBlockSig = newTotalBlock.signature
+        totalResBlockSig = newTotalBlock.signature,
+        stateHash = newTotalBlock.header.stateHash
       )
       .explicitGet()
     (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.id()))
@@ -135,10 +139,9 @@ package object history {
   ): (Block, Seq[MicroBlockWithTotalId]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)
     val microBlocks = micros
-      .foldLeft((block, Seq.empty[MicroBlockWithTotalId])) {
-        case ((lastTotal, allMicros), txs) =>
-          val (newTotal, micro) = customBuildMicroBlockOfTxs(totalRefTo, lastTotal, txs, signer, version, timestamp)
-          (newTotal, allMicros :+ micro)
+      .foldLeft((block, Seq.empty[MicroBlockWithTotalId])) { case ((lastTotal, allMicros), txs) =>
+        val (newTotal, micro) = customBuildMicroBlockOfTxs(totalRefTo, lastTotal, txs, signer, version, timestamp)
+        (newTotal, allMicros :+ micro)
       }
       ._2
     (block, microBlocks)

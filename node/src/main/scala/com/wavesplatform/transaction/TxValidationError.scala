@@ -29,11 +29,11 @@ object TxValidationError {
   case object MissingSenderPrivateKey                        extends ValidationError
   case object UnsupportedTransactionType                     extends ValidationError
   case object InvalidRequestSignature                        extends ValidationError
-  case class BlockFromFuture(ts: Long)                       extends ValidationError
+  case class BlockFromFuture(blockTs: Long, localTs: Long)   extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
-  case class AliasDoesNotExist(a: Alias) extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
-  case class AliasIsDisabled(a: Alias)   extends ValidationError
+  case class AliasDoesNotExist(a: Alias)                     extends ValidationError { override def toString: String = s"Alias '$a' does not exist." }
+  case class AliasIsDisabled(a: Alias)                       extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class SenderIsBlacklisted(addr: String)               extends ValidationError
   case class Mistiming(err: String)                          extends ValidationError
@@ -48,6 +48,8 @@ object TxValidationError {
   case class InvalidSignature(entity: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
     override def toString: String = s"InvalidSignature(${entity.toString + " reason: " + details})"
   }
+
+  case class InvalidStateHash(blockStateHash: Option[ByteStr]) extends ValidationError
 
   sealed trait WithLog extends Product with Serializable {
     def log: Log[Id]

@@ -2,13 +2,13 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.AssetDistributionPage
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -25,7 +25,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     nodes.waitForHeightArise()
 
-    val issueTx = node.issue(issuer, "TestCoin", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val issueTx = node.issue(issuer, "TestCoin", "no description", issueAmount, 8, reissuable = false, issueFee, waitForTx = true).id
 
     node.massTransfer(
       issuer,
@@ -47,9 +47,9 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
       .assetDistributionAtHeight(issueTx, distributionHeight, 100)
       .items
 
-    assetDis should be equals node.assetDistribution(issueTx)
-
     val issuerAssetDis = assetDis.view.filterKeys(_ == issuer.toAddress).values
+
+    assetDis should be equals node.assetDistribution(issueTx)
 
     issuerAssetDis.size shouldBe 1
     issuerAssetDis.head shouldBe (issueAmount - addresses.length * transferAmount)
@@ -75,7 +75,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   test("'Asset distribution' works properly") {
     val receivers = for (i <- 0 until 10) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
-    val issueTx = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val issueTx = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, reissuable = false, issueFee, waitForTx = true).id
 
     node
       .massTransfer(
@@ -99,7 +99,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   test("Correct last page and entry count") {
     val receivers = for (i <- 0 until 50) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
-    val issueTx = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val issueTx = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, reissuable = false, issueFee, waitForTx = true).id
 
     node
       .massTransfer(
@@ -125,12 +125,14 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   test("Unlimited list") {
+    val assetId = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, reissuable = false, issueFee, waitForTx = true).id
+
     val receivers = for (i <- 0 until 2000) yield KeyPair(s"receiver#$i".getBytes("UTF-8"))
 
-    val assetId = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
+    val transfers = receivers.map { r => MassTransferTransaction.Transfer(r.toAddress.toString, 10L) }.toList
 
-    receivers.foreach { receiver =>
-      node.transfer(issuer, receiver.toAddress.toString, 10, assetId = Some(assetId))
+    transfers.grouped(100).foreach { t =>
+      node.massTransfer(issuer, t, minFee + t.length * minFee, assetId = Some(assetId))
     }
 
     node.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)

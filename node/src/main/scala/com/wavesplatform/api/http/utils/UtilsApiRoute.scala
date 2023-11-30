@@ -1,10 +1,11 @@
 package com.wavesplatform.api.http.utils
+
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.{PathMatcher1, Route}
-import cats.syntax.either.*
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.ApiError.{ConflictingRequestStructure, CustomValidationError, ScriptCompilerError, TooBigArrayAllocation, WrongJson}
-import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, ScriptCompilerError, TooBigArrayAllocation}
+import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto
@@ -15,15 +16,10 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{API, CompileResult}
-import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.utils.Time
 import monix.execution.Scheduler
 import play.api.libs.json.*
@@ -56,7 +52,7 @@ case class UtilsApiRoute(
       FeeValidation.ScriptExtraFee
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
+    decompile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -82,28 +78,6 @@ case class UtilsApiRoute(
               Json.obj(wrapped*)
             )
           }
-      }
-    }
-  }
-
-  // Deprecated
-  def compile: Route = path("script" / "compile") {
-    (post & entity(as[String])) { code =>
-      parameter("assetScript".as[Boolean] ? false) { isAssetScript =>
-        executeLimited(ScriptCompiler(code, isAssetScript, estimator())) { result =>
-          complete(
-            result.fold(
-              e => ScriptCompilerError(e),
-              { case (script, complexity) =>
-                Json.obj(
-                  "script"     -> script.bytes().base64,
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
-                )
-              }
-            )
-          )
-        }
       }
     }
   }
@@ -171,7 +145,7 @@ case class UtilsApiRoute(
           result
             .fold(
               e => ScriptCompilerError(e),
-              { cr: CompileResult =>
+              { (cr: CompileResult) =>
                 Json.obj(
                   "script"     -> ByteStr(cr.bytes).base64,
                   "complexity" -> cr.verifierComplexity,
@@ -254,56 +228,25 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject] & parameter("trace".as[Boolean] ? false)) { (address, request, trace) =>
-      val scriptInfo = blockchain.accountScript(address).get
-      val pk         = scriptInfo.publicKey
-      val script     = scriptInfo.script
-
-      val simpleExpr = request.value.get("expr").map(parseCall(_, script.stdLibVersion))
-      val exprFromInvocation =
-        request
-          .asOpt[UtilsInvocationRequest]
-          .map(_.toInvocation.flatMap(UtilsEvaluator.toExpr(script, _)))
-
-      val exprE = (simpleExpr, exprFromInvocation) match {
-        case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictingRequestStructure.json)
-        case (None, None)                                  => Left(WrongJson().json)
-        case (Some(expr), _)                               => Right(expr)
-        case (None, Some(expr))                            => Right(expr)
-      }
-
-      val apiResult = exprE.flatMap { exprE =>
-        val evaluated = for {
-          expr <- exprE
-          limit = settings.evaluateScriptComplexityLimit
-          (result, complexity, log, scriptResult) <- UtilsEvaluator.executeExpression(blockchain, script, address, pk, limit)(expr)
-        } yield Json.obj(
-          "result"       -> ScriptValuesJson.serializeValue(result),
-          "complexity"   -> complexity,
-          "stateChanges" -> scriptResult
-        ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
-        evaluated.leftMap {
-          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
-          case e                    => ApiError.fromValidationError(e).json
-        }
-      }.merge
-
+    (
+      path("script" / "evaluate" / ScriptedAddress)
+        & jsonPostD[JsObject]
+        & parameter("trace".as[Boolean] ? false)
+        & optionalHeaderValueByType(Accept)
+    ) { (address, request, enableTraces, accept) =>
+      val apiResult = UtilsEvaluator.evaluate(
+        blockchain,
+        address,
+        request,
+        UtilsEvaluator.EvaluateOptions(
+          evaluateScriptComplexityLimit = settings.evaluateScriptComplexityLimit,
+          maxTxErrorLogSize = maxTxErrorLogSize,
+          enableTraces = enableTraces,
+          intAsString = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
+        )
+      )
       complete(apiResult ++ request ++ Json.obj("address" -> address.toString))
     }
-
-  private def parseCall(js: JsReadable, version: StdLibVersion) = {
-    val binaryCall = js
-      .asOpt[ByteStr]
-      .toRight(GenericError("Unable to parse expr bytes"))
-      .flatMap(bytes => SerdeV1.deserialize(bytes.arr).bimap(GenericError(_), _._1))
-
-    val textCall = js
-      .asOpt[String]
-      .toRight(GenericError("Unable to read expr string"))
-      .flatMap(UtilsEvaluator.compile(version))
-
-    binaryCall.orElse(textCall)
-  }
 
   private[this] val ScriptedAddress: PathMatcher1[Address] = AddrSegment.map {
     case address: Address if blockchain.hasAccountScript(address) => address
@@ -312,6 +255,8 @@ case class UtilsApiRoute(
 }
 
 object UtilsApiRoute {
-  val MaxSeedSize     = 1024
-  val DefaultSeedSize = 32
+  val MaxSeedSize                 = 1024
+  val DefaultSeedSize             = 32
+  val DefaultPublicKey: PublicKey = PublicKey(ByteStr(new Array[Byte](32)))
+  val DefaultAddress: Address     = DefaultPublicKey.toAddress
 }

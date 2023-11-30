@@ -45,7 +45,7 @@ class SyncDAppNegativeIssueTest extends PropSpec with WithDomain {
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
 
-  property("negative issue amount") {
+  property("negative issue decimals") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -67,7 +67,7 @@ class SyncDAppNegativeIssueTest extends PropSpec with WithDomain {
         d.appendBlock(preparingTxs*)
         if (bigComplexityDApp1 || bigComplexityDApp2) {
           d.appendBlock(invoke)
-          d.liquidDiff.errorMessage(invoke.txId).get.text should include("Invalid decimals")
+          d.liquidSnapshot.errorMessage(invoke.txId).get.text should include("Invalid decimals")
         } else {
           d.appendBlockE(invoke) should produce("Invalid decimals")
           d.appendBlock()

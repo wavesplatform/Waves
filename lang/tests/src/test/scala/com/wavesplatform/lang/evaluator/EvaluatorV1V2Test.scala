@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*
-import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.directives.values.{StdLibVersion, *}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -27,6 +27,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
+import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
@@ -67,7 +68,16 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV2
-      .applyCompleted(context, expr, LogExtraInfo(), implicitly[StdLibVersion], correctFunctionCallScope = true, newMode = true)
+      .applyCompleted(
+        context,
+        expr,
+        LogExtraInfo(),
+        implicitly[StdLibVersion],
+        correctFunctionCallScope = true,
+        newMode = true,
+        enableExecutionLog = false,
+        fixedThrownError = true
+      )
       ._3
       .asInstanceOf[Either[ExecutionError, T]]
 
@@ -91,7 +101,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         LogExtraInfo(),
         implicitly[StdLibVersion],
         correctFunctionCallScope = true,
-        newMode = true
+        newMode = true,
+        enableExecutionLog = true,
+        fixedThrownError = true
       )
 
     evaluatorV2Result shouldBe evaluatorV1Result.bimap(_._1, _._1)
@@ -766,7 +778,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
 
     val expr = ExpressionCompiler
-      .compileUntyped(script, context.compilerContext)
+      .compileUntyped(script, NoLibraries, context.compilerContext, StdLibVersion.VersionDic.all.last)
       .explicitGet()
 
     evalPure[EVALUATED](
@@ -870,7 +882,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         evalPure[EVALUATED](
           context.evaluationContext[Id],
           ExpressionCompiler
-            .apply(context.compilerContext, xs)
+            .apply(context.compilerContext, version, xs)
             .explicitGet()
             ._1
         )
@@ -899,7 +911,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext(Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext, StdLibVersion.VersionDic.all.last)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -976,7 +988,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     eval[CONST_BOOLEAN](
       defaultFullContext.evaluationContext(environment),
-      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))
+      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF(GlobalValNames.Unit)))
     ) shouldBe evaluated(false)
   }
 
@@ -1035,7 +1047,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalWithLogging(
       context.evaluationContext[Id](Common.emptyBlockchainEnvironment()),
       ExpressionCompiler
-        .compileBoolean(script, context.compilerContext)
+        .compileBoolean(script, NoLibraries, context.compilerContext, StdLibVersion.VersionDic.all.last)
         .explicitGet()
     ).map {
       case (CONST_BOOLEAN(b), log) => (b, log)
@@ -1112,7 +1124,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteStr.fromBytes(1))
     evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteStr.fromBytes(0))
-    evalToBytes(toStringBoolean, REF("unit")) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
+    evalToBytes(toStringBoolean, REF(GlobalValNames.Unit)) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe evaluated(ByteStr(ByteBuffer.allocate(8).putLong(n).array))
