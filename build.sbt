@@ -10,10 +10,10 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 
 enablePlugins(GitVersioning)
 
-git.uncommittedSignifier := Some("DIRTY")
-git.useGitDescribe := true
+git.uncommittedSignifier       := Some("DIRTY")
+git.useGitDescribe             := true
 ThisBuild / git.useGitDescribe := true
-ThisBuild / PB.protocVersion := "3.24.4"  // https://protobuf.dev/support/version-support/#java
+ThisBuild / PB.protocVersion   := "3.24.4" // https://protobuf.dev/support/version-support/#java
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -50,7 +50,10 @@ lazy val `lang-testkit` = project
   .dependsOn(`lang-jvm`)
   .in(file("lang/testkit"))
   .settings(
-    libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps
+    libraryDependencies ++=
+      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
+        "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
+      )
   )
 
 lazy val `lang-tests` = project
