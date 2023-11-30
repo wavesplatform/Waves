@@ -61,7 +61,7 @@ class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenB
   }
 
   property("estimator global vars fixes activation") {
-    withDomain(DomainPresets.ContinuationTransaction.setFeaturesHeight(ContinuationTransaction -> 2)) { d =>
+    withDomain(DomainPresets.ContinuationTransaction.setFeaturesHeight(LightNode -> 2)) { d =>
       val dApp = TestCompiler(V6).compileContract(
         """
           | @Callable(i)

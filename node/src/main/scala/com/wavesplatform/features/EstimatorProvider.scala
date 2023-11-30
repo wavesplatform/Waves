@@ -15,7 +15,7 @@ object EstimatorProvider {
         ScriptEstimatorV3(
           fixOverflow = checkEstimatorSumOverflow,
           overhead = !b.isFeatureActivated(RideV6),
-          letFixes = b.isFeatureActivated(ContinuationTransaction)
+          letFixes = b.isFeatureActivated(LightNode)
         )
       else if (b.isFeatureActivated(BlockReward)) ScriptEstimatorV2
       else ScriptEstimatorV1
@@ -32,7 +32,7 @@ object EstimatorProvider {
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {
     def estimator: ScriptEstimator =
-      if (ws.featuresSettings.supported.contains(ContinuationTransaction.id)) ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true)
+      if (ws.featuresSettings.supported.contains(LightNode.id)) ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true)
       else if (ws.featuresSettings.supported.contains(RideV6.id)) ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = false)
       else if (ws.featuresSettings.supported.contains(BlockV5.id)) ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false)
       else if (ws.featuresSettings.supported.contains(BlockReward.id)) ScriptEstimatorV2
