@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
-import com.wavesplatform.transaction.{TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{PBSince, TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -36,7 +36,7 @@ object SetScriptTxSerializer {
   }
 
   def toBytes(tx: SetScriptTransaction): Array[Byte] = {
-    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    if (PBSince.affects(tx)) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
   }
 

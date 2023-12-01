@@ -82,7 +82,7 @@ object FeeValidation {
           case tx: DataTransaction =>
             val payloadLength =
               if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) DataTxValidator.realUserPayloadSize(tx.data)
-              else if (tx.isProtobufVersion) tx.protoDataPayload.length
+              else if (PBSince.affects(tx)) tx.protoDataPayload.length
               else if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes().length
               else tx.bytes().length
 

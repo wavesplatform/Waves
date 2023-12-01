@@ -41,8 +41,8 @@ class MaxCallableComplexityTest extends PropSpec with WithDomain with Transactio
       val setLargeScript = SetScriptTransaction.selfSigned(TxVersion.V2, dApp, Some(largeScript(V6, 300)), 0.022.waves, ts).explicitGet()
 
       d.appendBlock(genDApp, genInvoker, setScript)
-      val invokeDiff = d.transactionDiffer(invokeScript(invoker, dApp.toAddress, "test")).resultE.explicitGet()
-      invokeDiff.scriptsComplexity shouldBe 51585
+      val invokeSnapshot = d.transactionDiffer(invokeScript(invoker, dApp.toAddress, "test")).resultE.explicitGet()
+      invokeSnapshot.scriptsComplexity shouldBe 51585
       d.appendAndCatchError(setLargeScript).toString should include("Contract function (test) is too complex: 54301 > 52000")
     }
   }
@@ -61,8 +61,8 @@ class MaxCallableComplexityTest extends PropSpec with WithDomain with Transactio
       val setInvokeScript = SetScriptTransaction.selfSigned(TxVersion.V2, invokeDApp, Some(invokeScript(V5, largeDApp.toAddress)), 0.01.waves, ts).explicitGet()
 
       d.appendBlock(genInvoker, genLargeDApp, genInvokeDApp, setLargeScript, setInvokeScript)
-      val invokeDiff = d.transactionDiffer(invokeScript(invoker, invokeDApp.toAddress, "invokeTest")).resultE.explicitGet()
-      invokeDiff.scriptsComplexity shouldBe 18177
+      val invokeSnapshot = d.transactionDiffer(invokeScript(invoker, invokeDApp.toAddress, "invokeTest")).resultE.explicitGet()
+      invokeSnapshot.scriptsComplexity shouldBe 18177
     }
   }
 

@@ -7,7 +7,6 @@ import java.util.function.Consumer
 
 import com.google.common.primitives.{Ints, UnsignedBytes}
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.common.ByteStrComparator
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -19,6 +18,7 @@ import org.eclipse.collections.impl.utility.MapIterate
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import org.rocksdb.{WriteBatch, WriteOptions}
+import com.wavesplatform.utils.byteStrOrdering
 
 import scala.util.Random
 
@@ -123,7 +123,7 @@ object RocksDBWriteBatchBenchmark {
   }
 
   object SortedBatch {
-    val byteStrComparator: Comparator[ByteStr] = (o1: ByteStr, o2: ByteStr) => ByteStrComparator.compare(o1, o2)
+    val byteStrComparator: Comparator[ByteStr] = (o1: ByteStr, o2: ByteStr) => byteStrOrdering.compare(o1, o2)
   }
 
   object ByteArrayHashingStrategy extends HashingStrategy[Array[Byte]] {

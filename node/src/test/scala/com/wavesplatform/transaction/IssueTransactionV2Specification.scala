@@ -25,7 +25,7 @@ import play.api.libs.json.Json
 class IssueTransactionV2Specification extends PropSpec with WithNewDBForEachTest with HistoryTest with EitherValues {
 
   property("IssueV2 serialization roundtrip") {
-    forAll(issueV2TransactionGen()) { tx: IssueTransaction =>
+    forAll(issueV2TransactionGen()) { (tx: IssueTransaction) =>
       val recovered = IssueTransaction.parseBytes(tx.bytes()).get
 
       tx.sender shouldEqual recovered.sender

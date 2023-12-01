@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 
 class UtilsSpecification extends FreeSpec {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   "estimate()" - {
     "handles functions that depend on each other" in {

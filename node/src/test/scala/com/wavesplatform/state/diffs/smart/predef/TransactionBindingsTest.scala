@@ -871,7 +871,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet(), fixBigScriptField = true)
 
-    val environment = new WavesEnvironment(
+    val environment = WavesEnvironment(
       chainId,
       Coeval(???),
       null,
@@ -881,7 +881,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       ByteStr.empty
     )
     for {
-      compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
+      compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, V3, expr)
       (typedExpr, _) = compileResult
       r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr).leftMap(_.message)
     } yield r
@@ -902,7 +902,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives, fixBigScriptField = true)
 
-    val env = new WavesEnvironment(
+    val env = WavesEnvironment(
       chainId,
       Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
       null,
@@ -913,7 +913,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     )
 
     for {
-      compileResult <- ExpressionCompiler(ctx.compilerContext, expr)
+      compileResult <- ExpressionCompiler(ctx.compilerContext, V2, expr)
       (typedExpr, _) = compileResult
       r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr).leftMap(_.message)
     } yield r

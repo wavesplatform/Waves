@@ -198,6 +198,7 @@ abstract class Caches extends Blockchain with Storage {
   protected def loadApprovedFeatures(): Map[Short, Int]
   override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
 
+  // Also contains features those will be activated in the future (activationHeight > currentHeight), because they were approved now or before.
   @volatile
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
@@ -281,7 +282,7 @@ abstract class Caches extends Blockchain with Storage {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
 
     val updatedBalanceNodes = for {
-      ((address, asset), amount) <- snapshot.balances
+      case ((address, asset), amount) <- snapshot.balances
       key         = (address, asset)
       prevBalance = balancesCache.get(key) if prevBalance.balance != amount
     } yield key -> (
@@ -320,9 +321,10 @@ abstract class Caches extends Blockchain with Storage {
     for ((address, script)          <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
     for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, Some(script.script))
     for ((asset, _)                 <- snapshot.assetStatics) if (!snapshot.assetScripts.contains(asset)) stateHash.addAssetScript(asset, None)
-    for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
-    for ((assetId, sponsorship)     <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
-    for ((alias, address)           <- snapshot.aliases) stateHash.addAlias(address, alias.name)
+    for (leaseId <- snapshot.newLeases.keys) if (!snapshot.cancelledLeases.contains(leaseId)) stateHash.addLeaseStatus(leaseId, isActive = true)
+    for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
+    for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
+    for ((alias, address)       <- snapshot.aliases) stateHash.addAlias(address, alias.name)
 
     doAppend(
       newMeta,
@@ -394,7 +396,7 @@ object Caches {
   def cache[K <: AnyRef, V <: AnyRef](
       maximumSize: Int,
       loader: K => V,
-      batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { _: lang.Iterable[? <: K] => new util.HashMap[K, V]() }
+      batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { (_: lang.Iterable[? <: K]) => new util.HashMap[K, V]() }
   ): LoadingCache[K, V] =
     CacheBuilder
       .newBuilder()

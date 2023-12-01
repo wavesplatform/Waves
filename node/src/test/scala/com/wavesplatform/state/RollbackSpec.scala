@@ -1,6 +1,9 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, Alias, KeyPair, PublicKey}
+import com.wavesplatform.api.common.LeaseInfo
+import com.wavesplatform.api.common.LeaseInfo.Status.Active
+import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -8,7 +11,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.*
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.history
-import com.wavesplatform.history.Domain
+import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V5
@@ -18,14 +21,15 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.traits.domain.Lease
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.{InvokeTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxPositiveAmount, TxVersion}
+import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, Assertions}
 
 class RollbackSpec extends FreeSpec with WithDomain {
@@ -33,7 +37,6 @@ class RollbackSpec extends FreeSpec with WithDomain {
   private def nextTs = time.getTimestamp()
 
   private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
-    import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
         val lease       = TxHelpers.lease(sender, recipient, amount, fee = 100000L, timestamp = nextTs, version = TxVersion.V1)
@@ -43,7 +46,10 @@ class RollbackSpec extends FreeSpec with WithDomain {
         List(
           TxHelpers.massTransfer(
             sender,
-            Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount)), ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))),
+            Seq(
+              recipient -> amount,
+              recipient -> amount
+            ),
             fee = 10000,
             timestamp = nextTs,
             version = TxVersion.V1
@@ -181,7 +187,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchainUpdater.height shouldBe 2
         val blockWithLeaseId = d.lastBlockId
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
+          LeaseDetails(LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, lt.id(), 2), LeaseDetails.Status.Active)
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -198,12 +204,8 @@ class RollbackSpec extends FreeSpec with WithDomain {
         )
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
           LeaseDetails(
-            sender.publicKey,
-            recipient.toAddress,
-            leaseAmount,
-            LeaseDetails.Status.Cancelled(d.blockchain.height, Some(leaseCancel.id())),
-            lt.id(),
-            2
+            LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, lt.id(), 2),
+            LeaseDetails.Status.Cancelled(d.blockchain.height, Some(leaseCancel.id()))
           )
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual 0
@@ -211,7 +213,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
         d.rollbackTo(blockWithLeaseId)
         d.blockchainUpdater.leaseDetails(lt.id()) should contain(
-          LeaseDetails(sender.publicKey, recipient.toAddress, leaseAmount, LeaseDetails.Status.Active, lt.id(), 2)
+          LeaseDetails(LeaseStaticInfo(sender.publicKey, recipient.toAddress, lt.amount, lt.id(), 2), LeaseDetails.Status.Active)
         )
         d.blockchainUpdater.leaseBalance(sender.toAddress).out shouldEqual leaseAmount
         d.blockchainUpdater.leaseBalance(recipient.toAddress).in shouldEqual leaseAmount
@@ -694,7 +696,12 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val (leaseAmount, leaseFc) = leaseFunctionCall(leaseRecipientAddress.toAddress)
 
             def leaseDetails(invokeId: ByteStr) =
-              Some(LeaseDetails(checkPk, leaseRecipientAddress.toAddress, leaseAmount, LeaseDetails.Status.Active, invokeId, 3))
+              Some(
+                LeaseDetails(
+                  LeaseStaticInfo(checkPk, leaseRecipientAddress.toAddress, TxPositiveAmount.unsafeFrom(leaseAmount), invokeId, 3),
+                  LeaseDetails.Status.Active
+                )
+              )
 
             // liquid block rollback
             val invokeId1 = append(d.lastBlockId, leaseFc)
@@ -758,13 +765,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         def leaseDetails(leaseHeight: Int, cancelHeight: Int = 0, cancelId: ByteStr = ByteStr.empty) =
           Some(
             LeaseDetails(
-              checkPk,
-              leaseRecipientAddress,
-              leaseAmount,
+              LeaseStaticInfo(checkPk, leaseRecipientAddress, TxPositiveAmount.unsafeFrom(leaseAmount), sourceId, leaseHeight),
               if (cancelId.isEmpty) LeaseDetails.Status.Active
-              else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId)),
-              sourceId,
-              leaseHeight
+              else LeaseDetails.Status.Cancelled(cancelHeight, Some(cancelId))
             )
           )
 
@@ -1100,6 +1103,43 @@ class RollbackSpec extends FreeSpec with WithDomain {
         } catch {
           case e: Throwable => Assertions.assert(e.getMessage.contains("AlreadyInTheState"))
         }
+      }
+    }
+
+    "active leases by address" in {
+      withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
+        def leases(address: Address) = d.accountsApi.activeLeases(address).toListL.runSyncUnsafe()
+
+        val leaseTxs = Seq.fill(5)(lease(defaultSigner, secondAddress)) ++ Seq.fill(5)(lease(secondSigner, defaultAddress))
+        val info =
+          leaseTxs.map(tx => LeaseInfo(tx.id(), tx.id(), tx.sender.toAddress, tx.recipient.asInstanceOf[Address], tx.amount.value, 2, Active))
+
+        val b1 = d.appendBlock(leaseTxs*)
+        leases(defaultAddress) should contain theSameElementsAs info
+        leases(secondAddress) should contain theSameElementsAs info
+
+        val b2 = d.appendBlock(leaseCancel(leaseTxs.head.id()))
+        leases(defaultAddress) should contain theSameElementsAs info.tail
+        leases(secondAddress) should contain theSameElementsAs info.tail
+
+        d.appendMicroBlock(leaseCancel(leaseTxs.last.id(), secondSigner))
+        leases(defaultAddress) should contain theSameElementsAs info.slice(1, 9)
+        leases(secondAddress) should contain theSameElementsAs info.slice(1, 9)
+
+        d.appendBlock(d.createBlock(ProtoBlockVersion, Nil, Some(b2.id())))
+        leases(defaultAddress) should contain theSameElementsAs info.tail
+        leases(secondAddress) should contain theSameElementsAs info.tail
+
+        d.appendBlock(transfer(defaultSigner, secondAddress), transfer(secondSigner, defaultAddress))
+        // to check that rolling back this block will not affect active leases from previous block
+
+        d.rollbackTo(b1.id())
+        leases(defaultAddress) should contain theSameElementsAs info
+        leases(secondAddress) should contain theSameElementsAs info
+
+        d.rollbackTo(1)
+        leases(defaultAddress) shouldBe empty
+        leases(secondAddress) shouldBe empty
       }
     }
   }

@@ -1,8 +1,5 @@
 package com.wavesplatform.state
 
-import java.io.File
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import cats.Id
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
@@ -21,6 +18,8 @@ import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import scodec.bits.BitVector
 
+import java.io.File
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.io.Codec
 
 /** Tests over real database. How to test:
@@ -137,7 +136,7 @@ object WavesEnvironmentBenchmark {
 
     val environment: Environment[Id] = {
       val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
-      new WavesEnvironment(
+      WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
         Coeval(state.height),

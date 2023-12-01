@@ -23,7 +23,7 @@ object GetInteger extends JsTestBase {
   private val invalidGetIntValue = s"getIntegerValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test("functions getInteger accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-12. Compile getInteger functions for address, alias, and 'this'") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (
@@ -48,7 +48,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test("functions own data getInteger accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-13. Compile own data getInteger functions for address, alias, and 'this'") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (ownData <- Seq(ownDataGetInt, ownDataGetIntArgBeforeFunc, ownDataGetIntValueArgBeforeFunc, ownDataGetIntValue)) {
@@ -58,7 +58,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test("negative tests for getInteger functions") {
+    test("RIDE-14. Test negative scenarios for getInteger functions") {
       val invalidFunction = s"getIntegerValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getIntegerValue()"
       for (version <- actualVersions) {
@@ -79,7 +79,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test("Can't find a own data functions overload Integer accountDataStorage for old Versions") {
+    test("RIDE-15. Ensure no overload of own data Integer accountDataStorage for old versions") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         for (

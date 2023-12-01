@@ -28,7 +28,8 @@ package object estimator {
       V3,
       correctFunctionCallScope = true,
       overhead,
-      enableExecutionLog = false
+      enableExecutionLog = false,
+      fixedThrownError = true
     )
 
   def evaluatorV2AsEstimator(overhead: Boolean): ScriptEstimator = new ScriptEstimator {

@@ -16,7 +16,7 @@ import play.api.libs.json.*
 import scala.util.Try
 
 case class InvokeScriptTransaction(
-    version: TxVersion,
+    override val version: TxVersion,
     sender: PublicKey,
     dApp: AddressOrAlias,
     funcCallOpt: Option[FUNCTION_CALL],
@@ -28,6 +28,7 @@ case class InvokeScriptTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeScript, payments.collect(InvokeScriptLike.IssuedAssets))
     with InvokeTransaction
+    with Versioned.ToV2
     with PBSince.V2 {
 
   override def root: InvokeScriptTransactionLike = this
@@ -42,8 +43,7 @@ case class InvokeScriptTransaction(
 object InvokeScriptTransaction extends TransactionParser {
   type TransactionT = InvokeScriptTransaction
 
-  override val typeId: TxType                    = 16: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val typeId: TxType = 16: Byte
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
 
@@ -53,9 +53,9 @@ object InvokeScriptTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
     InvokeScriptTxSerializer.parseBytes(bytes)
 
-  case class Payment(amount: Long, assetId: Asset)
+  case class Payment(amount: Long, assetId: Asset = Asset.Waves)
   object Payment {
-    implicit val jsonFormat: Format[Payment] = Json.format
+    implicit val jsonFormat: Format[Payment] = Json.configured[Json.WithDefaultValues].format
   }
 
   def create(

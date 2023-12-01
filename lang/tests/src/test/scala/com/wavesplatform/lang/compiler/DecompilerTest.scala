@@ -34,7 +34,7 @@ class DecompilerTest extends PropSpec {
   val decompilerContextV4 = getTestContext(V4).decompilerContext
 
   private def assertDecompile(script: String, decompiled: String, version: StdLibVersion): Assertion = {
-    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr.asInstanceOf[EXPR]
+    val expr   = TestCompiler(version).compileExpression(script.stripMargin).expr
     val result = Decompiler(expr, getDecompilerContext(version, Expression))
     result shouldBe decompiled.stripMargin.trim
   }
@@ -561,7 +561,7 @@ class DecompilerTest extends PropSpec {
 
   def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, untyped)
+    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, v, untyped)
     typed
   }
 
@@ -1125,5 +1125,15 @@ class DecompilerTest extends PropSpec {
   property("replaceByIndex()") {
     val script = """replaceByIndex(["a", "b", "c"], 1, "x")"""
     assertDecompile(script, script, V8)
+  }
+
+  property("escaping characters in string") {
+    val script =
+      s"""
+         |let a = "aaa\\"qqq\\"aaa"
+         |let b = "aaa\\\\qqq\\\\aaa"
+         |true
+       """
+    assertDecompile(script, script, V6)
   }
 }

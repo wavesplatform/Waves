@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import cats.Monoid
 import cats.implicits.catsSyntaxSemigroup
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -17,7 +17,6 @@ import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -60,7 +59,7 @@ object StateUpdate {
     def fromPB(v: PBBalanceUpdate): BalanceUpdate = {
       val (asset, after) = PBAmounts.toAssetAndAmount(v.getAmountAfter)
       val before         = v.amountBefore
-      BalanceUpdate(v.address.toAddress, asset, before, after)
+      BalanceUpdate(v.address.toAddress(), asset, before, after)
     }
 
     def toPB(v: BalanceUpdate): PBBalanceUpdate = {
@@ -81,7 +80,7 @@ object StateUpdate {
 
     def fromPB(v: PBDataEntryUpdate): DataEntryUpdate = {
       DataEntryUpdate(
-        v.address.toAddress,
+        v.address.toAddress(),
         PBTransactions.toVanillaDataEntry(v.getDataEntryBefore),
         PBTransactions.toVanillaDataEntry(v.getDataEntry)
       )
@@ -105,7 +104,7 @@ object StateUpdate {
 
     def fromPB(v: PBLeasingUpdate): LeasingBalanceUpdate = {
       LeasingBalanceUpdate(
-        v.address.toAddress,
+        v.address.toAddress(),
         LeaseBalance(v.inBefore, v.outBefore),
         LeaseBalance(v.inAfter, v.outAfter)
       )
@@ -157,7 +156,7 @@ object StateUpdate {
         },
         v.amount,
         v.sender.toPublicKey,
-        v.recipient.toAddress,
+        v.recipient.toAddress(),
         v.originTransactionId.toByteStr
       )
     }
@@ -386,9 +385,6 @@ object StateUpdate {
     }
   }
 
-  private lazy val WavesAlias   = Alias.fromString("alias:W:waves").explicitGet()
-  private lazy val WavesAddress = Address.fromString("3PGd1eQR8EhLkSogpmu9Ne7hSH1rQ5ALihd").explicitGet()
-
   def atomic(blockchainBeforeWithMinerReward: Blockchain, snapshot: StateSnapshot): StateUpdate = {
     val blockchain      = blockchainBeforeWithMinerReward
     val blockchainAfter = SnapshotBlockchain(blockchain, snapshot)
@@ -426,25 +422,37 @@ object StateUpdate {
       assetAfter  = blockchainAfter.assetDescription(asset)
     } yield AssetStateUpdate(asset.id, assetBefore, assetAfter)
 
-    val updatedLeases = snapshot.leaseStates.map { case (leaseId, newState) =>
+    val newLeaseUpdates = snapshot.newLeases.collect {
+      case (newId, staticInfo) if !snapshot.cancelledLeases.contains(newId) =>
+        LeaseUpdate(
+          newId,
+          LeaseStatus.Active,
+          staticInfo.amount.value,
+          staticInfo.sender,
+          staticInfo.recipientAddress,
+          staticInfo.sourceId
+        )
+    }
+
+    val cancelledLeaseUpdates = snapshot.cancelledLeases.map { case (id, _) =>
+      val si = snapshot.newLeases.get(id).orElse(blockchain.leaseDetails(id).map(_.static))
       LeaseUpdate(
-        leaseId,
-        if (newState.isActive) LeaseStatus.Active else LeaseStatus.Inactive,
-        newState.amount,
-        newState.sender,
-        newState.recipient match {
-          case `WavesAlias` => WavesAddress
-          case other        => blockchainAfter.resolveAlias(other).explicitGet()
-        },
-        newState.sourceId
+        id,
+        LeaseStatus.Inactive,
+        si.fold(0L)(_.amount.value),
+        si.fold(PublicKey(new Array[Byte](32)))(_.sender),
+        si.fold(PublicKey(new Array[Byte](32)).toAddress)(_.recipientAddress),
+        si.fold(ByteStr.empty)(_.sourceId)
       )
-    }.toVector
+    }
+
+    val updatedLeases = newLeaseUpdates ++ cancelledLeaseUpdates
 
     val updatedScripts = snapshot.accountScriptsByAddress.map { case (address, newScript) =>
       ScriptUpdate(ByteStr(address.bytes), blockchain.accountScript(address).map(_.script.bytes()), newScript.map(_.script.bytes()))
     }.toVector
 
-    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases, updatedScripts, Seq.empty)
+    StateUpdate(balances.toVector, leaseBalanceUpdates, dataEntries, assets, updatedLeases.toSeq, updatedScripts, Seq.empty)
   }
 
   private[this] def transactionsMetadata(blockchain: Blockchain, snapshot: StateSnapshot): Seq[TransactionMetadata] = {

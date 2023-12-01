@@ -3,15 +3,7 @@ package com.wavesplatform.api.grpc.test
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.api.grpc.{
-  AccountRequest,
-  AccountsApiGrpcImpl,
-  BalanceResponse,
-  BalancesRequest,
-  DataEntryResponse,
-  DataRequest,
-  LeaseResponse
-}
+import com.wavesplatform.api.grpc.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
@@ -19,7 +11,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.{DataTransactionData, Recipient}
+import com.wavesplatform.protobuf.transaction.{DataEntry, Recipient}
 import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -28,10 +20,14 @@ import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
 
+import scala.concurrent.Await
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
 class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatchers with WithDomain with GrpcApiHelpers {
 
-  val sender: KeyPair    = TxHelpers.signer(1)
-  val recipient: KeyPair = TxHelpers.signer(2)
+  val sender: KeyPair         = TxHelpers.signer(1)
+  val recipient: KeyPair      = TxHelpers.signer(2)
+  val timeout: FiniteDuration = 2.minutes
 
   "GetBalances should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
@@ -73,6 +69,28 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
     }
   }
 
+  "GetScript should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
+    val grpcApi = getGrpcApi(d)
+
+    val script = TxHelpers.script(
+      s"""{-# STDLIB_VERSION 6 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |@Callable(i)
+         |func foo(a: Int) = { ([], a == 42) }""".stripMargin
+    )
+
+    d.appendBlock(TxHelpers.setScript(sender, script))
+
+    val r = Await.result(
+      grpcApi.getScript(AccountRequest.of(ByteString.copyFrom(sender.toAddress.bytes))),
+      timeout
+    )
+
+    r.scriptBytes shouldBe ByteString.copyFrom(script.bytes().arr)
+    r.publicKey shouldBe ByteString.copyFrom(sender.publicKey.arr)
+  }
+
   "GetActiveLeases should work" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(sender)) { d =>
     val grpcApi = getGrpcApi(d)
 
@@ -89,7 +107,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       grpcApi.getActiveLeases(AccountRequest.of(ByteString.copyFrom(recipient.toAddress.bytes)), observer)
 
-      result.runSyncUnsafe() shouldBe List(
+      result.runSyncUnsafe() should contain theSameElementsAs List(
         LeaseResponse.of(
           ByteString.copyFrom(lease3.id().arr),
           ByteString.copyFrom(lease3.id().arr),
@@ -125,7 +143,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       result1.runSyncUnsafe() shouldBe List(
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key2", DataTransactionData.DataEntry.Value.IntValue(456)))
+          Some(DataEntry.of("key2", DataEntry.Value.IntValue(456)))
         )
       )
 
@@ -134,11 +152,11 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       result2.runSyncUnsafe() shouldBe List(
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key2", DataTransactionData.DataEntry.Value.IntValue(456)))
+          Some(DataEntry.of("key2", DataEntry.Value.IntValue(456)))
         ),
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key3", DataTransactionData.DataEntry.Value.IntValue(789)))
+          Some(DataEntry.of("key3", DataEntry.Value.IntValue(789)))
         )
       )
     }

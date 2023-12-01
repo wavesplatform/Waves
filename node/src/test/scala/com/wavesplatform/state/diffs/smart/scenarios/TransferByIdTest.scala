@@ -34,7 +34,7 @@ class TransferByIdTest extends PropSpec with WithState {
 
   val expr: EXPR = {
     val parsed = Parser.parseExpr(scriptSrc).get.value
-    ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = false), parsed).explicitGet()._1
+    ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = false), V3, parsed).explicitGet()._1
   }
 
   property("Transfer by id works fine") {

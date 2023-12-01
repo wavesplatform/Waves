@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -11,7 +10,7 @@ import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.serialization.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{Asset, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, PBSince, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.util.Try
@@ -69,7 +68,7 @@ object InvokeScriptTxSerializer {
   }
 
   def toBytes(tx: InvokeScriptTransaction): Array[Byte] =
-    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    if (PBSince.affects(tx)) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] = Try {
@@ -85,7 +84,7 @@ object InvokeScriptTxSerializer {
     val chainId = buf.getByte
 
     val sender       = buf.getPublicKey
-    val dApp         = buf.getAddressOrAlias(chainId)
+    val dApp         = buf.getAddressOrAlias(Some(chainId))
     val functionCall = Deser.parseOption(buf)(SerdeV1.deserializeFunctionCall(_).explicitGet())
     val payments     = Deser.parseArrays(buf).map(parsePayment)
     val fee          = TxPositiveAmount.unsafeFrom(buf.getLong)

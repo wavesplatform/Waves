@@ -13,9 +13,8 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.SettingsFromDefaultConfig
 import com.wavesplatform.transaction.TxHelpers
-import org.scalamock.scalatest.PathMockFactory
 
-class RideV5LimitsChangeTest extends FlatSpec with WithDomain with PathMockFactory {
+class RideV5LimitsChangeTest extends FlatSpec with WithDomain {
   "Blockchain" should "reject block with >1kk complexity before SynchronousCalls activated" in {
     val contractSigner  = TxHelpers.secondSigner
     val contractAddress = contractSigner.toAddress

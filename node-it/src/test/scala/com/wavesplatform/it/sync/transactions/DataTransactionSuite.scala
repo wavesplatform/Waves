@@ -3,23 +3,23 @@ package com.wavesplatform.it.sync.transactions
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
-import com.wavesplatform.it.sync.{calcDataFee, minFee, _}
+import com.wavesplatform.it.sync.{calcDataFee, minFee, *}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import org.scalatest.{Assertion, Assertions, EitherValues}
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Failure, Random, Try}
 
 class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
@@ -368,7 +368,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       def id(obj: JsObject): String = obj.value("id").as[String]
 
       val noProof = request - "proofs"
-      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
+      assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), s"${WrongJson.WrongJsonDataMessage}.*proofs.*missing")
       nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
       val badProof = request ++ Json.obj("proofs" -> Seq(Base58.encode(Array.fill(64)(Random.nextInt().toByte))))

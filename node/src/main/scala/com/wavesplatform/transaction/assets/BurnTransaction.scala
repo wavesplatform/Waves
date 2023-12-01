@@ -22,8 +22,9 @@ final case class BurnTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.Burn, Seq(asset)) with ProvenTransaction
-    with VersionedTransaction
+) extends Transaction(TransactionType.Burn, Seq(asset))
+    with ProvenTransaction
+    with Versioned.ToV3
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
@@ -36,9 +37,7 @@ final case class BurnTransaction(
 
 object BurnTransaction extends TransactionParser {
   type TransactionT = BurnTransaction
-
-  override val typeId: TxType                    = 6: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  override val typeId: TxType = 6: Byte
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
 
