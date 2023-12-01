@@ -1,4 +1,4 @@
-package com.wavesplatform.state.reader
+package com.wavesplatform.state
 
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -7,9 +7,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -85,16 +83,11 @@ case class SnapshotBlockchain(
     SnapshotBlockchain.assetDescription(asset, snapshot, height, inner)
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
-    lazy val innerDetails = inner.leaseDetails(leaseId)
-    val txOpt =
-      snapshot.transactions
-        .collectFirst {
-          case (_, txInfo) if txInfo.snapshot.leaseStates.contains(leaseId) => txInfo.transaction
-        }
-    snapshot.leaseStates
-      .get(leaseId)
-      .map(_.toDetails(this, txOpt, innerDetails))
-      .orElse(innerDetails)
+    val newer = snapshot.newLeases.get(leaseId).map(n => LeaseDetails(n, LeaseDetails.Status.Active)).orElse(inner.leaseDetails(leaseId))
+    snapshot.cancelledLeases.get(leaseId) match {
+      case Some(newStatus) => newer.map(_.copy(status = newStatus))
+      case None            => newer
+    }
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
@@ -272,8 +265,8 @@ object SnapshotBlockchain {
       .get(asset)
       .map { case (static, assetNum) =>
         AssetDescription(
-          static.sourceTransactionId.toByteStr,
-          static.issuerPublicKey.toPublicKey,
+          static.source,
+          static.issuer,
           info.get.name,
           info.get.description,
           static.decimals,

@@ -883,7 +883,7 @@ class ContractCompilerTest extends PropSpec {
       NoLibraries,
       dAppV4Ctx,
       V4,
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = true),
       needCompaction = false,
       removeUnusedCode = false
     ) should produce("Script is too large: 165187 bytes > 163840 bytes")
@@ -1042,7 +1042,7 @@ class ContractCompilerTest extends PropSpec {
       NoLibraries,
       getTestContext(V4).compilerContext,
       V4,
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = true),
       needCompaction = false,
       removeUnusedCode = false
     ) shouldBe Symbol("right")

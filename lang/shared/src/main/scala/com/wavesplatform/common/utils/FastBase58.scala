@@ -73,6 +73,7 @@ object FastBase58 extends BaseXXEncDec {
         outArray(outIndex) = longValue & 0xffffffffL
       }
 
+      // called only from Try structure, see BaseXXEncDec.tryDecode(str: String)
       if (base58EncMask > 0) throw new IllegalArgumentException("Output number too big (carry to the next int32)")
       if ((outArray(0) & zeroMask) != 0) throw new IllegalArgumentException("Output number too big (last int32 filled too far)")
     }

@@ -68,10 +68,7 @@ object NewTransactionInfo {
       case t: LeaseCancelTransaction =>
         Set(t.sender.toAddress) ++ blockchain
           .leaseDetails(t.leaseId)
-          .flatMap(_.recipient match {
-            case alias: Alias     => blockchain.resolveAlias(alias).toOption
-            case address: Address => Some(address)
-          })
+          .map(_.recipientAddress)
           .toSet
       case t: LeaseTransaction =>
         Set(t.sender.toAddress) ++ (t.recipient match {
@@ -79,12 +76,12 @@ object NewTransactionInfo {
           case address: Address => Set(address)
         })
       case t: MassTransferTransaction =>
-        Set(t.sender.toAddress) ++ (t.transfers.flatMap {
+        Set(t.sender.toAddress) ++ t.transfers.flatMap {
           _.address match {
             case alias: Alias     => blockchain.resolveAlias(alias).toOption.toSet
             case address: Address => Set(address)
           }
-        })
+        }
       case t: ReissueTransaction         => Set(t.sender.toAddress)
       case t: SetAssetScriptTransaction  => Set(t.sender.toAddress)
       case t: SetScriptTransaction       => Set(t.sender.toAddress)

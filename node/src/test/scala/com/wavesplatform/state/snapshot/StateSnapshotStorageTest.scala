@@ -5,25 +5,21 @@ import com.wavesplatform.TestValues.fee
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
-import com.wavesplatform.protobuf.ByteStrExt
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.reader.LeaseDetails.Status.{Active, Cancelled}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType.{BUY, SELL}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxPositiveAmount}
 
 import scala.collection.immutable.VectorMap
 import scala.math.pow
@@ -50,7 +46,11 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        StateSnapshot.fromProtobuf(d.rocksDBWriter.transactionSnapshot(tx.id()).get) shouldBe (expectedSnapshotWithMiner, status)
+        PBSnapshots.fromProtobuf(
+          d.rocksDBWriter.transactionSnapshot(tx.id()).get,
+          tx.id(),
+          d.blockchain.height - 1
+        ) shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
@@ -95,7 +95,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
           assetStatics = VectorMap(
-            asset -> AssetStatic(asset.id.toByteString, issueTx.id().toByteString, sender.publicKey.toByteString, issueTx.decimals.value)
+            asset -> AssetStaticInfo(asset.id, TransactionId(issueTx.id()), sender.publicKey, issueTx.decimals.value, false)
           ),
           assetVolumes = Map(
             asset -> AssetVolumeInfo(isReissuable = true, BigInt(issueTx.quantity.value))
@@ -174,8 +174,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress -> LeaseBalance(0, leaseTx.amount.value),
             recipient     -> LeaseBalance(leaseTx.amount.value, 0)
           ),
-          leaseStates = Map(
-            leaseTx.id() -> LeaseSnapshot(sender.publicKey, recipient, leaseTx.amount.value, Active)
+          newLeases = Map(
+            leaseTx.id() -> LeaseStaticInfo(leaseTx.sender, recipient, leaseTx.amount, leaseTx.id(), d.blockchain.height + 1)
           )
         )
       )
@@ -192,13 +192,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress -> LeaseBalance(0, 0),
             recipient     -> LeaseBalance(0, 0)
           ),
-          leaseStates = Map(
-            leaseTx.id() -> LeaseSnapshot(
-              PublicKey(ByteStr.fill(KeyLength)(0)),
-              Address(Array.fill(Address.HashLength)(0)),
-              0,
-              Cancelled(0, None)
-            )
+          cancelledLeases = Map(
+            leaseTx.id() -> LeaseDetails.Status.Cancelled(d.blockchain.height + 1, Some(leaseCancelTx.id()))
           )
         )
       )
@@ -220,8 +215,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           sender,
           fee = fee,
           to = Seq(
-            ParsedTransfer(TxHelpers.signer(4).toAddress, TxNonNegativeAmount(123)),
-            ParsedTransfer(TxHelpers.signer(5).toAddress, TxNonNegativeAmount(456))
+            TxHelpers.signer(4).toAddress -> 123,
+            TxHelpers.signer(5).toAddress -> 456
           )
         ),
         StateSnapshot(
@@ -322,7 +317,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             senderAddress    -> LeaseBalance(123, 0)
           ),
           assetStatics = VectorMap(
-            dAppAssetId -> AssetStatic(dAppAssetId.id.toByteString, invokeId.toByteString, dAppPk.toByteString, 4)
+            dAppAssetId -> AssetStaticInfo(dAppAssetId.id, TransactionId(invokeId), dAppPk, 4, false)
           ),
           assetVolumes = Map(
             dAppAssetId -> AssetVolumeInfo(true, 1000)
@@ -330,8 +325,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
           assetNamesAndDescriptions = Map(
             dAppAssetId -> AssetInfo("name", "description", Height(height))
           ),
-          leaseStates = Map(
-            leaseId -> LeaseSnapshot(dAppPk, senderAddress, 123, Active)
+          newLeases = Map(
+            leaseId -> LeaseStaticInfo(dAppPk, senderAddress, TxPositiveAmount(123), invokeId, height)
           ),
           accountData = Map(
             dAppPk.toAddress -> Map("key" -> StringDataEntry("key", "abc"))
@@ -356,7 +351,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, Waves) -> (d.balance(senderAddress) - fee)
           ),
           assetNamesAndDescriptions = Map(
-            asset2 -> AssetInfo(updateAssetTx.name, updateAssetTx.description, Height(d.solidStateHeight + 2))
+            asset2 -> AssetInfo(updateAssetTx.name, updateAssetTx.description, Height(d.blockchain.height + 1))
           )
         )
       )

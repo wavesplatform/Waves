@@ -6,7 +6,7 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.5.1-84-SNAPSHOT" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.5.1-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
   private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
@@ -97,15 +97,16 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private[this] val dbDeps =
-    Seq(
-      "org.rocksdb" % "rocksdbjni" % "8.5.4"
-    )
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.5.4"
+
+  private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
 
   lazy val node = Def.setting(
     Seq(
+      rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.10.0",
+      "commons-io"           % "commons-io"               % "2.11.0",
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonCore,
@@ -126,12 +127,11 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit"                 %% "refined-cats"  % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "9.4.0",
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test
-    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value ++ langCompilerPlugins.value
+      akkaHttpModule("akka-http-testkit") % Test,
+    ) ++ test ++ console ++ logDeps  ++ protobuf.value ++ langCompilerPlugins.value
   )
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.24.4"
@@ -158,8 +158,8 @@ object Dependencies {
 
   lazy val rideRunner = Def.setting(
     Seq(
-      "org.rocksdb"           % "rocksdbjni"     % "8.3.2",
-      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1",
+      rocksdb,
+      scalapbJson,
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",

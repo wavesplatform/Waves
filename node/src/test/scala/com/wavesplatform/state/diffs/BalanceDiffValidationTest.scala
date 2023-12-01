@@ -40,8 +40,8 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
       Seq(TestBlock.create(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
       TestBlock.create(Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
       settings
-    ) { totalDiffEi =>
-      totalDiffEi.explicitGet()
+    ) { snapshotEi =>
+      snapshotEi.explicitGet()
     }
   }
 
@@ -59,8 +59,8 @@ class BalanceDiffValidationTest extends PropSpec with WithState {
       ),
       TestBlock.create(Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
       settings
-    ) { totalDiffEi =>
-      totalDiffEi should produce("trying to spend leased money")
+    ) { snapshotEi =>
+      snapshotEi should produce("trying to spend leased money")
     }
   }
 }

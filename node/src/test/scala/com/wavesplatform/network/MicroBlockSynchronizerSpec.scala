@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.MicroBlockSnapshot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.test.FreeSpec
@@ -22,14 +21,14 @@ class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen
           PS[ByteStr],
           PS[(Channel, MicroBlockInv)],
           PS[(Channel, MicroBlockResponse)],
-          Observable[(Channel, MicroBlockSynchronizer.MicroblockData, Option[(Channel, MicroBlockSnapshot)])]
+          Observable[(Channel, MicroBlockSynchronizer.MicroblockData, Option[(Channel, MicroBlockSnapshotResponse)])]
       ) => Any
   ) = {
     val peers          = PeerDatabase.NoOp
     val lastBlockIds   = PS[ByteStr]()
     val microInvs      = PS[(Channel, MicroBlockInv)]()
     val microResponses = PS[(Channel, MicroBlockResponse)]()
-    val microSnapshots = PS[(Channel, MicroBlockSnapshot)]()
+    val microSnapshots = PS[(Channel, MicroBlockSnapshotResponse)]()
     val (r, _)         = MicroBlockSynchronizer(defaultSettings, false, peers, lastBlockIds, microInvs, microResponses, microSnapshots, testScheduler)
     try {
       f(lastBlockIds, microInvs, microResponses, r)

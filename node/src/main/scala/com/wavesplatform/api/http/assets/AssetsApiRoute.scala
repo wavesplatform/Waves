@@ -27,7 +27,6 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute.{
 }
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, TxMeta}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -51,7 +50,6 @@ case class AssetsApiRoute(
     settings: RestAPISettings,
     serverRequestTimeout: FiniteDuration,
     wallet: Wallet,
-    transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
     compositeBlockchain: () => Blockchain,
     time: Time,

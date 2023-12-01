@@ -1,7 +1,7 @@
 package com.wavesplatform.metrics
 
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import io.netty.channel.Channel
@@ -55,8 +55,8 @@ object BlockStats {
     Seq.empty
   )
 
-  def received(s: BlockSnapshot, source: Source, ch: Channel): Unit = write(
-    blockSnapshot(s, source)
+  def receivedSnapshot(blockId: ByteStr, source: Source, ch: Channel): Unit = write(
+    blockSnapshot(blockId, source)
       .addField("from", nodeName(ch)),
     Event.Received,
     Seq.empty
@@ -107,7 +107,7 @@ object BlockStats {
     Seq.empty
   )
 
-  def received(m: MicroBlockSnapshot, ch: Channel, blockId: BlockId): Unit = write(
+  def received(ch: Channel, blockId: BlockId): Unit = write(
     microBlockSnapshot(blockId)
       .addField("from", nodeName(ch)),
     Event.Received,
@@ -173,11 +173,10 @@ object BlockStats {
       .tag("whitelist", isWhitelistMiner.toString)
   }
 
-  private def blockSnapshot(s: BlockSnapshot, source: Source): Point.Builder = {
+  private def blockSnapshot(blockId: ByteStr, source: Source): Point.Builder =
     measurement(Type.BlockSnapshot)
-      .tag("id", id(s.blockId))
+      .tag("id", id(blockId))
       .tag("source", source.name)
-  }
 
   private def microBlockSnapshot(totalBlockId: BlockId): Point.Builder =
     measurement(Type.MicroSnapshot)

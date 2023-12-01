@@ -9,7 +9,6 @@ import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils.*
@@ -56,13 +55,7 @@ object DataNode {
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{
-    AddressId as AddressIdTag,
-    EthereumTransactionMeta as EthereumTransactionMetaTag,
-    InvokeScriptResult as InvokeScriptResultTag,
-    LeaseDetails as LeaseDetailsTag,
-    *
-  }
+  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
   val version: Key[Int] = intKey(Version, default = 1)
   val height: Key[Height] =
@@ -99,7 +92,7 @@ object Keys {
     Key(LeaseBalance, addressId.toByteArray, readLeaseBalance, writeLeaseBalance)
 
   def leaseDetailsHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseDetailsHistory, leaseId.arr)
-  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =
+  def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[LeaseDetails]] =
     Key.opt(LeaseDetailsTag, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
 
   def filledVolumeAndFeeAt(orderId: ByteStr, height: Height): Key[VolumeAndFeeNode] =
@@ -189,6 +182,17 @@ object Keys {
       hBytes(addressId.toByteArray, seqNr),
       readTransactionHNSeqAndType,
       writeTransactionHNSeqAndType
+    )
+
+  def addressLeaseSeqNr(addressId: AddressId): Key[Int] =
+    bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray)
+
+  def addressLeaseSeq(addressId: AddressId, seqNr: Int): Key[Option[Seq[ByteStr]]] =
+    Key.opt(
+      AddressLeaseInfoSeq,
+      hBytes(addressId.toByteArray, seqNr),
+      readLeaseIdSeq,
+      writeLeaseIdSeq
     )
 
   def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =

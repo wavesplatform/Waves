@@ -15,7 +15,7 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Failure, Success, Try}
 
 case class UpdateAssetInfoTransaction(
-    version: TxVersion,
+    override val version: TxVersion,
     sender: PublicKey,
     assetId: IssuedAsset,
     name: String,
@@ -26,7 +26,7 @@ case class UpdateAssetInfoTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.UpdateAssetInfo, Seq(assetId))
-    with VersionedTransaction
+    with Versioned.ConstV1
     with FastHashId
     with ProvenTransaction
     with PBSince.V1 { self =>
@@ -49,9 +49,7 @@ case class UpdateAssetInfoTransaction(
 
 object UpdateAssetInfoTransaction extends TransactionParser {
   type TransactionT = UpdateAssetInfoTransaction
-
-  override val typeId: TxType                    = 17: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val typeId: TxType = 17: Byte
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

@@ -13,7 +13,7 @@ import com.wavesplatform.lang.contract.meta.{MetaMapper, V1 as MetaV1, V2 as Met
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, UnionNotAllowedForCallableArgs, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler.*
+import com.wavesplatform.lang.v1.compiler.ContractCompiler.*
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.FreeCall
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
@@ -25,16 +25,13 @@ import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
 import scala.annotation.tailrec
 
-object ContractCompiler {
-  val FreeCallInvocationArg = "i"
-
+class ContractCompiler(version: StdLibVersion) extends ExpressionCompiler(version) {
   private def compileAnnotatedFunc(
       af: Expressions.ANNOTATEDFUNC,
-      version: StdLibVersion,
       saveExprContext: Boolean,
       allowIllFormedStrings: Boolean,
       source: ScriptResultSource
@@ -88,10 +85,10 @@ object ContractCompiler {
           _.flatMap(_.dic(version).toList).map(nameAndType => (nameAndType._1, VariableInfo(AnyPos, nameAndType._2)))
         )
         .getOrElse(List.empty)
-      unionInCallableErrs <- checkCallableUnions(af, annotationsWithErr._1.toList.flatten, version)
+      unionInCallableErrs <- checkCallableUnions(af, annotationsWithErr._1.toList.flatten)
       compiledBody <- local {
         modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(_ =>
-          compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
+          compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1), allowIllFormedStrings)
         )
       }
       annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
@@ -132,7 +129,6 @@ object ContractCompiler {
 
   private def compileContract(
       parsedDapp: Expressions.DAPP,
-      version: StdLibVersion,
       needCompaction: Boolean,
       removeUnusedCode: Boolean,
       source: ScriptResultSource,
@@ -149,7 +145,7 @@ object ContractCompiler {
       annFuncArgTypesErr <- validateAnnotatedFuncsArgTypes(parsedDapp).handleError()
       compiledAnnFuncsWithErr <- parsedDapp.fs
         .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](af =>
-          local(compileAnnotatedFunc(af, version, saveExprContext, allowIllFormedStrings, source))
+          local(compileAnnotatedFunc(af, saveExprContext, allowIllFormedStrings, source))
         )
       annotatedFuncs   = compiledAnnFuncsWithErr.filter(_._1.nonEmpty).map(_._1.get)
       parsedNodeAFuncs = compiledAnnFuncsWithErr.map(_._3)
@@ -236,7 +232,7 @@ object ContractCompiler {
     } yield result
   }
 
-  def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
+  private def handleValid[T](part: PART[T]): CompileM[PART.VALID[T]] = part match {
     case x: PART.VALID[T]         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }
@@ -305,13 +301,7 @@ object ContractCompiler {
     }
   }
 
-  val primitiveCallableTypes: Set[String] =
-    Set(LONG, BYTESTR, BOOLEAN, STRING).map(_.name)
-
-  val allowedCallableTypesV4: Set[String] =
-    primitiveCallableTypes + "List[]"
-
-  private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
+  private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] =
     for {
       ctx <- get[Id, CompilerContext, CompilationError]
       annotationVars = contract.fs.flatMap(_.anns.flatMap(_.args)).traverse[CompileM, PART.VALID[String]](handleValid)
@@ -339,7 +329,52 @@ object ContractCompiler {
         }
       }
     } yield ()
+
+  private def checkCallableUnions(
+      func: Expressions.ANNOTATEDFUNC,
+      annotations: List[Annotation],
+  ): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
+    @tailrec
+    def containsUnion(tpe: Type): Boolean =
+      tpe match {
+        case Expressions.Union(types) if types.size > 1                                                                            => true
+        case Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.Union(types)))) if types.size > 1 => true
+        case Expressions.Single(
+              PART.VALID(_, Type.ListTypeName),
+              Some(PART.VALID(_, inner @ Expressions.Single(PART.VALID(_, Type.ListTypeName), _)))
+            ) =>
+          containsUnion(inner)
+        case _ => false
+      }
+
+    val isCallable = annotations.exists {
+      case CallableAnnotation(_) => true
+      case _                     => false
+    }
+
+    if (version < V6 || !isCallable) {
+      Seq.empty[UnionNotAllowedForCallableArgs].pure[CompileM]
+    } else {
+      func.f.args
+        .filter { case (_, tpe) =>
+          containsUnion(tpe)
+        }
+        .map { case (argName, _) =>
+          UnionNotAllowedForCallableArgs(argName.position.start, argName.position.end)
+        }
+        .pure[CompileM]
+    }
   }
+}
+
+object ContractCompiler {
+  val FreeCallInvocationArg = "i"
+
+  val primitiveCallableTypes: Set[String] =
+    Set(LONG, BYTESTR, BOOLEAN, STRING).map(_.name)
+
+  val allowedCallableTypesV4: Set[String] =
+    primitiveCallableTypes + "List[]"
 
   def apply(
       c: CompilerContext,
@@ -350,7 +385,8 @@ object ContractCompiler {
       removeUnusedCode: Boolean = false,
       allowIllFormedStrings: Boolean = false
   ): Either[String, DApp] = {
-    compileContract(contract, version, needCompaction, removeUnusedCode, source, allowIllFormedStrings = allowIllFormedStrings)
+    new ContractCompiler(version)
+      .compileContract(contract, needCompaction, removeUnusedCode, source, allowIllFormedStrings = allowIllFormedStrings)
       .run(c)
       .map(
         _._2
@@ -375,7 +411,7 @@ object ContractCompiler {
     val parser = new Parser(version)(offset)
     parser.parseContract(input) match {
       case fastparse.Parsed.Success(xs, _) =>
-        ContractCompiler(ctx, xs, version, source, needCompaction, removeUnusedCode, allowIllFormedStrings) match {
+        apply(ctx, xs, version, source, needCompaction, removeUnusedCode, allowIllFormedStrings) match {
           case Left(err) => Left(err)
           case Right(c)  => Right(c)
         }
@@ -396,7 +432,8 @@ object ContractCompiler {
     new Parser(version)(offset)
       .parseDAPPWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
-        compileContract(parseResult, version, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
+        new ContractCompiler(version)
+          .compileContract(parseResult, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
           .run(ctx)
           .map(
             _._2
@@ -435,43 +472,6 @@ object ContractCompiler {
         ContractCompiler(ctx, dApp, version, FreeCall).map(_.callableFuncs.head.u.body)
       case f: fastparse.Parsed.Failure =>
         Left(parser.toString(input, f))
-    }
-  }
-
-  private def checkCallableUnions(
-      func: Expressions.ANNOTATEDFUNC,
-      annotations: List[Annotation],
-      version: StdLibVersion
-  ): CompileM[Seq[UnionNotAllowedForCallableArgs]] = {
-    @tailrec
-    def containsUnion(tpe: Type): Boolean =
-      tpe match {
-        case Expressions.Union(types) if types.size > 1                                                                            => true
-        case Expressions.Single(PART.VALID(_, Type.ListTypeName), Some(PART.VALID(_, Expressions.Union(types)))) if types.size > 1 => true
-        case Expressions.Single(
-              PART.VALID(_, Type.ListTypeName),
-              Some(PART.VALID(_, inner @ Expressions.Single(PART.VALID(_, Type.ListTypeName), _)))
-            ) =>
-          containsUnion(inner)
-        case _ => false
-      }
-
-    val isCallable = annotations.exists {
-      case CallableAnnotation(_) => true
-      case _                     => false
-    }
-
-    if (version < V6 || !isCallable) {
-      Seq.empty[UnionNotAllowedForCallableArgs].pure[CompileM]
-    } else {
-      func.f.args
-        .filter { case (_, tpe) =>
-          containsUnion(tpe)
-        }
-        .map { case (argName, _) =>
-          UnionNotAllowedForCallableArgs(argName.position.start, argName.position.end)
-        }
-        .pure[CompileM]
     }
   }
 }
