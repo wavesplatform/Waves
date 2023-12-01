@@ -28,7 +28,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |  [StringEntry("$wrKey", "$wrValue")]
          |}
       """.stripMargin
-    val scriptV4 = ScriptCompiler.compile(sourceV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    val scriptV4 = ScriptCompiler.compile(sourceV4, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(scriptV4), setScriptFee, waitForTx = true)
 
     val scr = ScriptCompiler(
@@ -40,7 +40,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |getStringValue(addressFromString("${dApp.toAddress.toString}").value(), "$wrKey") == "$wrValue"
          """.stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
     val smartAssetId = sender.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
 

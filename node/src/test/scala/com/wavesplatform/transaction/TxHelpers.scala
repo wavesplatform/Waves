@@ -293,7 +293,7 @@ object TxHelpers {
       .explicitGet()
 
   def script(scriptText: String): Script = {
-    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.latest).explicitGet()
     script
   }
 
@@ -341,7 +341,7 @@ object TxHelpers {
       Script
         .estimate(
           script,
-          ScriptEstimatorV3(fixOverflow = true, overhead = false),
+          ScriptEstimatorV3.latest,
           fixEstimateOfVerifier = true,
           useContractVerifierLimit = false
         )

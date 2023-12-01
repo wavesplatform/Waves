@@ -21,7 +21,7 @@ class ScriptComplexityMiningConstraintSuite extends FlatSpec with PathMockFactor
   private val maxTxs     = OneDimensionalMiningConstraint(3, TxEstimators.one, "MaxTxsInMicroBlock")
   private val constraint = MultiDimensionalMiningConstraint(complexity, maxTxs)
 
-  val (script, _) = ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+  val (script, _) = ScriptCompiler.compile("true", ScriptEstimatorV3.latest).explicitGet()
 
   "ScriptComplexityMiningConstraint" should "accept non-scripted txs after limit" in {
     forAll(preconditions) { case (acc1, acc2, tx1, tx2, tx3) =>

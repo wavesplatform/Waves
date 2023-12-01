@@ -34,7 +34,6 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain {
         MiningConstraints(
           d.blockchain,
           d.blockchain.height,
-          SettingsFromDefaultConfig.enableLightMode,
           Some(SettingsFromDefaultConfig.minerSettings)
         ).total,
         block.header.generationSignature
@@ -65,7 +64,6 @@ class RideV5LimitsChangeTest extends FlatSpec with WithDomain {
           MiningConstraints(
             d.blockchain,
             d.blockchain.height,
-            SettingsFromDefaultConfig.enableLightMode,
             Some(SettingsFromDefaultConfig.minerSettings)
           ).total,
           block.header.generationSignature
