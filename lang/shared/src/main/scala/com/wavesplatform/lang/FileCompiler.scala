@@ -6,7 +6,7 @@ import java.nio.file.{Files, Paths}
 import scala.jdk.CollectionConverters.*
 
 object FileCompiler extends App {
-  private val estimator = ScriptEstimatorV3(true, false)
+  private val estimator = ScriptEstimatorV3.latest
   args
     .foreach { path =>
       val script = Files.readAllLines(Paths.get(path)).asScala.reduce(_ + "\n" + _)

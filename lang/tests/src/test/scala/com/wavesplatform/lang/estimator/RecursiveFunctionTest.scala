@@ -14,10 +14,11 @@ class RecursiveFunctionTest
     extends ScriptEstimatorTestBase(
       ScriptEstimatorV1,
       ScriptEstimatorV2,
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
-      ScriptEstimatorV3(fixOverflow = true, overhead = false),
-      ScriptEstimatorV3(fixOverflow = false, overhead = true),
-      ScriptEstimatorV3(fixOverflow = false, overhead = false)
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = true, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = false, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true)   // <- all fixes
     ) {
 
   property("recursive func block") {
@@ -70,7 +71,7 @@ class RecursiveFunctionTest
       )
     )
 
-    ScriptEstimatorV3(fixOverflow = false, overhead = true)(Set.empty, Map.empty, expr) shouldBe Right(3)
-    ScriptEstimatorV3(fixOverflow = true, overhead = true)(Set.empty, Map.empty, expr) should produce("shadows preceding declaration")
+    ScriptEstimatorV3(fixOverflow = false, overhead = true, letFixes = false)(Set(), Map(), expr) shouldBe Right(3)
+    ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false)(Set(), Map(), expr) should produce("shadows preceding declaration")
   }
 }

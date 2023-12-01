@@ -9,7 +9,8 @@ import shapeless.{Lens, lens}
 
 private[v3] case class EstimatorContext(
     funcs: Map[FunctionHeader, (Coeval[Long], Set[String])],
-    usedRefs: Set[String] = Set.empty,
+    usedRefs: Set[String] = Set(),
+    refsCosts: Map[String, Long] = Map(),
     globalFunctionsCosts: Map[String, Long] = Map(), //
     globalLetsCosts: Map[String, Long] = Map(),      // only for globalDeclarationsMode
     globalLetEvals: Map[String, EvalM[Long]] = Map() //

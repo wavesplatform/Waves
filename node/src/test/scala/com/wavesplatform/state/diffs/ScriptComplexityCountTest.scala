@@ -29,7 +29,7 @@ class ScriptComplexityCountTest extends PropSpec with WithDomain with Inside {
       RideV6.blockchainSettings.functionalitySettings
     ) { case (blockDiff, _) =>
       val scriptComplexity = Script
-        .estimate(script, ScriptEstimatorV3(false, true), fixEstimateOfVerifier = true, useContractVerifierLimit = false)
+        .estimate(script, ScriptEstimatorV3.latest, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
         .explicitGet()
       blockDiff.scriptsComplexity shouldBe scriptComplexity * 31
     }
