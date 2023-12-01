@@ -145,7 +145,7 @@ class MinerImpl(
       reference: ByteStr,
       prevStateHash: Option[ByteStr]
   ): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
-    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, settings.enableLightMode, Some(minerSettings))
+    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
       BlockDiffer
         .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
