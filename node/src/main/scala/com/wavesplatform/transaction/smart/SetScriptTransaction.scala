@@ -21,8 +21,9 @@ case class SetScriptTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.SetScript) with ProvenTransaction
-    with VersionedTransaction
+) extends Transaction(TransactionType.SetScript)
+    with ProvenTransaction
+    with Versioned.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
@@ -35,8 +36,7 @@ case class SetScriptTransaction(
 object SetScriptTransaction extends TransactionParser {
   type TransactionT = SetScriptTransaction
 
-  override val typeId: TxType                    = 13: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val typeId: TxType = 13: Byte
 
   implicit val validator: TxValidator[SetScriptTransaction] = SetScriptTxValidator
 

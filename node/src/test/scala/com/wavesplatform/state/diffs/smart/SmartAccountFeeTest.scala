@@ -136,8 +136,8 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
 
       notEnoughPaidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
       d.appendAndAssertSucceed(freeVerifierTxs.map(_())*)
-      d.liquidDiff.scriptsComplexity should be > 0L
-      d.liquidDiff.scriptResults.size shouldBe 2
+      d.liquidSnapshot.scriptsComplexity should be > 0L
+      d.liquidSnapshot.scriptResults.size shouldBe 2
     }
   }
 }

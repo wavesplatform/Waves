@@ -24,7 +24,7 @@ class LeaseActionSuite extends BaseTransactionSuite {
       .buildNonConflicting()
 
   private def compile(script: String): String =
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
 
   private val dAppLeaseAmount     = 123
   private val txLeaseAmount       = 456

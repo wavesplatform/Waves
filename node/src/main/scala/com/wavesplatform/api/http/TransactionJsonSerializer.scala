@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.LeaseDetails
 import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -262,7 +262,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", tx.version, numbersAsString)
-          if (tx.asInstanceOf[PBSince].isProtobufVersion) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
+          if (PBSince.affects(tx)) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
           gen.writeStringField("sender", tx.sender.toAddress(tx.chainId).toString)
           gen.writeStringField("senderPublicKey", tx.sender.toString)
           gen.writeArrayField("proofs")(gen => tx.proofs.proofs.foreach(p => gen.writeString(p.toString)))
@@ -290,8 +290,8 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
           tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
-          gen.writeNumberField("version", tx.version, numbersAsString)
-          if (tx.isProtobufVersion) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
+          gen.writeNumberField("version", 1, numbersAsString)
+          gen.writeNumberField("chainId", tx.chainId, numbersAsString)
           gen.writeStringField("bytes", EthEncoding.toHexString(tx.bytes()))
           gen.writeStringField("sender", tx.senderAddress().toString)
           gen.writeStringField("senderPublicKey", tx.signerPublicKey().toString)
@@ -448,7 +448,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
   ): LeaseRef = {
     val detailsOpt           = blockchain.leaseDetails(leaseId)
     val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
-    val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipient))
+    val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipientAddress))
     val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
 
     val statusOpt = detailsOpt.map(_.status)
@@ -464,7 +464,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
       detailsOpt.map(_.sourceId),
       detailsOpt.map(_.sender.toAddress),
       resolvedRecipientOpt,
-      amountOpt orElse detailsOpt.map(_.amount),
+      amountOpt orElse detailsOpt.map(_.amount.value),
       txMetaOpt.map(_.height),
       status,
       statusDataOpt.flatMap(_._1),

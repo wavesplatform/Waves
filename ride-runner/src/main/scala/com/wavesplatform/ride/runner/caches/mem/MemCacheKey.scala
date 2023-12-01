@@ -5,10 +5,10 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.{ByteStringExt, transaction as pb}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, DataTransactionData, Transaction}
+import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, Transaction}
 import com.wavesplatform.ride.runner.caches.{WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -85,7 +85,7 @@ class GrpcCacheKeyConverters(chainId: Byte) {
   def accountDataValueBefore(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] =
     update.dataEntryBefore.map(accountDataValue)
   def accountDataValueAfter(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] = update.dataEntry.map(accountDataValue)
-  def accountDataValue(dataEntry: DataTransactionData.DataEntry): MemCacheKey.AccountData#ValueT         = toVanillaDataEntry(dataEntry)
+  def accountDataValue(dataEntry: pb.DataEntry): MemCacheKey.AccountData#ValueT         = toVanillaDataEntry(dataEntry)
 
   def transactionIdKey(id: ByteString): MemCacheKey.Transaction = MemCacheKey.Transaction(TransactionId(ByteStr(id.toByteArray)))
 

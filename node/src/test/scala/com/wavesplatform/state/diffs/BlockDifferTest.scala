@@ -13,8 +13,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.mining.{MinerImpl, MiningConstraint}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
-import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Diff, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.test.node.*
@@ -304,7 +303,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
     }
   }
 
-  private def assertDiff(blocks: Seq[BlockWithSigner], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
+  private def assertDiff(blocks: Seq[BlockWithSigner], ngAtHeight: Int)(assertion: (StateSnapshot, Blockchain) => Unit): Unit = {
     val fs = FunctionalitySettings(
       featureCheckBlocksPeriod = ngAtHeight / 2,
       blocksForFeatureActivation = 1,

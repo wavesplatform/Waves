@@ -50,7 +50,7 @@ class UtilsRouteEvaluateSpec
     },
     restAPISettings,
     Int.MaxValue,
-    () => ScriptEstimatorV3(true, false),
+    () => ScriptEstimatorV3.latest,
     timeBounded,
     stub[Blockchain]("globalBlockchain")
   )

@@ -36,9 +36,8 @@ import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSett
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidStateHash, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.EthConverters.*
-import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.transaction.{EthTxGenerator, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{JsonMatchers, Schedulers, SharedSchedulerMixin}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
@@ -55,8 +54,15 @@ import java.util.concurrent.locks.ReentrantLock
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Promise}
 
-class BlockChallengeTest extends PropSpec
-  with WithDomain with ScalatestRouteTest with ApiMarshallers with JsonMatchers with SharedSchedulerMixin with ParallelTestExecution with BeforeAndAfterAll {
+class BlockChallengeTest
+    extends PropSpec
+    with WithDomain
+    with ScalatestRouteTest
+    with ApiMarshallers
+    with JsonMatchers
+    with SharedSchedulerMixin
+    with ParallelTestExecution
+    with BeforeAndAfterAll {
 
   implicit val appenderScheduler: SchedulerService = Scheduler.singleThread("appender")
   val settings: WavesSettings =
@@ -67,7 +73,10 @@ class BlockChallengeTest extends PropSpec
 
   val invalidStateHash: ByteStr = ByteStr.fill(DigestLength)(1)
 
-  override def afterAll(): Unit = appenderScheduler.shutdown()
+  override def afterAll(): Unit = {
+    super.afterAll()
+    appenderScheduler.shutdown()
+  }
 
   property("NODE-883. Invalid challenging block should be ignored") {
     val sender           = TxHelpers.signer(1)
@@ -481,7 +490,7 @@ class BlockChallengeTest extends PropSpec
         lease,
         TxHelpers.leaseCancel(lease.id(), recipient),
         TxHelpers
-          .massTransfer(recipient, Seq(ParsedTransfer(recipientEth.toWavesAddress, TxNonNegativeAmount.unsafeFrom(1.waves))), fee = TestValues.fee),
+          .massTransfer(recipient, Seq(recipientEth.toWavesAddress -> 1.waves), fee = TestValues.fee),
         TxHelpers.reissue(issue.asset, recipient),
         TxHelpers.setAssetScript(recipient, issueSmart.asset, assetScript, fee = 2.waves),
         TxHelpers.transfer(recipient, recipientEth.toWavesAddress, 100.waves),

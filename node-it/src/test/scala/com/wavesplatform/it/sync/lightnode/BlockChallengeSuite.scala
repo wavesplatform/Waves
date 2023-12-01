@@ -16,8 +16,8 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
+import com.wavesplatform.{TestValues, crypto}
 import com.wavesplatform.{TestValues, crypto}
 
 import scala.concurrent.Await
@@ -30,10 +30,10 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
       .overrideBase(_.minAssetInfoUpdateInterval(0))
       .overrideBase(
         _.preactivatedFeatures(
-          BlockchainFeatures.SynchronousCalls.id.toInt         -> 0,
-          BlockchainFeatures.RideV6.id.toInt                   -> 0,
-          BlockchainFeatures.ConsensusImprovements.id.toInt    -> 0,
-          BlockchainFeatures.LightNode.id.toInt -> 0
+          BlockchainFeatures.SynchronousCalls.id.toInt      -> 0,
+          BlockchainFeatures.RideV6.id.toInt                -> 0,
+          BlockchainFeatures.ConsensusImprovements.id.toInt -> 0,
+          BlockchainFeatures.LightNode.id.toInt             -> 0
         )
       )
       .overrideBase(_.raw("waves.blockchain.custom.functionality.light-node-block-fields-absence-interval = 0"))
@@ -167,7 +167,7 @@ class BlockChallengeSuite extends BaseFunSuite with TransferSending {
       TxHelpers
         .massTransfer(
           sender.keyPair,
-          Seq(ParsedTransfer(challenger.keyPair.toAddress, TxNonNegativeAmount.unsafeFrom(1))),
+          Seq(challenger.keyPair.toAddress -> 1),
           fee = TestValues.fee
         ),
       TxHelpers.reissue(issue.asset, sender.keyPair),

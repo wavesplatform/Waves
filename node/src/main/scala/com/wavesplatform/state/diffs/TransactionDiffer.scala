@@ -108,7 +108,8 @@ object TransactionDiffer {
           InvokeRejectError(fte.message, fte.log)
         case fte: FailedTransactionError if fte.isFailFree && blockchain.isFeatureActivated(RideV6) =>
           ScriptExecutionError(fte.message, fte.log, fte.assetId)
-        case err => err
+        case err =>
+          err
       }
       .leftMap(TransactionValidationError(_, tx))
   }

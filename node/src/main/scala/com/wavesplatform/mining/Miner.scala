@@ -146,7 +146,7 @@ class MinerImpl(
       reference: ByteStr,
       prevStateHash: Option[ByteStr]
   ): (Seq[Transaction], MiningConstraint, Option[ByteStr]) = {
-    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, settings.enableLightMode, Some(minerSettings))
+    val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
     val keyBlockStateHash = prevStateHash.flatMap { prevHash =>
       BlockDiffer
         .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
@@ -290,7 +290,7 @@ class MinerImpl(
 
         def appendTask(block: Block, totalConstraint: MiningConstraint) =
           BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block, None).flatMap {
-            case Left(BlockFromFuture(_)) => // Time was corrected, retry
+            case Left(BlockFromFuture(_, _)) => // Time was corrected, retry
               generateBlockTask(account, None)
 
             case Left(err) =>

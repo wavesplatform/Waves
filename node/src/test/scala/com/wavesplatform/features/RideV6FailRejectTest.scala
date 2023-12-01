@@ -888,8 +888,8 @@ class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues wi
             def failTxTest(invoke: Transaction): Unit = {
               val complexity = ContractLimits.FailFreeInvokeComplexity + 1
               test(complexity) { d =>
-                val diff              = d.createDiffE(invoke).value
-                val (_, scriptResult) = diff.scriptResults.headOption.value
+                val snapshot              = d.createDiffE(invoke).value
+                val (_, scriptResult) = snapshot.scriptResults.headOption.value
                 scriptResult.error.value.text should include(testCase.rejectError)
 
                 d.appendBlock(invoke)

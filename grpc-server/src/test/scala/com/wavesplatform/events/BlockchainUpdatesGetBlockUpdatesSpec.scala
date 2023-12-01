@@ -160,7 +160,8 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
 
     "BU-200. Return correct data for massTransfer" in {
       val massTransferFee = fee * 6
-      val massTransfer    = TxHelpers.massTransfer(firstTxParticipant, recipients, firstToken.asset, massTransferFee)
+      val massTransfer =
+        TxHelpers.massTransfer(firstTxParticipant, recipients.map(r => r.address -> r.amount.value), firstToken.asset, massTransferFee)
 
       withGenerateGetBlockUpdate(
         height = 3,
@@ -271,7 +272,7 @@ class BlockchainUpdatesGetBlockUpdatesSpec extends BlockchainUpdatesTestBase {
       val ethereumTransfer: EthereumTransaction =
         EthTxGenerator.generateEthTransfer(firstTxParticipantEthereum, secondTxParticipantAddress, amount, secondTokenAsset)
       val ethAddress = ethereumTransfer.senderAddress.value()
-      val transfer = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
+      val transfer   = TxHelpers.transfer(secondTxParticipant, ethAddress, secondTokenQuantity, secondTokenAsset)
 
       withGenerateGetBlockUpdate(
         height = 4,

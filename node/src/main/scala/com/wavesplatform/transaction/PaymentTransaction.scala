@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import scala.util.Try
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -10,6 +9,8 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
+
+import scala.util.Try
 
 case class PaymentTransaction(
     sender: PublicKey,
@@ -36,8 +37,7 @@ case class PaymentTransaction(
 object PaymentTransaction extends TransactionParser {
   type TransactionT = PaymentTransaction
 
-  override val typeId: TxType                    = 2: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val typeId: TxType = 2: Byte
 
   override def parseBytes(bytes: Array[TxVersion]): Try[PaymentTransaction] =
     PaymentTxSerializer.parseBytes(bytes)

@@ -4,11 +4,11 @@ import cats.data.ValidatedNel
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.validation.TxValidator
-import com.wavesplatform.transaction.TxValidationError
+import com.wavesplatform.transaction.{TxPositiveAmount, TxValidationError}
 
 object LeaseTxValidator extends TxValidator[LeaseTransaction] {
   override def validate(tx: LeaseTransaction): ValidatedNel[ValidationError, LeaseTransaction] = {
-    import tx._
+    import tx.*
     V.seq(tx)(
       V.noOverflow(amount.value, fee.value),
       V.cond(sender.toAddress != recipient, TxValidationError.ToSelf),
@@ -16,6 +16,6 @@ object LeaseTxValidator extends TxValidator[LeaseTransaction] {
     )
   }
 
-  def validateAmount(amount: Long) =
-    Either.cond(amount > 0, (), TxValidationError.NonPositiveAmount(amount, "waves"))
+  def validateAmount(amount: Long): Either[ValidationError, TxPositiveAmount] =
+    TxPositiveAmount.from(amount).left.map[ValidationError](_ => TxValidationError.NonPositiveAmount(amount, "waves"))
 }

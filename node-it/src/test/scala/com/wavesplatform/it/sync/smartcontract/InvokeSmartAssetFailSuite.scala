@@ -60,7 +60,7 @@ class InvokeSmartAssetFailSuite extends BaseTransactionSuite {
     val dataFee = calcDataFee(data, TxVersion.V2)
     sender.putData(dApp, data, fee = dataFee, waitForTx = true)
 
-    val script = ScriptCompiler.compile(dAppText, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(dAppText, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
     assertApiError(
       sender.invokeScript(caller, dApp.toAddress.toString, Some("some"), List(CONST_BOOLEAN(true))),

@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import java.{util, lang}
+import java.{lang, util}
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -321,9 +321,10 @@ abstract class Caches extends Blockchain with Storage {
     for ((address, script)          <- snapshot.accountScriptsByAddress) stateHash.addAccountScript(address, script.map(_.script))
     for ((asset, script)            <- snapshot.assetScripts) stateHash.addAssetScript(asset, Some(script.script))
     for ((asset, _)                 <- snapshot.assetStatics) if (!snapshot.assetScripts.contains(asset)) stateHash.addAssetScript(asset, None)
-    for ((leaseId, lease)           <- snapshot.leaseStates) stateHash.addLeaseStatus(leaseId, lease.isActive)
-    for ((assetId, sponsorship)     <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
-    for ((alias, address)           <- snapshot.aliases) stateHash.addAlias(address, alias.name)
+    for (leaseId <- snapshot.newLeases.keys) if (!snapshot.cancelledLeases.contains(leaseId)) stateHash.addLeaseStatus(leaseId, isActive = true)
+    for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
+    for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
+    for ((alias, address)       <- snapshot.aliases) stateHash.addAlias(address, alias.name)
 
     doAppend(
       newMeta,

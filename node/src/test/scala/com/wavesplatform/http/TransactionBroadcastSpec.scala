@@ -10,8 +10,7 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, SnapshotBlockchain}
 import com.wavesplatform.test.TestTime
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -261,7 +260,7 @@ class TransactionBroadcastSpec
                |    else []
                |}
                |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
+            ScriptEstimatorV3.latest
           )
           .explicitGet()
 

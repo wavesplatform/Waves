@@ -130,8 +130,8 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, secondDApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-          case (diff, bc) =>
-            diff.errorMessage(invokeTx.id()) shouldBe None
+          case (snapshot, bc) =>
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
             bc.accountData(secondDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
             bc.accountData(secondDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
@@ -215,8 +215,8 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, mainDApp) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-          case (diff, bc) =>
-            diff.errorMessage(invokeTx.id()) shouldBe None
+          case (snapshot, bc) =>
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
             bc.accountData(mainDApp, invokeEntry1Key) shouldBe Some(IntegerDataEntry(invokeEntry1Key, invokeEntry1Val))
             bc.accountData(mainDApp, invokeEntry2Key) shouldBe Some(IntegerDataEntry(invokeEntry2Key, invokeEntry2NewVal))
@@ -239,7 +239,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
                       | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
                       |
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
     }
 
     def transferAssetScript(thirdAcc: Address): Script = {
@@ -251,7 +251,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
                       | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
                       |
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
     }
 
     def contractMain(secondAcc: Address, thirdAcc: Address, paymentAsset: ByteStr): Script = TestCompiler(V5).compileContract(s"""
@@ -396,8 +396,8 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     forAll(scenario) {
       case (genesisTxs, invokeTx, thirdAcc, transferAsset, paymentAsset) =>
         assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion), fsWithV5) {
-          case (diff, bc) =>
-            diff.errorMessage(invokeTx.id()) shouldBe None
+          case (snapshot, bc) =>
+            snapshot.errorMessage(invokeTx.id()) shouldBe None
 
             bc.balance(thirdAcc, IssuedAsset(transferAsset)) shouldBe transferAssetAmount
             bc.balance(thirdAcc, IssuedAsset(paymentAsset)) shouldBe paymentAssetAmount

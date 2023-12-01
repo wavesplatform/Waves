@@ -2,15 +2,16 @@ package com.wavesplatform.transaction.validation.impl
 
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.PBSince
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 import scala.util.Try
 
@@ -27,7 +28,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
 
     def checkLength: Either[GenericError, Unit] = {
       val length =
-        if (tx.isProtobufVersion)
+        if (PBSince.affects(tx))
           PBTransactions.toPBInvokeScriptData(tx.dApp, tx.funcCallOpt, tx.payments).toByteArray.length
         else
           tx.bytes().length

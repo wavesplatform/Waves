@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.RxScoreObserver.ChannelClosedAndSyncWith
@@ -39,13 +39,13 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
           PS[(Channel, Block)],
           PS[(Channel, Signatures)],
           PS[ChannelClosedAndSyncWith],
-          Observable[(Channel, Block, Option[BlockSnapshot])]
+          Observable[(Channel, Block, Option[BlockSnapshotResponse])]
       ) => Any
   ) = {
     val blocks          = PS[(Channel, Block)]()
     val sigs            = PS[(Channel, Signatures)]()
     val ccsw            = PS[ChannelClosedAndSyncWith]()
-    val snapshots       = PS[(Channel, BlockSnapshot)]()
+    val snapshots       = PS[(Channel, BlockSnapshotResponse)]()
     val timeout         = PS[Channel]()
     val op              = PeerDatabase.NoOp
     val invBlockStorage = new InMemoryInvalidBlockStorage

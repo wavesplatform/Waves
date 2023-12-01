@@ -32,7 +32,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
         ctx.evaluationContext(environment),
         version,
         correctFunctionCallScope = true,
-        newMode
+        newMode,
+        fixedThrownError = true
       )
       .value()
       .bimap(_._1.message, { case (result, complexity, _) => (result, complexity) })
@@ -67,7 +68,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
   private def compile(script: String): EXPR = {
     val parsed = Parser.parseExpr(script).get.value
-    ExpressionCompiler(ctx.compilerContext, parsed).explicitGet()._1
+    ExpressionCompiler(ctx.compilerContext, version, parsed).explicitGet()._1
   }
 
   property("multiple lets by step") {
@@ -1250,5 +1251,35 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
     evalOld(script2, 100) shouldBe ((TRUE, "true", 5)) // 3 conditions + ref twice
     evalNew(script2, 100) shouldBe ((TRUE, "true", 3)) // 3 function call
+  }
+
+  property("estimator global vars problem cases") {
+    val script =
+      """
+        | func f(a: Boolean) = {
+        |   func g(b1: Boolean, b2: Boolean) = b1 || b2
+        |   a || g(true, true)
+        | }
+        | let a  = groth16Verify(base58'', base58'', base58'')
+        | let b1 = groth16Verify(base58'', base58'', base58'')
+        | let b2 = groth16Verify(base58'', base58'', base58'')
+        | f(true)
+      """.stripMargin
+    evalNew(script, 100)._3 shouldBe 1
+
+    val script2 =
+      """
+        | let a = sigVerify(base58'', base58'', base58'')
+        | func f() = a
+        | f()
+      """.stripMargin
+    evalNew(script2, 1000)._3 shouldBe 200
+
+    val script3 =
+      """
+        | func f(a: Int) = a
+        | f(1 + 2 + 3)
+      """.stripMargin
+    evalNew(script3, 100)._3 shouldBe 3
   }
 }

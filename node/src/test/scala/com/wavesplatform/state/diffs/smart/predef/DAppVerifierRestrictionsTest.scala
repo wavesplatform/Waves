@@ -194,7 +194,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
       ).explicitGet()
 
     def estimateScript(script: Script): Option[Long] = {
-      val estimator = ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      val estimator = ScriptEstimatorV3.latest
 
       Script.estimate(script, estimator, fixEstimateOfVerifier = false, useContractVerifierLimit =  false).toOption
     }
