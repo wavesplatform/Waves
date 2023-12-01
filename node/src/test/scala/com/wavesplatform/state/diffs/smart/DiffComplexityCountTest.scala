@@ -55,7 +55,7 @@ class DiffComplexityCountTest extends PropSpec with Inside with WithState with D
                     |   else ($groth)
                     |
                   """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
   }
 
   private def dApp(asset: IssuedAsset): Script = TestCompiler(V4).compileContract(

@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import java.io.File
 
 object FileCompiler extends App {
-  private val estimator = ScriptEstimatorV3(true, false)
+  private val estimator = ScriptEstimatorV3.latest
 
   args
     .foreach { path =>

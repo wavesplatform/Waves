@@ -4,8 +4,8 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.smartcontract.setScrTxSupportedVersions
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -17,7 +17,7 @@ import com.wavesplatform.protobuf.transaction.{
   SetScriptTransactionData,
   SignedTransaction,
   TransferTransactionData,
-  Transaction => PBTransaction
+  Transaction as PBTransaction
 }
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
@@ -41,9 +41,15 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         }
       """.stripMargin
 
-      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val script      = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val estimatorV3 = ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false)
       val scriptComplexity = Script
-        .estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3(fixOverflow = true, overhead = true), fixEstimateOfVerifier = true, useContractVerifierLimit = true)
+        .estimate(
+          Script.fromBase64String(script.bytes().base64).explicitGet(),
+          estimatorV3,
+          fixEstimateOfVerifier = true,
+          useContractVerifierLimit = true
+        )
         .explicitGet()
       val setScriptTx   = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
       val setScriptTxId = PBTransactions.vanilla(setScriptTx, unsafe = false).explicitGet().id().toString

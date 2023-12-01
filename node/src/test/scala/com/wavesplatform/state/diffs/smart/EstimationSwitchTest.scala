@@ -3,14 +3,16 @@ package com.wavesplatform.state.diffs.smart
 import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
-import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.features.BlockchainFeatures.*
+import com.wavesplatform.lang.directives.values.{V5, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, setScript}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
@@ -52,9 +54,39 @@ class EstimationSwitchTest extends PropSpec with WithDomain with TransactionGenB
       d.appendBlock(setScript(), invoke())
       d.liquidSnapshot.accountScripts.head._2.get.complexitiesByEstimator(3)("default") shouldBe 1
       d.liquidSnapshot.scriptsComplexity shouldBe 1
-      // condition decreased by 1,
-      // accessing to ref ([] = nil) decreased by 1,
-      // != decreased by 4 (because of using predefined user function complexities)
+    // condition decreased by 1,
+    // accessing to ref ([] = nil) decreased by 1,
+    // != decreased by 4 (because of using predefined user function complexities)
+    }
+  }
+
+  property("estimator global vars fixes activation") {
+    withDomain(DomainPresets.ContinuationTransaction.setFeaturesHeight(LightNode -> 2)) { d =>
+      val dApp = TestCompiler(V6).compileContract(
+        """
+          | @Callable(i)
+          | func overlapCase() = {
+          |   func f(a: Boolean) = a
+          |   let a = groth16Verify(base58'', base58'', base58'')
+          |   if (f(true)) then [] else []
+          | }
+          |
+          | @Callable(i)
+          | func redundantOverheadCase() = {
+          |   let a = sigVerify(base58'', base58'', base58'')
+          |   func f() = a
+          |   if (f()) then [] else []
+          | }
+        """.stripMargin
+      )
+
+      d.appendBlock(setScript(defaultSigner, dApp))
+      d.blockchain.accountScript(defaultAddress).get.complexitiesByEstimator(3) shouldBe
+        Map("overlapCase" -> 2701, "redundantOverheadCase" -> 181)
+
+      d.appendBlock(setScript(defaultSigner, dApp))
+      d.blockchain.accountScript(defaultAddress).get.complexitiesByEstimator(3) shouldBe
+        Map("overlapCase" -> 1, "redundantOverheadCase" -> 180)
     }
   }
 }
