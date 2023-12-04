@@ -49,7 +49,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         "Description",
         assetAmount,
         8,
-        script = Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64),
+        script = Some(ScriptCompiler.compile("true", ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64),
         waitForTx = true
       )
       .id
@@ -111,7 +111,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |
         """.stripMargin
 
-    val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
   }
 
@@ -145,7 +145,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
                      |  case _ => true
                      |}
                      |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
+                  ScriptEstimatorV3.latest
                 )
                 .explicitGet()
                 ._1
@@ -173,7 +173,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
       exchangePreconditions(
-        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
+        Some(ScriptCompiler.compile("true", ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64)
       )
 
     val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get

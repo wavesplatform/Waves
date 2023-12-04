@@ -48,7 +48,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |}
       |
       |""".stripMargin
-  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {
     sender.setScript(dApp, Some(script), waitForTx = true)

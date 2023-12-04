@@ -61,7 +61,7 @@ class BlockchainUpdaterImpl(
   private[this] var ngState: Option[NgState] = Option.empty
 
   @volatile
-  private[this] var restTotalConstraint: MiningConstraint = MiningConstraints(rocksdb, rocksdb.height, wavesSettings.enableLightMode).total
+  private[this] var restTotalConstraint: MiningConstraint = MiningConstraints(rocksdb, rocksdb.height).total
 
   private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
 
@@ -223,7 +223,7 @@ class BlockchainUpdaterImpl(
                   Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(rocksdb.unsafeHeightOf)
-                  val miningConstraints = MiningConstraints(rocksdb, height, wavesSettings.enableLightMode)
+                  val miningConstraints = MiningConstraints(rocksdb, height)
                   val reward            = computeNextReward
 
                   val referencedBlockchain = SnapshotBlockchain(rocksdb, reward)
@@ -251,7 +251,7 @@ class BlockchainUpdaterImpl(
               if (ng.base.header.reference == block.header.reference) {
                 if (block.header.timestamp < ng.base.header.timestamp) {
                   val height            = rocksdb.unsafeHeightOf(ng.base.header.reference)
-                  val miningConstraints = MiningConstraints(rocksdb, height, wavesSettings.enableLightMode)
+                  val miningConstraints = MiningConstraints(rocksdb, height)
 
                   val referencedBlockchain = SnapshotBlockchain(rocksdb, ng.reward)
                   BlockDiffer
@@ -301,7 +301,7 @@ class BlockchainUpdaterImpl(
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                       val constraint: MiningConstraint = {
-                        val miningConstraints = MiningConstraints(rocksdb, height, wavesSettings.enableLightMode)
+                        val miningConstraints = MiningConstraints(rocksdb, height)
                         miningConstraints.total
                       }
 
