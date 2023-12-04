@@ -323,7 +323,7 @@ class ExpressionCompilerV1Test extends PropSpec {
       )
       .compilerContext
 
-    val e = ScriptEstimatorV3(fixOverflow = true, overhead = true)
+    val e = ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = true)
     Global.compileExpression(expr, NoLibraries, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 

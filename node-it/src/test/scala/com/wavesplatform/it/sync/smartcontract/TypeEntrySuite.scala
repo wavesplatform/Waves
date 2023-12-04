@@ -33,7 +33,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |  && getStringValue(addressFromStringValue(""), "str") == "string"
          """.stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
     firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
@@ -96,7 +96,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |
          """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
     val accountScript = ScriptCompiler(
@@ -112,7 +112,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |
          """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)

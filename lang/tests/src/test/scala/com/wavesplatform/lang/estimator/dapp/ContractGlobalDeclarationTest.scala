@@ -947,7 +947,7 @@ class ContractGlobalDeclarationTest extends PropSpec {
       """.stripMargin
 
     val dApp      = TestCompiler(V6).compileContract(neutrinoScript).expr
-    val estimator = ScriptEstimatorV3(fixOverflow = true, overhead = false)
+    val estimator = ScriptEstimatorV3.latest
 
     val oldFunctionsCosts = ContractScript.oldGlobalFunctionsCosts(V6, dApp, estimator).explicitGet()
     val oldLetsCosts      = ContractScript.oldGlobalLetsCosts(V6, dApp, estimator).explicitGet()

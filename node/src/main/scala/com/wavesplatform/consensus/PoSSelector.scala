@@ -2,7 +2,7 @@ package com.wavesplatform.consensus
 
 import scala.concurrent.duration.FiniteDuration
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -16,8 +16,8 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{forceStopApplication, BaseTargetReachedMaximum, ScorexLogging}
 
 case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) extends ScorexLogging {
-  import PoSCalculator._
-  import blockchain.{settings => blockchainSettings}
+  import PoSCalculator.*
+  import blockchain.settings as blockchainSettings
 
   protected def posCalculator(height: Int): PoSCalculator =
     if (fairPosActivated(height))
@@ -82,7 +82,9 @@ case class PoSSelector(blockchain: Blockchain, maxBaseTarget: Option[Long]) exte
     blockchain.heightOf(block.header.reference).toRight(GenericError(s"Block reference ${block.header.reference} doesn't exist")).flatMap { height =>
       if (vrfActivated(height + 1)) {
         getHitSource(height)
-          .flatMap(hs => crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height)))
+          .flatMap(hs =>
+        crypto.verifyVRF(blockGenSig, hs.arr, block.header.generator, blockchain.isFeatureActivated(BlockchainFeatures.RideV6, height))
+      )
       } else {
         blockchain
           .blockHeader(height)

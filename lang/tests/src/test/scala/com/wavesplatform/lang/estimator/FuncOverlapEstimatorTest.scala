@@ -13,7 +13,8 @@ class FuncOverlapEstimatorTest
     extends ScriptEstimatorTestBase(
       ScriptEstimatorV1,
       ScriptEstimatorV2,
-      ScriptEstimatorV3(fixOverflow = false, overhead = true),
+      ScriptEstimatorV3(fixOverflow = false, overhead = true, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = false, letFixes = true),
       evaluatorV2AsEstimator(true)
     ) {
   property("func forward reference") {
