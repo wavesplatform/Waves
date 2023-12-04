@@ -168,7 +168,10 @@ class LightNodeTest extends PropSpec with WithDomain {
     val recipient        = TxHelpers.address(2)
     val challengingMiner = TxHelpers.signer(3)
 
-    withDomain(settings, AddrWithBalance.enoughBalances(challengingMiner, TxHelpers.defaultSigner, sender)) { d =>
+    withDomain(
+      settings.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
+      AddrWithBalance.enoughBalances(challengingMiner, TxHelpers.defaultSigner, sender)
+    ) { d =>
       val txs              = Seq(TxHelpers.transfer(sender, recipient, amount = 1.waves), TxHelpers.transfer(sender, recipient, amount = 2.waves))
       val invalidBlock     = d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, invalidBlock, strictTime = true)
