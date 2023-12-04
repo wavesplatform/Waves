@@ -11,7 +11,7 @@ import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint.Unlimited
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.test.DomainPresets.*
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, transfer}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.netty.channel.group.DefaultChannelGroup
@@ -107,6 +107,35 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         challengeBlock()
         block(12).stateHash shouldBe defined
         block(12).challengedHeader shouldBe defined
+      }
+    }
+  }
+
+  property(
+    "blocks with challenged header or state hash should be allowed only `lightNodeBlockFieldsAbsenceInterval` blocks after LightNode activation"
+  ) {
+    withDomain(
+      TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2).configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10)),
+      AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
+    ) { d =>
+      withMiner(d.blockchain, d.testTime, d.settings, verify = false, timeDrift = Int.MaxValue) { case (_, append) =>
+        (1 to 9).foreach(_ => d.appendBlock())
+        d.blockchain.height shouldBe 10
+        val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
+        val challengingBlock = d.createChallengingBlock(defaultSigner, challengedBlock)
+        append(challengedBlock) should produce("UnexpectedLightNodeFields")
+        append(challengingBlock) should produce("UnexpectedLightNodeFields")
+
+        d.appendBlock()
+        d.blockchain.height shouldBe 11
+        val correctBlockWithStateHash = d.createBlock(ProtoBlockVersion, Nil)
+        correctBlockWithStateHash.header.stateHash shouldBe defined
+        append(correctBlockWithStateHash) shouldBe a[Right[?, ?]]
+
+        d.rollbackTo(11)
+        val invalidBlock      = d.createBlock(ProtoBlockVersion, Nil, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
+        val challengingBlock2 = d.createChallengingBlock(defaultSigner, invalidBlock)
+        append(challengingBlock2) shouldBe a[Right[?, ?]]
       }
     }
   }
