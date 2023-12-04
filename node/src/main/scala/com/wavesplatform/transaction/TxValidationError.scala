@@ -51,6 +51,8 @@ object TxValidationError {
 
   case class InvalidStateHash(blockStateHash: Option[ByteStr]) extends ValidationError
 
+  case object UnexpectedLightNodeFields extends ValidationError
+
   sealed trait WithLog extends Product with Serializable {
     def log: Log[Id]
     def toStringWithLog(limit: Int): String

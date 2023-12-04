@@ -12,7 +12,6 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.StateSnapshot.monoid
 import com.wavesplatform.state.TxStateSnapshotHashBuilder.TxStatusInfo
 import com.wavesplatform.state.patch.*
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -184,6 +183,7 @@ object BlockDiffer {
       _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       initSnapshot <- TracedResult(initSnapshotE.leftMap(GenericError(_)))
       prevStateHash = maybePrevBlock.flatMap(_.header.stateHash).getOrElse(blockchain.lastStateHash(None))
+      hasChallenge  = block.header.challengedHeader.isDefined
       r <- snapshot match {
         case Some(BlockSnapshot(_, txSnapshots)) =>
           TracedResult.wrapValue(
@@ -197,7 +197,7 @@ object BlockDiffer {
             prevStateHash,
             initSnapshot,
             stateHeight >= ngHeight,
-            block.header.challengedHeader.isDefined,
+            hasChallenge,
             block.transactionData,
             loadCacheData,
             verify = verify,
@@ -205,7 +205,7 @@ object BlockDiffer {
             txSignParCheck = txSignParCheck
           )
       }
-      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash)
+      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash, hasChallenge)
     } yield r
   }
 
@@ -272,7 +272,7 @@ object BlockDiffer {
             txSignParCheck = true
           )
       }
-      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash)
+      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash, hasChallenge = false)
     } yield r
   }
 
@@ -347,12 +347,7 @@ object BlockDiffer {
 
     prepareCaches(blockGenerator, txs, loadCacheData)
 
-    val initStateHash =
-      if (blockchain.supportsLightNodeBlockFields())
-        computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
-      else
-        ByteStr.empty
-
+    val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
     txs
       .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initSnapshot, initStateHash).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
@@ -394,12 +389,9 @@ object BlockDiffer {
                   currTotalFee + txFeeInfo.wavesFee,
                   updatedConstraint,
                   newKeyBlockSnapshot,
-                  if (blockchain.supportsLightNodeBlockFields())
-                    TxStateSnapshotHashBuilder
-                      .createHashFromSnapshot(resultTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
-                      .createHash(prevStateHash)
-                  else
-                    ByteStr.empty
+                  TxStateSnapshotHashBuilder
+                    .createHashFromSnapshot(resultTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                    .createHash(prevStateHash)
                 )
               }
             }
@@ -425,12 +417,7 @@ object BlockDiffer {
       txs: Seq[Transaction],
       txSnapshots: Seq[(StateSnapshot, TxMeta.Status)]
   ): Result = {
-    val initStateHash =
-      if (blockchain.supportsLightNodeBlockFields())
-        computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
-      else
-        ByteStr.empty
-
+    val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
     txs.zip(txSnapshots).foldLeft(Result(initSnapshot, 0L, 0L, MiningConstraint.Unlimited, initSnapshot, initStateHash)) {
       case (Result(currSnapshot, carryFee, currTotalFee, currConstraint, keyBlockSnapshot, prevStateHash), (tx, (txSnapshot, txStatus))) =>
         val currBlockchain = SnapshotBlockchain(blockchain, currSnapshot)
@@ -444,10 +431,7 @@ object BlockDiffer {
           currTotalFee + txFeeInfo.map(_.wavesFee).getOrElse(0L),
           currConstraint,
           keyBlockSnapshot.withTransaction(nti),
-          if (blockchain.supportsLightNodeBlockFields())
-            TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(TxStatusInfo(tx.id(), txStatus))).createHash(prevStateHash)
-          else
-            ByteStr.empty
+          TxStateSnapshotHashBuilder.createHashFromSnapshot(txSnapshot, Some(TxStatusInfo(tx.id(), txStatus))).createHash(prevStateHash)
         )
     }
   }
@@ -508,13 +492,16 @@ object BlockDiffer {
   private def checkStateHash(
       blockchain: Blockchain,
       blockStateHash: Option[ByteStr],
-      computedStateHash: ByteStr
+      computedStateHash: ByteStr,
+      hasChallenge: Boolean
   ): TracedResult[ValidationError, Unit] =
-    TracedResult(
-      Either.cond(
-        !blockchain.supportsLightNodeBlockFields() || blockStateHash.contains(computedStateHash),
-        (),
-        InvalidStateHash(blockStateHash)
-      )
-    )
+    if (blockchain.supportsLightNodeBlockFields())
+      if (blockStateHash.contains(computedStateHash))
+        Right(())
+      else
+        Left(InvalidStateHash(blockStateHash))
+    else if (blockStateHash.isDefined || hasChallenge)
+      Left(UnexpectedLightNodeFields)
+    else
+      Right(())
 }

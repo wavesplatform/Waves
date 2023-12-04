@@ -5,7 +5,6 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.Miner
@@ -209,7 +208,7 @@ package object appender {
   private def validateChallengedHeader(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     for {
       _ <- Either.cond(
-        block.header.challengedHeader.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.LightNode, blockchain.height + 1),
+        block.header.challengedHeader.isEmpty || blockchain.supportsLightNodeBlockFields(blockchain.height + 1),
         (),
         BlockAppendError("Challenged header is not supported yet", block)
       )
@@ -222,7 +221,7 @@ package object appender {
 
   private def validateStateHash(block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     Either.cond(
-      block.header.stateHash.isEmpty || blockchain.isFeatureActivated(BlockchainFeatures.LightNode, blockchain.height + 1),
+      block.header.stateHash.isEmpty || blockchain.supportsLightNodeBlockFields(blockchain.height + 1),
       (),
       BlockAppendError("Block state hash is not supported yet", block)
     )
