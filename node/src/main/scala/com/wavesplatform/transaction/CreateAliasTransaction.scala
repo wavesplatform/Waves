@@ -24,7 +24,7 @@ final case class CreateAliasTransaction(
     chainId: Byte
 ) extends Transaction(TransactionType.CreateAlias)
     with SigProofsSwitch
-    with VersionedTransaction
+    with Versioned.ToV3
     with TxWithFee.InWaves
     with PBSince.V3 {
 
@@ -45,8 +45,7 @@ final case class CreateAliasTransaction(
 object CreateAliasTransaction extends TransactionParser {
   type TransactionT = CreateAliasTransaction
 
-  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  val typeId: TxType                    = 10: Byte
+  val typeId: TxType = 10: Byte
 
   implicit val validator: TxValidator[CreateAliasTransaction] = CreateAliasTxValidator
 

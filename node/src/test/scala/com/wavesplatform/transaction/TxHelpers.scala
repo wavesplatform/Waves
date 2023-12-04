@@ -107,14 +107,16 @@ object TxHelpers {
 
   def massTransfer(
       from: KeyPair = defaultSigner,
-      to: Seq[ParsedTransfer] = Seq(ParsedTransfer(secondAddress, TxNonNegativeAmount.unsafeFrom(1.waves))),
+      to: Seq[(AddressOrAlias, Long)] = Seq(secondAddress -> 1.waves),
       asset: Asset = Waves,
       fee: Long = FeeConstants(TransactionType.MassTransfer) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: Byte = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
   ): MassTransferTransaction =
-    MassTransferTransaction.selfSigned(version, from, asset, to, fee, timestamp, ByteStr.empty, chainId).explicitGet()
+    MassTransferTransaction.selfSigned(version, from, asset,
+      to.map { case (r, a) => MassTransferTransaction.ParsedTransfer(r, TxNonNegativeAmount.unsafeFrom(a)) },
+      fee, timestamp, ByteStr.empty, chainId).explicitGet()
 
   def issue(
       issuer: KeyPair = defaultSigner,
@@ -291,7 +293,7 @@ object TxHelpers {
       .explicitGet()
 
   def script(scriptText: String): Script = {
-    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.latest).explicitGet()
     script
   }
 
@@ -339,7 +341,7 @@ object TxHelpers {
       Script
         .estimate(
           script,
-          ScriptEstimatorV3(fixOverflow = true, overhead = false),
+          ScriptEstimatorV3.latest,
           fixEstimateOfVerifier = true,
           useContractVerifierLimit = false
         )

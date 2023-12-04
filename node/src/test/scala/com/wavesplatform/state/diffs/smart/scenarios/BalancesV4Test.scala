@@ -20,7 +20,6 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.*
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.*
@@ -87,7 +86,6 @@ class BalancesV4Test extends PropSpec with WithState {
   }
 
   property("Waves balance details") {
-
     val (genesis, b, acc1, dapp, ci) = preconditionsAndTransfer
     assertDiffAndState(
       Seq(TestBlock.create(genesis)) ++

@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.state.diffs.{BalanceDiffValidation, DiffsCommon}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -377,7 +377,7 @@ object InvokeDiffsCommon {
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
           val versionInfo = tx.root match {
-            case s: PBSince => s" in tx version >= ${s.protobufVersion}"
+            case s: PBSince => s" in tx version >= ${PBSince.version(s)}"
             case _          => ""
           }
           s"Empty keys aren't allowed$versionInfo"
@@ -640,10 +640,10 @@ object InvokeDiffsCommon {
 
       def applyLease(l: Lease): TracedResult[ValidationError, StateSnapshot] =
         for {
-          _         <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
-          recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
+          validAmount <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
+          recipient   <- TracedResult(AddressOrAlias.fromRide(l.recipient))
           leaseId = Lease.calculateId(l, tx.txId)
-          diff <- DiffsCommon.processLease(blockchain, l.amount, pk, recipient, fee = 0, leaseId, tx.txId)
+          diff <- DiffsCommon.processLease(blockchain, validAmount, pk, recipient, fee = 0, leaseId, tx.txId)
         } yield diff
 
       def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, StateSnapshot] =

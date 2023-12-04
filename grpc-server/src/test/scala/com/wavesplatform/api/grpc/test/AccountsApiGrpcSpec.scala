@@ -3,15 +3,7 @@ package com.wavesplatform.api.grpc.test
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.api.grpc.{
-  AccountRequest,
-  AccountsApiGrpcImpl,
-  BalanceResponse,
-  BalancesRequest,
-  DataEntryResponse,
-  DataRequest,
-  LeaseResponse
-}
+import com.wavesplatform.api.grpc.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
@@ -19,7 +11,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.{DataTransactionData, Recipient}
+import com.wavesplatform.protobuf.transaction.{DataEntry, Recipient}
 import com.wavesplatform.state.{BlockRewardCalculator, EmptyDataEntry, IntegerDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
@@ -115,7 +107,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
       grpcApi.getActiveLeases(AccountRequest.of(ByteString.copyFrom(recipient.toAddress.bytes)), observer)
 
-      result.runSyncUnsafe() shouldBe List(
+      result.runSyncUnsafe() should contain theSameElementsAs List(
         LeaseResponse.of(
           ByteString.copyFrom(lease3.id().arr),
           ByteString.copyFrom(lease3.id().arr),
@@ -151,7 +143,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       result1.runSyncUnsafe() shouldBe List(
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key2", DataTransactionData.DataEntry.Value.IntValue(456)))
+          Some(DataEntry.of("key2", DataEntry.Value.IntValue(456)))
         )
       )
 
@@ -160,11 +152,11 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
       result2.runSyncUnsafe() shouldBe List(
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key2", DataTransactionData.DataEntry.Value.IntValue(456)))
+          Some(DataEntry.of("key2", DataEntry.Value.IntValue(456)))
         ),
         DataEntryResponse.of(
           ByteString.copyFrom(sender.toAddress.bytes),
-          Some(DataTransactionData.DataEntry.of("key3", DataTransactionData.DataEntry.Value.IntValue(789)))
+          Some(DataEntry.of("key3", DataEntry.Value.IntValue(789)))
         )
       )
     }

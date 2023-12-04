@@ -16,16 +16,31 @@ import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address as RideAddress
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.{Blockchain, BlockchainOverrides, OverriddenBlockchain}
+import com.wavesplatform.state.{Blockchain, BlockchainOverrides, SnapshotBlockchain, StateSnapshot}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.AttachedPaymentExtractor
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{TransactionType, smart}
+import com.wavesplatform.transaction.{Asset, TransactionType, smart}
 import play.api.libs.json.*
+
+import scala.collection.immutable.VectorMap
 
 sealed trait UtilsEvaluationRequest {
   def state: Option[BlockchainOverrides]
-  def mkBlockchain(underlying: Blockchain): Blockchain = state.foldLeft(underlying)(new OverriddenBlockchain(_, _))
+  def mkBlockchain(underlying: Blockchain): Blockchain = {
+
+    state.fold(underlying) { ovs =>
+      SnapshotBlockchain(
+        underlying,
+        StateSnapshot(balances = VectorMap.from[(Address, Asset), Long](for {
+          (addr, ov)    <- ovs.accounts
+          (id, balance) <- ov.assetBalances
+        } yield ((addr, id), balance.value)) ++ VectorMap.from(ovs.accounts.flatMap { case (addr, acc) =>
+          acc.regularBalance.map(v => ((addr, Asset.Waves), v.value))
+        }))
+      )
+    }
+  }
 }
 
 object UtilsEvaluationRequest {

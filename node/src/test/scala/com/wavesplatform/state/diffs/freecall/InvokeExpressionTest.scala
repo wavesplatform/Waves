@@ -10,12 +10,10 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot.AssetStatic
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.state.{AssetInfo, AssetVolumeInfo, BinaryDataEntry, BooleanDataEntry}
+import com.wavesplatform.state.{AssetInfo, AssetStaticInfo, AssetVolumeInfo, BinaryDataEntry, BooleanDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
@@ -263,7 +261,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
   }
 
   ignore("available versions") { // TODO check is commented in CommonValidation
-    val unsupportedVersion   = InvokeExpressionTransaction.supportedVersions.max + 1
+    val unsupportedVersion   = 4
     val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
@@ -332,7 +330,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   private[this] def checkAsset(
       invoke: InvokeExpressionTransaction,
-      static: AssetStatic,
+      static: AssetStaticInfo,
       info: AssetInfo,
       volume: AssetVolumeInfo
   ): Assertion = {
@@ -342,7 +340,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     volume.isReissuable shouldBe TestAssetReissuable
     static.decimals shouldBe TestAssetDecimals
     static.nft shouldBe false
-    static.issuerPublicKey.toPublicKey shouldBe invoke.sender
+    static.issuer shouldBe invoke.sender
   }
 }
 

@@ -26,8 +26,7 @@ case class GenesisTransaction(recipient: Address, amount: TxNonNegativeAmount, t
 object GenesisTransaction extends TransactionParser {
   type TransactionT = GenesisTransaction
 
-  override val typeId: TxType                    = 1: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val typeId: TxType = 1: Byte
 
   override def parseBytes(bytes: Array[TxVersion]): Try[GenesisTransaction] =
     GenesisTxSerializer.parseBytes(bytes)

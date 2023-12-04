@@ -59,7 +59,6 @@ class AssetsRouteSpec
             restAPISettings,
             60.seconds,
             testWallet,
-            DummyTransactionPublisher.accepting,
             d.blockchain,
             () => d.blockchain.snapshotBlockchain,
             TestTime(),
@@ -287,7 +286,7 @@ class AssetsRouteSpec
       checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
     }
 
-    d.appendBlock((7 to 10).map(issues): _*)
+    d.appendBlock((7 to 10).map(issues) *)
     (1 to 6).foreach { i =>
       checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
     }

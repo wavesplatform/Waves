@@ -214,7 +214,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
           |    else [IntegerEntry("h", height)]
           |  }
           |  """.stripMargin,
-        ScriptEstimatorV3(fixOverflow = true, overhead = true)
+        ScriptEstimatorV3.latest
       )
       .explicitGet()
 
@@ -270,7 +270,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
          |
          |if ($expr) then true else throw("reached err")
          |""".stripMargin
-    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+    val (script, _) = ScriptCompiler.compile(scriptText, ScriptEstimatorV3.latest).explicitGet()
     script
   }
 

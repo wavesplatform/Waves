@@ -27,7 +27,7 @@ case class ExchangeTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Exchange, order1.assetPair.checkedAssets)
-    with VersionedTransaction
+    with Versioned.ToV3
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
@@ -64,8 +64,6 @@ object ExchangeTransaction extends TransactionParser {
 
   override def parseBytes(bytes: Array[TxVersion]): Try[ExchangeTransaction] =
     ExchangeTxSerializer.parseBytes(bytes)
-
-  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val typeId: TxType = 7: Byte
 

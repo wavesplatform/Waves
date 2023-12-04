@@ -76,12 +76,13 @@ class SyncInvokeFailAndRejectTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(dApp2Signer, dApp2))
       d.appendBlock(invokeTx)
       d.blockchain.transactionInfo(invokeTx.id()).get._1.status == Status.Succeeded shouldBe false
-      d.liquidSnapshot.sponsorships shouldBe Map()
-      d.liquidSnapshot.leaseStates shouldBe Map()
-      d.liquidSnapshot.assetStatics shouldBe Map()
-      d.liquidSnapshot.assetNamesAndDescriptions shouldBe Map()
-      d.liquidSnapshot.assetVolumes shouldBe Map()
-      d.liquidSnapshot.accountData shouldBe Map()
+      d.liquidSnapshot.sponsorships should be(empty)
+      d.liquidSnapshot.newLeases should be(empty)
+      d.liquidSnapshot.cancelledLeases should be(empty)
+      d.liquidSnapshot.assetStatics should be(empty)
+      d.liquidSnapshot.assetNamesAndDescriptions should be(empty)
+      d.liquidSnapshot.assetVolumes should be(empty)
+      d.liquidSnapshot.accountData should be(empty)
       d.blockchain.accountData(dApp2Address, "old").get.value shouldBe "value"
       d.liquidSnapshot.balances shouldBe {
         val reward              = d.blockchain.blockReward(d.blockchain.height).get

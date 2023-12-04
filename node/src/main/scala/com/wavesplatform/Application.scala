@@ -140,7 +140,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
-    if (settings.minerSettings.enable && !settings.enableLightMode)
+    if (settings.minerSettings.enable)
       miner = new MinerImpl(
         allChannels,
         blockchainUpdater,
@@ -441,7 +441,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           settings.restAPISettings,
           serverRequestTimeout,
           wallet,
-          transactionPublisher,
           blockchainUpdater,
           () => blockchainUpdater.snapshotBlockchain,
           time,

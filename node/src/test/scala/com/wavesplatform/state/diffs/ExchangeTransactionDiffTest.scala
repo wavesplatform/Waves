@@ -33,7 +33,6 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals, Default as DefaultPriceMode}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
@@ -2271,7 +2270,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     val massTransfer = TxHelpers.massTransfer(
       from = buyer,
-      to = sellers.map(seller => ParsedTransfer(seller.toAddress, TxNonNegativeAmount.unsafeFrom(issue2.quantity.value / sellOrdersCount))),
+      to = sellers.map(seller => seller.toAddress -> (issue2.quantity.value / sellOrdersCount)),
       asset = issue2.asset,
       fee = 1_000_000,
       version = TxVersion.V1

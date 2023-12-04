@@ -52,7 +52,7 @@ import scala.util.{Random, Using}
 
 private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) extends AutoCloseable {
-    val path: Path            = Files.createTempDirectory("rocksdb-test")
+    val path: Path            = Files.createTempDirectory("rocksdb-test-utx")
     val rdb                   = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
@@ -839,7 +839,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
                  |    }
                  | }
                """.stripMargin,
-              ScriptEstimatorV3(fixOverflow = true, overhead = true)
+              ScriptEstimatorV3.latest
             )
             .explicitGet()
             ._1

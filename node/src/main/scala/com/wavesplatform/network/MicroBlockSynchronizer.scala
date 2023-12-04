@@ -1,10 +1,8 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.{Cache, CacheBuilder}
-
-import java.util.concurrent.TimeUnit
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{MicroBlock, MicroBlockSnapshot}
+import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
@@ -15,6 +13,7 @@ import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
+import java.util.concurrent.TimeUnit
 import scala.collection.mutable.Set as MSet
 import scala.concurrent.duration.FiniteDuration
 
@@ -27,9 +26,9 @@ object MicroBlockSynchronizer extends ScorexLogging {
       lastBlockIdEvents: Observable[ByteStr],
       microblockInvs: ChannelObservable[MicroBlockInv],
       microblockResponses: ChannelObservable[MicroBlockResponse],
-      microblockSnapshots: ChannelObservable[MicroBlockSnapshot],
+      microblockSnapshots: ChannelObservable[MicroBlockSnapshotResponse],
       scheduler: SchedulerService
-  ): (Observable[(Channel, MicroblockData, Option[(Channel, MicroBlockSnapshot)])], Coeval[CacheSizes]) = {
+  ): (Observable[(Channel, MicroblockData, Option[(Channel, MicroBlockSnapshotResponse)])], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
@@ -160,7 +159,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
         .subscribe()
 
       microblockSnapshots.observeOn(scheduler).flatMap { case (ch, snapshot) =>
-        BlockStats.received(snapshot, ch, snapshot.totalBlockId)
+        BlockStats.received(ch, snapshot.totalBlockId)
         Option(receivedSnapshots.getIfPresent(snapshot.totalBlockId)) match {
           case Some(_) =>
             waitingForSnapshot.invalidate(snapshot.totalBlockId)

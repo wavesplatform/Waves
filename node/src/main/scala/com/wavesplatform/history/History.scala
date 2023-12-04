@@ -4,6 +4,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.RDB
+import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.state.{Blockchain, Height, StateSnapshot}
 
@@ -43,7 +44,7 @@ object History {
 
       override def loadBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] =
         liquidBlockSnapshot(id)
-          .map(_.transactions.values.toSeq.map(txInfo => txInfo.snapshot.toProtobuf(txInfo.status)))
+          .map(_.transactions.values.toSeq.map(txInfo => PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status)))
           .orElse(blockchain.heightOf(id).map { h =>
             database.loadTxStateSnapshots(Height(h), rdb)
           })
@@ -51,7 +52,7 @@ object History {
       override def loadMicroBlockSnapshots(id: ByteStr): Option[Seq[TransactionStateSnapshot]] =
         microBlockSnapshot(id)
           .map(_.transactions.values.toSeq.map { txInfo =>
-            txInfo.snapshot.toProtobuf(txInfo.status)
+            PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status)
           })
     }
 }

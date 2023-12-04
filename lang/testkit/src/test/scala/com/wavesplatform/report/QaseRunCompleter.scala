@@ -1,8 +1,10 @@
 package com.wavesplatform.report
 
+import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.report.QaseReporter.{CheckPRRunIdKey, QaseProjects, TestResult}
 import io.qase.api.QaseClient
 import io.qase.api.config.QaseConfig.{PROJECT_CODE_KEY, RUN_ID_KEY}
+import io.qase.api.exceptions.QaseException
 import io.qase.api.services.impl.ReportersResultOperationsImpl
 import io.qase.client.ApiClient
 import io.qase.client.api.{CasesApi, ResultsApi, RunsApi}
@@ -15,8 +17,8 @@ import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Using
 
-object QaseRunCompleter extends App {
-  if (QaseClient.getConfig.isEnabled) {
+object QaseRunCompleter extends App with StrictLogging {
+  if (QaseClient.getConfig.isEnabled) try {
 
     val apiClient: ApiClient = QaseClient.getApiClient
     val runsApi              = new RunsApi(apiClient)
@@ -78,6 +80,9 @@ object QaseRunCompleter extends App {
         }
       }(_.foreach(f => Files.delete(f.toPath)))
     }
+  } catch {
+    case e: QaseException =>
+      logger.error(s"Qase error: ${e.getCode} ${e.getResponseBody}", e)
   }
 
   @tailrec

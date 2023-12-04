@@ -31,7 +31,7 @@ import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits

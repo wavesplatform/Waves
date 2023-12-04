@@ -1,212 +1,318 @@
 package com.wavesplatform.state.snapshot
 
-import com.google.common.primitives.{Ints, Longs, UnsignedBytes}
-import com.wavesplatform.account.{AddressScheme, Alias}
+import com.google.common.primitives.Ints
+import com.google.protobuf.ByteString.copyFrom as bs
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.crypto.DigestLength
-import com.wavesplatform.db.WithDomain
-import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.crypto.fastHash
+import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.protobuf.snapshot.{TransactionStatus, TransactionStateSnapshot as TSS}
+import com.wavesplatform.protobuf.transaction.DataEntry
+import com.wavesplatform.protobuf.{Amount, PBSnapshots}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.TxMeta.Status.*
-import com.wavesplatform.state.TxStateSnapshotHashBuilder.{KeyType, TxStatusInfo}
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxHelpers.invoke
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdLength, TxHelpers}
+import com.wavesplatform.transaction.TxHelpers
+import org.bouncycastle.util.encoders.Hex
 
-import java.nio.charset.StandardCharsets
-import scala.collection.immutable.VectorMap
+class TxStateSnapshotHashSpec extends PropSpec {
+  private def hashInt(i: Int) = bs(fastHash(Ints.toByteArray(i)))
 
-class TxStateSnapshotHashSpec extends PropSpec with WithDomain {
-  val stateHash        = new StateHashBuilder
-  private val address1 = TxHelpers.address(1)
-  private val address2 = TxHelpers.address(2)
-  private val assetId1 = IssuedAsset(ByteStr.fill(AssetIdLength)(1))
-  private val assetId2 = IssuedAsset(ByteStr.fill(AssetIdLength)(2))
-  private val assetId3 = IssuedAsset(ByteStr.fill(AssetIdLength)(3))
-  private val assetId4 = IssuedAsset(ByteStr.fill(AssetIdLength)(4))
+  val stateHash         = new StateHashBuilder
+  private val signer101 = TxHelpers.signer(101)
+  private val signer102 = TxHelpers.signer(102)
+  private val signer103 = TxHelpers.signer(103)
 
-  private val orderId      = ByteStr.fill(DigestLength)(5)
-  private val volumeAndFee = VolumeAndFee(11, 2)
+  private val address1 = signer101.toAddress
+  private val address2 = signer102.toAddress
+  private val address3 = signer103.toAddress
 
-  private val leaseId1      = ByteStr.fill(DigestLength)(6)
-  private val leaseId2      = ByteStr.fill(DigestLength)(7)
-  private val leaseDetails1 = LeaseSnapshot(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Active)
-  private val leaseDetails2 = LeaseSnapshot(TxHelpers.signer(1).publicKey, address2, 1.waves, LeaseDetails.Status.Cancelled(1, None))
+  private val assetId1 = hashInt(0xaa22aa44)
+  private val assetId2 = hashInt(0xbb22aa44)
 
-  private val addr1Balance       = 10.waves
-  private val addr2Balance       = 20.waves
-  private val addr1PortfolioDiff = Portfolio(balance = 2.waves, lease = LeaseBalance(3.waves, 1.waves))
-  private val addr2PortfolioDiff = Portfolio(assets = VectorMap(assetId1 -> 123))
+  private val leaseId  = hashInt(0x11aaef22)
+  private val orderId1 = hashInt(0xee23ef22)
+  private val orderId2 = hashInt(0xbb77ef29)
 
-  private val addr1Alias1 = Alias(AddressScheme.current.chainId, "addr1Alias1")
-  private val addr1Alias2 = Alias(AddressScheme.current.chainId, "addr1Alias2")
-  private val addr2Alias  = Alias(AddressScheme.current.chainId, "addr2")
+  private val testScript = bs(TestCompiler(V6).compileExpression("true").bytes().arr)
 
-  private val assetInfo1 = NewAssetInfo(
-    AssetStaticInfo(assetId1.id, TransactionId(assetId1.id), TxHelpers.signer(1).publicKey, 8, false),
-    AssetInfo("test1", "desc1", Height(2)),
-    AssetVolumeInfo(true, BigInt(123))
-  )
-  private val assetInfo2 = NewAssetInfo(
-    AssetStaticInfo(assetId2.id, TransactionId(assetId2.id), TxHelpers.signer(1).publicKey, 8, false),
-    AssetInfo("test2", "desc2", Height(2)),
-    AssetVolumeInfo(true, BigInt(123))
-  )
-  private val assetInfo3 = NewAssetInfo(
-    AssetStaticInfo(assetId3.id, TransactionId(assetId3.id), TxHelpers.signer(1).publicKey, 8, false),
-    AssetInfo("test3", "desc3", Height(2)),
-    AssetVolumeInfo(true, BigInt(123))
-  )
-  private val assetInfo4 = NewAssetInfo(
-    AssetStaticInfo(assetId4.id, TransactionId(assetId4.id), TxHelpers.signer(1).publicKey, 8, false),
-    AssetInfo("test4", "desc4", Height(2)),
-    AssetVolumeInfo(true, BigInt(123))
-  )
-  private val updatedAssetInfo1       = AssetInfo("updTest1", "updDesc1", Height(2))
-  private val updatedAssetVolumeInfo1 = AssetVolumeInfo(false, 124)
-  private val updatedAssetInfo2       = AssetInfo("updTest2", "updDesc2", Height(2))
-  private val updatedAssetVolumeInfo3 = AssetVolumeInfo(false, 125)
-  private val sponsorship             = SponsorshipValue(12)
-
-  private val testScript = ScriptCompiler
-    .compile(
-      """
-        |{-# STDLIB_VERSION 2 #-}
-        |{-# CONTENT_TYPE EXPRESSION #-}
-        |{-# SCRIPT_TYPE ACCOUNT #-}
-        |true
-        |""".stripMargin,
-      ScriptEstimatorV1
+  private val wavesBalances = TSS(balances =
+    Seq(
+      TSS.Balance(bs(address1.bytes), Some(Amount(amount = 10.waves))),
+      TSS.Balance(bs(address2.bytes), Some(Amount(amount = 20.waves)))
     )
-    .explicitGet()
-    ._1
-  private val accountScriptInfo = AccountScriptInfo(TxHelpers.signer(2).publicKey, testScript, 1)
-  private val assetScriptInfo   = AssetScriptInfo(testScript, 1)
-
-  private val dataEntry = StringDataEntry("key", "value")
-
-  private val snapshot = StateSnapshot(
-    balances = VectorMap(
-      (address1, Waves)    -> (addr1PortfolioDiff.balance + addr1Balance),
-      (address2, assetId1) -> addr2PortfolioDiff.assets.head._2
-    ),
-    leaseBalances = Map(address1 -> addr1PortfolioDiff.lease),
-    assetStatics = StateSnapshot.assetStatics(
-      VectorMap(
-        assetId1 -> assetInfo1,
-        assetId2 -> assetInfo2,
-        assetId3 -> assetInfo3,
-        assetId4 -> assetInfo4
-      )
-    ),
-    assetVolumes = VectorMap(
-      assetId1 -> updatedAssetVolumeInfo1,
-      assetId2 -> assetInfo2.volume,
-      assetId3 -> updatedAssetVolumeInfo3,
-      assetId4 -> assetInfo4.volume
-    ),
-    assetNamesAndDescriptions = VectorMap(
-      assetId1 -> updatedAssetInfo1,
-      assetId2 -> updatedAssetInfo2,
-      assetId3 -> assetInfo3.dynamic,
-      assetId4 -> assetInfo4.dynamic
-    ),
-    aliases = Map(addr1Alias1 -> address1, addr2Alias -> address2, addr1Alias2 -> address1),
-    orderFills = Map(orderId -> volumeAndFee),
-    leaseStates = Map(leaseId1 -> leaseDetails1, leaseId2 -> leaseDetails2),
-    accountScripts = Map(TxHelpers.signer(2).publicKey -> Some(accountScriptInfo)),
-    assetScripts = Map(assetId1 -> assetScriptInfo),
-    accountData = Map(address1 -> Map(dataEntry.key -> dataEntry)),
-    sponsorships = Map(assetId1 -> sponsorship)
   )
 
-  def hash(bs: Seq[Array[Byte]]): ByteStr = ByteStr(com.wavesplatform.crypto.fastHash(bs.reduce(_ ++ _)))
+  private val assetBalances = TSS(balances =
+    Seq(
+      TSS.Balance(bs(address1.bytes), Some(Amount(assetId1, 10_000))),
+      TSS.Balance(bs(address2.bytes), Some(Amount(assetId2, 20_000)))
+    )
+  )
+
+  private val dataEntries = TSS(accountData =
+    Seq(
+      TSS.AccountData(
+        bs(address1.bytes),
+        Seq(
+          DataEntry("foo", DataEntry.Value.Empty),
+          DataEntry("bar", DataEntry.Value.StringValue("StringValue")),
+          DataEntry("baz", DataEntry.Value.BinaryValue(bs(address1.bytes)))
+        )
+      ),
+      TSS.AccountData(
+        bs(address2.bytes),
+        Seq(
+          DataEntry("foo", DataEntry.Value.IntValue(1200)),
+          DataEntry("bar", DataEntry.Value.BoolValue(true))
+        )
+      )
+    )
+  )
+
+  private val accountScript = TSS(accountScripts =
+    Some(
+      TSS.AccountScript(
+        bs(signer101.publicKey.arr),
+        testScript,
+        250
+      )
+    )
+  )
+
+  private val assetScript = TSS(assetScripts = Some(TSS.AssetScript(assetId2, testScript)))
+
+  private val newLease = TSS(
+    leaseBalances = Seq(
+      TSS.LeaseBalance(bs(address1.bytes), out = 45.waves),
+      TSS.LeaseBalance(bs(address2.bytes), in = 55.waves)
+    ),
+    newLeases = Seq(
+      TSS.NewLease(leaseId,  bs(signer101.publicKey.arr), bs(address2.bytes), 25.waves)
+    )
+  )
+
+  private val cancelledLease = TSS(
+    leaseBalances = Seq(
+      TSS.LeaseBalance(bs(address3.bytes), out = 20.waves), TSS.LeaseBalance(bs(TxHelpers.address(104).bytes), in = 0.waves)),
+    cancelledLeases = Seq(
+      TSS.CancelledLease(leaseId)
+    )
+  )
+
+  private val sponsorship = TSS(
+    sponsorships = Seq(TSS.Sponsorship(assetId2, 5500))
+  )
+
+  private val alias = TSS(
+    aliases = Some(TSS.Alias(bs(address2.bytes), "wavesevo"))
+  )
+
+  private val volumeAndFee = TSS(
+    orderFills = Seq(
+      TSS.OrderFill(orderId1, 10.waves, 2000),
+      TSS.OrderFill(orderId2, 10.waves, 2000)
+    )
+  )
+
+  private val newAsset = TSS(
+    assetStatics = Seq(
+      TSS.NewAsset(assetId1, hashInt(0x88aadd55), nft = true),
+      TSS.NewAsset(assetId2, hashInt(0x88aadd55), decimals = 8)
+    ),
+    assetVolumes = Seq(
+      TSS.AssetVolume(assetId2, true, bs((BigInt(Long.MaxValue) * 10).toByteArray)),
+      TSS.AssetVolume(assetId1, false, bs(BigInt(1).toByteArray))
+    ),
+    assetNamesAndDescriptions = Seq()
+  )
+
+  private val reissuedAsset = TSS(
+    assetVolumes = Seq(
+      TSS.AssetVolume(hashInt(0x23aadd55), false, bs((BigInt(10000000_00L)).toByteArray)),
+    )
+  )
+  private val renamedAsset = TSS(
+    assetNamesAndDescriptions = Seq(
+      TSS.AssetNameAndDescription(
+        assetId2, "newname", "some fancy description"
+      )
+    )
+  )
+  private val failedTransaction = TSS(
+    balances = Seq(
+      TSS.Balance(bs(address2.bytes), Some(Amount(amount = 25.995.waves)))
+    ),
+    transactionStatus = TransactionStatus.FAILED
+  )
+  private val elidedTransaction = TSS(
+    transactionStatus = TransactionStatus.ELIDED
+  )
+
+  private val all = TSS(
+    assetBalances.balances ++ wavesBalances.balances,
+    newLease.leaseBalances ++ cancelledLease.leaseBalances,
+    newLease.newLeases,
+    cancelledLease.cancelledLeases,
+    newAsset.assetStatics,
+    newAsset.assetVolumes ++ reissuedAsset.assetVolumes,
+    newAsset.assetNamesAndDescriptions ++ renamedAsset.assetNamesAndDescriptions,
+    newAsset.assetScripts,
+    alias.aliases,
+    volumeAndFee.orderFills,
+    accountScript.accountScripts,
+    dataEntries.accountData,
+    sponsorship.sponsorships,
+    failedTransaction.transactionStatus
+  )
+
+  private val testData = Table(
+    ("clue", "state snapshot", "base64 bytes", "tx id", "previous state hash", "expected result"),
+    (
+      "waves balances",
+      wavesBalances,
+      "CiQKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgYQgJTr3AMKJAoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSBhCAqNa5Bw==",
+      ByteStr.empty,
+      "",
+      "954bf440a83542e528fe1e650471033e42d97c5896cc571aec39fccc912d7db0"
+    ),
+    (
+      "asset balances",
+      assetBalances,
+      "CkMKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EiUKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEJBOCkQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEiYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEKCcAQ==",
+      ByteStr.empty,
+      "954bf440a83542e528fe1e650471033e42d97c5896cc571aec39fccc912d7db0",
+      "534e27c3a787536e18faf844ff217a8f14e5323dfcd3cc5b9ab3a8e261f60cf7"
+    ),
+    (
+      "data entries",
+      dataEntries,
+      "YloKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgUKA2ZvbxISCgNiYXJqC1N0cmluZ1ZhbHVlEiEKA2JhemIaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7ViLwoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCAoDZm9vULAJEgcKA2JhclgB",
+      ByteStr.empty,
+      "534e27c3a787536e18faf844ff217a8f14e5323dfcd3cc5b9ab3a8e261f60cf7",
+      "b1440780a268eeaf9f6bb285a97ee35582cb84382576e84432b2e61b86d64581"
+    ),
+    (
+      "account script",
+      accountScript,
+      "Wi4KIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoEgcGAQaw0U/PGPoB",
+      ByteStr.empty,
+      "b1440780a268eeaf9f6bb285a97ee35582cb84382576e84432b2e61b86d64581",
+      "ca42620b03b437e025bec14152c3f7d8ff65b8fb1062b5013363186484176cb7"
+    ),
+    (
+      "asset script",
+      assetScript,
+      "QisKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEgcGAQaw0U/P",
+      ByteStr.empty,
+      "ca42620b03b437e025bec14152c3f7d8ff65b8fb1062b5013363186484176cb7",
+      "4e9cbb5349a31d2954d57f67d2fc5cf73dd1ce90b508299cf5f92b1b45ca668f"
+    ),
+    (
+      "new lease",
+      newLease,
+      "EiIKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1GICa4uEQEiIKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEICuzb4UGmYKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqNEiBQx1mvQnelVPDNtCyxR82wU73hEX9bBDsNfUlEuNBgaBoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoggPKLqAk=",
+      ByteStr.empty,
+      "4e9cbb5349a31d2954d57f67d2fc5cf73dd1ce90b508299cf5f92b1b45ca668f",
+      "8615df0268bcc76e851a9925e07f212a875a1bd047b0cccbc4ad3d842895f16e"
+    ),
+    (
+      "cancelled lease",
+      cancelledLease,
+      "EiIKGgFUMCPLqLW81X2Atgaj2KwF9QkaJq47Cev9GICo1rkHEhwKGgFUYSJd8vzI9rq7GdIuDy65JMc8zi497E98IiIKILiCMyyFggW8Zd2LGt/AtMr7WWp+kfWbzlN93pXZqzqN",
+      ByteStr.empty,
+      "8615df0268bcc76e851a9925e07f212a875a1bd047b0cccbc4ad3d842895f16e",
+      "3bb24694ea57c1d6b2eec2c549d5ba591853bd7f21959027d2793d5c0846cc8d"
+    ),
+    (
+      "sponsorship",
+      sponsorship,
+      "aiUKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEPwq",
+      ByteStr.empty,
+      "3bb24694ea57c1d6b2eec2c549d5ba591853bd7f21959027d2793d5c0846cc8d",
+      "4fd2ceeb81d4d9c7ebad4391fbd938cfc40564088d2cc71801d308d56eca9b75"
+    ),
+    (
+      "alias",
+      alias,
+      "SiYKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgh3YXZlc2V2bw==",
+      ByteStr.empty,
+      "4fd2ceeb81d4d9c7ebad4391fbd938cfc40564088d2cc71801d308d56eca9b75",
+      "0f02911227a9835c1248822f4e500213c4fc4c05a83a5d27680f67d1d1f6a8ee"
+    ),
+    (
+      "order fill",
+      volumeAndFee,
+      "UisKIMkknO8yHpMUT/XKkkdlrbYCG0Dt+qvVgphfgtRbyRDMEICU69wDGNAPUisKIJZ9YwvJObbWItHAD2zhbaFOTFx2zQ4p0Xbo81GXHKeEEICU69wDGNAP",
+      ByteStr.empty,
+      "0f02911227a9835c1248822f4e500213c4fc4c05a83a5d27680f67d1d1f6a8ee",
+      "4d0d2c893b435d1bbc3464c59ceda196961b94a81cfb9bb2c50fe03c06f23d00"
+    ),
+    (
+      "new asset",
+      newAsset,
+      "KkYKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEiDcYGFqY9MotHTpDpskoycN/Mt62bZfPxIC4fpU0ZTBniABKkYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEiDcYGFqY9MotHTpDpskoycN/Mt62bZfPxIC4fpU0ZTBnhgIMi8KIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEAEaCQT/////////9jIlCiBeZp+CCmfQiG2HR4zwQ6KseFzHr1XcMc4QdTlL01CiWxoBAQ==",
+      ByteStr.empty,
+      "4d0d2c893b435d1bbc3464c59ceda196961b94a81cfb9bb2c50fe03c06f23d00",
+      "e2baa6d7e863fc1f5f6cec326b01e577c4509e927f3b13ed7818af9075be82c3"
+    ),
+    (
+      "reissued asset",
+      reissuedAsset,
+      "MigKIDhvjT3TTlJ+v4Ni205vcYc1m9WWgnQPFovjmJI1H62yGgQ7msoA",
+      ByteStr.empty,
+      "e2baa6d7e863fc1f5f6cec326b01e577c4509e927f3b13ed7818af9075be82c3",
+      "a161ea70fa027f6127763cdb946606e3d65445915ec26c369e0ff28b37bee8cd"
+    ),
+    (
+      "renamed asset",
+      renamedAsset,
+      "OkMKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEgduZXduYW1lGhZzb21lIGZhbmN5IGRlc2NyaXB0aW9u",
+      ByteStr.empty,
+      "a161ea70fa027f6127763cdb946606e3d65445915ec26c369e0ff28b37bee8cd",
+      "7a43e1fb599e8a921ecb2a83b4b871bd46db4569bf5c4f6c9225479191450a58"
+    ),
+    (
+      "failed transaction",
+      failedTransaction,
+      "CiQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgYQ4PHE1wlwAQ==",
+      ByteStr(fastHash(Ints.toByteArray(0xaabbef20))),
+      "7a43e1fb599e8a921ecb2a83b4b871bd46db4569bf5c4f6c9225479191450a58",
+      "dfa190a84d59edda03428c93c4b1be4c50f12adf3c11528ef0bdd8db1edaf49b"
+    ),
+    (
+      "elided transaction",
+      elidedTransaction,
+      "cAI=",
+      ByteStr(fastHash(Ints.toByteArray(0xaabbef40))),
+      "dfa190a84d59edda03428c93c4b1be4c50f12adf3c11528ef0bdd8db1edaf49b",
+      "002f4f7f3741668c10a8ba92b4b183680fd6659bafd36037be6f9a636510b128"
+    ),
+    (
+      "all together",
+      all,
+      "CkMKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EiUKIF5mn4IKZ9CIbYdHjPBDoqx4XMevVdwxzhB1OUvTUKJbEJBOCkQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEiYKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEKCcAQokChoBVGD9UO8g3kVxIH37nIi+fBwviiLHCtiPtRIGEICU69wDCiQKGgFUQsXJY3P1D9gTUGBPHBTypsklatr9GbAqEgYQgKjWuQcSIgoaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7UYgJri4RASIgoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoQgK7NvhQSIgoaAVQwI8uotbzVfYC2BqPYrAX1CRomrjsJ6/0YgKjWuQcSHAoaAVRhIl3y/Mj2ursZ0i4PLrkkxzzOLj3sT3waZgoguIIzLIWCBbxl3Ysa38C0yvtZan6R9ZvOU33eldmrOo0SIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoGhoBVELFyWNz9Q/YE1BgTxwU8qbJJWra/RmwKiCA8ouoCSIiCiC4gjMshYIFvGXdixrfwLTK+1lqfpH1m85Tfd6V2as6jSpGCiBeZp+CCmfQiG2HR4zwQ6KseFzHr1XcMc4QdTlL01CiWxIg3GBhamPTKLR06Q6bJKMnDfzLetm2Xz8SAuH6VNGUwZ4gASpGCiB4ncARI9U2D3CCr9S0ari/6LUWC7+1JsBD5fx4Ok+JThIg3GBhamPTKLR06Q6bJKMnDfzLetm2Xz8SAuH6VNGUwZ4YCDIvCiB4ncARI9U2D3CCr9S0ari/6LUWC7+1JsBD5fx4Ok+JThABGgkE//////////YyJQogXmafggpn0Ihth0eM8EOirHhcx69V3DHOEHU5S9NQolsaAQEyKAogOG+NPdNOUn6/g2LbTm9xhzWb1ZaCdA8Wi+OYkjUfrbIaBDuaygA6QwogeJ3AESPVNg9wgq/UtGq4v+i1Fgu/tSbAQ+X8eDpPiU4SB25ld25hbWUaFnNvbWUgZmFuY3kgZGVzY3JpcHRpb25KJgoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCHdhdmVzZXZvUisKIMkknO8yHpMUT/XKkkdlrbYCG0Dt+qvVgphfgtRbyRDMEICU69wDGNAPUisKIJZ9YwvJObbWItHAD2zhbaFOTFx2zQ4p0Xbo81GXHKeEEICU69wDGNAPWi4KIFDHWa9Cd6VU8M20LLFHzbBTveERf1sEOw19SUS40GBoEgcGAQaw0U/PGPoBYloKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgUKA2ZvbxISCgNiYXJqC1N0cmluZ1ZhbHVlEiEKA2JhemIaAVRg/VDvIN5FcSB9+5yIvnwcL4oixwrYj7ViLwoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSCAoDZm9vULAJEgcKA2JhclgBaiUKIHidwBEj1TYPcIKv1LRquL/otRYLv7UmwEPl/Hg6T4lOEPwqcAE=",
+      ByteStr(fastHash(Ints.toByteArray(0xaabbef50))),
+      "002f4f7f3741668c10a8ba92b4b183680fd6659bafd36037be6f9a636510b128",
+      "a65304008a49f4ae10cd4af0e61c5d59ba048f0766846d9239d0b28275a0184b"
+    )
+  )
 
   property("correctly create transaction state snapshot hash from snapshot") {
-    withDomain(DomainPresets.RideV6, balances = Seq(AddrWithBalance(address1, addr1Balance), AddrWithBalance(address2, addr2Balance))) { _ =>
-      val tx = invoke()
-      testHash(snapshot, Some(TxStatusInfo(tx.id(), Succeeded)), Array())
-      testHash(snapshot, Some(TxStatusInfo(tx.id(), Failed)), tx.id().arr :+ 1)
-      testHash(snapshot, Some(TxStatusInfo(tx.id(), Elided)), tx.id().arr :+ 2)
-      testHash(snapshot, None, Array())
+    forAll(testData) { case (clue, pbSnapshot, b64str, txId, prev, expectedResult) =>
+      withClue(clue) {
+        TSS.parseFrom(Base64.decode(b64str)) shouldEqual pbSnapshot
+
+        val (snapshot, meta) = PBSnapshots.fromProtobuf(pbSnapshot, txId, 10)
+        val raw = Hex.toHexString(
+          TxStateSnapshotHashBuilder
+            .createHashFromSnapshot(snapshot, Some(TxStateSnapshotHashBuilder.TxStatusInfo(txId, meta)))
+            .createHash(ByteStr.decodeBase64(prev).get)
+            .arr
+        )
+        PBSnapshots.toProtobuf(snapshot, meta) shouldEqual pbSnapshot
+        raw shouldEqual expectedResult
+      }
     }
-  }
-
-  private def testHash(snapshot: StateSnapshot, txInfoOpt: Option[TxStatusInfo], txStatusBytes: Array[Byte]) =
-    TxStateSnapshotHashBuilder.createHashFromSnapshot(snapshot, txInfoOpt).txStateSnapshotHash shouldBe hash(
-      Seq(
-        Array(KeyType.WavesBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.balance + addr1Balance),
-        Array(KeyType.AssetBalance.id.toByte) ++ address2.bytes ++ assetId1.id.arr ++ Longs.toByteArray(addr2PortfolioDiff.assets.head._2),
-        Array(KeyType.DataEntry.id.toByte) ++ address1.bytes ++ dataEntry.key.getBytes(StandardCharsets.UTF_8) ++ dataEntry.valueBytes,
-        Array(KeyType.AccountScript.id.toByte) ++ address2.bytes ++ accountScriptInfo.script.bytes().arr ++ accountScriptInfo.publicKey.arr ++ Longs
-          .toByteArray(accountScriptInfo.verifierComplexity),
-        Array(KeyType.AssetScript.id.toByte) ++ assetId1.id.arr ++ testScript.bytes().arr,
-        Array(KeyType.LeaseBalance.id.toByte) ++ address1.bytes ++ Longs.toByteArray(addr1PortfolioDiff.lease.in) ++ Longs.toByteArray(
-          addr1PortfolioDiff.lease.out
-        ),
-        Array(KeyType.LeaseStatus.id.toByte)
-          ++ leaseId1.arr
-          ++ Array(1: Byte)
-          ++ leaseDetails1.sender.arr
-          ++ leaseDetails1.recipient.bytes
-          ++ Longs.toByteArray(leaseDetails1.amount),
-        Array(KeyType.LeaseStatus.id.toByte)
-          ++ leaseId2.arr
-          ++ Array(0: Byte),
-        Array(KeyType.Sponsorship.id.toByte) ++ assetId1.id.arr ++ Longs.toByteArray(sponsorship.minFee),
-        Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias1.name.getBytes(StandardCharsets.UTF_8),
-        Array(KeyType.Alias.id.toByte) ++ address1.bytes ++ addr1Alias2.name.getBytes(StandardCharsets.UTF_8),
-        Array(KeyType.Alias.id.toByte) ++ address2.bytes ++ addr2Alias.name.getBytes(StandardCharsets.UTF_8),
-        Array(KeyType.VolumeAndFee.id.toByte) ++ orderId.arr ++ Longs.toByteArray(volumeAndFee.volume) ++ Longs.toByteArray(volumeAndFee.fee),
-        Array(KeyType.AssetStatic.id.toByte) ++ assetId1.id.arr ++ assetInfo1.static.issuer.arr ++
-          Array(assetInfo1.static.decimals.toByte) ++ (if (assetInfo1.static.nft) Array(1: Byte) else Array(0: Byte)),
-        Array(KeyType.AssetStatic.id.toByte) ++ assetId2.id.arr ++ assetInfo2.static.issuer.arr ++
-          Array(assetInfo2.static.decimals.toByte) ++ (if (assetInfo2.static.nft) Array(1: Byte) else Array(0: Byte)),
-        Array(KeyType.AssetStatic.id.toByte) ++ assetId3.id.arr ++ assetInfo3.static.issuer.arr ++
-          Array(assetInfo3.static.decimals.toByte) ++ (if (assetInfo3.static.nft) Array(1: Byte) else Array(0: Byte)),
-        Array(KeyType.AssetStatic.id.toByte) ++ assetId4.id.arr ++ assetInfo4.static.issuer.arr ++
-          Array(assetInfo4.static.decimals.toByte) ++ (if (assetInfo4.static.nft) Array(1: Byte) else Array(0: Byte)),
-        Array(KeyType.AssetVolume.id.toByte) ++ assetId1.id.arr ++
-          (if (updatedAssetVolumeInfo1.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId1).volume.toByteArray,
-        Array(KeyType.AssetVolume.id.toByte) ++ assetId2.id.arr ++
-          (if (assetInfo2.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId2).volume.toByteArray,
-        Array(KeyType.AssetVolume.id.toByte) ++ assetId3.id.arr ++
-          (if (updatedAssetVolumeInfo3.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId3).volume.toByteArray,
-        Array(KeyType.AssetVolume.id.toByte) ++ assetId4.id.arr ++
-          (if (assetInfo4.volume.isReissuable) Array(1: Byte) else Array(0: Byte)) ++ snapshot.assetVolumes(assetId4).volume.toByteArray,
-        Array(
-          KeyType.AssetNameDescription.id.toByte
-        ) ++ assetId1.id.arr ++ updatedAssetInfo1.name.toByteArray ++ updatedAssetInfo1.description.toByteArray ++ Ints.toByteArray(
-          updatedAssetInfo1.lastUpdatedAt
-        ),
-        Array(
-          KeyType.AssetNameDescription.id.toByte
-        ) ++ assetId2.id.arr ++ updatedAssetInfo2.name.toByteArray ++ updatedAssetInfo2.description.toByteArray ++ Ints.toByteArray(
-          updatedAssetInfo2.lastUpdatedAt
-        ),
-        Array(
-          KeyType.AssetNameDescription.id.toByte
-        ) ++ assetId3.id.arr ++ assetInfo3.dynamic.name.toByteArray ++ assetInfo3.dynamic.description.toByteArray ++ Ints.toByteArray(
-          assetInfo3.dynamic.lastUpdatedAt
-        ),
-        Array(
-          KeyType.AssetNameDescription.id.toByte
-        ) ++ assetId4.id.arr ++ assetInfo4.dynamic.name.toByteArray ++ assetInfo4.dynamic.description.toByteArray ++ Ints.toByteArray(
-          assetInfo4.dynamic.lastUpdatedAt
-        ),
-        if (txStatusBytes.nonEmpty) Array(KeyType.TransactionStatus.id.toByte) ++ txStatusBytes else Array[Byte]()
-      ).sorted((x: Array[Byte], y: Array[Byte]) => UnsignedBytes.lexicographicalComparator().compare(x, y))
-    )
-
-  property("correctly compute hash using previous value") {
-    val txStateHash = TxStateSnapshotHashBuilder.Result(ByteStr.fill(DigestLength)(1))
-    val prevHash    = ByteStr.fill(DigestLength)(2)
-
-    txStateHash.createHash(prevHash) shouldBe hash(Seq(prevHash.arr ++ txStateHash.txStateSnapshotHash.arr))
   }
 }

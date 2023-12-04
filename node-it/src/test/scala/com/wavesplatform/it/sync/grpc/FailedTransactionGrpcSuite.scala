@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
+import com.wavesplatform.protobuf.transaction.DataEntry
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{BinaryDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
@@ -47,7 +47,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
             reissuable = true,
             issueFee,
             description = "Description",
-            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).toOption.map(_._1)),
+            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3.latest).toOption.map(_._1)),
             waitForTx = true
           )
       )
@@ -117,7 +117,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |}
          |
         """.stripMargin
-    val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1
+    val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3.latest).explicitGet()._1
     sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
@@ -135,7 +135,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
             assetAmount,
             8,
             reissuable = true,
-            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).toOption.map(_._1)),
+            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3.latest).toOption.map(_._1)),
             fee = issueFee + smartFee,
             waitForTx = true
           )
@@ -235,7 +235,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
                    |case _ => true
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true, overhead = false)
+                ScriptEstimatorV3.latest
               )
               .toOption
               .map(_._1)

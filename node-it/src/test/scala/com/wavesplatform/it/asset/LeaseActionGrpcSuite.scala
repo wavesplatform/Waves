@@ -29,7 +29,7 @@ class LeaseActionGrpcSuite extends GrpcBaseTransactionSuite {
       .buildNonConflicting()
 
   private def compile(script: String): Script =
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1
+    ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
 
   private val dAppLeaseAmount       = 123
   private val txLeaseAmount         = 456
