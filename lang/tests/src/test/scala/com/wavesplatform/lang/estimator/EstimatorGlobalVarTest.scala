@@ -40,7 +40,7 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
     estimateFixed(script) shouldBe Right(2700)
   }
 
-  property("avoid redundant overhead for function argument referencing to global variable") {
+  property("leave unchanged adding overhead complexity for function with zero complexity body") {
     val script =
       """
         | let a = groth16Verify(base58'', base58'', base58'')
@@ -48,7 +48,7 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
         | f(a)
       """.stripMargin
     estimate(script) shouldBe Right(2701)
-    estimateFixed(script) shouldBe Right(2700)
+    estimateFixed(script) shouldBe Right(2701)
   }
 
   property("avoid redundant overhead for single reference in function body with let overlap") {
