@@ -1030,7 +1030,7 @@ object Functions {
                 (CONST_LONG(delay): EVALUATED).asRight[ExecutionError].pure[F]
               }
             case xs =>
-              notImplemented[Id, EVALUATED]("calculateDelay(hitSource: ByteVector, baseTarget: ByteVector, generator: Address, balance: Long)", xs)
+              notImplemented[Id, EVALUATED]("calculateDelay(hitSource: ByteVector, generator: Address, balance: Long)", xs)
           }
       }
     }
