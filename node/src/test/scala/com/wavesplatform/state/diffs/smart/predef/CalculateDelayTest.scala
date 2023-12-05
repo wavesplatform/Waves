@@ -6,6 +6,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V8
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
 
@@ -30,6 +31,15 @@ class CalculateDelayTest extends PropSpec with WithDomain {
          |     IntegerEntry("largest", largest)
          |   ]
          | }
+         | 
+         | @Callable(i)
+         | func results() =
+         |   [
+         |     IntegerEntry("1", calculateDelay(base58'', Address(base58''), 1)),
+         |     IntegerEntry("2", calculateDelay(base58'${ByteStr.fill(96)(1)}', Address(base58'${ByteStr.fill(26)(1)}'), ${Int.MaxValue})),
+         |     IntegerEntry("3", calculateDelay(base58'${ByteStr.fill(96)(1)}', Address(base58'${ByteStr.fill(26)(1)}'), ${50_000L * Int.MaxValue})),
+         |     IntegerEntry("4", calculateDelay(base58'${ByteStr.fill(96)(1)}', Address(base58'${ByteStr.fill(26)(1)}'), ${75_000L * Int.MaxValue}))
+         |   ]
          |
          | @Callable(i)
          | func error1() = {
@@ -65,6 +75,19 @@ class CalculateDelayTest extends PropSpec with WithDomain {
       lowestIsMiner should be > 0
       mediumIsMiner should be > lowestIsMiner
       largestIsMiner should be > mediumIsMiner
+    }
+  }
+
+  property("results") {
+    withDomain(TransactionStateSnapshot, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      d.appendBlock(setScript(secondSigner, contract))
+      d.appendBlock(invoke(func = Some("results")))
+      d.liquidSnapshot.accountData.head._2.values.toSeq shouldBe Seq(
+        IntegerDataEntry("1", 1612717),
+        IntegerDataEntry("2", 44183),
+        IntegerDataEntry("3", 1),
+        IntegerDataEntry("4", 0)
+      )
     }
   }
 
