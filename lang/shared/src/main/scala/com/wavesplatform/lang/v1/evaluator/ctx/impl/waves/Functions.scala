@@ -1002,7 +1002,6 @@ object Functions {
   val calculateDelay: NativeFunction[Environment] = {
     val args =
       Seq(
-        ("hit source", BYTESTR),
         ("generator", addressType),
         ("balance", LONG)
       )
@@ -1013,23 +1012,19 @@ object Functions {
       LONG,
       args*
     ) {
-      val MaxHitSourceLength = 96
       new ContextfulNativeFunction.Simple[Environment]("calculateDelay", LONG, args) {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
           args match {
-            case CONST_BYTESTR(hitSource) :: CaseObj(`addressType`, fields) :: CONST_LONG(balance) :: Nil =>
+            case CaseObj(`addressType`, fields) :: CONST_LONG(balance) :: Nil =>
               val addressBytes = fields("bytes").asInstanceOf[CONST_BYTESTR].bs
               if (addressBytes.size > AddressLength) {
                 val error = CommonError(s"Address bytes length = ${addressBytes.size} exceeds limit = $AddressLength")
-                (error: ExecutionError).asLeft[EVALUATED].pure[F]
-              } else if (hitSource.size > MaxHitSourceLength) {
-                val error = CommonError(s"Hit source bytes length = ${hitSource.size} exceeds limit = $MaxHitSourceLength")
                 (error: ExecutionError).asLeft[EVALUATED].pure[F]
               } else if (balance <= 0) {
                 val error = CommonError(s"Unexpected non-positive balance = $balance")
                 (error: ExecutionError).asLeft[EVALUATED].pure[F]
               } else {
-                val delay = env.calculateDelay(hitSource, addressBytes, balance)
+                val delay = env.calculateDelay(addressBytes, balance)
                 (CONST_LONG(delay): EVALUATED).asRight[ExecutionError].pure[F]
               }
             case xs =>

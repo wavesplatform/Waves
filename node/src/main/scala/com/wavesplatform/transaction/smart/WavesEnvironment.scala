@@ -22,8 +22,8 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
 import com.wavesplatform.lang.{Global, ValidationError}
-import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.*
+import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
 import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.validateIntermediateBalances
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.transaction.Asset.*
@@ -267,9 +267,14 @@ class WavesEnvironment(
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
 
-  override def calculateDelay(hitSource: ByteStr, generator: ByteStr, balance: Long): Long = {
-    val hit        = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
+  override def calculateDelay(generator: ByteStr, balance: Long): Long = {
     val baseTarget = blockchain.lastBlockHeader.map(_.header.baseTarget).getOrElse(0L)
+    val hitSource =
+      blockchain
+        .vrf(blockchain.height)
+        .orElse(blockchain.lastBlockHeader.map(_.header.generationSignature))
+        .getOrElse(ByteStr.empty)
+    val hit = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
     FairPoSCalculator(0, 0).calculateDelay(BigInt(1, hit), baseTarget, balance)
   }
 

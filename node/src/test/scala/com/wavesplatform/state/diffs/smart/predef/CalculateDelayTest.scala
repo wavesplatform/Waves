@@ -22,9 +22,9 @@ class CalculateDelayTest extends PropSpec with WithDomain {
          |   let address1  = i.caller
          |   let address2  = Address(base58'${signer(2).toAddress}')
          |   let address3  = Address(base58'${signer(3).toAddress}')
-         |   let lowest    = calculateDelay(hitSource, address1, 10 * 1000 * 1000)
-         |   let medium    = calculateDelay(hitSource, address2, 30 * 1000 * 1000)
-         |   let largest   = calculateDelay(hitSource, address3, 90 * 1000 * 1000)
+         |   let lowest    = calculateDelay(address1, 10 * 1000 * 1000)
+         |   let medium    = calculateDelay(address2, 30 * 1000 * 1000)
+         |   let largest   = calculateDelay(address3, 90 * 1000 * 1000)
          |   [
          |     IntegerEntry("lowest", lowest),
          |     IntegerEntry("medium", medium),
@@ -35,27 +35,21 @@ class CalculateDelayTest extends PropSpec with WithDomain {
          | @Callable(i)
          | func results() =
          |   [
-         |     IntegerEntry("1", calculateDelay(base58'', Address(base58''), 1)),
-         |     IntegerEntry("2", calculateDelay(base58'${ByteStr.fill(96)(1)}', Address(base58'${ByteStr.fill(26)(1)}'), ${Int.MaxValue})),
-         |     IntegerEntry("3", calculateDelay(base58'${ByteStr.fill(96)(1)}', Address(base58'${ByteStr.fill(26)(1)}'), ${50_000L * Int.MaxValue})),
-         |     IntegerEntry("4", calculateDelay(base58'${ByteStr.fill(96)(1)}', Address(base58'${ByteStr.fill(26)(1)}'), ${75_000L * Int.MaxValue}))
+         |     IntegerEntry("1", calculateDelay(Address(base58''), 1)),
+         |     IntegerEntry("2", calculateDelay(Address(base58'${ByteStr.fill(26)(1)}'), ${Int.MaxValue})),
+         |     IntegerEntry("3", calculateDelay(Address(base58'${ByteStr.fill(26)(1)}'), ${100_000L * Int.MaxValue})),
+         |     IntegerEntry("4", calculateDelay(Address(base58'${ByteStr.fill(26)(1)}'), ${200_000L * Int.MaxValue}))
          |   ]
          |
          | @Callable(i)
          | func error1() = {
-         |   strict r = calculateDelay(base58'${ByteStr.fill(97)(1)}', i.caller, 1)
+         |   strict r = calculateDelay(Address(base58'${ByteStr.fill(27)(1)}'), 1)
          |   []
          | }
          |
          | @Callable(i)
-         | func error2() = {
-         |   strict r = calculateDelay(lastBlock.generationSignature, Address(base58'${ByteStr.fill(27)(1)}'), 1)
-         |   []
-         | }
-         |
-         | @Callable(i)
-         | func error3(balance: Int) = {
-         |   strict r = calculateDelay(lastBlock.generationSignature, Address(base58''), balance)
+         | func error2(balance: Int) = {
+         |   strict r = calculateDelay(Address(base58''), balance)
          |   []
          | }
        """.stripMargin
@@ -83,8 +77,8 @@ class CalculateDelayTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, contract))
       d.appendBlock(invoke(func = Some("results")))
       d.liquidSnapshot.accountData.head._2.values.toSeq shouldBe Seq(
-        IntegerDataEntry("1", 1612717),
-        IntegerDataEntry("2", 44183),
+        IntegerDataEntry("1", 1418883),
+        IntegerDataEntry("2", 70064),
         IntegerDataEntry("3", 1),
         IntegerDataEntry("4", 0)
       )
@@ -94,10 +88,9 @@ class CalculateDelayTest extends PropSpec with WithDomain {
   property("errors of calculateDelay()") {
     withDomain(TransactionStateSnapshot, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       d.appendBlock(setScript(secondSigner, contract))
-      d.appendBlockE(invoke(func = Some("error1"))) should produce("Hit source bytes length = 97 exceeds limit = 96")
-      d.appendBlockE(invoke(func = Some("error2"))) should produce("Address bytes length = 27 exceeds limit = 26")
-      d.appendBlockE(invoke(func = Some("error3"), args = Seq(CONST_LONG(-1)))) should produce("Unexpected non-positive balance = -1")
-      d.appendBlockE(invoke(func = Some("error3"), args = Seq(CONST_LONG(0)))) should produce("Unexpected non-positive balance = 0")
+      d.appendBlockE(invoke(func = Some("error1"))) should produce("Address bytes length = 27 exceeds limit = 26")
+      d.appendBlockE(invoke(func = Some("error2"), args = Seq(CONST_LONG(-1)))) should produce("Unexpected non-positive balance = -1")
+      d.appendBlockE(invoke(func = Some("error2"), args = Seq(CONST_LONG(0)))) should produce("Unexpected non-positive balance = 0")
     }
   }
 }
