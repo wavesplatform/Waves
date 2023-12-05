@@ -91,26 +91,27 @@ class MinerImpl(
   def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] =
     this.nextBlockGenOffsetWithConditions(account, blockchainUpdater)
 
-  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
-    Miner.blockMiningStarted.increment()
+  def scheduleMining(tempBlockchain: Option[Blockchain]): Unit =
+    if (!settings.enableLightMode || blockchainUpdater.supportsLightNodeBlockFields()) {
+      Miner.blockMiningStarted.increment()
 
-    val accounts = if (settings.minerSettings.privateKeys.nonEmpty) {
-      settings.minerSettings.privateKeys.map(PKKeyPair(_))
-    } else {
-      wallet.privateKeyAccounts
+      val accounts = if (settings.minerSettings.privateKeys.nonEmpty) {
+        settings.minerSettings.privateKeys.map(PKKeyPair(_))
+      } else {
+        wallet.privateKeyAccounts
+      }
+
+      val hasAllowedForMiningScriptsAccounts =
+        accounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
+      scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
+        generateBlockTask(account, tempBlockchain)
+          .onErrorHandle(err => log.warn(s"Error mining Block", err))
+          .runAsyncLogErr(appenderScheduler)
+      }.toSet)
+      microBlockAttempt := SerialCancelable()
+
+      debugStateRef = MinerDebugInfo.MiningBlocks
     }
-
-    val hasAllowedForMiningScriptsAccounts =
-      accounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
-    scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
-      generateBlockTask(account, tempBlockchain)
-        .onErrorHandle(err => log.warn(s"Error mining Block", err))
-        .runAsyncLogErr(appenderScheduler)
-    }.toSet)
-    microBlockAttempt := SerialCancelable()
-
-    debugStateRef = MinerDebugInfo.MiningBlocks
-  }
 
   override def state: MinerDebugInfo.State = debugStateRef
 
