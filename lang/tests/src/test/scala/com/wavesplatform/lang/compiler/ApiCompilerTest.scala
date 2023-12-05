@@ -3,6 +3,7 @@ package com.wavesplatform.lang.compiler
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.API
 import com.wavesplatform.lang.CompileAndParseResult.{Contract, Expression}
+import com.wavesplatform.lang.CompileResult.DApp
 import com.wavesplatform.lang.v1.compiler.CompilationError
 import com.wavesplatform.lang.v1.compiler.CompilationError.{DefNotFound, Generic}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -82,6 +83,111 @@ class ApiCompilerTest extends PropSpec {
       Seq(Generic(85, 110, "Parsing failed. Some chars was removed as result of recovery process."))
     )
     checkParseAndCompileVerifier(correctVerifier, libWithCompileError, Seq(DefNotFound(85, 108, "abc")))
+  }
+
+  property("compile should correctly process scopes during estimation") {
+    val estimator: ScriptEstimator = ScriptEstimator.all(true).last
+
+    val script1 =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |let a = {
+        |  func bar(i: Int) = i
+        |  bar(1)
+        |}
+        |let b = {
+        |  func bar(i: Int) = i
+        |  bar(a)
+        |}
+        |""".stripMargin
+
+    val script2 =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |let a = {
+        |  func bar(i: Int) = i
+        |  bar(1)
+        |}
+        |
+        |let b = {
+        |  let c = {
+        |    let d = {
+        |      func bar(i: Int) = i
+        |      bar(a)
+        |    }
+        |
+        |    func bar(i: Int) = i
+        |    bar(d)
+        |  }
+        |
+        |  func bar(i: Int) = i
+        |  bar(c)
+        |}
+        |
+        |let e = {
+        |  func bar(i: Int) = i
+        |  bar(b)
+        |}
+        |
+        |""".stripMargin
+
+    val script3 =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |let l = []
+        |let a = {
+        |  func foo(fooAcc: Int, i: Int) = fooAcc + i
+        |  FOLD<1>(l, 0, foo)
+        |}
+        |let b = {
+        |  func bar(barAcc: Int, i: Int) = barAcc + i
+        |  FOLD<1>(l, a, bar)
+        |}
+        |""".stripMargin
+
+    val script4 =
+      """
+        |{-# STDLIB_VERSION 6 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |let a = 1 + 1 + 1
+        |let b = a + 1 + 1
+        |let c = b + a + 1
+        |
+        |@Callable(i)
+        |func foo() = []
+        |""".stripMargin
+
+    API.compile(script1, estimator, libraries = Map.empty).explicitGet().asInstanceOf[DApp].dAppInfo.globalVariableComplexities shouldBe Map(
+      "a" -> 1,
+      "b" -> 2
+    )
+    API.compile(script2, estimator, libraries = Map.empty).explicitGet().asInstanceOf[DApp].dAppInfo.globalVariableComplexities shouldBe Map(
+      "a" -> 1,
+      "b" -> 4,
+      "e" -> 5
+    )
+
+    API.compile(script3, estimator, libraries = Map.empty).explicitGet().asInstanceOf[DApp].dAppInfo.globalVariableComplexities shouldBe Map(
+      "l" -> 0,
+      "a" -> 8,
+      "b" -> 16
+    )
+
+    API.compile(script4, estimator, libraries = Map.empty).explicitGet().asInstanceOf[DApp].dAppInfo.globalVariableComplexities shouldBe Map(
+      "a" -> 2,
+      "b" -> 4,
+      "c" -> 6
+    )
   }
 
   private def checkCompile(script: String, lib: String, expectedError: String): Assertion = {

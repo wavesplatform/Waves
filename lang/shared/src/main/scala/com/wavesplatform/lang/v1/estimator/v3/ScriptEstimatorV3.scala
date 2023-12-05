@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.estimator.v3
 
 import cats.implicits.{toBifunctorOps, toFoldableOps, toTraverseOps}
 import cats.{Id, Monad}
+import cats.syntax.functor.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -63,7 +64,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     for {
       _        <- if (globalDeclarationsMode) saveGlobalLetCost(let, activeFuncArgs) else doNothing
       startCtx <- get[Id, EstimatorContext, EstimationError]
-      letEval = evalHoldingFuncs(let.value, activeFuncArgs)
+      letEval = evalHoldingFuncs(let.value, activeFuncArgs, Some(startCtx.funcs))
       _            <- beforeNextExprEval(let, letEval)
       nextExprCost <- evalExpr(nextExpr, activeFuncArgs, globalDeclarationsMode)
       nextExprCtx  <- get[Id, EstimatorContext, EstimationError]
@@ -75,9 +76,17 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   private def saveGlobalLetCost(let: LET, activeFuncArgs: Set[String]): EvalM[Unit] = {
     val costEvaluation =
       for {
+        startCtx             <- get[Id, EstimatorContext, EstimationError]
         (bodyCost, usedRefs) <- withUsedRefs(evalExpr(let.value, activeFuncArgs))
         ctx                  <- get[Id, EstimatorContext, EstimationError]
-        letCosts             <- usedRefs.toSeq.traverse(ctx.globalLetEvals.getOrElse(_, zero))
+        letCosts <- usedRefs.toSeq.traverse { ref =>
+          local {
+            for {
+              _    <- update(funcs.set(_)(startCtx.funcs))
+              cost <- ctx.globalLetEvals.getOrElse(ref, zero)
+            } yield cost
+          }
+        }
       } yield bodyCost + letCosts.sum
     for {
       cost <- local(costEvaluation)
@@ -166,15 +175,15 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR], activeFuncArgs: Set[String]): EvalM[Long] =
     for {
-      ctx                       <- get[Id, EstimatorContext, EstimationError]
-      (bodyCost, bodyUsedRefs)  <- getFuncCost(header, ctx)
-      _                         <- setFuncToCtx(header, bodyCost, bodyUsedRefs)
-      (argsCosts, argsUsedRefs) <- withUsedRefs(args.traverse(evalHoldingFuncs(_, activeFuncArgs)))
-      argsCostsSum              <- argsCosts.foldM(0L)(sum)
+      ctx                      <- get[Id, EstimatorContext, EstimationError]
+      (bodyCost, bodyUsedRefs) <- getFuncCost(header, ctx)
+      _                        <- setFuncToCtx(header, bodyCost, bodyUsedRefs)
+      (argsCosts, _)           <- withUsedRefs(args.traverse(evalHoldingFuncs(_, activeFuncArgs)))
+      argsCostsSum             <- argsCosts.foldM(0L)(sum)
       bodyCostV = bodyCost.value()
       correctedBodyCost =
         if (!overhead && !letFixes && bodyCostV == 0) 1
-        else if (letFixes && bodyCostV == 0 && isBlankFunc(bodyUsedRefs ++ argsUsedRefs, ctx.refsCosts)) 1
+        else if (letFixes && bodyCostV == 0 && isBlankFunc(bodyUsedRefs, ctx.refsCosts)) 1
         else bodyCostV
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
@@ -201,9 +210,14 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   private def isBlankFunc(usedRefs: Set[String], refsCosts: Map[String, Long]): Boolean =
     !usedRefs.exists(refsCosts.get(_).exists(_ > 0))
 
-  private def evalHoldingFuncs(expr: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
+  private def evalHoldingFuncs(
+      expr: EXPR,
+      activeFuncArgs: Set[String],
+      ctxFuncsOpt: Option[Map[FunctionHeader, (Coeval[Long], Set[String])]] = None
+  ): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
+      _        <- ctxFuncsOpt.fold(doNothing.void)(ctxFuncs => update(funcs.set(_)(ctxFuncs)))
       cost     <- evalExpr(expr, activeFuncArgs)
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cost
