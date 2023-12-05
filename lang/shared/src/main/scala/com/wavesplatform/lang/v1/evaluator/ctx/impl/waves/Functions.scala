@@ -1025,6 +1025,9 @@ object Functions {
               } else if (hitSource.size > MaxHitSourceLength) {
                 val error = CommonError(s"Hit source bytes length = ${hitSource.size} exceeds limit = $MaxHitSourceLength")
                 (error: ExecutionError).asLeft[EVALUATED].pure[F]
+              } else if (balance <= 0) {
+                val error = CommonError(s"Unexpected non-positive balance = $balance")
+                (error: ExecutionError).asLeft[EVALUATED].pure[F]
               } else {
                 val delay = env.calculateDelay(hitSource, addressBytes, balance)
                 (CONST_LONG(delay): EVALUATED).asRight[ExecutionError].pure[F]

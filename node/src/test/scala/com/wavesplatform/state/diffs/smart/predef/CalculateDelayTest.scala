@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V8
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers.*
@@ -32,13 +33,19 @@ class CalculateDelayTest extends PropSpec with WithDomain {
          |
          | @Callable(i)
          | func error1() = {
-         |   strict r = calculateDelay(base58'${ByteStr.fill(97)(1)}', i.caller, 0)
+         |   strict r = calculateDelay(base58'${ByteStr.fill(97)(1)}', i.caller, 1)
          |   []
          | }
          |
          | @Callable(i)
          | func error2() = {
-         |   strict r = calculateDelay(lastBlock.generationSignature, Address(base58'${ByteStr.fill(27)(1)}'), 0)
+         |   strict r = calculateDelay(lastBlock.generationSignature, Address(base58'${ByteStr.fill(27)(1)}'), 1)
+         |   []
+         | }
+         |
+         | @Callable(i)
+         | func error3(balance: Int) = {
+         |   strict r = calculateDelay(lastBlock.generationSignature, Address(base58''), balance)
          |   []
          | }
        """.stripMargin
@@ -66,6 +73,8 @@ class CalculateDelayTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, contract))
       d.appendBlockE(invoke(func = Some("error1"))) should produce("Hit source bytes length = 97 exceeds limit = 96")
       d.appendBlockE(invoke(func = Some("error2"))) should produce("Address bytes length = 27 exceeds limit = 26")
+      d.appendBlockE(invoke(func = Some("error3"), args = Seq(CONST_LONG(-1)))) should produce("Unexpected non-positive balance = -1")
+      d.appendBlockE(invoke(func = Some("error3"), args = Seq(CONST_LONG(0)))) should produce("Unexpected non-positive balance = 0")
     }
   }
 }
