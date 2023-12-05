@@ -1,4 +1,4 @@
-FROM eclipse-temurin:8-jdk-jammy
+FROM eclipse-temurin:11-jdk-jammy
 
 ARG WAVES_VERSION
 ARG SBT_VERSION
