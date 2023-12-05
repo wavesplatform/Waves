@@ -270,7 +270,7 @@ class WavesEnvironment(
   override def calculateDelay(hitSource: ByteStr, generator: ByteStr, balance: Long): Long = {
     val hit        = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
     val baseTarget = blockchain.lastBlockHeader.map(_.header.baseTarget).getOrElse(0L)
-    FairPoSCalculator.V2.calculateDelay(BigInt(1, hit), baseTarget, balance)
+    FairPoSCalculator(0, 0).calculateDelay(BigInt(1, hit), baseTarget, balance)
   }
 
   private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
