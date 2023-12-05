@@ -20,9 +20,9 @@ class CalculateDelayTest extends PropSpec with WithDomain {
          |   let address1  = i.caller
          |   let address2  = Address(base58'${signer(2).toAddress}')
          |   let address3  = Address(base58'${signer(3).toAddress}')
-         |   let lowest    = calculateDelay(hitSource, lastBlock.baseTarget, address1, 10 * 1000 * 1000)
-         |   let medium    = calculateDelay(hitSource, lastBlock.baseTarget, address2, 30 * 1000 * 1000)
-         |   let largest   = calculateDelay(hitSource, lastBlock.baseTarget, address3, 90 * 1000 * 1000)
+         |   let lowest    = calculateDelay(hitSource, address1, 10 * 1000 * 1000)
+         |   let medium    = calculateDelay(hitSource, address2, 30 * 1000 * 1000)
+         |   let largest   = calculateDelay(hitSource, address3, 90 * 1000 * 1000)
          |   [
          |     IntegerEntry("lowest", lowest),
          |     IntegerEntry("medium", medium),
@@ -32,13 +32,13 @@ class CalculateDelayTest extends PropSpec with WithDomain {
          |
          | @Callable(i)
          | func error1() = {
-         |   strict r = calculateDelay(base58'${ByteStr.fill(97)(1)}', 0, i.caller, 0)
+         |   strict r = calculateDelay(base58'${ByteStr.fill(97)(1)}', i.caller, 0)
          |   []
          | }
          |
          | @Callable(i)
          | func error2() = {
-         |   strict r = calculateDelay(lastBlock.generationSignature, 0, Address(base58'${ByteStr.fill(27)(1)}'), 0)
+         |   strict r = calculateDelay(lastBlock.generationSignature, Address(base58'${ByteStr.fill(27)(1)}'), 0)
          |   []
          | }
        """.stripMargin

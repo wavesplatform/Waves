@@ -96,7 +96,7 @@ object Common {
       def addressFromString(address: String): Either[String, Recipient.Address]           = ???
       def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]               = ???
       def accountScript(addressOrAlias: Recipient): Option[Script]                        = ???
-      def calculateDelay(hs: ByteStr, bt: Long, gt: ByteStr, b: Long): Long               = ???
+      def calculateDelay(hs: ByteStr, gt: ByteStr, b: Long): Long               = ???
       def callScript(
           dApp: Address,
           func: String,

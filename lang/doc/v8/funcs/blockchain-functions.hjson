@@ -72,9 +72,9 @@
     }
     {
       name: "calculateDelay"
-      params: [ "ByteVector", "Int", "Address", "Int" ]
+      params: [ "ByteVector", "Address", "Int" ]
       doc: "Calculates mining delay using Fair PoS calculator."
-      paramsDoc: [ "hit source", "base target", "generator address", "generator balance" ]
+      paramsDoc: [ "hit source", "generator address", "generator balance" ]
       complexity: 1
     }
   ]
