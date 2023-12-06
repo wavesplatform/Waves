@@ -205,7 +205,7 @@ object BlockDiffer {
             txSignParCheck = txSignParCheck
           )
       }
-      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash, hasChallenge)
+      _ <- checkStateHash(blockchainWithNewBlock, block.header.stateHash, r.computedStateHash)
     } yield r
   }
 
@@ -272,7 +272,7 @@ object BlockDiffer {
             txSignParCheck = true
           )
       }
-      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash, hasChallenge = false)
+      _ <- checkStateHash(blockchain, micro.stateHash, r.computedStateHash)
     } yield r
   }
 
@@ -492,16 +492,13 @@ object BlockDiffer {
   private def checkStateHash(
       blockchain: Blockchain,
       blockStateHash: Option[ByteStr],
-      computedStateHash: ByteStr,
-      hasChallenge: Boolean
+      computedStateHash: ByteStr
   ): TracedResult[ValidationError, Unit] =
     if (blockchain.supportsLightNodeBlockFields())
       if (blockStateHash.contains(computedStateHash))
         Right(())
       else
         Left(InvalidStateHash(blockStateHash))
-    else if (blockStateHash.isDefined || hasChallenge)
-      Left(UnexpectedLightNodeFields)
     else
       Right(())
 }

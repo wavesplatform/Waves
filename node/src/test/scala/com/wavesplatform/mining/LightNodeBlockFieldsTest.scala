@@ -23,6 +23,8 @@ import monix.reactive.Observable
 import scala.concurrent.duration.DurationInt
 
 class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
+  private val invalidStateHash = Some(Some(ByteStr.fill(DigestLength)(1)))
+
   property("new block fields appear `lightNodeBlockFieldsAbsenceInterval` blocks after LightNode activation") {
     withDomain(
       TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2).configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10)),
@@ -65,7 +67,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
           microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
         }
         def challengeBlock() = {
-          val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
+          val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = invalidStateHash)
           challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
         }
 
@@ -118,23 +120,26 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
       TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2).configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10)),
       AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
     ) { d =>
-      withMiner(d.blockchain, d.testTime, d.settings, verify = false, timeDrift = Int.MaxValue) { case (_, append) =>
+      withMiner(d.blockchain, d.testTime, d.settings) { case (_, append) =>
         (1 to 9).foreach(_ => d.appendBlock())
         d.blockchain.height shouldBe 10
-        val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
-        val challengingBlock = d.createChallengingBlock(defaultSigner, challengedBlock)
-        append(challengedBlock) should produce("UnexpectedLightNodeFields")
-        append(challengingBlock) should produce("UnexpectedLightNodeFields")
+        val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, stateHash = invalidStateHash)
+        val challengingBlock = d.createChallengingBlock(secondSigner, challengedBlock, strictTime = true)
+        d.testTime.setTime(challengingBlock.header.timestamp)
+        append(challengedBlock) should produce("Block state hash is not supported yet")
+        append(challengingBlock) should produce("Block state hash is not supported yet")
 
         d.appendBlock()
         d.blockchain.height shouldBe 11
-        val correctBlockWithStateHash = d.createBlock(ProtoBlockVersion, Nil)
+        val correctBlockWithStateHash = d.createBlock(ProtoBlockVersion, Nil, strictTime = true)
         correctBlockWithStateHash.header.stateHash shouldBe defined
+        d.testTime.setTime(correctBlockWithStateHash.header.timestamp)
         append(correctBlockWithStateHash) shouldBe a[Right[?, ?]]
 
         d.rollbackTo(11)
-        val invalidBlock      = d.createBlock(ProtoBlockVersion, Nil, stateHash = Some(Some(ByteStr.fill(DigestLength)(1))))
-        val challengingBlock2 = d.createChallengingBlock(defaultSigner, invalidBlock)
+        val invalidBlock      = d.createBlock(ProtoBlockVersion, Nil, stateHash = invalidStateHash, strictTime = true)
+        val challengingBlock2 = d.createChallengingBlock(secondSigner, invalidBlock, strictTime = true)
+        d.testTime.setTime(challengingBlock2.header.timestamp)
         append(challengingBlock2) shouldBe a[Right[?, ?]]
       }
     }
