@@ -50,5 +50,5 @@ trait Environment[F[_]] {
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[F[(Either[ValidationError, (EVALUATED, Log[F])], Int)]]
-  def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long
+  def calculateDelay(generator: ByteStr, balance: Long): Long
 }

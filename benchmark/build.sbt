@@ -1,6 +1,6 @@
 enablePlugins(JmhPlugin)
 
-Jmh / version := "1.33"
+Jmh / version := "1.37"
 
 libraryDependencies ++= Seq(
   "org.scodec" %% "scodec-core" % "1.11.10",

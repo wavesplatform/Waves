@@ -34,7 +34,7 @@ case class ErrorMessageEnvironment[F[_]](message: String) extends Environment[F]
   override def addressFromString(address: String): Either[String, Recipient.Address]                 = unavailable
   override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                     = unavailable
   override def accountScript(addressOrAlias: Recipient): F[Option[Script]]                           = unavailable
-  override def calculateDelay(hitSource: ByteStr, bt: Long, generator: ByteStr, balance: Long): Long = unavailable
+  override def calculateDelay(generator: ByteStr, balance: Long): Long                               = unavailable
   override def callScript(
       dApp: Address,
       func: String,
