@@ -173,7 +173,7 @@ class TxStateSnapshotHashSpec extends PropSpec {
       wavesBalances,
       "CiQKGgFUYP1Q7yDeRXEgffuciL58HC+KIscK2I+1EgYQgJTr3AMKJAoaAVRCxcljc/UP2BNQYE8cFPKmySVq2v0ZsCoSBhCAqNa5Bw==",
       ByteStr.empty,
-      "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8", // Blake2b("")
+      Hex.toHexString(TxStateSnapshotHashBuilder.InitStateHash.arr),
       "f0a8b6745534c2d20412f40cdb097b7050898e44531a661ef64fc5be0744ac72"
     ),
     (
