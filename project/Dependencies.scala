@@ -6,13 +6,13 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.5.1-SNAPSHOT" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.5.1" classifier "protobuf-src" intransitive ()
 
-  private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.8.5"
+  private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
-  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.5.3"
+  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.6"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.0"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -26,8 +26,8 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "32.1.3-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.4.11" // 1.4.x and later is built for Java 11
-  val janino          = "org.codehaus.janino" % "janino"            % "3.1.10"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.4.14"
+  val janino          = "org.codehaus.janino" % "janino"            % "3.1.11"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.101.Final"
@@ -106,7 +106,7 @@ object Dependencies {
       rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.10.0",
-      "commons-io"           % "commons-io"               % "2.11.0",
+      "commons-io"           % "commons-io"               % "2.15.1",
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonCore,
@@ -173,7 +173,7 @@ object Dependencies {
       akkaHttpModule("akka-http-testkit")     % Test,
       "com.softwaremill.diffx"                          %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"                          %% "diffx-scalatest-should" % "0.9.0" % Test,
-      "io.grpc"                                          % "grpc-inprocess"         % "1.59.0" % Test
+      "io.grpc"                                          % "grpc-inprocess"         % "1.60.0" % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
