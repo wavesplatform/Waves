@@ -30,8 +30,8 @@ class TrackedDAppEnvironment(underlying: DAppEnvironment, tracker: DAppEnvironme
 
   override def invocationRoot: DAppEnvironment.InvocationTreeTracker = underlying.invocationRoot
 
-  override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long =
-    underlying.calculateDelay(hitSource, baseTarget, generator, balance)
+  override def calculateDelay(generator: ByteStr, balance: Long): Long =
+    underlying.calculateDelay(generator, balance)
 
   // Functions those need Blockchain
   override def height: Id[Long] = {
