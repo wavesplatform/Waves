@@ -17,7 +17,7 @@ import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, Tr
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
-import org.rocksdb.RocksDB
+import org.rocksdb.{ReadOptions, RocksDB}
 import play.api.libs.json.Json
 
 import java.io.File
@@ -231,22 +231,24 @@ object Explorer extends ScorexLogging {
 
           val result = new util.HashMap[Short, Stats]
           Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
-            Using(rdb.db.newIterator(cf)) { iterator =>
-              iterator.seekToFirst()
+            Using(new ReadOptions().setTotalOrderSeek(true)) { ro =>
+              Using(rdb.db.newIterator(cf, ro)) { iterator =>
+                iterator.seekToFirst()
 
-              while (iterator.isValid) {
-                val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
-                val valueLength = iterator.value().length
-                val keyLength   = iterator.key().length
-                result.compute(
-                  keyPrefix,
-                  (_, maybePrev) =>
-                    maybePrev match {
-                      case null => Stats(1, keyLength, valueLength)
-                      case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
-                    }
-                )
-                iterator.next()
+                while (iterator.isValid) {
+                  val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
+                  val valueLength = iterator.value().length
+                  val keyLength   = iterator.key().length
+                  result.compute(
+                    keyPrefix,
+                    (_, maybePrev) =>
+                      maybePrev match {
+                        case null => Stats(1, keyLength, valueLength)
+                        case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
+                      }
+                  )
+                  iterator.next()
+                }
               }
             }
           }

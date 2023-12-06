@@ -8,6 +8,7 @@ case class DBSettings(
     storeStateHashes: Boolean,
     maxCacheSize: Int,
     maxRollbackDepth: Int,
+    deleteOldDataInterval: Int = 1000,
     rememberBlocks: FiniteDuration,
     useBloomFilter: Boolean,
     rocksdb: RocksDBSettings

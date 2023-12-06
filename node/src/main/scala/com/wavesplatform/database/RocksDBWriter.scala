@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
@@ -411,9 +411,9 @@ class RocksDBWriter(
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
 
         deleteOldWavesBalanceEntries(Height(newSafeRollbackHeight), rw)
-        if (newSafeRollbackHeight > 1000 && newSafeRollbackHeight % 1000 == 0) {
+        if (newSafeRollbackHeight % dbSettings.deleteOldDataInterval == 0) {
           batchDeleteOldEntries(
-            fromInclusive = Height(newSafeRollbackHeight - 1000 + 1),
+            fromInclusive = Height(newSafeRollbackHeight - dbSettings.deleteOldDataInterval + 1),
             toInclusive = Height(newSafeRollbackHeight),
             rw = rw
           )
@@ -668,15 +668,15 @@ class RocksDBWriter(
 
     // Collecting data
 
-    val changedAddressesKey = Keys.changedAddresses(Int.MaxValue) // Doesn't matter, we need this only to parse
-    rw.iterateOverWithSeek(KeyTags.ChangedAddresses.prefixBytes, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
-      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+    val changedAddressesKey    = Keys.changedAddresses(Int.MaxValue) // Doesn't matter, we need this only to parse
+    val changedAddressesPrefix = KeyTags.ChangedAddresses.prefixBytes
+    rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
       val continue   = currHeight < toInclusive
       if (continue || currHeight == toInclusive)
         changedAddressesKey.parse(e.getValue).foreach { addressId =>
           // Account data
-          val changedDataKeysAtKey = Keys.changedDataKeys(currHeight, addressId)
-          val changedDataKeys      = rw.get(changedDataKeysAtKey)
+          val changedDataKeys = rw.get(Keys.changedDataKeys(currHeight, addressId))
           if (changedDataKeys.nonEmpty) {
             // TODO collect min-max?
             changedDataAddresses.addOne(addressId)
@@ -691,9 +691,11 @@ class RocksDBWriter(
 
     // Asset balances
 
-    val changedBalancesKey = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
-    rw.iterateOverWithSeek(KeyTags.ChangedAssetBalances.prefixBytes, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
-      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+    val changedBalancesKey    = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
+    val changedBalancesPrefix = KeyTags.ChangedAssetBalances.prefixBytes
+    rw.iterateOverWithSeek(changedBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
+      val k          = e.getKey.drop(changedBalancesPrefix.length)
+      val currHeight = Height(Ints.fromByteArray(k))
       val continue   = currHeight <= toInclusive
       if (continue) {
         val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
@@ -735,23 +737,18 @@ class RocksDBWriter(
 
     // Account data
     accountDataAt.foreach { case ((addressId, dataKey), heights) =>
+      val dataAt = Keys.dataAt(addressId, dataKey)(_)
       heights.prev match {
-        case Some(prevHeight) =>
-          rw.deleteRange(
-            Keys.dataAt(addressId, dataKey)(Height(1)),
-            Keys.dataAt(addressId, dataKey)(Height(prevHeight + 1))
-          )
-
+        case Some(prevHeight) => rw.deleteRange(dataAt(Height(1)), dataAt(Height(prevHeight + 1)))
         case None =>
-          val dataKeyAtKey = Keys.dataAt(addressId, dataKey)(heights.last)
+          val dataKeyAtKey = dataAt(heights.last)
           val dataKeyAt    = rw.get(dataKeyAtKey)
-          rw.delete(Keys.dataAt(addressId, dataKey)(dataKeyAt.prevHeight))
+          rw.delete(dataAt(dataKeyAt.prevHeight))
       }
     }
 
     // Changed keys
     rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toInclusive + 1))
-    // TODO find minmax assetId
     rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toInclusive + 1))
     changedDataAddresses.foreach { addressId =>
       rw.deleteRange(Keys.changedDataKeys(fromInclusive, addressId), Keys.changedDataKeys(toInclusive + 1, addressId))

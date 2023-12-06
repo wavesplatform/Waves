@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.KeyTags.KeyTag
 import com.wavesplatform.db.WithDomain
@@ -18,7 +19,11 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{TxHelpers, TxPositiveAmount}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount, TxPositiveAmount}
+
+import scala.collection.mutable
+import scala.util.{Random, Using}
 
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
   "Slice" - {
@@ -158,15 +163,13 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
   }
 
   "deleteOldEntries" - {
-    val maxRollbackDepth = 2
-    val cleanupTestsSettings = {
+    val settings = {
       val s = DomainPresets.RideV6
-      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = maxRollbackDepth))
+      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = 4, deleteOldDataInterval = 4))
     }
 
-    val alice            = TxHelpers.signer(1)
-    val aliceAddress     = alice.toAddress
-    val aliceInitBalance = 100.waves
+    val alice        = TxHelpers.signer(1)
+    val aliceAddress = alice.toAddress
 
     val bob        = TxHelpers.signer(2)
     val bobAddress = bob.toAddress
@@ -174,116 +177,140 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     val carl        = TxHelpers.signer(3)
     val carlAddress = carl.toAddress
 
-    val issueTx          = TxHelpers.issue(issuer = alice)
-    def transferWavesTx  = TxHelpers.transfer(from = alice, to = bobAddress)
-    def transferAssetTx  = TxHelpers.transfer(from = alice, to = carlAddress, asset = issueTx.asset, amount = 123)
-    val dataKey          = "test"
-    val dataTxFee        = TxPositiveAmount.unsafeFrom(TestValues.fee)
-    val defaultAddresses = Seq(aliceAddress, bobAddress, carlAddress, TxHelpers.defaultSigner.toAddress)
+    val addresses = Seq(aliceAddress, bobAddress, carlAddress, TxHelpers.defaultSigner.toAddress)
 
-    "doesn't affect entries required for rollback" in withDomain(
-      cleanupTestsSettings,
-      Seq(AddrWithBalance(aliceAddress, aliceInitBalance))
-    ) { d =>
-      def checkExpectedState(): Unit = {
-        val blocksSinceStart = d.blockchain.height - 2 // blocks with genesis and issue transactions
+    def transferWavesTx = TxHelpers.massTransfer(
+      to = Seq(
+        MassTransferTransaction.ParsedTransfer(aliceAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
+        MassTransferTransaction.ParsedTransfer(bobAddress, TxNonNegativeAmount.unsafeFrom(100.waves))
+      ),
+      fee = 1.waves
+    )
 
-        // WAVES
-        d.balance(aliceAddress) shouldBe (aliceInitBalance - issueTx.fee.value - blocksSinceStart * List(
-          transferWavesTx.amount,
-          transferWavesTx.fee,
-          transferAssetTx.fee,
-          dataTxFee
-        ).map(_.value).sum)
-        d.balance(bobAddress) shouldBe (blocksSinceStart * transferWavesTx.amount.value)
-        d.balance(carlAddress) shouldBe 0
+    val issueTx         = TxHelpers.issue(issuer = alice, amount = 100)
+    def transferAssetTx = TxHelpers.transfer(from = alice, to = carlAddress, asset = issueTx.asset, amount = 1)
 
-        // Asset
-        d.balance(aliceAddress, issueTx.asset) shouldBe (issueTx.quantity.value - blocksSinceStart * transferAssetTx.amount.value)
-        d.balance(bobAddress, issueTx.asset) shouldBe 0
-        d.balance(carlAddress, issueTx.asset) shouldBe (blocksSinceStart * transferAssetTx.amount.value)
+    val dataKey   = "test"
+    val dataTxFee = TxPositiveAmount.unsafeFrom(TestValues.fee)
+    def dataTx    = TxHelpers.dataSingle(account = bob, key = dataKey, value = Random.nextInt().toString, fee = dataTxFee.value)
 
-        // Data
-        if (blocksSinceStart > 0) d.blockchain.accountData(aliceAddress, dataKey).get.value shouldBe s"test-$blocksSinceStart"
-        else d.blockchain.accountData(aliceAddress, dataKey) shouldBe empty
-      }
+    "doesn't delete sole data" in withDomain(settings, Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))) { d =>
+      d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx)
 
-      d.appendBlock(issueTx)
-
-      markup("Appending")
-      (1 to maxRollbackDepth + 3).foreach { i =>
-        withClue(s"Append ${d.blockchain.height + 1} block: ") {
-          d.appendBlock(
-            transferWavesTx,
-            transferAssetTx,
-            TxHelpers.dataSingle(account = alice, key = dataKey, value = s"test-$i", fee = dataTxFee.value)
-          )
-          checkExpectedState()
-        }
-      }
-
-      markup("Rolling back")
-      (1 to maxRollbackDepth + 1).foreach { _ =>
-        val rollbackHeight = d.blockchain.height - 1
-        withClue(s"Rollback to $rollbackHeight:") {
-          d.rollbackTo(rollbackHeight)
-          checkExpectedState()
-        }
-      }
+      (3 to 9).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 9
 
       withClue("No data before current height: ") {
-        checkDataOnlySinceHeight(d, defaultAddresses, d.blockchain.height)
+        checkHistoricalDataOnlySinceHeight(d, addresses, 2)
       }
     }
 
-    "deletes old entries" in withDomain(
-      cleanupTestsSettings,
-      Seq(AddrWithBalance(aliceAddress, aliceInitBalance))
-    ) { d =>
-      d.appendBlock(issueTx)
-      def appendBlockWithTxs(i: Int): Unit = d.appendBlock(
+    "deletes old data and doesn't delete recent data" in withDomain(settings, Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))) { d =>
+      d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx)
+
+      d.appendBlock()
+
+      d.appendBlock(
         transferWavesTx,
         transferAssetTx,
-        TxHelpers.dataSingle(account = alice, key = dataKey, value = s"test-$i", fee = dataTxFee.value)
+        dataTx
       )
+      d.blockchain.height shouldBe 4
 
-      markup("Appending transactions")
-      appendBlockWithTxs(1)
-      appendBlockWithTxs(2)
-
-      markup("Appending empty")
-      (1 to maxRollbackDepth + 1).foreach { _ =>
-        withClue(s"Append ${d.blockchain.height + 1} block: ") {
-          d.appendBlock()
-        }
-      }
-
-      markup("Appending transactions - 2")
-      appendBlockWithTxs(3)
-
-      markup("Appending empty - 2")
-      (1 to maxRollbackDepth + 1).foreach { _ =>
-        withClue(s"Append ${d.blockchain.height + 1} block: ") {
-          d.appendBlock()
-        }
-      }
+      (5 to 9).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 9
 
       withClue("No data before current height: ") {
-        checkDataOnlySinceHeight(d, defaultAddresses, d.blockchain.height - maxRollbackDepth - 1)
+        checkHistoricalDataOnlySinceHeight(d, addresses, 4)
+      }
+    }
+
+    "deletes old data from previous intervals" in withDomain(settings, Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))) { d =>
+      (2 to 3).foreach(_ => d.appendBlock())
+
+      d.appendBlock(
+        transferWavesTx,
+        issueTx,
+        transferAssetTx,
+        dataTx
+      )
+      d.blockchain.height shouldBe 4
+
+      d.appendBlock()
+
+      d.appendBlock(
+        transferWavesTx,
+        transferAssetTx,
+        dataTx
+      )
+      d.blockchain.height shouldBe 6
+
+      (7 to 13).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 13
+
+      withClue("No data before current height: ") {
+        checkHistoricalDataOnlySinceHeight(d, addresses, 6)
+      }
+    }
+
+    "doesn't affect other sequences" in {
+      type CollectedKeys = mutable.ArrayBuffer[(ByteStr, String)]
+
+      def collectNonHistoricalKeys(d: Domain): CollectedKeys = {
+        val xs: CollectedKeys = mutable.ArrayBuffer.empty
+        Using(d.rdb.db.newIterator()) { iter =>
+          iter.seekToFirst()
+          while (iter.isValid) {
+            val k = iter.key()
+            if (!(HistoricalKeyTags.exists(kt => k.startsWith(kt.prefixBytes)) || k.startsWith(KeyTags.HeightOf.prefixBytes))) {
+              val description = KeyTags(Shorts.fromByteArray(k)).toString
+              xs.addOne(ByteStr(k) -> description)
+            }
+            iter.next()
+          }
+        }
+        xs
+      }
+
+      def appendBlocks(d: Domain): Unit = {
+        (2 to 3).foreach(_ => d.appendBlock())
+        d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx)
+
+        d.appendBlock()
+        d.appendBlock(transferWavesTx, transferAssetTx, dataTx)
+
+        (7 to 13).foreach(_ => d.appendBlock())
+      }
+
+      var nonHistoricalKeysWithoutCleanup: CollectedKeys = mutable.ArrayBuffer.empty
+      withDomain(
+        settings.copy(dbSettings = settings.dbSettings.copy(deleteOldDataInterval = 1000)), // Won't delete old data
+        Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))
+      ) { d =>
+        appendBlocks(d)
+        nonHistoricalKeysWithoutCleanup = collectNonHistoricalKeys(d)
+      }
+
+      withDomain(settings, Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))) { d =>
+        appendBlocks(d)
+        val nonHistoricalKeys = collectNonHistoricalKeys(d)
+        nonHistoricalKeys should contain theSameElementsInOrderAs nonHistoricalKeysWithoutCleanup
       }
     }
   }
 
-  private def checkDataOnlySinceHeight(d: Domain, addresses: Seq[Address], sinceHeight: Int): Unit = {
+  private val HistoricalKeyTags = Seq(
+    KeyTags.ChangedAssetBalances,
+    KeyTags.WavesBalanceHistory,
+    KeyTags.AssetBalanceHistory,
+    KeyTags.ChangedDataKeys,
+    KeyTags.DataHistory,
+    KeyTags.ChangedAddresses
+  )
+
+  private def checkHistoricalDataOnlySinceHeight(d: Domain, addresses: Seq[Address], sinceHeight: Int): Unit = {
     val addressIds = addresses.map(getAddressId(d, _))
-    Seq(
-      KeyTags.ChangedAssetBalances,
-      KeyTags.WavesBalanceHistory,
-      KeyTags.AssetBalanceHistory,
-      KeyTags.ChangedDataKeys,
-      KeyTags.DataHistory,
-      KeyTags.ChangedAddresses
-    ).foreach { keyTag =>
+    HistoricalKeyTags.foreach { keyTag =>
       withClue(s"$keyTag:") {
         d.rdb.db.iterateOver(keyTag) { e =>
           val (affectedHeight, affectedAddressIds) = getHeightAndAddressIds(keyTag, e)
