@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.parser
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
 import fastparse.*
+import fastparse.MultiLineWhitespace.*
 
 sealed abstract class UnaryOperation {
   val func: String

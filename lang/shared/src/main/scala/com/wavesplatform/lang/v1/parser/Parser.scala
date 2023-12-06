@@ -139,8 +139,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
   }
 
   def invalid[A: P]: P[INVALID] = {
-    import fastparse.NoWhitespace.*
-    P(Index ~~ CharPred(_ != '\n').rep(1) ~~ Index)
+    P(Index ~~ CharPred(_ != '\n').repX(1) ~~ Index)
       .map { case (start, end) =>
         INVALID(Pos(start, end), "can't parse the expression")
       }
