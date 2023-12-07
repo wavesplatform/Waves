@@ -360,7 +360,7 @@ object Importer extends ScorexLogging {
     val (blocksFileOffset, snapshotsFileOffset) =
       importOptions.format match {
         case Formats.Binary =>
-          var blocksOffset = 0L
+          var blocksOffset = 0
           rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
             e.getKey match {
               case Array(_, _, 0, 0, 0, 1) => // Skip genesis
@@ -369,12 +369,16 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-          val snapshotsOffset = (2 to blockchainUpdater.height).map { h =>
-            database.loadTxStateSnapshots(Height(h), rdb).map(_.toByteArray.length).sum
-          }.sum
-
-          blocksOffset -> snapshotsOffset.toLong
-        case _ => 0L -> 0L
+          var snapshotOffset = 0
+          (2 to blockchainUpdater.height).foreach(height =>
+            rdb.db.iterateOver(
+              KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height),
+              Some(rdb.txSnapshotHandle.handle)
+            )(snapshotOffset += _.getValue.length)
+          )
+          (blocksOffset, snapshotOffset)
+        case _ =>
+          (0, 0)
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
     val snapshotsInputStream =
