@@ -494,11 +494,9 @@ object BlockDiffer {
       blockStateHash: Option[ByteStr],
       computedStateHash: ByteStr
   ): TracedResult[ValidationError, Unit] =
-    if (blockchain.supportsLightNodeBlockFields())
-      if (blockStateHash.contains(computedStateHash))
-        Right(())
-      else
-        Left(InvalidStateHash(blockStateHash))
-    else
-      Right(())
+    Either.cond(
+      !blockchain.supportsLightNodeBlockFields() || blockStateHash.contains(computedStateHash),
+      (),
+      InvalidStateHash(blockStateHash)
+    )
 }
