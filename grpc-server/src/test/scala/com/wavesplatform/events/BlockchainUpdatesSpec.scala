@@ -803,7 +803,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val sender          = TxHelpers.signer(3)
       val recipient       = TxHelpers.signer(4)
 
-      withDomainAndRepo(settings = DomainPresets.TransactionStateSnapshot) { case (d, repo) =>
+      withDomainAndRepo(settings = TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))) { case (d, repo) =>
         val challengingMiner = d.wallet.generateNewAccount().get
 
         val initSenderBalance      = 100000.waves

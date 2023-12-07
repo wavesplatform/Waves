@@ -30,6 +30,7 @@ class BlockchainSettingsSpecification extends FlatSpec {
           |        max-transaction-time-back-offset = 55s
           |        max-transaction-time-forward-offset = 12d
           |        lease-expiration = 1000000
+          |        light-node-block-fields-absence-interval = 123
           |      }
           |      rewards {
           |        term = 100000
@@ -66,6 +67,7 @@ class BlockchainSettingsSpecification extends FlatSpec {
     settings.functionalitySettings.doubleFeaturesPeriodsAfterHeight should be(21)
     settings.functionalitySettings.maxTransactionTimeBackOffset should be(55.seconds)
     settings.functionalitySettings.maxTransactionTimeForwardOffset should be(12.days)
+    settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval shouldBe 123
     settings.rewardsSettings.initial should be(600000000)
     settings.rewardsSettings.minIncrement should be(50000000)
     settings.rewardsSettings.term should be(100000)

@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
+import com.wavesplatform.test.DomainPresets.*
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -186,7 +187,7 @@ class AccountsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatch
 
     val sender          = TxHelpers.signer(1)
     val challengedMiner = TxHelpers.signer(2)
-    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+    withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), balances = AddrWithBalance.enoughBalances(sender)) { d =>
       val grpcApi = getGrpcApi(d)
 
       val challengingMiner = d.wallet.generateNewAccount().get

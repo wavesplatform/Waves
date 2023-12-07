@@ -13,15 +13,14 @@ import com.wavesplatform.lang.directives.values.{Asset as AssetType, *}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.compiler
 import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
@@ -31,8 +30,8 @@ import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Asset, DataTransaction, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
@@ -835,7 +834,9 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         TestCompiler(v).compileExpressionE(script) should produce("Undefined field `attachment` of variable of type `Order`")
 
         withDomain(
-          DomainPresets.BlockRewardDistribution.setFeaturesHeight(BlockchainFeatures.LightNode -> Int.MaxValue),
+          DomainPresets.BlockRewardDistribution
+            .setFeaturesHeight(BlockchainFeatures.LightNode -> Int.MaxValue)
+            .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
           AddrWithBalance.enoughBalances(issuer, matcher, buyer)
         ) { d =>
           d.appendBlock(issue)

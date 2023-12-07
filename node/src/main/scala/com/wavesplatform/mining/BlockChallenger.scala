@@ -46,7 +46,8 @@ class BlockChallengerImpl(
     settings: WavesSettings,
     timeService: Time,
     pos: PoSSelector,
-    appendBlock: Block => Task[Either[ValidationError, BlockApplyResult]]
+    appendBlock: Block => Task[Either[ValidationError, BlockApplyResult]],
+    timeDrift: Long = MaxTimeDrift
 ) extends BlockChallenger
     with ScorexLogging {
 
@@ -179,8 +180,6 @@ class BlockChallengerImpl(
           blockchainUpdater.parentHeader(prevBlockHeader, 2).map(_.timestamp),
           blockTime
         )
-
-      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, acc.toAddress)
       blockWithoutChallengeAndStateHash <- Block.buildAndSign(
         challengedBlock.header.version,
         blockTime,
@@ -204,6 +203,7 @@ class BlockChallengerImpl(
         blockchainUpdater.computeNextReward,
         None
       )
+      initialBlockSnapshot <- BlockDiffer.createInitialBlockSnapshot(blockchainUpdater, challengedBlock.header.reference, acc.toAddress)
       stateHash <- TxStateSnapshotHashBuilder
         .computeStateHash(
           txs,
@@ -227,26 +227,28 @@ class BlockChallengerImpl(
           acc,
           blockFeatures(blockchainUpdater, settings),
           blockRewardVote(settings),
-          Some(stateHash),
-          Some(
-            ChallengedHeader(
-              challengedBlock.header.timestamp,
-              challengedBlock.header.baseTarget,
-              challengedBlock.header.generationSignature,
-              challengedBlock.header.featureVotes,
-              challengedBlock.header.generator,
-              challengedBlock.header.rewardVote,
-              challengedStateHash,
-              challengedSignature
+          if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
+          if (blockchainWithNewBlock.supportsLightNodeBlockFields())
+            Some(
+              ChallengedHeader(
+                challengedBlock.header.timestamp,
+                challengedBlock.header.baseTarget,
+                challengedBlock.header.generationSignature,
+                challengedBlock.header.featureVotes,
+                challengedBlock.header.generator,
+                challengedBlock.header.rewardVote,
+                challengedStateHash,
+                challengedSignature
+              )
             )
-          )
+          else None
         )
     } yield {
       log.debug(s"Forged challenging block $challengingBlock")
       challengingBlock
     }
   }.flatMap {
-    case res @ Right(block) => waitForTimeAlign(block.header.timestamp).map(_ => res)
+    case res @ Right(block) => waitForTimeAlign(block.header.timestamp, timeDrift).map(_ => res)
     case err @ Left(_)      => Task(err)
   }
 
@@ -262,10 +264,10 @@ class BlockChallengerImpl(
   private def blockRewardVote(settings: WavesSettings): Long =
     settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def waitForTimeAlign(blockTime: Long): Task[Unit] =
+  private def waitForTimeAlign(blockTime: Long, timeDrift: Long): Task[Unit] =
     Task {
       val currentTime = timeService.correctedTime()
-      blockTime - currentTime - MaxTimeDrift
+      blockTime - currentTime - timeDrift
     }.flatMap { timeDiff =>
       if (timeDiff > 0) {
         Task.sleep(timeDiff.millis)

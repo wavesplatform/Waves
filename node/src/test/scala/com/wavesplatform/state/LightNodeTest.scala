@@ -10,6 +10,7 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.network.{BlockSnapshotResponse, ExtensionBlocks, InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender}
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -30,7 +31,7 @@ class LightNodeTest extends PropSpec with WithDomain {
   property("NODE-1148. Light node shouldn't apply block when its state hash differs from snapshot state hash") {
     val sender    = TxHelpers.signer(1)
     val recipient = TxHelpers.address(2)
-    withDomain(settings, AddrWithBalance.enoughBalances(sender)) { d =>
+    withDomain(settings.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), AddrWithBalance.enoughBalances(sender)) { d =>
       val prevBlock    = d.lastBlock
       val txs          = Seq(TxHelpers.transfer(sender, recipient, amount = 10.waves), TxHelpers.transfer(sender, recipient, amount = 100.waves))
       val validBlock   = d.createBlock(Block.ProtoBlockVersion, txs)
@@ -167,7 +168,10 @@ class LightNodeTest extends PropSpec with WithDomain {
     val recipient        = TxHelpers.address(2)
     val challengingMiner = TxHelpers.signer(3)
 
-    withDomain(settings, AddrWithBalance.enoughBalances(challengingMiner, TxHelpers.defaultSigner, sender)) { d =>
+    withDomain(
+      settings.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
+      AddrWithBalance.enoughBalances(challengingMiner, TxHelpers.defaultSigner, sender)
+    ) { d =>
       val txs              = Seq(TxHelpers.transfer(sender, recipient, amount = 1.waves), TxHelpers.transfer(sender, recipient, amount = 2.waves))
       val invalidBlock     = d.createBlock(Block.ProtoBlockVersion, txs, strictTime = true, stateHash = Some(Some(invalidStateHash)))
       val challengingBlock = d.createChallengingBlock(challengingMiner, invalidBlock, strictTime = true)

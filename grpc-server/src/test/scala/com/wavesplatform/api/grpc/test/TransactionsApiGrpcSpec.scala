@@ -13,6 +13,7 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.state.TxMeta
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
@@ -142,7 +143,7 @@ class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffM
     val challengedMiner = TxHelpers.signer(2)
     val resender        = TxHelpers.signer(3)
     val recipient       = TxHelpers.signer(4)
-    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+    withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), balances = AddrWithBalance.enoughBalances(sender)) { d =>
       val grpcApi          = getGrpcApi(d)
       val challengingMiner = d.wallet.generateNewAccount().get
 

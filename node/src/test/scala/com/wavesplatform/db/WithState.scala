@@ -11,7 +11,6 @@ import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFacto
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
@@ -21,9 +20,8 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NgState, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NgState, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.defaultAddress
@@ -321,7 +319,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       signer: KeyPair,
       blockchain: BlockchainUpdater & Blockchain
   ): TracedResult[ValidationError, Block] = {
-    (if (blockchain.isFeatureActivated(LightNode, blockchain.height + 1)) {
+    (if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
        val compBlockchain =
          SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
        val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
@@ -404,7 +402,7 @@ trait WithDomain extends WithState { _: Suite =>
           domain.appendBlock(
             createGenesisWithStateHash(
               genesis,
-              bcu.isFeatureActivated(BlockchainFeatures.LightNode, 1),
+              fillStateHash = blockchain.supportsLightNodeBlockFields(),
               Some(settings.blockchainSettings.genesisSettings.initialBaseTarget)
             )
           )
@@ -428,7 +426,7 @@ trait WithDomain extends WithState { _: Suite =>
       .filter(v => v >= from && v <= to)
       .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
 
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean, baseTarget: Option[Long] = None): Block = {
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], fillStateHash: Boolean, baseTarget: Option[Long] = None): Block = {
     val timestamp = txs.map(_.timestamp).max
     val genesisSettings = GenesisSettings(
       timestamp,
@@ -461,7 +459,7 @@ trait WithDomain extends WithState { _: Suite =>
         GenesisGenerator,
         Seq.empty,
         -1,
-        Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
+        Option.when(fillStateHash)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
         None
       )
     } yield block).explicitGet()
