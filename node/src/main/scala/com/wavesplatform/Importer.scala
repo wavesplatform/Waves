@@ -53,7 +53,7 @@ object Importer extends ScorexLogging {
   final case class ImportOptions(
       configFile: Option[File] = None,
       blockchainFile: String = "blockchain",
-      snapshotsFile: String = "snapshots",
+      snapshotsFile: Option[String] = None,
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
       verify: Boolean = true,
@@ -79,7 +79,7 @@ object Importer extends ScorexLogging {
           .action((f, c) => c.copy(blockchainFile = f)),
         opt[String]('s', "snapshots-file")
           .text("Snapshots data file name")
-          .action((f, c) => c.copy(snapshotsFile = f)),
+          .action((f, c) => c.copy(snapshotsFile = Some(f))),
         opt[Int]('h', "height")
           .text("Import to height")
           .action((h, c) => c.copy(importHeight = h))
@@ -378,9 +378,7 @@ object Importer extends ScorexLogging {
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
     val snapshotsInputStream =
-      if (settings.enableLightMode)
-        Some(new BufferedInputStream(initFileStream(importOptions.snapshotsFile, snapshotsFileOffset), 20 * 1024 * 1024))
-      else None
+      importOptions.snapshotsFile.map(f => new BufferedInputStream(initFileStream(f, snapshotsFileOffset), 20 * 1024 * 1024))
 
     sys.addShutdownHook {
       quit = true
