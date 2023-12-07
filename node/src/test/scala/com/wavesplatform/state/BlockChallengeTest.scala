@@ -32,7 +32,7 @@ import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, Micro
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.WavesSettingsOps
+import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidStateHash, MicroBlockAppendError}
 import com.wavesplatform.transaction.assets.exchange.OrderType
@@ -66,7 +66,9 @@ class BlockChallengeTest
 
   implicit val appenderScheduler: SchedulerService = Scheduler.singleThread("appender")
   val settings: WavesSettings =
-    DomainPresets.TransactionStateSnapshot.addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+    TransactionStateSnapshot
+      .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
+      .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))
   val testTime: TestTime = TestTime()
 
   val invalidStateHash: ByteStr = ByteStr.fill(DigestLength)(1)
@@ -449,7 +451,7 @@ class BlockChallengeTest
     val recipientEth    = TxHelpers.signer(4).toEthKeyPair
     val dApp            = TxHelpers.signer(5)
     withDomain(
-      DomainPresets.TransactionStateSnapshot.configure(_.copy(minAssetInfoUpdateInterval = 0)),
+      TransactionStateSnapshot.configure(_.copy(minAssetInfoUpdateInterval = 0, lightNodeBlockFieldsAbsenceInterval = 0)),
       balances = AddrWithBalance.enoughBalances(sender, dApp)
     ) { d =>
       val challengingMiner = d.wallet.generateNewAccount().get
@@ -553,7 +555,7 @@ class BlockChallengeTest
     val buyer           = TxHelpers.signer(6)
     val matcher         = TxHelpers.signer(7)
     withDomain(
-      DomainPresets.TransactionStateSnapshot,
+      DomainPresets.TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
       balances = AddrWithBalance.enoughBalances(sender, dApp, invoker, buyer, matcher)
     ) { d =>
       val challengingMiner = d.wallet.generateNewAccount().get
@@ -1049,7 +1051,8 @@ class BlockChallengeTest
     withDomain(
       DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
-        .setFeaturesHeight(BlockchainFeatures.LightNode -> 1003),
+        .setFeaturesHeight(BlockchainFeatures.LightNode -> 1003)
+        .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
       balances = AddrWithBalance.enoughBalances(defaultSigner)
     ) { d =>
       val challengingMiner = d.wallet.generateNewAccount().get
@@ -1120,7 +1123,8 @@ class BlockChallengeTest
     withDomain(
       DomainPresets.BlockRewardDistribution
         .addFeatures(BlockchainFeatures.SmallerMinimalGeneratingBalance)
-        .setFeaturesHeight(BlockchainFeatures.LightNode -> 1008),
+        .setFeaturesHeight(BlockchainFeatures.LightNode -> 1008)
+        .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)),
       balances = AddrWithBalance.enoughBalances(sender)
     ) { d =>
       val challengingMiner = d.wallet.generateNewAccount().get

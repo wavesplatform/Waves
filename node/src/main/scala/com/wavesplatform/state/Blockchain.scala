@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ContractScript
@@ -221,5 +222,8 @@ object Blockchain {
 
     def hasBannedEffectiveBalance(address: Address, height: Int = blockchain.height): Boolean =
       blockchain.effectiveBalanceBanHeights(address).contains(height)
+
+    def supportsLightNodeBlockFields(height: Int = blockchain.height): Boolean =
+      blockchain.featureActivationHeight(LightNode.id).exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
   }
 }

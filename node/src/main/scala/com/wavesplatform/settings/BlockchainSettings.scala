@@ -76,7 +76,8 @@ case class FunctionalitySettings(
     ethInvokePaymentsCheckHeight: Int = 0,
     daoAddress: Option[String] = None,
     xtnBuybackAddress: Option[String] = None,
-    xtnBuybackRewardPeriod: Int = Int.MaxValue
+    xtnBuybackRewardPeriod: Int = Int.MaxValue,
+    lightNodeBlockFieldsAbsenceInterval: Int = 1000
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter

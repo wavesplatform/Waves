@@ -15,6 +15,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.Result
 import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.{TransactionStateSnapshot, WavesSettingsOps}
 import com.wavesplatform.test.node.*
 import com.wavesplatform.transaction.TxValidationError.InvalidStateHash
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
@@ -109,8 +110,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       "genesis block" in {
         val txs = (1 to 10).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 100.waves)) ++
           (1 to 5).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 1.waves))
-        withDomain(DomainPresets.TransactionStateSnapshot) { d =>
-          val block = createGenesisWithStateHash(txs, txStateSnapshotActivated = true)
+        withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))) { d =>
+          val block = createGenesisWithStateHash(txs, fillStateHash = true)
 
           block.header.stateHash shouldBe defined
           BlockDiffer
@@ -118,7 +119,7 @@ class BlockDifferTest extends FreeSpec with WithDomain {
         }
 
         withDomain(DomainPresets.RideV6) { d =>
-          val block = createGenesisWithStateHash(txs, txStateSnapshotActivated = false)
+          val block = createGenesisWithStateHash(txs, fillStateHash = false)
 
           block.header.stateHash shouldBe None
           BlockDiffer
@@ -127,8 +128,8 @@ class BlockDifferTest extends FreeSpec with WithDomain {
       }
 
       "arbitrary block/microblock" in
-        withDomain(DomainPresets.TransactionStateSnapshot) { d =>
-          val genesis = createGenesisWithStateHash(Seq(TxHelpers.genesis(TxHelpers.address(1))), txStateSnapshotActivated = true)
+        withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))) { d =>
+          val genesis = createGenesisWithStateHash(Seq(TxHelpers.genesis(TxHelpers.address(1))), fillStateHash = true)
           d.appendBlock(genesis)
 
           val txs = (1 to 10).map(idx => TxHelpers.transfer(TxHelpers.signer(idx), TxHelpers.address(idx + 1), (100 - idx).waves))

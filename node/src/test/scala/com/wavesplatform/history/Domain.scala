@@ -14,7 +14,7 @@ import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, LightNode, RideV6}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -297,7 +297,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   ): Either[ValidationError, MicroBlock] = {
     val lastBlock   = this.lastBlock
     val blockSigner = signer.getOrElse(defaultSigner)
-    val stateHashE = if (blockchain.isFeatureActivated(BlockchainFeatures.LightNode)) {
+    val stateHashE = if (blockchain.supportsLightNodeBlockFields()) {
       stateHash
         .map(Right(_))
         .getOrElse(
@@ -444,7 +444,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           challengedHeader = challengedHeader
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
-        if (blockchain.isFeatureActivated(LightNode, blockchain.height + 1)) {
+        if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
           val hitSource = posSelector.validateGenerationSignature(blockWithoutStateHash).getOrElse(blockWithoutStateHash.header.generationSignature)
           val blockchainWithNewBlock =
             SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, hitSource, 0, blockchain.computeNextReward, None)
