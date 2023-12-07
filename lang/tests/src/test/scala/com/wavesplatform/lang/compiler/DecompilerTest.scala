@@ -1118,7 +1118,7 @@ class DecompilerTest extends PropSpec {
   }
 
   property("calculateDelay()") {
-    val script = "calculateDelay(base58'aaa', 123, Address(base58'bbb'), 456)"
+    val script = "calculateDelay(Address(base58'bbb'), 456)"
     assertDecompile(script, script, V8)
   }
 

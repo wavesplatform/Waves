@@ -132,7 +132,7 @@ object EnvironmentFunctionsBenchmark {
 
     override def accountScript(addressOrAlias: Recipient): Option[Script] = ???
 
-    override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = ???
+    override def calculateDelay(generator: ByteStr, balance: Long): Long = ???
 
     def callScript(
         dApp: Address,

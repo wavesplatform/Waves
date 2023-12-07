@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
+import org.ehcache.sizeof.SizeOf
 
 import java.{lang, util}
 import scala.collection.immutable.VectorMap
@@ -127,11 +128,13 @@ abstract class Caches extends Blockchain with Storage {
     VolumeAndFee(curVf.volume, curVf.fee)
   }
 
+  private val objectWeigher = SizeOf.newInstance()
+
   private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] =
     CacheBuilder
       .newBuilder()
       .maximumWeight(128 << 20)
-      .weigher((_: Address, asi: Option[AccountScriptInfo]) => asi.map(_.script.bytes().size).getOrElse(0))
+      .weigher((_: Address, asi: Option[AccountScriptInfo]) => asi.map(s => objectWeigher.deepSizeOf(s).toInt).getOrElse(0))
       .recordStats()
       .build(new CacheLoader[Address, Option[AccountScriptInfo]] {
         override def load(key: Address): Option[AccountScriptInfo] = loadScript(key)
