@@ -32,10 +32,12 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
 import java.util
+import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -110,7 +112,8 @@ class RocksDBWriter(
     val dbSettings: DBSettings,
     isLightMode: Boolean,
     bfBlockInsertions: Int = 10000
-) extends Caches {
+) extends Caches
+    with AutoCloseable {
   import rdb.db as writableDB
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
@@ -118,6 +121,24 @@ class RocksDBWriter(
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
   import RocksDBWriter.*
+
+  private val cleanupThreadPoolExecutor = new ThreadPoolExecutor(
+    1,
+    3,
+    0,
+    TimeUnit.MILLISECONDS,
+    new LinkedBlockingQueue[Runnable],
+    new DefaultThreadFactory("db-cleanup", true),
+    { (r: Runnable, executor: ThreadPoolExecutor) =>
+      log.error(s"$r has been rejected from $executor")
+      throw new RejectedExecutionException
+    }
+  )
+
+  override def close(): Unit = {
+    cleanupThreadPoolExecutor.shutdown()
+    cleanupThreadPoolExecutor.awaitTermination(10, TimeUnit.MINUTES)
+  }
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
@@ -410,14 +431,22 @@ class RocksDBWriter(
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
 
-        deleteOldWavesBalanceEntries(Height(newSafeRollbackHeight), rw)
-        if (newSafeRollbackHeight % dbSettings.deleteOldDataInterval == 0) {
-          batchDeleteOldEntries(
-            fromInclusive = Height(newSafeRollbackHeight - dbSettings.deleteOldDataInterval + 1),
-            toInclusive = Height(newSafeRollbackHeight),
-            rw = rw
-          )
-        }
+        cleanupThreadPoolExecutor.submit(new Runnable {
+          override def run(): Unit = {
+            writableDB.withOptions { (ro, wo) =>
+              writableDB.readWriteWithOptions(ro, wo) { rw =>
+                deleteOldWavesBalanceEntries(Height(newSafeRollbackHeight), rw)
+                if (newSafeRollbackHeight % dbSettings.deleteOldDataInterval == 0) {
+                  batchDeleteOldEntries(
+                    fromInclusive = Height(newSafeRollbackHeight - dbSettings.deleteOldDataInterval + 1),
+                    toInclusive = Height(newSafeRollbackHeight),
+                    rw = rw
+                  )
+                }
+              }
+            }
+          }
+        })
       }
 
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
