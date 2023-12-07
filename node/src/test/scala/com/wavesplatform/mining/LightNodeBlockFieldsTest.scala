@@ -29,7 +29,6 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         d.blockchain,
         d.testTime,
         d.settings.copy(minerSettings = d.settings.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds)),
-        verify = false,
         timeDrift = Int.MaxValue
       ) { case (miner, append) =>
         val microBlockMiner = new MicroBlockMinerImpl(
@@ -44,7 +43,11 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
           identity
         )
         def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
-        def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
+        def appendBlock() = {
+          val block = miner.forgeBlock(defaultSigner).explicitGet()._1
+          d.testTime.setTime(block.header.timestamp)
+          append(block).explicitGet()
+        }
         def appendMicro() = {
           d.utxPool.putIfNew(transfer()).resultE.explicitGet()
           microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
