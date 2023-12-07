@@ -369,14 +369,14 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-          var snapshotOffset = 0
+          var snapshotsOffset = 0
           (2 to blockchainUpdater.height).foreach(height =>
             rdb.db.iterateOver(
               KeyTags.NthTransactionStateSnapshotAtHeight.prefixBytes ++ Ints.toByteArray(height),
               Some(rdb.txSnapshotHandle.handle)
-            )(snapshotOffset += _.getValue.length)
+            )(snapshotsOffset += _.getValue.length)
           )
-          (blocksOffset, snapshotOffset)
+          (blocksOffset, snapshotsOffset)
         case _ =>
           (0, 0)
       }
