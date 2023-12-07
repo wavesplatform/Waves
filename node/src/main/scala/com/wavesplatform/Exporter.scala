@@ -1,8 +1,6 @@
 package com.wavesplatform
 
 import com.google.common.collect.AbstractIterator
-
-import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.protobuf.BlockMeta
@@ -19,6 +17,7 @@ import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -75,6 +74,11 @@ object Exporter extends ScorexLogging {
                 val start                  = System.currentTimeMillis()
 
                 new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
+                  val txCount = block.transactionData.length
+                  if (exportSnapshots && txCount != txSnapshots.length)
+                    throw new RuntimeException(
+                      s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
+                    )
                   exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
                   snapshotsStream.foreach { output =>
                     exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
@@ -100,7 +104,8 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean) extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
+  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean)
+      extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
     var nextTxEntry: Option[(Int, Transaction)]       = None
     var nextSnapshotEntry: Option[(Int, Array[Byte])] = None
 
