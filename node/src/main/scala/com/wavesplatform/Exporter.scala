@@ -74,7 +74,7 @@ object Exporter extends ScorexLogging {
                 var exportedSnapshotsBytes = 0L
                 val start                  = System.currentTimeMillis()
 
-                new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
+                new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
                   exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
                   snapshotsStream.foreach { output =>
                     exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
@@ -100,7 +100,7 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, isLightMode: Boolean) extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
+  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean) extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
     var nextTxEntry: Option[(Int, Transaction)]       = None
     var nextSnapshotEntry: Option[(Int, Array[Byte])] = None
 
@@ -156,7 +156,7 @@ object Exporter extends ScorexLogging {
             case Some(_) => Seq.empty
             case _       => loadTxData[Transaction](Seq.empty, h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
           }
-          val snapshots = if (isLightMode) {
+          val snapshots = if (exportSnapshots) {
             nextSnapshotEntry match {
               case Some((snapshotHeight, txSnapshot)) if snapshotHeight == h =>
                 nextSnapshotEntry = None
