@@ -125,9 +125,15 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         d.blockchain.height shouldBe 10
         val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, stateHash = invalidStateHash)
         val challengingBlock = d.createChallengingBlock(secondSigner, challengedBlock, strictTime = true)
+        val blockWithOnlyChallengingHeader = {
+          val challengedHeader = challengingBlock.header.challengedHeader.map(_.copy(stateHash = None))
+          val block            = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, challengedHeader = challengedHeader)
+          block.copy(header = block.header.copy(stateHash = None))
+        }
         d.testTime.setTime(challengingBlock.header.timestamp)
         append(challengedBlock) should produce("Block state hash is not supported yet")
         append(challengingBlock) should produce("Block state hash is not supported yet")
+        append(blockWithOnlyChallengingHeader) should produce("Challenged header is not supported yet")
 
         d.appendBlock()
         d.blockchain.height shouldBe 11
