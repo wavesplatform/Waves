@@ -14,6 +14,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain,
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Task
 import monix.reactive.Observable
+import org.rocksdb.RocksIterator
 
 import java.util.regex.Pattern
 import scala.annotation.tailrec
@@ -135,59 +136,59 @@ object CommonAccountsApi {
       entriesFromDiff: Array[DataEntry[?]],
       pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
-    val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
+    private val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
 
-    val length: Int = entriesFromDiff.length
+    private val length: Int = entriesFromDiff.length
 
     db.withSafePrefixIterator(_.seek(prefix))()
 
-    var nextIndex                         = 0
-    var nextDbEntry: Option[DataEntry[?]] = None
+    private var nextIndex                         = 0
+    private var nextDbEntry: Option[DataEntry[?]] = None
 
-    def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
+    private def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
 
     @tailrec
-    final override def computeNext(): DataEntry[?] =
-      if (!db.prefixIterator.isOwningHandle) endOfData()
-      else {
-        nextDbEntry match {
-          case Some(dbEntry) =>
-            if (nextIndex < length) {
-              val entryFromDiff = entriesFromDiff(nextIndex)
-              if (entryFromDiff.key < dbEntry.key) {
-                nextIndex += 1
-                entryFromDiff
-              } else if (entryFromDiff.key == dbEntry.key) {
-                nextIndex += 1
-                nextDbEntry = None
-                entryFromDiff
-              } else {
-                nextDbEntry = None
-                dbEntry
-              }
+    private def doComputeNext(iter: RocksIterator): DataEntry[?] =
+      nextDbEntry match {
+        case Some(dbEntry) =>
+          if (nextIndex < length) {
+            val entryFromDiff = entriesFromDiff(nextIndex)
+            if (entryFromDiff.key < dbEntry.key) {
+              nextIndex += 1
+              entryFromDiff
+            } else if (entryFromDiff.key == dbEntry.key) {
+              nextIndex += 1
+              nextDbEntry = None
+              entryFromDiff
             } else {
               nextDbEntry = None
               dbEntry
             }
-          case None =>
-            if (!db.prefixIterator.isValid) {
-              if (nextIndex < length) {
-                nextIndex += 1
-                entriesFromDiff(nextIndex - 1)
-              } else {
-                endOfData()
-              }
+          } else {
+            nextDbEntry = None
+            dbEntry
+          }
+        case None =>
+          if (!iter.isValid) {
+            if (nextIndex < length) {
+              nextIndex += 1
+              entriesFromDiff(nextIndex - 1)
             } else {
-              val key = new String(db.prefixIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
-              if (matches(key)) {
-                nextDbEntry = Option(db.prefixIterator.value()).map { arr =>
-                  Keys.data(address, key).parse(arr).entry
-                }
-              }
-              db.prefixIterator.next()
-              computeNext()
+              endOfData()
             }
-        }
+          } else {
+            val key = new String(iter.key().drop(2 + Address.HashLength), Charsets.UTF_8)
+            if (matches(key)) {
+              nextDbEntry = Option(iter.value()).map { arr =>
+                Keys.data(address, key).parse(arr).entry
+              }
+            }
+            iter.next()
+            doComputeNext(iter)
+          }
       }
+
+    override def computeNext(): DataEntry[?] =
+      db.withSafePrefixIterator(doComputeNext)(endOfData())
   }
 }
