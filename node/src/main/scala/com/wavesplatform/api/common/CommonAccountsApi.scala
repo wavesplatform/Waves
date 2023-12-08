@@ -16,6 +16,7 @@ import monix.eval.Task
 import monix.reactive.Observable
 
 import java.util.regex.Pattern
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 
 trait CommonAccountsApi {
@@ -145,43 +146,48 @@ object CommonAccountsApi {
 
     def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
 
-    final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
-      nextDbEntry match {
-        case Some(dbEntry) =>
-          if (nextIndex < length) {
-            val entryFromDiff = entriesFromDiff(nextIndex)
-            if (entryFromDiff.key < dbEntry.key) {
-              nextIndex += 1
-              entryFromDiff
-            } else if (entryFromDiff.key == dbEntry.key) {
-              nextIndex += 1
-              nextDbEntry = None
-              entryFromDiff
+    @tailrec
+    final override def computeNext(): DataEntry[?] =
+      if (!db.prefixIterator.isOwningHandle) endOfData()
+      else {
+        nextDbEntry match {
+          case Some(dbEntry) =>
+            if (nextIndex < length) {
+              val entryFromDiff = entriesFromDiff(nextIndex)
+              if (entryFromDiff.key < dbEntry.key) {
+                nextIndex += 1
+                entryFromDiff
+              } else if (entryFromDiff.key == dbEntry.key) {
+                nextIndex += 1
+                nextDbEntry = None
+                entryFromDiff
+              } else {
+                nextDbEntry = None
+                dbEntry
+              }
             } else {
               nextDbEntry = None
               dbEntry
             }
-          } else {
-            nextDbEntry = None
-            dbEntry
-          }
-        case None =>
-          if (dbIterator.isValid) {
-            val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
-            if (matches(key)) {
-              nextDbEntry = Option(dbIterator.value()).map { arr =>
-                Keys.data(address, key).parse(arr).entry
+          case None =>
+            if (!db.prefixIterator.isValid) {
+              if (nextIndex < length) {
+                nextIndex += 1
+                entriesFromDiff(nextIndex - 1)
+              } else {
+                endOfData()
               }
+            } else {
+              val key = new String(db.prefixIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
+              if (matches(key)) {
+                nextDbEntry = Option(db.prefixIterator.value()).map { arr =>
+                  Keys.data(address, key).parse(arr).entry
+                }
+              }
+              db.prefixIterator.next()
+              computeNext()
             }
-            dbIterator.next()
-            computeNext()
-          } else if (nextIndex < length) {
-            nextIndex += 1
-            entriesFromDiff(nextIndex - 1)
-          } else {
-            endOfData()
-          }
+        }
       }
-    }(endOfData())
   }
 }
