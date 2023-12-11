@@ -179,7 +179,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       argsCostsSum             <- argsCosts.foldM(0L)(sum)
       bodyCostV = bodyCost.value()
       correctedBodyCost <-
-        if (bodyCostV > 0) const(bodyCostV)
+        if (bodyCostV != 0) const(bodyCostV)
         else if (overhead || !letFixes) const(1L)
         else isBlankFunc(bodyUsedRefs, ctx.refsCosts).map(if (_) 1L else 0L)
       result <- sum(argsCostsSum, correctedBodyCost)
