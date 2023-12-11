@@ -29,7 +29,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
+import scala.util.{Try, Using}
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -255,7 +255,7 @@ object Explorer extends ScorexLogging {
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
-            log.info(s"${KeyTags(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+            log.info(s"${Try(KeyTags(prefix)).getOrElse(prefix.toString)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
           }
 
         case "TXBH" =>

@@ -690,15 +690,42 @@ class RocksDBWriter(
   }
 
   private def batchDeleteOldEntries(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
-    val assetBalanceAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), TwoHeights]
+    // Asset balances
 
-    val changedDataAddresses = mutable.Set.empty[AddressId]
-    val accountDataAt        = mutable.AnyRefMap.empty[(AddressId, String), TwoHeights]
+    val lastAssetBalanceUpdateAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
+    val changedBalancesKey       = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
+    val changedBalancesPrefix    = KeyTags.ChangedAssetBalances.prefixBytes
+    rw.iterateOverWithSeek(changedBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
+      val k          = e.getKey.drop(changedBalancesPrefix.length)
+      val currHeight = Height(Ints.fromByteArray(k))
+      val continue   = currHeight <= toInclusive
+      if (continue) {
+        val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
+        changedBalancesKey.parse(e.getValue).foreach { addressId =>
+          lastAssetBalanceUpdateAt.updateWith((addressId, asset))(_ => Some(currHeight))
+        }
+      }
+      continue
+    }
 
-    // Collecting data
+    lastAssetBalanceUpdateAt.foreach { case ((addressId, asset), lastHeight) =>
+      // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
+      // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
+      // We doesn't know about 1900, so we will delete all keys from 1.
+      rw.deleteRange(
+        Keys.assetBalanceAt(addressId, asset, Height(1)),
+        Keys.assetBalanceAt(addressId, asset, lastHeight) // Deletes in [1; lastHeight)
+      )
+    }
 
-    val changedAddressesKey    = Keys.changedAddresses(Int.MaxValue) // Doesn't matter, we need this only to parse
-    val changedAddressesPrefix = KeyTags.ChangedAddresses.prefixBytes
+    rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toInclusive + 1))
+
+    // Account data
+
+    val changedDataAddresses    = mutable.Set.empty[AddressId]
+    val lastAccountDataUpdateAt = mutable.AnyRefMap.empty[(AddressId, String), Height]
+    val changedAddressesKey     = Keys.changedAddresses(Int.MaxValue) // Doesn't matter, we need this only to parse
+    val changedAddressesPrefix  = KeyTags.ChangedAddresses.prefixBytes
     rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
       val continue   = currHeight < toInclusive
@@ -707,10 +734,9 @@ class RocksDBWriter(
           // Account data
           val changedDataKeys = rw.get(Keys.changedDataKeys(currHeight, addressId))
           if (changedDataKeys.nonEmpty) {
-            // TODO collect min-max?
             changedDataAddresses.addOne(addressId)
             changedDataKeys.foreach { accountDataKey =>
-              accountDataAt.updateWith((addressId, accountDataKey))(TwoHeights.update(_, currHeight))
+              lastAccountDataUpdateAt.updateWith((addressId, accountDataKey))(_ => Some(currHeight))
             }
           }
         }
@@ -718,67 +744,14 @@ class RocksDBWriter(
       continue
     }
 
-    // Asset balances
-
-    val changedBalancesKey    = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
-    val changedBalancesPrefix = KeyTags.ChangedAssetBalances.prefixBytes
-    rw.iterateOverWithSeek(changedBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
-      val k          = e.getKey.drop(changedBalancesPrefix.length)
-      val currHeight = Height(Ints.fromByteArray(k))
-      val continue   = currHeight <= toInclusive
-      if (continue) {
-        val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
-        changedBalancesKey.parse(e.getValue).foreach { addressId =>
-          assetBalanceAt.updateWith((addressId, asset))(TwoHeights.update(_, currHeight))
-        }
-      }
-      continue
+    lastAccountDataUpdateAt.foreach { case ((addressId, dataKey), lastHeight) =>
+      rw.deleteRange(
+        Keys.dataAt(addressId, dataKey)(Height(1)),
+        Keys.dataAt(addressId, dataKey)(lastHeight)
+      )
     }
 
-    // Deleting data
-
-    // Asset balances
-    val assetBalanceAtAids = new ArrayBuffer[(AddressId, IssuedAsset)]()
-    val assetBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]]()
-    assetBalanceAt.foreach { case ((addressId, asset), heights) =>
-      heights.prev match {
-        case Some(prevHeight) =>
-          rw.deleteRange(
-            // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
-            // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
-            // But we doesn't know 1900, so we will delete all keys from 1.
-            Keys.assetBalanceAt(addressId, asset, Height(1)),
-            Keys.assetBalanceAt(addressId, asset, Height(prevHeight + 1)) // +1 to [1; prevHeight] instead of [1; prevHeight)
-          )
-
-        case None =>
-          assetBalanceAtAids.addOne((addressId, asset))
-          assetBalanceAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, heights.last))
-      }
-    }
-
-    assetBalanceAtAids.view
-      .zip(rw.multiGet(assetBalanceAtKeys, BalanceNode.SizeInBytes))
-      .foreach {
-        case ((addressId, asset), Some(assetBalanceAt)) => rw.delete(Keys.assetBalanceAt(addressId, asset, assetBalanceAt.prevHeight))
-        case _                                          =>
-      }
-
-    // Account data
-    accountDataAt.foreach { case ((addressId, dataKey), heights) =>
-      val dataAt = Keys.dataAt(addressId, dataKey)(_)
-      heights.prev match {
-        case Some(prevHeight) => rw.deleteRange(dataAt(Height(1)), dataAt(Height(prevHeight + 1)))
-        case None =>
-          val dataKeyAtKey = dataAt(heights.last)
-          val dataKeyAt    = rw.get(dataKeyAtKey)
-          rw.delete(dataAt(dataKeyAt.prevHeight))
-      }
-    }
-
-    // Changed keys
     rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toInclusive + 1))
-    rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toInclusive + 1))
     changedDataAddresses.foreach { addressId =>
       rw.deleteRange(Keys.changedDataKeys(fromInclusive, addressId), Keys.changedDataKeys(toInclusive + 1, addressId))
     }
@@ -1253,16 +1226,5 @@ class RocksDBWriter(
 
   override def lastStateHash(refId: Option[ByteStr]): ByteStr = {
     readOnly(_.get(Keys.blockStateHash(height)))
-  }
-}
-
-private case class TwoHeights(last: Height, prev: Option[Height] = None) {
-  def update(h: Height): TwoHeights = copy(last = h, prev = Some(last))
-}
-
-private object TwoHeights {
-  def update(orig: Option[TwoHeights], h: Height): Option[TwoHeights] = orig match {
-    case Some(orig) => Some(orig.update(h))
-    case None       => Some(TwoHeights(h))
   }
 }

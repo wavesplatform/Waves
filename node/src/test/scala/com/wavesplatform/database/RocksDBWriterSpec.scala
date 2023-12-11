@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount, TxPositiveAmount}
+import org.rocksdb.{ReadOptions, RocksIterator}
 
 import scala.collection.mutable
 import scala.util.{Random, Using}
@@ -258,7 +259,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
       def collectNonHistoricalKeys(d: Domain): CollectedKeys = {
         val xs: CollectedKeys = mutable.ArrayBuffer.empty
-        Using(d.rdb.db.newIterator()) { iter =>
+        withGlobalIterator(d.rdb) { iter =>
           iter.seekToFirst()
           while (iter.isValid) {
             val k = iter.key()
@@ -352,4 +353,10 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
   private def getAddressId(d: Domain, address: Address): AddressId =
     d.rdb.db.get(Keys.addressId(address)).getOrElse(throw new RuntimeException(s"Can't find address id for $address"))
+
+  private def withGlobalIterator(rdb: RDB)(f: RocksIterator => Unit): Unit = {
+    Using(new ReadOptions().setTotalOrderSeek(true)) { ro =>
+      Using(rdb.db.newIterator(ro))(f).get
+    }.get
+  }
 }
