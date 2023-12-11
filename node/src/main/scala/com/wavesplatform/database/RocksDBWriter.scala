@@ -122,13 +122,13 @@ class RocksDBWriter(
 
   import RocksDBWriter.*
 
-  private val cleanupThreadPoolExecutor = new ThreadPoolExecutor(
+  private val deleteOldEntriesThreadPoolExecutor = new ThreadPoolExecutor(
     1,
-    3,
+    1,
     0,
-    TimeUnit.MILLISECONDS,
+    TimeUnit.SECONDS,
     new LinkedBlockingQueue[Runnable],
-    new DefaultThreadFactory("db-cleanup", true),
+    new DefaultThreadFactory("db-cleanup", false),
     { (r: Runnable, executor: ThreadPoolExecutor) =>
       log.error(s"$r has been rejected from $executor")
       throw new RejectedExecutionException
@@ -136,8 +136,8 @@ class RocksDBWriter(
   )
 
   override def close(): Unit = {
-    cleanupThreadPoolExecutor.shutdown()
-    cleanupThreadPoolExecutor.awaitTermination(10, TimeUnit.MINUTES)
+    deleteOldEntriesThreadPoolExecutor.shutdown()
+    deleteOldEntriesThreadPoolExecutor.awaitTermination(10, TimeUnit.SECONDS)
   }
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -431,7 +431,7 @@ class RocksDBWriter(
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
 
-        cleanupThreadPoolExecutor.submit(new Runnable {
+        deleteOldEntriesThreadPoolExecutor.submit(new Runnable {
           override def run(): Unit = {
             writableDB.withOptions { (ro, wo) =>
               writableDB.readWriteWithOptions(ro, wo) { rw =>
