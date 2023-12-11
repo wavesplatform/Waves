@@ -484,6 +484,34 @@ class LeaseRouteSpec extends RouteSpec("/leasing") with OptionValues with RestAP
     checkForInvoke(EthTxGenerator.generateEthInvoke(invoker.toEthKeyPair, dApp1.toAddress, "foo", Seq.empty, Seq.empty))
   }
 
+  "multiple leases in the same block" in {
+    val sender  = TxHelpers.signer(240)
+    val leases1 = Seq.tabulate(10)(i => TxHelpers.lease(sender, TxHelpers.address(241 + i)))
+    val leases2 = Seq.tabulate(10)(i => TxHelpers.lease(sender, TxHelpers.address(251 + i)))
+    val leases3 = Seq.tabulate(10)(i => TxHelpers.lease(sender, TxHelpers.address(261 + i)))
+    val leases4 = Seq.tabulate(10)(i => TxHelpers.lease(sender, TxHelpers.address(271 + i)))
+
+    domain.appendBlock(TxHelpers.transfer(richAccount, sender.toAddress, 10_000.waves))
+    domain.appendBlock(leases1*)
+    domain.appendBlock(leases2*)
+    domain.appendBlock(leases3*)
+    domain.appendBlock(leases4*)
+    domain.appendBlock()
+
+    import monix.execution.Scheduler.Implicits.global
+    val leases = domain.accountsApi.activeLeases(sender.toAddress).toListL.runSyncUnsafe(15.seconds)
+    leases.size shouldEqual 40
+
+    Get(routePath(s"/active/${sender.toAddress}")) ~> route ~> check {
+      responseAs[Seq[JsObject]].map(v => (v \ "id").as[ByteStr]) should contain theSameElementsAs (
+        leases4.map(_.id()) ++
+          leases3.map(_.id()) ++
+          leases2.map(_.id()) ++
+          leases1.map(_.id())
+      )
+    }
+  }
+
   routePath("/info") in {
 
     val lease       = TxHelpers.lease()
