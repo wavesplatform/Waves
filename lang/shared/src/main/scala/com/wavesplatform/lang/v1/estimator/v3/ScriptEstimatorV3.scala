@@ -1,8 +1,8 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
 import cats.implicits.{toBifunctorOps, toFoldableOps, toTraverseOps}
-import cats.{Id, Monad}
 import cats.syntax.functor.*
+import cats.{Id, Monad}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -100,14 +100,11 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   }
 
   private def beforeNextExprEval(let: LET, eval: EvalM[Long]): EvalM[Unit] =
-    for {
-      cost <- local(eval)
-      _ <- update(ctx =>
-        usedRefs
-          .modify(ctx)(_ - let.name)
-          .copy(refsCosts = ctx.refsCosts + (let.name -> cost))
-      )
-    } yield ()
+    update(ctx =>
+      usedRefs
+        .modify(ctx)(_ - let.name)
+        .copy(refsCosts = ctx.refsCosts + (let.name -> local(eval)))
+    )
 
   private def afterNextExprEval(let: LET, startCtx: EstimatorContext): EvalM[Unit] =
     update(ctx =>
@@ -181,10 +178,10 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       (argsCosts, _)           <- withUsedRefs(args.traverse(evalHoldingFuncs(_, activeFuncArgs)))
       argsCostsSum             <- argsCosts.foldM(0L)(sum)
       bodyCostV = bodyCost.value()
-      correctedBodyCost =
-        if (!overhead && !letFixes && bodyCostV == 0) 1
-        else if (letFixes && bodyCostV == 0 && isBlankFunc(bodyUsedRefs, ctx.refsCosts)) 1
-        else bodyCostV
+      correctedBodyCost <-
+        if (bodyCostV > 0) const(bodyCostV)
+        else if (overhead || !letFixes) const(1L)
+        else isBlankFunc(bodyUsedRefs, ctx.refsCosts).map(if (_) 1L else 0L)
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
 
@@ -207,8 +204,10 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         raiseError[Id, EstimatorContext, EstimationError, (Coeval[Long], Set[EstimationError])](s"function '$header' not found")
       )
 
-  private def isBlankFunc(usedRefs: Set[String], refsCosts: Map[String, Long]): Boolean =
-    !usedRefs.exists(refsCosts.get(_).exists(_ > 0))
+  private def isBlankFunc(usedRefs: Set[String], refsCosts: Map[String, EvalM[Long]]): EvalM[Boolean] =
+    usedRefs.toSeq
+      .existsM(refsCosts.get(_).existsM(_.map(_ > 0)))
+      .map(!_)
 
   private def evalHoldingFuncs(
       expr: EXPR,
