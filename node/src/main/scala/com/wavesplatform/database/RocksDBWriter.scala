@@ -137,7 +137,18 @@ class RocksDBWriter(
 
   override def close(): Unit = {
     deleteOldEntriesThreadPoolExecutor.shutdown()
-    deleteOldEntriesThreadPoolExecutor.awaitTermination(10, TimeUnit.SECONDS)
+
+    var attempts = 5
+    while (attempts > 0) {
+      log.trace(s"Stopping ${deleteOldEntriesThreadPoolExecutor.getQueue.size()} tasks")
+      if (deleteOldEntriesThreadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS)) attempts = -1
+      else attempts -= 1
+    }
+
+    if (attempts == 0) {
+      val xs = deleteOldEntriesThreadPoolExecutor.shutdownNow()
+      log.trace(s"Canceling ${xs.size()} tasks")
+    }
   }
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
