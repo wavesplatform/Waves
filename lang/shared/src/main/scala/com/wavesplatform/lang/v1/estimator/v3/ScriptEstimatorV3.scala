@@ -180,7 +180,8 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       bodyCostV = bodyCost.value()
       correctedBodyCost <-
         if (bodyCostV != 0) const(bodyCostV)
-        else if (overhead || !letFixes) const(1L)
+        else if (overhead) zero
+        else if (!overhead && !letFixes) const(1L)
         else isBlankFunc(bodyUsedRefs, ctx.refsCosts).map(if (_) 1L else 0L)
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
