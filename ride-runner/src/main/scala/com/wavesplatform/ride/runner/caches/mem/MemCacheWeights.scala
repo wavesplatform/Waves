@@ -4,38 +4,20 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
 import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import com.wavesplatform.state.{AssetScriptInfo, BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{base58Length, base64Length}
-import org.ehcache.sizeof.SizeOf
-import org.ehcache.sizeof.filters.SizeOfFilter
-
-import java.lang.reflect.Field
-import java.util
+import org.github.jamm.MemoryMeter
 
 // Close size of objects in bytes
 object MemCacheWeights {
-  private val sizeOf = SizeOf.newInstance(
-    false,
-    true,
-    new SizeOfFilter {
-      private val excludeClassNames = Set(classOf[LazyBlockchain[?]].getName)
-
-      override def filterFields(klazz: Class[?], fields: util.Collection[Field]): util.Collection[Field] = fields
-      override def filterClass(klazz: Class[?]): Boolean = {
-        // Because we can't determine their sizes or they shared among all objects
-        val remove = klazz.getName.contains("$$Lambda$") || excludeClassNames.contains(klazz.getName)
-        !remove
-      }
-    }
-  )
+  private val sizeOf = MemoryMeter.builder().build()
 
   // Uses the reflection, so generally much slower than custom calculations
   private def ofAny(x: Any): Int = {
-    val longWeight = sizeOf.deepSizeOf(x)
+    val longWeight = sizeOf.measureDeep(x)
     if (longWeight.isValidInt) longWeight.toInt
     else throw new ArithmeticException(s"Weight of ${x.getClass.getSimpleName} overflow: $longWeight")
   }
