@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{defaultSigner, setScript}
 import org.scalatest.EitherValues
 
 class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherValues {
@@ -196,7 +197,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
     def estimateScript(script: Script): Option[Long] = {
       val estimator = ScriptEstimatorV3.latest
 
-      Script.estimate(script, estimator, fixEstimateOfVerifier = false, useContractVerifierLimit =  false).toOption
+      Script.estimate(script, estimator, fixEstimateOfVerifier = false, useContractVerifierLimit = false).toOption
     }
 
     val script1 = createScript(
@@ -225,5 +226,20 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
     estimateScript(script3) shouldBe defined
     estimateScript(script4) shouldBe defined
     estimateScript(script5) shouldBe defined
+  }
+
+  property("An old buggy check that was in effect before RideV6 should not cause an error if a variable is not used in a @Callable") {
+    val script = TestCompiler(V5).compileContract(
+      """
+        | func call() = {
+        |   let asset = invoke(addressFromStringValue(""), "", nil, nil)
+        |   nil
+        | }
+        |
+        | @Verifier(tx)
+        | func verify() = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
+      """.stripMargin
+    )
+    withDomain(RideV5, AddrWithBalance.enoughBalances(defaultSigner))(_.appendAndAssertSucceed(setScript(defaultSigner, script)))
   }
 }
