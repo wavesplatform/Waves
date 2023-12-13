@@ -469,7 +469,9 @@ object InvokeDiffsCommon {
       initSnapshot: StateSnapshot,
       remainingLimit: Int
   ): TracedResult[ValidationError, StateSnapshot] = {
-    actions.foldM(initSnapshot) { (currentSnapshot, action) =>
+    actions.foldLeft(TracedResult(initSnapshot.asRight[ValidationError])) {
+      case (r@TracedResult(Left(_), _, _), _) => r
+      case (TracedResult(Right(currentSnapshot), prevTrace, prevAttrs), action) =>
       val complexityLimit =
         if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
         else remainingLimit
@@ -566,7 +568,7 @@ object InvokeDiffsCommon {
                     val errorOpt = assetValidationSnapshot.fold(Some(_), _ => None)
                     TracedResult(
                       assetValidationSnapshot.map(d => portfolioSnapshot.setScriptsComplexity(d.scriptsComplexity)),
-                      List(AssetVerifierTrace(id, errorOpt, AssetContext.Transfer))
+                      prevTrace :+ AssetVerifierTrace(id, errorOpt, AssetContext.Transfer)
                     )
                   }
               )
@@ -675,7 +677,7 @@ object InvokeDiffsCommon {
           val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
           TracedResult(
             assetValidationDiff,
-            List(AssetVerifierTrace(assetId, errorOpt, assetType))
+            prevTrace :+ AssetVerifierTrace(assetId, errorOpt, assetType)
           )
         }
 
