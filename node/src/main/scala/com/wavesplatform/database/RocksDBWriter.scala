@@ -166,7 +166,7 @@ class RocksDBWriter(
   override protected def loadAccountData(address: Address, key: String): CurrentData =
     writableDB.get(Keys.data(address, key))
 
-  override protected def loadMultipleEntries(keys: Iterable[(Address, String)]): Map[(Address, String), CurrentData] = {
+  override protected def loadEntryHeights(keys: Iterable[(Address, String)]): Map[(Address, String), Height] = {
     val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addr, k) }.toSeq)
     val valBufs = database.getValueBuffers(keys.size, 8)
     val valueBuf = new Array[Byte](8)
@@ -181,8 +181,8 @@ class RocksDBWriter(
         if (status.status.getCode == Status.Code.Ok) {
           value.get(valueBuf)
           Util.releaseTemporaryDirectBuffer(status.value)
-          k -> readCurrentData(key)(valueBuf)
-        } else k -> CurrentData.empty(key)
+          k -> readCurrentData(key)(valueBuf).height
+        } else k -> Height(0)
       }.toMap
 
     keyBufs.forEach(Util.releaseTemporaryDirectBuffer _)
