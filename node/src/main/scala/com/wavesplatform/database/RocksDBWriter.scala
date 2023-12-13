@@ -31,8 +31,9 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
-import org.rocksdb.RocksDB
+import org.rocksdb.{RocksDB, Status}
 import org.slf4j.LoggerFactory
+import sun.nio.ch.Util
 
 import java.util
 import scala.annotation.tailrec
@@ -164,6 +165,34 @@ class RocksDBWriter(
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
     writableDB.get(Keys.data(address, key))
+
+  override protected def loadMultipleEntries(keys: Iterable[(Address, String)]): Map[(Address, String), CurrentData] = {
+    var nonEmptyCount = 0L
+
+    val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addr, k) }.toSeq)
+    val valBufs = database.getValueBuffers(keys.size, 8)
+    val valueBuf = new Array[Byte](8)
+
+    val result = rdb.db
+      .multiGetByteBuffers(keyBufs, valBufs)
+      .asScala
+      .view
+      .zip(keys)
+      .zip(valBufs.asScala)
+      .map { case ((status, k@(_, key)), value) =>
+        if (status.status.getCode == Status.Code.Ok) {
+          nonEmptyCount += 1
+          value.get(valueBuf)
+          Util.releaseTemporaryDirectBuffer(status.value)
+          k -> readCurrentData(key)(valueBuf)
+        } else k -> CurrentData.empty(key)
+      }.toMap
+
+    keyBufs.forEach(Util.releaseTemporaryDirectBuffer _)
+    valBufs.forEach(Util.releaseTemporaryDirectBuffer _)
+
+    result
+  }
 
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
@@ -297,7 +326,7 @@ class RocksDBWriter(
 
   private def appendBalances(
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
-      assetStatics: Map[IssuedAsset, AssetStaticInfo],
+      assetStatics: Map[IssuedAsset, (AssetStaticInfo, Int)],
       rw: RW
   ): Unit = {
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
@@ -315,7 +344,7 @@ class RocksDBWriter(
 
           val isNFT = currentBalance.balance > 0 && assetStatics
             .get(a)
-            .map(_.nft)
+            .map(_._1.nft)
             .orElse(assetDescription(a).map(_.nft))
             .getOrElse(false)
           if (currentBalance.prevHeight == Height(0) && isNFT) updatedNftLists.put(addressId.toLong, a)
@@ -449,7 +478,7 @@ class RocksDBWriter(
         rw.put(Keys.filledVolumeAndFeeAt(orderId, currentVolumeAndFee.height), volumeAndFeeNode)
       }
 
-      for ((asset, (assetStatic, assetNum)) <- snapshot.indexedAssetStatics) {
+      for ((asset, (assetStatic, assetNum)) <- snapshot.assetStatics) {
         val pbAssetStatic = StaticAssetInfo(
           assetStatic.source.toByteString,
           assetStatic.issuer.toByteString,
@@ -557,9 +586,7 @@ class RocksDBWriter(
             address            <- Seq(details.recipientAddress, details.sender.toAddress)
             addressId = this.addressIdWithFallback(address, newAddresses)
           } yield (addressId, leaseId)
-        val leaseIdsByAddressId = addressIdWithLeaseIds
-          .groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
-          .toSeq
+        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2).toSeq
 
         rw.multiGetInts(leaseIdsByAddressId.map(_._1._2))
           .zip(leaseIdsByAddressId)

@@ -310,7 +310,7 @@ package object database {
   }
 
   private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
-    pb.DataEntry.parseFrom(bs).value match {
+    if (bs == null || bs.length == 0) EmptyDataEntry(key) else  pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
       case Value.BoolValue(value)   => BooleanDataEntry(key, value)
@@ -358,6 +358,37 @@ package object database {
 
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
+
+  def getKeyBuffersFromKeys(keys: collection.Seq[Key[?]]): util.List[ByteBuffer] =
+    keys.map { k =>
+      val arr = k.keyBytes
+      val b   = Util.getTemporaryDirectBuffer(arr.length)
+      b.put(k.keyBytes).flip()
+      b
+    }.asJava
+
+  def getKeyBuffers(keys: collection.Seq[Array[Byte]]): util.List[ByteBuffer] =
+    keys.map { k =>
+      val b = Util.getTemporaryDirectBuffer(k.length)
+      b.put(k).flip()
+      b
+    }.asJava
+
+  def getValueBuffers(amount: Int, bufferSize: Int): util.List[ByteBuffer] =
+    List
+      .fill(amount) {
+        val buf = Util.getTemporaryDirectBuffer(bufferSize)
+        buf.limit(buf.capacity())
+        buf
+      }
+      .asJava
+
+  def getValueBuffers(bufferSizes: collection.Seq[Int]): util.List[ByteBuffer] =
+    bufferSizes.map { size =>
+      val buf = Util.getTemporaryDirectBuffer(size)
+      buf.limit(buf.capacity())
+      buf
+    }.asJava
 
   implicit class DBExt(val db: RocksDB) extends AnyVal {
 
@@ -498,37 +529,6 @@ package object database {
       try f(resource)
       finally resource.close()
     }
-
-    private def getKeyBuffersFromKeys(keys: collection.Seq[Key[?]]): util.List[ByteBuffer] =
-      keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-
-    private def getKeyBuffers(keys: collection.Seq[Array[Byte]]): util.List[ByteBuffer] =
-      keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-
-    private def getValueBuffers(amount: Int, bufferSize: Int): util.List[ByteBuffer] =
-      List
-        .fill(amount) {
-          val buf = Util.getTemporaryDirectBuffer(bufferSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-    private def getValueBuffers(bufferSizes: collection.Seq[Int]): util.List[ByteBuffer] =
-      bufferSizes.map { size =>
-        val buf = Util.getTemporaryDirectBuffer(size)
-        buf.limit(buf.capacity())
-        buf
-      }.asJava
 
     private def multiGetOpt[A](
         readOptions: ReadOptions,

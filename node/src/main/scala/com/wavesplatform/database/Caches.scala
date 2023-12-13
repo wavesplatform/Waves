@@ -184,6 +184,7 @@ abstract class Caches extends Blockchain with Storage with StrictLogging {
 
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(acc: Address, key: String): CurrentData
+  protected def loadMultipleEntries(keys: Iterable[(Address, String)]): Map[(Address, String), CurrentData]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
   private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] =
@@ -223,7 +224,7 @@ abstract class Caches extends Blockchain with Storage with StrictLogging {
       stateHash: StateHashBuilder.Result
   ): Unit
 
-  private var prevTs = System.currentTimeMillis()
+  private var prevTs         = System.currentTimeMillis()
   private var prevComplexity = 0L
 
   override def append(
@@ -297,17 +298,21 @@ abstract class Caches extends Blockchain with Storage with StrictLogging {
       BalanceNode(amount, prevBalance.height)
     )
 
-    val updatedDataWithNodes = for {
+    val newEntries = for {
       (address, entries) <- snapshot.accountData
       (key, entry)       <- entries
-    } yield {
-      val entryKey = (address, key)
-      val prevData = accountDataCache.get(entryKey)
-      entryKey -> (
-        CurrentData(entry, Height(height), prevData.height),
-        DataNode(entry, prevData.height)
-      )
-    }
+    } yield ((address, key), entry)
+
+    val cachedEntries = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
+    val loadedPrevEntries = loadMultipleEntries(newEntries.keys.filterNot(cachedEntries.contains))
+
+    val updatedDataWithNodes = (for {
+      (k, currentEntry) <- cachedEntries ++ loadedPrevEntries
+      newEntry          <- newEntries.get(k)
+    } yield k -> (
+      CurrentData(newEntry, Height(height), currentEntry.height),
+      DataNode(newEntry, currentEntry.height)
+    )).toMap
 
     val orderFillsWithNodes = for {
       (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills

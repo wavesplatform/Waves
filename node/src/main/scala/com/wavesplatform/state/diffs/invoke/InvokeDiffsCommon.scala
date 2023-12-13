@@ -469,9 +469,7 @@ object InvokeDiffsCommon {
       initSnapshot: StateSnapshot,
       remainingLimit: Int
   ): TracedResult[ValidationError, StateSnapshot] = {
-    actions.foldLeft(TracedResult(initSnapshot.asRight[ValidationError])) {
-      case (r@TracedResult(Left(_), _, _), _) => r
-      case (TracedResult(Right(currentSnapshot), _, _), action) =>
+    actions.foldM(initSnapshot) { (currentSnapshot, action) =>
       val complexityLimit =
         if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
         else remainingLimit
@@ -603,7 +601,7 @@ object InvokeDiffsCommon {
           StateSnapshot.build(
             blockchain,
             portfolios = Map(pk.toAddress -> Portfolio(assets = VectorMap(asset -> issue.quantity))),
-            issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo))
+            issuedAssets = Seq(asset -> NewAssetInfo(staticInfo, info, volumeInfo))
           )
         }
       }
