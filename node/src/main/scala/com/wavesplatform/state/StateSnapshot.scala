@@ -9,7 +9,7 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 import scala.collection.immutable.VectorMap
 
@@ -64,6 +64,8 @@ case class StateSnapshot(
 
   lazy val accountScriptsByAddress: Map[Address, Option[AccountScriptInfo]] =
     accountScripts.map { case (pk, script) => (pk.toAddress, script) }
+
+  lazy val erc20addresses = assetStatics.keysIterator.map(id => ERC20Address(id) -> id).toMap
 
   lazy val hashString: String =
     Integer.toHexString(hashCode())

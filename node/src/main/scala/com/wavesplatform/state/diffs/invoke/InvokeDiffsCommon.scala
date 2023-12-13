@@ -469,7 +469,9 @@ object InvokeDiffsCommon {
       initSnapshot: StateSnapshot,
       remainingLimit: Int
   ): TracedResult[ValidationError, StateSnapshot] = {
-    actions.foldM(initSnapshot) { (currentSnapshot, action) =>
+    actions.foldLeft(TracedResult(initSnapshot.asRight[ValidationError])) {
+      case (r@TracedResult(Left(_), _, _), _) => r
+      case (TracedResult(Right(currentSnapshot), _, _), action) =>
       val complexityLimit =
         if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
         else remainingLimit
@@ -587,7 +589,7 @@ object InvokeDiffsCommon {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset name", 0L)), List())
         } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
-        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
+        } else if (blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
           val error = s"Asset ${issue.id} is already issued"
           if (blockchain.isFeatureActivated(RideV6) || blockchain.height < blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
             TracedResult(Left(FailedTransactionError.dAppExecution(error, 0L)), List())
