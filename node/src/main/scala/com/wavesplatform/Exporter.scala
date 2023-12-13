@@ -1,8 +1,6 @@
 package com.wavesplatform
 
 import com.google.common.collect.AbstractIterator
-
-import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.protobuf.BlockMeta
@@ -19,6 +17,7 @@ import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -46,9 +45,9 @@ object Exporter extends ScorexLogging {
           new NTP(settings.ntpServer),
           RDB.open(settings.dbSettings)
         ) { (time, rdb) =>
-          val (blockchain, _)  = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
-          val blockchainHeight = blockchain.height
-          val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
+          val (blockchain, rdbWriter) = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
+          val blockchainHeight        = blockchain.height
+          val height                  = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
           log.info(s"Blockchain height is $blockchainHeight exporting to $height")
           val blocksOutputFilename = s"$blocksOutputFileNamePrefix-$height"
           log.info(s"Blocks output file: $blocksOutputFilename")
@@ -64,33 +63,35 @@ object Exporter extends ScorexLogging {
             case None    => ()
           }
 
-          Using.resources(
-            createOutputFile(blocksOutputFilename),
-            snapshotsOutputFilename.map(createOutputFile)
-          ) { case (blocksOutput, snapshotsOutput) =>
-            Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
-              case (blocksStream, snapshotsStream) =>
-                var exportedBlocksBytes    = 0L
-                var exportedSnapshotsBytes = 0L
-                val start                  = System.currentTimeMillis()
+          Using.resource(rdbWriter) { _ =>
+            Using.resources(
+              createOutputFile(blocksOutputFilename),
+              snapshotsOutputFilename.map(createOutputFile)
+            ) { case (blocksOutput, snapshotsOutput) =>
+              Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
+                case (blocksStream, snapshotsStream) =>
+                  var exportedBlocksBytes    = 0L
+                  var exportedSnapshotsBytes = 0L
+                  val start                  = System.currentTimeMillis()
 
-                new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
-                  exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
-                  snapshotsStream.foreach { output =>
-                    exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
+                  new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
+                    exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
+                    snapshotsStream.foreach { output =>
+                      exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
+                    }
+
+                    if (h % (height / 10) == 0) {
+                      log.info(
+                        s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+                      )
+                    }
                   }
-
-                  if (h % (height / 10) == 0) {
-                    log.info(
-                      s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+                  val duration = System.currentTimeMillis() - start
+                  log
+                    .info(
+                      s"Finished exporting $height blocks in ${java.time.Duration.ofMillis(duration)}, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
                     )
-                  }
-                }
-                val duration = System.currentTimeMillis() - start
-                log
-                  .info(
-                    s"Finished exporting $height blocks in ${java.time.Duration.ofMillis(duration)}, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
-                  )
+              }
             }
           }
         }

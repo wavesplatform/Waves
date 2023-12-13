@@ -69,7 +69,7 @@ object Explorer extends ScorexLogging {
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val rdb    = RDB.open(settings.dbSettings)
-    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
+    val reader = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -390,6 +390,9 @@ object Explorer extends ScorexLogging {
           val meta = rdb.db.get(Keys.transactionMetaById(TransactionId(ByteStr.decodeBase58(id).get), rdb.txMetaHandle))
           log.info(s"Meta: $meta")
       }
-    } finally rdb.close()
+    } finally {
+      reader.close()
+      rdb.close()
+    }
   }
 }

@@ -37,7 +37,7 @@ import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
 import java.util
-import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
+import java.util.concurrent.*
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -103,6 +103,32 @@ object RocksDBWriter extends ScorexLogging {
 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
+
+  def apply(
+      rdb: RDB,
+      settings: BlockchainSettings,
+      dbSettings: DBSettings,
+      isLightMode: Boolean,
+      bfBlockInsertions: Int = 10000,
+      deleteOldEntriesThreadPoolExecutor: Option[ExecutorService] = None
+  ): RocksDBWriter = new RocksDBWriter(
+    rdb,
+    settings,
+    dbSettings,
+    isLightMode,
+    bfBlockInsertions,
+    deleteOldEntriesThreadPoolExecutor.getOrElse {
+      new ThreadPoolExecutor(
+        1,
+        1,
+        0,
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue[Runnable],
+        new DefaultThreadFactory("delete-old-entries", true),
+        { (_: Runnable, _: ThreadPoolExecutor) => /* Ignoring rejected tasks */ }
+      )
+    }
+  )
 }
 
 //noinspection UnstableApiUsage
@@ -111,7 +137,8 @@ class RocksDBWriter(
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
     isLightMode: Boolean,
-    bfBlockInsertions: Int = 10000
+    bfBlockInsertions: Int = 10000,
+    deleteOldEntriesThreadPoolExecutor: ExecutorService
 ) extends Caches
     with AutoCloseable {
   import rdb.db as writableDB
@@ -122,33 +149,10 @@ class RocksDBWriter(
 
   import RocksDBWriter.*
 
-  private val deleteOldEntriesThreadPoolExecutor = new ThreadPoolExecutor(
-    1,
-    1,
-    0,
-    TimeUnit.SECONDS,
-    new LinkedBlockingQueue[Runnable],
-    new DefaultThreadFactory("db-cleanup", false),
-    { (r: Runnable, executor: ThreadPoolExecutor) =>
-      log.error(s"$r has been rejected from $executor")
-      throw new RejectedExecutionException
-    }
-  )
-
   override def close(): Unit = {
-    deleteOldEntriesThreadPoolExecutor.shutdown()
-
-    var attempts = 5
-    while (attempts > 0) {
-      log.trace(s"Stopping ${deleteOldEntriesThreadPoolExecutor.getQueue.size()} tasks")
-      if (deleteOldEntriesThreadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS)) attempts = -1
-      else attempts -= 1
-    }
-
-    if (attempts == 0) {
-      val xs = deleteOldEntriesThreadPoolExecutor.shutdownNow()
-      log.trace(s"Canceling ${xs.size()} tasks")
-    }
+    deleteOldEntriesThreadPoolExecutor.shutdownNow()
+    if (!deleteOldEntriesThreadPoolExecutor.awaitTermination(20, TimeUnit.SECONDS))
+      log.warn("Not enough time to a stop deleting old entries task, try to increase the limit")
   }
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -1034,7 +1038,7 @@ class RocksDBWriter(
         .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
           case (tm, t: TransferTransaction) if tm.status == TxMeta.Status.Succeeded => t
-          case (m, e @ EthereumTransaction(transfer: Transfer, _, _, _)) if tm.status == PBStatus.SUCCEEDED =>
+          case (_, e @ EthereumTransaction(transfer: Transfer, _, _, _)) if tm.status == PBStatus.SUCCEEDED =>
             val asset = transfer.tokenAddress.fold[Asset](Waves)(resolveERC20Address(_).get)
             e.toTransferLike(TxPositiveAmount.unsafeFrom(transfer.amount), transfer.recipient, asset)
         }

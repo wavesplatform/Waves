@@ -1,6 +1,5 @@
 package com.wavesplatform.test
 
-import com.wavesplatform.{Exporter, checkGenesis, crypto}
 import com.wavesplatform.Exporter.IO
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -17,30 +16,16 @@ import com.wavesplatform.settings.{DBSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.BlockchainGenerator.{GenBlock, GenTx}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.{
-  BurnTransaction,
-  IssueTransaction,
-  ReissueTransaction,
-  SetAssetScriptTransaction,
-  SponsorFeeTransaction,
-  UpdateAssetInfoTransaction
-}
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{
-  CreateAliasTransaction,
-  DataTransaction,
-  EthTxGenerator,
-  EthereumTransaction,
-  PaymentTransaction,
-  Transaction,
-  TxHelpers
-}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, EthTxGenerator, EthereumTransaction, PaymentTransaction, Transaction, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{Exporter, checkGenesis, crypto}
 import io.netty.channel.group.DefaultChannelGroup
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ConcurrentSubject
@@ -121,82 +106,83 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       override def getTimestamp(): Long  = time
     }
     Using.resource(RDB.open(dbSettings)) { db =>
-      val (blockchain, _) =
-        StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
-      Using.resource(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)) { utxPool =>
-        val pos         = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
-        val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler)(_, None)
-        val utxEvents   = ConcurrentSubject.publish[UtxEvent]
+      val (blockchain, rdbWriter) = StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
+      Using.resource(rdbWriter) { _ =>
+        Using.resource(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)) { utxPool =>
+          val pos = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
+          val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler)(_, None)
+          val utxEvents = ConcurrentSubject.publish[UtxEvent]
 
-        val miner = new MinerImpl(
-          new DefaultChannelGroup("", null),
-          blockchain,
-          settings,
-          time,
-          utxPool,
-          Wallet(settings.walletSettings),
-          PoSSelector(blockchain, None),
-          scheduler,
-          scheduler,
-          utxEvents.collect { case _: UtxEvent.TxAdded =>
-            ()
+          val miner = new MinerImpl(
+            new DefaultChannelGroup("", null),
+            blockchain,
+            settings,
+            time,
+            utxPool,
+            Wallet(settings.walletSettings),
+            PoSSelector(blockchain, None),
+            scheduler,
+            scheduler,
+            utxEvents.collect { case _: UtxEvent.TxAdded =>
+              ()
+            }
+          )
+
+          checkGenesis(settings, blockchain, Miner.Disabled)
+          val result = genBlocks.foldLeft[Either[ValidationError, Unit]](Right(())) {
+            case (res@Left(_), _) => res
+            case (_, genBlock) =>
+              time.time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
+              val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))
+
+              miner.forgeBlock(genBlock.signer) match {
+                case Right((block, _)) =>
+                  for {
+                    blockWithTxs <- Block.buildAndSign(
+                      block.header.version,
+                      block.header.timestamp,
+                      block.header.reference,
+                      block.header.baseTarget,
+                      block.header.generationSignature,
+                      correctedTimeTxs,
+                      genBlock.signer,
+                      block.header.featureVotes,
+                      block.header.rewardVote,
+                      block.header.stateHash,
+                      block.header.challengedHeader
+                    )
+                    _ <- Await
+                      .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
+                  } yield exportToFile(blockWithTxs)
+
+                case Left(err) => Left(GenericError(err))
+              }
           }
-        )
-
-        checkGenesis(settings, blockchain, Miner.Disabled)
-        val result = genBlocks.foldLeft[Either[ValidationError, Unit]](Right(())) {
-          case (res @ Left(_), _) => res
-          case (_, genBlock) =>
-            time.time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
-            val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))
-
-            miner.forgeBlock(genBlock.signer) match {
-              case Right((block, _)) =>
-                for {
-                  blockWithTxs <- Block.buildAndSign(
-                    block.header.version,
-                    block.header.timestamp,
-                    block.header.reference,
-                    block.header.baseTarget,
-                    block.header.generationSignature,
-                    correctedTimeTxs,
-                    genBlock.signer,
-                    block.header.featureVotes,
-                    block.header.rewardVote,
-                    block.header.stateHash,
-                    block.header.challengedHeader
-                  )
-                  _ <- Await
-                    .result(extAppender(blockWithTxs).runAsyncLogErr, Duration.Inf)
-                } yield exportToFile(blockWithTxs)
-
-              case Left(err) => Left(GenericError(err))
-            }
-        }
-        result match {
-          case Right(_) =>
-            if (blockchain.isFeatureActivated(BlockchainFeatures.NG) && blockchain.liquidBlockMeta.nonEmpty) {
-              val lastHeader = blockchain.lastBlockHeader.get.header
-              val pseudoBlock = Block(
-                BlockHeader(
-                  blockchain.blockVersionAt(blockchain.height),
-                  time.getTimestamp() + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis,
-                  blockchain.lastBlockId.get,
-                  lastHeader.baseTarget,
-                  lastHeader.generationSignature,
-                  lastHeader.generator,
-                  Nil,
-                  0,
+          result match {
+            case Right(_) =>
+              if (blockchain.isFeatureActivated(BlockchainFeatures.NG) && blockchain.liquidBlockMeta.nonEmpty) {
+                val lastHeader = blockchain.lastBlockHeader.get.header
+                val pseudoBlock = Block(
+                  BlockHeader(
+                    blockchain.blockVersionAt(blockchain.height),
+                    time.getTimestamp() + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis,
+                    blockchain.lastBlockId.get,
+                    lastHeader.baseTarget,
+                    lastHeader.generationSignature,
+                    lastHeader.generator,
+                    Nil,
+                    0,
+                    ByteStr.empty,
+                    None,
+                    None
+                  ),
                   ByteStr.empty,
-                  None,
-                  None
-                ),
-                ByteStr.empty,
-                Nil
-              )
-              blockchain.processBlock(pseudoBlock, ByteStr.empty, None, verify = false)
-            }
-          case Left(err) => log.error(s"Error appending block: $err")
+                  Nil
+                )
+                blockchain.processBlock(pseudoBlock, ByteStr.empty, None, verify = false)
+              }
+            case Left(err) => log.error(s"Error appending block: $err")
+          }
         }
       }
     }

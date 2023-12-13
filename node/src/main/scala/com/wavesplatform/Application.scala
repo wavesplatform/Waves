@@ -518,6 +518,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
       log.info("Closing storage")
+      rocksDB.close()
       rdb.close()
 
       // extensions should be shut down last, after all node functionality, to guarantee no data loss

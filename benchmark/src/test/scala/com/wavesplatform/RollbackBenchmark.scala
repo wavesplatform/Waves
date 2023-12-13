@@ -111,6 +111,7 @@ object RollbackBenchmark extends ScorexLogging {
     rocksDBWriter.rollbackTo(1)
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
+    rocksDBWriter.close()
     rdb.close()
   }
 }

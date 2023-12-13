@@ -44,6 +44,7 @@ abstract class DBState extends ScorexLogging {
 
   @TearDown
   def close(): Unit = {
+    rocksDBWriter.close()
     rdb.close()
   }
 }

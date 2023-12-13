@@ -295,6 +295,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
       bcu.shutdown()
     } finally {
       bcu.shutdown()
+      defaultWriter.close()
       db.close()
       TestHelpers.deleteRecursively(path)
     }

@@ -56,7 +56,7 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
           txMetaCfOptions.options
-            .optimizeForPointLookup(16 << 20) // Iterators won't work with this option
+            .optimizeForPointLookup(16 << 20) // Iterators might not work with this option
             .setDisableAutoCompactions(true)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
         ),
