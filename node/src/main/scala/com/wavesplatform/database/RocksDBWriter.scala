@@ -167,8 +167,6 @@ class RocksDBWriter(
     writableDB.get(Keys.data(address, key))
 
   override protected def loadMultipleEntries(keys: Iterable[(Address, String)]): Map[(Address, String), CurrentData] = {
-    var nonEmptyCount = 0L
-
     val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addr, k) }.toSeq)
     val valBufs = database.getValueBuffers(keys.size, 8)
     val valueBuf = new Array[Byte](8)
@@ -181,7 +179,6 @@ class RocksDBWriter(
       .zip(valBufs.asScala)
       .map { case ((status, k@(_, key)), value) =>
         if (status.status.getCode == Status.Code.Ok) {
-          nonEmptyCount += 1
           value.get(valueBuf)
           Util.releaseTemporaryDirectBuffer(status.value)
           k -> readCurrentData(key)(valueBuf)
