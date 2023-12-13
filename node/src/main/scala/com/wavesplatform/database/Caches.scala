@@ -3,7 +3,6 @@ package com.wavesplatform.database
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
-import com.typesafe.scalalogging.StrictLogging
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -25,7 +24,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches extends Blockchain with Storage with StrictLogging {
+abstract class Caches extends Blockchain with Storage {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -224,9 +223,6 @@ abstract class Caches extends Blockchain with Storage with StrictLogging {
       stateHash: StateHashBuilder.Result
   ): Unit
 
-  private var prevTs         = System.currentTimeMillis()
-  private var prevComplexity = 0L
-
   override def append(
       snapshot: StateSnapshot,
       carryFee: Long,
@@ -337,13 +333,6 @@ abstract class Caches extends Blockchain with Storage with StrictLogging {
     for (leaseId <- snapshot.cancelledLeases.keys) stateHash.addLeaseStatus(leaseId, isActive = false)
     for ((assetId, sponsorship) <- snapshot.sponsorships) stateHash.addSponsorship(assetId, sponsorship.minFee)
     for ((alias, address)       <- snapshot.aliases) stateHash.addAlias(address, alias.name)
-
-    prevComplexity += snapshot.scriptsComplexity
-    if (System.currentTimeMillis() - prevTs > 60000) {
-      logger.info(s"COMP: $prevComplexity")
-      prevComplexity = 0
-      prevTs = System.currentTimeMillis()
-    }
 
     doAppend(
       newMeta,
