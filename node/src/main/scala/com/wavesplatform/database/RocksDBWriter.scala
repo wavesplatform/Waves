@@ -110,14 +110,14 @@ object RocksDBWriter extends ScorexLogging {
       dbSettings: DBSettings,
       isLightMode: Boolean,
       bfBlockInsertions: Int = 10000,
-      deleteOldEntriesThreadPoolExecutor: Option[ExecutorService] = None
+      forceCleanupExecutorService: Option[ExecutorService] = None
   ): RocksDBWriter = new RocksDBWriter(
     rdb,
     settings,
     dbSettings,
     isLightMode,
     bfBlockInsertions,
-    deleteOldEntriesThreadPoolExecutor.getOrElse {
+    forceCleanupExecutorService.getOrElse {
       new ThreadPoolExecutor(
         1,
         1,
@@ -138,7 +138,7 @@ class RocksDBWriter(
     val dbSettings: DBSettings,
     isLightMode: Boolean,
     bfBlockInsertions: Int = 10000,
-    deleteOldEntriesThreadPoolExecutor: ExecutorService
+    cleanupExecutorService: ExecutorService
 ) extends Caches
     with AutoCloseable {
   import rdb.db as writableDB
@@ -150,9 +150,9 @@ class RocksDBWriter(
   import RocksDBWriter.*
 
   override def close(): Unit = {
-    deleteOldEntriesThreadPoolExecutor.shutdownNow()
-    if (!deleteOldEntriesThreadPoolExecutor.awaitTermination(20, TimeUnit.SECONDS))
-      log.warn("Not enough time to a stop deleting old entries task, try to increase the limit")
+    cleanupExecutorService.shutdownNow()
+    if (!cleanupExecutorService.awaitTermination(20, TimeUnit.SECONDS))
+      log.warn("Not enough time for a cleanup task, try to increase the limit")
   }
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
@@ -446,17 +446,24 @@ class RocksDBWriter(
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
 
-        deleteOldEntriesThreadPoolExecutor.submit(new Runnable {
+        cleanupExecutorService.submit(new Runnable {
           override def run(): Unit = {
-            writableDB.withOptions { (ro, wo) =>
-              writableDB.readWriteWithOptions(ro, wo) { rw =>
-                deleteOldWavesBalanceEntries(Height(newSafeRollbackHeight), rw)
-                if (newSafeRollbackHeight % dbSettings.deleteOldDataInterval == 0) {
-                  batchDeleteOldEntries(
-                    fromInclusive = Height(newSafeRollbackHeight - dbSettings.deleteOldDataInterval + 1),
-                    toInclusive = Height(newSafeRollbackHeight),
-                    rw = rw
-                  )
+            val lastCleanupHeight = rdb.db.get(Keys.lastCleanupHeight)
+            // If lastCleanupHeight is previous to newSafeRollbackHeight, we run 1 batch.
+            // If more - we will run multiple batches to preserve the progress and don't overfill RAM.
+            (lastCleanupHeight + 1 to newSafeRollbackHeight).foreach { height =>
+              writableDB.withOptions { (ro, wo) =>
+                writableDB.readWriteWithOptions(ro, wo) { rw =>
+                  val h = Height(height)
+                  cleanupWavesBalanceEntries(h, rw)
+                  if (h % dbSettings.cleanupInterval == 0) {
+                    batchCleanup(
+                      fromInclusive = Height(h - dbSettings.cleanupInterval + 1),
+                      toInclusive = h,
+                      rw = rw
+                    )
+                  }
+                  rw.put(Keys.lastCleanupHeight, h)
                 }
               }
             }
@@ -684,7 +691,7 @@ class RocksDBWriter(
 
   // Because ChangedAddresses contains addresses those are affected by a transaction or have changed WAVES balance.
   // In case of sponsor transfers without WAVES an address is affected by a transaction, but WAVES balance still the same.
-  private def deleteOldWavesBalanceEntries(height: Height, rw: RW): Unit = {
+  private def cleanupWavesBalanceEntries(height: Height, rw: RW): Unit = {
     val changedAddressesKey = Keys.changedAddresses(height)
     val changedAddresses    = rw.get(changedAddressesKey)
 
@@ -704,7 +711,7 @@ class RocksDBWriter(
       }
   }
 
-  private def batchDeleteOldEntries(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
+  private def batchCleanup(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
     // Asset balances
 
     val lastAssetBalanceUpdateAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]

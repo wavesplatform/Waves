@@ -6,7 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -58,9 +57,8 @@ object Keys {
   import KeyHelpers.*
   import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
-  val version: Key[Int] = intKey(Version, default = 1)
-  val height: Key[Height] =
-    Key(Height, Array.emptyByteArray, v => state.Height @@ (if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else 0), Ints.toByteArray)
+  val version: Key[Int]   = intKey(Version, default = 1)
+  val height: Key[Height] = heightKey(Height)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
 
@@ -229,4 +227,6 @@ object Keys {
 
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
+
+  val lastCleanupHeight: Key[Height] = heightKey(LastCleanupHeight)
 }

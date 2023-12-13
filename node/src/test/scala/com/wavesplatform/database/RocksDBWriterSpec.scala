@@ -163,10 +163,10 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     d.blockchain.resolveAlias(createAlias.alias) shouldEqual Left(AliasDoesNotExist(createAlias.alias))
   }
 
-  "deleteOldEntries" - {
+  "cleanup" - {
     val settings = {
       val s = DomainPresets.RideV6
-      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = 4, deleteOldDataInterval = 4))
+      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = 4, cleanupInterval = 4))
     }
 
     val alice        = TxHelpers.signer(1)
@@ -285,7 +285,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
       var nonHistoricalKeysWithoutCleanup: CollectedKeys = mutable.ArrayBuffer.empty
       withDomain(
-        settings.copy(dbSettings = settings.dbSettings.copy(deleteOldDataInterval = 1000)), // Won't delete old data
+        settings.copy(dbSettings = settings.dbSettings.copy(cleanupInterval = 1000)), // Won't delete old data
         Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))
       ) { d =>
         appendBlocks(d)
