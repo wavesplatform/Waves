@@ -1,5 +1,5 @@
 package com.wavesplatform.lang.estimator
-import com.wavesplatform.lang.directives.values.{Expression, V6}
+import com.wavesplatform.lang.directives.values.{Expression, V4, V6}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
@@ -129,5 +129,16 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
       """.stripMargin
     estimate(script) shouldBe Right(3)
     estimateFixed(script) shouldBe Right(3)
+  }
+
+  property("blank function call with/without overhead before let fixes") {
+    Seq(false, true).foreach(overhead =>
+      ScriptEstimatorV3(fixOverflow = true, overhead, letFixes = false)(
+        lets,
+        functionCosts(V4),
+        compile("func f() = true\nf()")
+      ) shouldBe Right(1)
+    // with overhead 1 for "true", without — for blank function call
+    )
   }
 }
