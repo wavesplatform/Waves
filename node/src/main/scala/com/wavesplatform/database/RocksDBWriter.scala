@@ -176,11 +176,9 @@ class RocksDBWriter(
       .asScala
       .view
       .zip(keys)
-      .zip(valBufs.asScala)
-      .map { case ((status, k@(_, key)), value) =>
+      .map { case (status, k@(_, key)) =>
         if (status.status.getCode == Status.Code.Ok) {
-          value.get(valueBuf)
-          Util.releaseTemporaryDirectBuffer(status.value)
+          status.value.get(valueBuf)
           k -> readCurrentData(key)(valueBuf).height
         } else k -> Height(0)
       }.toMap

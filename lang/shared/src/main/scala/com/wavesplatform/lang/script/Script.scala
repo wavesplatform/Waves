@@ -32,7 +32,7 @@ trait Script {
     case _            => false
   }
 
-  override def hashCode(): Int = stdLibVersion.id * 31 + expr.hashCode()
+  override def hashCode(): Int = stdLibVersion.id * 31 + bytes().hashCode()
 }
 
 object Script {

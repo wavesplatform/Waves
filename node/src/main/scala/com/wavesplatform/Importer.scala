@@ -369,9 +369,13 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-          val snapshotsOffset = (2 to blockchainUpdater.height).map { h =>
-            database.loadTxStateSnapshots(Height(h), rdb).map(_.toByteArray.length).sum
-          }.sum
+
+          var totalSize = 0L
+          rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight) { e =>
+            totalSize += e.getValue.length
+          }
+
+          val snapshotsOffset = totalSize
 
           blocksOffset -> snapshotsOffset.toLong
         case _ => 0L -> 0L
