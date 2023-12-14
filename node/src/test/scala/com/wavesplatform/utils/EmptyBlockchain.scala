@@ -49,6 +49,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = None
 
+  override def transactionSnapshot(id: ByteStr): Option[StateSnapshot] = None
+
   override def containsTransaction(tx: Transaction): Boolean = false
 
   override def assetDescription(id: IssuedAsset): Option[AssetDescription] = None

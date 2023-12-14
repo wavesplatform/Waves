@@ -17,7 +17,7 @@ import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, Bl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
+import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
@@ -970,11 +970,11 @@ class RocksDBWriter(
     }
   }
 
-  def transactionSnapshot(id: ByteStr): Option[TransactionStateSnapshot] = readOnly { db =>
+  override def transactionSnapshot(id: ByteStr): Option[StateSnapshot] = readOnly { db =>
     for {
       meta     <- db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
       snapshot <- db.get(Keys.transactionStateSnapshotAt(Height(meta.height), TxNum(meta.num.toShort), rdb.txSnapshotHandle))
-    } yield snapshot
+    } yield PBSnapshots.fromProtobuf(snapshot, id, meta.height)._1
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] =

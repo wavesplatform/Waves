@@ -119,6 +119,12 @@ case class SnapshotBlockchain(
       .map(t => TxMeta(Height(this.height), t.status, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
+  override def transactionSnapshot(id: ByteStr): Option[StateSnapshot] =
+    snapshot.transactions
+      .get(id)
+      .map(_.snapshot)
+      .orElse(inner.transactionSnapshot(id))
+
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = inner.resolveAlias(alias) match {

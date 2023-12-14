@@ -41,6 +41,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]                              = ???
       override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]]                  = ???
       override def transactionMeta(id: ByteStr): Option[TxMeta]                                             = ???
+      override def transactionSnapshot(id: ByteStr): Option[StateSnapshot]                                  = ???
       override def containsTransaction(tx: Transaction): Boolean                                            = ???
       override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]                        = ???
       override def resolveAlias(a: Alias): Either[ValidationError, Address]                                 = ???

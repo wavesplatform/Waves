@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -751,6 +752,10 @@ class BlockchainUpdaterImpl(
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = readLock {
     snapshotBlockchain.transactionMeta(id)
+  }
+
+  override def transactionSnapshot(id: ByteStr): Option[StateSnapshot] = readLock {
+    snapshotBlockchain.transactionSnapshot(id)
   }
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = readLock {

@@ -12,7 +12,6 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -47,6 +46,7 @@ trait Blockchain {
   def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
   def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]]
   def transactionMeta(id: ByteStr): Option[TxMeta]
+  def transactionSnapshot(id: ByteStr): Option[StateSnapshot]
 
   def containsTransaction(tx: Transaction): Boolean
 
