@@ -77,6 +77,11 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         val hash2 = block(12).stateHash
         hash2 shouldBe defined
         hash2 should not be hash1
+
+        d.rollbackTo(11)
+        d.lastBlock.header.stateHash shouldBe empty
+        appendBlock()
+        d.lastBlock.header.stateHash shouldBe defined
       }
     }
   }
