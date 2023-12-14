@@ -115,6 +115,8 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         val challengingBlock2 = d.createChallengingBlock(secondSigner, invalidBlock, strictTime = true)
         d.testTime.setTime(challengingBlock2.header.timestamp)
         append(challengingBlock2) shouldBe a[Right[?, ?]]
+        challengingBlock2.header.challengedHeader shouldBe defined
+        challengingBlock2.header.stateHash shouldBe defined
       }
     }
   }
