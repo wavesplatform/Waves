@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.DomainPresets.*
@@ -43,7 +44,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             .explicitGet()
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
-        d.rocksDBWriter.transactionSnapshot(tx.id()).get shouldBe expectedSnapshotWithMiner
+        val status = if (failed) Failed else Succeeded
+        d.rocksDBWriter.transactionSnapshot(tx.id()).get shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
