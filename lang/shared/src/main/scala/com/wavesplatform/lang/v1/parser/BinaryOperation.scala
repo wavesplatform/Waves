@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import fastparse.*
+import fastparse.MultiLineWhitespace.*
 
 sealed abstract class BinaryOperation {
   val func: String

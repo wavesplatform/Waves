@@ -11,9 +11,7 @@ import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFacto
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.LightNode
-import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
-import com.wavesplatform.history.{Domain, SnapshotOps}
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lagonaki.mocks.TestBlock.BlockWithSigner
 import com.wavesplatform.lang.ValidationError
@@ -22,10 +20,11 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NgState, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.test.*
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
@@ -113,7 +112,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       fs: FunctionalitySettings = TFS.Enabled,
       enableExecutionLog: Boolean = false
   )(
-      assertion: Either[ValidationError, Diff] => Unit
+      assertion: Either[ValidationError, StateSnapshot] => Unit
   ): Unit = withTestState(fs) { (bcu, state) =>
     assertDiffEi(preconditions, block, bcu, state, enableExecutionLog)(assertion)
   }
@@ -125,7 +124,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       state: RocksDBWriter,
       enableExecutionLog: Boolean
   )(
-      assertion: Either[ValidationError, Diff] => Unit
+      assertion: Either[ValidationError, StateSnapshot] => Unit
   ): Unit = {
     def differ(blockchain: Blockchain, b: Block) =
       BlockDiffer.fromBlock(
@@ -151,8 +150,11 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         preconditionBlock
       )
     }
-    val totalDiff1 = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.flatMap(differ(state, _))
-    assertion(totalDiff1.map(_.snapshot.toDiff(state)))
+    val snapshot =
+      blockWithComputedStateHash(block.block, block.signer, bcu).resultE
+        .flatMap(differ(state, _))
+        .map(_.snapshot)
+    assertion(snapshot)
   }
 
   def assertDiffEiTraced(
@@ -161,7 +163,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       fs: FunctionalitySettings = TFS.Enabled,
       enableExecutionLog: Boolean = false
   )(
-      assertion: TracedResult[ValidationError, Diff] => Unit
+      assertion: TracedResult[ValidationError, StateSnapshot] => Unit
   ): Unit = withTestState(fs) { (bcu, state) =>
     def getCompBlockchain(blockchain: Blockchain) = {
       val reward = if (blockchain.height > 0) bcu.computeNextReward else None
@@ -197,17 +199,17 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       )
     }
 
-    val totalDiff1 =
+    val snapshot1 =
       (blockWithComputedStateHash(block.block, block.signer, bcu) match {
         case right @ TracedResult(Right(_), _, _) => right.copy(trace = Nil)
         case err                                  => err
       }).flatMap(differ(state, state.lastBlock, _))
 
-    assertion(totalDiff1.map(_.snapshot.toDiff(state)))
+    assertion(snapshot1.map(_.snapshot))
   }
 
   private def assertDiffAndState(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, fs: FunctionalitySettings, withNg: Boolean)(
-      assertion: (Diff, Blockchain) => Unit
+      assertion: (StateSnapshot, Blockchain) => Unit
   ): Unit = withTestState(fs) { (bcu, state) =>
     def getCompBlockchain(blockchain: Blockchain) =
       if (withNg && fs.preActivatedFeatures.get(BlockchainFeatures.BlockReward.id).exists(_ <= blockchain.height)) {
@@ -227,8 +229,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val preconditionBlock = blockWithComputedStateHash(curBlock.block, curBlock.signer, bcu).resultE.explicitGet()
-      val BlockDiffer.Result(diff, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, preconditionBlock).explicitGet()
-      state.append(diff, fees, totalFee, None, preconditionBlock.header.generationSignature, computedStateHash, preconditionBlock)
+      val BlockDiffer.Result(snapshot, fees, totalFee, _, _, computedStateHash) = differ(state, prevBlock, preconditionBlock).explicitGet()
+      state.append(snapshot, fees, totalFee, None, preconditionBlock.header.generationSignature, computedStateHash, preconditionBlock)
       Some(preconditionBlock)
     }
 
@@ -246,22 +248,19 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         checkedBlock.header.generationSignature,
         Map()
       )
-    val cb   = SnapshotBlockchain(state, ngState)
-    val diff = snapshot.toDiff(state)
-    assertion(diff, cb)
-
+    val cb = SnapshotBlockchain(state, ngState)
+    assertion(snapshot, cb)
     state.append(snapshot, fees, totalFee, None, checkedBlock.header.generationSignature, computedStateHash, checkedBlock)
-
-    assertion(diff, state)
+    assertion(snapshot, state)
   }
 
   def assertNgDiffState(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: (Diff, Blockchain) => Unit
+      assertion: (StateSnapshot, Blockchain) => Unit
   ): Unit =
     assertDiffAndState(preconditions, block, fs, withNg = true)(assertion)
 
   def assertDiffAndState(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: (Diff, Blockchain) => Unit
+      assertion: (StateSnapshot, Blockchain) => Unit
   ): Unit =
     assertDiffAndState(preconditions, block, fs, withNg = false)(assertion)
 
@@ -289,9 +288,8 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         val checkedBlock = blockWithComputedStateHash(block.block, block.signer, bcu).resultE.explicitGet()
 
         differ(state, checkedBlock).map { result =>
-          val snapshot = SnapshotOps.fromDiff(result.snapshot.toDiff(state), state).explicitGet()
           state.append(
-            snapshot,
+            result.snapshot,
             result.carry,
             result.totalFee,
             None,
@@ -303,11 +301,15 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       })
     }
 
-  def assertBalanceInvariant(diff: Diff): Unit = {
-    val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-    portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance(false).explicitGet() shouldBe 0
-    all(portfolioDiff.assets.values) shouldBe 0
+  def assertBalanceInvariant(snapshot: StateSnapshot, db: RocksDBWriter, rewardAndFee: Long = 0): Unit = {
+    snapshot.balances.toSeq
+      .map {
+        case ((`defaultAddress`, Waves), balance) => Waves -> (balance - db.balance(defaultAddress, Waves) - rewardAndFee)
+        case ((address, asset), balance)          => asset -> (balance - db.balance(address, asset))
+      }
+      .groupMap(_._1)(_._2)
+      .foreach { case (_, balances) => balances.sum shouldBe 0 }
+    snapshot.leaseBalances.foreach { case (address, balance) => balance shouldBe db.leaseBalance(address) }
   }
 
   def assertLeft(preconditions: Seq[BlockWithSigner], block: BlockWithSigner, fs: FunctionalitySettings = TFS.Enabled)(errorMessage: String): Unit =
@@ -318,7 +320,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       signer: KeyPair,
       blockchain: BlockchainUpdater & Blockchain
   ): TracedResult[ValidationError, Block] = {
-    (if (blockchain.isFeatureActivated(LightNode, blockchain.height + 1)) {
+    (if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
        val compBlockchain =
          SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, ByteStr.empty, 0, blockchain.computeNextReward, None)
        val prevStateHash = blockchain.lastStateHash(Some(blockWithoutStateHash.header.reference))
@@ -401,7 +403,7 @@ trait WithDomain extends WithState { _: Suite =>
           domain.appendBlock(
             createGenesisWithStateHash(
               genesis,
-              bcu.isFeatureActivated(BlockchainFeatures.LightNode, 1),
+              fillStateHash = blockchain.supportsLightNodeBlockFields(),
               Some(settings.blockchainSettings.genesisSettings.initialBaseTarget)
             )
           )
@@ -425,7 +427,7 @@ trait WithDomain extends WithState { _: Suite =>
       .filter(v => v >= from && v <= to)
       .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
 
-  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], txStateSnapshotActivated: Boolean, baseTarget: Option[Long] = None): Block = {
+  def createGenesisWithStateHash(txs: Seq[GenesisTransaction], fillStateHash: Boolean, baseTarget: Option[Long] = None): Block = {
     val timestamp = txs.map(_.timestamp).max
     val genesisSettings = GenesisSettings(
       timestamp,
@@ -458,7 +460,7 @@ trait WithDomain extends WithState { _: Suite =>
         GenesisGenerator,
         Seq.empty,
         -1,
-        Option.when(txStateSnapshotActivated)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
+        Option.when(fillStateHash)(TxStateSnapshotHashBuilder.createGenesisStateHash(txs)),
         None
       )
     } yield block).explicitGet()

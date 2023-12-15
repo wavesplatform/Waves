@@ -561,7 +561,7 @@ class DecompilerTest extends PropSpec {
 
   def compileExpr(code: String, v: StdLibVersion = V3): Either[String, (EXPR, TYPE)] = {
     val untyped = Parser.parseExpr(code).get.value
-    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, untyped)
+    val typed   = ExpressionCompiler(getTestContext(v).compilerContext, v, untyped)
     typed
   }
 
@@ -1118,7 +1118,7 @@ class DecompilerTest extends PropSpec {
   }
 
   property("calculateDelay()") {
-    val script = "calculateDelay(base58'aaa', 123, Address(base58'bbb'), 456)"
+    val script = "calculateDelay(Address(base58'bbb'), 456)"
     assertDecompile(script, script, V8)
   }
 

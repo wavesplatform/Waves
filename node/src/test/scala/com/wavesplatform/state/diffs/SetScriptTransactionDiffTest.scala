@@ -435,7 +435,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       withDomain(domainSettingsWithFS(settings()), balances) { db =>
         val tx = setScript()
         db.appendBlock(tx)
-        db.liquidDiff.errorMessage(tx.id()) shouldBe None
+        db.liquidSnapshot.errorMessage(tx.id()) shouldBe None
       }
 
       withDomain(domainSettingsWithFS(settings(checkNegative = true)), balances) { db =>

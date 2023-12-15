@@ -31,7 +31,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with CancelAfterFailure 
 
     sender.setScript(
       smartAcc,
-      Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64),
+      Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64),
       fee = setScriptFee + smartFee,
       waitForTx = true
     )

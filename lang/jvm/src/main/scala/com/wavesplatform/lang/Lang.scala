@@ -26,7 +26,7 @@ object Lang {
 
   def compileDApp(input: String): DAppWithMeta =
     API
-      .compile(input, ScriptEstimatorV3(fixOverflow = true, overhead = false))
+      .compile(input, ScriptEstimatorV3.latest)
       .flatMap {
         case r: CompileResult.DApp =>
           val javaMeta = Meta(

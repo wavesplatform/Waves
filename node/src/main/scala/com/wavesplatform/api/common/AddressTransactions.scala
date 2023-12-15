@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressTransactions.TxByAddressIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys, RDB, readTransactionHNSeqAndType}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, Keys, RDB, readTransactionHNSeqAndType}
 import com.wavesplatform.state.{Height, InvokeScriptResult, StateSnapshot, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
@@ -118,7 +118,7 @@ object AddressTransactions {
       .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
       .collect { case (m, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => (m, tx, None) }
 
-  class TxByAddressIterator(
+  private class TxByAddressIterator(
       db: DBResource,
       txHandle: RDB.TxHandle,
       addressId: AddressId,
@@ -127,9 +127,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type]
   ) extends AbstractIterator[Seq[(TxMeta, Transaction, Option[TxNum])]] {
-    val prefix: Array[Byte] = KeyTags.AddressTransactionHeightTypeAndNums.prefixBytes ++ addressId.toByteArray
-    val seqNr: Int          = db.get(Keys.addressTransactionSeqNr(addressId))
-
+    private val seqNr = db.get(Keys.addressTransactionSeqNr(addressId))
     db.withSafePrefixIterator(_.seekForPrev(Keys.addressTransactionHN(addressId, seqNr).keyBytes))()
 
     final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = db.withSafePrefixIterator { dbIterator =>

@@ -13,7 +13,6 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
@@ -150,14 +149,19 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers with I
       d.appendBlock(preparingTxs*)
       d.appendBlock(ethInvoke)
 
-      d.liquidDiff.errorMessage(ethInvoke.id()) shouldBe None
-      d.liquidDiff.accountData(dApp)("check").value shouldBe true
-      if (syncCall) d.liquidDiff.accountData(dApp2)("check").value shouldBe true
+      d.liquidSnapshot.errorMessage(ethInvoke.id()) shouldBe None
+      d.liquidSnapshot.accountData(dApp)("check").value shouldBe true
+      if (syncCall) d.liquidSnapshot.accountData(dApp2)("check").value shouldBe true
 
-      val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
-      d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio
-      d.liquidDiff.portfolios(ethInvoke.senderAddress()) shouldBe Portfolio(-ethInvoke.underlying.getGasPrice.longValue()).minus(assetsPortfolio)
-      inside(d.liquidDiff.scriptResults.toSeq) { case Seq((_, call1)) =>
+      val ethSender = ethInvoke.senderAddress()
+      assets.foreach { asset =>
+        d.liquidSnapshot.balances((dApp, asset)) shouldBe d.rocksDBWriter.balance(dApp, asset) + paymentAmount
+        d.liquidSnapshot.balances((ethSender, asset)) shouldBe d.rocksDBWriter.balance(ethSender, asset) - paymentAmount
+      }
+      d.liquidSnapshot.balances.get((dApp, Waves)) shouldBe None
+      d.liquidSnapshot.balances((ethSender, Waves)) shouldBe d.rocksDBWriter.balance(ethSender) - ethInvoke.underlying.getGasPrice.longValue()
+
+      inside(d.liquidSnapshot.scriptResults.toSeq) { case Seq((_, call1)) =>
         if (syncCall)
           inside(call1.invokes) { case Seq(call2) =>
             call2.stateChanges.error shouldBe empty

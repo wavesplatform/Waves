@@ -56,6 +56,8 @@ object KeyTags extends Enumeration {
   NthTransactionStateSnapshotAtHeight,
   MaliciousMinerBanHeights,
   BlockStateHash,
+  AddressLeaseInfoSeqNr,
+  AddressLeaseInfoSeq,
   LastCleanupHeight = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {

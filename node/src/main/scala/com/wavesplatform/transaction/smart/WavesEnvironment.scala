@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.smart
 
-import cats.implicits.catsSyntaxSemigroup
 import cats.Id
+import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
@@ -10,8 +10,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{FairPoSCalculator, PoSCalculator}
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.features.MultiPaymentPolicyProvider.*
-import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
@@ -21,10 +21,11 @@ import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
+import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.BlockRewardCalculator.CurrentBlockRewardPart
+import com.wavesplatform.state.diffs.invoke.InvokeScriptDiff.validateIntermediateBalances
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -157,7 +158,7 @@ class WavesEnvironment(
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
-    val addressE: Either[ValidationError, account.Address] = addressOrAlias match {
+    val addressE = addressOrAlias match {
       case Address(bytes) => account.Address.fromBytes(bytes.arr)
       case Alias(name)    => account.Alias.create(name).flatMap(a => blockchain.resolveAlias(a))
     }
@@ -169,7 +170,10 @@ class WavesEnvironment(
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
-      blockchain.generatingBalance(address),
+      if (blockchain.isFeatureActivated(LightNode))
+        currentBlockchain().generatingBalance(address)
+      else
+        blockchain.generatingBalance(address),
       effectiveBalance
     )
   }
@@ -263,9 +267,15 @@ class WavesEnvironment(
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
 
-  override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = {
+  override def calculateDelay(generator: ByteStr, balance: Long): Long = {
+    val baseTarget = blockchain.lastBlockHeader.map(_.header.baseTarget).getOrElse(0L)
+    val hitSource =
+      blockchain
+        .vrf(blockchain.height)
+        .orElse(blockchain.lastBlockHeader.map(_.header.generationSignature))
+        .getOrElse(ByteStr.empty)
     val hit = Global.blake2b256(hitSource.arr ++ generator.arr).take(PoSCalculator.HitSize)
-    FairPoSCalculator.V2.calculateDelay(BigInt(1, hit), baseTarget, balance)
+    FairPoSCalculator(0, 0).calculateDelay(BigInt(1, hit), baseTarget, balance)
   }
 
   private def getRewards(generator: PublicKey, height: Int): Seq[(Address, Long)] = {
@@ -471,6 +481,11 @@ class DAppEnvironment(
           invocationTracker,
           wrapDAppEnv
         )(invoke)
+      _ <-
+        if (blockchain.isFeatureActivated(LightNode))
+          validateIntermediateBalances(blockchain, snapshot, totalComplexityLimit - availableComplexity, Nil)
+        else
+          traced(Right(()))
       fixedSnapshot = snapshot
         .setScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = snapshot.scriptResults(txId))))))
     } yield {

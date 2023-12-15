@@ -6,17 +6,17 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.5.0" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.5.1" classifier "protobuf-src" intransitive ()
 
   private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.5"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.0"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
-  private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // https://github.com/web3j/web3j/issues/1907
+  private def web3jModule(module: String) = "org.web3j" % module % "4.9.8" // 4.10+ requires Java 17 https://github.com/web3j/web3j/issues/1907
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
@@ -26,21 +26,21 @@ object Dependencies {
   val googleGuava     = "com.google.guava"    % "guava"             % "32.1.3-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.3.11" // 1.4.x and later is built for Java 11
-  val janino          = "org.codehaus.janino" % "janino"            % "3.1.10"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.4.14"
+  val janino          = "org.codehaus.janino" % "janino"            % "3.1.11"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.100.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.101.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.9.4" // 2.10.x and later is built for Java 11
+  val playJson = "com.typesafe.play" %% "play-json" % "2.10.3" // 2.10.x and later is built for Java 11
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.17" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.2" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.5.2"
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.1" // 3.6.x and later is built for Java 11
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.1"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
 
@@ -59,9 +59,9 @@ object Dependencies {
       // explicit dependency can likely be removed when monix 3 is released
       monixModule("eval").value,
       "org.typelevel" %%% s"cats-core" % "2.10.0",
-      "com.lihaoyi"   %%% "fastparse"  % "2.3.3",
+      "com.lihaoyi"   %%% "fastparse"  % "3.0.2",
       shapeless.value,
-      "org.typelevel" %%% "cats-mtl" % "1.3.1",
+      "org.typelevel" %%% "cats-mtl" % "1.4.0",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
@@ -75,7 +75,7 @@ object Dependencies {
     logback,
     "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.21", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.14.2",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.0",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -98,15 +98,16 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private[this] val dbDeps =
-    Seq(
-      "org.rocksdb" % "rocksdbjni" % "8.8.1"
-    )
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.8.1"
+
+  private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
 
   lazy val node = Def.setting(
     Seq(
+      rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.10.0",
+      "commons-io"           % "commons-io"               % "2.15.1",
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonCore,
@@ -127,15 +128,15 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit"                 %% "refined-cats"  % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "9.4.0",
+      "com.esaulpaugh"              % "headlong"      % "10.0.1",
+      "org.ehcache"                 % "sizeof"        % "0.4.3", // Weighing caches
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test
-    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value ++ langCompilerPlugins.value
+      akkaHttpModule("akka-http-testkit") % Test,
+    ) ++ test ++ console ++ logDeps  ++ protobuf.value ++ langCompilerPlugins.value
   )
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.24.4"
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.1"
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -159,22 +160,21 @@ object Dependencies {
 
   lazy val rideRunner = Def.setting(
     Seq(
-      "org.rocksdb"           % "rocksdbjni"     % "8.3.2",
-      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1",
+      rocksdb,
+      scalapbJson,
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
-      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",
-      "net.logstash.logback"          % "logstash-logback-encoder" % "7.2" % Runtime,
-      "org.ehcache"                   % "sizeof"                   % "0.4.3", // Weighing caches
+      "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.8",
+      "net.logstash.logback"          % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonModule("caffeine"),
       kamonModule("prometheus"),
       sttp3,
       sttp3Monix,
       "org.scala-lang.modules"                          %% "scala-xml"              % "2.2.0", // JUnit reports
       akkaHttpModule("akka-http-testkit")     % Test,
-      "com.softwaremill.diffx"                          %% "diffx-core"             % "0.8.3" % Test,
-      "com.softwaremill.diffx"                          %% "diffx-scalatest-should" % "0.8.3" % Test,
-      "io.grpc"                                          % "grpc-inprocess"         % scalapb.compiler.Version.grpcJavaVersion % Test
+      "com.softwaremill.diffx"                          %% "diffx-core"             % "0.9.0" % Test,
+      "com.softwaremill.diffx"                          %% "diffx-scalatest-should" % "0.9.0" % Test,
+      "io.grpc"                                          % "grpc-inprocess"         % "1.60.0" % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
@@ -190,5 +190,5 @@ object Dependencies {
   // https://github.com/sbt/sbt-javaagent#scopes
   // dist (only sbt-native-packager), because causes using logs before needed, so System.setProperty in RideRunnerWithPreparedStateApp has no effect.
   lazy val kanela =
-    Seq("io.kamon" % "kanela-agent" % "1.0.17" % "dist")
+    Seq("io.kamon" % "kanela-agent" % "1.0.18" % "dist")
 }

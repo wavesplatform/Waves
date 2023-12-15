@@ -74,7 +74,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
     recipients.map { recipient =>
       val payment       = TxHelpers.payment(master, recipient.toAddress, ENOUGH_AMT * 2)
       val untypedScript = Parser.parseExpr(script(genesis, payment)).get.value
-      val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+      val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untypedScript).explicitGet()._1)
         .explicitGet()
       val setScriptTransaction = TxHelpers.setScript(recipient, typedScript)
       val nextTransfer         = TxHelpers.transfer(recipient, master.toAddress)

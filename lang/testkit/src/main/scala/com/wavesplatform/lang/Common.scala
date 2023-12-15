@@ -9,10 +9,10 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, *}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
@@ -96,7 +96,7 @@ object Common {
       def addressFromString(address: String): Either[String, Recipient.Address]           = ???
       def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]               = ???
       def accountScript(addressOrAlias: Recipient): Option[Script]                        = ???
-      def calculateDelay(hs: ByteStr, bt: Long, gt: ByteStr, b: Long): Long               = ???
+      def calculateDelay(gt: ByteStr, b: Long): Long                                      = ???
       def callScript(
           dApp: Address,
           func: String,

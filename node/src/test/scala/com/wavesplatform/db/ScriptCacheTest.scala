@@ -138,7 +138,7 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
       TestFunctionalitySettings.Stub
     )
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

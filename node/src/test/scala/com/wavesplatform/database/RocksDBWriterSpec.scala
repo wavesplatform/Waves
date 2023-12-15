@@ -19,8 +19,7 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
-import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount, TxPositiveAmount}
+import com.wavesplatform.transaction.{TxHelpers, TxPositiveAmount}
 import org.rocksdb.{ReadOptions, RocksIterator}
 
 import scala.collection.mutable
@@ -182,8 +181,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
     def transferWavesTx = TxHelpers.massTransfer(
       to = Seq(
-        MassTransferTransaction.ParsedTransfer(aliceAddress, TxNonNegativeAmount.unsafeFrom(100.waves)),
-        MassTransferTransaction.ParsedTransfer(bobAddress, TxNonNegativeAmount.unsafeFrom(100.waves))
+        aliceAddress -> 100.waves,
+        bobAddress   -> 100.waves
       ),
       fee = 1.waves
     )

@@ -14,7 +14,7 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{DefaultWavesSettings, SnapshotOps, randomSig, settingsWithFeatures}
+import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
@@ -52,7 +52,7 @@ import scala.util.{Random, Using}
 
 private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) extends AutoCloseable {
-    val path: Path            = Files.createTempDirectory("rocksdb-test")
+    val path: Path            = Files.createTempDirectory("rocksdb-test-utx")
     val rdb                   = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
@@ -842,7 +842,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
                  |    }
                  | }
                """.stripMargin,
-              ScriptEstimatorV3(fixOverflow = true, overhead = true)
+              ScriptEstimatorV3.latest
             )
             .explicitGet()
             ._1
@@ -1014,7 +1014,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     }
 
     "cleanup" - {
-      "doesnt take the composite diff into account" in withDomain() { d =>
+      "doesnt take the composite snapshot into account" in withDomain() { d =>
         d.helpers.creditWavesToDefaultSigner(11.waves)
         val transfers = Seq.fill(10)(TxHelpers.transfer(amount = 10.waves))
         transfers.foreach(tx => d.utxPool.addTransaction(tx, verify = false))
@@ -1027,7 +1027,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val transfer1 = TxHelpers.transfer(amount = 10.waves)
         val transfer2 = TxHelpers.transfer(amount = 10.waves) // Double spend
 
-        d.utxPool.priorityPool.setPriorityDiffs(Seq(SnapshotOps.fromDiff(d.createDiff(transfer1), d.blockchain).explicitGet()))
+        d.utxPool.priorityPool.setPriorityDiffs(Seq(d.createDiff(transfer1)))
         d.utxPool.addTransaction(transfer2, verify = false)
 
         d.utxPool.cleanUnconfirmed()

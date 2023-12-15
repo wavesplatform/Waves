@@ -282,7 +282,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
@@ -296,7 +296,7 @@ class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheS
     } finally {
       bcu.shutdown()
       defaultWriter.close()
-      db.close()
+      rdb.close()
       TestHelpers.deleteRecursively(path)
     }
   }

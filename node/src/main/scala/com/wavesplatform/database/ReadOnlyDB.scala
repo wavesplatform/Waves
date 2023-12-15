@@ -5,7 +5,6 @@ import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, RocksIterator}
 
-import scala.annotation.tailrec
 import scala.util.Using
 
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
@@ -54,10 +53,10 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
       }
     }
 
-  /**
-   * Tries to find the exact key if prefix.length < 10.
-   * @see RDB.newColumnFamilyOptions
-   */
+  /** Tries to find the exact key if prefix.length < 10.
+    * @see
+    *   RDB.newColumnFamilyOptions
+    */
   def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
     iter =>
       iter.seek(prefix)

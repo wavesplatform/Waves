@@ -102,7 +102,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
           case _: SecurityException =>
             Task.unit
         }
-        Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)
+        Await.result(blockAppendTask.runToFuture(scheduler), 1.minute)
 
         signal.tryAcquire(10, TimeUnit.SECONDS)
 
@@ -130,7 +130,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
     )
 
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Map.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
     val utxPoolStub = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings, settings.maxTxErrorLogSize, settings0.minerSettings.enable)
