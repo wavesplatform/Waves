@@ -71,7 +71,7 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
 
-  private[this] val serializer = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] val serializer = TransactionJsonSerializer(blockchain)
 
   override lazy val route: Route = pathPrefix("debug") {
     balanceHistory ~ stateHash ~ validate ~ withAuth {

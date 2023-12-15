@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.{JsonSerializer, SerializerProvider}
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.api.http.TransactionJsonSerializer.*
 import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, LeaseStatus, TxMetaEnriched}
@@ -16,8 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
-import com.wavesplatform.state.LeaseDetails
-import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, LeaseDetails, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -29,7 +28,7 @@ import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.*
 import play.api.libs.json.JsonConfiguration.Aux
 
-final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
+final case class TransactionJsonSerializer(blockchain: Blockchain) {
 
   val assetSerializer: JsonSerializer[Asset] =
     (value: Asset, gen: JsonGenerator, serializers: SerializerProvider) => {
