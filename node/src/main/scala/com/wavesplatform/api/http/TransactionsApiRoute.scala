@@ -41,12 +41,12 @@ case class TransactionsApiRoute(
     with AuthRoute {
   import TransactionsApiRoute.*
 
-  private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
+  private[this] val serializer                                               = TransactionJsonSerializer(blockchain, commonApi)
   private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressWithLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
+      unconfirmed ~ addressWithLimit ~ info ~ snapshot ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   def addressWithLimit: Route = {
@@ -81,6 +81,25 @@ case class TransactionsApiRoute(
 
       complete(result)
     }
+  }
+
+  def snapshot: Route = pathPrefix("snapshot") {
+    def readSnapshot(id: ByteStr) =
+      blockchain
+        .transactionSnapshot(id)
+        .toRight(TransactionDoesNotExist)
+        .map(StateSnapshotJson.fromSnapshot)
+    val single = (get & path(TransactionId))(id => complete(readSnapshot(id)))
+    val multiple = (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionsSnapshotsLimit))(rawIds =>
+      complete(
+        for {
+          _    <- Either.cond(rawIds.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+          ids  <- rawIds.toSeq.traverse(ByteStr.decodeBase58(_).toEither.leftMap(err => CustomValidationError(err.toString)))
+          meta <- ids.traverse(readSnapshot)
+        } yield meta
+      )
+    )
+    single ~ multiple
   }
 
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {

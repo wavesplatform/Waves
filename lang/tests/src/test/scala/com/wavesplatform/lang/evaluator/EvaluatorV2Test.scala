@@ -1282,4 +1282,8 @@ class EvaluatorV2Test extends PropSpec with Inside {
       """.stripMargin
     evalNew(script3, 100)._3 shouldBe 3
   }
+
+  property("ssd") {
+    println(evalNew("blake2b256(0.toBytes())", 1000)._2)
+  }
 }

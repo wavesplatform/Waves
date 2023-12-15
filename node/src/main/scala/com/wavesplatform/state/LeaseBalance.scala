@@ -2,6 +2,7 @@ package com.wavesplatform.state
 
 import cats.Monad
 import cats.implicits.{toFlatMapOps, toFunctorOps}
+import play.api.libs.json.{Json, OFormat}
 
 case class LeaseBalance(in: Long, out: Long) {
   def combineF[F[_]: Monad](that: LeaseBalance)(implicit s: Summarizer[F]): F[LeaseBalance] =
@@ -13,4 +14,6 @@ case class LeaseBalance(in: Long, out: Long) {
 
 object LeaseBalance {
   val empty: LeaseBalance = LeaseBalance(0, 0)
+
+  implicit val format: OFormat[LeaseBalance] = Json.format
 }

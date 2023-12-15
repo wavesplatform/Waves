@@ -15,7 +15,6 @@ import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
-import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.diffs.BlockDiffer

@@ -7,6 +7,7 @@ case class RestAPISettings(
     apiKeyHash: String,
     corsHeaders: CorsHeaders,
     transactionsByAddressLimit: Int,
+    transactionsSnapshotsLimit: Int,
     distributionAddressLimit: Int,
     dataKeysRequestLimit: Int,
     assetDetailsLimit: Int,
