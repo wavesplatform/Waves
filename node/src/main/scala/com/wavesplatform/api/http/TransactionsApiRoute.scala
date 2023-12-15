@@ -90,7 +90,7 @@ case class TransactionsApiRoute(
         .toRight(TransactionDoesNotExist)
         .map(StateSnapshotJson.fromSnapshot)
     val single = (get & path(TransactionId))(id => complete(readSnapshot(id)))
-    val multiple = (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionsSnapshotsLimit))(rawIds =>
+    val multiple = (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionSnapshotsLimit))(rawIds =>
       complete(
         for {
           _    <- Either.cond(rawIds.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
