@@ -128,7 +128,7 @@ class RocksDBWriter(
     writableDB.get(Keys.addressId(address))
 
   override protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = readOnly { ro =>
-    addresses.view.zip(ro.multiGetOpt(addresses.map(Keys.addressId), 8)).toMap
+    addresses.view.zip(ro.multiGetOpt(addresses.view.map(Keys.addressId).toVector, 8)).toMap
   }
 
   override protected def loadHeight(): Height = RocksDBWriter.loadHeight(writableDB)
@@ -167,12 +167,12 @@ class RocksDBWriter(
     writableDB.get(Keys.data(address, key))
 
   override protected def loadEntryHeights(keys: Iterable[(Address, String)]): Map[(Address, String), Height] = {
-    val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addr, k) }.toSeq)
+    val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addr, k) }.toVector)
     val valBufs = database.getValueBuffers(keys.size, 8)
     val valueBuf = new Array[Byte](8)
 
     val result = rdb.db
-      .multiGetByteBuffers(keyBufs, valBufs)
+      .multiGetByteBuffers(keyBufs.asJava, valBufs.asJava)
       .asScala
       .view
       .zip(keys)
@@ -183,8 +183,8 @@ class RocksDBWriter(
         } else k -> Height(0)
       }.toMap
 
-    keyBufs.forEach(Util.releaseTemporaryDirectBuffer _)
-    valBufs.forEach(Util.releaseTemporaryDirectBuffer _)
+    keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
+    valBufs.foreach(Util.releaseTemporaryDirectBuffer)
 
     result
   }
@@ -222,7 +222,7 @@ class RocksDBWriter(
     }
 
     val addressAssetToBalance = reqWithKeys
-      .zip(ro.multiGet(reqWithKeys.map(_._2), 16))
+      .zip(ro.multiGet(reqWithKeys.view.map(_._2).toVector, 16))
       .collect { case (((address, asset), _), Some(balance)) =>
         (address, asset) -> balance
       }
@@ -240,9 +240,9 @@ class RocksDBWriter(
     val idToBalance = addrIds
       .zip(
         ro.multiGet(
-          addrIds.map { addrId =>
+          addrIds.view.map { addrId =>
             Keys.wavesBalance(addrId)
-          },
+          }.toVector,
           16
         )
       )
@@ -267,9 +267,9 @@ class RocksDBWriter(
     val idToBalance = addrIds
       .zip(
         ro.multiGet(
-          addrIds.map { addrId =>
+          addrIds.view.map { addrId =>
             Keys.leaseBalance(addrId)
-          },
+          }.toVector,
           24
         )
       )
@@ -287,7 +287,7 @@ class RocksDBWriter(
 
   override protected def loadVolumesAndFees(orders: Seq[ByteStr]): Map[ByteStr, CurrentVolumeAndFee] = readOnly { ro =>
     orders.view
-      .zip(ro.multiGet(orders.map(Keys.filledVolumeAndFee), 24))
+      .zip(ro.multiGet(orders.view.map(Keys.filledVolumeAndFee).toVector, 24))
       .map { case (id, v) => id -> v.getOrElse(CurrentVolumeAndFee.Unavailable) }
       .toMap
   }
@@ -561,7 +561,7 @@ class RocksDBWriter(
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
           (aid, txIds, Keys.addressTransactionSeqNr(aid))
         }
-        rw.multiGetInts(addressTxs.map(_._3))
+        rw.multiGetInts(addressTxs.view.map(_._3).toVector)
           .zip(addressTxs)
           .foreach { case (prevSeqNr, (addressId, txIds, txSeqNrKey)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
@@ -583,7 +583,7 @@ class RocksDBWriter(
           } yield (addressId, leaseId)
         val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2).toSeq
 
-        rw.multiGetInts(leaseIdsByAddressId.map(_._1._2))
+        rw.multiGetInts(leaseIdsByAddressId.view.map(_._1._2).toVector)
           .zip(leaseIdsByAddressId)
           .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIds)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
@@ -971,11 +971,11 @@ class RocksDBWriter(
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = readOnly { db =>
-    val tms = db.multiGetOpt(ids.map(id => Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)), 36)
-    val (keys, sizes) = tms.map {
+    val tms = db.multiGetOpt(ids.view.map(id => Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)).toVector, 36)
+    val (keys, sizes) = tms.view.map {
       case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle) -> tm.size
       case None     => Keys.transactionAt(Height(0), TxNum(0.toShort), rdb.txHandle)              -> 0
-    }.unzip
+    }.toVector.unzip
 
     db.multiGetOpt(keys, sizes)
   }

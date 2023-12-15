@@ -4,18 +4,12 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.blockchain.LazyBlockchain
 import com.wavesplatform.ride.runner.caches.WeighedAssetDescription
 import com.wavesplatform.ride.runner.requests.{RideScriptRunRequest, RideScriptRunResult}
 import com.wavesplatform.state.{AssetScriptInfo, BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{base58Length, base64Length}
-import org.ehcache.sizeof.SizeOf
-import org.ehcache.sizeof.filters.SizeOfFilter
 import org.github.jamm.MemoryMeter
-
-import java.lang.reflect.Field
-import java.util
 
 // Close size of objects in bytes
 object MemCacheWeights {
