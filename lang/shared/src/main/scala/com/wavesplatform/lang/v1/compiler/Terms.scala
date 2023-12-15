@@ -1,18 +1,19 @@
 package com.wavesplatform.lang.v1.compiler
 
-import java.nio.charset.StandardCharsets
 import cats.Eval
 import cats.instances.list.*
 import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.{CommonError, ExecutionError}
 import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
+import com.wavesplatform.lang.{CommonError, ExecutionError}
 import monix.eval.Coeval
 
-import scala.annotation.nowarn
+import java.nio.charset.StandardCharsets
+import scala.annotation.{nowarn, tailrec}
+import scala.util.hashing.MurmurHash3
 
 object Terms {
   val DataTxMaxBytes: Int      = 150 * 1024     // should be the same as DataTransaction.MaxBytes
@@ -58,6 +59,87 @@ object Terms {
     def deepCopy: Eval[EXPR]
     override def toString: String = toStr()
     def isItFailed: Boolean       = false
+
+    override def hashCode(): Int = EXPR.hashCode(List(this), 7207)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case e: EXPR => EXPR.equals(List(this), List(e))
+      case _       => false
+    }
+  }
+
+  object EXPR {
+    @tailrec
+    final def hashCode(stack: List[EXPR], prevHashCode: Int): Int =
+      if (stack.isEmpty) prevHashCode
+      else
+        stack.head match {
+          case FAILED_EXPR() =>
+            hashCode(stack.tail, prevHashCode * 31 + 7001)
+          case GETTER(expr, field) =>
+            hashCode(expr :: stack.tail, (prevHashCode * 31 + field.hashCode) * 31 + 7013)
+          case LET_BLOCK(let, body) =>
+            hashCode(let.value :: body :: stack.tail, (prevHashCode * 31 + let.name.hashCode) * 31 + 7019)
+          case BLOCK(dec, body) =>
+            dec match {
+              case FAILED_DEC() =>
+                hashCode(body :: stack.tail, prevHashCode * 31 + 7027)
+              case LET(name, value) =>
+                hashCode(value :: stack.tail, (prevHashCode * 31 + name.hashCode) * 31 + 7027)
+              case FUNC(name, args, body) =>
+                hashCode(body :: stack.tail, (prevHashCode * 31 + MurmurHash3.listHash(name :: args, 7027)) * 31 + 7027)
+            }
+          case IF(cond, ifTrue, ifFalse) =>
+            hashCode(cond :: ifTrue :: ifFalse :: stack.tail, prevHashCode * 31 + 7039)
+          case REF(key) =>
+            hashCode(stack.tail, (prevHashCode * 31 + key.hashCode) * 31 + 7043)
+          case FUNCTION_CALL(function, args) =>
+            hashCode(args ++ stack.tail, (prevHashCode * 31 + function.hashCode()) * 31 + 7057)
+          case evaluated: EVALUATED =>
+            hashCode(stack.tail, (prevHashCode * 31 + evaluated.hashCode()) * 31 + 7069)
+        }
+
+    @tailrec
+    final def equals(e1: List[EXPR], e2: List[EXPR]): Boolean =
+      if (e1.isEmpty && e2.isEmpty) true
+      else
+        (e1.head, e2.head) match {
+          case (FAILED_EXPR(), FAILED_EXPR()) =>
+            equals(e1.tail, e2.tail)
+          case (g1: GETTER, g2: GETTER) =>
+            if (g1.field != g2.field) false
+            else equals(g1.expr :: e1.tail, g2.expr :: e2.tail)
+          case (lb1: LET_BLOCK, lb2: LET_BLOCK) =>
+            if (lb1.let.name != lb2.let.name) false
+            else equals(lb1.let.value :: lb1.body :: e1.tail, lb2.let.value :: lb2.body :: e2.tail)
+          case (b1: BLOCK, b2: BLOCK) =>
+            (b1.dec, b2.dec) match {
+              case (FAILED_DEC(), FAILED_DEC()) =>
+                equals(b1.body :: e1.tail, b2.body :: e2.tail)
+              case (l1: LET, l2: LET) =>
+                if (l1.name != l2.name) false
+                else equals(l1.value :: b1.body :: e1.tail, l2.value :: b2.body :: e2.tail)
+              case (f1: FUNC, f2: FUNC) =>
+                if (f1.name != f2.name || f1.args != f2.args) false
+                else equals(f1.body :: b1.body :: e1.tail, f2.body :: b2.body :: e2.tail)
+              case _ => false
+            }
+          case (if1: IF, if2: IF) =>
+            equals(
+              if1.cond :: if1.ifFalse :: if1.ifTrue :: e1.tail,
+              if2.cond :: if2.ifFalse :: if2.ifTrue :: e2.tail
+            )
+          case (REF(key1), REF(key2)) =>
+            if (key1 != key2) false
+            else equals(e1.tail, e2.tail)
+          case (fc1: FUNCTION_CALL, fc2: FUNCTION_CALL) =>
+            if (fc1.function != fc2.function) false
+            else equals(fc1.args ++ e1.tail, fc2.args ++ e2.tail)
+          case (ev1: EVALUATED, ev2: EVALUATED) =>
+            if (ev1 != ev2) false
+            else equals(e1.tail, e2.tail)
+          case _ => false
+        }
   }
 
   case class FAILED_EXPR() extends EXPR {
@@ -143,7 +225,11 @@ object Terms {
       } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
     override def deepCopy: Eval[EXPR] =
-      Eval.defer(args.traverse(_.deepCopy)).map(FUNCTION_CALL(function, _))
+      args
+        .foldLeft(Eval.now(List.empty[EXPR])) { case (prev, cur) =>
+          prev.flatMap(p => cur.deepCopy.map(_ :: p))
+        }
+        .map(reversedArgs => FUNCTION_CALL(function, reversedArgs.reverse))
   }
 
   sealed trait EVALUATED extends EXPR {
@@ -159,11 +245,21 @@ object Terms {
     override def toString: String = t.toString
     override val weight: Long     = 8L
     override val getType: REAL    = LONG
+    override def hashCode(): Int  = t.hashCode()
+    override def equals(obj: Any): Boolean = obj match {
+      case CONST_LONG(`t`) => true
+      case _               => false
+    }
   }
   case class CONST_BIGINT(t: BigInt) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 64L
     override val getType: REAL    = BIGINT
+    override def hashCode(): Int  = t.hashCode()
+    override def equals(obj: Any): Boolean = obj match {
+      case CONST_BIGINT(`t`) => true
+      case _                 => false
+    }
   }
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
@@ -238,6 +334,13 @@ object Terms {
     override val weight: Long     = 1L
 
     override val getType: REAL = BOOLEAN
+
+    override def hashCode(): Int = b.hashCode()
+
+    override def equals(obj: Any): Boolean = obj match {
+      case CONST_BOOLEAN(`b`) => true
+      case _                  => false
+    }
   }
 
   lazy val TRUE: CONST_BOOLEAN  = CONST_BOOLEAN(true)
@@ -255,6 +358,13 @@ object Terms {
         TUPLE(fields.toSeq.sortBy(_._1).map(_._2.getType).toList)
       else
         caseType
+
+    override def hashCode(): Int = MurmurHash3.productHash(this)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case CaseObj(`caseType`, `fields`) => true
+      case _                             => false
+    }
   }
 
   object CaseObj {
@@ -276,6 +386,13 @@ object Terms {
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
 
     override val getType: REAL = LIST(ANY)
+
+    override def hashCode(): Int = MurmurHash3.indexedSeqHash(xs, 4517)
+
+    override def equals(obj: Any): Boolean = obj match {
+      case ARR(`xs`) => true
+      case _         => false
+    }
   }
 
   object ARR {
@@ -300,6 +417,13 @@ object Terms {
     override def toString: String = "Evaluation failed: " ++ reason
     def weight: Long              = 0
     override val getType: REAL    = NOTHING
+
+    override def hashCode(): Int = reason.hashCode * 31 + 7129
+
+    override def equals(obj: Any): Boolean = obj match {
+      case FAIL(`reason`) => true
+      case _              => false
+    }
   }
 
   val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
