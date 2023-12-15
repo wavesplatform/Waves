@@ -1,8 +1,5 @@
 package com.wavesplatform.state
 
-import java.nio.file.Files
-import java.util.concurrent.TimeUnit
-
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.database.RDB
@@ -11,6 +8,9 @@ import com.wavesplatform.state.RocksDBIteratorBenchmark.*
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 import org.rocksdb.{ReadOptions, WriteBatch, WriteOptions}
+
+import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -60,7 +60,7 @@ object RocksDBIteratorBenchmark {
       RDB.open(wavesSettings.dbSettings.copy(directory = dir))
     }
 
-    val keysPrefix            = "keysPrefix"
+    val keysPrefix            = "keysPrefix" // Must have 10 or more bytes, see RDB.newColumnFamilyOptions
     val firstKey: Array[Byte] = keysPrefix.getBytes ++ Ints.toByteArray(1)
     val lastKey: Array[Byte]  = keysPrefix.getBytes ++ Ints.toByteArray(10000)
 
@@ -74,10 +74,15 @@ object RocksDBIteratorBenchmark {
     kvs.foreach { case (key, value) =>
       wb.put(key, value)
     }
-    rdb.db.write(new WriteOptions(), wb)
+
+    private val wo = new WriteOptions()
+    rdb.db.write(wo, wb)
+    wo.close()
+    wb.close()
 
     @TearDown
     def close(): Unit = {
+      readOptions.close()
       rdb.close()
     }
   }

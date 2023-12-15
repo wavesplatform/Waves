@@ -111,6 +111,9 @@ object RDB extends StrictLogging {
       )
       .setWriteBufferSize(writeBufferSize)
       .setLevelCompactionDynamicLevelBytes(true)
+      // Defines the prefix.
+      // Improves an iterator performance for keys with prefixes of 10 or more bytes.
+      // Iterator finds the exact key for seek(key) and becomes invalid after next(), if specified key has less than 10 bytes.
       .useCappedPrefixExtractor(10)
       .setMemtablePrefixBloomSizeRatio(0.25)
       .setCompressionType(CompressionType.LZ4_COMPRESSION)

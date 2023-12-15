@@ -22,13 +22,12 @@ abstract class DBState extends ScorexLogging {
 
   lazy val rdb: RDB = RDB.open(settings.dbSettings)
 
-  lazy val rocksDBWriter: RocksDBWriter =
-    new RocksDBWriter(
-      rdb,
-      settings.blockchainSettings,
-      settings.dbSettings.copy(maxCacheSize = 1),
-      settings.enableLightMode
-    )
+  lazy val rocksDBWriter: RocksDBWriter = RocksDBWriter(
+    rdb,
+    settings.blockchainSettings,
+    settings.dbSettings.copy(maxCacheSize = 1),
+    settings.enableLightMode
+  )
 
   AddressScheme.current = new AddressScheme { override val chainId: Byte = 'W' }
 

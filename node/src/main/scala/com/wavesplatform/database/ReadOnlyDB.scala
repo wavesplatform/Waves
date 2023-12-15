@@ -35,25 +35,6 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
 
   def newIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
 
-  def iterateOverPrefix(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOverPrefix(tag.prefixBytes)(f)
-
-  def iterateOverPrefix(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
-    @tailrec
-    def loop(iter: RocksIterator): Unit = {
-      val key = iter.key()
-      if (iter.isValid) {
-        f(Maps.immutableEntry(key, iter.value()))
-        iter.next()
-        loop(iter)
-      } else ()
-    }
-
-    Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) { iter =>
-      iter.seek(prefix)
-      loop(iter)
-    }
-  }
-
   def iterateOverWithSeek(prefix: Array[Byte], seek: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Boolean): Unit =
     Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
       iter.seek(seek)
@@ -73,6 +54,10 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
       }
     }
 
+  /**
+   * Tries to find the exact key if prefix.length < 10.
+   * @see RDB.newColumnFamilyOptions
+   */
   def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
     iter =>
       iter.seek(prefix)

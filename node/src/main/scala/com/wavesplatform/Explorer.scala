@@ -373,13 +373,15 @@ object Explorer extends ScorexLogging {
         case "CTI" =>
           log.info("Counting transaction IDs")
           var counter = 0
-          Using(rdb.db.newIterator(rdb.txMetaHandle.handle)) { iter =>
-            iter.seekToFirst()
-//            iter.seek(KeyTags.TransactionMetaById.prefixBytes)
-            log.info(iter.key().mkString(","))
-            while (iter.isValid && iter.key().startsWith(KeyTags.TransactionMetaById.prefixBytes)) {
-              counter += 1
-              iter.next()
+          Using(new ReadOptions().setTotalOrderSeek(true)) { ro =>
+            Using(rdb.db.newIterator(rdb.txMetaHandle.handle, ro)) { iter =>
+              iter.seekToFirst()
+              // iter.seek(KeyTags.TransactionMetaById.prefixBytes) // Doesn't work, because of CappedPrefixExtractor(10)
+              log.info(iter.key().mkString(","))
+              while (iter.isValid && iter.key().startsWith(KeyTags.TransactionMetaById.prefixBytes)) {
+                counter += 1
+                iter.next()
+              }
             }
           }
           log.info(s"Found $counter transaction IDs")
