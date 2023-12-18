@@ -111,8 +111,11 @@ class TransactionsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffM
 
     d.appendBlock(txs(0), txs(1))
     d.appendMicroBlock(txs(2))
+
+    // both liquid and solid state
     getSnapshots() shouldBe firstThreeSnapshots
 
+    // hardened state
     d.appendBlock(txs(3), txs(4))
     getSnapshots() shouldBe firstThreeSnapshots ++ Seq(
       StateSnapshot(balances =
