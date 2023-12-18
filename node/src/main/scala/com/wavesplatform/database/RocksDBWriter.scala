@@ -337,12 +337,14 @@ class RocksDBWriter(
       assetStatics: Map[IssuedAsset, AssetStaticInfo],
       rw: RW
   ): Unit = {
+    var changedWavesBalances = List.empty[AddressId]
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
     val updatedNftLists      = MultimapBuilder.hashKeys().linkedHashSetValues().build[java.lang.Long, IssuedAsset]()
 
     for (((addressId, asset), (currentBalance, balanceNode)) <- balances) {
       asset match {
         case Waves =>
+          changedWavesBalances = addressId :: changedWavesBalances
           rw.put(Keys.wavesBalance(addressId), currentBalance)
           rw.put(Keys.wavesBalanceAt(addressId, currentBalance.height), balanceNode)
         case a: IssuedAsset =>
@@ -368,6 +370,7 @@ class RocksDBWriter(
       }
     }
 
+    rw.put(Keys.changedWavesBalances(height), changedWavesBalances)
     changedAssetBalances.asMap().forEach { (asset, addresses) =>
       rw.put(Keys.changedBalances(height, asset), addresses.asScala.map(id => AddressId(id.toLong)).toSeq)
     }
@@ -450,19 +453,19 @@ class RocksDBWriter(
             val lastCleanupHeight = rdb.db.get(Keys.lastCleanupHeight)
             // If lastCleanupHeight is previous to newSafeRollbackHeight, we run 1 batch.
             // If more - we will run multiple batches to preserve the progress and don't overfill RAM.
+            // TODO we can optimize this
             (lastCleanupHeight + 1 to newSafeRollbackHeight).foreach { height =>
-              writableDB.withOptions { (ro, wo) =>
-                writableDB.readWriteWithOptions(ro, wo) { rw =>
-                  val h = Height(height)
-                  cleanupWavesBalanceEntries(h, rw)
-                  if (h % dbSettings.cleanupInterval == 0) {
+              val h = Height(height)
+              if (h % dbSettings.cleanupInterval == 0) {
+                writableDB.withOptions { (ro, wo) =>
+                  writableDB.readWriteWithOptions(ro, wo) { rw =>
                     batchCleanup(
                       fromInclusive = Height(h - dbSettings.cleanupInterval + 1),
                       toInclusive = h,
                       rw = rw
                     )
+                    rw.put(Keys.lastCleanupHeight, h)
                   }
-                  rw.put(Keys.lastCleanupHeight, h)
                 }
               }
             }
@@ -717,29 +720,35 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  // Because ChangedAddresses contains addresses those are affected by a transaction or have changed WAVES balance.
-  // In case of sponsor transfers without WAVES an address is affected by a transaction, but WAVES balance still the same.
-  private def cleanupWavesBalanceEntries(height: Height, rw: RW): Unit = {
-    val changedAddressesKey = Keys.changedAddresses(height)
-    val changedAddresses    = rw.get(changedAddressesKey)
+  private def batchCleanup(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
+    // Waves balances
 
-    val wavesAddressIds    = new ArrayBuffer[AddressId](changedAddresses.size)
-    val wavesBalanceAtKeys = new ArrayBuffer[Key[BalanceNode]](changedAddresses.size)
-    changedAddresses.foreach { addressId =>
-      wavesAddressIds.addOne(addressId)
-      wavesBalanceAtKeys.addOne(Keys.wavesBalanceAt(addressId, height))
+    val lastWavesBalanceUpdateAt = mutable.LongMap.empty[Height]
+    val changedWavesBalancesKey  = Keys.changedWavesBalances(Int.MaxValue)
+    rw.iterateOverWithSeek(KeyTags.ChangedWavesBalances.prefixBytes, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
+      val k          = e.getKey.drop(KeyTags.ChangedWavesBalances.prefixBytes.length)
+      val currHeight = Height(Ints.fromByteArray(k))
+      val continue   = currHeight <= toInclusive
+      if (continue) {
+        changedWavesBalancesKey.parse(e.getValue).foreach { addressId =>
+          lastWavesBalanceUpdateAt.updateWith(addressId)(_ => Some(currHeight))
+        }
+      }
+      continue
     }
 
-    wavesAddressIds.view
-      .zip(rw.multiGet(wavesBalanceAtKeys, BalanceNode.SizeInBytes))
-      .foreach {
-        // DB won't complain about a non-existed key with height = 0
-        case (addressId, Some(wavesBalanceAt)) => rw.delete(Keys.wavesBalanceAt(addressId, wavesBalanceAt.prevHeight))
-        case _                                 =>
-      }
-  }
+    lastWavesBalanceUpdateAt.foreach { case (addressId, lastHeight) =>
+      // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
+      // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
+      // We doesn't know about 1900, so we will delete all keys from 1.
+      rw.deleteRange(
+        Keys.wavesBalanceAt(AddressId(addressId), Height(1)),
+        Keys.wavesBalanceAt(AddressId(addressId), lastHeight) // Deletes in [1; lastHeight)
+      )
+    }
 
-  private def batchCleanup(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
+    rw.deleteRange(Keys.changedWavesBalances(fromInclusive), Keys.changedWavesBalances(toInclusive + 1))
+
     // Asset balances
 
     val lastAssetBalanceUpdateAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
@@ -759,9 +768,6 @@ class RocksDBWriter(
     }
 
     lastAssetBalanceUpdateAt.foreach { case ((addressId, asset), lastHeight) =>
-      // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
-      // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
-      // We doesn't know about 1900, so we will delete all keys from 1.
       rw.deleteRange(
         Keys.assetBalanceAt(addressId, asset, Height(1)),
         Keys.assetBalanceAt(addressId, asset, lastHeight) // Deletes in [1; lastHeight)
@@ -955,6 +961,7 @@ class RocksDBWriter(
 
           rw.delete(Keys.blockMetaAt(currentHeight))
           rw.delete(Keys.changedAddresses(currentHeight))
+          rw.delete(Keys.changedWavesBalances(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
           blockHeightsToInvalidate.addOne(discardedMeta.id)
           rw.delete(Keys.carryFee(currentHeight))

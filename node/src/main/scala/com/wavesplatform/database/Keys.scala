@@ -101,6 +101,9 @@ object Keys {
 
   def changedAddresses(height: Int): Key[Seq[AddressId]] = Key(ChangedAddresses, h(height), readAddressIds, writeAddressIds)
 
+  def changedWavesBalances(height: Int): Key[Seq[AddressId]] =
+    Key(ChangedWavesBalances, h(height), readAddressIds, writeAddressIds)
+
   def changedBalances(height: Int, asset: IssuedAsset): Key[Seq[AddressId]] =
     Key(ChangedAssetBalances, h(height) ++ asset.id.arr, readAddressIds, writeAddressIds)
 

@@ -262,7 +262,10 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
           iter.seekToFirst()
           while (iter.isValid) {
             val k = iter.key()
-            if (!(HistoricalKeyTags.exists(kt => k.startsWith(kt.prefixBytes)) || k.startsWith(KeyTags.HeightOf.prefixBytes))) {
+            if (
+              !(HistoricalKeyTags.exists(kt => k.startsWith(kt.prefixBytes)) || k
+                .startsWith(KeyTags.HeightOf.prefixBytes) || k.startsWith(KeyTags.LastCleanupHeight.prefixBytes))
+            ) {
               val description = KeyTags(Shorts.fromByteArray(k)).toString
               xs.addOne(ByteStr(k) -> description)
             }
@@ -301,6 +304,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
   private val HistoricalKeyTags = Seq(
     KeyTags.ChangedAssetBalances,
+    KeyTags.ChangedWavesBalances,
     KeyTags.WavesBalanceHistory,
     KeyTags.AssetBalanceHistory,
     KeyTags.ChangedDataKeys,
@@ -326,7 +330,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
 
   private def getHeightAndAddressIds(tag: KeyTag, bytes: DBEntry): (Int, Seq[AddressId]) = {
     val (heightBytes, addresses) = tag match {
-      case KeyTags.ChangedAddresses | KeyTags.ChangedAssetBalances =>
+      case KeyTags.ChangedAddresses | KeyTags.ChangedAssetBalances | KeyTags.ChangedWavesBalances =>
         (
           bytes.getKey.drop(Shorts.BYTES),
           readAddressIds(bytes.getValue)
