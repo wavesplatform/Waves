@@ -41,7 +41,6 @@ class LazyBlockchain[TagT] private (
     db: RideDbAccess,
     diskCaches: DiskCaches,
     blockHeaders: BlockHeaderStorage,
-    bannedGenerators: BannedGeneratorsStorage,
     memCache: MemBlockchainDataCache,
     allTags: CacheKeyTags[TagT]
 ) extends SupportedBlockchain
@@ -169,7 +168,19 @@ class LazyBlockchain[TagT] private (
 
   // Ride: accountWavesBalanceOf
   // See GeneratingBalanceProvider.balance
-  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = bannedGenerators.getHeights(address)
+  override def effectiveBalanceBanHeights(address: Address): Seq[Int] = db
+    .directReadOnly { implicit ctx =>
+      memCache.getOrLoad(MemCacheKey.MaliciousMinerBanHeights(address)) { key =>
+        val cached = diskCaches.maliciousMiners.get(key.address)
+        if (cached.loaded) cached
+        else
+          RemoteData
+            .loaded(blockchainApi.getMaliciousMinerBanHeights(key.address))
+            .tap { r => diskCaches.maliciousMiners.set(key.address, r) }
+      }
+    }
+    .mayBeValue
+    .getOrElse(Seq.empty)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
@@ -225,7 +236,9 @@ class LazyBlockchain[TagT] private (
 
   private def removeAllFromCtx(height: Height)(implicit ctx: ReadWrite): Unit = {
     blockHeaders.removeFrom(height)
-    bannedGenerators.removeFrom(height)
+    diskCaches.maliciousMiners
+      .removeFrom(height)
+      .foreach(x => memCache.remove(MemCacheKey.MaliciousMinerBanHeights(x)))
     diskCaches.accountDataEntries
       .removeAllFrom(height)
       .foreach(x => memCache.remove(MemCacheKey.AccountData(x._1, x._2)))
@@ -263,7 +276,6 @@ class LazyBlockchain[TagT] private (
         case Update.Rollback(evt) => rollback(toHeight, evt)
       }
 
-      bannedGenerators.update(event)
       blockHeaders.update(event)
       affected
     }
@@ -318,8 +330,15 @@ class LazyBlockchain[TagT] private (
             }
           }
 
+        val withAffectedMaliciousMiners =
+          evt.getBlock.getBlock.getHeader.challengedHeader.map(_.generator).foldLeft(withTxAffectedTags) { case (r, x) =>
+            val cacheKey = conv.maliciousMinerBanHeightsKey(x)
+            val updated  = RemoteData.loaded(diskCaches.maliciousMiners.append(cacheKey.address, atHeight))
+            r ++ updateCacheIfExists(cacheKey)(updated)
+          }
+
         val stateUpdate = (evt.getStateUpdate +: evt.transactionStateUpdates).view
-        withTxAffectedTags ++
+        withAffectedMaliciousMiners ++
           stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
             val cacheKey = conv.assetKey(x)
             val v        = RemoteData.loaded(conv.assetValueAfter(cacheKey.asset, x).map(toWeightedAssetDescription))
@@ -525,8 +544,6 @@ object LazyBlockchain {
   )(implicit ctx: ReadOnly): LazyBlockchain[TagT] = {
     val blockHeaders = new BlockHeaderStorage(blockchainApi, diskCaches.blockHeaders)
     blockHeaders.load()
-    val bannedGenerators = new BannedGeneratorsStorage(diskCaches.bannedGenerators)
-    bannedGenerators.load(blockHeaders)
-    new LazyBlockchain[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, bannedGenerators, memCache, allTags)
+    new LazyBlockchain[TagT](settings, blockchainApi, db, diskCaches, blockHeaders, memCache, allTags)
   }
 }

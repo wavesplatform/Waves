@@ -277,6 +277,11 @@ class DefaultBlockchainApi(
     r
   }
 
+  override def getMaliciousMinerBanHeights(address: Address): Seq[Int] = {
+    // ClientCalls.blockingUnaryCall(grpcApiChannel.newCall())
+    Seq.empty
+  }
+
   private def firstOf[T](xs: java.util.Iterator[T]): Option[T] = if (xs.hasNext) xs.next().some else none
 }
 

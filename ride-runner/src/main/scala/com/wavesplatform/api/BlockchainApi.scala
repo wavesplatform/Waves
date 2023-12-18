@@ -27,6 +27,7 @@ trait BlockchainApi {
   def getBalance(address: Address, asset: Asset): Long
   def getLeaseBalance(address: Address): WavesBalances
   def getTransactionHeight(id: ByteStr): Option[Height]
+  def getMaliciousMinerBanHeights(address: Address): Seq[Int]
 }
 
 object BlockchainApi {

@@ -5,10 +5,10 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.protobuf.{ByteStringExt, transaction as pb}
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, Transaction}
+import com.wavesplatform.protobuf.{ByteStringExt, transaction as pb}
 import com.wavesplatform.ride.runner.caches.{WeighedAccountScriptInfo, WeighedAssetDescription}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -74,6 +74,14 @@ object MemCacheKey {
     // 24 = 12 (header) + 4 (size) + 4 (ref: scriptInfo) + 4 (align)
     override def valueWeight(value: WeighedAccountScriptInfo): Int = 24 + value.scriptInfoWeight
   }
+
+  case class MaliciousMinerBanHeights(address: Address) extends MemCacheKey {
+    override type ValueT = Seq[Int] // Height
+    // 16 = 12 (header) + 4 (ref)
+    override def keyWeight: Int = 16 + MemCacheWeights.OfAddress
+    // 16 = 12 (header) + 4 (size)
+    override def valueWeight(value: Seq[Int]): Int = 16 + value.size * 4 // Approximate
+  }
 }
 
 class GrpcCacheKeyConverters(chainId: Byte) {
@@ -85,7 +93,7 @@ class GrpcCacheKeyConverters(chainId: Byte) {
   def accountDataValueBefore(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] =
     update.dataEntryBefore.map(accountDataValue)
   def accountDataValueAfter(update: StateUpdate.DataEntryUpdate): Option[MemCacheKey.AccountData#ValueT] = update.dataEntry.map(accountDataValue)
-  def accountDataValue(dataEntry: pb.DataEntry): MemCacheKey.AccountData#ValueT         = toVanillaDataEntry(dataEntry)
+  def accountDataValue(dataEntry: pb.DataEntry): MemCacheKey.AccountData#ValueT                          = toVanillaDataEntry(dataEntry)
 
   def transactionIdKey(id: ByteString): MemCacheKey.Transaction = MemCacheKey.Transaction(TransactionId(ByteStr(id.toByteArray)))
 
@@ -154,4 +162,7 @@ class GrpcCacheKeyConverters(chainId: Byte) {
     val address = update.address.toAddress(chainId)
     MemCacheKey.AccountScript(address)
   }
+
+  def maliciousMinerBanHeightsKey(addressBytes: ByteString): MemCacheKey.MaliciousMinerBanHeights =
+    MemCacheKey.MaliciousMinerBanHeights(addressBytes.toAddress(chainId))
 }

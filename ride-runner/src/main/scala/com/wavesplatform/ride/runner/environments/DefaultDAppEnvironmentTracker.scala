@@ -79,6 +79,7 @@ class DefaultDAppEnvironmentTracker[TagT](allTags: CacheKeyTags[TagT], tag: TagT
     // log.trace(s"[$tag] accountWavesBalanceOf($address)")
     allTags.addDependent(MemCacheKey.AccountBalance(address, Asset.Waves), tag)
     allTags.addDependent(MemCacheKey.AccountLeaseBalance(address), tag)
+    allTags.addDependent(MemCacheKey.MaliciousMinerBanHeights(address), tag)
   }
 
   override def accountScript(address: Address): Unit = {

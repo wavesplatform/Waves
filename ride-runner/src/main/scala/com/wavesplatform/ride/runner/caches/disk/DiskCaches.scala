@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 
 trait DiskCaches {
   def blockHeaders: BlockDiskCache
-  def bannedGenerators: BannedGeneratorsDiskCache
+  def maliciousMiners: MaliciousMinerBanHeightsDiskCache
 
   def accountDataEntries: DiskCache[(Address, String), DataEntry[?]]
   def accountScripts: DiskCache[Address, WeighedAccountScriptInfo]
