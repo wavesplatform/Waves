@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.ContentTypes.`application/json`
-import akka.http.scaladsl.model.StatusCodes.BadRequest
+import akka.http.scaladsl.model.StatusCodes.{BadRequest, NotFound}
 import akka.http.scaladsl.model.{FormData, HttpEntity}
 import com.wavesplatform.BlockGen
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
@@ -422,6 +422,22 @@ class TransactionSnapshotsRouteSpec
       multipleFormData(transfers) ~> route ~> check {
         status shouldEqual BadRequest
         (responseAs[JsObject] \ "message").as[String] shouldBe "Too big sequence requested: max limit is 100 entries"
+      }
+    }
+
+    "unexisting id" in {
+      val tx = transfer()
+      Get(routePath(s"/snapshot/${tx.id()}")) ~> route ~> check {
+        status shouldEqual NotFound
+        (responseAs[JsObject] \ "message").as[String] shouldBe "transactions does not exist"
+      }
+      multipleJson(Seq(tx)) ~> route ~> check {
+        status shouldEqual NotFound
+        (responseAs[JsObject] \ "message").as[String] shouldBe "transactions does not exist"
+      }
+      multipleFormData(Seq(tx)) ~> route ~> check {
+        status shouldEqual NotFound
+        (responseAs[JsObject] \ "message").as[String] shouldBe "transactions does not exist"
       }
     }
   }
