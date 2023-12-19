@@ -1,5 +1,4 @@
 package com.wavesplatform.state
-import play.api.libs.json.{Json, Writes}
 
 case class VolumeAndFee(volume: Long, fee: Long) {
   def combineE(that: VolumeAndFee): Either[String, VolumeAndFee] =
@@ -11,6 +10,4 @@ case class VolumeAndFee(volume: Long, fee: Long) {
 
 object VolumeAndFee {
   val empty: VolumeAndFee = VolumeAndFee(0, 0)
-
-  implicit val writes: Writes[VolumeAndFee] = Json.writes
 }
