@@ -731,20 +731,24 @@ class RocksDBWriter(
       val continue   = currHeight <= toInclusive
       if (continue) {
         changedWavesBalancesKey.parse(e.getValue).foreach { addressId =>
-          lastWavesBalanceUpdateAt.updateWith(addressId)(_ => Some(currHeight))
+          lastWavesBalanceUpdateAt.updateWith(addressId) { prevHeight =>
+            prevHeight match {
+              case Some(prevHeight) => rw.delete(Keys.wavesBalanceAt(addressId, prevHeight))
+              case None =>
+                // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
+                // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
+                // We doesn't know about 1900, so we will delete all keys from 1.
+                rw.deleteRange(
+                  Keys.wavesBalanceAt(addressId, Height(1)),
+                  Keys.wavesBalanceAt(addressId, currHeight) // Deletes in [1; lastHeight)
+                )
+            }
+
+            Some(currHeight)
+          }
         }
       }
       continue
-    }
-
-    lastWavesBalanceUpdateAt.foreach { case (addressId, lastHeight) =>
-      // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
-      // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
-      // We doesn't know about 1900, so we will delete all keys from 1.
-      rw.deleteRange(
-        Keys.wavesBalanceAt(AddressId(addressId), Height(1)),
-        Keys.wavesBalanceAt(AddressId(addressId), lastHeight) // Deletes in [1; lastHeight)
-      )
     }
 
     rw.deleteRange(Keys.changedWavesBalances(fromInclusive), Keys.changedWavesBalances(toInclusive + 1))
@@ -761,17 +765,21 @@ class RocksDBWriter(
       if (continue) {
         val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
         changedBalancesKey.parse(e.getValue).foreach { addressId =>
-          lastAssetBalanceUpdateAt.updateWith((addressId, asset))(_ => Some(currHeight))
+          lastAssetBalanceUpdateAt.updateWith((addressId, asset)) { prevHeight =>
+            prevHeight match {
+              case Some(prevHeight) => rw.delete(Keys.assetBalanceAt(addressId, asset, prevHeight))
+              case None =>
+                rw.deleteRange(
+                  Keys.assetBalanceAt(addressId, asset, Height(1)),
+                  Keys.assetBalanceAt(addressId, asset, currHeight) // Deletes in [1; lastHeight)
+                )
+            }
+
+            Some(currHeight)
+          }
         }
       }
       continue
-    }
-
-    lastAssetBalanceUpdateAt.foreach { case ((addressId, asset), lastHeight) =>
-      rw.deleteRange(
-        Keys.assetBalanceAt(addressId, asset, Height(1)),
-        Keys.assetBalanceAt(addressId, asset, lastHeight) // Deletes in [1; lastHeight)
-      )
     }
 
     rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toInclusive + 1))
@@ -792,25 +800,27 @@ class RocksDBWriter(
           if (changedDataKeys.nonEmpty) {
             changedDataAddresses.addOne(addressId)
             changedDataKeys.foreach { accountDataKey =>
-              lastAccountDataUpdateAt.updateWith((addressId, accountDataKey))(_ => Some(currHeight))
+              lastAccountDataUpdateAt.updateWith((addressId, accountDataKey)) { prevHeight =>
+                prevHeight match {
+                  case Some(prevHeight) => rw.delete(Keys.dataAt(addressId, accountDataKey)(prevHeight))
+                  case None =>
+                    rw.deleteRange(
+                      Keys.dataAt(addressId, accountDataKey)(Height(1)), // TODO data activation height?
+                      Keys.dataAt(addressId, accountDataKey)(currHeight) // Deletes in [1; lastHeight)
+                    )
+                }
+
+                Some(currHeight)
+              }
             }
+            rw.delete(Keys.changedDataKeys(currHeight, addressId))
           }
         }
 
       continue
     }
 
-    lastAccountDataUpdateAt.foreach { case ((addressId, dataKey), lastHeight) =>
-      rw.deleteRange(
-        Keys.dataAt(addressId, dataKey)(Height(1)),
-        Keys.dataAt(addressId, dataKey)(lastHeight)
-      )
-    }
-
     rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toInclusive + 1))
-    changedDataAddresses.foreach { addressId =>
-      rw.deleteRange(Keys.changedDataKeys(fromInclusive, addressId), Keys.changedDataKeys(toInclusive + 1, addressId))
-    }
   }
 
   override protected def doRollback(targetHeight: Int): DiscardedBlocks = {
