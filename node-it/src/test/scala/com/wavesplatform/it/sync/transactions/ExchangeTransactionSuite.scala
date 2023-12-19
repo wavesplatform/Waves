@@ -55,7 +55,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val matcher = acc2
 
       val ts                  = ntpTime.correctedTime()
-      val expirationTimestamp = ts + Order.MaxLiveTime
+      val expirationTimestamp = ts + Order.MaxLiveTime / 2
 
       val buyPrice   = 2 * Order.PriceConstant
       val sellPrice  = 2 * Order.PriceConstant
