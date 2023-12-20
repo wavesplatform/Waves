@@ -177,7 +177,9 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     val carl        = TxHelpers.signer(3)
     val carlAddress = carl.toAddress
 
-    val addresses = Seq(aliceAddress, bobAddress, carlAddress, TxHelpers.defaultSigner.toAddress)
+    val userAddresses  = Seq(aliceAddress, bobAddress, carlAddress)
+    val minerAddresses = Seq(TxHelpers.defaultAddress)
+    val allAddresses   = userAddresses ++ minerAddresses
 
     def transferWavesTx = TxHelpers.massTransfer(
       to = Seq(
@@ -195,13 +197,16 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     def dataTx    = TxHelpers.dataSingle(account = bob, key = dataKey, value = Random.nextInt().toString, fee = dataTxFee.value)
 
     "doesn't delete sole data" in withDomain(settings, Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))) { d =>
-      d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx)
+      d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx) // Last user data
+      d.blockchain.height shouldBe 2
 
-      (3 to 9).foreach(_ => d.appendBlock())
-      d.blockchain.height shouldBe 9
+      (3 to 10).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 10
 
-      withClue("No data before current height: ") {
-        checkHistoricalDataOnlySinceHeight(d, addresses, 2)
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
+      withClue("No data before: ") {
+        checkHistoricalDataOnlySinceHeight(d, userAddresses, 2)
+        checkHistoricalDataOnlySinceHeight(d, minerAddresses, 4) // Updated on each height
       }
     }
 
@@ -214,14 +219,15 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         transferWavesTx,
         transferAssetTx,
         dataTx
-      )
+      ) // Last user data
       d.blockchain.height shouldBe 4
 
-      (5 to 9).foreach(_ => d.appendBlock())
-      d.blockchain.height shouldBe 9
+      (5 to 10).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 10
 
-      withClue("No data before current height: ") {
-        checkHistoricalDataOnlySinceHeight(d, addresses, 4)
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
+      withClue("No data before: ") {
+        checkHistoricalDataOnlySinceHeight(d, allAddresses, 4)
       }
     }
 
@@ -242,14 +248,16 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         transferWavesTx,
         transferAssetTx,
         dataTx
-      )
+      ) // Last user data
       d.blockchain.height shouldBe 6
 
-      (7 to 13).foreach(_ => d.appendBlock())
-      d.blockchain.height shouldBe 13
+      (7 to 14).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 14
 
-      withClue("No data before current height: ") {
-        checkHistoricalDataOnlySinceHeight(d, addresses, 6)
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 8
+      withClue("No data before: ") {
+        checkHistoricalDataOnlySinceHeight(d, userAddresses, 6)
+        checkHistoricalDataOnlySinceHeight(d, minerAddresses, 8) // Updated on each height
       }
     }
 
@@ -282,7 +290,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         d.appendBlock()
         d.appendBlock(transferWavesTx, transferAssetTx, dataTx)
 
-        (7 to 13).foreach(_ => d.appendBlock())
+        (7 to 14).foreach(_ => d.appendBlock())
       }
 
       var nonHistoricalKeysWithoutCleanup: CollectedKeys = mutable.ArrayBuffer.empty

@@ -450,24 +450,20 @@ class RocksDBWriter(
 
         cleanupExecutorService.submit(new Runnable {
           override def run(): Unit = {
-            val lastCleanupHeight = rdb.db.get(Keys.lastCleanupHeight)
-            // If lastCleanupHeight is previous to newSafeRollbackHeight, we run 1 batch.
-            // If more - we will run multiple batches to preserve the progress and don't overfill RAM.
-            // TODO we can optimize this
-            (lastCleanupHeight + 1 to newSafeRollbackHeight).foreach { height =>
-              val h = Height(height)
-              if (h % dbSettings.cleanupInterval == 0) {
-                writableDB.withOptions { (ro, wo) =>
-                  writableDB.readWriteWithOptions(ro, wo) { rw =>
-                    batchCleanup(
-                      fromInclusive = Height(h - dbSettings.cleanupInterval + 1),
-                      toInclusive = h,
-                      rw = rw
-                    )
-                    rw.put(Keys.lastCleanupHeight, h)
-                  }
+            // Running in portions to not overfill RAM.
+            // Not moving outside, because lastCleanupHeight is updated here, so recently added jobs see the right lastCleanupHeight on start.
+            val firstDirtyHeight = rdb.db.get(Keys.lastCleanupHeight) + 1
+            (firstDirtyHeight to newSafeRollbackHeight by dbSettings.cleanupInterval).sliding(2).foreach {
+              case fromInclusive +: toExclusive +: _ =>
+                writableDB.readWrite { rw =>
+                  batchCleanup(
+                    fromInclusive = Height(fromInclusive),
+                    toExclusive = Height(toExclusive),
+                    rw = rw
+                  )
+                  rw.put(Keys.lastCleanupHeight, Height(toExclusive - 1))
                 }
-              }
+              case _ =>
             }
           }
         })
@@ -720,7 +716,7 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  private def batchCleanup(fromInclusive: Height, toInclusive: Height, rw: RW): Unit = {
+  private def batchCleanup(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
     // Waves balances
 
     val lastWavesBalanceUpdateAt = mutable.LongMap.empty[Height]
@@ -728,12 +724,11 @@ class RocksDBWriter(
     rw.iterateOverWithSeek(KeyTags.ChangedWavesBalances.prefixBytes, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
       val k          = e.getKey.drop(KeyTags.ChangedWavesBalances.prefixBytes.length)
       val currHeight = Height(Ints.fromByteArray(k))
-      val continue   = currHeight <= toInclusive
-      if (continue) {
+      val continue   = currHeight < toExclusive
+      if (continue)
         changedWavesBalancesKey.parse(e.getValue).foreach { addressId =>
           lastWavesBalanceUpdateAt.updateWith(addressId)(_ => Some(currHeight))
         }
-      }
       continue
     }
 
@@ -747,7 +742,7 @@ class RocksDBWriter(
       )
     }
 
-    rw.deleteRange(Keys.changedWavesBalances(fromInclusive), Keys.changedWavesBalances(toInclusive + 1))
+    rw.deleteRange(Keys.changedWavesBalances(fromInclusive), Keys.changedWavesBalances(toExclusive))
 
     // Asset balances
 
@@ -757,7 +752,7 @@ class RocksDBWriter(
     rw.iterateOverWithSeek(changedBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
       val k          = e.getKey.drop(changedBalancesPrefix.length)
       val currHeight = Height(Ints.fromByteArray(k))
-      val continue   = currHeight <= toInclusive
+      val continue   = currHeight < toExclusive
       if (continue) {
         val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
         changedBalancesKey.parse(e.getValue).foreach { addressId =>
@@ -774,7 +769,7 @@ class RocksDBWriter(
       )
     }
 
-    rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toInclusive + 1))
+    rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toExclusive))
 
     // Account data
 
@@ -784,8 +779,8 @@ class RocksDBWriter(
     val changedAddressesPrefix  = KeyTags.ChangedAddresses.prefixBytes
     rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
-      val continue   = currHeight < toInclusive
-      if (continue || currHeight == toInclusive)
+      val continue   = currHeight < toExclusive
+      if (continue)
         changedAddressesKey.parse(e.getValue).foreach { addressId =>
           // Account data
           val changedDataKeys = rw.get(Keys.changedDataKeys(currHeight, addressId))
@@ -807,9 +802,9 @@ class RocksDBWriter(
       )
     }
 
-    rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toInclusive + 1))
+    rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toExclusive))
     changedDataAddresses.foreach { addressId =>
-      rw.deleteRange(Keys.changedDataKeys(fromInclusive, addressId), Keys.changedDataKeys(toInclusive + 1, addressId))
+      rw.deleteRange(Keys.changedDataKeys(fromInclusive, addressId), Keys.changedDataKeys(toExclusive, addressId))
     }
   }
 
