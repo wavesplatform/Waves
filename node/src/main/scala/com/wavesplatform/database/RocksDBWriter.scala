@@ -205,7 +205,7 @@ class RocksDBWriter(
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
       ro.get(Keys.addressId(address)).fold(false) { addressId =>
-        ro.prefixExists(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray)
+        ro.prefixExists(KeyTags.Data.prefixBytes ++ addressId.toByteArray)
       }
     }
   }
@@ -1010,7 +1010,10 @@ class RocksDBWriter(
     if (currentData.height == currentHeight) {
       val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
       rw.delete(dataNodeKey(currentHeight))
-      rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      prevDataNode.entry match {
+        case _: EmptyDataEntry => rw.delete(currentDataKey)
+        case _                 => rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      }
     }
   }
 
