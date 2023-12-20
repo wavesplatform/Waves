@@ -372,12 +372,12 @@ object Importer extends ScorexLogging {
 
           var totalSize = 0L
           rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight) { e =>
-            totalSize += e.getValue.length
+            totalSize += (e.getValue.length + 4)
           }
 
           val snapshotsOffset = totalSize
 
-          blocksOffset -> snapshotsOffset.toLong
+          blocksOffset -> snapshotsOffset
         case _ => 0L -> 0L
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
