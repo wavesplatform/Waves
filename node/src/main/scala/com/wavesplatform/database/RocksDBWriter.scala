@@ -21,7 +21,6 @@ import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
-import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
@@ -993,7 +992,7 @@ class RocksDBWriter(
     }
   }
 
-  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, Status)] = readOnly { db =>
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, TxMeta.Status)] = readOnly { db =>
     for {
       meta     <- db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
       snapshot <- db.get(Keys.transactionStateSnapshotAt(Height(meta.height), TxNum(meta.num.toShort), rdb.txSnapshotHandle))
