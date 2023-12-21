@@ -703,25 +703,27 @@ class RocksDBWriter(
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
-  private def runCleanupTask(newSafeRollbackHeight: Int, cleanupInterval: Int): Unit = cleanupExecutorService.submit(new Runnable {
-    override def run(): Unit = {
-      // Running in portions to not overfill RAM.
-      // Not moving outside, because lastCleanupHeight is updated here, so recently added jobs see the right lastCleanupHeight on start.
-      val firstDirtyHeight = rdb.db.get(Keys.lastCleanupHeight) + 1
-      (firstDirtyHeight to newSafeRollbackHeight by cleanupInterval).sliding(2).foreach {
-        case fromInclusive +: toExclusive +: _ =>
+  @volatile private var lastCleanupHeight = writableDB.get(Keys.lastCleanupHeight)
+  private def runCleanupTask(newSafeRollbackHeight: Int, cleanupInterval: Int): Unit =
+    if (lastCleanupHeight + cleanupInterval < newSafeRollbackHeight) {
+      cleanupExecutorService.submit(new Runnable {
+        override def run(): Unit = {
+          val firstDirtyHeight  = Height(lastCleanupHeight + 1)
+          val toHeightExclusive = Height(firstDirtyHeight + cleanupInterval)
+
           writableDB.readWrite { rw =>
             batchCleanup(
-              fromInclusive = Height(fromInclusive),
-              toExclusive = Height(toExclusive),
+              fromInclusive = firstDirtyHeight,
+              toExclusive = toHeightExclusive,
               rw = rw
             )
-            rw.put(Keys.lastCleanupHeight, Height(toExclusive - 1))
+
+            lastCleanupHeight = Height(toHeightExclusive - 1)
+            rw.put(Keys.lastCleanupHeight, lastCleanupHeight)
           }
-        case _ =>
-      }
+        }
+      })
     }
-  })
 
   private def batchCleanup(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
     // Waves balances
