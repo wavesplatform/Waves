@@ -11,6 +11,7 @@ import org.rocksdb.{ReadOptions, WriteBatch, WriteOptions}
 
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
+import scala.util.Using
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -70,15 +71,14 @@ object RocksDBIteratorBenchmark {
 
     val readOptions: ReadOptions = new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true)
 
-    private val wb: WriteBatch = new WriteBatch()
-    kvs.foreach { case (key, value) =>
-      wb.put(key, value)
+    Using.Manager { use =>
+      val wb = use(new WriteBatch())
+      val wo = use(new WriteOptions())
+      kvs.foreach { case (key, value) =>
+        wb.put(key, value)
+      }
+      rdb.db.write(wo, wb)
     }
-
-    private val wo = new WriteOptions()
-    rdb.db.write(wo, wb)
-    wo.close()
-    wb.close()
 
     @TearDown
     def close(): Unit = {

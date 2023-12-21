@@ -142,7 +142,8 @@ object Keys {
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
     Key.opt(AssetScript, hBytes(asset.id.arr, height), _ => (), _ => Array[Byte]())
 
-  val safeRollbackHeight: Key[Int] = intKey(SafeRollbackHeight)
+  val safeRollbackHeight: Key[Int]   = intKey(SafeRollbackHeight)
+  val lastCleanupHeight: Key[Height] = heightKey(LastCleanupHeight)
 
   def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
@@ -240,6 +241,4 @@ object Keys {
 
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)
-
-  val lastCleanupHeight: Key[Height] = heightKey(LastCleanupHeight)
 }

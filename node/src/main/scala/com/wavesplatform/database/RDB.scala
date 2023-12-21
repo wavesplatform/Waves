@@ -114,7 +114,7 @@ object RDB extends StrictLogging {
       .setLevelCompactionDynamicLevelBytes(true)
       // Defines the prefix.
       // Improves an iterator performance for keys with prefixes of 10 or more bytes.
-      // Iterator finds the exact key for seek(key) and becomes invalid after next(), if specified key has less than 10 bytes.
+      // If specified key has less than 10 bytes: iterator finds the exact key for seek(key) and becomes invalid after next().
       .useCappedPrefixExtractor(10)
       .setMemtablePrefixBloomSizeRatio(0.25)
       .setCompressionType(CompressionType.LZ4_COMPRESSION)
@@ -132,7 +132,7 @@ object RDB extends StrictLogging {
       .setMaxBackgroundJobs(6)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
-      .setMaxSubcompactions(2) // Could lead to max_background_jobs * max_subcompactions background threads
+      .setMaxSubcompactions(2) // Can lead to max_background_jobs * max_subcompactions background threads
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()

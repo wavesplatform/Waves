@@ -64,35 +64,34 @@ object Exporter extends ScorexLogging {
             case None    => ()
           }
 
-          Using.resource(rdbWriter) { _ =>
-            Using.resources(
-              createOutputFile(blocksOutputFilename),
-              snapshotsOutputFilename.map(createOutputFile)
-            ) { case (blocksOutput, snapshotsOutput) =>
-              Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
-                case (blocksStream, snapshotsStream) =>
-                  var exportedBlocksBytes    = 0L
-                  var exportedSnapshotsBytes = 0L
-                  val start                  = System.currentTimeMillis()
+          Using.resources(
+            createOutputFile(blocksOutputFilename),
+            snapshotsOutputFilename.map(createOutputFile),
+            rdbWriter
+          ) { case (blocksOutput, snapshotsOutput, _) =>
+            Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
+              case (blocksStream, snapshotsStream) =>
+                var exportedBlocksBytes    = 0L
+                var exportedSnapshotsBytes = 0L
+                val start                  = System.currentTimeMillis()
 
-                  new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
-                    exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
-                    snapshotsStream.foreach { output =>
-                      exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
-                    }
-
-                    if (h % (height / 10) == 0) {
-                      log.info(
-                        s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
-                      )
-                    }
+                new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
+                  exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
+                  snapshotsStream.foreach { output =>
+                    exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
                   }
-                  val duration = System.currentTimeMillis() - start
-                  log
-                    .info(
-                      s"Finished exporting $height blocks in ${java.time.Duration.ofMillis(duration)}, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+
+                  if (h % (height / 10) == 0) {
+                    log.info(
+                      s"$h blocks exported, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
                     )
-              }
+                  }
+                }
+                val duration = System.currentTimeMillis() - start
+                log
+                  .info(
+                    s"Finished exporting $height blocks in ${java.time.Duration.ofMillis(duration)}, ${humanReadableSize(exportedBlocksBytes)} written for blocks${snapshotsLogInfo(exportSnapshots, exportedSnapshotsBytes)}"
+                  )
             }
           }
         }

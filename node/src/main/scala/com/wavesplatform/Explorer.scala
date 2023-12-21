@@ -12,8 +12,7 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, TransactionId}
+import com.wavesplatform.state.{Blockchain, Height, Portfolio, SnapshotBlockchain, StateSnapshot, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
@@ -231,24 +230,24 @@ object Explorer extends ScorexLogging {
 
           val result = new util.HashMap[Short, Stats]
           Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
-            Using(new ReadOptions().setTotalOrderSeek(true)) { ro =>
-              Using(rdb.db.newIterator(cf, ro)) { iterator =>
-                iterator.seekToFirst()
+            Using.Manager { use =>
+              val ro       = use(new ReadOptions().setTotalOrderSeek(true))
+              val iterator = use(rdb.db.newIterator(cf, ro))
+              iterator.seekToFirst()
 
-                while (iterator.isValid) {
-                  val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
-                  val valueLength = iterator.value().length
-                  val keyLength   = iterator.key().length
-                  result.compute(
-                    keyPrefix,
-                    (_, maybePrev) =>
-                      maybePrev match {
-                        case null => Stats(1, keyLength, valueLength)
-                        case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
-                      }
-                  )
-                  iterator.next()
-                }
+              while (iterator.isValid) {
+                val keyPrefix   = ByteBuffer.wrap(iterator.key()).getShort
+                val valueLength = iterator.value().length
+                val keyLength   = iterator.key().length
+                result.compute(
+                  keyPrefix,
+                  (_, maybePrev) =>
+                    maybePrev match {
+                      case null => Stats(1, keyLength, valueLength)
+                      case prev => Stats(prev.entryCount + 1, prev.totalKeySize + keyLength, prev.totalValueSize + valueLength)
+                    }
+                )
+                iterator.next()
               }
             }
           }
@@ -373,15 +372,15 @@ object Explorer extends ScorexLogging {
         case "CTI" =>
           log.info("Counting transaction IDs")
           var counter = 0
-          Using(new ReadOptions().setTotalOrderSeek(true)) { ro =>
-            Using(rdb.db.newIterator(rdb.txMetaHandle.handle, ro)) { iter =>
-              iter.seekToFirst()
-              // iter.seek(KeyTags.TransactionMetaById.prefixBytes) // Doesn't work, because of CappedPrefixExtractor(10)
-              log.info(iter.key().mkString(","))
-              while (iter.isValid && iter.key().startsWith(KeyTags.TransactionMetaById.prefixBytes)) {
-                counter += 1
-                iter.next()
-              }
+          Using.Manager { use =>
+            val ro   = use(new ReadOptions().setTotalOrderSeek(true))
+            val iter = use(rdb.db.newIterator(rdb.txMetaHandle.handle, ro))
+            iter.seekToFirst()
+            // iter.seek(KeyTags.TransactionMetaById.prefixBytes) // Doesn't work, because of CappedPrefixExtractor(10)
+
+            while (iter.isValid && iter.key().startsWith(KeyTags.TransactionMetaById.prefixBytes)) {
+              counter += 1
+              iter.next()
             }
           }
           log.info(s"Found $counter transaction IDs")

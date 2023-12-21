@@ -160,6 +160,8 @@ class RocksDBWriter(
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
+  private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
+
   override protected def loadMaxAddressId(): Long = writableDB.get(Keys.lastAddressId).getOrElse(0L)
 
   override protected def loadAddressId(address: Address): Option[AddressId] =
@@ -439,9 +441,9 @@ class RocksDBWriter(
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       stateHash: StateHashBuilder.Result
-  ): Unit = writableDB.withOptions { (ro, wo) =>
+  ): Unit = {
     log.trace(s"Persisting block ${blockMeta.id} at height $height")
-    writableDB.readWriteWithOptions(ro, wo) { rw =>
+    readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
 
       rw.put(Keys.height, Height(height))
@@ -604,7 +606,9 @@ class RocksDBWriter(
             address            <- Seq(details.recipientAddress, details.sender.toAddress)
             addressId = this.addressIdWithFallback(address, newAddresses)
           } yield (addressId, leaseId)
-        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2).toSeq
+        val leaseIdsByAddressId = addressIdWithLeaseIds
+          .groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2)
+          .toSeq
 
         rw.multiGetInts(leaseIdsByAddressId.map(_._1._2))
           .zip(leaseIdsByAddressId)
@@ -711,7 +715,7 @@ class RocksDBWriter(
           val firstDirtyHeight  = Height(lastCleanupHeight + 1)
           val toHeightExclusive = Height(firstDirtyHeight + cleanupInterval)
 
-          writableDB.readWrite { rw =>
+          readWrite { rw =>
             batchCleanup(
               fromInclusive = firstDirtyHeight,
               toExclusive = toHeightExclusive,
@@ -728,11 +732,11 @@ class RocksDBWriter(
   private def batchCleanup(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
     // Waves balances
 
-    val lastWavesBalanceUpdateAt = mutable.LongMap.empty[Height]
-    val changedWavesBalancesKey  = Keys.changedWavesBalances(Int.MaxValue)
-    rw.iterateOverWithSeek(KeyTags.ChangedWavesBalances.prefixBytes, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
-      val k          = e.getKey.drop(KeyTags.ChangedWavesBalances.prefixBytes.length)
-      val currHeight = Height(Ints.fromByteArray(k))
+    val lastWavesBalanceUpdateAt   = mutable.LongMap.empty[Height]
+    val changedWavesBalancesKey    = Keys.changedWavesBalances(Int.MaxValue) // Doesn't matter, we need this only to parse
+    val changedWavesBalancesPrefix = KeyTags.ChangedWavesBalances.prefixBytes
+    rw.iterateOverWithSeek(changedWavesBalancesPrefix, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedWavesBalancesPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue)
         changedWavesBalancesKey.parse(e.getValue).foreach { addressId =>
@@ -755,16 +759,15 @@ class RocksDBWriter(
 
     // Asset balances
 
-    val lastAssetBalanceUpdateAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
-    val changedBalancesKey       = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
-    val changedBalancesPrefix    = KeyTags.ChangedAssetBalances.prefixBytes
-    rw.iterateOverWithSeek(changedBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
-      val k          = e.getKey.drop(changedBalancesPrefix.length)
-      val currHeight = Height(Ints.fromByteArray(k))
+    val lastAssetBalanceUpdateAt   = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
+    val changedAssetBalancesKey    = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
+    val changedAssetBalancesPrefix = KeyTags.ChangedAssetBalances.prefixBytes
+    rw.iterateOverWithSeek(changedAssetBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAssetBalancesPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue) {
         val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
-        changedBalancesKey.parse(e.getValue).foreach { addressId =>
+        changedAssetBalancesKey.parse(e.getValue).foreach { addressId =>
           lastAssetBalanceUpdateAt.updateWith((addressId, asset))(_ => Some(currHeight))
         }
       }
@@ -774,7 +777,7 @@ class RocksDBWriter(
     lastAssetBalanceUpdateAt.foreach { case ((addressId, asset), lastHeight) =>
       rw.deleteRange(
         Keys.assetBalanceAt(addressId, asset, Height(1)),
-        Keys.assetBalanceAt(addressId, asset, lastHeight) // Deletes in [1; lastHeight)
+        Keys.assetBalanceAt(addressId, asset, lastHeight)
       )
     }
 
@@ -782,16 +785,15 @@ class RocksDBWriter(
 
     // Account data
 
-    val changedDataAddresses    = mutable.Set.empty[AddressId]
     val lastAccountDataUpdateAt = mutable.AnyRefMap.empty[(AddressId, String), Height]
-    val changedAddressesKey     = Keys.changedAddresses(Int.MaxValue) // Doesn't matter, we need this only to parse
+    val changedDataAddresses    = mutable.Set.empty[AddressId]
+    val changedAddressesKey     = Keys.changedAddresses(Int.MaxValue)
     val changedAddressesPrefix  = KeyTags.ChangedAddresses.prefixBytes
     rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue)
         changedAddressesKey.parse(e.getValue).foreach { addressId =>
-          // Account data
           val changedDataKeys = rw.get(Keys.changedDataKeys(currHeight, addressId))
           if (changedDataKeys.nonEmpty) {
             changedDataAddresses.addOne(addressId)
@@ -834,7 +836,7 @@ class RocksDBWriter(
         val aliasesToInvalidate      = Seq.newBuilder[Alias]
         val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
-        val discardedBlock = writableDB.readWrite { rw =>
+        val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
 
           val discardedMeta = rw

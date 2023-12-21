@@ -20,6 +20,7 @@ object KeyTags extends Enumeration {
   FilledVolumeAndFeeHistory,
   FilledVolumeAndFee,
   ChangedAddresses,
+  ChangedWavesBalances,
   ChangedAssetBalances,
   ChangedDataKeys,
   AddressIdOfAlias,
@@ -38,6 +39,7 @@ object KeyTags extends Enumeration {
   AssetScriptHistory,
   AssetScript,
   SafeRollbackHeight,
+  LastCleanupHeight,
   BlockInfoAtHeight,
   NthTransactionInfoAtHeight,
   AddressTransactionSeqNr,
@@ -57,9 +59,7 @@ object KeyTags extends Enumeration {
   MaliciousMinerBanHeights,
   BlockStateHash,
   AddressLeaseInfoSeqNr,
-  AddressLeaseInfoSeq,
-  LastCleanupHeight,
-  ChangedWavesBalances = Value
+  AddressLeaseInfoSeq = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)
