@@ -30,7 +30,7 @@ case class IssueTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Issue)
-    with VersionedTransaction
+    with Versioned.ToV3
     with ProvenTransaction
     with FastHashId
     with SigProofsSwitch
@@ -50,8 +50,7 @@ object IssueTransaction extends TransactionParser {
   val MaxAssetDescriptionLength = 1000
   val MaxAssetDecimals          = 8
 
-  override val typeId: TxType                    = 3: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  override val typeId: TxType = 3: Byte
 
   implicit val validator: TxValidator[IssueTransaction] = IssueTxValidator
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =

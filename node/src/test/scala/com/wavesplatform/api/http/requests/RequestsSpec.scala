@@ -3,10 +3,9 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
-import play.api.libs.json._
+import play.api.libs.json.*
 
 class RequestsSpec extends FreeSpec with OptionValues {
   private def transferRequestGen(version: Int): Gen[(KeyPair, JsObject)] =
@@ -33,7 +32,7 @@ class RequestsSpec extends FreeSpec with OptionValues {
 
   "TransferRequest" - {
     "accepts proofs for version >= 2" in {
-      TransferTransaction.supportedVersions.filter(_ >= 2).foreach { version =>
+      Seq(2, 3).foreach { version =>
         forAll(transferRequestGen(version)) {
           case (sender, json) =>
             val request = json.as[TransferRequest]

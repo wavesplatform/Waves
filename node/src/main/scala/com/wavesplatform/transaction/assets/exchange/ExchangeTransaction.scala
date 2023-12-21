@@ -6,6 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -26,7 +27,7 @@ case class ExchangeTransaction(
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.Exchange, order1.assetPair.checkedAssets)
-    with VersionedTransaction
+    with Versioned.ToV3
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
@@ -56,15 +57,13 @@ case class ExchangeTransaction(
 object ExchangeTransaction extends TransactionParser {
   type TransactionT = ExchangeTransaction
 
-  implicit val validator = ExchangeTxValidator
+  implicit val validator: TxValidator[ExchangeTransaction] = ExchangeTxValidator
 
   implicit def sign(tx: ExchangeTransaction, privateKey: PrivateKey): ExchangeTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[ExchangeTransaction] =
     ExchangeTxSerializer.parseBytes(bytes)
-
-  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val typeId: TxType = 7: Byte
 

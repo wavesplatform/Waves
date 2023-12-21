@@ -37,7 +37,7 @@ class MultiSig2of3Test extends PropSpec with WithState {
          |
       """.stripMargin
     val untyped = Parser.parseExpr(script).get.value
-    ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).explicitGet()._1
+    ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), V1, untyped).explicitGet()._1
   }
 
   val preconditionsAndTransfer: (GenesisTransaction, SetScriptTransaction, TransferTransaction, Seq[ByteStr]) = {

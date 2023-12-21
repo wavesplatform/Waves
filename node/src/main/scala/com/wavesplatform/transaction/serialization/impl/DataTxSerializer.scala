@@ -5,10 +5,10 @@ import java.nio.charset.StandardCharsets.UTF_8
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.serialization._
+import com.wavesplatform.serialization.*
 import com.wavesplatform.state.DataEntry.Type
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, PBSince, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import play.api.libs.json.{JsObject, Json}
 
@@ -38,7 +38,7 @@ object DataTxSerializer {
     }
   }
 
-  private def serializeEntry(e: DataEntry[?]): Array[Byte] = {
+  def serializeEntry(e: DataEntry[?]): Array[Byte] = {
     val keyBytes = e.key.utf8Bytes
     val valueBytes = e match {
       case IntegerDataEntry(_, value) => Bytes.concat(Array(Type.Integer.id.toByte), Longs.toByteArray(value))
@@ -51,7 +51,7 @@ object DataTxSerializer {
   }
 
   def toBytes(tx: DataTransaction): Array[Byte] =
-    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    if (PBSince.affects(tx)) PBTransactionSerializer.bytes(tx)
     else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {
@@ -71,7 +71,7 @@ object DataTxSerializer {
     DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 
-  private def parseEntry(buf: ByteBuffer): DataEntry[_] = {
+  def parseEntry(buf: ByteBuffer): DataEntry[_] = {
     val key = new String(Deser.parseArrayWithLength(buf), UTF_8)
     buf.get match {
       case t if t == Type.Integer.id => IntegerDataEntry(key, buf.getLong)

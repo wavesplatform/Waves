@@ -69,7 +69,7 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     nodes.waitForHeight(activationHeight)
-    val script = ScriptCompiler.compile(dAppScriptV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(dAppScriptV4, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), waitForTx = true)
   }
 

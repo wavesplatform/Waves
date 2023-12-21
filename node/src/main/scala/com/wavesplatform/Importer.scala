@@ -7,7 +7,7 @@ import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
-import com.wavesplatform.block.{Block, BlockHeader, BlockSnapshot}
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, KeyTags, RDB}
@@ -17,13 +17,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.network.BlockSnapshotResponse
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker, StateSnapshot, TxMeta}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.ParSignatureChecker.sigverify
+import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Height, ParSignatureChecker}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
@@ -38,6 +39,7 @@ import scopt.OParser
 
 import java.io.*
 import java.net.{MalformedURLException, URL}
+import java.time
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -46,7 +48,7 @@ import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
 
-  type AppendBlock = (Block, Option[BlockSnapshot]) => Task[Either[ValidationError, BlockApplyResult]]
+  type AppendBlock = (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]]
 
   final case class ImportOptions(
       configFile: Option[File] = None,
@@ -208,15 +210,15 @@ object Importer extends ScorexLogging {
       import scala.concurrent.duration.*
       val millis = (System.nanoTime() - start).nanos.toMillis
       log.info(
-        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}"
+        s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${time.Duration.ofMillis(millis)}"
       )
     }
 
     val maxSize = importOptions.maxQueueSize
-    val queue   = new mutable.Queue[(VanillaBlock, Option[BlockSnapshot])](maxSize)
+    val queue   = new mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])](maxSize)
 
     @tailrec
-    def readBlocks(queue: mutable.Queue[(VanillaBlock, Option[BlockSnapshot])], remainCount: Int, maxCount: Int): Unit = {
+    def readBlocks(queue: mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])], remainCount: Int, maxCount: Int): Unit = {
       if (remainCount == 0) ()
       else {
         val blockSizeBytesLength    = ByteStreams.read(blocksInputStream, lenBlockBytes, 0, Ints.BYTES)
@@ -251,14 +253,12 @@ object Importer extends ScorexLogging {
 
               val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
               val blockSnapshot = snapshotsBytes.map { bytes =>
-                BlockSnapshot(
+                BlockSnapshotResponse(
                   block.id(),
                   block.transactionData
-                    .foldLeft((0, Seq.empty[(StateSnapshot, TxMeta.Status)])) { case ((offset, acc), _) =>
+                    .foldLeft((0, Seq.empty[TransactionStateSnapshot])) { case ((offset, acc), _) =>
                       val txSnapshotSize = Ints.fromByteArray(bytes.slice(offset, offset + Ints.BYTES))
-                      val txSnapshot = StateSnapshot.fromProtobuf(
-                        TransactionStateSnapshot.parseFrom(bytes.slice(offset + Ints.BYTES, offset + Ints.BYTES + txSnapshotSize))
-                      )
+                      val txSnapshot     = TransactionStateSnapshot.parseFrom(bytes.slice(offset + Ints.BYTES, offset + Ints.BYTES + txSnapshotSize))
                       (offset + Ints.BYTES + txSnapshotSize, txSnapshot +: acc)
                     }
                     ._2
@@ -351,7 +351,7 @@ object Importer extends ScorexLogging {
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender: (Block, Option[BlockSnapshot]) => Task[Either[ValidationError, BlockApplyResult]] =
+    val extAppender: (Block, Option[BlockSnapshotResponse]) => Task[Either[ValidationError, BlockApplyResult]] =
       BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify, txSignParCheck = false)
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
@@ -369,11 +369,15 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-          val snapshotsOffset = (2 to blockchainUpdater.height).map { h =>
-            database.loadTxStateSnapshots(Height(h), rdb).map(_.toByteArray.length).sum
-          }.sum
 
-          blocksOffset -> snapshotsOffset.toLong
+          var totalSize = 0L
+          rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight) { e =>
+            totalSize += (e.getValue.length + 4)
+          }
+
+          val snapshotsOffset = totalSize
+
+          blocksOffset -> snapshotsOffset
         case _ => 0L -> 0L
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)

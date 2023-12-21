@@ -4,26 +4,20 @@ import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
-import com.wavesplatform.api.common.TransactionMeta.Ethereum
+import com.wavesplatform.api.common.lease.AddressLeaseInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
-import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, SnapshotBlockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
+import org.rocksdb.RocksIterator
 
 import java.util.regex.Pattern
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 
 trait CommonAccountsApi {
@@ -130,99 +124,31 @@ object CommonAccountsApi {
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
     override def activeLeases(address: Address): Observable[LeaseInfo] =
-      addressTransactions(
-        rdb,
-        Some(Height(blockchain.height) -> compositeBlockchain().snapshot),
-        address,
-        None,
-        Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),
-        None
-      ).flatMapIterable {
-        case TransactionMeta(leaseHeight, lt: LeaseTransaction, TxMeta.Status.Succeeded) if leaseIsActive(lt.id()) =>
-          Seq(
-            LeaseInfo(
-              lt.id(),
-              lt.id(),
-              lt.sender.toAddress,
-              blockchain.resolveAlias(lt.recipient).explicitGet(),
-              lt.amount.value,
-              leaseHeight,
-              LeaseInfo.Status.Active
-            )
-          )
-        case TransactionMeta.Invoke(invokeHeight, originTransaction, TxMeta.Status.Succeeded, _, Some(scriptResult)) =>
-          extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
-        case Ethereum(height, tx @ EthereumTransaction(_: Invocation, _, _, _), TxMeta.Status.Succeeded, _, _, Some(scriptResult)) =>
-          extractLeases(address, scriptResult, tx.id(), height)
-        case _ => Seq()
-      }
+      AddressLeaseInfo.activeLeases(rdb, compositeBlockchain().snapshot, address)
 
-    private def extractLeases(subject: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
-      (for {
-        lease   <- result.leases
-        details <- blockchain.leaseDetails(lease.id) if details.isActive
-        sender = details.sender.toAddress
-        recipient <- blockchain.resolveAlias(lease.recipient).toOption if subject == sender || subject == recipient
-      } yield LeaseInfo(
-        lease.id,
-        txId,
-        sender,
-        recipient,
-        lease.amount,
-        height,
-        LeaseInfo.Status.Active
-      )) ++ {
-        result.invokes.flatMap(i => extractLeases(subject, i.stateChanges, txId, height))
-      }
-    }
-
-    private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
-      CancelLeasesToDisabledAliases.patchData
-        .get(leaseId)
-        .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) { case (_, recipientAddress) =>
-          Right(recipientAddress)
-        }
-
-    def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>
-      LeaseInfo(
-        leaseId,
-        ld.sourceId,
-        ld.sender.toAddress,
-        blockchain.resolveAlias(ld.recipient).orElse(resolveDisabledAlias(leaseId)).explicitGet(),
-        ld.amount,
-        ld.height,
-        ld.status match {
-          case Status.Active          => LeaseInfo.Status.Active
-          case Status.Cancelled(_, _) => LeaseInfo.Status.Canceled
-          case Status.Expired(_)      => LeaseInfo.Status.Expired
-        },
-        ld.status.cancelHeight,
-        ld.status.cancelTransactionId
-      )
-    }
-
-    private[this] def leaseIsActive(id: ByteStr): Boolean =
-      blockchain.leaseDetails(id).exists(_.isActive)
+    def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] =
+      blockchain.leaseDetails(leaseId).map(LeaseInfo.fromLeaseDetails(leaseId, _))
   }
 
-  class AddressDataIterator(
+  private class AddressDataIterator(
       db: DBResource,
       address: Address,
       entriesFromDiff: Array[DataEntry[?]],
       pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
-    val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
+    private val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
 
-    val length: Int = entriesFromDiff.length
+    private val length: Int = entriesFromDiff.length
 
     db.withSafePrefixIterator(_.seek(prefix))()
 
-    var nextIndex                         = 0
-    var nextDbEntry: Option[DataEntry[?]] = None
+    private var nextIndex                         = 0
+    private var nextDbEntry: Option[DataEntry[?]] = None
 
-    def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
+    private def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
 
-    final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
+    @tailrec
+    private def doComputeNext(iter: RocksIterator): DataEntry[?] =
       nextDbEntry match {
         case Some(dbEntry) =>
           if (nextIndex < length) {
@@ -243,22 +169,26 @@ object CommonAccountsApi {
             dbEntry
           }
         case None =>
-          if (dbIterator.isValid) {
-            val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
+          if (!iter.isValid) {
+            if (nextIndex < length) {
+              nextIndex += 1
+              entriesFromDiff(nextIndex - 1)
+            } else {
+              endOfData()
+            }
+          } else {
+            val key = new String(iter.key().drop(2 + Address.HashLength), Charsets.UTF_8)
             if (matches(key)) {
-              nextDbEntry = Option(dbIterator.value()).map { arr =>
+              nextDbEntry = Option(iter.value()).map { arr =>
                 Keys.data(address, key).parse(arr).entry
               }
             }
-            dbIterator.next()
-            computeNext()
-          } else if (nextIndex < length) {
-            nextIndex += 1
-            entriesFromDiff(nextIndex - 1)
-          } else {
-            endOfData()
+            iter.next()
+            doComputeNext(iter)
           }
       }
-    }(endOfData())
+
+    override def computeNext(): DataEntry[?] =
+      db.withSafePrefixIterator(doComputeNext)(endOfData())
   }
 }

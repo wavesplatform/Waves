@@ -182,9 +182,10 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
          |	)
          |	timestamp = ${bi.timestamp}
          |	vrf = base58'${bi.vrf.get}'
-         |	height = ${bi.height}
          |	generationSignature = base58'${bi.generationSignature.get}'
          |	generatorPublicKey = base58'${bi.generatorPublicKey}'
+         |	height = ${bi.height}
+         |	rewards = []
          |)
       """.trim.stripMargin
     )

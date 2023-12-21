@@ -5,11 +5,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.BlockRewardDistribution
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, StateSnapshot}
 import com.wavesplatform.transaction.EthereumTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -20,7 +19,7 @@ object EthereumTransactionDiff {
     val resultEi = tx.payload match {
       case et: EthereumTransaction.Transfer =>
         for {
-          _       <- if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.checkAsset(tx.underlying.getData) else Right(())
+          _       <- et.checkTransferDataSize(blockchain, tx.underlying.getData)
           assetId <- et.tryResolveAsset(blockchain)
         } yield StateSnapshot(
           ethereumTransactionMeta = Map(
@@ -61,7 +60,7 @@ object EthereumTransactionDiff {
       case et: EthereumTransaction.Transfer =>
         for {
           _        <- checkLeadingZeros(tx, blockchain)
-          _        <- TracedResult { if (blockchain.isFeatureActivated(BlockRewardDistribution)) et.checkAsset(tx.underlying.getData) else Right(()) }
+          _        <- TracedResult(et.checkTransferDataSize(blockchain, tx.underlying.getData))
           asset    <- TracedResult(et.tryResolveAsset(blockchain))
           transfer <- TracedResult(et.toTransferLike(tx, blockchain))
           assetSnapshot <- TransactionDiffer.assetsVerifierDiff(
@@ -79,6 +78,7 @@ object EthereumTransactionDiff {
         for {
           _          <- checkLeadingZeros(tx, blockchain)
           invocation <- TracedResult(ei.toInvokeScriptLike(tx, blockchain))
+          _          <- TracedResult(InvokeDiffsCommon.checkPayments(blockchain, invocation.payments))
           snapshot   <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution, enableExecutionLog)(invocation)
           resultSnapshot <- TransactionDiffer.assetsVerifierDiff(
             blockchain,

@@ -6,17 +6,20 @@ import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.SnapshotBlockchain
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, SnapshotBlockchain}
 import com.wavesplatform.test.TestTime
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
@@ -257,7 +260,7 @@ class TransactionBroadcastSpec
                |    else []
                |}
                |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
+            ScriptEstimatorV3.latest
           )
           .explicitGet()
 
@@ -651,6 +654,44 @@ class TransactionBroadcastSpec
              |}
              |""".stripMargin
         )
+      }
+    }
+  }
+
+  "transactions with asset id field" - {
+    "return error when asset id with wrong size is passed" in {
+      val validSizeAssetId = ByteStr.fill(AssetIdLength)(1)
+      val wrongAssetIds = Seq(
+        Array.fill(AssetIdLength - 1)(1.toByte),
+        Array.fill(AssetIdLength + 1)(1.toByte)
+      ).map(arr => IssuedAsset(ByteStr(arr)))
+
+      val txs = wrongAssetIds.flatMap { asset =>
+        Seq(
+          TxHelpers.burn(asset = asset),
+          TxHelpers.massTransfer(asset = asset),
+          TxHelpers.reissue(asset = asset),
+          TxHelpers.setAssetScript(TxHelpers.defaultSigner, asset, TxHelpers.exprScript(V5)("true")),
+          TxHelpers.sponsor(asset = asset),
+          TxHelpers.transfer(asset = asset),
+          TxHelpers.updateAssetInfo(validSizeAssetId).copy(assetId = asset)
+        ) ++
+          Seq(TxHelpers.invoke(feeAssetId = asset), TxHelpers.invoke(payments = Seq(Payment(1, asset)))) ++
+          Seq(
+            TxHelpers.exchange(TxHelpers.order(OrderType.BUY, asset, Waves), TxHelpers.order(OrderType.SELL, asset, Waves)),
+            TxHelpers.exchange(TxHelpers.order(OrderType.BUY, Waves, asset), TxHelpers.order(OrderType.SELL, Waves, asset)),
+            TxHelpers.exchange(
+              TxHelpers.order(OrderType.BUY, IssuedAsset(validSizeAssetId), Waves, asset),
+              TxHelpers.order(OrderType.SELL, IssuedAsset(validSizeAssetId), Waves, asset)
+            )
+          )
+      }
+
+      txs.foreach { tx =>
+        Post(routePath("/broadcast"), tx.json()) ~> route ~> check {
+          val result = responseAs[JsObject].toString
+          result should include regex ("Invalid validation. Size of asset id.*not equal 32 bytes")
+        }
       }
     }
   }

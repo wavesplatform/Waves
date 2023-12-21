@@ -25,24 +25,24 @@ class CalculateDelayBenchmark {
 
   @Benchmark
   def calculateDelay1(bh: Blackhole, st: St): Unit =
-    bh.consume(st.environment.calculateDelay(ByteStr.empty, 0, ByteStr.empty, 0))
+    bh.consume(st.environment.calculateDelay(ByteStr.empty, 0))
 
   @Benchmark
   def calculateDelay2(bh: Blackhole, st: St): Unit =
     bh.consume(
-      st.environment.calculateDelay(ByteStr.fill(96)(127), Long.MaxValue, ByteStr.fill(26)(127), Long.MaxValue)
+      st.environment.calculateDelay(ByteStr.fill(26)(127), Long.MaxValue)
     )
 
   @Benchmark
   def calculateDelay3(bh: Blackhole, st: St): Unit =
     bh.consume(
-      st.environment.calculateDelay(ByteStr.fill(96)(-128), Long.MinValue, ByteStr.fill(26)(-128), Long.MinValue)
+      st.environment.calculateDelay(ByteStr.fill(26)(-128), Long.MinValue)
     )
 
   @Benchmark
   def calculateDelay4(bh: Blackhole, st: St): Unit =
     bh.consume(
-      st.environment.calculateDelay(ByteStr.fill(32)(32), 123456, ByteStr.fill(26)(32), 100_000_000)
+      st.environment.calculateDelay(ByteStr.fill(26)(32), 100_000_000)
     )
 }
 

@@ -11,10 +11,11 @@ class CommonScriptEstimatorTest
     extends ScriptEstimatorTestBase(
       ScriptEstimatorV1,
       ScriptEstimatorV2,
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
-      ScriptEstimatorV3(fixOverflow = true, overhead = false),
-      ScriptEstimatorV3(fixOverflow = false, overhead = true),
-      ScriptEstimatorV3(fixOverflow = false, overhead = false),
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = true, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = false, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true),   // <- all fixes
       evaluatorV2AsEstimator(overhead = true),
       evaluatorV2AsEstimator(overhead = false)
     ) {

@@ -75,7 +75,7 @@ class SyncInvokeTotalPaymentsTest extends PropSpec with WithDomain {
         if (error)
           if (fail) {
             d.appendAndAssertFailed(tx)
-            d.liquidDiff.errorMessage(tx.id()).get.text should include("Invoke payments limit = 100 is exceeded")
+            d.liquidSnapshot.errorMessage(tx.id()).get.text should include("Invoke payments limit = 100 is exceeded")
           } else
             d.appendBlockE(tx) should produce("Invoke payments limit = 100 is exceeded")
         else

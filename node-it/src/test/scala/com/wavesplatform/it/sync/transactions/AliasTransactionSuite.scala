@@ -5,6 +5,7 @@ import com.typesafe.config.Config
 
 import scala.util.{Random, Try}
 import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.api.http.ApiError.WrongJson
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -120,7 +121,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("aliasName", "message"),
       ("", "Alias '' length should be between 4 and 30"),
       ("abc", "Alias 'abc' length should be between 4 and 30"),
-      (null, "failed to parse json message"),
+      (null, WrongJson.WrongJsonDataMessage),
       ("morethen_thirtycharactersinline", "Alias 'morethen_thirtycharactersinline' length should be between 4 and 30"),
       ("~!|#$%^&*()_+=\";:/?><|\\][{}", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
       ("multilnetest\ntest", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
@@ -143,7 +144,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val aliasFee  = createAlias(thirdKeyPair, thirdAddressAlias)
     val aliasFull = fullAliasByAddress(thirdAddress, thirdAddressAlias)
-    //lease maximum value, to pass next thirdAddress
+    // lease maximum value, to pass next thirdAddress
     val leasingAmount = balance1 - minFee - 0.5.waves
 
     val leasingTx = sender.lease(firstKeyPair, aliasFull, leasingAmount, minFee).id
@@ -154,7 +155,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   }
 
-  //previous test should not be commented to run this one
+  // previous test should not be commented to run this one
   test("Not able to create alias when insufficient funds") {
     for (v <- aliasTxSupportedVersions) {
       val balance = miner.accountBalances(firstAddress)._1
@@ -177,7 +178,15 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     )
 
     val kp = KeyPair(Longs.toByteArray(Random.nextLong()))
-    val cat = CreateAliasTransaction(3.toByte, notMiner.publicKey, "abc12345", TxPositiveAmount.unsafeFrom(0.005.waves), System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
+    val cat = CreateAliasTransaction(
+      3.toByte,
+      notMiner.publicKey,
+      "abc12345",
+      TxPositiveAmount.unsafeFrom(0.005.waves),
+      System.currentTimeMillis(),
+      Proofs.empty,
+      AddressScheme.current.chainId
+    )
     val signedCreateAlias = cat.copy(
       proofs = cat.signWith(notMiner.keyPair.privateKey).proofs.proofs ++ cat.signWith(kp.privateKey).proofs.proofs
     )

@@ -1,7 +1,5 @@
 package com.wavesplatform
 
-import java.lang.reflect.Constructor
-
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -9,6 +7,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.*
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 
+import java.lang.reflect.Constructor
 import scala.util.Try
 
 package object crypto {

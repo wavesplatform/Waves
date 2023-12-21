@@ -2,6 +2,7 @@ package com.wavesplatform.utils
 
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.{Future as JavaFuture, *}
+
 import io.netty.util.{Timeout, Timer}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
@@ -40,7 +41,7 @@ object Schedulers {
     }
   }
 
-  private[this] def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = { r: Runnable =>
+  private[this] def threadFactory(name: String, daemonic: Boolean, reporter: UncaughtExceptionReporter): ThreadFactory = { (r: Runnable) =>
     val thread = new Thread(r)
     thread.setName(name + "-" + thread.getId)
     thread.setDaemon(daemonic)

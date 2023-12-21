@@ -1,25 +1,19 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.protobuf.transaction.PBTransactions
-
-trait PBSince { self: Transaction with VersionedTransaction =>
-  def protobufVersion: TxVersion
-  final def isProtobufVersion: Boolean = self.version >= protobufVersion
-
-  override def bytesSize: Int =
-    if (isProtobufVersion) PBTransactions.protobuf(self).serializedSize else bytes().length
-}
+sealed trait PBSince
 
 object PBSince {
-  trait V1 extends PBSince { self: Transaction with VersionedTransaction =>
-    override def protobufVersion: TxVersion = TxVersion.V1
-  }
+  trait V1 extends PBSince
+  trait V2 extends PBSince
+  trait V3 extends PBSince
 
-  trait V2 extends PBSince { self: Transaction with VersionedTransaction =>
-    override def protobufVersion: TxVersion = TxVersion.V2
-  }
+  def version(tx: PBSince): TxVersion =
+    tx match {
+      case _: V1 => TxVersion.V1
+      case _: V2 => TxVersion.V2
+      case _: V3 => TxVersion.V3
+    }
 
-  trait V3 extends PBSince { self: Transaction with VersionedTransaction =>
-    override def protobufVersion: TxVersion = TxVersion.V3
-  }
+  def affects(tx: PBSince & Versioned): Boolean =
+    tx.version >= version(tx)
 }

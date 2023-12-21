@@ -14,8 +14,7 @@ import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, LightNode}
-import com.wavesplatform.history.SnapshotOps.TransactionStateSnapshotExt
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -26,11 +25,10 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.{Applied, Ignored}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
-import com.wavesplatform.state.reader.SnapshotBlockchain
 import com.wavesplatform.test.TestTime
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -60,15 +58,14 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   val posSelector: PoSSelector = PoSSelector(blockchainUpdater, None)
 
-  val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
-    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _).map(_.toDiff(blockchain))
+  val transactionDiffer: Transaction => TracedResult[ValidationError, StateSnapshot] =
+    TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  val transactionDifferWithLog: Transaction => TracedResult[ValidationError, Diff] =
+  val transactionDifferWithLog: Transaction => TracedResult[ValidationError, StateSnapshot] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis(), enableExecutionLog = true)(blockchain, _)
-      .map(_.toDiff(blockchain))
 
-  def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
-  def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
+  def createDiffE(tx: Transaction): Either[ValidationError, StateSnapshot] = transactionDiffer(tx).resultE
+  def createDiff(tx: Transaction): StateSnapshot                           = createDiffE(tx).explicitGet()
 
   lazy val utxPool: UtxPoolImpl =
     new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
@@ -123,7 +120,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
     def commonTransactionsApi(challenger: Option[BlockChallenger]): CommonTransactionsApi =
       CommonTransactionsApi(
-        blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
         rdb,
         blockchain,
         utxPool,
@@ -175,8 +172,8 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
       .getOrElse(TestBlock.create(Nil).block)
   }
 
-  def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidSnapshot.orEmpty.toDiff(rocksDBWriter)
+  def liquidSnapshot: StateSnapshot =
+    blockchainUpdater.bestLiquidSnapshot.orEmpty
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
@@ -211,7 +208,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
     AddressTransactions
       .allAddressTransactions(
         rdb,
-        blockchainUpdater.bestLiquidSnapshot.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidSnapshot.map(Height(blockchainUpdater.height) -> _),
         address,
         None,
         Set.empty,
@@ -259,7 +256,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def appendAndAssertFailed(tx: Transaction, message: String): Block = {
     appendBlock(tx)
     assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx")
-    liquidDiff.errorMessage(tx.id()).get.text should include(message)
+    liquidSnapshot.errorMessage(tx.id()).get.text should include(message)
     lastBlock
   }
 
@@ -300,7 +297,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   ): Either[ValidationError, MicroBlock] = {
     val lastBlock   = this.lastBlock
     val blockSigner = signer.getOrElse(defaultSigner)
-    val stateHashE = if (blockchain.isFeatureActivated(BlockchainFeatures.LightNode)) {
+    val stateHashE = if (blockchain.supportsLightNodeBlockFields()) {
       stateHash
         .map(Right(_))
         .getOrElse(
@@ -447,7 +444,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
           challengedHeader = challengedHeader
         )
       resultStateHash <- stateHash.map(Right(_)).getOrElse {
-        if (blockchain.isFeatureActivated(LightNode, blockchain.height + 1)) {
+        if (blockchain.supportsLightNodeBlockFields(blockchain.height + 1)) {
           val hitSource = posSelector.validateGenerationSignature(blockWithoutStateHash).getOrElse(blockWithoutStateHash.header.generationSignature)
           val blockchainWithNewBlock =
             SnapshotBlockchain(blockchain, StateSnapshot.empty, blockWithoutStateHash, hitSource, 0, blockchain.computeNextReward, None)

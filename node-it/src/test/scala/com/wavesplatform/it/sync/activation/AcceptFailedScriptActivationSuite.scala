@@ -300,7 +300,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         smartMatcherFee,
         100L,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + 2.days.toMillis,
         smartMatcherFee
       )
       .explicitGet()
@@ -314,7 +314,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         smartMatcherFee,
         100L,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + 2.days.toMillis,
         smartMatcherFee
       )
       .explicitGet()
@@ -375,7 +375,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           10L,
           100L,
           ts,
-          ts + Order.MaxLiveTime,
+          ts + 2.days.toMillis,
           smartMatcherFee,
           matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
         )
@@ -390,7 +390,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
             10L,
             100L,
             ts,
-            ts + Order.MaxLiveTime,
+            ts + 2.days.toMillis,
             smartMatcherFee,
             matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
           )
@@ -464,7 +464,7 @@ object AcceptFailedScriptActivationSuite {
   private val UpdateInterval     = 3
   private val MaxTxsInMicroBlock = 2
 
-  private val estimator = ScriptEstimatorV3(overhead = false, fixOverflow = true)
+  private val estimator = ScriptEstimatorV3.latest
 
   private val priorityFee  = 5.waves
   private val minInvokeFee = invokeFee + smartFee // invoke fee + transfer action fee

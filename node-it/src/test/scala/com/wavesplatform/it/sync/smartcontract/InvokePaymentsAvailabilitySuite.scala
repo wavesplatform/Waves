@@ -53,7 +53,7 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
        |
          """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
   private val dApp =
@@ -73,7 +73,7 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
        | }
      """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
   private val paymentAmount = 12345

@@ -6,7 +6,6 @@ enablePlugins(
   UniversalDeployPlugin,
   JDebPackaging,
   SystemdPlugin,
-  GitVersioning,
   VersionObject,
   JavaAgent
 )
@@ -156,7 +155,7 @@ inConfig(Debian)(
     maintainer               := "com.wavesplatform",
     packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
-    debianPackageDependencies += "java8-runtime-headless",
+    debianPackageDependencies += "java11-runtime-headless",
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))
   )
 )

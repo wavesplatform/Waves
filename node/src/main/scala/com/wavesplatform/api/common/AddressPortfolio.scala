@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
 import java.nio.ByteBuffer
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
@@ -29,9 +30,8 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
       def skipEntry(key: Array[Byte]): Boolean =
         !key.endsWith(after.id.arr)
 
-      while (dbIterator.isValid && skipEntry(dbIterator.key())) {
+      while (dbIterator.isValid && skipEntry(dbIterator.key()))
         dbIterator.next()
-      }
       if (dbIterator.isValid && !skipEntry(dbIterator.key()))
         dbIterator.next()
     }
@@ -99,19 +99,14 @@ class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends A
 class BalanceIterator(
     address: Address,
     underlying: Iterator[Seq[(IssuedAsset, Long)]],
-    includeAsset: IssuedAsset => Boolean,
-    private var pendingOverrides: Map[(Address, Asset), Long]
+    private var pendingOverrides: VectorMap[(Address, Asset), Long]
 ) extends AbstractIterator[Seq[(IssuedAsset, Long)]] {
-
   private def nextOverride(): Seq[(IssuedAsset, Long)] =
     if (pendingOverrides.isEmpty) endOfData()
     else {
-      val balances = pendingOverrides.collect {
-        case ((`address`, asset: IssuedAsset), balance) if includeAsset(asset) =>
-          asset -> balance
-      }.toSeq
-      pendingOverrides = Map.empty
-      balances
+      val assetsWithBalances = pendingOverrides.collect { case ((`address`, asset: IssuedAsset), balance) => asset -> balance }.toSeq
+      pendingOverrides = VectorMap.empty
+      assetsWithBalances
     }
 
   override def computeNext(): Seq[(IssuedAsset, Long)] =
@@ -138,11 +133,15 @@ object AddressPortfolio {
       resource
         .get(Keys.addressId(address))
         .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
-      asset => loadAssetDescription(asset).exists(_.nft),
       snapshot.balances
     ).asScala
-      .map(_.collect { case (asset, balance) if balance > 0 => asset }
-        .flatMap(a => loadAssetDescription(a).map(a -> _)))
+      .map { assets =>
+        maybeAfter
+          .filter(after => assets.exists(_._1 == after))
+          .fold(assets)(after => assets.dropWhile(_._1 != after).drop(1))
+          .collect { case (asset, balance) if balance > 0 => asset }
+          .flatMap(asset => loadAssetDescription(asset).collect { case description if description.nft => asset -> description })
+      }
 
   def assetBalanceIterator(
       resource: DBResource,
@@ -155,10 +154,9 @@ object AddressPortfolio {
       resource
         .get(Keys.addressId(address))
         .fold(Iterator.empty[Seq[(IssuedAsset, Long)]])(addressId => new AssetBalanceIterator(addressId, resource).asScala),
-      includeAsset,
       snapshot.balances
     ).asScala
-      .map(_.filter { case (asset, balance) =>
-        includeAsset(asset) && balance > 0
-      })
+      .map(
+        _.filter { case (asset, balance) => includeAsset(asset) && balance > 0 }
+      )
 }
