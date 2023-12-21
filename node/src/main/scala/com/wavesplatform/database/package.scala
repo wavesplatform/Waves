@@ -32,7 +32,6 @@ import sun.nio.ch.Util
 import supertagged.TaggedType
 
 import java.nio.ByteBuffer
-import java.util
 import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -310,7 +309,7 @@ package object database {
   }
 
   private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
-    pb.DataEntry.parseFrom(bs).value match {
+    if (bs == null || bs.length == 0) EmptyDataEntry(key) else  pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
       case Value.BoolValue(value)   => BooleanDataEntry(key, value)
@@ -359,6 +358,36 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
+  def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
+    keys.map { k =>
+      val arr = k.keyBytes
+      val b   = Util.getTemporaryDirectBuffer(arr.length)
+      b.put(k.keyBytes).flip()
+      b
+    }
+
+  def getKeyBuffers(keys: collection.IndexedSeq[Array[Byte]]): collection.IndexedSeq[ByteBuffer] =
+    keys.map { k =>
+      val b = Util.getTemporaryDirectBuffer(k.length)
+      b.put(k).flip()
+      b
+    }
+
+  def getValueBuffers(amount: Int, bufferSize: Int): IndexedSeq[ByteBuffer] =
+    IndexedSeq
+      .fill(amount) {
+        val buf = Util.getTemporaryDirectBuffer(bufferSize)
+        buf.limit(buf.capacity())
+        buf
+      }
+
+  def getValueBuffers(bufferSizes: collection.IndexedSeq[Int]): collection.IndexedSeq[ByteBuffer] =
+    bufferSizes.map { size =>
+      val buf = Util.getTemporaryDirectBuffer(size)
+      buf.limit(buf.capacity())
+      buf
+    }
+
   implicit class DBExt(val db: RocksDB) extends AnyVal {
 
     def readOnly[A](f: ReadOnlyDB => A): A = {
@@ -390,10 +419,10 @@ package object database {
       }
     }
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.Seq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSizes: IndexedSeq[Int]): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
@@ -402,13 +431,13 @@ package object database {
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] =
       multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGet[A](readOptions: ReadOptions, keys: collection.Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+    def multiGet[A](readOptions: ReadOptions, keys: IndexedSeq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
       val keyBufs = getKeyBuffersFromKeys(keys)
       val valBufs = getValueBuffers(keys.size, valBufSize)
 
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .map { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -419,18 +448,18 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
-    def multiGetInts(readOptions: ReadOptions, keys: collection.Seq[Key[Int]]): Seq[Option[Int]] = {
+    def multiGetInts(readOptions: ReadOptions, keys: IndexedSeq[Key[Int]]): Seq[Option[Int]] = {
       val keyBytes = keys.map(_.keyBytes)
       val keyBufs  = getKeyBuffers(keyBytes)
       val valBufs  = getValueBuffers(keyBytes.size, 4)
 
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = db
-        .multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs)
+        .multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava)
         .asScala
         .map { value =>
           if (value.status.getCode == Status.Code.Ok) {
@@ -441,7 +470,7 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
@@ -451,7 +480,7 @@ package object database {
 
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .flatMap { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -462,7 +491,7 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
@@ -499,46 +528,15 @@ package object database {
       finally resource.close()
     }
 
-    private def getKeyBuffersFromKeys(keys: collection.Seq[Key[?]]): util.List[ByteBuffer] =
-      keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-
-    private def getKeyBuffers(keys: collection.Seq[Array[Byte]]): util.List[ByteBuffer] =
-      keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-
-    private def getValueBuffers(amount: Int, bufferSize: Int): util.List[ByteBuffer] =
-      List
-        .fill(amount) {
-          val buf = Util.getTemporaryDirectBuffer(bufferSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-    private def getValueBuffers(bufferSizes: collection.Seq[Int]): util.List[ByteBuffer] =
-      bufferSizes.map { size =>
-        val buf = Util.getTemporaryDirectBuffer(size)
-        buf.limit(buf.capacity())
-        buf
-      }.asJava
-
     private def multiGetOpt[A](
         readOptions: ReadOptions,
-        keys: collection.Seq[Key[Option[A]]],
-        keyBufs: util.List[ByteBuffer],
-        valBufs: util.List[ByteBuffer]
+        keys: collection.IndexedSeq[Key[Option[A]]],
+        keyBufs: collection.IndexedSeq[ByteBuffer],
+        valBufs: collection.IndexedSeq[ByteBuffer]
     ): Seq[Option[A]] = {
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .map { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -549,19 +547,19 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
     private def multiGet[A](
         readOptions: ReadOptions,
         keys: ArrayBuffer[Key[A]],
-        keyBufs: util.List[ByteBuffer],
-        valBufs: util.List[ByteBuffer]
+        keyBufs: collection.IndexedSeq[ByteBuffer],
+        valBufs: collection.IndexedSeq[ByteBuffer]
     ): View[A] = {
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .flatMap { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -571,7 +569,7 @@ package object database {
           } else None
         }
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
   }

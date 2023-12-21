@@ -9,7 +9,7 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 import scala.collection.immutable.VectorMap
 
@@ -17,7 +17,7 @@ case class StateSnapshot(
     transactions: VectorMap[ByteStr, NewTransactionInfo] = VectorMap(),
     balances: VectorMap[(Address, Asset), Long] = VectorMap(), // VectorMap is used to preserve the order of NFTs for a given address
     leaseBalances: Map[Address, LeaseBalance] = Map(),
-    assetStatics: VectorMap[IssuedAsset, AssetStaticInfo] = VectorMap(),
+    assetStatics: Map[IssuedAsset, (AssetStaticInfo, Int)] = Map(),
     assetVolumes: Map[IssuedAsset, AssetVolumeInfo] = Map(),
     assetNamesAndDescriptions: Map[IssuedAsset, AssetInfo] = Map(),
     assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
@@ -30,7 +30,8 @@ case class StateSnapshot(
     accountData: Map[Address, Map[String, DataEntry[?]]] = Map(),
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map(),
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map(),
-    scriptsComplexity: Long = 0
+    scriptsComplexity: Long = 0,
+    erc20Addresses: Map[ERC20Address, IssuedAsset] = Map()
 ) {
 
   // ignores lease balances from portfolios
@@ -59,9 +60,6 @@ case class StateSnapshot(
       transactions = transactions + (tx.id() -> NewTransactionInfo.create(tx, TxMeta.Status.Elided, StateSnapshot.empty, blockchain))
     )
 
-  lazy val indexedAssetStatics: Map[IssuedAsset, (AssetStaticInfo, Int)] =
-    assetStatics.zipWithIndex.map { case ((asset, static), i) => asset -> (static, i + 1) }.toMap
-
   lazy val accountScriptsByAddress: Map[Address, Option[AccountScriptInfo]] =
     accountScripts.map { case (pk, script) => (pk.toAddress, script) }
 
@@ -75,7 +73,7 @@ object StateSnapshot {
       blockchain: Blockchain,
       portfolios: Map[Address, Portfolio] = Map(),
       orderFills: Map[ByteStr, VolumeAndFee] = Map(),
-      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] = VectorMap(),
+      issuedAssets: Seq[(IssuedAsset, NewAssetInfo)] = Seq(),
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map(),
       assetScripts: Map[IssuedAsset, AssetScriptInfo] = Map(),
       sponsorships: Map[IssuedAsset, Sponsorship] = Map(),
@@ -111,7 +109,8 @@ object StateSnapshot {
         accountData,
         scriptResults,
         ethereumTransactionMeta,
-        scriptsComplexity
+        scriptsComplexity,
+        issuedAssets.view.map { case (id, _) => ERC20Address(id) -> id }.toMap
       )
     r.leftMap(GenericError(_))
   }
@@ -164,17 +163,17 @@ object StateSnapshot {
       }
       .map(_.toMap)
 
-  def assetStatics(issuedAssets: VectorMap[IssuedAsset, NewAssetInfo]): VectorMap[IssuedAsset, AssetStaticInfo] =
-    issuedAssets.map { case (asset, info) =>
-      asset -> info.static
-    }
+  def assetStatics(issuedAssets: Seq[(IssuedAsset, NewAssetInfo)]): Map[IssuedAsset, (AssetStaticInfo, Int)] =
+    issuedAssets.view.zipWithIndex.map { case ((asset, info), idx) =>
+      asset -> (info.static, idx + 1)
+    }.toMap
 
   private def assetVolumes(
       blockchain: Blockchain,
-      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
+      issuedAssets: Seq[(IssuedAsset, NewAssetInfo)],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]]
   ): Map[IssuedAsset, AssetVolumeInfo] = {
-    val issued = issuedAssets.view.mapValues(_.volume).toMap
+    val issued = issuedAssets.view.map { case (id, nai) => id -> nai.volume }.toMap
     val updated = updatedAssets.collect {
       case (asset, Ior.Right(volume))   => (asset, volume)
       case (asset, Ior.Both(_, volume)) => (asset, volume)
@@ -188,10 +187,10 @@ object StateSnapshot {
   }
 
   private def assetNamesAndDescriptions(
-      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
+      issuedAssets: Seq[(IssuedAsset, NewAssetInfo)],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]]
   ): Map[IssuedAsset, AssetInfo] = {
-    val issued = issuedAssets.view.mapValues(_.dynamic).toMap
+    val issued = issuedAssets.view.map { case (id, nai) => id -> nai.dynamic }.toMap
     val updated = updatedAssets.collect {
       case (asset, Ior.Left(info))    => (asset, info)
       case (asset, Ior.Both(info, _)) => (asset, info)
@@ -215,7 +214,7 @@ object StateSnapshot {
         s1.transactions ++ s2.transactions,
         s1.balances ++ s2.balances,
         s1.leaseBalances ++ s2.leaseBalances,
-        s1.assetStatics ++ s2.assetStatics,
+        s1.assetStatics ++ s2.assetStatics.map { case (id, (asi, idx)) => (id, (asi, idx + s1.assetStatics.size)) },
         s1.assetVolumes ++ s2.assetVolumes,
         s1.assetNamesAndDescriptions ++ s2.assetNamesAndDescriptions,
         s1.assetScripts ++ s2.assetScripts,
@@ -228,7 +227,8 @@ object StateSnapshot {
         combineDataEntries(s1.accountData, s2.accountData),
         s1.scriptResults |+| s2.scriptResults,
         s1.ethereumTransactionMeta ++ s2.ethereumTransactionMeta,
-        s1.scriptsComplexity + s2.scriptsComplexity
+        s1.scriptsComplexity + s2.scriptsComplexity,
+        s1.erc20Addresses ++ s2.erc20Addresses
       )
 
     private def combineDataEntries(
