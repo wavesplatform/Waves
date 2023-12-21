@@ -22,7 +22,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{TxHelpers, TxPositiveAmount}
 import org.rocksdb.{ReadOptions, RocksIterator}
 
-import scala.collection.mutable
 import scala.util.{Random, Using}
 
 class RocksDBWriterSpec extends FreeSpec with WithDomain {
@@ -165,7 +164,7 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
   "cleanup" - {
     val settings = {
       val s = DomainPresets.RideV6
-      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = 4, cleanupInterval = 4))
+      s.copy(dbSettings = s.dbSettings.copy(maxRollbackDepth = 4, cleanupInterval = Some(4)))
     }
 
     val alice        = TxHelpers.signer(1)
@@ -195,6 +194,20 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     val dataKey   = "test"
     val dataTxFee = TxPositiveAmount.unsafeFrom(TestValues.fee)
     def dataTx    = TxHelpers.dataSingle(account = bob, key = dataKey, value = Random.nextInt().toString, fee = dataTxFee.value)
+
+    "doesn't delete if disabled" in withDomain(
+      settings.copy(dbSettings = settings.dbSettings.copy(cleanupInterval = None)),
+      Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))
+    ) { d =>
+      d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx)
+      (3 to 10).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 10
+
+      d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 0
+      withClue("All data exists: ") {
+        checkHistoricalDataOnlySinceHeight(d, allAddresses, 1)
+      }
+    }
 
     "doesn't delete sole data" in withDomain(settings, Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))) { d =>
       d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx) // Last user data
@@ -262,27 +275,6 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     }
 
     "doesn't affect other sequences" in {
-      type CollectedKeys = mutable.ArrayBuffer[(ByteStr, String)]
-
-      def collectNonHistoricalKeys(d: Domain): CollectedKeys = {
-        val xs: CollectedKeys = mutable.ArrayBuffer.empty
-        withGlobalIterator(d.rdb) { iter =>
-          iter.seekToFirst()
-          while (iter.isValid) {
-            val k = iter.key()
-            if (
-              !(HistoricalKeyTags.exists(kt => k.startsWith(kt.prefixBytes)) || k
-                .startsWith(KeyTags.HeightOf.prefixBytes) || k.startsWith(KeyTags.LastCleanupHeight.prefixBytes))
-            ) {
-              val description = KeyTags(Shorts.fromByteArray(k)).toString
-              xs.addOne(ByteStr(k) -> description)
-            }
-            iter.next()
-          }
-        }
-        xs
-      }
-
       def appendBlocks(d: Domain): Unit = {
         (2 to 3).foreach(_ => d.appendBlock())
         d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx)
@@ -293,9 +285,9 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         (7 to 14).foreach(_ => d.appendBlock())
       }
 
-      var nonHistoricalKeysWithoutCleanup: CollectedKeys = mutable.ArrayBuffer.empty
+      var nonHistoricalKeysWithoutCleanup: CollectedKeys = Vector.empty
       withDomain(
-        settings.copy(dbSettings = settings.dbSettings.copy(cleanupInterval = 1000)), // Won't delete old data
+        settings.copy(dbSettings = settings.dbSettings.copy(cleanupInterval = None)),
         Seq(AddrWithBalance(TxHelpers.defaultSigner.toAddress))
       ) { d =>
         appendBlocks(d)
@@ -319,6 +311,26 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
     KeyTags.DataHistory,
     KeyTags.ChangedAddresses
   )
+
+  private type CollectedKeys = Vector[(ByteStr, String)]
+  private def collectNonHistoricalKeys(d: Domain): CollectedKeys = {
+    var xs: CollectedKeys = Vector.empty
+    withGlobalIterator(d.rdb) { iter =>
+      iter.seekToFirst()
+      while (iter.isValid) {
+        val k = iter.key()
+        if (
+          !(HistoricalKeyTags.exists(kt => k.startsWith(kt.prefixBytes)) || k
+            .startsWith(KeyTags.HeightOf.prefixBytes) || k.startsWith(KeyTags.LastCleanupHeight.prefixBytes))
+        ) {
+          val description = KeyTags(Shorts.fromByteArray(k)).toString
+          xs = xs.appended(ByteStr(k) -> description)
+        }
+        iter.next()
+      }
+    }
+    xs
+  }
 
   private def checkHistoricalDataOnlySinceHeight(d: Domain, addresses: Seq[Address], sinceHeight: Int): Unit = {
     val addressIds = addresses.map(getAddressId(d, _))

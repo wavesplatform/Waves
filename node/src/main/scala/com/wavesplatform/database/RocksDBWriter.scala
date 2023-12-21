@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
+import com.wavesplatform.utils.{LoggerFacade, RunNowExecutorService, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
@@ -116,16 +116,20 @@ object RocksDBWriter extends ScorexLogging {
     dbSettings,
     isLightMode,
     bfBlockInsertions,
-    forceCleanupExecutorService.getOrElse {
-      new ThreadPoolExecutor(
-        1,
-        1,
-        0,
-        TimeUnit.SECONDS,
-        new LinkedBlockingQueue[Runnable],
-        new DefaultThreadFactory("delete-old-entries", true),
-        { (_: Runnable, _: ThreadPoolExecutor) => /* Ignoring rejected tasks */ }
-      )
+    dbSettings.cleanupInterval match {
+      case None => RunNowExecutorService // We don't care if disabled
+      case Some(_) =>
+        forceCleanupExecutorService.getOrElse {
+          new ThreadPoolExecutor(
+            1,
+            1,
+            0,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue[Runnable],
+            new DefaultThreadFactory("delete-old-entries", true),
+            { (_: Runnable, _: ThreadPoolExecutor) => /* Ignoring rejected tasks */ }
+          )
+        }
     }
   )
 }
@@ -447,26 +451,9 @@ class RocksDBWriter(
 
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
-
-        cleanupExecutorService.submit(new Runnable {
-          override def run(): Unit = {
-            // Running in portions to not overfill RAM.
-            // Not moving outside, because lastCleanupHeight is updated here, so recently added jobs see the right lastCleanupHeight on start.
-            val firstDirtyHeight = rdb.db.get(Keys.lastCleanupHeight) + 1
-            (firstDirtyHeight to newSafeRollbackHeight by dbSettings.cleanupInterval).sliding(2).foreach {
-              case fromInclusive +: toExclusive +: _ =>
-                writableDB.readWrite { rw =>
-                  batchCleanup(
-                    fromInclusive = Height(fromInclusive),
-                    toExclusive = Height(toExclusive),
-                    rw = rw
-                  )
-                  rw.put(Keys.lastCleanupHeight, Height(toExclusive - 1))
-                }
-              case _ =>
-            }
-          }
-        })
+        dbSettings.cleanupInterval.foreach { cleanupInterval =>
+          runCleanupTask(newSafeRollbackHeight, cleanupInterval)
+        }
       }
 
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
@@ -715,6 +702,26 @@ class RocksDBWriter(
     }
     log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
+
+  private def runCleanupTask(newSafeRollbackHeight: Int, cleanupInterval: Int): Unit = cleanupExecutorService.submit(new Runnable {
+    override def run(): Unit = {
+      // Running in portions to not overfill RAM.
+      // Not moving outside, because lastCleanupHeight is updated here, so recently added jobs see the right lastCleanupHeight on start.
+      val firstDirtyHeight = rdb.db.get(Keys.lastCleanupHeight) + 1
+      (firstDirtyHeight to newSafeRollbackHeight by cleanupInterval).sliding(2).foreach {
+        case fromInclusive +: toExclusive +: _ =>
+          writableDB.readWrite { rw =>
+            batchCleanup(
+              fromInclusive = Height(fromInclusive),
+              toExclusive = Height(toExclusive),
+              rw = rw
+            )
+            rw.put(Keys.lastCleanupHeight, Height(toExclusive - 1))
+          }
+        case _ =>
+      }
+    }
+  })
 
   private def batchCleanup(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
     // Waves balances
