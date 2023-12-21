@@ -157,7 +157,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
       d.blockchain.accountData(invoke.sender.toAddress, "check").get shouldBe BooleanDataEntry("check", true)
       d.blockchain.accountData(invoke.sender.toAddress, "transactionId").get shouldBe BinaryDataEntry("transactionId", invoke.txId)
       d.liquidSnapshot.assetStatics.size shouldBe 1
-      checkAsset(invoke, d.liquidSnapshot.assetStatics.head._2, d.liquidSnapshot.assetNamesAndDescriptions.head._2, d.liquidSnapshot.assetVolumes.head._2)
+      checkAsset(invoke, d.liquidSnapshot.assetStatics.head._2._1, d.liquidSnapshot.assetNamesAndDescriptions.head._2, d.liquidSnapshot.assetVolumes.head._2)
     }
   }
 

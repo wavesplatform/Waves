@@ -31,11 +31,13 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
+import org.github.jamm.Unmetered
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
 
+@Unmetered
 class LazyBlockchain[TagT] private (
     override val settings: BlockchainSettings,
     blockchainApi: BlockchainApi,

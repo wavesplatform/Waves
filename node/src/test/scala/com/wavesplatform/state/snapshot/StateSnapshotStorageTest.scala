@@ -89,8 +89,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, asset) -> issueTx.quantity.value,
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
-          assetStatics = VectorMap(
-            asset -> AssetStaticInfo(asset.id, TransactionId(issueTx.id()), sender.publicKey, issueTx.decimals.value, false)
+          assetStatics = Map(
+            asset -> (AssetStaticInfo(asset.id, TransactionId(issueTx.id()), sender.publicKey, issueTx.decimals.value, false), 1)
           ),
           assetVolumes = Map(
             asset -> AssetVolumeInfo(isReissuable = true, BigInt(issueTx.quantity.value))
@@ -311,8 +311,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             dAppPk.toAddress -> LeaseBalance(0, 123),
             senderAddress    -> LeaseBalance(123, 0)
           ),
-          assetStatics = VectorMap(
-            dAppAssetId -> AssetStaticInfo(dAppAssetId.id, TransactionId(invokeId), dAppPk, 4, false)
+          assetStatics = Map(
+            dAppAssetId -> (AssetStaticInfo(dAppAssetId.id, TransactionId(invokeId), dAppPk, 4, false), 1)
           ),
           assetVolumes = Map(
             dAppAssetId -> AssetVolumeInfo(true, 1000)
