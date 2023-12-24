@@ -127,9 +127,9 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(6)
+      .setIncreaseParallelism(4)
       .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(6)
+      .setMaxBackgroundJobs(4)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
       .setMaxSubcompactions(2) // Can lead to max_background_jobs * max_subcompactions background threads

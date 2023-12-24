@@ -213,8 +213,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       d.appendBlock(transferWavesTx, issueTx, transferAssetTx, dataTx) // Last user data
       d.blockchain.height shouldBe 2
 
-      (3 to 10).foreach(_ => d.appendBlock())
-      d.blockchain.height shouldBe 10
+      (3 to 11).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 11
 
       d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
       withClue("No data before: ") {
@@ -235,8 +235,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       ) // Last user data
       d.blockchain.height shouldBe 4
 
-      (5 to 10).foreach(_ => d.appendBlock())
-      d.blockchain.height shouldBe 10
+      (5 to 11).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 11
 
       d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 4
       withClue("No data before: ") {
@@ -264,8 +264,8 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
       ) // Last user data
       d.blockchain.height shouldBe 6
 
-      (7 to 14).foreach(_ => d.appendBlock())
-      d.blockchain.height shouldBe 14
+      (7 to 15).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 15
 
       d.rdb.db.get(Keys.lastCleanupHeight) shouldBe 8
       withClue("No data before: ") {

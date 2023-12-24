@@ -390,31 +390,42 @@ package object database {
 
   implicit class DBExt(val db: RocksDB) extends AnyVal {
 
-    def readOnly[A](f: ReadOnlyDB => A): A = {
-      Using.resource(db.getSnapshot) { s =>
-        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
-          f(new ReadOnlyDB(db, ro))
-        }
-      }(db.releaseSnapshot(_))
-    }
+    def readOnly[A](f: ReadOnlyDB => A): A = withReadOptions { ro => f(new ReadOnlyDB(db, ro)) }
 
     /** @note
       *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
-    def readWrite[A](f: RW => A): A = {
-      val snapshot     = db.getSnapshot
-      val readOptions  = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
-      val batch        = new WriteBatch()
-      val rw           = new RW(db, readOptions, batch)
-      val writeOptions = new WriteOptions()
+    def readWrite[A](f: RW => A): A = withOptions { (ro, wo) => readWriteWithOptions(ro, wo)(f) }
+
+    def readWriteWithOptions[A](readOptions: ReadOptions, writeOptions: WriteOptions)(f: RW => A): A = {
+      val batch = new WriteBatch()
+      val rw    = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
         db.write(writeOptions, batch)
         r
-      } finally {
-        readOptions.close()
-        writeOptions.close()
-        batch.close()
+      } finally batch.close()
+    }
+
+    def withOptions[A](f: (ReadOptions, WriteOptions) => A): A =
+      withReadOptions { ro =>
+        withWriteOptions { wo =>
+          f(ro, wo)
+        }
+      }
+
+    def withWriteOptions[A](f: WriteOptions => A): A = {
+      val wo = new WriteOptions()
+      try f(wo)
+      finally wo.close()
+    }
+
+    def withReadOptions[A](f: ReadOptions => A): A = {
+      val snapshot = db.getSnapshot
+      val ro       = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+      try f(ro)
+      finally {
+        ro.close()
         db.releaseSnapshot(snapshot)
       }
     }

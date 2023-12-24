@@ -742,30 +742,34 @@ class RocksDBWriter(
         override def run(): Unit = {
           val firstDirtyHeight  = Height(lastCleanupHeight + 1)
           val toHeightExclusive = Height(firstDirtyHeight + cleanupInterval)
-          log.debug(s"Running cleanup in [$firstDirtyHeight; $toHeightExclusive)")
+          val startTs           = System.nanoTime()
 
-          readWrite { rw =>
-            batchCleanupWavesBalances(
-              fromInclusive = firstDirtyHeight,
-              toExclusive = toHeightExclusive,
-              rw = rw
-            )
+          rdb.db.withOptions { (ro, wo) =>
+            rdb.db.readWriteWithOptions(ro, wo.setLowPri(true)) { rw =>
+              batchCleanupWavesBalances(
+                fromInclusive = firstDirtyHeight,
+                toExclusive = toHeightExclusive,
+                rw = rw
+              )
 
-            batchCleanupAssetBalances(
-              fromInclusive = firstDirtyHeight,
-              toExclusive = toHeightExclusive,
-              rw = rw
-            )
+              batchCleanupAssetBalances(
+                fromInclusive = firstDirtyHeight,
+                toExclusive = toHeightExclusive,
+                rw = rw
+              )
 
-            batchCleanupAccountData(
-              fromInclusive = firstDirtyHeight,
-              toExclusive = toHeightExclusive,
-              rw = rw
-            )
+              batchCleanupAccountData(
+                fromInclusive = firstDirtyHeight,
+                toExclusive = toHeightExclusive,
+                rw = rw
+              )
 
-            lastCleanupHeight = Height(toHeightExclusive - 1)
-            rw.put(Keys.lastCleanupHeight, lastCleanupHeight)
+              lastCleanupHeight = Height(toHeightExclusive - 1)
+              rw.put(Keys.lastCleanupHeight, lastCleanupHeight)
+            }
           }
+
+          log.debug(s"Cleanup in [$firstDirtyHeight; $toHeightExclusive) took ${(System.nanoTime() - startTs) / 1_000_000}ms")
         }
       })
     }
