@@ -127,7 +127,7 @@ object RocksDBWriter extends ScorexLogging {
             0,
             TimeUnit.SECONDS,
             new LinkedBlockingQueue[Runnable],
-            new DefaultThreadFactory("delete-old-entries", true),
+            new DefaultThreadFactory("rocksdb-cleanup", true),
             { (_: Runnable, _: ThreadPoolExecutor) => /* Ignoring rejected tasks */ }
           )
         }
@@ -739,7 +739,19 @@ class RocksDBWriter(
           val toHeightExclusive = Height(firstDirtyHeight + cleanupInterval)
 
           readWrite { rw =>
-            batchCleanup(
+            batchCleanupWavesBalances(
+              fromInclusive = firstDirtyHeight,
+              toExclusive = toHeightExclusive,
+              rw = rw
+            )
+
+            batchCleanupAssetBalances(
+              fromInclusive = firstDirtyHeight,
+              toExclusive = toHeightExclusive,
+              rw = rw
+            )
+
+            batchCleanupAccountData(
               fromInclusive = firstDirtyHeight,
               toExclusive = toHeightExclusive,
               rw = rw
@@ -752,66 +764,100 @@ class RocksDBWriter(
       })
     }
 
-  private def batchCleanup(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
-    // Waves balances
+  private def batchCleanupWavesBalances(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
+    val lastUpdateAt     = mutable.LongMap.empty[Height]
+    val changedKey       = Keys.changedWavesBalances(Int.MaxValue) // Doesn't matter, we need this only to parse
+    val changedKeyPrefix = KeyTags.ChangedWavesBalances.prefixBytes
 
-    val lastWavesBalanceUpdateAt   = mutable.LongMap.empty[Height]
-    val changedWavesBalancesKey    = Keys.changedWavesBalances(Int.MaxValue) // Doesn't matter, we need this only to parse
-    val changedWavesBalancesPrefix = KeyTags.ChangedWavesBalances.prefixBytes
-    rw.iterateOverWithSeek(changedWavesBalancesPrefix, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
-      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedWavesBalancesPrefix.length)))
+    val updateAt     = new ArrayBuffer[(AddressId, Height)]() // AddressId -> First height of update in this range
+    val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
+
+    rw.iterateOverWithSeek(changedKeyPrefix, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue)
-        changedWavesBalancesKey.parse(e.getValue).foreach { addressId =>
-          lastWavesBalanceUpdateAt.updateWith(addressId)(_ => Some(currHeight))
+        changedKey.parse(e.getValue).foreach { addressId =>
+          lastUpdateAt.updateWith(addressId) { orig =>
+            if (orig.isEmpty) {
+              updateAt.addOne(addressId -> currHeight)
+              updateAtKeys.addOne(Keys.wavesBalanceAt(addressId, currHeight))
+            }
+            Some(currHeight)
+          }
         }
       continue
     }
 
-    lastWavesBalanceUpdateAt.foreach { case (addressId, lastHeight) =>
-      // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
-      // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
-      // We doesn't know about 1900, so we will delete all keys from 1.
-      rw.deleteRange(
-        Keys.wavesBalanceAt(AddressId(addressId), Height(1)),
-        Keys.wavesBalanceAt(AddressId(addressId), lastHeight) // Deletes in [1; lastHeight)
-      )
-    }
+    rw.multiGet(updateAtKeys, BalanceNode.SizeInBytes)
+      .view
+      .zip(updateAt)
+      .foreach { case (prevBalanceNode, (addressId, firstHeight)) =>
+        // We have changes on: previous period = 1000, 1200, 1900, current period = 2000, 2500.
+        // Removed on a previous period: 1100, 1200. We need to remove on a current period: 1900, 2000.
+        // We doesn't know about 1900, so we should delete all keys from 1.
+        // But there is an issue in RocksDB: https://github.com/facebook/rocksdb/issues/11407 that leads to stopped writes.
+        // So we need to issue non-overlapping delete ranges and we have to read changes on 2000 to know 1900.
+        // Also note: memtable_max_range_deletions doesn't have any effect.
+        // TODO Use deleteRange(1, height) after RocksDB's team solves the overlapping deleteRange issue.
+        val prevNodeHeight = prevBalanceNode.fold(firstHeight)(_.prevHeight)
+        rw.deleteRange(
+          Keys.wavesBalanceAt(addressId, prevNodeHeight),
+          Keys.wavesBalanceAt(addressId, lastUpdateAt(addressId)) // Deletes exclusively
+        )
+      }
 
     rw.deleteRange(Keys.changedWavesBalances(fromInclusive), Keys.changedWavesBalances(toExclusive))
+  }
 
-    // Asset balances
+  private def batchCleanupAssetBalances(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
+    val lastUpdateAt     = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
+    val changedKey       = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
+    val changedKeyPrefix = KeyTags.ChangedAssetBalances.prefixBytes
 
-    val lastAssetBalanceUpdateAt   = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
-    val changedAssetBalancesKey    = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
-    val changedAssetBalancesPrefix = KeyTags.ChangedAssetBalances.prefixBytes
-    rw.iterateOverWithSeek(changedAssetBalancesPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
-      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAssetBalancesPrefix.length)))
+    val updateAt     = new ArrayBuffer[(AddressId, IssuedAsset, Height)]() // First height of update in this range
+    val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
+
+    rw.iterateOverWithSeek(changedKeyPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
+      val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue) {
         val asset = IssuedAsset(ByteStr(e.getKey.takeRight(AssetIdLength)))
-        changedAssetBalancesKey.parse(e.getValue).foreach { addressId =>
-          lastAssetBalanceUpdateAt.updateWith((addressId, asset))(_ => Some(currHeight))
+        changedKey.parse(e.getValue).foreach { addressId =>
+          lastUpdateAt.updateWith((addressId, asset)) { orig =>
+            if (orig.isEmpty) {
+              updateAt.addOne((addressId, asset, currHeight))
+              updateAtKeys.addOne(Keys.assetBalanceAt(addressId, asset, currHeight))
+            }
+            Some(currHeight)
+          }
         }
       }
       continue
     }
 
-    lastAssetBalanceUpdateAt.foreach { case ((addressId, asset), lastHeight) =>
-      rw.deleteRange(
-        Keys.assetBalanceAt(addressId, asset, Height(1)),
-        Keys.assetBalanceAt(addressId, asset, lastHeight)
-      )
-    }
+    rw.multiGet(updateAtKeys, BalanceNode.SizeInBytes)
+      .view
+      .zip(updateAt)
+      .foreach { case (prevBalanceNode, (addressId, asset, firstHeight)) =>
+        val prevBalanceNodeHeight = prevBalanceNode.fold(firstHeight)(_.prevHeight)
+        rw.deleteRange(
+          Keys.assetBalanceAt(addressId, asset, prevBalanceNodeHeight),
+          Keys.assetBalanceAt(addressId, asset, lastUpdateAt((addressId, asset)))
+        )
+      }
 
     rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toExclusive))
+  }
 
-    // Account data
+  private def batchCleanupAccountData(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
+    val lastUpdateAt           = mutable.AnyRefMap.empty[(AddressId, String), Height]
+    val changedDataAddresses   = mutable.Set.empty[AddressId]
+    val changedAddressesKey    = Keys.changedAddresses(Int.MaxValue)
+    val changedAddressesPrefix = KeyTags.ChangedAddresses.prefixBytes
 
-    val lastAccountDataUpdateAt = mutable.AnyRefMap.empty[(AddressId, String), Height]
-    val changedDataAddresses    = mutable.Set.empty[AddressId]
-    val changedAddressesKey     = Keys.changedAddresses(Int.MaxValue)
-    val changedAddressesPrefix  = KeyTags.ChangedAddresses.prefixBytes
+    val updateAt     = new ArrayBuffer[(AddressId, String, Height)]() // First height of update in this range
+    val updateAtKeys = new ArrayBuffer[Key[DataNode]]()
+
     rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
       val continue   = currHeight < toExclusive
@@ -821,7 +867,13 @@ class RocksDBWriter(
           if (changedDataKeys.nonEmpty) {
             changedDataAddresses.addOne(addressId)
             changedDataKeys.foreach { accountDataKey =>
-              lastAccountDataUpdateAt.updateWith((addressId, accountDataKey))(_ => Some(currHeight))
+              lastUpdateAt.updateWith((addressId, accountDataKey)) { orig =>
+                if (orig.isEmpty) {
+                  updateAt.addOne((addressId, accountDataKey, currHeight))
+                  updateAtKeys.addOne(Keys.dataAt(addressId, accountDataKey)(currHeight))
+                }
+                Some(currHeight)
+              }
             }
           }
         }
@@ -829,12 +881,15 @@ class RocksDBWriter(
       continue
     }
 
-    lastAccountDataUpdateAt.foreach { case ((addressId, dataKey), lastHeight) =>
-      rw.deleteRange(
-        Keys.dataAt(addressId, dataKey)(Height(1)),
-        Keys.dataAt(addressId, dataKey)(lastHeight)
-      )
-    }
+    updateAt.view
+      .zip(rw.multiGet(updateAtKeys, Ints.BYTES * 2)) // height and prevHeight of DataNode
+      .foreach { case ((addressId, accountDataKey, firstHeight), prevBalanceNode) =>
+        val prevBalanceNodeHeight = prevBalanceNode.fold(firstHeight)(_.prevHeight)
+        rw.deleteRange(
+          Keys.dataAt(addressId, accountDataKey)(prevBalanceNodeHeight),
+          Keys.dataAt(addressId, accountDataKey)(lastUpdateAt((addressId, accountDataKey)))
+        )
+      }
 
     rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toExclusive))
     changedDataAddresses.foreach { addressId =>
