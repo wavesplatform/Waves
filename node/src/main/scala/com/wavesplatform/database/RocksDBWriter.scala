@@ -36,12 +36,15 @@ import org.rocksdb.{RocksDB, Status}
 import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 
+import java.nio.ByteBuffer
 import java.util
 import java.util.concurrent.*
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
+import scala.util.Using.Releasable
 import scala.util.control.NonFatal
 
 object RocksDBWriter extends ScorexLogging {
@@ -103,6 +106,8 @@ object RocksDBWriter extends ScorexLogging {
 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
+
+  private implicit val buffersReleaseable: Releasable[collection.IndexedSeq[ByteBuffer]] = _.foreach(Util.releaseTemporaryDirectBuffer)
 
   def apply(
       rdb: RDB,
@@ -765,13 +770,13 @@ class RocksDBWriter(
     }
 
   private def batchCleanupWavesBalances(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
-    val lastUpdateAt     = mutable.LongMap.empty[Height]
-    val changedKey       = Keys.changedWavesBalances(Int.MaxValue) // Doesn't matter, we need this only to parse
-    val changedKeyPrefix = KeyTags.ChangedWavesBalances.prefixBytes
+    val lastUpdateAt = mutable.LongMap.empty[Height]
 
     val updateAt     = new ArrayBuffer[(AddressId, Height)]() // AddressId -> First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
+    val changedKeyPrefix = KeyTags.ChangedWavesBalances.prefixBytes
+    val changedKey       = Keys.changedWavesBalances(Int.MaxValue) // Doesn't matter, we need this only to parse
     rw.iterateOverWithSeek(changedKeyPrefix, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
       val continue   = currHeight < toExclusive
@@ -799,24 +804,30 @@ class RocksDBWriter(
         // So we need to issue non-overlapping delete ranges and we have to read changes on 2000 to know 1900.
         // Also note: memtable_max_range_deletions doesn't have any effect.
         // TODO Use deleteRange(1, height) after RocksDB's team solves the overlapping deleteRange issue.
-        val prevNodeHeight = prevBalanceNode.fold(firstHeight)(_.prevHeight)
-        rw.deleteRange(
-          Keys.wavesBalanceAt(addressId, prevNodeHeight),
-          Keys.wavesBalanceAt(addressId, lastUpdateAt(addressId)) // Deletes exclusively
-        )
+        val firstDeleteHeight = prevBalanceNode.fold(firstHeight) { x =>
+          if (x.prevHeight == 0) firstHeight // There is no previous record
+          else x.prevHeight
+        }
+
+        val lastDeleteHeight = lastUpdateAt(addressId)
+        if (firstDeleteHeight != lastDeleteHeight)
+          rw.deleteRange(
+            Keys.wavesBalanceAt(addressId, firstDeleteHeight),
+            Keys.wavesBalanceAt(addressId, lastDeleteHeight) // Deletes exclusively
+          )
       }
 
     rw.deleteRange(Keys.changedWavesBalances(fromInclusive), Keys.changedWavesBalances(toExclusive))
   }
 
   private def batchCleanupAssetBalances(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
-    val lastUpdateAt     = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
-    val changedKey       = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
-    val changedKeyPrefix = KeyTags.ChangedAssetBalances.prefixBytes
+    val lastUpdateAt = mutable.AnyRefMap.empty[(AddressId, IssuedAsset), Height]
 
     val updateAt     = new ArrayBuffer[(AddressId, IssuedAsset, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
+    val changedKeyPrefix = KeyTags.ChangedAssetBalances.prefixBytes
+    val changedKey       = Keys.changedBalances(Int.MaxValue, IssuedAsset(ByteStr.empty))
     rw.iterateOverWithSeek(changedKeyPrefix, Keys.changedBalancesAtPrefix(fromInclusive)) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
       val continue   = currHeight < toExclusive
@@ -839,25 +850,31 @@ class RocksDBWriter(
       .view
       .zip(updateAt)
       .foreach { case (prevBalanceNode, (addressId, asset, firstHeight)) =>
-        val prevBalanceNodeHeight = prevBalanceNode.fold(firstHeight)(_.prevHeight)
-        rw.deleteRange(
-          Keys.assetBalanceAt(addressId, asset, prevBalanceNodeHeight),
-          Keys.assetBalanceAt(addressId, asset, lastUpdateAt((addressId, asset)))
-        )
+        val firstDeleteHeight = prevBalanceNode.fold(firstHeight) { x =>
+          if (x.prevHeight == 0) firstHeight
+          else x.prevHeight
+        }
+
+        val lastDeleteHeight = lastUpdateAt((addressId, asset))
+        if (firstDeleteHeight != lastDeleteHeight)
+          rw.deleteRange(
+            Keys.assetBalanceAt(addressId, asset, firstDeleteHeight),
+            Keys.assetBalanceAt(addressId, asset, lastDeleteHeight)
+          )
       }
 
     rw.deleteRange(Keys.changedBalancesAtPrefix(fromInclusive), Keys.changedBalancesAtPrefix(toExclusive))
   }
 
   private def batchCleanupAccountData(fromInclusive: Height, toExclusive: Height, rw: RW): Unit = {
-    val lastUpdateAt           = mutable.AnyRefMap.empty[(AddressId, String), Height]
-    val changedDataAddresses   = mutable.Set.empty[AddressId]
-    val changedAddressesKey    = Keys.changedAddresses(Int.MaxValue)
-    val changedAddressesPrefix = KeyTags.ChangedAddresses.prefixBytes
+    val changedDataAddresses = mutable.Set.empty[AddressId]
+    val lastUpdateAt         = mutable.AnyRefMap.empty[(AddressId, String), Height]
 
     val updateAt     = new ArrayBuffer[(AddressId, String, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[DataNode]]()
 
+    val changedAddressesPrefix = KeyTags.ChangedAddresses.prefixBytes
+    val changedAddressesKey    = Keys.changedAddresses(Int.MaxValue)
     rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
       val continue   = currHeight < toExclusive
@@ -881,15 +898,31 @@ class RocksDBWriter(
       continue
     }
 
-    updateAt.view
-      .zip(rw.multiGet(updateAtKeys, Ints.BYTES * 2)) // height and prevHeight of DataNode
-      .foreach { case ((addressId, accountDataKey, firstHeight), prevBalanceNode) =>
-        val prevBalanceNodeHeight = prevBalanceNode.fold(firstHeight)(_.prevHeight)
-        rw.deleteRange(
-          Keys.dataAt(addressId, accountDataKey)(prevBalanceNodeHeight),
-          Keys.dataAt(addressId, accountDataKey)(lastUpdateAt((addressId, accountDataKey)))
-        )
-      }
+    val valueBuff = new Array[Byte](Ints.BYTES) // height of DataNode
+    Using.resources(
+      database.getKeyBuffersFromKeys(updateAtKeys),
+      database.getValueBuffers(updateAtKeys.size, valueBuff.length)
+    ) { (keyBuffs, valBuffs) =>
+      rdb.db
+        .multiGetByteBuffers(keyBuffs.asJava, valBuffs.asJava)
+        .asScala
+        .view
+        .zip(updateAt)
+        .foreach { case (status, (addressId, accountDataKey, firstHeight)) =>
+          val firstDeleteHeight = if (status.status.getCode == Status.Code.Ok) {
+            status.value.get(valueBuff)
+            val r = readDataNode(accountDataKey)(valueBuff).prevHeight
+            if (r == 0) firstHeight else r
+          } else firstHeight
+
+          val lastDeleteHeight = lastUpdateAt((addressId, accountDataKey))
+          if (firstDeleteHeight != lastDeleteHeight)
+            rw.deleteRange(
+              Keys.dataAt(addressId, accountDataKey)(firstDeleteHeight),
+              Keys.dataAt(addressId, accountDataKey)(lastDeleteHeight)
+            )
+        }
+    }
 
     rw.deleteRange(Keys.changedAddresses(fromInclusive), Keys.changedAddresses(toExclusive))
     changedDataAddresses.foreach { addressId =>
