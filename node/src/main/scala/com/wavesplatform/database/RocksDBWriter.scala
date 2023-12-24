@@ -131,9 +131,9 @@ object RocksDBWriter extends ScorexLogging {
             1,
             0,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue[Runnable],
+            new LinkedBlockingQueue[Runnable](1), // Only one task at time
             new DefaultThreadFactory("rocksdb-cleanup", true),
-            { (_: Runnable, _: ThreadPoolExecutor) => /* Ignoring rejected tasks */ }
+            { (_: Runnable, _: ThreadPoolExecutor) => /* Ignore new jobs, because TPE is busy, we will clean the data next time */ }
           )
         }
     }
@@ -484,7 +484,7 @@ class RocksDBWriter(
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
         dbSettings.cleanupInterval.foreach { cleanupInterval =>
-          runCleanupTask(newSafeRollbackHeight, cleanupInterval)
+          runCleanupTask(newSafeRollbackHeight - 1, cleanupInterval) // -1 because we haven't appended this block
         }
       }
 
@@ -736,12 +736,13 @@ class RocksDBWriter(
   }
 
   @volatile private var lastCleanupHeight = writableDB.get(Keys.lastCleanupHeight)
-  private def runCleanupTask(newSafeRollbackHeight: Int, cleanupInterval: Int): Unit =
-    if (lastCleanupHeight + cleanupInterval < newSafeRollbackHeight) {
+  private def runCleanupTask(newLastSafeHeightForDeletion: Int, cleanupInterval: Int): Unit =
+    if (lastCleanupHeight + cleanupInterval < newLastSafeHeightForDeletion) {
       cleanupExecutorService.submit(new Runnable {
         override def run(): Unit = {
           val firstDirtyHeight  = Height(lastCleanupHeight + 1)
           val toHeightExclusive = Height(firstDirtyHeight + cleanupInterval)
+          log.debug(s"Running cleanup in [$firstDirtyHeight; $toHeightExclusive)")
 
           readWrite { rw =>
             batchCleanupWavesBalances(
@@ -776,12 +777,12 @@ class RocksDBWriter(
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
     val changedKeyPrefix = KeyTags.ChangedWavesBalances.prefixBytes
-    val changedKey       = Keys.changedWavesBalances(Int.MaxValue) // Doesn't matter, we need this only to parse
-    rw.iterateOverWithSeek(changedKeyPrefix, Keys.changedWavesBalances(fromInclusive).keyBytes) { e =>
+    val changedFromKey   = Keys.changedWavesBalances(fromInclusive) // Doesn't matter, we need this only to parse
+    rw.iterateOverWithSeek(changedKeyPrefix, changedFromKey.keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue)
-        changedKey.parse(e.getValue).foreach { addressId =>
+        changedFromKey.parse(e.getValue).foreach { addressId =>
           lastUpdateAt.updateWith(addressId) { orig =>
             if (orig.isEmpty) {
               updateAt.addOne(addressId -> currHeight)
@@ -873,13 +874,13 @@ class RocksDBWriter(
     val updateAt     = new ArrayBuffer[(AddressId, String, Height)]() // First height of update in this range
     val updateAtKeys = new ArrayBuffer[Key[DataNode]]()
 
-    val changedAddressesPrefix = KeyTags.ChangedAddresses.prefixBytes
-    val changedAddressesKey    = Keys.changedAddresses(Int.MaxValue)
-    rw.iterateOverWithSeek(changedAddressesPrefix, Keys.changedAddresses(fromInclusive).keyBytes) { e =>
+    val changedAddressesPrefix  = KeyTags.ChangedAddresses.prefixBytes
+    val changedAddressesFromKey = Keys.changedAddresses(fromInclusive)
+    rw.iterateOverWithSeek(changedAddressesPrefix, changedAddressesFromKey.keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedAddressesPrefix.length)))
       val continue   = currHeight < toExclusive
       if (continue)
-        changedAddressesKey.parse(e.getValue).foreach { addressId =>
+        changedAddressesFromKey.parse(e.getValue).foreach { addressId =>
           val changedDataKeys = rw.get(Keys.changedDataKeys(currHeight, addressId))
           if (changedDataKeys.nonEmpty) {
             changedDataAddresses.addOne(addressId)
