@@ -37,7 +37,6 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
 
 //noinspection UnstableApiUsage
 package object database {
@@ -309,13 +308,15 @@ package object database {
   }
 
   private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
-    if (bs == null || bs.length == 0) EmptyDataEntry(key) else  pb.DataEntry.parseFrom(bs).value match {
-      case Value.Empty              => EmptyDataEntry(key)
-      case Value.IntValue(value)    => IntegerDataEntry(key, value)
-      case Value.BoolValue(value)   => BooleanDataEntry(key, value)
-      case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
-      case Value.StringValue(value) => StringDataEntry(key, value)
-    }
+    if (bs == null || bs.length == 0) EmptyDataEntry(key)
+    else
+      pb.DataEntry.parseFrom(bs).value match {
+        case Value.Empty              => EmptyDataEntry(key)
+        case Value.IntValue(value)    => IntegerDataEntry(key, value)
+        case Value.BoolValue(value)   => BooleanDataEntry(key, value)
+        case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
+        case Value.StringValue(value) => StringDataEntry(key, value)
+      }
 
   private def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
@@ -433,7 +434,11 @@ package object database {
     def multiGetOpt[A](readOptions: ReadOptions, keys: collection.IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.IndexedSeq[Key[Option[A]]], valBufSizes: collection.IndexedSeq[Int]): Seq[Option[A]] =
+    def multiGetOpt[A](
+        readOptions: ReadOptions,
+        keys: collection.IndexedSeq[Key[Option[A]]],
+        valBufSizes: collection.IndexedSeq[Int]
+    ): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
