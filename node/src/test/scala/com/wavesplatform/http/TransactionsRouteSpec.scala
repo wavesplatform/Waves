@@ -87,7 +87,7 @@ class TransactionsRouteSpec
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
   routePath("/calculateFee") - {
-    "waves" in {
+    "SAPI-152 waves" in {
       val transferTx = Json.obj(
         "type"            -> 4,
         "version"         -> 1,
@@ -105,7 +105,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "asset" in {
+    "SAPI-153 asset" in {
       val asset: IssuedAsset = TestValues.asset
       val transferTx = Json.obj(
         "type"            -> 4,
@@ -218,13 +218,13 @@ class TransactionsRouteSpec
     val addressGen    = accountGen.map(_.toAddress.toString)
 
     "handles parameter errors with corresponding responses" - {
-      "invalid address" in {
+      "SAPI-157 invalid address" in {
         forAll(bytes32StrGen) { badAddress =>
           Get(routePath(s"/address/$badAddress/limit/1")) ~> route should produce(InvalidAddress)
         }
       }
 
-      "invalid limit" - {
+      "SAPI-158 invalid limit" - {
         "limit is too big" in {
           forAll(addressGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) { case (address, limit) =>
             Get(routePath(s"/address/$address/limit/$limit")) ~> route should produce(TooBigArrayAllocation)
@@ -232,7 +232,7 @@ class TransactionsRouteSpec
         }
       }
 
-      "invalid after" in {
+      "SAPI-159 invalid after" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), invalidBase58Gen) { case (address, limit, invalidBase58) =>
           Get(routePath(s"/address/$address/limit/$limit?after=$invalidBase58")) ~> route ~> check {
             status shouldEqual StatusCodes.BadRequest
@@ -243,7 +243,7 @@ class TransactionsRouteSpec
     }
 
     "returns 200 if correct params provided" - {
-      "address and limit" in {
+      "SAPI-160 address and limit" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) { case (address, limit) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
@@ -254,7 +254,7 @@ class TransactionsRouteSpec
         }
       }
 
-      "address, limit and after" in {
+      "SAPI-161 address, limit and after" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) { case (address, limit, txId) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
@@ -266,7 +266,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "provides stateChanges" in forAll(accountGen) { account =>
+    "SAPI-162 provides stateChanges" in forAll(accountGen) { account =>
       val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
@@ -282,7 +282,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "provides lease and lease cancel actions stateChanges" in {
+    "SAPI-163 provides lease and lease cancel actions stateChanges" in {
       val invokeAddress      = accountGen.sample.get.toAddress
       val leaseId1           = ByteStr(bytes32gen.sample.get)
       val leaseId2           = ByteStr(bytes32gen.sample.get)
@@ -387,7 +387,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "large-significand-format" in {
+    "SAPI-155 large-significand-format" in {
       withDomain(RideV6) { d =>
         val tx = TxHelpers.transfer()
         d.appendBlock(tx)
@@ -536,7 +536,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "returns lease tx for lease cancel tx" in {
+    "SAPI-156 returns lease tx for lease cancel tx" in {
       val lease       = TxHelpers.lease()
       val leaseCancel = TxHelpers.leaseCancel(lease.id())
 
@@ -590,7 +590,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "handles invalid signature" in {
+    "SAPI-174 handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
       }
@@ -831,7 +831,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "handles multiple ids" in {
+    "SAPI-173 handles multiple ids" in {
       val inputLimitErrMsg = TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
       val emptyInputErrMsg = "Transaction ID was not specified"
 
@@ -986,7 +986,7 @@ class TransactionsRouteSpec
     }
   }
 
-  routePath("/unconfirmed/info/{id}") - {
+  routePath("SAPI-189 /unconfirmed/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
@@ -1008,7 +1008,7 @@ class TransactionsRouteSpec
   }
 
   routePath("/sign") - {
-    "function call without args" in {
+    "SAPI-193 function call without args" in {
       val acc1 = testWallet.generateNewAccount().get
       val acc2 = testWallet.generateNewAccount().get
 
@@ -1066,7 +1066,7 @@ class TransactionsRouteSpec
       f(sender, ist)
     }
 
-    "shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
+    "SAPI-196 shows trace when trace is enabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
       (utxPoolSynchronizer.validateAndBroadcast _)
         .expects(*, None)
@@ -1080,7 +1080,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
+    "SAPI-197 does not show trace when trace is disabled" in withInvokeScriptTransaction { (sender, ist) =>
       val accountTrace = AccountVerifierTrace(sender.toAddress, Some(GenericError("Error in account script")))
       (utxPoolSynchronizer.validateAndBroadcast _)
         .expects(*, None)
@@ -1096,7 +1096,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "generates valid trace with vars" in {
+    "SAPI-199 generates valid trace with vars" in {
       val sender     = testWallet.generateNewAccount().get
       val aliasOwner = testWallet.generateNewAccount().get
       val recipient  = testWallet.generateNewAccount().get
@@ -1144,7 +1144,7 @@ class TransactionsRouteSpec
 
         Post(routePath("/broadcast?trace=true"), invoke.json()) ~> mkRoute(d) ~> check {
           val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
-
+          println(responseAs[JsObject])
           (dappTrace \ "error").get shouldEqual JsNull
           (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq(
             "i",
@@ -1181,7 +1181,7 @@ class TransactionsRouteSpec
       }
     }
 
-    "checks the length of base58 attachment in symbols" in {
+    "SAPI-200 checks the length of base58 attachment in symbols" in {
       val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentStringSize + 1
       val attachmentStr           = "1" * attachmentSizeInSymbols
 
@@ -1202,7 +1202,7 @@ class TransactionsRouteSpec
       )
     }
 
-    "checks the length of base58 attachment in bytes" in {
+    "SAPI-201 checks the length of base58 attachment in bytes" in {
       val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentSize + 1
       val attachmentStr           = "1" * attachmentSizeInSymbols
       val attachment              = ByteStr(Base58.decode(attachmentStr))
@@ -1269,7 +1269,7 @@ class TransactionsRouteSpec
       (responseAs[JsObject] \ "message").as[String] shouldEqual s"transactions do not exist or block version < ${Block.ProtoBlockVersion}"
     }
 
-    "returns merkle proofs" in {
+    "SAPI-202 SAPI-203 returns merkle proofs" in {
       forAll(Gen.choose(10, 20).flatMap(n => Gen.listOfN(n, merkleProofs))) { transactionsAndProofs =>
         val (transactions, proofs) = transactionsAndProofs.unzip
         (addressTransactions.transactionProofs _).expects(transactions.map(_.id())).returning(proofs).twice()
@@ -1319,7 +1319,7 @@ class TransactionsRouteSpec
       Post(routePath("/merkleProof"), Json.obj("ids" -> invalidIds)) ~> route should produce(InvalidIds(invalidIds))
     }
 
-    "handles transactions ids limit" in {
+    "SAPI-209  handles transactions ids limit" in {
       val inputLimitErrMsg = TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
       val emptyInputErrMsg = "Transaction ID was not specified"
 

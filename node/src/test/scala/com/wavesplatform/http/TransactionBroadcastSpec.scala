@@ -56,7 +56,7 @@ class TransactionBroadcastSpec
   private val route = seal(transactionsApiRoute.route)
 
   "exchange" - {
-    "accepted with ETH signed orders" in {
+    "SAPI-218 accepted with ETH signed orders" in {
       import com.wavesplatform.transaction.assets.exchange.EthOrderSpec.{ethBuyOrder, ethSellOrder}
 
       val blockchain = createBlockchainStub { blockchain =>

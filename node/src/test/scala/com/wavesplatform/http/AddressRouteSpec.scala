@@ -180,7 +180,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     Get(path) ~> ApiKeyHeader ~> route ~> check {
       val json = responseAs[JsObject]
       (json \ "address").as[String] shouldEqual account.toAddress.toString
-      (json \ "seed").as[String] shouldEqual Base58.encode(account.seed)
+      (json \ "").as[String] shouldEqual Base58.encode(account.seed)
     }
   }
 

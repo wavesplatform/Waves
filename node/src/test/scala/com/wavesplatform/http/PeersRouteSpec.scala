@@ -35,7 +35,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
 
   private def genListOf[A](maxLength: Int, src: Gen[A]) = Gen.chooseNum(0, maxLength).flatMap(n => Gen.listOfN(n, src))
 
-  routePath("/connected") in {
+  routePath("SAPI-87 /connected") in {
     val gen = for {
       remoteAddress      <- inetSocketAddressGen
       declaredAddress    <- Gen.option(inetSocketAddressGen)
@@ -67,7 +67,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
   }
 
-  routePath("/all") in {
+  routePath("SAPI-88 /all") in {
     val gen = for {
       inetAddress <- inetSocketAddressGen
       ts          <- Gen.posNum[Long]
@@ -86,7 +86,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
   }
 
-  routePath("/connect") in {
+  routePath("SAPI-92 /connect") in {
     val route      = PeersApiRoute(restAPISettings, connectToPeer, peerDatabase, new ConcurrentHashMap[Channel, PeerInfo]()).route
     val connectUri = routePath("/connect")
     Post(connectUri, ConnectReq("example.com", 1)) ~> route should produce(ApiKeyNotValid)

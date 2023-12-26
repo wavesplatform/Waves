@@ -53,7 +53,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     assert(hasPositiveHeight2.getOrElse(false))
   }
 
-  test("/transactions/sign should handle erroneous input") {
+  test("SAPI-224 /transactions/sign should handle erroneous input") {
     def assertSignBadJson(json: JsObject, expectedMessage: String, code: Int = 400): scalatest.Assertion =
       assertBadRequestAndMessage(sender.postJsonWithApiKey("/transactions/sign", json), expectedMessage, code)
 
@@ -82,7 +82,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     assertSignBadJson(bigBaseTx, WrongJson.WrongJsonDataMessage)
   }
 
-  test("/transaction/calculateFee should handle coding size limit") {
+  test("SAPI-898 /transaction/calculateFee should handle coding size limit") {
     {
       val json =
         Json.obj(
@@ -97,7 +97,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should respect timestamp if specified") {
+  test("SAPI-225 /transactions/sign should respect timestamp if specified") {
     val timestamp = 1500000000000L
     for (v <- supportedVersions) {
       val json =
@@ -109,7 +109,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/broadcast should handle erroneous input") {
+  test("SAPI-226 /transactions/broadcast should handle erroneous input") {
     def assertBroadcastBadJson(json: JsObject, expectedMessage: String): scalatest.Assertion =
       assertBadRequestAndMessage(sender.postJson("/transactions/broadcast", json), expectedMessage)
 
@@ -145,7 +145,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should produce issue/reissue/burn/transfer transactions that are good for /transactions/broadcast") {
+  test("SAPI-227 /transactions/sign should produce issue/reissue/burn/transfer transactions that are good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
       val issueId = signBroadcastAndCalcFee(
@@ -195,7 +195,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should produce transfer transaction that is good for /transactions/broadcast") {
+  test("SAPI-228 /transactions/sign should produce transfer transaction that is good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       signBroadcastAndCalcFee(
         Json.obj(
@@ -211,7 +211,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
+  test("SAPI-229 /transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
     signBroadcastAndCalcFee(
       Json.obj(
         "type"       -> MassTransferTransaction.typeId,
@@ -225,7 +225,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     )
   }
 
-  test("/transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
+  test("SAPI-230 /transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
       val leaseId =
@@ -243,7 +243,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should produce alias transaction that is good for /transactions/broadcast") {
+  test("SAPI-231 /transactions/sign should produce alias transaction that is good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
       val rnd     = Random.alphanumeric.take(9).mkString.toLowerCase
@@ -255,7 +255,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should produce data transaction that is good for /transactions/broadcast") {
+  test("SAPI-232 /transactions/sign should produce data transaction that is good for /transactions/broadcast") {
     signBroadcastAndCalcFee(
       Json.obj(
         "type"    -> DataTransaction.typeId,
@@ -273,7 +273,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     )
   }
 
-  test("/transactions/sign should produce script transaction that is good for /transactions/broadcast") {
+  test("SAPI-233 /transactions/sign should produce script transaction that is good for /transactions/broadcast") {
     signBroadcastAndCalcFee(
       Json.obj(
         "type"    -> SetScriptTransaction.typeId,
@@ -286,7 +286,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     )
   }
 
-  test("/transactions/sign should produce sponsor transactions that are good for /transactions/broadcast") {
+  test("SAPI-234 /transactions/sign should produce sponsor transactions that are good for /transactions/broadcast") {
     for (v <- supportedVersions) {
       val isProof = Option(v).nonEmpty
 
@@ -330,7 +330,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
-  test("/transactions/sign should produce update asset info transactions that are good for /transactions/broadcast") {
+  test("SAPI-235 /transactions/sign should produce update asset info transactions that are good for /transactions/broadcast") {
     for (v <- supportedVersions) {
 
       val assetId = signBroadcastAndCalcFee(

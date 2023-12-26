@@ -535,7 +535,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "script").as[String] shouldBe expectedResult
     }
 
-  routePath("/script/compileCode") in {
+  routePath("SAPI-97 /script/compileCode") in {
     Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
       responseAs[JsValue] should matchJson("""{
                                              |  "script" : "base64:AAIDAAAAAAAAAAgIASIEdGVzdAAAAAEBAAAAAWEAAAAABgAAAAAAAAAAyF8thg==",
@@ -799,7 +799,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
   }
 
-  routePath("/seed/{length}") in forAll(Gen.posNum[Int]) { l =>
+  routePath("SAPI-120 /seed/{length}") in forAll(Gen.posNum[Int]) { l =>
     if (l > UtilsApiRoute.MaxSeedSize) {
       Get(routePath(s"/seed/$l")) ~> route should produce(TooBigArrayAllocation)
     } else {

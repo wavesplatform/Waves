@@ -143,11 +143,11 @@ class LeaseRouteSpec
       version   <- Gen.oneOf(1.toByte, 2.toByte, 3.toByte)
     } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
-  "returns active leases which were" - {
+  "SAPI-73 returns active leases which were" - {
     val sender  = TxHelpers.signer(1)
     val leaseTx = leaseGen(sender, ENOUGH_AMT, ntpTime.correctedTime())
 
-    "created and cancelled by Lease/LeaseCancel transactions" in forAll(leaseTx) { leaseTransaction =>
+    "SAPI-286 created and cancelled by Lease/LeaseCancel transactions" in forAll(leaseTx) { leaseTransaction =>
       withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
         d.appendBlock(leaseTransaction)
         val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
@@ -165,7 +165,7 @@ class LeaseRouteSpec
       }
     }
 
-    "created by LeaseTransaction and canceled by InvokeScriptTransaction" in forAll(leaseTx) { leaseTransaction =>
+    "SAPI-74 created by LeaseTransaction and canceled by InvokeScriptTransaction" in forAll(leaseTx) { leaseTransaction =>
       withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
         d.appendBlock(leaseTransaction)
         val expectedDetails = Seq(leaseTransaction.id() -> toDetails(leaseTransaction))
@@ -214,7 +214,7 @@ class LeaseRouteSpec
       )
     }
 
-    "created by InvokeScriptTransaction and canceled by CancelLeaseTransaction" in forAll(setScriptAndInvoke) {
+    "SAPI-75 created by InvokeScriptTransaction and canceled by CancelLeaseTransaction" in forAll(setScriptAndInvoke) {
       case (sender, setScript, invoke, recipient) =>
         withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
           d.appendBlock(setScript)
@@ -241,7 +241,7 @@ class LeaseRouteSpec
         }
     }
 
-    "created and canceled by InvokeScriptTransaction" in forAll(setScriptAndInvoke) { case (sender, setScript, invoke, recipient) =>
+    "SAPI-76 created and canceled by InvokeScriptTransaction" in forAll(setScriptAndInvoke) { case (sender, setScript, invoke, recipient) =>
       withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
         d.appendBlock(setScript)
         d.appendBlock(invoke)
@@ -291,7 +291,7 @@ class LeaseRouteSpec
       recipient.toAddress
     )
 
-    "created by InvokeExpressionTransaction and canceled by CancelLeaseTransaction" in forAll(invokeExpression) { case (sender, invoke, recipient) =>
+    "SAPI-77 created by InvokeExpressionTransaction and canceled by CancelLeaseTransaction" in forAll(invokeExpression) { case (sender, invoke, recipient) =>
       withRoute(AddrWithBalance.enoughBalances(sender), DomainPresets.ContinuationTransaction) { (d, r) =>
         d.appendBlock(invoke)
         val leaseId = d.blockchain
@@ -316,7 +316,7 @@ class LeaseRouteSpec
       }
     }
 
-    "created by EthereumTransaction and canceled by CancelLeaseTransaction" in {
+    "SAPI-78 created by EthereumTransaction and canceled by CancelLeaseTransaction" in {
       val sender    = signer(2).toEthKeyPair
       val dApp      = defaultSigner
       val recipient = secondSigner.toAddress
@@ -385,7 +385,7 @@ class LeaseRouteSpec
       )
     }
 
-    "created by nested invocations" in {
+    "SAPI-79 created by nested invocations" in {
       val ((proxy, target, recipient), transactions) = nestedInvocation
       withRoute(Seq(AddrWithBalance(proxy.toAddress), AddrWithBalance(target.toAddress))) { (d, r) =>
         d.appendBlock(transactions*)
@@ -428,7 +428,7 @@ class LeaseRouteSpec
     }
   }
 
-  "returns leases created by invoke only for lease sender or recipient" in {
+  "SAPI-80 returns leases created by invoke only for lease sender or recipient" in {
     val invoker         = TxHelpers.signer(1)
     val dApp1           = TxHelpers.signer(2)
     val dApp2           = TxHelpers.signer(3)
@@ -514,7 +514,7 @@ class LeaseRouteSpec
     checkForInvoke(EthTxGenerator.generateEthInvoke(invoker.toEthKeyPair, dApp1.toAddress, "foo", Seq.empty, Seq.empty))
   }
 
-  routePath("/info") in {
+  routePath("SAPI-82 /info") in {
     val blockchain = stub[Blockchain]
     val commonApi  = stub[CommonAccountsApi]
 

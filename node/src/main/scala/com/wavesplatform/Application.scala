@@ -211,7 +211,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         settings.synchronizationSettings.utxSynchronizer.allowTxRebroadcasting,
         () =>
           if (allChannels.size >= settings.restAPISettings.minimumPeers) Right(())
-          else Left(GenericError(s"There are not enough connections with peers (${allChannels.size}) to accept transaction"))
+          else Left(GenericError(s"There are not enough connections with peers (${settings.restAPISettings.minimumPeers}) to accept transaction"))
       )
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
