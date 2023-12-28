@@ -41,7 +41,7 @@ object RDB extends StrictLogging {
     dbDir.getParentFile.mkdirs()
 
     val handles             = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize, 3)
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
@@ -89,7 +89,8 @@ object RDB extends StrictLogging {
       blockSize: Long,
       cacheCapacity: Long,
       highPriPoolRatio: Double,
-      writeBufferSize: Long
+      writeBufferSize: Long,
+      writeBufferNumber: Int = 2
   ): OptionsWithResources[ColumnFamilyOptions] = {
     val bloomFilter           = new BloomFilter(bitsPerKey)
     val blockCache            = new LRUCache(cacheCapacity, -1, false, highPriPoolRatio)
@@ -111,6 +112,7 @@ object RDB extends StrictLogging {
           .setDataBlockHashTableUtilRatio(0.5)
       )
       .setWriteBufferSize(writeBufferSize)
+      .setMaxWriteBufferNumber(writeBufferNumber)
       .setLevelCompactionDynamicLevelBytes(true)
       // Defines the prefix.
       // Improves an iterator performance for keys with prefixes of 10 or more bytes.
@@ -129,7 +131,7 @@ object RDB extends StrictLogging {
       .setParanoidChecks(true)
       .setIncreaseParallelism(4)
       .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(4)
+      .setMaxBackgroundJobs(6)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
       .setMaxSubcompactions(2) // Can lead to max_background_jobs * max_subcompactions background threads
