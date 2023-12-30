@@ -128,11 +128,11 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(8)
+      .setIncreaseParallelism(7)
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
-      .setMaxSubcompactions(2) // Can lead to max_background_jobs * max_subcompactions background threads
+      // .setMaxSubcompactions(2) // Can lead to max_background_jobs * max_subcompactions background threads
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()
