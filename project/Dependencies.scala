@@ -98,7 +98,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.8.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.9.1"
 
   private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
 
