@@ -40,8 +40,11 @@ object RDB extends StrictLogging {
     val dbDir = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles             = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val handles          = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val defaultCfCompressionForLevels = CompressionType.NO_COMPRESSION :: // Disable compaction for L0, because it is predictable and small
+      List.fill(defaultCfOptions.options.numLevels() - 1)(CompressionType.LZ4_COMPRESSION)
+
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
@@ -53,6 +56,12 @@ object RDB extends StrictLogging {
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
             .setMaxWriteBufferNumber(4)
+            .setMinWriteBufferNumberToMerge(2)
+            .setLevel0FileNumCompactionTrigger(2)
+            .setTargetFileSizeBase(64 << 20)
+            .setMaxBytesForLevelBase(settings.rocksdb.writeBufferSize * 4)
+            .setCompactionStyle(CompactionStyle.LEVEL)
+            .setCompressionPerLevel(defaultCfCompressionForLevels.asJava)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
@@ -132,7 +141,7 @@ object RDB extends StrictLogging {
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
-      // .setMaxSubcompactions(2) // Can lead to max_background_jobs * max_subcompactions background threads
+      .setMaxSubcompactions(2) // Write stalls expected without this option. Can lead to max_background_jobs * max_subcompactions background threads
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()
