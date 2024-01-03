@@ -55,7 +55,7 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
-            .setMaxWriteBufferNumber(4)
+            .setMaxWriteBufferNumber(6)
             .setMinWriteBufferNumberToMerge(2)
             .setLevel0FileNumCompactionTrigger(2)
             .setTargetFileSizeBase(64 << 20)
