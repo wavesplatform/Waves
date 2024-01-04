@@ -56,7 +56,7 @@ object RDB extends StrictLogging {
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
             .setMaxWriteBufferNumber(3)
-            .setLevel0FileNumCompactionTrigger(2)
+            .setLevel0FileNumCompactionTrigger(3)
             .setCompressionPerLevel(defaultCfCompressionForLevels.asJava)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
@@ -134,7 +134,7 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(6) // Max threads - 2
+      .setIncreaseParallelism(7) // Max threads - 1
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
