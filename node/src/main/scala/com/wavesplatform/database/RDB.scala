@@ -55,12 +55,8 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
-            .setMaxWriteBufferNumber(6)
-            .setMinWriteBufferNumberToMerge(2)
+            .setMaxWriteBufferNumber(3)
             .setLevel0FileNumCompactionTrigger(2)
-            .setTargetFileSizeBase(64 << 20)
-            .setMaxBytesForLevelBase(settings.rocksdb.writeBufferSize * 4)
-            .setCompactionStyle(CompactionStyle.LEVEL)
             .setCompressionPerLevel(defaultCfCompressionForLevels.asJava)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
@@ -121,6 +117,7 @@ object RDB extends StrictLogging {
           .setDataBlockHashTableUtilRatio(0.5)
       )
       .setWriteBufferSize(writeBufferSize)
+      .setCompactionStyle(CompactionStyle.LEVEL)
       .setLevelCompactionDynamicLevelBytes(true)
       // Defines the prefix.
       // Improves an iterator performance for keys with prefixes of 10 or more bytes.
@@ -137,7 +134,7 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(7)
+      .setIncreaseParallelism(6) // Max threads - 2
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
