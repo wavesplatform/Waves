@@ -1,22 +1,22 @@
 package com.wavesplatform.transaction.transfer
 
-import scala.util.{Either, Try}
-
-import cats.instances.list._
-import cats.syntax.traverse._
-import com.wavesplatform.account._
+import cats.instances.list.*
+import cats.syntax.traverse.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsObject, Json, OFormat}
+
+import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
     version: TxVersion,
@@ -28,12 +28,15 @@ case class MassTransferTransaction(
     attachment: ByteStr,
     proofs: Proofs,
     chainId: Byte
-) extends Transaction(TransactionType.MassTransfer, assetId match {
-      case Waves          => Seq()
-      case a: IssuedAsset => Seq(a)
-    })
+) extends Transaction(
+      TransactionType.MassTransfer,
+      assetId match {
+        case Waves          => Seq()
+        case a: IssuedAsset => Seq(a)
+      }
+    )
     with ProvenTransaction
-    with VersionedTransaction
+    with Versioned.ToV2
     with TxWithFee.InWaves
     with FastHashId
     with PBSince.V2 {
@@ -58,8 +61,7 @@ object MassTransferTransaction extends TransactionParser {
 
   val MaxTransferCount = 100
 
-  override val typeId: TxType                    = 11: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val typeId: TxType = 11: Byte
 
   implicit val validator: TxValidator[MassTransferTransaction] = MassTransferTxValidator
 
@@ -75,7 +77,7 @@ object MassTransferTransaction extends TransactionParser {
   )
 
   object Transfer {
-    implicit val jsonFormat = Json.format[Transfer]
+    implicit val jsonFormat: OFormat[Transfer] = Json.format[Transfer]
   }
 
   case class ParsedTransfer(address: AddressOrAlias, amount: TxNonNegativeAmount)
@@ -122,14 +124,13 @@ object MassTransferTransaction extends TransactionParser {
     signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey, chainId)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] =
-    transfers.traverse {
-      case Transfer(recipient, amount) =>
-        for {
-          addressOrAlias <- AddressOrAlias.fromString(recipient)
-          transferAmount <- TxNonNegativeAmount(amount)(NegativeAmount(amount, "asset"))
-        } yield {
-          ParsedTransfer(addressOrAlias, transferAmount)
-        }
+    transfers.traverse { case Transfer(recipient, amount) =>
+      for {
+        addressOrAlias <- AddressOrAlias.fromString(recipient)
+        transferAmount <- TxNonNegativeAmount(amount)(NegativeAmount(amount, "asset"))
+      } yield {
+        ParsedTransfer(addressOrAlias, transferAmount)
+      }
     }
 
 }

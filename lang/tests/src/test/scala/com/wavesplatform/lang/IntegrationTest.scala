@@ -93,7 +93,16 @@ class IntegrationTest extends PropSpec with Inside {
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
       EvaluatorV2
-        .applyCompleted(evalCtx, v._1, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true, enableExecutionLog = false)
+        .applyCompleted(
+          evalCtx,
+          v._1,
+          LogExtraInfo(),
+          version,
+          correctFunctionCallScope = true,
+          newMode = true,
+          enableExecutionLog = false,
+          fixedThrownError = true
+        )
         ._3
         .bimap(_.message, _.asInstanceOf[T])
     )

@@ -6,7 +6,6 @@ import cats.kernel.Monoid
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.script.ScriptPreprocessor
-import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -29,9 +28,9 @@ class ScriptPreprocessorTest extends PropSpec with ScriptGenParser {
     } yield r
 
   private def eval(code: String): Either[String, EVALUATED] = {
-    val untyped  = Parser.parseExpr(code).get.value
-    val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(V3, useNewPowPrecision = true)))
-    val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
+    val untyped = Parser.parseExpr(code).get.value
+    val ctx     = Monoid.combineAll(Seq(PureContext.build(V3, useNewPowPrecision = true)))
+    val typed   = ExpressionCompiler(ctx.compilerContext, V3, untyped)
     typed.flatMap(v => evaluator[EVALUATED](ctx.evaluationContext, v._1).leftMap(_.toString))
   }
 

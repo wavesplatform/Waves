@@ -6,7 +6,7 @@ class PartialUnificationTests extends FlatSpec {
   def foo[F[_], A](fa: F[A]): String = fa.toString
 
   "Partial unification" should "be enabled" in {
-    val result = foo { x: Int =>
+    val result = foo { (x: Int) =>
       x * 2
     }
 

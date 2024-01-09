@@ -60,7 +60,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
                |}
                |
                |""".stripMargin,
-        ScriptEstimatorV3(fixOverflow = true, overhead = false)
+        ScriptEstimatorV3.latest
       )
       .explicitGet()
       ._1
@@ -76,7 +76,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
                |
                | false
                |""".stripMargin,
-        ScriptEstimatorV3(fixOverflow = true, overhead = false)
+        ScriptEstimatorV3.latest
       )
       .explicitGet()
       ._1
@@ -178,9 +178,10 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
           |	\\)
           |	timestamp = \\d+
           |	vrf = base58'[$Base58Alphabet]+'
-          |	height = $height
           |	generationSignature = base58'[$Base58Alphabet]+'
           |	generatorPublicKey = base58'[$Base58Alphabet]+${"" /*miner.publicKey*/}'
+          |	height = $height
+          |	rewards = \\[\\]
           |\\)
         """.trim.stripMargin
 

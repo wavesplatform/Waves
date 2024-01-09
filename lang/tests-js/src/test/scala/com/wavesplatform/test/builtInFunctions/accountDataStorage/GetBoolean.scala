@@ -23,7 +23,7 @@ object GetBoolean extends JsTestBase {
   private val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test("functions getBoolean accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-8. Compile getBoolean functions for address, alias, and 'this'") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (
@@ -48,7 +48,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test("functions own data getBoolean accountDataStorage compiles for address, alias and 'this'") {
+    test("RIDE-9. Compile own data getBoolean functions for address, alias, and 'this'") {
       for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (ownData <- Seq(ownDataGetBoolean, ownDataGetBooleanArgBeforeFunc, ownDataGetBooleanValueArgBeforeFunc, ownDataGetBooleanValue)) {
@@ -58,7 +58,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test("negative tests for getBoolean functions") {
+    test("RIDE-10. Negative tests for getBoolean functions") {
       val invalidFunction = s"getBooleanValue($randomInt)"
       val invalidArgBeforeFunction = s"$randomInt.getBooleanValue()"
       for (version <- actualVersions) {
@@ -79,7 +79,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test("Can't find a own data functions overload Boolean accountDataStorage for old Versions") {
+    test("RIDE-11. Ensure no overload of own data Boolean accountDataStorage for old Versions") {
       for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         for (

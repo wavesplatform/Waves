@@ -5,17 +5,16 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.smartcontract.invokeScrTxSupportedVersions
 import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
+import com.wavesplatform.it.sync.smartcontract.invokeScrTxSupportedVersions
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
-import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.test._
+import com.wavesplatform.protobuf.transaction.{DataEntry, PBRecipients, PBTransactions, Recipient}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
@@ -96,8 +95,8 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         |
         """.stripMargin
     val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1
-    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1
-    val script3 = ScriptCompiler.compile(scriptTextV5, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1
+    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3.latest).explicitGet()._1
+    val script3 = ScriptCompiler.compile(scriptTextV5, ScriptEstimatorV3.latest).explicitGet()._1
     sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(thirdContractAddr), 10.waves, minFee, waitForTx = true)
     sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(fourthContractAddr), 10.waves, minFee, waitForTx = true)
     sender.setScript(firstContract, Right(Some(script)), setScriptFee, waitForTx = true)
@@ -107,6 +106,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     val scriptInfo = sender.scriptInfo(firstAddress)
     PBTransactions.toVanillaScript(scriptInfo.scriptBytes) shouldBe Some(script)
+    scriptInfo.publicKey shouldBe ByteString.copyFrom(firstAcc.publicKey.arr)
   }
 
   test("dApp caller invokes a nested function on a dApp") {

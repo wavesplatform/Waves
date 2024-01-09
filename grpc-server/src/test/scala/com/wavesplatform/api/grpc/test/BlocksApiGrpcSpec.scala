@@ -23,7 +23,7 @@ import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.DiffMatchers
 import monix.execution.Scheduler.Implicits.global
 import org.scalatest.{Assertion, BeforeAndAfterAll}
-
+import com.wavesplatform.utils.byteStrOrdering
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
@@ -253,7 +253,7 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
 
   "NODE-922. GetBlock should return correct data for challenging block" in {
     val sender = TxHelpers.signer(1)
-    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
+    withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
       val grpcApi          = getGrpcApi(d)
       val challengingMiner = d.wallet.generateNewAccount().get
 
@@ -304,7 +304,7 @@ class BlocksApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
 
   "NODE-922. GetBlockRange should return correct data for challenging block" in {
     val sender = TxHelpers.signer(1)
-    withDomain(DomainPresets.TransactionStateSnapshot, balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
+    withDomain(TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0)), balances = AddrWithBalance.enoughBalances(sender, defaultSigner)) { d =>
       val grpcApi          = getGrpcApi(d)
       val challengingMiner = d.wallet.generateNewAccount().get
 

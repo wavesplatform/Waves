@@ -10,7 +10,6 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
@@ -34,8 +33,8 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
         d.appendBlock(invoke1)
         d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
 
-        d.liquidDiff.portfolios(dApp1) shouldBe Portfolio.build(asset, 1)
-        d.liquidDiff.portfolios(dApp2) shouldBe Portfolio.build(asset, -1)
+        d.liquidSnapshot.balances((dApp1, asset)) shouldBe d.rocksDBWriter.balance(dApp1, asset) + 1
+        d.liquidSnapshot.balances((dApp2, asset)) shouldBe d.rocksDBWriter.balance(dApp2, asset) - 1
 
         val invoke2 = invoke()
         d.appendBlockE(invoke2) should produce {

@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.nio.ByteBuffer
-import java.util
-import java.util.Map as JMap
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -19,24 +16,14 @@ import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
 import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{
-  EthereumTransaction,
-  GenesisTransaction,
-  PBSince,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers,
-  TxValidationError
-}
+import com.wavesplatform.transaction.{EthereumTransaction, PBSince, Transaction, TransactionParsers, TxPositiveAmount, TxValidationError, Versioned}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -44,6 +31,8 @@ import org.rocksdb.*
 import sun.nio.ch.Util
 import supertagged.TaggedType
 
+import java.nio.ByteBuffer
+import java.util.Map as JMap
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
@@ -143,47 +132,40 @@ package object database {
   def writeLeaseBalance(lb: CurrentLeaseBalance): Array[Byte] =
     Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ Ints.toByteArray(lb.height) ++ Ints.toByteArray(lb.prevHeight)
 
-  def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
-    lde.fold(
-      _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
-      ld =>
-        pb.LeaseDetails(
-          ByteString.copyFrom(ld.sender.arr),
-          Some(PBRecipients.create(ld.recipient)),
-          ld.amount,
-          ByteString.copyFrom(ld.sourceId.arr),
-          ld.height,
-          ld.status match {
-            case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-            case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-              pb.LeaseDetails.Status
-                .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-          }
-        ).toByteArray
-    )
+  def writeLeaseDetails(ld: LeaseDetails): Array[Byte] =
+    pb.LeaseDetails(
+      ByteString.copyFrom(ld.sender.arr),
+      Some(PBRecipients.create(ld.recipientAddress)),
+      ld.amount.value,
+      ByteString.copyFrom(ld.sourceId.arr),
+      ld.height,
+      ld.status match {
+        case LeaseDetails.Status.Active => pb.LeaseDetails.CancelReason.Empty
+        case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+          pb.LeaseDetails.CancelReason
+            .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+        case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height))
+      }
+    ).toByteArray
 
-  def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
-    if (data.length == 1) Left(data(0) == 1)
-    else {
-      val d = pb.LeaseDetails.parseFrom(data)
-      Right(
-        LeaseDetails(
-          d.senderPublicKey.toPublicKey,
-          PBRecipients.toAddressOrAlias(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
-          d.amount,
-          d.status match {
-            case pb.LeaseDetails.Status.Active(_)                                   => LeaseDetails.Status.Active
-            case pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
-            case pb.LeaseDetails.Status.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
-              LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
-            case pb.LeaseDetails.Status.Empty => ???
-          },
-          d.sourceId.toByteStr,
-          d.height
-        )
-      )
-    }
+  def readLeaseDetails(data: Array[Byte]): LeaseDetails = {
+    val d = pb.LeaseDetails.parseFrom(data)
+    LeaseDetails(
+      LeaseStaticInfo(
+        d.senderPublicKey.toPublicKey,
+        PBRecipients.toAddress(d.recipient.get, AddressScheme.current.chainId).explicitGet(),
+        TxPositiveAmount.unsafeFrom(d.amount),
+        d.sourceId.toByteStr,
+        d.height
+      ),
+      d.cancelReason match {
+        case pb.LeaseDetails.CancelReason.Expired(pb.LeaseDetails.Expired(height, _)) => LeaseDetails.Status.Expired(height)
+        case pb.LeaseDetails.CancelReason.Cancelled(pb.LeaseDetails.Cancelled(height, transactionId, _)) =>
+          LeaseDetails.Status.Cancelled(height, Some(transactionId.toByteStr).filter(!_.isEmpty))
+        case pb.LeaseDetails.CancelReason.Empty => LeaseDetails.Status.Active
+      }
+    )
+  }
 
   def readVolumeAndFeeNode(data: Array[Byte]): VolumeAndFeeNode = if (data != null && data.length == 20)
     VolumeAndFeeNode(Longs.fromByteArray(data.take(8)), Longs.fromByteArray(data.slice(8, 16)), Height(Ints.fromByteArray(data.takeRight(4))))
@@ -255,17 +237,6 @@ package object database {
     ).toByteArray
   }
 
-  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
-    val sai = pb.StaticAssetInfo.parseFrom(bb)
-    AssetStaticInfo(
-      sai.id.toByteStr,
-      TransactionId(sai.sourceId.toByteStr),
-      PublicKey(sai.issuerPublicKey.toByteArray),
-      sai.decimals,
-      sai.isNft
-    )
-  }
-
   def writeBlockMeta(data: pb.BlockMeta): Array[Byte] = data.toByteArray
 
   def readBlockMeta(bs: Array[Byte]): pb.BlockMeta = pb.BlockMeta.parseFrom(bs)
@@ -304,6 +275,15 @@ package object database {
     ndo.toByteArray
   }
 
+  def readLeaseIdSeq(data: Array[Byte]): Seq[ByteStr] =
+    pb.LeaseIds
+      .parseFrom(data)
+      .ids
+      .map(_.toByteStr)
+
+  def writeLeaseIdSeq(ids: Seq[ByteStr]): Array[Byte] =
+    pb.LeaseIds(ids.map(_.toByteString)).toByteArray
+
   def readStateHash(bs: Array[Byte]): StateHash = {
     val ndi           = newDataInput(bs)
     val sectionsCount = ndi.readByte()
@@ -329,7 +309,7 @@ package object database {
   }
 
   private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
-    pb.DataEntry.parseFrom(bs).value match {
+    if (bs == null || bs.length == 0) EmptyDataEntry(key) else  pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
       case Value.BoolValue(value)   => BooleanDataEntry(key, value)
@@ -378,6 +358,36 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
+  def getKeyBuffersFromKeys(keys: collection.IndexedSeq[Key[?]]): collection.IndexedSeq[ByteBuffer] =
+    keys.map { k =>
+      val arr = k.keyBytes
+      val b   = Util.getTemporaryDirectBuffer(arr.length)
+      b.put(k.keyBytes).flip()
+      b
+    }
+
+  def getKeyBuffers(keys: collection.IndexedSeq[Array[Byte]]): collection.IndexedSeq[ByteBuffer] =
+    keys.map { k =>
+      val b = Util.getTemporaryDirectBuffer(k.length)
+      b.put(k).flip()
+      b
+    }
+
+  def getValueBuffers(amount: Int, bufferSize: Int): IndexedSeq[ByteBuffer] =
+    IndexedSeq
+      .fill(amount) {
+        val buf = Util.getTemporaryDirectBuffer(bufferSize)
+        buf.limit(buf.capacity())
+        buf
+      }
+
+  def getValueBuffers(bufferSizes: collection.IndexedSeq[Int]): collection.IndexedSeq[ByteBuffer] =
+    bufferSizes.map { size =>
+      val buf = Util.getTemporaryDirectBuffer(size)
+      buf.limit(buf.capacity())
+      buf
+    }
+
   implicit class DBExt(val db: RocksDB) extends AnyVal {
 
     def readOnly[A](f: ReadOnlyDB => A): A = {
@@ -409,10 +419,10 @@ package object database {
       }
     }
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSizes: IndexedSeq[Int]): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
@@ -421,13 +431,13 @@ package object database {
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] =
       multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGet[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+    def multiGet[A](readOptions: ReadOptions, keys: IndexedSeq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
       val keyBufs = getKeyBuffersFromKeys(keys)
       val valBufs = getValueBuffers(keys.size, valBufSize)
 
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .map { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -438,18 +448,18 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
-    def multiGetInts(readOptions: ReadOptions, keys: Seq[Key[Int]]): Seq[Option[Int]] = {
+    def multiGetInts(readOptions: ReadOptions, keys: IndexedSeq[Key[Int]]): Seq[Option[Int]] = {
       val keyBytes = keys.map(_.keyBytes)
       val keyBufs  = getKeyBuffers(keyBytes)
       val valBufs  = getValueBuffers(keyBytes.size, 4)
 
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = db
-        .multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs)
+        .multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava)
         .asScala
         .map { value =>
           if (value.status.getCode == Status.Code.Ok) {
@@ -460,7 +470,7 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
@@ -470,7 +480,7 @@ package object database {
 
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .flatMap { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -481,7 +491,7 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
@@ -518,46 +528,15 @@ package object database {
       finally resource.close()
     }
 
-    private def getKeyBuffersFromKeys(keys: collection.Seq[Key[?]]): util.List[ByteBuffer] =
-      keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-
-    private def getKeyBuffers(keys: collection.Seq[Array[Byte]]): util.List[ByteBuffer] =
-      keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-
-    private def getValueBuffers(amount: Int, bufferSize: Int): util.List[ByteBuffer] =
-      List
-        .fill(amount) {
-          val buf = Util.getTemporaryDirectBuffer(bufferSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-    private def getValueBuffers(bufferSizes: collection.Seq[Int]): util.List[ByteBuffer] =
-      bufferSizes.map { size =>
-        val buf = Util.getTemporaryDirectBuffer(size)
-        buf.limit(buf.capacity())
-        buf
-      }.asJava
-
     private def multiGetOpt[A](
         readOptions: ReadOptions,
-        keys: Seq[Key[Option[A]]],
-        keyBufs: util.List[ByteBuffer],
-        valBufs: util.List[ByteBuffer]
+        keys: collection.IndexedSeq[Key[Option[A]]],
+        keyBufs: collection.IndexedSeq[ByteBuffer],
+        valBufs: collection.IndexedSeq[ByteBuffer]
     ): Seq[Option[A]] = {
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .map { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -568,19 +547,19 @@ package object database {
         }
         .toSeq
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
 
     private def multiGet[A](
         readOptions: ReadOptions,
         keys: ArrayBuffer[Key[A]],
-        keyBufs: util.List[ByteBuffer],
-        valBufs: util.List[ByteBuffer]
+        keyBufs: collection.IndexedSeq[ByteBuffer],
+        valBufs: collection.IndexedSeq[ByteBuffer]
     ): View[A] = {
       val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs).asScala)
+        .zip(db.multiGetByteBuffers(readOptions, cfhs, keyBufs.asJava, valBufs.asJava).asScala)
         .flatMap { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
@@ -590,7 +569,7 @@ package object database {
           } else None
         }
 
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
       result
     }
   }
@@ -634,22 +613,22 @@ package object database {
 
   def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
-    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> (data.transaction match {
-      case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
-      case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
-      case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
-      case _                          => throw new IllegalArgumentException("Illegal transaction data")
-    })
+    TxMeta(height, TxMeta.Status.fromProtobuf(data.status), data.spentComplexity) -> toVanillaTransaction(data.transaction)
+  }
+
+  def toVanillaTransaction(tx: pb.TransactionData.Transaction): Transaction = tx match {
+    case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
+    case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
+    case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
+    case _                          => throw new IllegalArgumentException("Illegal transaction data")
   }
 
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case lps: PBSince with Versioned if PBSince.affects(lps) => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case et: EthereumTransaction                             => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                                   => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
     }
     pb.TransactionData(ptx, m.status.protobuf, m.spentComplexity).toByteArray
   }
@@ -670,8 +649,8 @@ package object database {
     txSnapshots.result()
   }
 
-  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB): Seq[(StateSnapshot, TxMeta.Status)] =
-    loadTxStateSnapshots(height, rdb).map(StateSnapshot.fromProtobuf)
+  def loadTxStateSnapshotsWithStatus(height: Height, rdb: RDB, transactions: Seq[Transaction]): Seq[(StateSnapshot, TxMeta.Status)] =
+    loadTxStateSnapshots(height, rdb).zip(transactions).map { case (s, tx) => PBSnapshots.fromProtobuf(s, tx.id(), height) }
 
   def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {
@@ -706,21 +685,19 @@ package object database {
       Height(pbStaticInfo.height)
     )
 
-  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = rdb.db.withResource { r =>
+  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Map[ByteStr, LeaseDetails] = rdb.db.withResource { r =>
     (for {
-      id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
-      details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
-      if details.exists(_.fold(identity, _.isActive))
-      tm <- r.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
-      tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
-    } yield tx).collect {
-      case (ltm, lt: LeaseTransaction) if ltm.status == TxMeta.Status.Succeeded => lt
-    }.toSeq
+      id         <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
+      newDetails <- loadLease(r, id)
+      if newDetails.isActive
+    } yield (id, newDetails)).toMap
   }
+
+  def loadLease(resource: DBResource, id: ByteStr): Option[LeaseDetails] =
+    fromHistory(resource, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id)).flatten
 
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
-
     val iterator = resource.fullIterator
 
     @inline
@@ -732,7 +709,7 @@ package object database {
     iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
     while (iterator.isValid && keyInRange()) {
       val leaseId = ByteStr(iterator.key().drop(6))
-      if (includeCancelled || readLeaseDetails(iterator.value()).fold(identity, _.isActive))
+      if (includeCancelled || readLeaseDetails(iterator.value()).isActive)
         leaseIds += leaseId
       else
         leaseIds -= leaseId

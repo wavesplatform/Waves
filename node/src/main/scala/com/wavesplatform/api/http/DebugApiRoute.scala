@@ -13,7 +13,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash, TxMeta}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -262,9 +262,10 @@ case class DebugApiRoute(
       sh <- loadStateHash(height)
       h  <- blockchain.blockHeader(height)
     } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-      "blockId" -> h.id().toString,
-      "height"  -> height,
-      "version" -> Version.VersionString
+      "blockId"    -> h.id().toString,
+      "baseTarget" -> h.header.baseTarget,
+      "height"     -> height,
+      "version"    -> Version.VersionString
     )
 
     result match {

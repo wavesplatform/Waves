@@ -14,7 +14,7 @@ object Split extends JsTestBase {
   private val invalidErrorSplit         = testData.invalidFunctionError("split", 2)
 
   val tests: Tests = Tests {
-    test("split functions compiles") {
+    test("RIDE-200. split function should compile for valid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         for (
@@ -29,7 +29,7 @@ object Split extends JsTestBase {
       }
     }
 
-    test("Compilation error for split functions") {
+    test("RIDE-201. split function should throw a compilation error for invalid data") {
       for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         for (

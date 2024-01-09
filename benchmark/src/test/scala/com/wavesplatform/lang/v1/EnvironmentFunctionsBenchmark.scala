@@ -34,8 +34,8 @@ import scala.util.Random
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 10)
-@Measurement(iterations = 10)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 class EnvironmentFunctionsBenchmark {
 
   @Benchmark
@@ -132,7 +132,7 @@ object EnvironmentFunctionsBenchmark {
 
     override def accountScript(addressOrAlias: Recipient): Option[Script] = ???
 
-    override def calculateDelay(hitSource: ByteStr, baseTarget: Long, generator: ByteStr, balance: Long): Long = ???
+    override def calculateDelay(generator: ByteStr, balance: Long): Long = ???
 
     def callScript(
         dApp: Address,

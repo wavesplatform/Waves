@@ -11,15 +11,7 @@ import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.InterferableDB
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
-import com.wavesplatform.events.StateUpdate.{
-  AssetInfo,
-  AssetStateUpdate,
-  BalanceUpdate,
-  DataEntryUpdate,
-  LeaseUpdate,
-  LeasingBalanceUpdate,
-  ScriptUpdate
-}
+import com.wavesplatform.events.StateUpdate.{AssetInfo, AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate, ScriptUpdate}
 import com.wavesplatform.events.api.grpc.protobuf.{GetBlockUpdateRequest, GetBlockUpdatesRangeRequest, SubscribeRequest}
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
@@ -35,8 +27,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.InvokeScriptResult
+import com.wavesplatform.protobuf.transaction.{DataEntry, InvokeScriptResult}
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, BlockRewardCalculator, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
@@ -50,6 +41,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, TxHelpers}
+import com.wavesplatform.utils.byteStrOrdering
 import io.grpc.StatusException
 import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
@@ -419,7 +411,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       (1 to blocksCount + 1).foreach(_ => d.appendBlock())
 
       val result = Await
-        .result(r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(1, blocksCount)), Duration.Inf)
+        .result(r.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(1, blocksCount)), 1.minute)
         .updates
         .map(_.update.append.map(_.getBlock.vrf.toByteStr).filterNot(_.isEmpty))
 
@@ -469,13 +461,13 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val reward        = 600000000
       val genesisAmount = Constants.TotalWaves * Constants.UnitsInWave + reward
       val genesis       = results.head.getAppend.transactionStateUpdates.head.balances.head
-      genesis.address.toAddress shouldBe TxHelpers.defaultAddress
+      genesis.address.toAddress() shouldBe TxHelpers.defaultAddress
       genesis.getAmountAfter.amount shouldBe genesisAmount
       genesis.amountBefore shouldBe reward
       genesis.getAmountAfter.assetId shouldBe empty
 
       val payment = results.last.getAppend.transactionStateUpdates.last.balances.find { bu =>
-        bu.address.toAddress == TxHelpers.secondAddress
+        bu.address.toAddress() == TxHelpers.secondAddress
       }.get
 
       payment.getAmountAfter.amount shouldBe 100
@@ -811,7 +803,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val sender          = TxHelpers.signer(3)
       val recipient       = TxHelpers.signer(4)
 
-      withDomainAndRepo(settings = DomainPresets.TransactionStateSnapshot) { case (d, repo) =>
+      withDomainAndRepo(settings = TransactionStateSnapshot.configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))) { case (d, repo) =>
         val challengingMiner = d.wallet.generateNewAccount().get
 
         val initSenderBalance      = 100000.waves
@@ -1214,7 +1206,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
     Await
       .result(
         repo.getBlockUpdate(GetBlockUpdateRequest(height)),
-        Duration.Inf
+        1.minute
       )
       .getUpdate
       .update

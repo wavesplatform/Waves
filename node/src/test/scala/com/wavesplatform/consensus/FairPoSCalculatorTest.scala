@@ -1,14 +1,14 @@
 package com.wavesplatform.consensus
 
+import scala.io.Source
+import scala.util.Random
+
 import cats.data.NonEmptyList
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.test.PropSpec
-
-import scala.io.Source
-import scala.util.Random
 
 class FairPoSCalculatorTest extends PropSpec {
   import FairPoSCalculatorTest._
@@ -27,6 +27,16 @@ class FairPoSCalculatorTest extends PropSpec {
   val balance: Long     = 50000000L * 100000000L
   val blockDelaySeconds = 60
   val defaultBaseTarget = 100L
+
+  property("Base target should not be 0") {
+    val baseTarget = FairPoSCalculator(60, 0).calculateBaseTarget(60, 1, 1, 2, Some(1), 3)
+    baseTarget shouldBe 1
+  }
+
+  property("Base target should not be overflowed") {
+    val baseTarget = FairPoSCalculator(60, 0).calculateBaseTarget(60, 1, Long.MaxValue, 2, Some(1), 3e10.toLong)
+    baseTarget shouldBe Long.MaxValue
+  }
 
   property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
@@ -128,8 +138,8 @@ class FairPoSCalculatorTest extends PropSpec {
 
 object FairPoSCalculatorTest {
   import play.api.libs.functional.syntax._
-  import play.api.libs.json.Reads._
   import play.api.libs.json._
+  import play.api.libs.json.Reads._
 
   case class Input(
       privateKey: PrivateKey,

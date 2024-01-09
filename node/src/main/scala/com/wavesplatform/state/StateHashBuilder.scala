@@ -36,6 +36,7 @@ object StateHashBuilder {
 }
 
 class StateHashBuilder {
+  import com.wavesplatform.utils.byteStrOrdering
   private[this] val maps = Vector.fill(SectionId.maxId)(mutable.TreeMap.empty[ByteStr, Array[Byte]])
 
   private[this] def addEntry(section: SectionId.Value, key: Array[Byte]*)(value: Array[Byte]*): Unit = {
@@ -83,9 +84,9 @@ class StateHashBuilder {
     )
   }
 
-  def addLeaseStatus(leaseId: ByteStr, status: Boolean): Unit = {
+  def addLeaseStatus(leaseId: ByteStr, isActive: Boolean): Unit = {
     addEntry(SectionId.LeaseStatus, leaseId.arr)(
-      if (status) Array(1: Byte) else Array(0: Byte)
+      if (isActive) Array(1: Byte) else Array(0: Byte)
     )
   }
 

@@ -43,7 +43,7 @@ class InvokePaymentsFeeSuite extends BaseTransactionSuite {
                     |  )
                     |
                     """.stripMargin
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
   }
 
   private def dApp(assetId: String): String =
@@ -62,7 +62,7 @@ class InvokePaymentsFeeSuite extends BaseTransactionSuite {
          |     Reissue(base58'$assetId', 1, false)
          |   ]
        """.stripMargin,
-        ScriptEstimatorV3(fixOverflow = true, overhead = false)
+        ScriptEstimatorV3.latest
       )
       .explicitGet()
       ._1

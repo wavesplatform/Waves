@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.directives
 
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 
 sealed trait DirectiveKey {
   type Value <: DirectiveValue
@@ -28,10 +28,10 @@ object DirectiveKey {
     override val valueMapper = mapper
   }
 
-  implicit lazy val STDLIB_VERSION = DirectiveKey.predefined[StdLibVersion]("STDLIB_VERSION")
-  implicit lazy val CONTENT_TYPE   = DirectiveKey.predefined[ContentType]("CONTENT_TYPE")
-  implicit lazy val SCRIPT_TYPE    = DirectiveKey.predefined[ScriptType]("SCRIPT_TYPE")
-  implicit lazy val IMPORT         = DirectiveKey.arbitrary[Imports]("IMPORT")
+  lazy val STDLIB_VERSION = DirectiveKey.predefined[StdLibVersion]("STDLIB_VERSION")
+  lazy val CONTENT_TYPE   = DirectiveKey.predefined[ContentType]("CONTENT_TYPE")
+  lazy val SCRIPT_TYPE    = DirectiveKey.predefined[ScriptType]("SCRIPT_TYPE")
+  lazy val IMPORT         = DirectiveKey.arbitrary[Imports]("IMPORT")
 
   lazy val all: Set[DirectiveKey] =
     Set(

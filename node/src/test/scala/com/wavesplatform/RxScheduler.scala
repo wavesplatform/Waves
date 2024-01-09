@@ -24,10 +24,10 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
 
   def test[A](f: => Future[A]): A = Await.result(f, 10.seconds)
 
-  def send[A](p: Observer[A])(a: A): Future[Ack] =
+  def send[A](p: Observer[A], timeout: Int = 500)(a: A): Future[Ack] =
     p.onNext(a)
       .map(ack => {
-        Thread.sleep(500)
+        Thread.sleep(timeout)
         ack
       })
 

@@ -883,7 +883,7 @@ class ContractCompilerTest extends PropSpec {
       NoLibraries,
       dAppV4Ctx,
       V4,
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = true),
       needCompaction = false,
       removeUnusedCode = false
     ) should produce("Script is too large: 165187 bytes > 163840 bytes")
@@ -1042,7 +1042,7 @@ class ContractCompilerTest extends PropSpec {
       NoLibraries,
       getTestContext(V4).compilerContext,
       V4,
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = true),
       needCompaction = false,
       removeUnusedCode = false
     ) shouldBe Symbol("right")
@@ -1063,7 +1063,7 @@ class ContractCompilerTest extends PropSpec {
       )
   }
 
-  property("union as argument of non-@Callable function is allowed in V6") {
+  property("NODE-516. union as argument of non-@Callable function is allowed in V6") {
     val script =
       """
         |{-# STDLIB_VERSION 6 #-}

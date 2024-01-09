@@ -10,6 +10,7 @@ import java.io.File
 import java.nio.file.{Files, Path}
 import java.util
 import scala.jdk.CollectionConverters.*
+import scala.util.{Failure, Success, Using}
 
 final class RDB(
     val db: RocksDB,
@@ -138,14 +139,21 @@ object RDB extends StrictLogging {
     } else OptionsWithResources(dbOptions, Seq(dbOptions))
   }
 
-  private def checkDbDir(dbPath: Path): Unit = {
-    val containsLdbFiles = Files.exists(dbPath) && Files.list(dbPath).iterator().asScala.exists(_.getFileName.toString.endsWith(".ldb"))
-    if (containsLdbFiles) {
-      logger.error(
-        s"Database directory ${dbPath.toAbsolutePath.toString} contains LevelDB files (.ldb) which is not compatible with current database. Please delete these files and restart node"
-      )
-      logger.error("FOR THIS REASON THE NODE STOPPED AUTOMATICALLY")
-      forceStopApplication(FatalDBError)
+  private def checkDbDir(dbPath: Path): Unit =
+    if (Files.exists(dbPath)) {
+      Using(Files.list(dbPath)) { fileList =>
+        fileList.iterator().asScala.exists(_.getFileName.toString.endsWith(".ldb"))
+      } match {
+        case Failure(exception) =>
+          logger.error(s"Could not open data directory ${dbPath.toAbsolutePath.toString}", exception)
+          forceStopApplication(FatalDBError)
+        case Success(true) =>
+          logger.error(
+            s"Database directory ${dbPath.toAbsolutePath.toString} contains LevelDB files (.ldb) which is not compatible with current database. Please delete these files and restart node"
+          )
+          logger.error("FOR THIS REASON THE NODE STOPPED AUTOMATICALLY")
+          forceStopApplication(FatalDBError)
+        case _ =>
+      }
     }
-  }
 }

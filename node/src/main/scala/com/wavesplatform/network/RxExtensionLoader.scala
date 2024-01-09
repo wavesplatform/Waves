@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.{Cache, CacheBuilder}
-import com.wavesplatform.block.{Block, BlockSnapshot}
+import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -22,7 +22,7 @@ import monix.reactive.{Observable, Observer}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 
-case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block], snapshots: Map[BlockId, BlockSnapshot]) {
+case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block], snapshots: Map[BlockId, BlockSnapshotResponse]) {
   override def toString: String = s"ExtensionBlocks($remoteScore, ${formatSignatures(blocks.map(_.id()))}"
 }
 
@@ -30,6 +30,8 @@ object RxExtensionLoader extends ScorexLogging {
 
   type ApplyExtensionResult = Either[ValidationError, Option[BigInt]]
   private val dummy = new Object()
+
+  type BlockWithSnapshot = (Channel, Block, Option[BlockSnapshotResponse])
 
   def apply(
       syncTimeOut: FiniteDuration,
@@ -40,19 +42,20 @@ object RxExtensionLoader extends ScorexLogging {
       invalidBlocks: InvalidBlockStorage,
       blocks: Observable[(Channel, Block)],
       signatures: Observable[(Channel, Signatures)],
-      snapshots: Observable[(Channel, BlockSnapshot)],
+      snapshots: Observable[(Channel, BlockSnapshotResponse)],
       syncWithChannelClosed: Observable[ChannelClosedAndSyncWith],
       scheduler: SchedulerService,
       timeoutSubject: Subject[Channel, Channel]
   )(
       extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult]
-  ): (Observable[(Channel, Block, Option[BlockSnapshot])], Coeval[State], RxExtensionLoaderShutdownHook) = {
+  ): (Observable[BlockWithSnapshot], Coeval[State], RxExtensionLoaderShutdownHook) = {
 
     implicit val schdlr: SchedulerService = scheduler
 
     val extensions: ConcurrentSubject[(Channel, ExtensionBlocks), (Channel, ExtensionBlocks)] = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
-    val simpleBlocksWithSnapshot: ConcurrentSubject[(Channel, Block, Option[BlockSnapshot]), (Channel, Block, Option[BlockSnapshot])] =
-      ConcurrentSubject.publish[(Channel, Block, Option[BlockSnapshot])]
+    val simpleBlocksWithSnapshot
+        : ConcurrentSubject[BlockWithSnapshot, BlockWithSnapshot] =
+      ConcurrentSubject.publish[BlockWithSnapshot]
     @volatile var stateValue: State            = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
@@ -89,7 +92,7 @@ object RxExtensionLoader extends ScorexLogging {
                   )
 
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsyncLogErr
-                  ch.writeAndFlush(GetSignatures(knownSigs)).addListener { f: ChannelFuture =>
+                  ch.writeAndFlush(GetSignatures(knownSigs)).addListener { (f: ChannelFuture) =>
                     if (!f.isSuccess) log.trace(s"Error requesting signatures: $ch", f.cause())
                   }
 
@@ -215,14 +218,14 @@ object RxExtensionLoader extends ScorexLogging {
       }
     }
 
-    def onSnapshot(state: State, ch: Channel, snapshot: BlockSnapshot): State = {
+    def onSnapshot(state: State, ch: Channel, snapshot: BlockSnapshotResponse): State = {
       if (isLightMode) {
         state.loaderState match {
           case LoaderState.ExpectingBlocksWithSnapshots(c, requested, expectedBlocks, receivedBlocks, expectedSnapshots, receivedSnapshots, _)
               if c.channel == ch && expectedSnapshots.contains(snapshot.blockId) =>
             val updatedExpectedSnapshots = expectedSnapshots - snapshot.blockId
 
-            BlockStats.received(snapshot, BlockStats.Source.Ext, ch)
+            BlockStats.receivedSnapshot(snapshot.blockId, BlockStats.Source.Ext, ch)
 
             if (updatedExpectedSnapshots.isEmpty && expectedBlocks.isEmpty) {
               val blockById = receivedBlocks.map(b => b.id() -> b).toMap
@@ -247,7 +250,7 @@ object RxExtensionLoader extends ScorexLogging {
               )
             }
           case _ =>
-            BlockStats.received(snapshot, BlockStats.Source.Broadcast, ch)
+            BlockStats.receivedSnapshot(snapshot.blockId, BlockStats.Source.Broadcast, ch)
             Option(receivedSnapshots.getIfPresent(snapshot.blockId)) match {
               case Some(_) =>
                 pendingBlocks.invalidate(snapshot.blockId)
@@ -378,7 +381,7 @@ object RxExtensionLoader extends ScorexLogging {
         expectedBlocks: Set[BlockId],
         receivedBlocks: Set[Block],
         expectedSnapshots: Set[BlockId],
-        receivedSnapshots: Map[BlockId, BlockSnapshot],
+        receivedSnapshots: Map[BlockId, BlockSnapshotResponse],
         timeout: CancelableFuture[Unit]
     ) extends WithPeer {
       override def toString: String =
@@ -390,7 +393,7 @@ object RxExtensionLoader extends ScorexLogging {
 
   case class RxExtensionLoaderShutdownHook(
       extensionChannel: Observer[(Channel, ExtensionBlocks)],
-      simpleBlocksWithSnapshotChannel: Observer[(Channel, Block, Option[BlockSnapshot])]
+      simpleBlocksWithSnapshotChannel: Observer[BlockWithSnapshot]
   ) {
     def shutdown(): Unit = {
       extensionChannel.onComplete()

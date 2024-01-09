@@ -1,6 +1,4 @@
 package com.wavesplatform.transaction.smart.script.trace
-import scala.util.Right
-
 import com.wavesplatform.lang.ValidationError
 import monix.eval.Coeval
 

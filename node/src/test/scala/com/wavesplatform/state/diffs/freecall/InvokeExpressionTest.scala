@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
+import com.wavesplatform.state.{AssetInfo, AssetStaticInfo, AssetVolumeInfo, BinaryDataEntry, BooleanDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
@@ -156,8 +156,8 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
       d.appendBlock(invoke)
       d.blockchain.accountData(invoke.sender.toAddress, "check").get shouldBe BooleanDataEntry("check", true)
       d.blockchain.accountData(invoke.sender.toAddress, "transactionId").get shouldBe BinaryDataEntry("transactionId", invoke.txId)
-      d.liquidDiff.issuedAssets.size shouldBe 1
-      checkAsset(invoke, d.liquidDiff.issuedAssets.head._2)
+      d.liquidSnapshot.assetStatics.size shouldBe 1
+      checkAsset(invoke, d.liquidSnapshot.assetStatics.head._2._1, d.liquidSnapshot.assetNamesAndDescriptions.head._2, d.liquidSnapshot.assetVolumes.head._2)
     }
   }
 
@@ -261,7 +261,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
   }
 
   ignore("available versions") { // TODO check is commented in CommonValidation
-    val unsupportedVersion   = InvokeExpressionTransaction.supportedVersions.max + 1
+    val unsupportedVersion   = 4
     val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
@@ -324,21 +324,23 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
-      d.liquidDiff.errorMessage(invoke.id.value()).get.text should include("Explicit script termination")
+      d.liquidSnapshot.errorMessage(invoke.id.value()).get.text should include("Explicit script termination")
     }
   }
 
   private[this] def checkAsset(
       invoke: InvokeExpressionTransaction,
-      asset: NewAssetInfo
+      static: AssetStaticInfo,
+      info: AssetInfo,
+      volume: AssetVolumeInfo
   ): Assertion = {
-    asset.dynamic.name.toStringUtf8 shouldBe TestAssetName
-    asset.dynamic.description.toStringUtf8 shouldBe TestAssetDesc
-    asset.volume.volume shouldBe TestAssetVolume
-    asset.volume.isReissuable shouldBe TestAssetReissuable
-    asset.static.decimals shouldBe TestAssetDecimals
-    asset.static.nft shouldBe false
-    asset.static.issuer shouldBe invoke.sender
+    info.name.toStringUtf8 shouldBe TestAssetName
+    info.description.toStringUtf8 shouldBe TestAssetDesc
+    volume.volume shouldBe TestAssetVolume
+    volume.isReissuable shouldBe TestAssetReissuable
+    static.decimals shouldBe TestAssetDecimals
+    static.nft shouldBe false
+    static.issuer shouldBe invoke.sender
   }
 }
 

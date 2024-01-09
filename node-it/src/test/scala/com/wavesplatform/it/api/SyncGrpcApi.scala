@@ -165,7 +165,7 @@ object SyncGrpcApi extends Assertions {
 
     def putData(
         source: KeyPair,
-        data: Seq[DataTransactionData.DataEntry],
+        data: Seq[DataEntry],
         fee: Long,
         version: Int = 1,
         timestamp: Long = System.currentTimeMillis(),
@@ -279,11 +279,11 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).setAssetScript(sender, assetId, script, fee, timestamp, version)), waitForTx)
     }
 
-    def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
+    def getDataByKey(address: ByteString, key: String): List[DataEntry] = {
       accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
     }
 
-    def getData(address: ByteString): List[DataTransactionData.DataEntry] = {
+    def getData(address: ByteString): List[DataEntry] = {
       accounts.getDataEntries(DataRequest(address)).toList.map(res => res.getEntry)
     }
 
@@ -298,7 +298,7 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).setScript(sender, script, fee, timestamp, version)), waitForTx)
     }
 
-    def scriptInfo(address: ByteString): ScriptData = {
+    def scriptInfo(address: ByteString): ScriptResponse = {
       accounts.getScript(AccountRequest.of(address))
     }
 

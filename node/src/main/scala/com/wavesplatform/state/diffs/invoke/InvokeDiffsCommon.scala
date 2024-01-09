@@ -8,7 +8,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockRewardDistribution, BlockV5, RideV6, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider.*
 import com.wavesplatform.features.ScriptTransferValidationProvider.*
@@ -24,12 +24,13 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.FeeValidation.*
 import com.wavesplatform.state.diffs.{BalanceDiffValidation, DiffsCommon}
-import com.wavesplatform.state.reader.SnapshotBlockchain
+import com.wavesplatform.state.SnapshotBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.DAppEnvironment.ActionLimits
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.AssetContext
@@ -262,7 +263,7 @@ object InvokeDiffsCommon {
     import actions.*
     for {
       resultTransfers <- transferList.traverse { transfer =>
-        resolveAddress(transfer.address, blockchain)
+        resolveAddress(transfer.recipientAddressBytes, blockchain)
           .map(InvokeScriptResult.Payment(_, Asset.fromCompatId(transfer.assetId), transfer.amount))
           .leftMap {
             case f: FailedTransactionError => f.addComplexity(storingComplexity).withLog(log)
@@ -330,7 +331,7 @@ object InvokeDiffsCommon {
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
         "DApp self-payment is forbidden since V4".asLeft[Unit]
-      else if (transfers.exists(_.address.bytes == ByteStr(dAppAddress.bytes)))
+      else if (transfers.exists(_.recipientAddressBytes.bytes == ByteStr(dAppAddress.bytes)))
         "DApp self-transfer is forbidden since V4".asLeft[Unit]
       else
         ().asRight[String]
@@ -344,6 +345,15 @@ object InvokeDiffsCommon {
         _ => ().asRight[String]
       )
   }
+
+  def checkPayments(blockchain: Blockchain, payments: Seq[Payment]): Either[GenericError, Unit] =
+    payments
+      .collectFirstSome {
+        case Payment(_, IssuedAsset(id)) => InvokeDiffsCommon.checkAsset(blockchain, id).swap.toOption
+        case Payment(_, Waves)           => None
+      }
+      .map(GenericError(_))
+      .toLeft(())
 
   def checkAsset(blockchain: Blockchain, assetId: ByteStr): Either[String, Unit] =
     if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls))
@@ -367,7 +377,7 @@ object InvokeDiffsCommon {
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),
         (), {
           val versionInfo = tx.root match {
-            case s: PBSince => s" in tx version >= ${s.protobufVersion}"
+            case s: PBSince => s" in tx version >= ${PBSince.version(s)}"
             case _          => ""
           }
           s"Empty keys aren't allowed$versionInfo"
@@ -459,13 +469,15 @@ object InvokeDiffsCommon {
       initSnapshot: StateSnapshot,
       remainingLimit: Int
   ): TracedResult[ValidationError, StateSnapshot] = {
-    actions.foldM(initSnapshot) { (currentSnapshot, action) =>
+    actions.foldLeft(TracedResult(initSnapshot.asRight[ValidationError])) {
+      case (r@TracedResult(Left(_), _, _), _) => r
+      case (TracedResult(Right(currentSnapshot), prevTrace, prevAttrs), action) =>
       val complexityLimit =
         if (remainingLimit < Int.MaxValue) remainingLimit - currentSnapshot.scriptsComplexity.toInt
         else remainingLimit
 
-      val blockchain      = SnapshotBlockchain(sblockchain, currentSnapshot)
-      val actionSender    = Recipient.Address(ByteStr(dAppAddress.bytes))
+      val blockchain   = SnapshotBlockchain(sblockchain, currentSnapshot)
+      val actionSender = Recipient.Address(ByteStr(dAppAddress.bytes))
 
       def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, StateSnapshot] = {
         val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
@@ -504,17 +516,17 @@ object InvokeDiffsCommon {
                           e
                       )
                   )
-              ).flatMap(nextDiff =>
+              ).flatMap(portfolioSnapshot =>
                 blockchain
                   .assetScript(a)
                   .fold {
                     val r = checkAsset(blockchain, id)
-                      .map(_ => nextDiff)
+                      .map(_ => portfolioSnapshot)
                       .leftMap(FailedTransactionError.dAppExecution(_, 0): ValidationError)
                     TracedResult(r)
                   } { case AssetScriptInfo(script, complexity) =>
                     val assetVerifierSnapshot =
-                      if (blockchain.disallowSelfPayment) nextDiff
+                      if (blockchain.disallowSelfPayment) portfolioSnapshot
                       else
                         StateSnapshot
                           .build(
@@ -539,9 +551,11 @@ object InvokeDiffsCommon {
                       tx.timestamp,
                       tx.txId
                     )
-                    val assetValidationDiff = for {
-                      _ <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(assetVerifierSnapshot)
-                      assetValidationDiff <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
+                    val assetValidationSnapshot = for {
+                      _ <- BalanceDiffValidation
+                        .cond(blockchain, _.isFeatureActivated(RideV6))(assetVerifierSnapshot)
+                        .leftMap(e => if (blockchain.isFeatureActivated(LightNode)) FailedTransactionError.asFailedScriptError(e) else e)
+                      snapshot <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
                         pseudoTx,
                         a.id,
                         assetVerifierSnapshot,
@@ -550,11 +564,11 @@ object InvokeDiffsCommon {
                         complexityLimit,
                         enableExecutionLog
                       )
-                    } yield assetValidationDiff
-                    val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+                    } yield snapshot
+                    val errorOpt = assetValidationSnapshot.fold(Some(_), _ => None)
                     TracedResult(
-                      assetValidationDiff.map(d => nextDiff.setScriptsComplexity(d.scriptsComplexity)),
-                      List(AssetVerifierTrace(id, errorOpt, AssetContext.Transfer))
+                      assetValidationSnapshot.map(d => portfolioSnapshot.setScriptsComplexity(d.scriptsComplexity)),
+                      prevTrace :+ AssetVerifierTrace(id, errorOpt, AssetContext.Transfer)
                     )
                   }
               )
@@ -575,7 +589,7 @@ object InvokeDiffsCommon {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset name", 0L)), List())
         } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
-        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
+        } else if (blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
           val error = s"Asset ${issue.id} is already issued"
           if (blockchain.isFeatureActivated(RideV6) || blockchain.height < blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
             TracedResult(Left(FailedTransactionError.dAppExecution(error, 0L)), List())
@@ -589,7 +603,7 @@ object InvokeDiffsCommon {
           StateSnapshot.build(
             blockchain,
             portfolios = Map(pk.toAddress -> Portfolio(assets = VectorMap(asset -> issue.quantity))),
-            issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo))
+            issuedAssets = Seq(asset -> NewAssetInfo(staticInfo, info, volumeInfo))
           )
         }
       }
@@ -628,10 +642,10 @@ object InvokeDiffsCommon {
 
       def applyLease(l: Lease): TracedResult[ValidationError, StateSnapshot] =
         for {
-          _         <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
-          recipient <- TracedResult(AddressOrAlias.fromRide(l.recipient))
+          validAmount <- TracedResult(LeaseTxValidator.validateAmount(l.amount))
+          recipient   <- TracedResult(AddressOrAlias.fromRide(l.recipient))
           leaseId = Lease.calculateId(l, tx.txId)
-          diff <- DiffsCommon.processLease(blockchain, l.amount, pk, recipient, fee = 0, leaseId, tx.txId)
+          diff <- DiffsCommon.processLease(blockchain, validAmount, pk, recipient, fee = 0, leaseId, tx.txId)
         } yield diff
 
       def applyLeaseCancel(l: LeaseCancel): TracedResult[ValidationError, StateSnapshot] =
@@ -663,7 +677,7 @@ object InvokeDiffsCommon {
           val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
           TracedResult(
             assetValidationDiff,
-            List(AssetVerifierTrace(assetId, errorOpt, assetType))
+            prevTrace :+ AssetVerifierTrace(assetId, errorOpt, assetType)
           )
         }
 

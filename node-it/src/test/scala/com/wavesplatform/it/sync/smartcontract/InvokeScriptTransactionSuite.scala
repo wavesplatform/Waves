@@ -129,7 +129,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | func biz() = [IntegerEntry("numb", 1)]
         |
         """.stripMargin
-    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.waitForHeight(activationHeight, 13.minute)
     val setScriptId3 = sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
     sender.transactionInfo[TransactionInfo](setScriptId3).script.get.startsWith("base64:") shouldBe true

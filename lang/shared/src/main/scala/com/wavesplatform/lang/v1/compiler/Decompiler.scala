@@ -111,7 +111,8 @@ object Decompiler {
     }
   }
 
-  val MatchRef = """(\$match\d*)""".r
+  private val MatchRef        = """(\$match\d*)""".r
+  private val EscapingSymbols = "[\\\\\"]".r
 
   private[lang] def expr(e: Coeval[EXPR], ctx: DecompilerContext, braces: BlockBraces, firstLinePolicy: FirstLinePolicy): Coeval[String] = {
     def checkBrackets(expr: EXPR) = expr match {
@@ -161,8 +162,8 @@ object Decompiler {
         case Terms.TRUE                    => pureOut("true", i)
         case Terms.FALSE                   => pureOut("false", i)
         case Terms.CONST_BOOLEAN(b)        => pureOut(b.toString.toLowerCase(), i)
-        case Terms.CONST_LONG(t)           => pureOut(t.toLong.toString, i)
-        case Terms.CONST_STRING(s)         => pureOut("\"" ++ s ++ "\"", i)
+        case Terms.CONST_LONG(t)           => pureOut(t.toString, i)
+        case Terms.CONST_STRING(s)         => pureOut("\"" ++ EscapingSymbols.replaceAllIn(s, "\\\\$0") ++ "\"", i)
         case Terms.CONST_BYTESTR(bs) =>
           pureOut(
             if (bs.size <= 128) { "base58'" ++ bs.toString ++ "'" }
