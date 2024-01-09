@@ -1410,6 +1410,65 @@ paths:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
       x-codegen-request-body-name: ids
+  '/transactions/snapshot/{id}':
+    get:
+      tags:
+        - transactions
+      summary: Transaction snapshot
+      description: Get transaction snapshot by transaction ID
+      operationId: getTxSnapshotById
+      parameters:
+        - $ref: '#/components/parameters/txId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionSnapshot'
+  /transactions/snapshot:
+    post:
+      tags:
+        - transactions
+      summary: Transaction snapshots
+      description: >-
+        Get transaction snapshots by transaction IDs. 
+        Limited by `rest-api.transaction-snapshots-limit`, 100 by default.
+        <br>Transaction snapshots in the response are in the same order as in the request.
+      operationId: getTxSnapshotsViaPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+                  minItems: 1
+                  maxItems: 100
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionSnapshot'
+      x-codegen-request-body-name: ids
   /transactions/sign:
     post:
       tags:
@@ -5431,6 +5490,177 @@ components:
                 nullable: true
         state:
           $ref: '#/components/schemas/BlockchainOverrides'
+    TransactionSnapshot:
+      type: object
+      properties:
+        balances:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                $ref: '#/components/schemas/Address'
+              asset:
+                $ref: '#/components/schemas/AssetId'
+              balance:
+                type: integer
+                format: int64
+        leaseBalances:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                $ref: '#/components/schemas/Address'
+              in:
+                type: integer
+                format: int64
+              out:
+                type: integer
+                format: int64
+        assetStatics:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/AssetId'
+              source:
+                $ref: '#/components/schemas/TransactionId'
+              issuer:
+                $ref: '#/components/schemas/PublicKey'
+              decimals:
+                type: integer
+                minimum: 0
+                maximum: 8
+              nft:
+                type: boolean
+        assetVolumes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/AssetId'
+              isReissuable:
+                type: boolean
+              volume:
+                type: integer
+                format: int64
+        assetNamesAndDescriptions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/AssetId'
+              name:
+                type: string
+              description:
+                type: string
+              lastUpdatedAt:
+                type: integer
+        assetScripts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/AssetId'
+              script:
+                type: string
+                format: byte
+              complexity:
+                type: integer
+        sponsorships:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/AssetId'
+              minSponsoredAssetFee:
+                type: integer
+                format: int64
+        newLeases:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/LeaseId'
+              sender:
+                $ref: '#/components/schemas/PublicKey'
+              recipient:
+                $ref: '#/components/schemas/Address'
+              amount:
+                type: integer
+                format: int64
+              txId:
+                $ref: '#/components/schemas/TransactionId'
+              height:
+                $ref: '#/components/schemas/Height'
+        cancelledLeases:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                $ref: '#/components/schemas/LeaseId'
+              txId:
+                $ref: '#/components/schemas/TransactionId'
+              height:
+                $ref: '#/components/schemas/Height'
+        aliases:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                $ref: '#/components/schemas/Address'
+              alias:
+                type: string
+        orderFills:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: byte
+              volume:
+                type: integer
+                format: int64
+              fee:
+                type: integer
+                format: int64
+        accountScripts:
+          type: array
+          items:
+            type: object
+            properties:
+              publicKey:
+                $ref: '#/components/schemas/PublicKey'
+              script:
+                type: string
+                format: byte
+              verifierComplexity:
+                type: integer
+                format: int64
+        accountData:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                $ref: '#/components/schemas/Address'
+              data:
+                type: array
+                items:
+                  oneOf:
+                    - $ref: '#/components/schemas/DataEntry'
+                    - $ref: '#/components/schemas/DeleteEntry'
+
   responses:
     Height:
       description: Block height
