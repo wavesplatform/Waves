@@ -37,10 +37,13 @@ lazy val lang =
 
 lazy val `lang-jvm` = lang.jvm
   .settings(
-    name                                  := "RIDE Compiler",
-    normalizedName                        := "lang",
-    description                           := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
+    name           := "RIDE Compiler",
+    normalizedName := "lang",
+    description    := "The RIDE smart contract language compiler",
+    libraryDependencies ++= Seq(
+      "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
+      Dependencies.scalaLogging
+    )
   )
 
 lazy val `lang-js` = lang.js

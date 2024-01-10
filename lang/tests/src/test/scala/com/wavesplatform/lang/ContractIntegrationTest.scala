@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.sampleTypes
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.miniev.{ComplexityLimit, State}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.*
@@ -23,9 +24,9 @@ import org.scalatest.Inside
 
 class ContractIntegrationTest extends PropSpec with Inside {
 
-  private val ctx: CTX[Environment] =
-    PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment] |+|
-      CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
+  private val ctx: CTX =
+    PureContext.build(V3, useNewPowPrecision = true) |+|
+      CTX(sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
         DirectiveSet(V3, Account, DApp).explicitGet(),
@@ -90,7 +91,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
         DataItem.Bin("feeAssetId", ByteStr.empty)
       ),
       List(),
-      2147483615
+      Int.MaxValue - 2147483615
     )
   }
 
@@ -104,7 +105,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
       """.stripMargin,
       "foo",
       Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
-    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List(), 2147483641)
+    ).explicitGet()._1 shouldBe ScriptResultV3(List(DataItem.Lng("1", 22)), List(), Int.MaxValue - 2147483641)
   }
 
   property("@Callable exception error contains initialised values") {
@@ -157,7 +158,6 @@ class ContractIntegrationTest extends PropSpec with Inside {
 
     ContractEvaluator
       .applyV2Coeval(
-        ctx.evaluationContext(environment),
         compiled,
         ByteStr.fill(32)(1),
         Invocation(
@@ -175,10 +175,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
         Int.MaxValue,
         correctFunctionCallScope = true,
         newMode = false,
-        enableExecutionLog = true,
-        fixedThrownError = true
+        State(ctx.evaluationContext(Common.emptyBlockchainEnvironment()), ComplexityLimit.Unlimited, false, V3)
       )
-      .value()
       .leftMap { case (e, _, log) => (e, log) }
   }
 
@@ -323,7 +321,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
         AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 1L, None),
         AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 2L, None)
       ),
-      2147483626
+      Int.MaxValue - 2147483626
     )
   }
 
@@ -392,7 +390,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
         AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 3, None),
         AssetTransfer(Recipient.Address(callerAddress), Recipient.Address(callerAddress), 4, None)
       ),
-      2147483605
+      Int.MaxValue - 2147483605
     )
   }
 }

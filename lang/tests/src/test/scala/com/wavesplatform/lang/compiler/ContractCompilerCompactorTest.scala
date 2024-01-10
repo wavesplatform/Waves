@@ -12,13 +12,11 @@ import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CaseObj, FUNC}
 import com.wavesplatform.lang.v1.compiler.Types.{ANY, BIGINT, BOOLEAN, LIST, LONG, PARAMETERIZED, PARAMETERIZEDLIST, STRING, UNION}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, TestCompiler}
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding.Down
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, GlobalValNames, PureContext}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, compiler}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CompactNameAndOriginalNamePair
@@ -31,20 +29,20 @@ class ContractCompilerCompactorTest extends PropSpec {
       Script.decompile(ContractScriptImpl(stdLibVersion, dApp.copy(meta = DAppMeta())))._1
   }
 
-  private def fullCtxForV(version: StdLibVersion): CTX[Environment] = {
+  private def fullCtxForV(version: StdLibVersion): CTX = {
     val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     ctxForV(version) |+|
-      CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-      CTX[NoContext](
+      CryptoContext.build(Global, version) |+|
+      CTX(
         Seq(transactionType),
-        Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),
+        Map(("tx", (transactionType, ContextfulVal.pure(tx)))),
         Array.empty
-      ).withEnvironment[Environment]
+      )
   }
 
-  private def ctxForV(version: StdLibVersion): CTX[Environment] =
-    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
+  private def ctxForV(version: StdLibVersion): CTX =
+    PureContext.build(version, useNewPowPrecision = true) |+|
       WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
   property("contract script compaction - V4, V5, V6") {

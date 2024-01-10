@@ -1,12 +1,13 @@
 package com.wavesplatform.state.diffs.smart
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
@@ -30,18 +31,13 @@ package object predef {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), version, expr)
       (typedExpr, _) = compileResult
       directives     = DirectiveSet(version, Account, Expression).explicitGet()
-      evalContext <- BlockchainContext.build(
-        version,
-        chainId,
-        Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet()),
-        Coeval.evalOnce(blockchain.height),
-        blockchain,
-        isTokenContext = false,
-        isContract = false,
-        Coproduct[Environment.Tthis](Environment.AssetId(Array())),
-        ByteStr.empty,
-        fixUnicodeFunctions = true,
-        useNewPowPrecision = true,
+      evalContext = BlockchainContext.build(
+        directives,
+        Common.emptyBlockchainEnvironment(in =
+          Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet())
+        ),
+        true,
+        true,
         fixBigScriptField = true
       )
       r <- EvaluatorV1().apply[T](evalContext, typedExpr).leftMap(_.message)
@@ -230,7 +226,7 @@ package object predef {
        | let sender = t.sender == Address(base58'${t.sender.toAddress}')
        | let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
        | let version = t.version == $version
-       | ${ if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
+       | ${if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
      """.stripMargin
   }
 

@@ -1,23 +1,21 @@
 package com.wavesplatform.lang.evaluator
 
-import java.nio.ByteBuffer
-import cats.Id
-import cats.data.EitherT
 import cats.kernel.Monoid
 import cats.syntax.bifunctor.*
+import cats.{Eval, Id}
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.lang.Common.*
 import com.wavesplatform.lang.Testing.*
-import com.wavesplatform.lang.directives.values.{StdLibVersion, *}
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.miniev.{ComplexityLimit, Ev}
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
@@ -26,14 +24,15 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset.NoLibraries
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
+import com.wavesplatform.lang.{Common, CommonError, ExecutionError, Global}
 import com.wavesplatform.test.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues
+
+import java.nio.ByteBuffer
 
 class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
@@ -45,11 +44,11 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 
-  private def defaultFullContext(implicit version: StdLibVersion): CTX[Environment] =
+  private def defaultFullContext(implicit version: StdLibVersion): CTX =
     Monoid.combineAll(
       Seq(
-        defaultCryptoContext(version).withEnvironment[Environment],
-        pureContext(version).withEnvironment[Environment],
+        defaultCryptoContext(version),
+        pureContext(version),
         WavesContext.build(
           Global,
           DirectiveSet(version, Account, Expression).explicitGet(),
@@ -58,15 +57,15 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       )
     )
 
-  private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
-    PureContext.build(version, useNewPowPrecision = true).evaluationContext
+  private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[Id] =
+    pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
 
-  private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
+  private val defaultEvaluator = new EvaluatorV1[Id]()
 
-  private def evalV1[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
+  private def evalV1[T <: EVALUATED](context: EvaluationContext[Id], expr: EXPR): Either[ExecutionError, T] =
     defaultEvaluator[T](context, expr)
 
-  private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
+  private def evalV2[T <: EVALUATED](context: EvaluationContext[Id], expr: EXPR): Either[ExecutionError, T] =
     EvaluatorV2
       .applyCompleted(
         context,
@@ -81,7 +80,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       ._3
       .asInstanceOf[Either[ExecutionError, T]]
 
-  private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
+  private def eval[T <: EVALUATED](context: EvaluationContext[Id], expr: EXPR): Either[ExecutionError, T] = {
     val evaluatorV1Result = evalV1[T](context, expr)
     val evaluatorV2Result = evalV2[T](context, expr)
 
@@ -89,22 +88,12 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evaluatorV1Result
   }
 
-  private def evalPure[T <: EVALUATED](context: EvaluationContext[NoContext, Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
-    eval[T](context.asInstanceOf[EvaluationContext[Environment, Id]], expr)
+  private def evalPure[T <: EVALUATED](context: EvaluationContext[Id] = pureEvalContext, expr: EXPR): Either[ExecutionError, T] =
+    eval[T](context, expr)
 
-  private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
-    val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val (evaluatorV2Log, _, evaluatorV2Result) =
-      EvaluatorV2.applyCompleted(
-        context,
-        expr,
-        LogExtraInfo(),
-        implicitly[StdLibVersion],
-        correctFunctionCallScope = true,
-        newMode = true,
-        enableExecutionLog = true,
-        fixedThrownError = true
-      )
+  private def evalWithLogging(context: EvaluationContext[Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
+    val evaluatorV1Result                      = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
+    val (evaluatorV2Log, _, evaluatorV2Result) = Ev.run(expr, context, ComplexityLimit.Unlimited, true, version)
 
     evaluatorV2Result shouldBe evaluatorV1Result.bimap(_._1, _._1)
     evaluatorV2Log should contain allElementsOf evaluatorV1Result.fold(_._2, _._2)
@@ -122,7 +111,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
       val result = evalWithLogging(
-        pureEvalContext.asInstanceOf[EvaluationContext[Environment, Id]],
+        pureEvalContext,
         expr = block(
           LET("x", CONST_LONG(3)),
           block(
@@ -232,15 +221,16 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     val pointType     = CASETYPEREF("Point", List("X" -> LONG, "Y" -> LONG))
     val pointInstance = CaseObj(pointType, Map("X" -> 3L, "Y" -> 4L))
     evalPure[EVALUATED](
-      context = Monoid.combine(
-        pureEvalContext,
-        EvaluationContext[NoContext, Id](
-          Contextful.empty[Id],
-          typeDefs = Map.empty,
-          letDefs = Map(("p", LazyVal.fromEvaluated[Id](pointInstance))),
-          functions = Map.empty
+      context = Monoid
+        .combine(
+          pureContext,
+          CTX(
+            Seq.empty,
+            Map("p" -> (pointType, ContextfulVal.pure(pointInstance))),
+            Array.empty
+          )
         )
-      ),
+        .evaluationContext(Common.emptyBlockchainEnvironment()),
       expr = FUNCTION_CALL(sumLong.header, List(GETTER(REF("p"), "X"), CONST_LONG(2)))
     ) shouldBe evaluated(5)
   }
@@ -258,18 +248,20 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("lazy let evaluation doesn't throw if not used") {
     val pointType     = CASETYPEREF("Point", List(("X", LONG), ("Y", LONG)))
     val pointInstance = CaseObj(pointType, Map("X" -> 3L, "Y" -> 4L))
-    val context = Monoid.combine(
-      pureEvalContext,
-      EvaluationContext[NoContext, Id](
-        Contextful.empty[Id],
-        typeDefs = Map.empty,
-        letDefs = Map(
-          ("p", LazyVal.fromEvaluated[Id](pointInstance)),
-          ("badVal", LazyVal.apply[Id](EitherT.leftT[({ type L[A] = EvalF[Id, A] })#L, EVALUATED]("Error")))
-        ),
-        functions = Map.empty
+    import cats.syntax.applicative.*
+    val context = Monoid
+      .combine(
+        pureContext,
+        CTX(
+          Seq.empty,
+          Map(
+            "p"      -> (pointType, ContextfulVal.pure(pointInstance)),
+            "badVal" -> (NOTHING, ContextfulVal.fromEval(Left(CommonError("Error")).pure[Eval]))
+          ),
+          Array.empty
+        )
       )
-    )
+      .evaluationContext(Common.emptyBlockchainEnvironment())
     forAll(blockBuilder) { block =>
       evalPure[EVALUATED](
         context = context,
@@ -282,22 +274,17 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(blockBuilder) { block =>
       var functionEvaluated = 0
 
-      val f = NativeFunction[NoContext]("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG))*) { _ =>
+      val f = NativeFunction("F", 1: Long, 258: Short, LONG: TYPE, Seq(("_", LONG))*) { _ =>
         functionEvaluated = functionEvaluated + 1
         evaluated(1L)
       }
 
       val context = Monoid
         .combine(
-          pureEvalContext,
-          EvaluationContext[NoContext, Id](
-            Contextful.empty[Id],
-            typeDefs = Map.empty,
-            letDefs = Map.empty,
-            functions = Map(f.header -> f)
-          )
+          pureContext,
+          CTX(Seq.empty, Map.empty, Array(f))
         )
-        .asInstanceOf[EvaluationContext[Environment, Id]]
+        .evaluationContext(Common.emptyBlockchainEnvironment())
 
       val expr = block(LET("X", FUNCTION_CALL(f.header, List(CONST_LONG(1000)))), FUNCTION_CALL(sumLong.header, List(REF("X"), REF("X"))))
 
@@ -314,10 +301,11 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     val fooInstance = CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L))
 
-    val context = EvaluationContext.build(
+    val context = EvaluationContext(
+      Common.emptyBlockchainEnvironment(),
       typeDefs = Map.empty,
       letDefs = Map("fooInstance" -> LazyVal.fromEvaluated[Id](fooInstance)),
-      functions = Seq()
+      functions = Map.empty
     )
 
     val expr = GETTER(REF("fooInstance"), "bar")
@@ -327,14 +315,14 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on function call getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*)(_ =>
-      evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L)))
-    )
+    val fooCtor =
+      NativeFunction("createFoo", 1: Long, 259: Short, fooType, List.empty*)(_ => evaluated(CaseObj(fooType, Map("bar" -> "bAr", "buz" -> 1L))))
 
-    val context = EvaluationContext.build(
+    val context = EvaluationContext(
+      Common.emptyBlockchainEnvironment(),
       typeDefs = Map.empty,
       letDefs = Map.empty,
-      functions = Seq(fooCtor)
+      functions = Map(fooCtor.header -> fooCtor)
     )
 
     val expr = GETTER(FUNCTION_CALL(fooCtor.header, List.empty), "bar")
@@ -344,7 +332,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on block getter evaluation") {
     val fooType = CASETYPEREF("Foo", List(("bar", STRING), ("buz", LONG)))
-    val fooCtor = NativeFunction[NoContext]("createFoo", 1: Long, 259: Short, fooType, List.empty*) { _ =>
+    val fooCtor = NativeFunction("createFoo", 1: Long, 259: Short, fooType, List.empty*) { _ =>
       evaluated(
         CaseObj(
           fooType,
@@ -356,15 +344,16 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       )
     }
     val fooTransform =
-      NativeFunction[NoContext]("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
+      NativeFunction("transformFoo", 1: Long, 260: Short, fooType, ("foo", fooType)) {
         case (fooObj: CaseObj) :: Nil => evaluated(CaseObj(fooObj.caseType, fooObj.fields.updated("bar", "TRANSFORMED_BAR")))
         case _                        => ???
       }
 
-    val context = EvaluationContext.build(
+    val context = EvaluationContext(
+      Common.emptyBlockchainEnvironment(),
       typeDefs = Map.empty,
       letDefs = Map.empty,
-      functions = Seq(fooCtor, fooTransform)
+      functions = Map(fooCtor.header -> fooCtor, fooTransform.header -> fooTransform)
     )
 
     forAll(blockBuilder) { block =>
@@ -381,10 +370,11 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("successful on simple function evaluation") {
     evalPure[EVALUATED](
-      context = EvaluationContext.build(
+      context = EvaluationContext(
+        Common.emptyBlockchainEnvironment(),
         typeDefs = Map.empty,
         letDefs = Map.empty,
-        functions = Seq(multiplierFunction)
+        functions = Map(multiplierFunction.header -> multiplierFunction)
       ),
       expr = FUNCTION_CALL(multiplierFunction.header, List(CONST_LONG(3), CONST_LONG(4)))
     ) shouldBe evaluated(12)
@@ -485,7 +475,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("dropRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) { case (xs, number) =>
       val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-      val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
+      val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext(Common.emptyBlockchainEnvironment()), expr).leftMap(_.message)
       val limit  = 165947
       actual shouldBe (
         if (number < 0)
@@ -501,7 +491,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("takeRightBytes(ByteStr, Long) works as the native one") {
     forAll(genBytesAndNumber) { case (xs, number) =>
       val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-      val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
+      val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext(Common.emptyBlockchainEnvironment()), expr).leftMap(_.message)
       val limit  = 165947
       actual shouldBe (
         if (number < 0)
@@ -567,7 +557,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
-      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext(Common.emptyBlockchainEnvironment()), expr)
       actual shouldBe evaluated(ByteStr(Base58.tryDecodeWithLimit(xs).get))
     }
   }
@@ -581,7 +571,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     forAll(gen) { xs =>
       val expr = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
-      evalPure(defaultCryptoContext.evaluationContext, expr) should produce("base58Decode input exceeds 100")
+      evalPure(defaultCryptoContext.evaluationContext(Common.emptyBlockchainEnvironment()), expr) should produce("base58Decode input exceeds 100")
     }
   }
 
@@ -593,7 +583,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs).explicitGet()))
-      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext(Common.emptyBlockchainEnvironment()), expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
   }
@@ -606,7 +596,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     forAll(gen) { xs =>
       val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE64), List(CONST_STRING(xs).explicitGet()))
-      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext(Common.emptyBlockchainEnvironment()), expr)
       actual shouldBe evaluated(ByteStr(Base64.tryDecode(xs).get))
     }
   }
@@ -624,7 +614,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
           FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(ByteStr(xs)).explicitGet()))
         )
       )
-      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
+      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext(Common.emptyBlockchainEnvironment()), expr)
       actual shouldBe evaluated(ByteStr(xs))
     }
   }
@@ -763,15 +753,15 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   }
 
   private def hashTest(bodyBytes: Array[Byte], hash: String, lim: Int)(implicit version: StdLibVersion): Either[ExecutionError, ByteStr] = {
-    val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-      ("b", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(bodyBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
+    val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+      ("b", (BYTESTR, ContextfulVal.pure(CONST_BYTESTR(ByteStr(bodyBytes), limit = CONST_BYTESTR.DataTxSize).explicitGet())))
     )
 
-    val context: CTX[NoContext] = Monoid.combineAll(
+    val context: CTX = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
-        CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+        CTX(Seq(), vars, Array.empty[BaseFunction])
       )
     )
 
@@ -782,7 +772,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       .explicitGet()
 
     evalPure[EVALUATED](
-      context = context.evaluationContext[Id],
+      context = context.evaluationContext(Common.emptyBlockchainEnvironment()),
       expr = expr
     ).map {
       case CONST_BYTESTR(b) => b
@@ -840,17 +830,15 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       )
     )
 
-    val context = Monoid.combineAll(
-      Seq(
-        pureEvalContext,
-        defaultCryptoContext.evaluationContext[Id],
-        EvaluationContext.build(
-          typeDefs = Map.empty,
-          letDefs = Map("tx" -> LazyVal.fromEvaluated[Id](txObj)),
-          functions = Seq.empty
+    val context = Monoid
+      .combineAll(
+        Seq(
+          pureContext,
+          defaultCryptoContext,
+          CTX(Seq.empty, Map("tx" -> (txType, ContextfulVal.pure(txObj))), Array.empty)
         )
       )
-    )
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 
     evalPure[EVALUATED](
       context = context,
@@ -869,18 +857,18 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   }
 
   private def recArrWeight(script: String): Either[ExecutionError, EVALUATED] = {
-    val context: CTX[NoContext] = Monoid.combineAll(
+    val context: CTX = Monoid.combineAll(
       Seq(
         pureContext,
         defaultCryptoContext,
-        CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
+        CTX(Seq(), Map(), Array.empty[BaseFunction])
       )
     )
 
     com.wavesplatform.lang.v1.parser.Parser.parseExpr(script) match {
       case fastparse.Parsed.Success(xs, _) =>
         evalPure[EVALUATED](
-          context.evaluationContext[Id],
+          context.evaluationContext(Common.emptyBlockchainEnvironment()),
           ExpressionCompiler
             .apply(context.compilerContext, version, xs)
             .explicitGet()
@@ -891,17 +879,16 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   }
 
   private def recCmp(cnt: Int)(
-      f: ((String => String) => String) = (gen => gen("x") ++ gen("y") ++ s"x${cnt + 1} == y${cnt + 1}")
+      f: (String => String) => String = gen => gen("x") ++ gen("y") ++ s"x${cnt + 1} == y${cnt + 1}"
   ): Either[(ExecutionError, Log[Id]), (Boolean, Log[Id])] = {
     val context = Monoid
       .combineAll(
         Seq(
           pureContext,
           defaultCryptoContext,
-          CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
+          CTX(Seq(), Map(), Array.empty[BaseFunction])
         )
       )
-      .withEnvironment[Environment]
 
     def gen(a: String) = (0 to cnt).foldLeft(s"""let ${a}0="qqqq";""") { (c, n) =>
       c ++ s"""let $a${n + 1}=[$a$n,$a$n,$a$n];"""
@@ -1020,10 +1007,10 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       )
     )
 
-    val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-      ("tx", (txType, ContextfulVal.pure[NoContext](txObj))),
-      ("alicePubKey", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(alicePK)))),
-      ("bobPubKey", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bobPK))))
+    val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+      ("tx", (txType, ContextfulVal.pure(txObj))),
+      ("alicePubKey", (BYTESTR, ContextfulVal.pure(ByteStr(alicePK)))),
+      ("bobPubKey", (BYTESTR, ContextfulVal.pure(ByteStr(bobPK))))
     )
 
     val context = Monoid
@@ -1031,10 +1018,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         Seq(
           pureContext,
           defaultCryptoContext,
-          CTX[NoContext](Seq(txType), vars, Array.empty[BaseFunction[NoContext]])
+          CTX(Seq(txType), vars, Array.empty[BaseFunction])
         )
       )
-      .withEnvironment[Environment]
 
     val script =
       s"""
@@ -1064,7 +1050,14 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   }
 
   private def hashFuncTest(bodyBytes: Array[Byte], funcName: Short): Either[ExecutionError, ByteStr] = {
-    val context = Monoid.combineAll(Seq(pureEvalContext, defaultCryptoContext.evaluationContext[Id]))
+    val context = Monoid
+      .combineAll(
+        Seq(
+          pureContext,
+          defaultCryptoContext
+        )
+      )
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 
     evalPure[CONST_BYTESTR](
       context = context,
@@ -1099,7 +1092,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     val pointCtor = FunctionHeader.User(point)
 
     evalPure[EVALUATED](
-      context = EvaluationContext.build(typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Seq()),
+      context =
+        EvaluationContext(Common.emptyBlockchainEnvironment(), typeDefs = Map(point -> pointType), letDefs = Map.empty, functions = Map()),
       FUNCTION_CALL(pointCtor, List(CONST_LONG(1), CONST_LONG(2)))
     ) shouldBe evaluated(CaseObj(pointType, Map("X" -> CONST_LONG(1), "Y" -> CONST_LONG(2))))
   }
@@ -1135,25 +1129,25 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
   property("each argument is evaluated maximum once for user function") {
     var functionEvaluated = 0
 
-    val f = NativeFunction[NoContext]("F", 1, 258: Short, LONG, ("_", LONG)) { case _ =>
+    val f = NativeFunction("F", 1, 258: Short, LONG, ("_", LONG)) { case _ =>
       functionEvaluated = functionEvaluated + 1
       evaluated(1L)
     }
 
-    val doubleFst = UserFunction[NoContext]("ID", 0, LONG, ("x", LONG)) {
+    val doubleFst = UserFunction("ID", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
     val context = Monoid
       .combine(
-        pureEvalContext,
-        EvaluationContext.build(
-          typeDefs = Map.empty,
-          letDefs = Map.empty,
-          functions = Seq(f, doubleFst)
+        pureContext,
+        CTX(
+          Seq.empty,
+          Map.empty,
+          Array(f, doubleFst)
         )
       )
-      .asInstanceOf[EvaluationContext[Environment, Id]]
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 
     // g(...(g(f(1000)))))
     val expr = (1 to 6).foldLeft(FUNCTION_CALL(f.header, List(CONST_LONG(1000)))) { case (r, _) =>
@@ -1169,12 +1163,12 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("function parameters (REF) in body should be taken from the arguments, not from the outer context") {
     // func doubleFn(x: Int) = x + x
-    val doubleFn = UserFunction[NoContext]("doubleFn", 0, LONG, ("x", LONG)) {
+    val doubleFn = UserFunction("doubleFn", 0, LONG, ("x", LONG)) {
       FUNCTION_CALL(sumLong.header, List(REF("x"), REF("x")))
     }
 
     // func mulFn(y: Int, x: Int) = y - x
-    val subFn = UserFunction[NoContext]("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
+    val subFn = UserFunction("mulFn", 0, LONG, ("y", LONG), ("x", LONG)) {
       FUNCTION_CALL(subLong.header, List(REF("y"), REF("x")))
     }
 
@@ -1182,17 +1176,17 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     // let y = 100
     val context = Monoid
       .combine(
-        pureEvalContext,
-        EvaluationContext.build(
-          typeDefs = Map.empty,
-          letDefs = Map(
-            "x" -> LazyVal.fromEvaluated[Id](3L),
-            "y" -> LazyVal.fromEvaluated[Id](100L)
+        pureContext,
+        CTX(
+          Seq.empty,
+          Map(
+            "x" -> (LONG, ContextfulVal.pure(3L)),
+            "y" -> (LONG, ContextfulVal.pure(100L))
           ),
-          functions = Seq(doubleFn, subFn)
+          Array(doubleFn, subFn)
         )
       )
-      .asInstanceOf[EvaluationContext[Environment, Id]]
+      .evaluationContext(Common.emptyBlockchainEnvironment())
 
     // mulFn(doubleFn(x), 7) = (x + x) - 7 = 6 - 7 = -1
     val expr1 = FUNCTION_CALL(subFn.header, List(FUNCTION_CALL(doubleFn.header, List(REF("x"))), CONST_LONG(7)))
@@ -1247,7 +1241,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     DirectiveDictionary[StdLibVersion].all
       .foreach(version =>
         Rounding.fromV5.foreach { rounding =>
-          evalPure(pureContext(version).evaluationContext, REF(rounding.`type`.name.toUpperCase)) shouldBe Right(rounding.value)
+          evalPure(pureContext(version).evaluationContext(Common.emptyBlockchainEnvironment()), REF(rounding.`type`.name.toUpperCase)) shouldBe Right(
+            rounding.value
+          )
         }
       )
   }
@@ -1257,7 +1253,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
       .foreach(version =>
         Rounding.all.filterNot(Rounding.fromV5.contains).foreach { rounding =>
           val ref = rounding.`type`.name.toUpperCase
-          val r   = evalPure(pureContext(version).evaluationContext, REF(ref))
+          val r   = evalPure(pureContext(version).evaluationContext(Common.emptyBlockchainEnvironment()), REF(ref))
           if (version < V5)
             r shouldBe Right(rounding.value)
           else

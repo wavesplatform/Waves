@@ -2,7 +2,6 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.Id
 import cats.syntax.either.*
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.features.EstimatorProvider.*
@@ -79,7 +78,7 @@ object ScriptRunner {
 
     def evalVerifier(
         isContract: Boolean,
-        partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED])
+        partialEvaluate: (DirectiveSet, EvaluationContext[Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED])
     ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val txId = in.eliminate(_.id(), _ => ByteStr.empty)
       val ctxE =
@@ -89,9 +88,7 @@ object ScriptRunner {
           ctx <- BlockchainContext
             .build(
               script.stdLibVersion,
-              AddressScheme.current.chainId,
               Coeval.evalOnce(mi),
-              Coeval.evalOnce(blockchain.height),
               blockchain,
               isAssetScript,
               isContract,
@@ -107,7 +104,7 @@ object ScriptRunner {
     }
 
     def evaluate(
-        ctx: EvaluationContext[Environment, Id],
+        ctx: EvaluationContext[Id],
         expr: EXPR,
         logExtraInfo: LogExtraInfo,
         version: StdLibVersion
@@ -127,7 +124,7 @@ object ScriptRunner {
         else
           (defaultLimit, (_: EXPR) => Right(default))
 
-      val (log, unusedComplexity, result) =
+      val (log, usedComplexity, result) =
         EvaluatorV2.applyOrDefault(
           ctx,
           expr,
@@ -141,7 +138,7 @@ object ScriptRunner {
           fixedThrownError
         )
 
-      (log, limit - unusedComplexity, result)
+      (log, usedComplexity, result)
     }
 
     script match {
@@ -149,22 +146,22 @@ object ScriptRunner {
         evalVerifier(isContract = false, (_, ctx) => evaluate(ctx, s.expr, LogExtraInfo(), s.stdLibVersion))
 
       case ContractScript.ContractScriptImpl(v, DApp(_, decls, _, Some(vf))) =>
-        val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
-          (directives, ctx) =>
-            val verify          = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
-            val bindingsVersion = if (useCorrectScriptVersion) directives.stdLibVersion else V3
-            in.eliminate(
-              t =>
-                RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
-                  .fold(
-                    e => (Nil, 0, Left(e)),
-                    tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))
-                  ),
-              _.eliminate(
-                t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true, bindingsVersion)),
-                _ => ???
-              )
+        val partialEvaluate: (DirectiveSet, EvaluationContext[Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED]) = { (directives, ctx) =>
+          val verify = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
+          val bindingsVersion =
+            if (useCorrectScriptVersion)
+              directives.stdLibVersion
+            else
+              V3
+          in.eliminate(
+            t =>
+              RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
+                .fold(e => (Nil, 0, Left(e)), tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))),
+            _.eliminate(
+              t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true, bindingsVersion)),
+              _ => ???
             )
+          )
         }
         evalVerifier(isContract = true, partialEvaluate)
 

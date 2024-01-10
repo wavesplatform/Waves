@@ -3,27 +3,26 @@ package com.wavesplatform.utils
 import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 
 import cats.Id
-import cats.implicits._
+import cats.implicits.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.{Common, Global}
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest._
+import org.scalatest.*
 
 import scala.util.Random
 
@@ -177,10 +176,10 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
           val signature = privateSignature.sign
 
-          val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
+          val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+             ("msg", (BYTESTR, ContextfulVal.pure(CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
            )
-          val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+          val ctx: CTX = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX(Seq(), vars, Array.empty[BaseFunction])
 
           eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Right(CONST_BOOLEAN(true))
         }
@@ -203,10 +202,10 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
           val signature = privateSignature.sign
 
-          val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-             ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
+          val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+             ("msg", (BYTESTR, ContextfulVal.pure(CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
            )
-          val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+          val ctx: CTX = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX(Seq(), vars, Array.empty[BaseFunction])
 
           eval(limScriptSrc(lim, alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size = ${lim * 1024 + 1} bytes, must be not greater than ${lim} KB")
         }
@@ -228,10 +227,10 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
         val signature = privateSignature.sign
 
-        val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
+        val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+           ("msg", (BYTESTR, ContextfulVal.pure(CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
          )
-        val ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+        val ctx: CTX = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4) |+| CTX(Seq(), vars, Array.empty[BaseFunction])
 
         eval(maxScriptSrcV4(alg, signature, xpub.getEncoded), ctx) shouldBe Right(CONST_BOOLEAN(true))
       }
@@ -252,10 +251,10 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
         val signature = privateSignature.sign
 
-        val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
+        val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+           ("msg", (BYTESTR, ContextfulVal.pure(CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
          )
-        val ctx: CTX[NoContext] = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+        val ctx: CTX = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3) |+| CTX(Seq(), vars, Array.empty[BaseFunction])
 
         eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Right(CONST_BOOLEAN(true))
       }
@@ -276,10 +275,10 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
 
         val signature = privateSignature.sign
 
-        val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
-           ("msg", (BYTESTR, ContextfulVal.pure[NoContext](CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
+        val vars: Map[String, (FINAL, ContextfulVal)] = Map(
+           ("msg", (BYTESTR, ContextfulVal.pure(CONST_BYTESTR(ByteStr(message), limit = CONST_BYTESTR.DataTxSize).explicitGet()))),
          )
-        val ctx: CTX[NoContext] = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3) |+| CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+        val ctx: CTX = PureContext.build(V3, useNewPowPrecision = true) |+| CryptoContext.build(Global, V3) |+| CTX(Seq(), vars, Array.empty[BaseFunction])
 
         eval(maxScriptSrc(alg, signature, xpub.getEncoded), ctx) shouldBe Left(s"Invalid message size = ${32 * 1024 + 1} bytes, must be not greater than 32 KB")
       }
@@ -333,12 +332,12 @@ class RSATest extends PropSpec with BeforeAndAfterAll {
     }
   }
 
-  private val evaluator = new EvaluatorV1[Id, NoContext]()
+  private val evaluator = new EvaluatorV1[Id]()
 
-  private def eval[T <: EVALUATED](code: String, ctx: CTX[NoContext] = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4)): Either[String, T] = {
+  private def eval[T <: EVALUATED](code: String, ctx: CTX = PureContext.build(V4, useNewPowPrecision = true) |+| CryptoContext.build(Global, V4)): Either[String, T] = {
     val untyped  = Parser.parseExpr(code).get.value
     val typed    = ExpressionCompiler(ctx.compilerContext, V4, untyped)
-    typed.flatMap(v => evaluator[T](ctx.evaluationContext, v._1).leftMap(_.message))
+    typed.flatMap(v => evaluator[T](ctx.evaluationContext(Common.emptyBlockchainEnvironment()), v._1).leftMap(_.message))
   }
 
 }

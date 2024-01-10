@@ -16,7 +16,6 @@ import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.*
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.*
@@ -116,8 +115,8 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4, useNewPowPrecision = true) |+|
+          CryptoContext.build(Global, V4) |+|
           WavesContext.build(Global, directives, fixBigScriptField = true)
       }
 
@@ -178,8 +177,8 @@ class BalancesV4Test extends PropSpec with WithState {
     def assetScript(acc: ByteStr): Script = {
       val ctx = {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
-        PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
-          CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
+        PureContext.build(V4, useNewPowPrecision = true) |+|
+          CryptoContext.build(Global, V4) |+|
           WavesContext.build(Global, directives, fixBigScriptField = true)
       }
 

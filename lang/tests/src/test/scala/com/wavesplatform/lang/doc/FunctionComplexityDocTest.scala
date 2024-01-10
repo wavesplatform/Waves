@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.UtilityFunctionPrefix
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.test.PropSpec
 import org.scalatest.exceptions.TestFailedException
 
@@ -34,7 +33,7 @@ class FunctionComplexityDocTest extends PropSpec {
   private val allDataStorageFunctions =
     baseDataStorageFunctions ++ baseDataStorageFunctions.map(_ + "Value")
 
-  private def check(functions: Array[BaseFunction[Environment]], ds: DirectiveSet): Unit = {
+  private def check(functions: Array[BaseFunction], ds: DirectiveSet): Unit = {
     val docCosts =
       DocSource.funcData.collect {
         case ((name, signature, version), (_, _, complexity)) if version == ds.stdLibVersion.id => ((name, signature), complexity)

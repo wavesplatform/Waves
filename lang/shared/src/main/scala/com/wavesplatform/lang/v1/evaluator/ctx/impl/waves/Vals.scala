@@ -21,7 +21,7 @@ object Vals {
       version: StdLibVersion,
       proofsEnabled: Boolean,
       fixBigScriptField: Boolean
-  ): (String, (UNION, ContextfulVal[Environment])) =
+  ): (String, (UNION, ContextfulVal)) =
     (Tx, (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled, fixBigScriptField)))
 
   private def scriptInputType(isTokenContext: Boolean, version: StdLibVersion, proofsEnabled: Boolean) =
@@ -30,8 +30,8 @@ object Vals {
     else
       UNION(buildOrderType(proofsEnabled, version) :: buildActiveTransactionTypes(proofsEnabled, version))
 
-  private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean, fixBigScriptField: Boolean): ContextfulVal[Environment] =
-    new ContextfulVal.Lifted[Environment] {
+  private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean, fixBigScriptField: Boolean): ContextfulVal =
+    new ContextfulVal.Lifted {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later(
           env.inputEntity
@@ -54,8 +54,8 @@ object Vals {
         )
     }
 
-  val heightVal: ContextfulVal[Environment] =
-    new ContextfulVal[Environment] {
+  val heightVal: ContextfulVal =
+    new ContextfulVal {
       override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env.height
@@ -64,8 +64,8 @@ object Vals {
         }
     }
 
-  val accountThisVal: ContextfulVal[Environment] =
-    new ContextfulVal.Lifted[Environment] {
+  val accountThisVal: ContextfulVal =
+    new ContextfulVal.Lifted {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later {
           if (env.dAppAlias) {
@@ -80,8 +80,8 @@ object Vals {
         }
     }
 
-  def assetThisVal(version: StdLibVersion): ContextfulVal[Environment] =
-    new ContextfulVal[Environment] {
+  def assetThisVal(version: StdLibVersion): ContextfulVal =
+    new ContextfulVal {
       override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env
@@ -96,8 +96,8 @@ object Vals {
         }
     }
 
-  def lastBlockVal(version: StdLibVersion): ContextfulVal[Environment] =
-    new ContextfulVal[Environment] {
+  def lastBlockVal(version: StdLibVersion): ContextfulVal =
+    new ContextfulVal {
       override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env
@@ -109,16 +109,16 @@ object Vals {
 
   def lastBlock(version: StdLibVersion) = (LastBlock, (blockInfo(version), lastBlockVal(version)))
 
-  val sellOrdTypeVal: ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
-  val buyOrdTypeVal: ContextfulVal[Environment]  = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
+  val sellOrdTypeVal: ContextfulVal = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
+  val buyOrdTypeVal: ContextfulVal  = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
 
   val sell = (Sell, (ordTypeType, sellOrdTypeVal))
   val buy  = (Buy, (ordTypeType, buyOrdTypeVal))
 
-  val height: (String, (LONG.type, ContextfulVal[Environment])) = (Height, (LONG, heightVal))
+  val height: (String, (LONG.type, ContextfulVal)) = (Height, (LONG, heightVal))
 
-  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = (This, (addressType, accountThisVal))
-  def assetThis(version: StdLibVersion): (String, (CASETYPEREF, ContextfulVal[Environment])) =
+  val accountThis: (String, (CASETYPEREF, ContextfulVal)) = (This, (addressType, accountThisVal))
+  def assetThis(version: StdLibVersion): (String, (CASETYPEREF, ContextfulVal)) =
     (This, (assetType(version), assetThisVal(version)))
 
 }

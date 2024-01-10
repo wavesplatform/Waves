@@ -51,13 +51,13 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         case LET_BLOCK(let, inner)       => evalLetBlock(let, inner, activeFuncArgs, globalDeclarationsMode)
         case BLOCK(let: LET, inner)      => evalLetBlock(let, inner, activeFuncArgs, globalDeclarationsMode)
         case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner, activeFuncArgs, globalDeclarationsMode)
-        case BLOCK(_: FAILED_DEC, _)     => zero
+        case BLOCK(FAILED_DEC, _)        => zero
         case REF(str)                    => evalRef(str, activeFuncArgs)
         case _: EVALUATED                => const(overheadCost)
         case IF(cond, t1, t2)            => evalIF(cond, t1, t2, activeFuncArgs)
         case GETTER(expr, _)             => evalGetter(expr, activeFuncArgs)
         case FUNCTION_CALL(header, args) => evalFuncCall(header, args, activeFuncArgs)
-        case _: FAILED_EXPR              => zero
+        case FAILED_EXPR                 => zero
       }
 
   private def evalLetBlock(let: LET, nextExpr: EXPR, activeFuncArgs: Set[String], globalDeclarationsMode: Boolean): EvalM[Long] =

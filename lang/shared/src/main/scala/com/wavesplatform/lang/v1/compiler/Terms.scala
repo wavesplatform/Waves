@@ -27,7 +27,7 @@ object Terms {
     override def toString: String = toStr()
     def isItFailed: Boolean       = false
   }
-  case class FAILED_DEC() extends DECLARATION {
+  case object FAILED_DEC extends DECLARATION {
     def name                         = "NO_NAME"
     def toStr: Coeval[String]        = Coeval.now("Error")
     override def isItFailed: Boolean = true
@@ -142,7 +142,7 @@ object Terms {
         }
   }
 
-  case class FAILED_EXPR() extends EXPR {
+  case object FAILED_EXPR extends EXPR {
     def toStr: Coeval[String]        = Coeval.now("error")
     override def isItFailed: Boolean = true
 

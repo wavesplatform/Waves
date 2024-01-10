@@ -7,14 +7,14 @@ import com.wavesplatform.lang.v1.task.TaskMT
 import com.wavesplatform.lang.{EvalF, ExecutionError, TrampolinedExecResult}
 
 package object evaluator {
-  type EvalM[F[_], C[_[_]], A] = TaskMT[F, EnabledLogEvaluationContext[C, F], ExecutionError, A]
+  type EvalM[F[_], A] = TaskMT[F, EnabledLogEvaluationContext[F], ExecutionError, A]
 
-  implicit class EvalMOps[F[_], C[_[_]], A](ev: EvalM[F, C, A]) {
-    def ter(ctx: EnabledLogEvaluationContext[C, F]): TrampolinedExecResult[F, A] =
+  implicit class EvalMOps[F[_], A](ev: EvalM[F, A]) {
+    def ter(ctx: EnabledLogEvaluationContext[F]): TrampolinedExecResult[F, A] =
       EitherT[EvalF[F, *], ExecutionError, A](ev.run(ctx).map(_._2))
   }
 
-  def liftTER[F[_], C[_[_]], A](ter: Eval[F[Either[ExecutionError, A]]]): EvalM[F, C, A] =
+  def liftTER[F[_], A](ter: Eval[F[Either[ExecutionError, A]]]): EvalM[F, A] =
     TaskMT(_ => ter)
 
   type LetExecResult[F[_]]  = F[Either[ExecutionError, compiler.Terms.EVALUATED]]

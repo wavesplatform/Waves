@@ -244,7 +244,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
          |        LeaseCancel(l.calculateLeaseId())
          |       ]
          |      else
-         |       throw("Balance check failed")
+         |       throw("Balance check failed ${}")
          |    else
          |     throw("Bad state")
          |   else

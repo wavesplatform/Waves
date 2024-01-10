@@ -169,7 +169,7 @@ object EnvironmentFunctionsBenchmark {
 
 @State(Scope.Benchmark)
 class AddressFromString {
-  val ctx: EvaluationContext[Environment, Id] =
+  val ctx: EvaluationContext[Id] =
     WavesContext
       .build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), true)
       .evaluationContext(environment)

@@ -20,9 +20,9 @@ package object repl {
   val version                  = StdLibVersion.VersionDic.latest
   val directives: DirectiveSet = DirectiveSet(version, Account, DApp).explicitGet()
 
-  val initialCtx: CTX[Environment] =
-    CryptoContext.build(global, version).withEnvironment[Environment] |+|
-      PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
+  val initialCtx: CTX =
+    CryptoContext.build(global, version) |+|
+      PureContext.build(version, useNewPowPrecision = true) |+|
       WavesContext.build(global, directives, fixBigScriptField = true)
 
   def buildEnvironment(settings: Option[NodeConnectionSettings], customHttpClient: Option[NodeClient]): Environment[Future] =

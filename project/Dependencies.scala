@@ -101,6 +101,8 @@ object Dependencies {
 
   private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
 
+  val scalaLogging: ModuleID = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
+
   lazy val node = Def.setting(
     Seq(
       rocksdb,
@@ -125,7 +127,7 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
+      scalaLogging,
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "10.0.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches

@@ -134,7 +134,7 @@ object WavesEnvironmentBenchmark {
       RDB.open(wavesSettings.dbSettings)
     }
 
-    val environment: Environment[Id] = {
+    val environment: Environment[Id] = ???/*{
       val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
       WavesEnvironment(
         AddressScheme.current.chainId,
@@ -145,7 +145,7 @@ object WavesEnvironmentBenchmark {
         DirectiveSet.contractDirectiveSet,
         ByteStr.empty
       )
-    }
+    }*/
 
     @TearDown
     def close(): Unit = {

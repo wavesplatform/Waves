@@ -3,7 +3,6 @@ package com.wavesplatform.lang.evaluator.string
 import com.wavesplatform.lang.directives.values.{V3, V4, V5, V6}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
@@ -149,7 +148,7 @@ class SplitFunctionTest extends EvaluatorSpec {
            |   let splitted1 = $f(strContainingRegex, regex)
            |   let result1   = splitted1.size() == 1 &&
            |                   splitted1[0] == strContainingRegex
-           |  
+           |
            |   let strContainingRegexText = "aaa${regex}bbb"
            |   let splitted2 = $f(strContainingRegexText, regex)
            |   let result2   = splitted2.size() == 2 &&
@@ -209,7 +208,7 @@ class SplitFunctionTest extends EvaluatorSpec {
 
   property("function family output limits") {
     val elem = "a"
-    def str(f: BaseFunction[NoContext], n: Int) = s""" ${f.name}("${s"$elem," * (n - 1)}$elem", ",") """
+    def str(f: BaseFunction, n: Int) = s""" ${f.name}("${s"$elem," * (n - 1)}$elem", ",") """
     for ((f, limit) <- List((PureContext.splitStr4C, 100), (PureContext.splitStr51C, MaxListLengthV4))) {
       eval(str(f, limit + 1))(V6) shouldBe Left(s"Output list size = ${limit + 1} exceeds limit = $limit for ${f.name}")
       eval(str(f, limit))(V6) shouldBe a[Right[?, ?]]
