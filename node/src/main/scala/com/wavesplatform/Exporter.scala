@@ -38,7 +38,7 @@ object Exporter extends ScorexLogging {
   // noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportSnapshots, exportHeight, format) =>
+      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportHeight, format) =>
         val settings = Application.loadApplicationConfig(configFile)
 
         Using.resources(
@@ -52,8 +52,9 @@ object Exporter extends ScorexLogging {
           val blocksOutputFilename = s"$blocksOutputFileNamePrefix-$height"
           log.info(s"Blocks output file: $blocksOutputFilename")
 
+          val exportSnapshots = snapshotsOutputFileNamePrefix.isDefined
           val snapshotsOutputFilename = if (exportSnapshots) {
-            val filename = s"$snapshotsOutputFileNamePrefix-$height"
+            val filename = s"${snapshotsOutputFileNamePrefix.get}-$height"
             log.info(s"Snapshots output file: $filename")
             Some(filename)
           } else None
@@ -272,8 +273,7 @@ object Exporter extends ScorexLogging {
   private[this] final case class ExporterOptions(
       configFileName: Option[File] = None,
       blocksOutputFileNamePrefix: String = "blockchain",
-      snapshotsFileNamePrefix: String = "snapshots",
-      exportSnapshots: Boolean = false,
+      snapshotsFileNamePrefix: Option[String] = None,
       exportHeight: Option[Int] = None,
       format: String = Formats.Binary
   )
@@ -295,10 +295,7 @@ object Exporter extends ScorexLogging {
         .action((p, c) => c.copy(blocksOutputFileNamePrefix = p)),
       opt[String]('s', "snapshot-output-prefix")
         .text("Snapshots output file name prefix")
-        .action((p, c) => c.copy(snapshotsFileNamePrefix = p)),
-      opt[Unit]('l', "export-snapshots")
-        .text("Export snapshots for light node")
-        .action((_, c) => c.copy(exportSnapshots = true)),
+        .action((p, c) => c.copy(snapshotsFileNamePrefix = Some(p))),
       opt[Int]('h', "height")
         .text("Export to height")
         .action((h, c) => c.copy(exportHeight = Some(h)))
