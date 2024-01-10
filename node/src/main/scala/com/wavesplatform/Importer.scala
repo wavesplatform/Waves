@@ -357,7 +357,7 @@ object Importer extends ScorexLogging {
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val (blocksFileOffset, snapshotsFileOffset) =
+    val blocksFileOffset =
       importOptions.format match {
         case Formats.Binary =>
           var blocksOffset = 0
@@ -369,20 +369,25 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-
-          var totalSize = 0L
-          rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight) { e =>
-            totalSize += (e.getValue.length + 4)
-          }
-
-          val snapshotsOffset = totalSize
-
-          blocksOffset -> snapshotsOffset
-        case _ => 0L -> 0L
+          blocksOffset
+        case _ =>
+          0
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
     val snapshotsInputStream =
-      importOptions.snapshotsFile.map(f => new BufferedInputStream(initFileStream(f, snapshotsFileOffset), 20 * 1024 * 1024))
+      importOptions.snapshotsFile
+        .map { file =>
+          val inputStream     = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
+          val sizeBytes       = new Array[Byte](Ints.BYTES)
+          var snapshotsOffset = 0L
+          (2 to blockchainUpdater.height).foreach { _ =>
+            ByteStreams.read(inputStream, sizeBytes, 0, 4)
+            val snapshotsSize = Ints.fromByteArray(sizeBytes)
+            ByteStreams.skipFully(inputStream, snapshotsSize)
+            snapshotsOffset += (snapshotsSize + 4)
+          }
+          inputStream
+        }
 
     sys.addShutdownHook {
       quit = true
