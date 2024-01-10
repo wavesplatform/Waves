@@ -377,14 +377,12 @@ object Importer extends ScorexLogging {
     val snapshotsInputStream =
       importOptions.snapshotsFile
         .map { file =>
-          val inputStream     = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
-          val sizeBytes       = new Array[Byte](Ints.BYTES)
-          var snapshotsOffset = 0L
+          val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
+          val sizeBytes   = new Array[Byte](Ints.BYTES)
           (2 to blockchainUpdater.height).foreach { _ =>
             ByteStreams.read(inputStream, sizeBytes, 0, 4)
             val snapshotsSize = Ints.fromByteArray(sizeBytes)
             ByteStreams.skipFully(inputStream, snapshotsSize)
-            snapshotsOffset += (snapshotsSize + 4)
           }
           inputStream
         }
