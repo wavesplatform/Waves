@@ -53,7 +53,7 @@ object Importer extends ScorexLogging {
   final case class ImportOptions(
       configFile: Option[File] = None,
       blockchainFile: String = "blockchain",
-      snapshotsFile: String = "snapshots",
+      snapshotsFile: Option[String] = None,
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
       verify: Boolean = true,
@@ -79,7 +79,7 @@ object Importer extends ScorexLogging {
           .action((f, c) => c.copy(blockchainFile = f)),
         opt[String]('s', "snapshots-file")
           .text("Snapshots data file name")
-          .action((f, c) => c.copy(snapshotsFile = f)),
+          .action((f, c) => c.copy(snapshotsFile = Some(f))),
         opt[Int]('h', "height")
           .text("Import to height")
           .action((h, c) => c.copy(importHeight = h))
@@ -357,10 +357,10 @@ object Importer extends ScorexLogging {
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val (blocksFileOffset, snapshotsFileOffset) =
+    val blocksFileOffset =
       importOptions.format match {
         case Formats.Binary =>
-          var blocksOffset = 0L
+          var blocksOffset = 0
           rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
             e.getKey match {
               case Array(_, _, 0, 0, 0, 1) => // Skip genesis
@@ -369,22 +369,23 @@ object Importer extends ScorexLogging {
                 blocksOffset += meta.size + 4
             }
           }
-
-          var totalSize = 0L
-          rdb.db.iterateOver(KeyTags.NthTransactionStateSnapshotAtHeight) { e =>
-            totalSize += (e.getValue.length + 4)
-          }
-
-          val snapshotsOffset = totalSize
-
-          blocksOffset -> snapshotsOffset
-        case _ => 0L -> 0L
+          blocksOffset
+        case _ =>
+          0
       }
     val blocksInputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, blocksFileOffset), 2 * 1024 * 1024)
     val snapshotsInputStream =
-      if (settings.enableLightMode)
-        Some(new BufferedInputStream(initFileStream(importOptions.snapshotsFile, snapshotsFileOffset), 20 * 1024 * 1024))
-      else None
+      importOptions.snapshotsFile
+        .map { file =>
+          val inputStream = new BufferedInputStream(initFileStream(file, 0), 20 * 1024 * 1024)
+          val sizeBytes   = new Array[Byte](Ints.BYTES)
+          (2 to blockchainUpdater.height).foreach { _ =>
+            ByteStreams.read(inputStream, sizeBytes, 0, 4)
+            val snapshotsSize = Ints.fromByteArray(sizeBytes)
+            ByteStreams.skipFully(inputStream, snapshotsSize)
+          }
+          inputStream
+        }
 
     sys.addShutdownHook {
       quit = true

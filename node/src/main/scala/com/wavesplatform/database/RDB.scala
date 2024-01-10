@@ -62,14 +62,14 @@ object RDB extends StrictLogging {
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
-          "transactions".utf8Bytes,
+          "tx".utf8Bytes,
           txCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, "tx").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
-          "transactions-snapshot".utf8Bytes,
+          "tx-snapshot".utf8Bytes,
           txSnapshotCfOptions.options
-            .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions-snapshot").toPath, 0L)).asJava)
+            .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-snapshot").toPath, 0L)).asJava)
         )
       ).asJava,
       handles
