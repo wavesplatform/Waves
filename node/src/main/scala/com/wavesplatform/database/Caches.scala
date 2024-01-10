@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
-import org.ehcache.sizeof.SizeOf
+import org.github.jamm.MemoryMeter
 
 import java.{lang, util}
 import scala.collection.immutable.VectorMap
@@ -128,13 +128,13 @@ abstract class Caches extends Blockchain with Storage {
     VolumeAndFee(curVf.volume, curVf.fee)
   }
 
-  private val objectWeigher = SizeOf.newInstance()
+  private val memMeter = MemoryMeter.builder().build()
 
   private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] =
     CacheBuilder
       .newBuilder()
       .maximumWeight(128 << 20)
-      .weigher((_: Address, asi: Option[AccountScriptInfo]) => asi.map(s => objectWeigher.deepSizeOf(s).toInt).getOrElse(0))
+      .weigher((_: Address, asi: Option[AccountScriptInfo]) => asi.map(s => memMeter.measureDeep(s).toInt).getOrElse(0))
       .recordStats()
       .build(new CacheLoader[Address, Option[AccountScriptInfo]] {
         override def load(key: Address): Option[AccountScriptInfo] = loadScript(key)
@@ -183,6 +183,7 @@ abstract class Caches extends Blockchain with Storage {
 
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(acc: Address, key: String): CurrentData
+  protected def loadEntryHeights(keys: Iterable[(Address, String)]): Map[(Address, String), Height]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
   private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] =
@@ -293,17 +294,21 @@ abstract class Caches extends Blockchain with Storage {
       BalanceNode(amount, prevBalance.height)
     )
 
-    val updatedDataWithNodes = for {
+    val newEntries = for {
       (address, entries) <- snapshot.accountData
       (key, entry)       <- entries
-    } yield {
-      val entryKey = (address, key)
-      val prevData = accountDataCache.get(entryKey)
-      entryKey -> (
-        CurrentData(entry, Height(height), prevData.height),
-        DataNode(entry, prevData.height)
-      )
-    }
+    } yield ((address, key), entry)
+
+    val cachedEntries = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
+    val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains))
+
+    val updatedDataWithNodes = (for {
+      (k, currentEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntries
+      newEntry          <- newEntries.get(k)
+    } yield k -> (
+      CurrentData(newEntry, Height(height), currentEntry),
+      DataNode(newEntry, currentEntry)
+    )).toMap
 
     val orderFillsWithNodes = for {
       (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills

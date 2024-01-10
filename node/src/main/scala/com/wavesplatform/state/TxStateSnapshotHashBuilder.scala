@@ -82,7 +82,7 @@ object TxStateSnapshotHashBuilder {
       changedKeys += orderId.arr ++ Longs.toByteArray(fillInfo.volume) ++ Longs.toByteArray(fillInfo.fee)
     }
 
-    snapshot.assetStatics.foreach { case (asset, assetInfo) =>
+    snapshot.assetStatics.foreach { case (asset, (assetInfo, _)) =>
       changedKeys += asset.id.arr ++ assetInfo.issuer.arr ++ Array(assetInfo.decimals.toByte) ++ booleanToBytes(assetInfo.nft)
     }
 

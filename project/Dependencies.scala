@@ -128,11 +128,11 @@ object Dependencies {
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "10.0.1",
-      "org.ehcache"                 % "sizeof"        % "0.4.3", // Weighing caches
+      "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test,
-    ) ++ test ++ console ++ logDeps  ++ protobuf.value ++ langCompilerPlugins.value
+      akkaHttpModule("akka-http-testkit") % Test
+    ) ++ test ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.1"
@@ -169,11 +169,11 @@ object Dependencies {
       kamonModule("prometheus"),
       sttp3,
       sttp3Monix,
-      "org.scala-lang.modules"                          %% "scala-xml"              % "2.2.0", // JUnit reports
-      akkaHttpModule("akka-http-testkit")     % Test,
-      "com.softwaremill.diffx"                          %% "diffx-core"             % "0.9.0" % Test,
-      "com.softwaremill.diffx"                          %% "diffx-scalatest-should" % "0.9.0" % Test,
-      "io.grpc"                                          % "grpc-inprocess"         % "1.60.0" % Test
+      "org.scala-lang.modules"           %% "scala-xml"              % "2.2.0", // JUnit reports
+      akkaHttpModule("akka-http-testkit") % Test,
+      "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
+      "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
+      "io.grpc"                           % "grpc-inprocess"         % "1.60.0" % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
