@@ -23,14 +23,14 @@ object Dependencies {
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "32.1.3-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.0.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.4.14"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.11"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.101.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.104.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
@@ -74,7 +74,7 @@ object Dependencies {
   lazy val it = scalaTest +: Seq(
     logback,
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.0",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.1",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -97,7 +97,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.8.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.9.1"
 
   private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
 
@@ -114,7 +114,7 @@ object Dependencies {
       kamonModule("influxdb"),
       kamonModule("akka-http"),
       kamonModule("executors"),
-      "org.influxdb" % "influxdb-java" % "2.23",
+      "org.influxdb" % "influxdb-java" % "2.24",
       googleGuava,
       "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
       playJson,
@@ -127,7 +127,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "10.0.1",
+      "com.esaulpaugh"              % "headlong"      % "10.0.2",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi"),
       akkaModule("testkit")               % Test,
@@ -173,7 +173,7 @@ object Dependencies {
       akkaHttpModule("akka-http-testkit") % Test,
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
-      "io.grpc"                           % "grpc-inprocess"         % "1.60.0" % Test
+      "io.grpc"                           % "grpc-inprocess"         % "1.60.1" % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
