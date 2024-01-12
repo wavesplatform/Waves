@@ -632,7 +632,6 @@ class RocksDBWriter(
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
       rw.put(Keys.blockStateHash(height), computedBlockStateHash)
-      expiredKeys += Keys.blockStateHash(threshold - 1).keyBytes
 
       if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactionsWithSize
