@@ -5493,6 +5493,8 @@ components:
     TransactionSnapshot:
       type: object
       properties:
+        applicationStatus:
+          $ref: '#/components/schemas/ApplicationStatus'
         balances:
           type: array
           items:
