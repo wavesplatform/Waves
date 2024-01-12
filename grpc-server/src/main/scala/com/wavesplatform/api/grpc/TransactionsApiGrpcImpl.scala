@@ -72,11 +72,11 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
     responseObserver.interceptErrors {
       val snapshots =
         for {
-          id                 <- request.transactionIds
-          (snapshot, status) <- blockchain.transactionSnapshot(id.toByteStr)
+          id                 <- Observable.fromIterable(request.transactionIds)
+          (snapshot, status) <- Observable.fromIterable(blockchain.transactionSnapshot(id.toByteStr))
           pbSnapshot = PBSnapshots.toProtobuf(snapshot, status)
         } yield TransactionSnapshotResponse(id, Some(pbSnapshot))
-      responseObserver.completeWith(Observable.fromIterable(snapshots))
+      responseObserver.completeWith(snapshots)
     }
 
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
