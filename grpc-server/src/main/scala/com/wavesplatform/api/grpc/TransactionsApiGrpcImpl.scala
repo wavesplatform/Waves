@@ -51,7 +51,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
 
         // By ids
         case None =>
-          Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById))
+          for {
+            id <- Observable.fromIterable(transactionIds)
+            tx <- Observable.fromIterable(commonApi.transactionById(id))
+          } yield tx
       }
 
       val transactionIdSet = transactionIds.toSet
@@ -124,6 +127,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
       result <- commonApi.broadcastTransaction(vtx)
       _      <- result.resultE.toFuture // Check for success
     } yield tx).wrapErrors
+  override def getTransactionSnapshots(
+      request: TransactionSnapshotsRequest,
+      responseObserver: StreamObserver[TransactionSnapshotResponse]
+  ): Unit = ???
 }
 
 private object TransactionsApiGrpcImpl {
