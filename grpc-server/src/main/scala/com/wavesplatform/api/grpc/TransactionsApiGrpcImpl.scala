@@ -127,10 +127,6 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
       result <- commonApi.broadcastTransaction(vtx)
       _      <- result.resultE.toFuture // Check for success
     } yield tx).wrapErrors
-  override def getTransactionSnapshots(
-      request: TransactionSnapshotsRequest,
-      responseObserver: StreamObserver[TransactionSnapshotResponse]
-  ): Unit = ???
 }
 
 private object TransactionsApiGrpcImpl {
