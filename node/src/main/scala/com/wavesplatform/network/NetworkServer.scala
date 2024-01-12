@@ -12,6 +12,7 @@ import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
+import io.netty.handler.logging.{ByteBufFormat, LogLevel, LoggingHandler}
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
@@ -71,6 +72,7 @@ object NetworkServer extends ScorexLogging {
       localAddresses ++ settings.networkSettings.declaredAddress.toSet
     }
 
+    val loggingHandler = new LoggingHandler(LogLevel.TRACE)
     val lengthFieldPrepender = new LengthFieldPrepender(4)
 
     // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
@@ -98,6 +100,7 @@ object NetworkServer extends ScorexLogging {
     }
 
     def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
+      loggingHandler,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
       new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
