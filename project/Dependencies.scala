@@ -99,8 +99,6 @@ object Dependencies {
 
   private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.9.1"
 
-  private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
-
   lazy val node = Def.setting(
     Seq(
       rocksdb,
@@ -160,7 +158,6 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      scalapbJson,
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.8",
