@@ -12,6 +12,7 @@ import play.api.libs.json.JsonConfiguration.Aux
 import play.api.libs.json.OptionHandlers.WritesNull
 
 case class StateSnapshotJson(
+    applicationStatus: String,
     balances: Seq[BalanceJson],
     leaseBalances: Seq[LeaseBalanceJson],
     assetStatics: Seq[AssetStaticInfo],
@@ -28,8 +29,9 @@ case class StateSnapshotJson(
 )
 
 object StateSnapshotJson {
-  def fromSnapshot(s: StateSnapshot): StateSnapshotJson =
+  def fromSnapshot(s: StateSnapshot, txStatus: TxMeta.Status): StateSnapshotJson =
     StateSnapshotJson(
+      TransactionJsonSerializer.applicationStatusFromTxStatus(txStatus),
       s.balances.map { case ((address, asset), balance) => BalanceJson(address, asset, balance) }.toSeq,
       s.leaseBalances.map { case (address, lease) => LeaseBalanceJson(address, lease.in, lease.out) }.toSeq,
       s.assetStatics.map(_._2._1).toSeq,

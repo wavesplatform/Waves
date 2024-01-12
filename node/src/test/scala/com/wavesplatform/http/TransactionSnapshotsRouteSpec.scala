@@ -96,6 +96,7 @@ class TransactionSnapshotsRouteSpec
       val setScriptJson = Json.parse(
         s"""
            | {
+           |  "applicationStatus": "succeeded",
            |  "balances": [
            |    {
            |      "address": "$secondAddress",
@@ -136,6 +137,7 @@ class TransactionSnapshotsRouteSpec
       val invokeJson = Json.parse(
         s"""
            | {
+           |   "applicationStatus": "succeeded",
            |   "balances": [
            |     {
            |       "address": "$defaultAddress",
@@ -252,6 +254,7 @@ class TransactionSnapshotsRouteSpec
       val issueJson = Json.parse(
         s"""
            | {
+           |  "applicationStatus": "succeeded",
            |  "balances" : [ {
            |    "address" : "$defaultAddress",
            |    "asset" : "$asset",
@@ -302,6 +305,7 @@ class TransactionSnapshotsRouteSpec
       val aliasJson = Json.parse(
         s"""
            | {
+           |  "applicationStatus": "succeeded",
            |  "balances" : [ {
            |    "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
            |    "asset" : null,
@@ -327,6 +331,7 @@ class TransactionSnapshotsRouteSpec
       val removeScriptJson = Json.parse(
         s"""
            | {
+           |  "applicationStatus": "succeeded",
            |  "balances": [
            |    {
            |      "address": "$secondAddress",
@@ -367,6 +372,7 @@ class TransactionSnapshotsRouteSpec
       val exchangeJson = Json.parse(
         s"""
            | {
+           |  "applicationStatus": "succeeded",
            |  "balances": [
            |    {
            |      "address": "$defaultAddress",
