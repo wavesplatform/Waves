@@ -224,7 +224,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         amount,
         price,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + Order.MaxLiveTime / 2,
         matcherFee
       )
       .explicitGet()
@@ -237,7 +237,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         amount,
         price,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + Order.MaxLiveTime / 2,
         matcherFee
       )
       .explicitGet()

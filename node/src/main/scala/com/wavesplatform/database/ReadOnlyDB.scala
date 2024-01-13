@@ -15,16 +15,16 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
-  def multiGetOpt[V](keys: Seq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
+  def multiGetOpt[V](keys: IndexedSeq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
     db.multiGetOpt(readOptions, keys, valBufferSize)
 
-  def multiGet[V](keys: Seq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
+  def multiGet[V](keys: IndexedSeq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
     db.multiGet(readOptions, keys, valBufferSize)
 
-  def multiGetOpt[V](keys: Seq[Key[Option[V]]], valBufSizes: Seq[Int]): Seq[Option[V]] =
+  def multiGetOpt[V](keys: IndexedSeq[Key[Option[V]]], valBufSizes: IndexedSeq[Int]): Seq[Option[V]] =
     db.multiGetOpt(readOptions, keys, valBufSizes)
 
-  def multiGetInts(keys: Seq[Key[Int]]): Seq[Option[Int]] =
+  def multiGetInts(keys: IndexedSeq[Key[Int]]): Seq[Option[Int]] =
     db.multiGetInts(readOptions, keys)
 
   def has[V](key: Key[V]): Boolean = {

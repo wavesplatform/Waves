@@ -125,7 +125,7 @@ object AssetTransactionsDiffs {
         assetScripts = script.fold(Map[IssuedAsset, AssetScriptInfo]()) { case (script, complexity) =>
           Map(asset -> AssetScriptInfo(script, complexity))
         },
-        issuedAssets = VectorMap(asset -> NewAssetInfo(assetStatic, assetInfo, assetVolume)),
+        issuedAssets = Seq(asset -> NewAssetInfo(assetStatic, assetInfo, assetVolume)),
         portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value))
       )
     } yield snapshot

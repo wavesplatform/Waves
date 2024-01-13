@@ -161,7 +161,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
         amount = 1,
         price = 1.waves,
         timestamp = ts,
-        expiration = ts + Order.MaxLiveTime,
+        expiration = ts + Order.MaxLiveTime / 2,
         matcherFee = matcherFee
       )
       .explicitGet()
@@ -174,7 +174,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
         amount = 1,
         price = 1.waves,
         timestamp = ts,
-        expiration = ts + Order.MaxLiveTime,
+        expiration = ts + Order.MaxLiveTime / 2,
         matcherFee = matcherFee
       )
       .explicitGet()

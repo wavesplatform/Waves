@@ -1,8 +1,6 @@
 package com.wavesplatform
 
 import com.google.common.collect.AbstractIterator
-
-import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.protobuf.BlockMeta
@@ -19,6 +17,7 @@ import kamon.Kamon
 import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -39,7 +38,7 @@ object Exporter extends ScorexLogging {
   // noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportSnapshots, exportHeight, format) =>
+      case ExporterOptions(configFile, blocksOutputFileNamePrefix, snapshotsOutputFileNamePrefix, exportHeight, format) =>
         val settings = Application.loadApplicationConfig(configFile)
 
         Using.resources(
@@ -53,8 +52,9 @@ object Exporter extends ScorexLogging {
           val blocksOutputFilename = s"$blocksOutputFileNamePrefix-$height"
           log.info(s"Blocks output file: $blocksOutputFilename")
 
+          val exportSnapshots = snapshotsOutputFileNamePrefix.isDefined
           val snapshotsOutputFilename = if (exportSnapshots) {
-            val filename = s"$snapshotsOutputFileNamePrefix-$height"
+            val filename = s"${snapshotsOutputFileNamePrefix.get}-$height"
             log.info(s"Snapshots output file: $filename")
             Some(filename)
           } else None
@@ -74,7 +74,12 @@ object Exporter extends ScorexLogging {
                 var exportedSnapshotsBytes = 0L
                 val start                  = System.currentTimeMillis()
 
-                new BlockSnapshotIterator(rdb, height, settings.enableLightMode).asScala.foreach { case (h, block, txSnapshots) =>
+                new BlockSnapshotIterator(rdb, height, exportSnapshots).asScala.foreach { case (h, block, txSnapshots) =>
+                  val txCount = block.transactionData.length
+                  if (exportSnapshots && txCount != txSnapshots.length)
+                    throw new RuntimeException(
+                      s"${txSnapshots.length} snapshot(s) don't match $txCount transaction(s) on height $h, data is corrupted"
+                    )
                   exportedBlocksBytes += IO.exportBlock(blocksStream, Some(block), format == Formats.Binary)
                   snapshotsStream.foreach { output =>
                     exportedSnapshotsBytes += IO.exportBlockTxSnapshots(output, txSnapshots)
@@ -100,7 +105,8 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, isLightMode: Boolean) extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
+  private class BlockSnapshotIterator(rdb: RDB, targetHeight: Int, exportSnapshots: Boolean)
+      extends AbstractIterator[(Int, Block, Seq[Array[Byte]])] {
     var nextTxEntry: Option[(Int, Transaction)]       = None
     var nextSnapshotEntry: Option[(Int, Array[Byte])] = None
 
@@ -156,7 +162,7 @@ object Exporter extends ScorexLogging {
             case Some(_) => Seq.empty
             case _       => loadTxData[Transaction](Seq.empty, h, txIterator, (h, tx) => nextTxEntry = Some(h -> tx))
           }
-          val snapshots = if (isLightMode) {
+          val snapshots = if (exportSnapshots) {
             nextSnapshotEntry match {
               case Some((snapshotHeight, txSnapshot)) if snapshotHeight == h =>
                 nextSnapshotEntry = None
@@ -267,8 +273,7 @@ object Exporter extends ScorexLogging {
   private[this] final case class ExporterOptions(
       configFileName: Option[File] = None,
       blocksOutputFileNamePrefix: String = "blockchain",
-      snapshotsFileNamePrefix: String = "snapshots",
-      exportSnapshots: Boolean = false,
+      snapshotsFileNamePrefix: Option[String] = None,
       exportHeight: Option[Int] = None,
       format: String = Formats.Binary
   )
@@ -290,10 +295,7 @@ object Exporter extends ScorexLogging {
         .action((p, c) => c.copy(blocksOutputFileNamePrefix = p)),
       opt[String]('s', "snapshot-output-prefix")
         .text("Snapshots output file name prefix")
-        .action((p, c) => c.copy(snapshotsFileNamePrefix = p)),
-      opt[Unit]('l', "export-snapshots")
-        .text("Export snapshots for light node")
-        .action((_, c) => c.copy(exportSnapshots = true)),
+        .action((p, c) => c.copy(snapshotsFileNamePrefix = Some(p))),
       opt[Int]('h', "height")
         .text("Export to height")
         .action((h, c) => c.copy(exportHeight = Some(h)))

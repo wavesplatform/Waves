@@ -1,10 +1,9 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account.*
-import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -26,12 +25,11 @@ import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
+import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
-import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
-import com.wavesplatform.lang.v1.traits.domain.AssetTransfer
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Issue}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
@@ -46,13 +44,13 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Asset, utils as _, *}
-import org.scalamock.scalatest.MockFactory
+import com.wavesplatform.utils.EmptyBlockchain
 import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable
 import scala.util.{Random, Try}
 
-class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside with MockFactory {
+class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCacheSettings with EitherValues with Inside {
   import DomainPresets.*
 
   private val allVersions = DirectiveDictionary[StdLibVersion].all
@@ -687,7 +685,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         withDomain(settingsForRide(version), AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
           d.appendBlock(asset, setScript)
           val tracedSnapshot = d.transactionDiffer(ci)
-          val message    = if (version == V3) "TransactionNotAllowedByScript" else "Transaction is not allowed by script of the asset"
+          val message        = if (version == V3) "TransactionNotAllowedByScript" else "Transaction is not allowed by script of the asset"
           tracedSnapshot.resultE should produceRejectOrFailedDiff(message)
           inside(tracedSnapshot.trace) { case List(_, AssetVerifierTrace(assetId, Some(tne: TransactionNotAllowedByScript), _)) =>
             assetId shouldBe asset.id()
@@ -1111,78 +1109,28 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("issuing asset with existed id should produce error") {
+    val script = TestCompiler(V5).compileContract("""
+      @Callable(i)
+      func f() = [Issue("ZZZT", "foo bar", 100000000, 6, true, unit, 1)]
+    """.stripMargin)
+
     val invoke = TxHelpers.invoke(dAppAddress, Some("f"), fee = TestValues.invokeFee(issues = 1))
 
-    val blockchain: Blockchain = mock[Blockchain]
+    val clashingId =
+      IssuedAsset(ByteStr(Issue.calculateId(6, "foo bar", true, "ZZZT", 100000000, 1, invoke.id()).arr.take(20) ++ new Array[Byte](12)))
 
-    (() => blockchain.settings)
-      .expects()
-      .returning(TestSettings.Default.blockchainSettings)
-      .anyNumberOfTimes()
-    (blockchain.assetScript _)
-      .expects(*)
-      .returning(None)
-      .anyNumberOfTimes() // XXX Why?
-    (blockchain.accountScript _)
-      .expects(dAppAddress)
-      .returning(Some(AccountScriptInfo(dApp.publicKey, issueContract, 10L, Map(1 -> Map("f" -> 10L)))))
-      .anyNumberOfTimes()
-    (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
-    (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
-    (blockchain.balance _).expects(*, Waves).returning(ENOUGH_AMT).anyNumberOfTimes()
-    (blockchain.leaseBalance _).expects(*).returning(LeaseBalance.empty).anyNumberOfTimes()
-    (() => blockchain.activatedFeatures)
-      .expects()
-      .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
-      .anyNumberOfTimes()
-    (() => blockchain.height).expects().returning(1).anyNumberOfTimes()
-    (blockchain.blockHeader _)
-      .expects(*)
-      .returning(
-        Some(
-          SignedBlockHeader(
-            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None, None),
-            ByteStr.empty
-          )
-        )
+    val blockchain = SnapshotBlockchain(
+      EmptyBlockchain,
+      StateSnapshot(
+        assetStatics = Map(clashingId -> (AssetStaticInfo(clashingId.id, TransactionId(clashingId.id), dApp.publicKey, 6, false), 1)),
+        accountScripts = Map(dApp.publicKey -> Some(AccountScriptInfo(dApp.publicKey, script, 0, Map.empty))),
+        erc20Addresses = Map(ERC20Address(clashingId) -> clashingId)
       )
-      .anyNumberOfTimes()
-    (blockchain.blockHeader _)
-      .expects(*)
-      .returning(
-        Some(
-          SignedBlockHeader(
-            BlockHeader(1, 1, ByteStr.empty, 1, ByteStr.empty, PublicKey(new Array[Byte](32)), Seq(), 1, ByteStr.empty, None, None),
-            ByteStr.empty
-          )
-        )
-      )
-      .anyNumberOfTimes()
-    (blockchain.assetDescription _)
-      .expects(*)
-      .returning(
-        Some(
-          AssetDescription(
-            ByteStr.fromBytes(1, 2, 3),
-            dApp.publicKey,
-            ByteString.EMPTY,
-            ByteString.EMPTY,
-            1,
-            reissuable = false,
-            BigInt(1),
-            Height(1),
-            None,
-            0L,
-            nft = false,
-            0,
-            Height(1)
-          )
-        )
-      )
-      .anyNumberOfTimes()
-    InvokeScriptTransactionDiff
-      .apply(blockchain, invoke.timestamp, limitedExecution = false, enableExecutionLog = false)(invoke)
-      .resultE should produceRejectOrFailedDiff("is already issued")
+    )
+
+    InvokeScriptTransactionDiff(blockchain, invoke.timestamp, limitedExecution = false, enableExecutionLog = false)(
+      invoke
+    ).resultE should produceRejectOrFailedDiff("is already issued")
 
   }
 

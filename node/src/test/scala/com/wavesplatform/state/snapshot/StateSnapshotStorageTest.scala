@@ -9,7 +9,6 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
-import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
@@ -46,11 +45,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        PBSnapshots.fromProtobuf(
-          d.rocksDBWriter.transactionSnapshot(tx.id()).get,
-          tx.id(),
-          d.blockchain.height - 1
-        ) shouldBe (expectedSnapshotWithMiner, status)
+        d.rocksDBWriter.transactionSnapshot(tx.id()).get shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis
@@ -94,8 +89,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             (senderAddress, asset) -> issueTx.quantity.value,
             (senderAddress, Waves) -> (d.balance(senderAddress) - 1.waves)
           ),
-          assetStatics = VectorMap(
-            asset -> AssetStaticInfo(asset.id, TransactionId(issueTx.id()), sender.publicKey, issueTx.decimals.value, false)
+          assetStatics = Map(
+            asset -> (AssetStaticInfo(asset.id, TransactionId(issueTx.id()), sender.publicKey, issueTx.decimals.value, false), 1)
           ),
           assetVolumes = Map(
             asset -> AssetVolumeInfo(isReissuable = true, BigInt(issueTx.quantity.value))
@@ -316,8 +311,8 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
             dAppPk.toAddress -> LeaseBalance(0, 123),
             senderAddress    -> LeaseBalance(123, 0)
           ),
-          assetStatics = VectorMap(
-            dAppAssetId -> AssetStaticInfo(dAppAssetId.id, TransactionId(invokeId), dAppPk, 4, false)
+          assetStatics = Map(
+            dAppAssetId -> (AssetStaticInfo(dAppAssetId.id, TransactionId(invokeId), dAppPk, 4, false), 1)
           ),
           assetVolumes = Map(
             dAppAssetId -> AssetVolumeInfo(true, 1000)

@@ -41,8 +41,8 @@ package object state {
 
   implicit val dstWrites: Writes[AssetDistribution] = Writes { dst =>
     Json
-      .toJson(dst.map {
-        case (addr, balance) => addr.toString -> balance
+      .toJson(dst.map { case (addr, balance) =>
+        addr.toString -> balance
       })
   }
 
@@ -57,7 +57,9 @@ package object state {
     )
   }
 
-  object Height extends TaggedType[Int]
+  object Height extends TaggedType[Int] {
+    implicit val format: Format[Height] = implicitly[Format[Int]].bimap(Height(_), identity)
+  }
   type Height = Height.Type
 
   object TxNum extends TaggedType[Short]
@@ -66,6 +68,11 @@ package object state {
   object AssetNum extends TaggedType[Int]
   type AssetNum = AssetNum.Type
 
-  object TransactionId extends TaggedType[ByteStr]
+  object TransactionId extends TaggedType[ByteStr] {
+    implicit val format: Format[TransactionId] = Format[TransactionId](
+      com.wavesplatform.utils.byteStrFormat.map(this(_)),
+      Writes(com.wavesplatform.utils.byteStrFormat.writes)
+    )
+  }
   type TransactionId = TransactionId.Type
 }
