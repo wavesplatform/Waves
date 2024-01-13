@@ -1,6 +1,5 @@
 package com.wavesplatform.api.grpc
 
-import scala.concurrent.Future
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.grpc.TransactionsApiGrpcImpl.applicationStatusFromTxStatus
@@ -8,12 +7,14 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
 import com.wavesplatform.state.{Blockchain, TxMeta, InvokeScriptResult as VISR}
-import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import io.grpc.{Status, StatusRuntimeException}
+import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
 import io.grpc.stub.StreamObserver
+import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 import monix.reactive.Observable
+
+import scala.concurrent.Future
 
 class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransactionsApi)(implicit sc: Scheduler)
     extends TransactionsApiGrpc.TransactionsApi {
@@ -62,6 +63,20 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
               TransactionsApiGrpcImpl.toTransactionResponse(m)
           }
       )
+    }
+
+  override def getTransactionSnapshots(
+      request: TransactionSnapshotsRequest,
+      responseObserver: StreamObserver[TransactionSnapshotResponse]
+  ): Unit =
+    responseObserver.interceptErrors {
+      val snapshots =
+        for {
+          id                 <- Observable.fromIterable(request.transactionIds)
+          (snapshot, status) <- Observable.fromIterable(blockchain.transactionSnapshot(id.toByteStr))
+          pbSnapshot = PBSnapshots.toProtobuf(snapshot, status)
+        } yield TransactionSnapshotResponse(id, Some(pbSnapshot))
+      responseObserver.completeWith(snapshots)
     }
 
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =

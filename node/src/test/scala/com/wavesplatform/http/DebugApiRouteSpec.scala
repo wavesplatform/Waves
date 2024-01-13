@@ -89,8 +89,7 @@ class DebugApiRouteSpec
       null,
       null,
       configObject,
-      domain.rocksDBWriter.loadBalanceHistory,
-      domain.rocksDBWriter.loadStateHash,
+      domain.rocksDBWriter,
       () => Some(domain.blockchain),
       new RouteTimeout(60.seconds)(sharedScheduler),
       sharedScheduler
@@ -174,10 +173,11 @@ class DebugApiRouteSpec
         val lastButOneHeader    = domain.blockchain.blockHeader(lastButOneHeight).value
         val lastButOneStateHash = domain.rocksDBWriter.loadStateHash(lastButOneHeight).value
         val expectedResponse = Json.toJson(lastButOneStateHash).as[JsObject] ++ Json.obj(
-          "blockId"    -> lastButOneHeader.id().toString,
-          "baseTarget" -> lastButOneHeader.header.baseTarget,
-          "height"     -> lastButOneHeight,
-          "version"    -> Version.VersionString
+          "snapshotHash" -> domain.rocksDBWriter.snapshotStateHash(lastButOneHeight),
+          "blockId"      -> lastButOneHeader.id().toString,
+          "baseTarget"   -> lastButOneHeader.header.baseTarget,
+          "height"       -> lastButOneHeight,
+          "version"      -> Version.VersionString
         )
 
         Get(routePath(s"/stateHash/last")) ~> route ~> check {

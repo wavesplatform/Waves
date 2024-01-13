@@ -150,7 +150,7 @@ package object smartcontract {
     val seller              = accounts.tail.head // second one
     val matcher             = accounts.last
     val ts                  = time.correctedTime()
-    val expirationTimestamp = ts + Order.MaxLiveTime
+    val expirationTimestamp = ts + Order.MaxLiveTime / 2
     val buyPrice            = 1 * Order.PriceConstant
     val sellPrice           = (0.50 * Order.PriceConstant).toLong
     val buyAmount           = 2

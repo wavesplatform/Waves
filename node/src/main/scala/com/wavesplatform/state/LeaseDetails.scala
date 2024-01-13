@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.TxPositiveAmount
+import play.api.libs.json.{Format, Json, Writes}
 
 object LeaseDetails {
   sealed trait Status
@@ -24,6 +25,11 @@ object LeaseDetails {
         case _                         => None
       }
     }
+
+    implicit val byteStrFormat: Format[ByteStr]     = com.wavesplatform.utils.byteStrFormat
+    implicit val writesCancelled: Writes[Cancelled] = Json.writes
+    implicit val writesExpired: Writes[Expired]     = Json.writes
+    implicit val writesInactive: Writes[Inactive]   = Json.writes
   }
 }
 

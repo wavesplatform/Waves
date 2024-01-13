@@ -36,10 +36,7 @@ trait Script {
 }
 
 object Script {
-
   case class ComplexityInfo(verifierComplexity: Long, callableComplexities: Map[String, Long], maxComplexity: Long)
-
-  val checksumLength = 4
 
   def fromBase64String(str: String): Either[ScriptParseError, Script] =
     for {
@@ -93,9 +90,7 @@ object Script {
           )
           complexityInfo = verifierFuncOpt.fold(
             ComplexityInfo(0L, callableComplexities, maxComplexity)
-          )(
-            v => ComplexityInfo(callableComplexities(v.u.name), callableComplexities - v.u.name, maxComplexity)
-          )
+          )(v => ComplexityInfo(callableComplexities(v.u.name), callableComplexities - v.u.name, maxComplexity))
         } yield complexityInfo
     }
 

@@ -201,7 +201,7 @@ class OrderSpecification extends PropSpec with ValidationMatcher with NTPTime {
 
   property("Buy and Sell orders") {
     forAll(orderParamGen) { case (sender, matcher, pair, _, amount, price, timestamp, _, _) =>
-      val expiration = timestamp + Order.MaxLiveTime - 1000
+      val expiration = timestamp + Order.MaxLiveTime / 2 - 1000
       val buy = Order
         .buy(
           Order.V1,

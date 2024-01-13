@@ -23,6 +23,7 @@ class RestAPISettingsSpecification extends FlatSpec {
         |      access-control-allow-credentials = yes
         |    }
         |    transactions-by-address-limit = 1000
+        |    transaction-snapshots-limit = 123
         |    distribution-address-limit = 1000
         |    data-keys-request-limit = 1000
         |    asset-details-limit = 100
@@ -42,6 +43,7 @@ class RestAPISettingsSpecification extends FlatSpec {
     settings.port should be(6869)
     settings.apiKeyHash should be("BASE58APIKEYHASH")
     settings.transactionsByAddressLimit shouldBe 1000
+    settings.transactionSnapshotsLimit shouldBe 123
     settings.distributionAddressLimit shouldBe 1000
     settings.dataKeysRequestLimit shouldBe 1000
     settings.assetDetailsLimit shouldBe 100
