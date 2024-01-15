@@ -123,7 +123,6 @@ object Keys {
   val approvedFeatures: Key[Map[Short, Int]]  = Key(ApprovedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
-  // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
   def data(addressId: AddressId, key: String): Key[CurrentData] =
     Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
