@@ -5,6 +5,7 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
+import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block.BlockId
@@ -30,7 +31,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.utils.{LoggerFacade, RunNowExecutorService, ScorexLogging}
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
 import org.rocksdb.{RocksDB, Status}
 import org.slf4j.LoggerFactory
@@ -123,7 +124,7 @@ object RocksDBWriter extends ScorexLogging {
     isLightMode,
     bfBlockInsertions,
     dbSettings.cleanupInterval match {
-      case None => RunNowExecutorService // We don't care if disabled
+      case None => MoreExecutors.newDirectExecutorService() // We don't care if disabled
       case Some(_) =>
         forceCleanupExecutorService.getOrElse {
           new ThreadPoolExecutor(
