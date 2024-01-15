@@ -38,6 +38,7 @@ package object transaction {
 
   type TxPositiveAmount = Long Refined Positive
   object TxPositiveAmount extends RefinedTypeOps[TxPositiveAmount, Long]
+  implicit val posAmountWrites: Writes[TxPositiveAmount] = Writes(v => JsNumber(v.value))
 
   type TxNonNegativeAmount = Long Refined NonNegative
   object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long] {

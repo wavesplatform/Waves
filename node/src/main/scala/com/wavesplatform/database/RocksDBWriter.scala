@@ -18,7 +18,7 @@ import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, Bl
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStatus as PBStatus}
+import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 import com.wavesplatform.protobuf.{ByteStrExt, ByteStringExt, PBSnapshots}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
@@ -688,7 +688,6 @@ class RocksDBWriter(
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
       rw.put(Keys.blockStateHash(height), computedBlockStateHash)
-      expiredKeys += Keys.blockStateHash(threshold - 1).keyBytes
 
       if (dbSettings.storeInvokeScriptResults) snapshot.scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactionsWithSize
@@ -1254,11 +1253,11 @@ class RocksDBWriter(
     }
   }
 
-  def transactionSnapshot(id: ByteStr): Option[TransactionStateSnapshot] = readOnly { db =>
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, TxMeta.Status)] = readOnly { db =>
     for {
       meta     <- db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
       snapshot <- db.get(Keys.transactionStateSnapshotAt(Height(meta.height), TxNum(meta.num.toShort), rdb.txSnapshotHandle))
-    } yield snapshot
+    } yield PBSnapshots.fromProtobuf(snapshot, id, meta.height)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] =
@@ -1409,7 +1408,9 @@ class RocksDBWriter(
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id.toByteStr)))
 
-  override def lastStateHash(refId: Option[ByteStr]): ByteStr = {
+  override def lastStateHash(refId: Option[ByteStr]): ByteStr =
+    snapshotStateHash(height)
+
+  def snapshotStateHash(height: Int): ByteStr =
     readOnly(_.get(Keys.blockStateHash(height)))
-  }
 }

@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.ride.runner.*
 import com.wavesplatform.ride.runner.input.RideRunnerBlockchainState
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, StateSnapshot, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -187,6 +187,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   override def carryFee(refId: Option[BlockId]): Long = ???
 
   override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = ???
+
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, TxMeta.Status)] = ???
 
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = ???
 

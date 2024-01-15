@@ -25,7 +25,7 @@ import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, TransactionId, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, DataEntry, Height, LeaseBalance, StateSnapshot, TransactionId, TxMeta}
 import com.wavesplatform.transaction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -92,6 +92,8 @@ class LazyBlockchain[TagT] private (
   override def carryFee(refId: Option[BlockId]): Long = ???
 
   override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, transaction.Transaction)]] = ???
+
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, TxMeta.Status)] = ???
 
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = ???
 

@@ -431,8 +431,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot,
-          rocksDB.loadBalanceHistory,
-          rocksDB.loadStateHash,
+          rocksDB,
           () => utxStorage.getPriorityPool.map(_.compositeBlockchain),
           routeTimeout,
           heavyRequestScheduler

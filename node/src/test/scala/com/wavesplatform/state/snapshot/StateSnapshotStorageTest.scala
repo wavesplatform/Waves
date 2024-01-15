@@ -9,7 +9,6 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
-import com.wavesplatform.protobuf.PBSnapshots
 import com.wavesplatform.state.*
 import com.wavesplatform.state.TxMeta.Status.{Failed, Succeeded}
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
@@ -46,11 +45,7 @@ class StateSnapshotStorageTest extends PropSpec with WithDomain {
         if (failed) d.appendAndAssertFailed(tx) else d.appendAndAssertSucceed(tx)
         d.appendBlock()
         val status = if (failed) Failed else Succeeded
-        PBSnapshots.fromProtobuf(
-          d.rocksDBWriter.transactionSnapshot(tx.id()).get,
-          tx.id(),
-          d.blockchain.height - 1
-        ) shouldBe (expectedSnapshotWithMiner, status)
+        d.rocksDBWriter.transactionSnapshot(tx.id()).get shouldBe (expectedSnapshotWithMiner, status)
       }
 
       // Genesis

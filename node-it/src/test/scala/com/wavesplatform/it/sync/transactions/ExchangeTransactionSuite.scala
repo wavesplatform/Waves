@@ -55,7 +55,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val matcher = acc2
 
       val ts                  = ntpTime.correctedTime()
-      val expirationTimestamp = ts + Order.MaxLiveTime
+      val expirationTimestamp = ts + Order.MaxLiveTime / 2
 
       val buyPrice   = 2 * Order.PriceConstant
       val sellPrice  = 2 * Order.PriceConstant
@@ -197,7 +197,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       val matcher                  = thirdKeyPair
       val ts                       = ntpTime.correctedTime()
-      val expirationTimestamp      = ts + Order.MaxLiveTime
+      val expirationTimestamp      = ts + Order.MaxLiveTime / 2
       var assetBalanceBefore: Long = 0L
 
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
@@ -283,7 +283,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val matcher             = thirdKeyPair
     val ts                  = ntpTime.correctedTime()
-    val expirationTimestamp = ts + Order.MaxLiveTime
+    val expirationTimestamp = ts + Order.MaxLiveTime / 2
     val amount              = 1
     val nftWavesPrice       = 1000 * math.pow(10, 8).toLong
     val nftForAssetPrice    = 1 * math.pow(10, 8).toLong
