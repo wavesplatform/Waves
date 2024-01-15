@@ -782,7 +782,7 @@ class RocksDBWriter(
     val updateAtKeys = new ArrayBuffer[Key[BalanceNode]]()
 
     val changedKeyPrefix = KeyTags.ChangedWavesBalances.prefixBytes
-    val changedFromKey   = Keys.changedWavesBalances(fromInclusive) // Doesn't matter, we need this only to parse
+    val changedFromKey   = Keys.changedWavesBalances(fromInclusive) // fromInclusive doesn't affect the parsing result
     rw.iterateOverWithSeek(changedKeyPrefix, changedFromKey.keyBytes) { e =>
       val currHeight = Height(Ints.fromByteArray(e.getKey.drop(changedKeyPrefix.length)))
       val continue   = currHeight < toExclusive
