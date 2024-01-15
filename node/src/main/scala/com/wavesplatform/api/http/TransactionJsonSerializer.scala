@@ -285,9 +285,10 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
           val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
 
           gen.writeStartObject()
+          gen.writeNumberField("type", tx.tpe.id, numbersAsString)
           gen.writeStringField("id", tx.id().toString)
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
-          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          gen.writeStringField("feeAssetId", null)
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", 1, numbersAsString)
           gen.writeNumberField("chainId", tx.chainId, numbersAsString)
@@ -302,6 +303,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
               None
           appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
           gen.writeNumberField("spentComplexity", spentComplexity, numbersAsString)
+          gen.writeObjectFieldStart("payload")
           gen.writeStringField("type", "invocation")
           gen.writeStringField("dApp", Address(EthEncoding.toBytes(tx.underlying.getTo)).toString)
           functionCallEi.fold(gen.writeNullField("call"))(fc =>
@@ -312,7 +314,8 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
             gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(isr, _, serializers))
           )
           gen.writeEndObject()
-        case meta @ TransactionMeta.Default(height, mtt: MassTransferTransaction, succeeded, spentComplexity) if mtt.sender.toAddress != address =>
+          gen.writeEndObject()
+        case meta @ TransactionMeta.Default(_, mtt: MassTransferTransaction, _, _) if mtt.sender.toAddress != address =>
           /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction
             * only.
             */
