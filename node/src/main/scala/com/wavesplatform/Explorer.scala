@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
-import com.google.common.primitives.Longs
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
@@ -12,12 +12,11 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Height, Portfolio, StateSnapshot, TransactionId}
+import com.wavesplatform.state.{Blockchain, Height, Portfolio, SnapshotBlockchain, StateSnapshot, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
-import org.rocksdb.RocksDB
+import org.rocksdb.{ReadOptions, RocksDB}
 import play.api.libs.json.Json
 
 import java.io.File
@@ -29,7 +28,7 @@ import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
+import scala.util.{Try, Using}
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -69,7 +68,7 @@ object Explorer extends ScorexLogging {
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val rdb    = RDB.open(settings.dbSettings)
-    val reader = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
+    val reader = RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings, settings.enableLightMode)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -94,19 +93,27 @@ object Explorer extends ScorexLogging {
 
       flag match {
         case "WB" =>
-          val balances = mutable.Map[BigInt, Long]()
+          var accountsBaseTotalBalance = 0L
+          var wavesBalanceRecords      = 0
           rdb.db.iterateOver(KeyTags.WavesBalance) { e =>
-            val addressId = BigInt(e.getKey.drop(6))
-            val balance   = Longs.fromByteArray(e.getValue)
-            balances += (addressId -> balance)
+            val addressId = AddressId(Longs.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+            val key       = Keys.wavesBalance(addressId)
+            accountsBaseTotalBalance += key.parse(e.getValue).balance
+            wavesBalanceRecords += 1
           }
 
           var actualTotalReward = 0L
-          rdb.db.iterateOver(KeyTags.BlockReward) { e =>
-            actualTotalReward += Longs.fromByteArray(e.getValue)
+          var blocksRecords     = 0
+          rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+            val height = Height(Ints.fromByteArray(e.getKey.drop(Shorts.BYTES)))
+            val key    = Keys.blockMetaAt(height)
+            actualTotalReward += key.parse(e.getValue).fold(0L)(_.reward)
+            blocksRecords += 1
           }
 
-          val actualTotalBalance   = balances.values.sum + reader.carryFee(None)
+          log.info(s"Found $wavesBalanceRecords waves balance records and $blocksRecords block records")
+
+          val actualTotalBalance   = accountsBaseTotalBalance + reader.carryFee(None)
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
           val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 
@@ -223,7 +230,9 @@ object Explorer extends ScorexLogging {
 
           val result = new util.HashMap[Short, Stats]
           Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txSnapshotHandle.handle, rdb.txMetaHandle.handle).foreach { cf =>
-            Using(rdb.db.newIterator(cf)) { iterator =>
+            Using.Manager { use =>
+              val ro       = use(new ReadOptions().setTotalOrderSeek(true))
+              val iterator = use(rdb.db.newIterator(cf, ro))
               iterator.seekToFirst()
 
               while (iterator.isValid) {
@@ -245,7 +254,7 @@ object Explorer extends ScorexLogging {
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
-            log.info(s"${KeyTags(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+            log.info(s"${Try(KeyTags(prefix)).getOrElse(prefix.toString)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
           }
 
         case "TXBH" =>
@@ -363,10 +372,12 @@ object Explorer extends ScorexLogging {
         case "CTI" =>
           log.info("Counting transaction IDs")
           var counter = 0
-          Using(rdb.db.newIterator(rdb.txMetaHandle.handle)) { iter =>
+          Using.Manager { use =>
+            val ro   = use(new ReadOptions().setTotalOrderSeek(true))
+            val iter = use(rdb.db.newIterator(rdb.txMetaHandle.handle, ro))
             iter.seekToFirst()
-//            iter.seek(KeyTags.TransactionMetaById.prefixBytes)
-            log.info(iter.key().mkString(","))
+            // iter.seek(KeyTags.TransactionMetaById.prefixBytes) // Doesn't work, because of CappedPrefixExtractor(10)
+
             while (iter.isValid && iter.key().startsWith(KeyTags.TransactionMetaById.prefixBytes)) {
               counter += 1
               iter.next()
@@ -380,6 +391,9 @@ object Explorer extends ScorexLogging {
           val meta = rdb.db.get(Keys.transactionMetaById(TransactionId(ByteStr.decodeBase58(id).get), rdb.txMetaHandle))
           log.info(s"Meta: $meta")
       }
-    } finally rdb.close()
+    } finally {
+      reader.close()
+      rdb.close()
+    }
   }
 }

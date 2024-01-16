@@ -104,6 +104,7 @@ trait BaseState {
 
   @TearDown
   def close(): Unit = {
+    state.close()
     rdb.close()
   }
 }

@@ -18,6 +18,7 @@ import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB}
 import scopt.OParser
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
+import scala.annotation.tailrec
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -45,9 +46,9 @@ object Exporter extends ScorexLogging {
           new NTP(settings.ntpServer),
           RDB.open(settings.dbSettings)
         ) { (time, rdb) =>
-          val (blockchain, _)  = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
-          val blockchainHeight = blockchain.height
-          val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
+          val (blockchain, rdbWriter) = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
+          val blockchainHeight        = blockchain.height
+          val height                  = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
           log.info(s"Blockchain height is $blockchainHeight exporting to $height")
           val blocksOutputFilename = s"$blocksOutputFileNamePrefix-$height"
           log.info(s"Blocks output file: $blocksOutputFilename")
@@ -66,8 +67,9 @@ object Exporter extends ScorexLogging {
 
           Using.resources(
             createOutputFile(blocksOutputFilename),
-            snapshotsOutputFilename.map(createOutputFile)
-          ) { case (blocksOutput, snapshotsOutput) =>
+            snapshotsOutputFilename.map(createOutputFile),
+            rdbWriter
+          ) { case (blocksOutput, snapshotsOutput, _) =>
             Using.resources(createBufferedOutputStream(blocksOutput, 10), snapshotsOutput.map(createBufferedOutputStream(_, 100))) {
               case (blocksStream, snapshotsStream) =>
                 var exportedBlocksBytes    = 0L
@@ -139,7 +141,8 @@ object Exporter extends ScorexLogging {
       )
     }
 
-    def loadTxData[A](acc: Seq[A], height: Int, iterator: DataIterator[A], updateNextEntryF: (Int, A) => Unit): Seq[A] = {
+    @tailrec
+    private def loadTxData[A](acc: Seq[A], height: Int, iterator: DataIterator[A], updateNextEntryF: (Int, A) => Unit): Seq[A] = {
       if (iterator.hasNext) {
         val (h, txData) = iterator.next()
         if (h == height) {
@@ -151,7 +154,8 @@ object Exporter extends ScorexLogging {
       } else acc.reverse
     }
 
-    override def computeNext(): (Int, Block, Seq[Array[Byte]]) = {
+    @tailrec
+    override final def computeNext(): (Int, Block, Seq[Array[Byte]]) = {
       if (blockMetaIterator.hasNext) {
         val (h, meta) = blockMetaIterator.next()
         if (h <= targetHeight) {
@@ -172,8 +176,10 @@ object Exporter extends ScorexLogging {
             }
           } else Seq.empty
           createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, txs).toOption
-            .map(block => (h, block, snapshots))
-            .getOrElse(computeNext())
+            .map(block => (h, block, snapshots)) match {
+            case Some(r) => r
+            case None    => computeNext()
+          }
         } else {
           closeResources()
           endOfData()
@@ -204,7 +210,8 @@ object Exporter extends ScorexLogging {
 
     dbIterator.seek(prefixBytes)
 
-    override def computeNext(): (Int, A) = {
+    @tailrec
+    override final def computeNext(): (Int, A) = {
       if (dbIterator.isValid && dbIterator.key().startsWith(prefixBytes)) {
         val h = Ints.fromByteArray(heightFromKeyF(dbIterator.key()))
         if (h > 1) {

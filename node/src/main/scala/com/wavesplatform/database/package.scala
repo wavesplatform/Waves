@@ -37,7 +37,6 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
 import scala.jdk.CollectionConverters.*
-import scala.util.Using
 
 //noinspection UnstableApiUsage
 package object database {
@@ -309,13 +308,15 @@ package object database {
   }
 
   private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
-    if (bs == null || bs.length == 0) EmptyDataEntry(key) else  pb.DataEntry.parseFrom(bs).value match {
-      case Value.Empty              => EmptyDataEntry(key)
-      case Value.IntValue(value)    => IntegerDataEntry(key, value)
-      case Value.BoolValue(value)   => BooleanDataEntry(key, value)
-      case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
-      case Value.StringValue(value) => StringDataEntry(key, value)
-    }
+    if (bs == null || bs.length == 0) EmptyDataEntry(key)
+    else
+      pb.DataEntry.parseFrom(bs).value match {
+        case Value.Empty              => EmptyDataEntry(key)
+        case Value.IntValue(value)    => IntegerDataEntry(key, value)
+        case Value.BoolValue(value)   => BooleanDataEntry(key, value)
+        case Value.BinaryValue(value) => BinaryDataEntry(key, value.toByteStr)
+        case Value.StringValue(value) => StringDataEntry(key, value)
+      }
 
   private def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
@@ -351,7 +352,7 @@ package object database {
   def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.height) ++ Ints.toByteArray(balance.prevHeight)
 
-  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == 12)
+  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == BalanceNode.SizeInBytes)
     BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
   else BalanceNode.Empty
 
@@ -390,39 +391,54 @@ package object database {
 
   implicit class DBExt(val db: RocksDB) extends AnyVal {
 
-    def readOnly[A](f: ReadOnlyDB => A): A = {
-      Using.resource(db.getSnapshot) { s =>
-        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
-          f(new ReadOnlyDB(db, ro))
-        }
-      }(db.releaseSnapshot(_))
-    }
+    def readOnly[A](f: ReadOnlyDB => A): A = withReadOptions { ro => f(new ReadOnlyDB(db, ro)) }
 
     /** @note
       *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
-    def readWrite[A](f: RW => A): A = {
-      val snapshot     = db.getSnapshot
-      val readOptions  = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
-      val batch        = new WriteBatch()
-      val rw           = new RW(db, readOptions, batch)
-      val writeOptions = new WriteOptions()
+    def readWrite[A](f: RW => A): A = withOptions { (ro, wo) => readWriteWithOptions(ro, wo)(f) }
+
+    def readWriteWithOptions[A](readOptions: ReadOptions, writeOptions: WriteOptions)(f: RW => A): A = {
+      val batch = new WriteBatch()
+      val rw    = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
         db.write(writeOptions, batch)
         r
-      } finally {
-        readOptions.close()
-        writeOptions.close()
-        batch.close()
+      } finally batch.close()
+    }
+
+    def withOptions[A](f: (ReadOptions, WriteOptions) => A): A =
+      withReadOptions { ro =>
+        withWriteOptions { wo =>
+          f(ro, wo)
+        }
+      }
+
+    def withWriteOptions[A](f: WriteOptions => A): A = {
+      val wo = new WriteOptions()
+      try f(wo)
+      finally wo.close()
+    }
+
+    def withReadOptions[A](f: ReadOptions => A): A = {
+      val snapshot = db.getSnapshot
+      val ro       = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+      try f(ro)
+      finally {
+        ro.close()
         db.releaseSnapshot(snapshot)
       }
     }
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
+    def multiGetOpt[A](readOptions: ReadOptions, keys: collection.IndexedSeq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGetOpt[A](readOptions: ReadOptions, keys: IndexedSeq[Key[Option[A]]], valBufSizes: IndexedSeq[Int]): Seq[Option[A]] =
+    def multiGetOpt[A](
+        readOptions: ReadOptions,
+        keys: collection.IndexedSeq[Key[Option[A]]],
+        valBufSizes: collection.IndexedSeq[Int]
+    ): Seq[Option[A]] =
       multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
@@ -431,7 +447,7 @@ package object database {
     def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] =
       multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGet[A](readOptions: ReadOptions, keys: IndexedSeq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+    def multiGet[A](readOptions: ReadOptions, keys: collection.IndexedSeq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
       val keyBufs = getKeyBuffersFromKeys(keys)
       val valBufs = getValueBuffers(keys.size, valBufSize)
 
@@ -452,7 +468,7 @@ package object database {
       result
     }
 
-    def multiGetInts(readOptions: ReadOptions, keys: IndexedSeq[Key[Int]]): Seq[Option[Int]] = {
+    def multiGetInts(readOptions: ReadOptions, keys: collection.IndexedSeq[Key[Int]]): Seq[Option[Int]] = {
       val keyBytes = keys.map(_.keyBytes)
       val keyBufs  = getKeyBuffers(keyBytes)
       val valBufs  = getValueBuffers(keyBytes.size, 4)

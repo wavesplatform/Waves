@@ -347,7 +347,7 @@ object Importer extends ScorexLogging {
 
     val actorSystem = ActorSystem("wavesplatform-import")
     val rdb         = RDB.open(settings.dbSettings)
-    val (blockchainUpdater, _) =
+    val (blockchainUpdater, rdbWriter) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
@@ -423,6 +423,7 @@ object Importer extends ScorexLogging {
 
         utxPool.close()
         blockchainUpdater.shutdown()
+        rdbWriter.close()
         rdb.close()
       }
       blocksInputStream.close()
