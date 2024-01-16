@@ -82,7 +82,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
         amount,
         price,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + Order.MaxLiveTime / 2,
         matcherFee
       )
       .explicitGet()
@@ -95,7 +95,7 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
         amount,
         price,
         ts,
-        ts + Order.MaxLiveTime,
+        ts + Order.MaxLiveTime / 2,
         matcherFee
       )
       .explicitGet()

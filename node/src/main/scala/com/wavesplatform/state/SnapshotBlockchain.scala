@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -118,6 +119,12 @@ case class SnapshotBlockchain(
       .get(id)
       .map(t => TxMeta(Height(this.height), t.status, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
+
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, Status)] =
+    snapshot.transactions
+      .get(id)
+      .map(tx => (tx.snapshot, tx.status))
+      .orElse(inner.transactionSnapshot(id))
 
   override def height: Int = inner.height + blockMeta.fold(0)(_ => 1)
 

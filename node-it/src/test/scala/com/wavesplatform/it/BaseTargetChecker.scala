@@ -23,11 +23,11 @@ object BaseTargetChecker {
       .withFallback(defaultReference())
       .resolve()
 
-    val settings               = WavesSettings.fromRootConfig(sharedConfig)
-    val db                     = RDB.open(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
-    val ntpTime                = new NTP("ntp.pool.org")
-    val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
-    val poSSelector            = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+    val settings                       = WavesSettings.fromRootConfig(sharedConfig)
+    val db                             = RDB.open(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
+    val ntpTime                        = new NTP("ntp.pool.org")
+    val (blockchainUpdater, rdbWriter) = StorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
+    val poSSelector                    = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     try {
       val genesisBlock =
@@ -51,6 +51,10 @@ object BaseTargetChecker {
 
           f"$address: ${timeDelay * 1e-3}%10.3f s"
       }
-    } finally ntpTime.close()
+    } finally {
+      ntpTime.close()
+      rdbWriter.close()
+      db.close()
+    }
   }
 }

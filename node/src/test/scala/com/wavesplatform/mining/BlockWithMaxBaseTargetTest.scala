@@ -166,6 +166,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with
       schedulerService.shutdown()
       utxPoolStub.close()
       bcu.shutdown()
+      defaultWriter.close()
     }
   }
 }

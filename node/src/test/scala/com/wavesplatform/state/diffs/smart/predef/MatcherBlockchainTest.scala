@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.script.ScriptRunner
@@ -41,6 +42,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]                              = ???
       override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]]                  = ???
       override def transactionMeta(id: ByteStr): Option[TxMeta]                                             = ???
+      override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, Status)]                        = ???
       override def containsTransaction(tx: Transaction): Boolean                                            = ???
       override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription]                        = ???
       override def resolveAlias(a: Alias): Either[ValidationError, Address]                                 = ???

@@ -57,6 +57,7 @@ private object UtxPoolSpecification {
     val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
     override def close(): Unit = {
+      writer.close()
       rdb.close()
       TestHelpers.deleteRecursively(path)
     }
@@ -91,17 +92,19 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     )
 
     Using.resource(TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)) { dbContext =>
-      val (bcu, _) = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
-      bcu.processBlock(
-        Block
-          .genesis(
-            genesisSettings,
-            bcu.isFeatureActivated(BlockchainFeatures.RideV6),
-            bcu.isFeatureActivated(BlockchainFeatures.LightNode)
-          )
-          .explicitGet()
-      ) should beRight
-      test(bcu)
+      val (bcu, rdbWriter) = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
+      Using.resource(rdbWriter) { _ =>
+        bcu.processBlock(
+          Block
+            .genesis(
+              genesisSettings,
+              bcu.isFeatureActivated(BlockchainFeatures.RideV6),
+              bcu.isFeatureActivated(BlockchainFeatures.LightNode)
+            )
+            .explicitGet()
+        ) should beRight
+        test(bcu)
+      }
     }
   }
 

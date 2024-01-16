@@ -288,7 +288,7 @@ object FailedTransactionSuiteLike {
       100,
       100,
       timestamp,
-      timestamp + Order.MaxLiveTime,
+      timestamp + Order.MaxLiveTime / 2,
       buyMatcherFee,
       Asset.fromString(Some(buyMatcherFeeAsset))
     ).explicitGet()
@@ -300,7 +300,7 @@ object FailedTransactionSuiteLike {
       100,
       100,
       timestamp,
-      timestamp + Order.MaxLiveTime,
+      timestamp + Order.MaxLiveTime / 2,
       sellMatcherFee,
       Asset.fromString(Some(sellMatcherFeeAsset))
     ).explicitGet()

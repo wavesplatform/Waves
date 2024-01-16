@@ -40,8 +40,11 @@ object RDB extends StrictLogging {
     val dbDir = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles             = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val handles          = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val defaultCfCompressionForLevels = CompressionType.NO_COMPRESSION :: // Disable compaction for L0, because it is predictable and small
+      List.fill(defaultCfOptions.options.numLevels() - 1)(CompressionType.LZ4_COMPRESSION)
+
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
@@ -52,12 +55,14 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
+            .setMaxWriteBufferNumber(3)
+            .setCompressionPerLevel(defaultCfCompressionForLevels.asJava)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
           txMetaCfOptions.options
-            .optimizeForPointLookup(16 << 20)
+            .optimizeForPointLookup(16 << 20) // Iterators might not work with this option
             .setDisableAutoCompactions(true)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
         ),
@@ -111,7 +116,11 @@ object RDB extends StrictLogging {
           .setDataBlockHashTableUtilRatio(0.5)
       )
       .setWriteBufferSize(writeBufferSize)
+      .setCompactionStyle(CompactionStyle.LEVEL)
       .setLevelCompactionDynamicLevelBytes(true)
+      // Defines the prefix.
+      // Improves an iterator performance for keys with prefixes of 10 or more bytes.
+      // If specified key has less than 10 bytes: iterator finds the exact key for seek(key) and becomes invalid after next().
       .useCappedPrefixExtractor(10)
       .setMemtablePrefixBloomSizeRatio(0.25)
       .setCompressionType(CompressionType.LZ4_COMPRESSION)
@@ -124,11 +133,11 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      .setIncreaseParallelism(4)
+      .setIncreaseParallelism(6)
       .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(4)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
+      .setMaxSubcompactions(2) // Write stalls expected without this option. Can lead to max_background_jobs * max_subcompactions background threads
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()

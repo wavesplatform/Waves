@@ -8,19 +8,19 @@ import com.wavesplatform.Version
 import com.wavesplatform.account.{Address, PKKeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, SnapshotBlockchain, TxMeta}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utils.{ScorexLogging, Time, byteStrFormat}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -54,8 +54,7 @@ case class DebugApiRoute(
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
-    loadBalanceHistory: Address => Seq[(Int, Long)],
-    loadStateHash: Int => Option[StateHash],
+    db: RocksDBWriter,
     priorityPoolBlockchain: () => Option[Blockchain],
     routeTimeout: RouteTimeout,
     heavyRequestScheduler: Scheduler
@@ -71,7 +70,7 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
 
-  private[this] val serializer = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] val serializer = TransactionJsonSerializer(blockchain)
 
   override lazy val route: Route = pathPrefix("debug") {
     balanceHistory ~ stateHash ~ validate ~ withAuth {
@@ -86,7 +85,7 @@ case class DebugApiRoute(
     })
 
   def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
-    complete(Json.toJson(loadBalanceHistory(address).map { case (h, b) =>
+    complete(Json.toJson(db.loadBalanceHistory(address).map { case (h, b) =>
       Json.obj("height" -> h, "balance" -> b)
     }))
   }
@@ -259,13 +258,14 @@ case class DebugApiRoute(
 
   private def stateHashAt(height: Int): Route = {
     val result = for {
-      sh <- loadStateHash(height)
+      sh <- db.loadStateHash(height)
       h  <- blockchain.blockHeader(height)
     } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-      "blockId"    -> h.id().toString,
-      "baseTarget" -> h.header.baseTarget,
-      "height"     -> height,
-      "version"    -> Version.VersionString
+      "snapshotHash" -> db.snapshotStateHash(height),
+      "blockId"      -> h.id().toString,
+      "baseTarget"   -> h.header.baseTarget,
+      "height"       -> height,
+      "version"      -> Version.VersionString
     )
 
     result match {

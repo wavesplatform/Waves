@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.{JsonSerializer, SerializerProvider}
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.api.common.TransactionMeta
 import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.api.http.TransactionJsonSerializer.*
 import com.wavesplatform.api.http.TransactionsApiRoute.{ApplicationStatus, LeaseStatus, TxMetaEnriched}
@@ -16,8 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.state.InvokeScriptResult.{AttachedPayment, Burn, Call, ErrorMessage, Invocation, Issue, Lease, LeaseCancel, Reissue, SponsorFee}
-import com.wavesplatform.state.LeaseDetails
-import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.{Blockchain, DataEntry, InvokeScriptResult, LeaseDetails, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -29,7 +28,7 @@ import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.*
 import play.api.libs.json.JsonConfiguration.Aux
 
-final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
+final case class TransactionJsonSerializer(blockchain: Blockchain) {
 
   val assetSerializer: JsonSerializer[Asset] =
     (value: Asset, gen: JsonGenerator, serializers: SerializerProvider) => {
@@ -286,9 +285,10 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
           val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
 
           gen.writeStartObject()
+          gen.writeNumberField("type", tx.tpe.id, numbersAsString)
           gen.writeStringField("id", tx.id().toString)
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
-          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          gen.writeStringField("feeAssetId", null)
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", 1, numbersAsString)
           gen.writeNumberField("chainId", tx.chainId, numbersAsString)
@@ -303,6 +303,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
               None
           appStatus.foreach(s => gen.writeStringField("applicationStatus", s))
           gen.writeNumberField("spentComplexity", spentComplexity, numbersAsString)
+          gen.writeObjectFieldStart("payload")
           gen.writeStringField("type", "invocation")
           gen.writeStringField("dApp", Address(EthEncoding.toBytes(tx.underlying.getTo)).toString)
           functionCallEi.fold(gen.writeNullField("call"))(fc =>
@@ -313,7 +314,8 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
             gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(isr, _, serializers))
           )
           gen.writeEndObject()
-        case meta @ TransactionMeta.Default(height, mtt: MassTransferTransaction, succeeded, spentComplexity) if mtt.sender.toAddress != address =>
+          gen.writeEndObject()
+        case meta @ TransactionMeta.Default(_, mtt: MassTransferTransaction, _, _) if mtt.sender.toAddress != address =>
           /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction
             * only.
             */

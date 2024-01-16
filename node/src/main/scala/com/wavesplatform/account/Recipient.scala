@@ -227,4 +227,6 @@ object Alias {
         case Some(expected) if expected != chainId => Left(WrongChain(expected, chainId))
         case _                                     => Right(Alias(chainId, name))
       }
+
+  implicit val writes: Writes[Alias] = Writes(a => JsString(a.toString))
 }

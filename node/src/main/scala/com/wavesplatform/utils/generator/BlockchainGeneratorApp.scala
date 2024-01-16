@@ -118,11 +118,12 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     val blockchain = {
       val rdb = RDB.open(wavesSettings.dbSettings)
-      val (blockchainUpdater, rocksdb) =
+      val (blockchainUpdater, rdbWriter) =
         StorageFactory(wavesSettings, rdb, fakeTime, BlockchainUpdateTriggers.noop)
       com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
+        rdbWriter.close()
         rdb.close()
       })
       blockchainUpdater

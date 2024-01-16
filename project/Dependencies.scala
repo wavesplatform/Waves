@@ -6,7 +6,7 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.5.1" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
   private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
@@ -73,6 +73,7 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
+    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.21", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.1",
     asyncHttpClient

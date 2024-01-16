@@ -349,6 +349,7 @@ class Docker(
     client.startContainer(id)
     nodes.asScala.find(_.containerId == id).foreach { node =>
       node.nodeInfo = getNodeInfo(node.containerId, node.settings)
+      Await.result(node.waitForStartup(), 3.minutes)
     }
   }
 

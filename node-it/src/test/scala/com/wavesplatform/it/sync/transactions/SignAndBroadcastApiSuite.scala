@@ -426,7 +426,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val seller              = secondKeyPair
       val matcher             = thirdKeyPair
       val ts                  = ntpTime.correctedTime()
-      val expirationTimestamp = ts + Order.MaxLiveTime
+      val expirationTimestamp = ts + Order.MaxLiveTime / 2
       val buyPrice            = 1 * Order.PriceConstant
       val sellPrice           = (0.50 * Order.PriceConstant).toLong
       val mf                  = 300000L

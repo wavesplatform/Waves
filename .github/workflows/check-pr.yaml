@@ -49,7 +49,7 @@ jobs:
           sbt lang/assembly
           git clone https://github.com/waves-exchange/neutrino-contract
           git clone https://github.com/waves-exchange/contracts
-          git clone https://oauth2:${{ secrets.DUCKS_GITHUB_TOKEN }}@github.com/akharazyan/wavesducks-public
+          git clone https://github.com/waves-ducks-core/wavesducks-public
           git clone https://oauth2:${{ secrets.SWOPFI_GITLAB_TOKEN }}@gitlabwp.wvservices.com/swopfi/swopfi-smart-contracts
           find neutrino-contract/script     -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
           find contracts/ride               -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
