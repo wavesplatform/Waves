@@ -1,8 +1,5 @@
 package com.wavesplatform.state
 
-import java.io.File
-import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.*
 import com.wavesplatform.api.BlockMeta
@@ -17,7 +14,10 @@ import com.wavesplatform.transaction.Transaction
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
+import java.io.File
+import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.io.Codec
+import scala.util.Using
 
 /** Tests over real database. How to test:
   *   1. Download a database 2. Import it:
@@ -87,7 +87,7 @@ object RocksDBWriterBenchmark {
       RDB.open(wavesSettings.dbSettings)
     }
 
-    val db = new RocksDBWriter(rawDB, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
+    val db = RocksDBWriter(rawDB, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
 
     def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(height).map { meta =>
@@ -102,15 +102,12 @@ object RocksDBWriterBenchmark {
 
     @TearDown
     def close(): Unit = {
+      db.close()
       rawDB.close()
     }
 
     protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {
-      scala.io.Source
-        .fromFile(absolutePath)(Codec.UTF8)
-        .getLines()
-        .map(f)
-        .toVector
+      Using.resource(scala.io.Source.fromFile(absolutePath)(Codec.UTF8))(_.getLines().map(f).toVector)
     }
   }
 

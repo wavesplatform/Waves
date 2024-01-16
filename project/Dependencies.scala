@@ -73,6 +73,7 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
+    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.21", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.0",
     asyncHttpClient
@@ -97,7 +98,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.8.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.9.1"
 
   private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
 

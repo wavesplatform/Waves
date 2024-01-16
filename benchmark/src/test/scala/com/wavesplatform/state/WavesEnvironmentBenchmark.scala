@@ -21,6 +21,7 @@ import scodec.bits.BitVector
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import scala.io.Codec
+import scala.util.Using
 
 /** Tests over real database. How to test:
   *   1. Download a database 2. Import it:
@@ -134,8 +135,8 @@ object WavesEnvironmentBenchmark {
       RDB.open(wavesSettings.dbSettings)
     }
 
+    val state = RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
     val environment: Environment[Id] = {
-      val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings, wavesSettings.enableLightMode)
       WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
@@ -149,15 +150,12 @@ object WavesEnvironmentBenchmark {
 
     @TearDown
     def close(): Unit = {
+      state.close()
       rdb.close()
     }
 
     protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {
-      scala.io.Source
-        .fromFile(absolutePath)(Codec.UTF8)
-        .getLines()
-        .map(f)
-        .toVector
+      Using.resource(scala.io.Source.fromFile(absolutePath)(Codec.UTF8))(_.getLines().map(f).toVector)
     }
   }
 
