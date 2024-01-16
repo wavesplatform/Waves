@@ -20,6 +20,8 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
+  private def grpcModule(module: String) = "io.grpc" % module % "1.61.0"
+
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http")
@@ -89,7 +91,7 @@ object Dependencies {
 
   lazy val qaseReportDeps = Seq(
     playJson,
-    ("io.qase" % "qase-api" % "3.1.1").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+    ("io.qase" % "qase-api" % "3.2.0").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -134,7 +136,7 @@ object Dependencies {
     ) ++ test ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.1"
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.2"
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -150,8 +152,8 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion,
-    "io.grpc"               % "grpc-services"        % scalapb.compiler.Version.grpcJavaVersion,
+    grpcModule("grpc-netty"),
+    grpcModule("grpc-services"),
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapbVersion,
     protoSchemasLib         % "protobuf"
   )
@@ -171,7 +173,7 @@ object Dependencies {
       akkaHttpModule("akka-http-testkit") % Test,
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
-      "io.grpc"                           % "grpc-inprocess"         % "1.60.1" % Test
+      grpcModule("grpc-inprocess")        % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 
