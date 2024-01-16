@@ -178,7 +178,15 @@ object BlockDiffer extends ScorexLogging {
         totalRewardPortfolios    <- Portfolio.combine(totalMinerPortfolio, nonMinerRewardPortfolios)
         patchesSnapshot = leasePatchesSnapshot(blockchainWithNewBlock)
         resultSnapshot <- patchesSnapshot.addBalances(totalRewardPortfolios, blockchainWithNewBlock)
-      } yield resultSnapshot
+      } yield {
+        log.info(s"feeFromPreviousBlock = $feeFromPreviousBlock")
+        log.info(s"initialFeeFromThisBlock = $initialFeeFromThisBlock")
+        log.info(s"(minerReward, daoPortfolio, xtnBuybackPortfolio) = ${(minerReward, daoPortfolio, xtnBuybackPortfolio)}")
+        log.info(s"totalRewardPortfolios = $totalRewardPortfolios")
+        log.info(s"patchesSnapshot = $patchesSnapshot")
+        log.info(s"lastBlockId = ${blockchainWithNewBlock.lastBlockId}")
+        resultSnapshot
+      }
 
     for {
       _            <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
@@ -308,9 +316,16 @@ object BlockDiffer extends ScorexLogging {
       .combine(feeFromPreviousBlock)
       .leftMap(GenericError(_))
       .flatMap { minerReward =>
+        log.info(s"rewardShares.miner = ${rewardShares.miner}")
+        log.info(s"feeFromPreviousBlock = $feeFromPreviousBlock")
+        log.info(s"minerReward = $minerReward")
+
         val resultPf = Map(miner -> minerReward) ++
           daoAddress.map(_ -> Portfolio.waves(rewardShares.daoAddress)) ++
           xtnBuybackAddress.map(_ -> Portfolio.waves(rewardShares.xtnBuybackAddress))
+
+        log.info(s"resultPf = $resultPf")
+        log.info(s"lastBlockId = ${blockchain.lastBlockId}")
 
         StateSnapshot.build(blockchain, portfolios = resultPf.filter(!_._2.isEmpty))
       }
@@ -319,8 +334,10 @@ object BlockDiffer extends ScorexLogging {
   def computeInitialStateHash(blockchain: Blockchain, initSnapshot: StateSnapshot, prevStateHash: ByteStr): ByteStr = {
     if (initSnapshot == StateSnapshot.empty || blockchain.height == 1)
       prevStateHash
-    else
+    else {
+      log.info(s"initSnapshot $initSnapshot")
       TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevStateHash)
+    }
   }
 
   private[this] def apply(

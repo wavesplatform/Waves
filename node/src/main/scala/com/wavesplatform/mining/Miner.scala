@@ -152,7 +152,11 @@ class MinerImpl(
       BlockDiffer
         .createInitialBlockSnapshot(blockchainUpdater, reference, miner)
         .toOption
-        .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
+        .map {
+          initSnapshot =>
+            log.info(s"initSnapshot $initSnapshot")
+            TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash)
+        }
     }
     log.info(s"keyBlockStateHash = $keyBlockStateHash")
 
