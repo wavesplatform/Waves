@@ -93,7 +93,7 @@ class MicroBlockMinerImpl(
               )
             )
           )
-        log.trace(s"Finished pack for ${accumulatedBlock.id()}")
+        log.trace(s"Finished pack for ${accumulatedBlock.id()}, stateHash = $stateHash")
         val updatedTotalConstraint = updatedMdConstraint.head
         cb.onSuccess((unconfirmed, updatedTotalConstraint, stateHash))
       }

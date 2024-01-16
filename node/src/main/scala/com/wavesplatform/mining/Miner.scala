@@ -154,6 +154,7 @@ class MinerImpl(
         .toOption
         .map(initSnapshot => TxStateSnapshotHashBuilder.createHashFromSnapshot(initSnapshot, None).createHash(prevHash))
     }
+    log.info(s"keyBlockStateHash = $keyBlockStateHash")
 
     if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, keyBlockStateHash)
     else {
@@ -197,6 +198,7 @@ class MinerImpl(
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.LightNode, blockchainUpdater.height + 1))
           Some(blockchainUpdater.lastStateHash(Some(reference)))
         else None
+      _ = log.info(s"prevStateHash = $prevStateHash")
       (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock(account.toAddress, reference, prevStateHash)
       block <- Block
         .buildAndSign(

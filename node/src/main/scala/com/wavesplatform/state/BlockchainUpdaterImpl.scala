@@ -242,6 +242,7 @@ class BlockchainUpdaterImpl(
                       txSignParCheck = txSignParCheck
                     )
                     .map { r =>
+                      log.info(s"computedStateHash ${r.computedStateHash}")
                       val updatedBlockchain = SnapshotBlockchain(rocksdb, r.snapshot, block, hitSource, r.carry, reward, Some(r.computedStateHash))
                       miner.scheduleMining(Some(updatedBlockchain))
                       blockchainUpdateTriggers.onProcessBlock(block, r.keyBlockSnapshot, reward, hitSource, referencedBlockchain)
@@ -298,6 +299,7 @@ class BlockchainUpdaterImpl(
                 metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, referencedComputedStateHash, discarded)) =>
+                    log.info(s"referencedComputedStateHash $referencedComputedStateHash")
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
@@ -386,6 +388,7 @@ class BlockchainUpdaterImpl(
                     reward,
                     hitSource
                   ) =>
+                log.info(s"computedStateHash $computedStateHash")
                 val newHeight = rocksdb.height + 1
 
                 restTotalConstraint = updatedTotalConstraint
@@ -537,6 +540,7 @@ class BlockchainUpdaterImpl(
                     )
                     .signatureValid() -> computedStateHash
                 }
+              _ = log.info(s"referencedComputedStateHash $referencedComputedStateHash")
               _ <- Either
                 .cond(
                   totalSignatureValid,
@@ -557,6 +561,7 @@ class BlockchainUpdaterImpl(
               }
             } yield {
               val BlockDiffer.Result(snapshot, carry, totalFee, updatedMdConstraint, keyBlockSnapshot, computedStateHash) = blockDifferResult
+              log.info(s"computedStateHash $computedStateHash")
               restTotalConstraint = updatedMdConstraint
               val blockId = ng.createBlockId(microBlock)
 

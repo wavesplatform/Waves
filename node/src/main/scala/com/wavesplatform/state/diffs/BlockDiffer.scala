@@ -21,10 +21,11 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, Authorized, BlockchainUpdater, GenesisTransaction, PaymentTransaction, Transaction}
+import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.immutable.VectorMap
 
-object BlockDiffer {
+object BlockDiffer extends ScorexLogging {
   final case class Result(
       snapshot: StateSnapshot,
       carry: Long,
@@ -336,6 +337,7 @@ object BlockDiffer {
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
+    log.info(s"prevStateHash = $prevStateHash")
     val timestamp       = blockchain.lastBlockTimestamp.get
     val blockGenerator  = blockchain.lastBlockHeader.get.header.generator.toAddress
     val rideV6Activated = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
@@ -348,6 +350,8 @@ object BlockDiffer {
     prepareCaches(blockGenerator, txs, loadCacheData)
 
     val initStateHash = computeInitialStateHash(blockchain, initSnapshot, prevStateHash)
+    log.info(s"initStateHash = $initStateHash")
+
     txs
       .foldLeft(TracedResult(Result(initSnapshot, 0L, 0L, initConstraint, initSnapshot, initStateHash).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
@@ -383,15 +387,18 @@ object BlockDiffer {
 
                 val newSnapshot = currSnapshot |+| resultTxSnapshot.withTransaction(txInfoWithFee)
 
+                val newStateHash = TxStateSnapshotHashBuilder
+                  .createHashFromSnapshot(resultTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
+                  .createHash(prevStateHash)
+                log.info(s"newStateHash = $newStateHash, transaction id = ${txInfo.transaction.id()}")
+
                 Result(
                   newSnapshot,
                   carryFee + txFeeInfo.carry,
                   currTotalFee + txFeeInfo.wavesFee,
                   updatedConstraint,
                   newKeyBlockSnapshot,
-                  TxStateSnapshotHashBuilder
-                    .createHashFromSnapshot(resultTxSnapshot, Some(TxStatusInfo(txInfo.transaction.id(), txInfo.status)))
-                    .createHash(prevStateHash)
+                  newStateHash
                 )
               }
             }
@@ -399,11 +406,13 @@ object BlockDiffer {
 
           res.copy(resultE = res.resultE.recover {
             case _ if hasChallenge =>
-              result.copy(
-                snapshot = result.snapshot.bindElidedTransaction(currBlockchain, tx),
-                computedStateHash = TxStateSnapshotHashBuilder
+              val computedStateHash = TxStateSnapshotHashBuilder
                   .createHashFromSnapshot(StateSnapshot.empty, Some(TxStatusInfo(tx.id(), TxMeta.Status.Elided)))
                   .createHash(result.computedStateHash)
+              log.info(s"computedStateHash = $computedStateHash")
+              result.copy(
+                snapshot = result.snapshot.bindElidedTransaction(currBlockchain, tx),
+                computedStateHash = computedStateHash
               )
           })
       }
@@ -497,6 +506,9 @@ object BlockDiffer {
     Either.cond(
       !blockchain.supportsLightNodeBlockFields() || blockStateHash.contains(computedStateHash),
       (),
-      InvalidStateHash(blockStateHash)
+      {
+        log.info(s"expected $computedStateHash, actual $blockStateHash, lastBlockId = ${blockchain.lastBlockId}")
+        InvalidStateHash(blockStateHash)
+      }
     )
 }
