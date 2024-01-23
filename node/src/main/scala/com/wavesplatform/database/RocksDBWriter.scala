@@ -229,6 +229,11 @@ class RocksDBWriter(
         if (status.status.getCode == Status.Code.Ok) {
           status.value.get(valueBuf)
           k -> readCurrentData(key)(valueBuf).height
+        } else if (status.status.getCode != Status.Code.NotFound) {
+          log.error(
+            s"$key: code=${status.status.getCode}, subCode=${status.status.getSubCode}, state=${status.status.getState}, codeString=${status.status.getCodeString}"
+          )
+          k -> Height(-1)
         } else k -> Height(0)
       }
       .toMap
@@ -454,10 +459,15 @@ class RocksDBWriter(
 
   private var (bf0, bf1) = initFilters()
 
-  override def containsTransaction(tx: Transaction): Boolean =
-    (bf0.mightContain(tx.id().arr) || bf1.mightContain(tx.id().arr)) && {
-      writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
-    }
+  override def containsTransaction(tx: Transaction): Boolean = {
+    val bf1contains = bf0.mightContain(tx.id().arr)
+    val bf2contains = bf1.mightContain(tx.id().arr)
+    if (bf1contains || bf2contains) {
+      val dbContains = writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
+      log.debug(s"${tx.id}: bf0=$bf1contains, bf1=$bf2contains, db=$dbContains")
+      dbContains
+    } else false
+  }
 
   override protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -1136,11 +1146,11 @@ class RocksDBWriter(
     val currentData = rw.get(currentDataKey)
     if (currentData.height == currentHeight) {
       val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
-      rw.delete(dataNodeKey(currentHeight))
-      prevDataNode.entry match {
-        case _: EmptyDataEntry => rw.delete(currentDataKey)
-        case _                 => rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      if (currentData.entry.key == "lastUpdatedBlock") {
+        log.info(s"Rollback $currentData, currentHeight=$currentHeight, currentData=$currentData, prevNode=$prevDataNode")
       }
+      rw.delete(dataNodeKey(currentHeight))
+      rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
     }
   }
 

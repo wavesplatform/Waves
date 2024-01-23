@@ -390,6 +390,20 @@ object Explorer extends ScorexLogging {
           log.info(s"Load meta for $id")
           val meta = rdb.db.get(Keys.transactionMetaById(TransactionId(ByteStr.decodeBase58(id).get), rdb.txMetaHandle))
           log.info(s"Meta: $meta")
+        case "DH" =>
+          val address = Address.fromString(argument(1, "address")).explicitGet()
+          val key = argument(2, "key")
+          val requestedHeight = argument(3, "height").toInt
+          log.info(s"Loading address ID for $address")
+          val addressId = rdb.db.get(Keys.addressId(address)).get
+          log.info(s"Collecting data history for key $key on $address ($addressId)")
+          val currentEntry = rdb.db.get(Keys.data(addressId, key))
+          log.info(s"Current entry: $currentEntry")
+//          rdb.db.iterateOver(KeyTags.DataHistory.prefixBytes ++ addressId.toByteArray ++ key.getBytes("utf-8"), None) { e =>
+//            log.info(s"${Ints.fromByteArray(e.getKey.takeRight(4))}: ${readDataNode(key)(e.getValue)}")
+//          }
+          val problematicEntry = rdb.db.get(Keys.dataAt(addressId, key)(requestedHeight))
+          log.info(s"Entry at $requestedHeight: $problematicEntry")
       }
     } finally {
       reader.close()
