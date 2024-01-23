@@ -464,7 +464,7 @@ class RocksDBWriter(
     val bf2contains = bf1.mightContain(tx.id().arr)
     if (bf1contains || bf2contains) {
       val dbContains = writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
-      log.debug(s"${tx.id}: bf0=$bf1contains, bf1=$bf2contains, db=$dbContains")
+      log.debug(s"${tx.id()}: bf0=$bf1contains, bf1=$bf2contains, db=$dbContains")
       dbContains
     } else false
   }
