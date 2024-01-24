@@ -1,9 +1,10 @@
 package com.wavesplatform.report
 
 import com.wavesplatform.report.QaseReporter.{CaseIdPattern, QaseProjects, TestResult}
-import io.qase.api.QaseClient
+import io.qase.api.config.QaseConfig
 import io.qase.api.utils.IntegrationUtils
 import io.qase.client.model.ResultCreate
+import org.aeonbits.owner.ConfigFactory
 import org.scalatest.Reporter
 import org.scalatest.events.*
 import play.api.libs.json.{Format, Json}
@@ -45,7 +46,7 @@ class QaseReporter extends Reporter {
       msgOpt: Option[String],
       duration: Option[Long]
   ): Unit =
-    if (QaseClient.isEnabled) {
+    if (QaseReporter.isEnabled) {
       val errMsg     = msgOpt.map(msg => s"\n\n**Error**\n$msg").getOrElse("")
       val comment    = s"$testName$errMsg"
       val stacktrace = throwable.map(IntegrationUtils.getStacktrace)
@@ -55,7 +56,7 @@ class QaseReporter extends Reporter {
     }
 
   private def saveRunResults(): Unit =
-    if (QaseClient.isEnabled) {
+    if (QaseReporter.isEnabled) {
       results.asScala.foreach { case (projectCode, results) =>
         if (results.nonEmpty) {
           val writer = new FileWriter(s"./$projectCode-${System.currentTimeMillis()}")
@@ -73,6 +74,10 @@ class QaseReporter extends Reporter {
 }
 
 object QaseReporter {
+  // this hack prevents QaseClient class from being initialized, which in turn initializes Logback with malformed config
+  // and prints a warning about unused appender to stdout
+  private[QaseReporter] val isEnabled = ConfigFactory.create(classOf[QaseConfig]).isEnabled
+
   val RunIdKeyPrefix  = "QASE_RUN_ID_"
   val CheckPRRunIdKey = "CHECKPR_RUN_ID"
   val QaseProjects    = Seq("NODE", "RIDE", "BU", "SAPI")

@@ -36,11 +36,11 @@ object RDB extends StrictLogging {
     logger.debug(s"Open DB at ${settings.directory}")
 
     val dbOptions = createDbOptions(settings)
-    val dbDir = file.getAbsoluteFile
+    val dbDir     = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
-    val handles          = new util.ArrayList[ColumnFamilyHandle]()
-    val defaultCfOptions = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
+    val handles             = new util.ArrayList[ColumnFamilyHandle]()
+    val defaultCfOptions    = newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6, settings.rocksdb.writeBufferSize)
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
