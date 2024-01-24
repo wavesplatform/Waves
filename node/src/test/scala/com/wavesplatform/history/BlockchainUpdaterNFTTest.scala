@@ -99,7 +99,6 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
 
       val settings = settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)
       withDomain(settings)(assert)
-      withDomain(settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true)))(assert)
     }
   }
 

@@ -115,14 +115,12 @@ object RocksDBWriter extends ScorexLogging {
       settings: BlockchainSettings,
       dbSettings: DBSettings,
       isLightMode: Boolean,
-      bfBlockInsertions: Int = 10000,
       forceCleanupExecutorService: Option[ExecutorService] = None
   ): RocksDBWriter = new RocksDBWriter(
     rdb,
     settings,
     dbSettings,
     isLightMode,
-    bfBlockInsertions,
     dbSettings.cleanupInterval match {
       case None => MoreExecutors.newDirectExecutorService() // We don't care if disabled
       case Some(_) =>
@@ -147,7 +145,6 @@ class RocksDBWriter(
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
     isLightMode: Boolean,
-    bfBlockInsertions: Int = 10000,
     cleanupExecutorService: ExecutorService
 ) extends Caches
     with AutoCloseable {
@@ -435,9 +432,8 @@ class RocksDBWriter(
     }
   }
 
-  // todo: instead of fixed-size block batches, store fixed-time batches
-  private val BlockStep  = 200
-  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * bfBlockInsertions, 0.01f)
+  private val BlockStep  = dbSettings.txBloomFilter.rotateInterval
+  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * dbSettings.txBloomFilter.expectedTxPerBlock, 0.01f)
   private def initFilters(): (BloomFilter[Array[Byte]], BloomFilter[Array[Byte]]) = {
     def loadFilter(heights: Seq[Int]): BloomFilter[Array[Byte]] = {
       val filter = mkFilter()
@@ -459,15 +455,10 @@ class RocksDBWriter(
 
   private var (bf0, bf1) = initFilters()
 
-  override def containsTransaction(tx: Transaction): Boolean = {
-    val bf1contains = bf0.mightContain(tx.id().arr)
-    val bf2contains = bf1.mightContain(tx.id().arr)
-    if (bf1contains || bf2contains) {
-      val dbContains = writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
-      log.debug(s"${tx.id()}: bf0=$bf1contains, bf1=$bf2contains, db=$dbContains")
-      dbContains
-    } else false
-  }
+  override def containsTransaction(tx: Transaction): Boolean =
+    (bf0.mightContain(tx.id().arr) || bf1.mightContain(tx.id().arr)) && {
+      writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
+    }
 
   override protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -603,7 +594,7 @@ class RocksDBWriter(
           bf1 = mkFilter()
         }
       }
-      val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
+      val targetBf = if ((height / BlockStep) % 2 == 0) bf1 else bf0
 
       val transactionsWithSize =
         snapshot.transactions.zipWithIndex.map { case ((id, txInfo), i) =>

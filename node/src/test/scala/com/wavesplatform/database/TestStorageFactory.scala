@@ -18,7 +18,6 @@ object TestStorageFactory {
       settings.blockchainSettings,
       settings.dbSettings,
       settings.enableLightMode,
-      100,
       Some(MoreExecutors.newDirectExecutorService())
     )
     (
