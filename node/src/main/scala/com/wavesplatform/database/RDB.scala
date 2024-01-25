@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.typesafe.scalalogging.StrictLogging
-import com.wavesplatform.database.RDB.{TxHandle, TxMetaHandle}
+import com.wavesplatform.database.RDB.{ApiHandle, TxHandle, TxMetaHandle, TxSnapshotHandle}
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.utils.*
 import org.rocksdb.*
@@ -16,7 +16,8 @@ final class RDB(
     val db: RocksDB,
     val txMetaHandle: TxMetaHandle,
     val txHandle: TxHandle,
-    val txSnapshotHandle: TxHandle,
+    val txSnapshotHandle: TxSnapshotHandle,
+    val apiHandle: ApiHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
   override def close(): Unit = {
@@ -28,6 +29,9 @@ final class RDB(
 object RDB extends StrictLogging {
   final class TxMetaHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class TxHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class TxSnapshotHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class ApiHandle private[RDB] (val handle: ColumnFamilyHandle)
+
   case class OptionsWithResources[A](options: A, resources: Seq[RocksObject])
 
   def open(settings: DBSettings): RDB = {
@@ -44,6 +48,7 @@ object RDB extends StrictLogging {
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val apiCfOptions        = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -52,6 +57,7 @@ object RDB extends StrictLogging {
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
+            .setParanoidFileChecks(settings.rocksdb.paranoidChecks)
         ),
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
@@ -67,6 +73,11 @@ object RDB extends StrictLogging {
           "tx-snapshot".utf8Bytes,
           txSnapshotCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-snapshot").toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          "api".utf8Bytes,
+          apiCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, "api").toPath, 0L)).asJava)
         )
       ).asJava,
       handles
@@ -76,7 +87,8 @@ object RDB extends StrictLogging {
       db,
       new TxMetaHandle(handles.get(1)),
       new TxHandle(handles.get(2)),
-      new TxHandle(handles.get(3)),
+      new TxSnapshotHandle(handles.get(3)),
+      new ApiHandle(handles.get(4)),
       dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources
     )
   }
@@ -101,7 +113,6 @@ object RDB extends StrictLogging {
           .setPinL0FilterAndIndexBlocksInCache(true)
           .setFormatVersion(5)
           .setBlockSize(blockSize)
-          .setChecksumType(ChecksumType.kNoChecksum)
           .setBlockCache(blockCache)
           .setCacheIndexAndFilterBlocksWithHighPriority(true)
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)

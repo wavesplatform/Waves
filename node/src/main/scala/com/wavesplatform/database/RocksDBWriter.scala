@@ -616,7 +616,7 @@ class RocksDBWriter(
 
       if (dbSettings.storeTransactionsByAddress) {
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
-          (aid, txIds, Keys.addressTransactionSeqNr(aid))
+          (aid, txIds, Keys.addressTransactionSeqNr(aid, rdb.apiHandle))
         }
         rw.multiGetInts(addressTxs.view.map(_._3).toVector)
           .zip(addressTxs)
@@ -626,7 +626,7 @@ class RocksDBWriter(
               val (num, tx, size) = transactionsWithSize(txId)
               (tx.tpe.id.toByte, num, size)
             }.toSeq
-            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
+            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr, rdb.apiHandle), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
             rw.put(txSeqNrKey, nextSeqNr)
           }
       }
@@ -638,13 +638,15 @@ class RocksDBWriter(
             address            <- Seq(details.recipientAddress, details.sender.toAddress)
             addressId = this.addressIdWithFallback(address, newAddresses)
           } yield (addressId, leaseId)
-        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2).toSeq
+        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) =>
+          (addressId, Keys.addressLeaseSeqNr(addressId, rdb.apiHandle))
+        }(_._2).toSeq
 
         rw.multiGetInts(leaseIdsByAddressId.view.map(_._1._2).toVector)
           .zip(leaseIdsByAddressId)
           .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIds)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
-            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr), Some(leaseIds))
+            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr, rdb.apiHandle), Some(leaseIds))
             rw.put(leaseSeqKey, nextSeqNr)
           }
       }
@@ -699,7 +701,7 @@ class RocksDBWriter(
           })
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-        try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
+        try rw.put(Keys.invokeScriptResult(txHeight, txNum, rdb.apiHandle), Some(result))
         catch {
           case NonFatal(e) =>
             throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
@@ -708,7 +710,7 @@ class RocksDBWriter(
 
       for ((txId, pbMeta) <- snapshot.ethereumTransactionMeta) {
         val txNum = transactionsWithSize(TransactionId @@ txId)._1
-        val key   = Keys.ethereumTransactionMeta(Height(height), txNum)
+        val key   = Keys.ethereumTransactionMeta(Height(height), txNum, rdb.apiHandle)
         rw.put(key, Some(pbMeta))
       }
 
@@ -994,9 +996,9 @@ class RocksDBWriter(
             discardLeaseBalance(address)
 
             if (dbSettings.storeTransactionsByAddress) {
-              val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
+              val kTxSeqNr = Keys.addressTransactionSeqNr(addressId, rdb.apiHandle)
               val txSeqNr  = rw.get(kTxSeqNr)
-              val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
+              val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr, rdb.apiHandle)
 
               rw.get(kTxHNSeq).collect { case (`currentHeight`, _) =>
                 rw.delete(kTxHNSeq)
@@ -1005,9 +1007,9 @@ class RocksDBWriter(
             }
 
             if (dbSettings.storeLeaseStatesByAddress) {
-              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId)
+              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId, rdb.apiHandle)
               val leaseSeqNr    = rw.get(leaseSeqNrKey)
-              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
+              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr, rdb.apiHandle)
               rw.get(leaseSeqKey)
                 .flatMap(_.headOption)
                 .flatMap(leaseDetails)
@@ -1055,7 +1057,7 @@ class RocksDBWriter(
 
               case _: DataTransaction => // see changed data keys removal
               case _: InvokeScriptTransaction | _: InvokeExpressionTransaction =>
-                rw.delete(Keys.invokeScriptResult(currentHeight, num))
+                rw.delete(Keys.invokeScriptResult(currentHeight, num, rdb.apiHandle))
 
               case tx: CreateAliasTransaction =>
                 rw.delete(Keys.addressIdOfAlias(tx.alias))
@@ -1064,7 +1066,7 @@ class RocksDBWriter(
                 ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
               case _: EthereumTransaction =>
-                rw.delete(Keys.ethereumTransactionMeta(currentHeight, num))
+                rw.delete(Keys.ethereumTransactionMeta(currentHeight, num, rdb.apiHandle))
             }
 
             if (tx.tpe != TransactionType.Genesis) {
@@ -1136,12 +1138,10 @@ class RocksDBWriter(
   private def rollbackDataHistory(rw: RW, currentDataKey: Key[CurrentData], dataNodeKey: Height => Key[DataNode], currentHeight: Height): Unit = {
     val currentData = rw.get(currentDataKey)
     if (currentData.height == currentHeight) {
-      val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
-      if (currentData.entry.key == "lastUpdatedBlock") {
-        log.info(s"Rollback $currentData, currentHeight=$currentHeight, currentData=$currentData, prevNode=$prevDataNode")
-      }
-      rw.delete(dataNodeKey(currentHeight))
-      rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      if (currentData.prevHeight > 0) {
+        val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
+        rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      } else rw.delete(currentDataKey)
     }
   }
 

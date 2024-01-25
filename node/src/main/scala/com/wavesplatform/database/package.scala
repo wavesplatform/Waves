@@ -423,7 +423,7 @@ package object database {
 
     def withReadOptions[A](f: ReadOptions => A): A = {
       val snapshot = db.getSnapshot
-      val ro       = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+      val ro       = new ReadOptions().setSnapshot(snapshot)
       try f(ro)
       finally {
         ro.close()

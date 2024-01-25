@@ -3,7 +3,7 @@ package com.wavesplatform.api.common.lease
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.LeaseInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, Keys, RDB}
+import com.wavesplatform.database.{AddressId, DBResource, Keys, RDB}
 import com.wavesplatform.state.{LeaseDetails, StateSnapshot}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -39,15 +39,15 @@ object AddressLeaseInfo {
 
   private def leasesFromDb(rdb: RDB, subject: Address): Observable[LeaseInfo] =
     for {
-      dbResource <- rdb.db.resourceObservable
+      dbResource <- Observable.resource(Task(DBResource(rdb.db, Some(rdb.apiHandle.handle))))(r => Task(r.close()))
       (leaseId, details) <- dbResource
         .get(Keys.addressId(subject))
-        .map(fromLeaseDbIterator(dbResource, _))
+        .map(fromLeaseDbIterator(dbResource, rdb.apiHandle, _))
         .getOrElse(Observable.empty)
     } yield LeaseInfo.fromLeaseDetails(leaseId, details)
 
-  private def fromLeaseDbIterator(dbResource: DBResource, addressId: AddressId): Observable[(ByteStr, LeaseDetails)] =
+  private def fromLeaseDbIterator(dbResource: DBResource, apiHandle: RDB.ApiHandle, addressId: AddressId): Observable[(ByteStr, LeaseDetails)] =
     Observable
-      .fromIterator(Task(new LeaseByAddressIterator(dbResource, addressId).asScala))
+      .fromIterator(Task(new LeaseByAddressIterator(dbResource, apiHandle, addressId).asScala))
       .concatMapIterable(identity)
 }

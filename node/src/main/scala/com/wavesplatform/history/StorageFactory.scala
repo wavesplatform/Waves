@@ -9,7 +9,7 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import org.rocksdb.RocksDB
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 1
+  private val StorageVersion = 2
 
   def apply(
       settings: WavesSettings,
