@@ -536,10 +536,20 @@ package object database {
       } finally iterator.close()
     }
 
-    def resourceObservable: Observable[DBResource] = Observable.resource(Task(DBResource(db)))(r => Task(r.close()))
+    def resourceObservable: Observable[DBResource] =
+      Observable.resource(Task(DBResource(db, None)))(r => Task(r.close()))
+
+    def resourceObservable(iteratorCfHandle: ColumnFamilyHandle): Observable[DBResource] =
+      Observable.resource(Task(DBResource(db, Some(iteratorCfHandle))))(r => Task(r.close()))
 
     def withResource[A](f: DBResource => A): A = {
       val resource = DBResource(db)
+      try f(resource)
+      finally resource.close()
+    }
+
+    def withResource[A](iteratorCfHandle: ColumnFamilyHandle)(f: DBResource => A): A = {
+      val resource = DBResource(db, Some(iteratorCfHandle))
       try f(resource)
       finally resource.close()
     }

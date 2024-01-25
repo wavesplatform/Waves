@@ -3,7 +3,7 @@ package com.wavesplatform.api.common.lease
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.LeaseInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{AddressId, DBResource, Keys, RDB}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, Keys, RDB}
 import com.wavesplatform.state.{LeaseDetails, StateSnapshot}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -39,7 +39,7 @@ object AddressLeaseInfo {
 
   private def leasesFromDb(rdb: RDB, subject: Address): Observable[LeaseInfo] =
     for {
-      dbResource <- Observable.resource(Task(DBResource(rdb.db, Some(rdb.apiHandle.handle))))(r => Task(r.close()))
+      dbResource <- rdb.db.resourceObservable(rdb.apiHandle.handle)
       (leaseId, details) <- dbResource
         .get(Keys.addressId(subject))
         .map(fromLeaseDbIterator(dbResource, rdb.apiHandle, _))

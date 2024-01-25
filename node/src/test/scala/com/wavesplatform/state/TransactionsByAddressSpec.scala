@@ -118,12 +118,8 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
         d.appendBlock()
         d.appendMicroBlock(issue())
         startRead.lock()
-        val txs = Future {
-        println(s"Started loading address transactions")
-          d.addressTransactions(defaultAddress).map(_._2.tpe)
-        }
+        val txs = Future { d.addressTransactions(defaultAddress).map(_._2.tpe) }
         d.blockchain.bestLiquidSnapshot.synchronized(d.appendKeyBlock())
-        println(s"\n\tKey block appended\n")
         startRead.unlock()
         Await.result(txs, 1.minute).map(_.tpe) shouldBe List(TransactionType.Issue)
       }

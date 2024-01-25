@@ -88,7 +88,7 @@ object AddressTransactions {
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[(TxMeta, Transaction, Option[TxNum])] =
-    Observable.resource(Task(DBResource(rdb.db, Some(rdb.apiHandle.handle))))(r => Task(r.close())).flatMap { dbResource =>
+    rdb.db.resourceObservable(rdb.apiHandle.handle).flatMap { dbResource =>
       dbResource
         .get(Keys.addressId(subject))
         .fold(Observable.empty[(TxMeta, Transaction, Option[TxNum])]) { addressId =>
