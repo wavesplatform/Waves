@@ -1,18 +1,14 @@
 package com.wavesplatform.db
 
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.settings.{TxBloomFilterSettings, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 
 class TxBloomFilterSpec extends PropSpec with SharedDomain {
   private val richAccount = TxHelpers.signer(1200)
 
-  override def settings: WavesSettings = DomainPresets.TransactionStateSnapshot.copy(
-    dbSettings = DomainPresets.TransactionStateSnapshot.dbSettings.copy(
-      txBloomFilter = TxBloomFilterSettings(100, 10)
-    )
-  )
+  override def settings: WavesSettings = DomainPresets.TransactionStateSnapshot
 
   override def genesisBalances: Seq[AddrWithBalance] = Seq(AddrWithBalance(richAccount.toAddress, 10000.waves))
 
@@ -24,5 +20,15 @@ class TxBloomFilterSpec extends PropSpec with SharedDomain {
     domain.appendBlock()         // height = 11
     domain.appendBlock()         // solid state height = 11, filters are rotated
     domain.appendBlockE(transfer) should produce("AlreadyInTheState")
+
+    domain.appendBlock()
+    val tf2 = TxHelpers.transfer(richAccount, TxHelpers.address(1202), 20.waves)
+    domain.appendBlock(tf2)
+    1 to 20 foreach { _ =>
+      withClue(s"height = ${domain.blockchain.height}") {
+        domain.appendBlockE(tf2) should produce("AlreadyInTheState")
+      }
+      domain.appendBlock()
+    }
   }
 }

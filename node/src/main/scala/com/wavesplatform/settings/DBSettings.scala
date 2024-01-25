@@ -1,11 +1,6 @@
 package com.wavesplatform.settings
 import scala.concurrent.duration.FiniteDuration
 
-case class TxBloomFilterSettings(
-    expectedTxPerBlock: Int,
-    rotateInterval: Int
-)
-
 case class DBSettings(
     directory: String,
     storeTransactionsByAddress: Boolean,
@@ -17,5 +12,4 @@ case class DBSettings(
     cleanupInterval: Option[Int] = None,
     rememberBlocks: FiniteDuration,
     rocksdb: RocksDBSettings,
-    txBloomFilter: TxBloomFilterSettings
 )

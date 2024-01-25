@@ -78,7 +78,7 @@ object AddressTransactions {
       types,
       fromId.filter(id => maybeSnapshot.exists(s => !s._2.transactions.contains(id)))
     )
-    Observable.fromIterable(diffTxs) ++ dbTxs.filterNot(diffTxs.contains)
+    Observable.fromIterable(diffTxs) ++ dbTxs//.filterNot(diffTxs.contains)
   }
 
   def transactionsFromDB(

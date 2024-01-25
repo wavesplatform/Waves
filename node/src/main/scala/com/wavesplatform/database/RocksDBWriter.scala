@@ -3,7 +3,6 @@ package com.wavesplatform.database
 import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias}
@@ -432,33 +431,8 @@ class RocksDBWriter(
     }
   }
 
-  private val BlockStep  = dbSettings.txBloomFilter.rotateInterval
-  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * dbSettings.txBloomFilter.expectedTxPerBlock, 0.01f)
-  private def initFilters(): (BloomFilter[Array[Byte]], BloomFilter[Array[Byte]]) = {
-    def loadFilter(heights: Seq[Int]): BloomFilter[Array[Byte]] = {
-      val filter = mkFilter()
-      heights.filter(_ > 0).foreach { h =>
-        loadTransactions(Height(h), rdb).foreach { case (_, tx) => filter.put(tx.id().arr) }
-      }
-      filter
-    }
-
-    val lastFilterStart = (height / BlockStep) * BlockStep + 1
-    val prevFilterStart = lastFilterStart - BlockStep
-    val (bf0Heights, bf1Heights) = if ((height / BlockStep) % 2 == 0) {
-      (lastFilterStart to height, prevFilterStart until lastFilterStart)
-    } else {
-      (prevFilterStart until lastFilterStart, lastFilterStart to height)
-    }
-    (loadFilter(bf0Heights), loadFilter(bf1Heights))
-  }
-
-  private var (bf0, bf1) = initFilters()
-
   override def containsTransaction(tx: Transaction): Boolean =
-    (bf0.mightContain(tx.id().arr) || bf1.mightContain(tx.id().arr)) && {
-      writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
-    }
+    writableDB.keyExists(rdb.txMetaHandle.handle, Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle).keyBytes)
 
   override protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -587,15 +561,6 @@ class RocksDBWriter(
         rw.put(Keys.assetScript(asset)(height), Some(script))
       }
 
-      if (height % BlockStep == 1) {
-        if ((height / BlockStep) % 2 == 0) {
-          bf0 = mkFilter()
-        } else {
-          bf1 = mkFilter()
-        }
-      }
-      val targetBf = if ((height / BlockStep) % 2 == 0) bf1 else bf0
-
       val transactionsWithSize =
         snapshot.transactions.zipWithIndex.map { case ((id, txInfo), i) =>
           val tx   = txInfo.transaction
@@ -609,7 +574,6 @@ class RocksDBWriter(
             Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status))
           )
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
-          targetBf.put(id.arr)
 
           txId -> (num, tx, size)
         }.toMap

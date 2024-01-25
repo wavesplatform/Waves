@@ -72,7 +72,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
       )
       Using.resource(rdw)(test)
     } finally {
-      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle).foreach { cfh =>
+      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle, rdb.apiHandle.handle).foreach { cfh =>
         rdb.db.deleteRange(cfh, MinKey, MaxKey)
       }
     }
