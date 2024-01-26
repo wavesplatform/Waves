@@ -424,6 +424,7 @@ class RocksDBWriter(
       val kdh = Keys.data(addressId, key)
       rw.put(kdh, currentData)
       rw.put(Keys.dataAt(addressId, key)(height), dataNode)
+      log.trace(s"PUT $address($addressId)/$key: ${currentData.entry}@$height>${currentData.prevHeight}; $dataNode")
     }
 
     changedKeys.asMap().forEach { (addressId, keys) =>
@@ -942,11 +943,9 @@ class RocksDBWriter(
 
           for ((addressId, address) <- changedAddresses) {
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
-              log.trace(s"Discarding $k for $address at $currentHeight")
               accountDataToInvalidate += (address -> k)
 
-              rw.delete(Keys.dataAt(addressId, k)(currentHeight))
-              rollbackDataHistory(rw, Keys.data(addressId, k), Keys.dataAt(addressId, k)(_), currentHeight)
+              rollbackDataEntry(rw, k, address, addressId, currentHeight)
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
@@ -1099,13 +1098,19 @@ class RocksDBWriter(
     discardedBlocks.reverse
   }
 
-  private def rollbackDataHistory(rw: RW, currentDataKey: Key[CurrentData], dataNodeKey: Height => Key[DataNode], currentHeight: Height): Unit = {
+  private def rollbackDataEntry(rw: RW, key: String, address: Address, addressId: AddressId, currentHeight: Height): Unit = {
+    val currentDataKey = Keys.data(addressId, key)
     val currentData = rw.get(currentDataKey)
+    rw.delete(Keys.dataAt(addressId, key)(currentHeight))
     if (currentData.height == currentHeight) {
       if (currentData.prevHeight > 0) {
-        val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
+        val prevDataNode = rw.get(Keys.dataAt(addressId, key)(currentData.prevHeight))
+        log.trace(s"PUT $address($addressId)/$key: ${currentData.entry}@$currentHeight => ${prevDataNode.entry}@${currentData.prevHeight}>${prevDataNode.prevHeight}")
         rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
-      } else rw.delete(currentDataKey)
+      } else {
+        log.trace(s"DEL $address($addressId)/$key: ${currentData.entry}@$currentHeight => EMPTY@${currentData.prevHeight}")
+        rw.delete(currentDataKey)
+      }
     }
   }
 
