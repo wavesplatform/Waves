@@ -58,4 +58,19 @@ class DataKeyRollback extends PropSpec with SharedDomain {
 
     }
   }
+
+  property("check new entries") {
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 1))))
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 2))))
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 3))))
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 4))))
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 5))))
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 6))))
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 7))))
+    domain.appendBlock()
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 8))))
+    domain.appendBlock()
+    domain.rollbackTo(9)
+    domain.appendBlock(TxHelpers.data(richAccount, Seq(IntegerDataEntry("k", 8))))
+  }
 }

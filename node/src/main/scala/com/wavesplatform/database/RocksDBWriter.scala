@@ -424,7 +424,6 @@ class RocksDBWriter(
       val kdh = Keys.data(addressId, key)
       rw.put(kdh, currentData)
       rw.put(Keys.dataAt(addressId, key)(height), dataNode)
-      log.trace(s"PUT $address($addressId)/$key: ${currentData.entry}@$height>${currentData.prevHeight}; $dataNode")
     }
 
     changedKeys.asMap().forEach { (addressId, keys) =>

@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
+import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -24,7 +25,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches extends Blockchain with Storage {
+abstract class Caches extends Blockchain with Storage with LazyLogging {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -302,13 +303,21 @@ abstract class Caches extends Blockchain with Storage {
     val cachedEntries     = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
     val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains), addressIdWithFallback(_, newAddressIds))
 
-    val updatedDataWithNodes = (for {
-      (k, currentEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntries
-      newEntry          <- newEntries.get(k)
-    } yield k -> (
-      CurrentData(newEntry, Height(height), currentEntry),
-      DataNode(newEntry, currentEntry)
-    )).toMap
+    val updatedDataWithNodes = newEntries.map { case (k@(address, entryKey), newEntryFromSnapshot) =>
+      val cachedPrevEntry = accountDataCache.getIfPresent(k)
+      val loadedPrevEntry = loadedPrevEntries.get(k)
+      val prevHeight = if (cachedPrevEntry != null) {
+        logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${cachedPrevEntry.height}[CACHED]")
+        cachedPrevEntry.height
+      } else {
+        logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${loadedPrevEntry.get}[LOADED]")
+        loadedPrevEntry.get
+      }
+      k -> (
+        CurrentData(newEntryFromSnapshot, Height(height), prevHeight),
+        DataNode(newEntryFromSnapshot, prevHeight)
+      )
+    }
 
     val orderFillsWithNodes = for {
       (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills
