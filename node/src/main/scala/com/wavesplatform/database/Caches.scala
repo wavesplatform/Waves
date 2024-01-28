@@ -3,7 +3,6 @@ package com.wavesplatform.database
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.protobuf.ByteString
-import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -25,7 +24,7 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches extends Blockchain with Storage with LazyLogging {
+abstract class Caches extends Blockchain with Storage {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -301,26 +300,15 @@ abstract class Caches extends Blockchain with Storage with LazyLogging {
     } yield ((address, key), entry)
 
     val cachedEntries     = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
-
-    logger.info(s"Cached entries (${cachedEntries.size}): ${cachedEntries.mkString("\n")}")
-
     val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains).toSeq, addressIdWithFallback(_, newAddressIds))
 
-    val updatedDataWithNodes = newEntries.map { case (k@(address, entryKey), newEntryFromSnapshot) =>
-      val cachedPrevEntry = cachedEntries.get(k)
-      val loadedPrevEntry = loadedPrevEntries.get(k)
-      val prevHeight = if (cachedPrevEntry.nonEmpty) {
-        logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${cachedPrevEntry.get.height}[CACHED]")
-        cachedPrevEntry.get.height
-      } else {
-        logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${loadedPrevEntry.get}[LOADED]")
-        loadedPrevEntry.get
-      }
-      k -> (
-        CurrentData(newEntryFromSnapshot, Height(height), prevHeight),
-        DataNode(newEntryFromSnapshot, prevHeight)
-      )
-    }
+    val updatedDataWithNodes = (for {
+      (k, currentEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntries
+      newEntry          <- newEntries.get(k)
+    } yield k -> (
+      CurrentData(newEntry, Height(height), currentEntry),
+      DataNode(newEntry, currentEntry)
+    )).toMap
 
     val orderFillsWithNodes = for {
       (orderId, VolumeAndFee(volume, fee)) <- snapshot.orderFills

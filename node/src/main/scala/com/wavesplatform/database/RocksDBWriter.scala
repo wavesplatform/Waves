@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
-import com.google.common.collect.{MultimapBuilder, Streams}
+import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias}
@@ -32,16 +32,13 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
-import org.bouncycastle.util.encoders.Hex
 import org.rocksdb.{RocksDB, Status}
 import org.slf4j.LoggerFactory
-import sun.nio.ch.{DirectBuffer, Util}
+import sun.nio.ch.Util
 
 import java.nio.ByteBuffer
 import java.util
-import java.util.Collections
 import java.util.concurrent.*
-import java.util.stream.Collectors
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
