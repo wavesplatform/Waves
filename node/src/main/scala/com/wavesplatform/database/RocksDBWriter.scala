@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
-import com.google.common.collect.MultimapBuilder
+import com.google.common.collect.{MultimapBuilder, Streams}
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias}
@@ -39,7 +39,9 @@ import sun.nio.ch.{DirectBuffer, Util}
 
 import java.nio.ByteBuffer
 import java.util
+import java.util.Collections
 import java.util.concurrent.*
+import java.util.stream.Collectors
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -212,48 +214,24 @@ class RocksDBWriter(
       writableDB.get(Keys.data(addressId, key))
     }
 
-  override protected def loadEntryHeights(keys: Iterable[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height] = {
-    val keyBufs = keys.map { case (a, k) =>
-      val dk = Keys.data(addressIdOf(a), k)
-      ByteBuffer.allocateDirect(dk.keyBytes.length).put(dk.keyBytes).flip()
-    }.toIndexedSeq
-    val valBufs  = mutable.IndexedSeq.fill(keyBufs.size)(ByteBuffer.allocateDirect(8))
-//    val keyBufs  = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
-//    val valBufs  = database.getValueBuffers(keys.size, 8)
-    val valueBuf = new Array[Byte](8)
+  override protected def loadEntryHeights(keys: Seq[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height] = {
+    val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
+    val valBufs = database.getValueBuffers(keys.size, 4)
 
-    val statuses = rdb.db
+    val result = rdb.db
       .multiGetByteBuffers(keyBufs.asJava, valBufs.asJava)
-
-    logger.info(s"Vals:\n${
-      valBufs.view.map { b =>
-        val zzz = new Array[Byte](b.limit())
-        b.get(zzz)
-        b.flip()
-        Hex.toHexString(zzz)
-      }.mkString("\n")}")
-
-    val result = statuses
       .asScala
       .view
       .zip(keys)
-      .map { case (status, k @ (address, key)) =>
+      .map { case (status, k) =>
         if (status.status.getCode == Status.Code.Ok) {
-          status.value.get(valueBuf)
-          val prevCurrentData = readCurrentData(key)(valueBuf)
-          log.debug(s"LOAD $address/$key: $prevCurrentData")
-          k -> prevCurrentData.height
-        } else if (status.status.getCode != Status.Code.NotFound) {
-          log.error(
-            s"$key: code=${status.status.getCode}, subCode=${status.status.getSubCode}, state=${status.status.getState}, codeString=${status.status.getCodeString}"
-          )
-          k -> Height(-1)
+          k -> Height(status.value.getInt)
         } else k -> Height(0)
       }
       .toMap
 
     keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
-    valBufs.foreach(_.asInstanceOf[DirectBuffer].cleaner().clean())
+    valBufs.foreach(Util.releaseTemporaryDirectBuffer)
 
     result
   }
@@ -1117,12 +1095,14 @@ class RocksDBWriter(
 
   private def rollbackDataEntry(rw: RW, key: String, address: Address, addressId: AddressId, currentHeight: Height): Unit = {
     val currentDataKey = Keys.data(addressId, key)
-    val currentData = rw.get(currentDataKey)
+    val currentData    = rw.get(currentDataKey)
     rw.delete(Keys.dataAt(addressId, key)(currentHeight))
     if (currentData.height == currentHeight) {
       if (currentData.prevHeight > 0) {
         val prevDataNode = rw.get(Keys.dataAt(addressId, key)(currentData.prevHeight))
-        log.trace(s"PUT $address($addressId)/$key: ${currentData.entry}@$currentHeight => ${prevDataNode.entry}@${currentData.prevHeight}>${prevDataNode.prevHeight}")
+        log.trace(
+          s"PUT $address($addressId)/$key: ${currentData.entry}@$currentHeight => ${prevDataNode.entry}@${currentData.prevHeight}>${prevDataNode.prevHeight}"
+        )
         rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
       } else {
         log.trace(s"DEL $address($addressId)/$key: ${currentData.entry}@$currentHeight => EMPTY@${currentData.prevHeight}")

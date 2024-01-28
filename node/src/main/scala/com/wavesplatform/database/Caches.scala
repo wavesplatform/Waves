@@ -184,7 +184,7 @@ abstract class Caches extends Blockchain with Storage with LazyLogging {
 
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(acc: Address, key: String): CurrentData
-  protected def loadEntryHeights(keys: Iterable[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height]
+  protected def loadEntryHeights(keys: Seq[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
   private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] =
@@ -301,14 +301,17 @@ abstract class Caches extends Blockchain with Storage with LazyLogging {
     } yield ((address, key), entry)
 
     val cachedEntries     = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
-    val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains), addressIdWithFallback(_, newAddressIds))
+
+    logger.info(s"Cached entries (${cachedEntries.size}): ${cachedEntries.mkString("\n")}")
+
+    val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains).toSeq, addressIdWithFallback(_, newAddressIds))
 
     val updatedDataWithNodes = newEntries.map { case (k@(address, entryKey), newEntryFromSnapshot) =>
-      val cachedPrevEntry = accountDataCache.getIfPresent(k)
+      val cachedPrevEntry = cachedEntries.get(k)
       val loadedPrevEntry = loadedPrevEntries.get(k)
-      val prevHeight = if (cachedPrevEntry != null) {
-        logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${cachedPrevEntry.height}[CACHED]")
-        cachedPrevEntry.height
+      val prevHeight = if (cachedPrevEntry.nonEmpty) {
+        logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${cachedPrevEntry.get.height}[CACHED]")
+        cachedPrevEntry.get.height
       } else {
         logger.trace(s"PUT $address/$entryKey: $newEntryFromSnapshot@$height>${loadedPrevEntry.get}[LOADED]")
         loadedPrevEntry.get

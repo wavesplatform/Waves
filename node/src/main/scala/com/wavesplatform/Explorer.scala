@@ -399,36 +399,83 @@ object Explorer extends ScorexLogging {
           log.info(s"Collecting data history for key $key on $address ($addressId)")
           val currentEntry = rdb.db.get(Keys.data(addressId, key))
           log.info(s"Current entry: $currentEntry")
-//          rdb.db.iterateOver(KeyTags.DataHistory.prefixBytes ++ addressId.toByteArray ++ key.getBytes("utf-8"), None) { e =>
-//            log.info(s"${Ints.fromByteArray(e.getKey.takeRight(4))}: ${readDataNode(key)(e.getValue)}")
-//          }
           val problematicEntry = rdb.db.get(Keys.dataAt(addressId, key)(requestedHeight))
           log.info(s"Entry at $requestedHeight: $problematicEntry")
         case "DHC" =>
-          log.info("Looking for data entry corruptions")
+          log.info("Looking for data entry history corruptions")
           var thisAddressId = 0L
           var prevHeight    = 0
           var key           = ""
+          var addressCount = 0
           rdb.db.iterateOver(KeyTags.DataHistory.prefixBytes, None) { e =>
             val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
             val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))
             val keyFromKey       = new String(e.getKey.drop(10).dropRight(4), "utf-8")
             if (addressIdFromKey != thisAddressId) {
               thisAddressId = addressIdFromKey
-              prevHeight = heightFromKey
               key = keyFromKey
+              addressCount += 1
             } else if (key != keyFromKey) {
-              prevHeight = heightFromKey
               key = keyFromKey
             } else {
               val node = readDataNode(key)(e.getValue)
               if (node.prevHeight != prevHeight) {
                 val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
-                log.warn(s"$address/$key: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
-                prevHeight = heightFromKey
+                log.warn(s"$address/$key@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+
               }
             }
+            prevHeight = heightFromKey
+            log.info(s"Checked $addressCount addresses")
           }
+        case "ABHC" =>
+          log.info("Looking for asset balance history corruptions")
+          var thisAddressId = 0L
+          var prevHeight    = 0
+          var key           = IssuedAsset(ByteStr(new Array[Byte](32)))
+          var addressCount = 0
+          rdb.db.iterateOver(KeyTags.AssetBalanceHistory.prefixBytes, None) { e =>
+            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(34, 42))
+            val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))
+            val keyFromKey       = IssuedAsset(ByteStr(e.getKey.slice(2, 34)))
+            if (keyFromKey != key) {
+              thisAddressId = addressIdFromKey
+              key = keyFromKey
+              addressCount += 1
+            } else if (thisAddressId != addressIdFromKey) {
+              thisAddressId = addressIdFromKey
+            } else {
+              val node = readBalanceNode(e.getValue)
+              if (node.prevHeight != prevHeight) {
+                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
+                log.warn(s"$key/$address@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+
+              }
+            }
+            prevHeight = heightFromKey
+          }
+          log.info(s"Checked $addressCount assets")
+        case "BHC" =>
+          log.info("Looking for balance history corruptions")
+          var thisAddressId = 0L
+          var prevHeight    = 0
+          var addressCount = 0
+          rdb.db.iterateOver(KeyTags.WavesBalanceHistory.prefixBytes, None) { e =>
+            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
+            val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))
+            if (addressIdFromKey != thisAddressId) {
+              thisAddressId = addressIdFromKey
+              addressCount += 1
+            } else {
+              val node = readBalanceNode(e.getValue)
+              if (node.prevHeight != prevHeight) {
+                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
+                log.warn(s"$address@$heightFromKey: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+              }
+            }
+            prevHeight = heightFromKey
+          }
+          log.info(s"Checked $addressCount addresses")
       }
     } finally {
       reader.close()
