@@ -300,14 +300,14 @@ abstract class Caches extends Blockchain with Storage {
     } yield ((address, key), entry)
 
     val cachedEntries     = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
-    val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains).toSeq, addressIdWithFallback(_, newAddressIds))
+    val loadedPrevEntryHeights = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains).toSeq, addressIdWithFallback(_, newAddressIds))
 
     val updatedDataWithNodes = (for {
-      (k, currentEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntries
+      (k, heightOfPreviousEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntryHeights
       newEntry          <- newEntries.get(k)
     } yield k -> (
-      CurrentData(newEntry, Height(height), currentEntry),
-      DataNode(newEntry, currentEntry)
+      CurrentData(newEntry, Height(height), heightOfPreviousEntry),
+      DataNode(newEntry, heightOfPreviousEntry)
     )).toMap
 
     val orderFillsWithNodes = for {

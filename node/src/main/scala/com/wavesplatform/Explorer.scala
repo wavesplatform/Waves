@@ -426,8 +426,8 @@ object Explorer extends ScorexLogging {
               }
             }
             prevHeight = heightFromKey
-            log.info(s"Checked $addressCount addresses")
           }
+          log.info(s"Checked $addressCount addresses")
         case "ABHC" =>
           log.info("Looking for asset balance history corruptions")
           var thisAddressId = 0L
