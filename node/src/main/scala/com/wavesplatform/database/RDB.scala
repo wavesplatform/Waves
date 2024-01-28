@@ -56,12 +56,14 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
+            .setMaxWriteBufferNumber(3)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
-            .setParanoidFileChecks(settings.rocksdb.paranoidChecks)
         ),
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
           txMetaCfOptions.options
+            .optimizeForPointLookup(16 << 20) // Iterators might not work with this option
+            .setDisableAutoCompactions(true)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
@@ -119,6 +121,7 @@ object RDB extends StrictLogging {
           .setDataBlockHashTableUtilRatio(0.5)
       )
       .setWriteBufferSize(writeBufferSize)
+      .setCompactionStyle(CompactionStyle.LEVEL)
       .setLevelCompactionDynamicLevelBytes(true)
       // Defines the prefix.
       // Improves an iterator performance for keys with prefixes of 10 or more bytes.
@@ -135,9 +138,11 @@ object RDB extends StrictLogging {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
+      .setIncreaseParallelism(6)
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
+      .setMaxSubcompactions(2) // Write stalls expected without this option. Can lead to max_background_jobs * max_subcompactions background threads
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()

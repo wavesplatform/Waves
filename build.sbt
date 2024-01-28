@@ -198,10 +198,6 @@ buildTarballsForDocker := {
     (`grpc-server` / Universal / packageZipTarball).value,
     baseDirectory.value / "docker" / "target" / "waves-grpc-server.tgz"
   )
-  IO.copyFile(
-    (`ride-runner` / Universal / packageZipTarball).value,
-    (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
-  )
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")

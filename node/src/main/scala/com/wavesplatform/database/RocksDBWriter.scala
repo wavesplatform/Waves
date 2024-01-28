@@ -32,9 +32,10 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
+import org.bouncycastle.util.encoders.Hex
 import org.rocksdb.{RocksDB, Status}
 import org.slf4j.LoggerFactory
-import sun.nio.ch.Util
+import sun.nio.ch.{DirectBuffer, Util}
 
 import java.nio.ByteBuffer
 import java.util
@@ -212,19 +213,36 @@ class RocksDBWriter(
     }
 
   override protected def loadEntryHeights(keys: Iterable[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height] = {
-    val keyBufs  = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
-    val valBufs  = database.getValueBuffers(keys.size, 8)
+    val keyBufs = keys.map { case (a, k) =>
+      val dk = Keys.data(addressIdOf(a), k)
+      ByteBuffer.allocateDirect(dk.keyBytes.length).put(dk.keyBytes).flip()
+    }.toIndexedSeq
+    val valBufs  = mutable.IndexedSeq.fill(keyBufs.size)(ByteBuffer.allocateDirect(8))
+//    val keyBufs  = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
+//    val valBufs  = database.getValueBuffers(keys.size, 8)
     val valueBuf = new Array[Byte](8)
 
-    val result = rdb.db
+    val statuses = rdb.db
       .multiGetByteBuffers(keyBufs.asJava, valBufs.asJava)
+
+    logger.info(s"Vals:\n${
+      valBufs.view.map { b =>
+        val zzz = new Array[Byte](b.limit())
+        b.get(zzz)
+        b.flip()
+        Hex.toHexString(zzz)
+      }.mkString("\n")}")
+
+    val result = statuses
       .asScala
       .view
       .zip(keys)
-      .map { case (status, k @ (_, key)) =>
+      .map { case (status, k @ (address, key)) =>
         if (status.status.getCode == Status.Code.Ok) {
           status.value.get(valueBuf)
-          k -> readCurrentData(key)(valueBuf).height
+          val prevCurrentData = readCurrentData(key)(valueBuf)
+          log.debug(s"LOAD $address/$key: $prevCurrentData")
+          k -> prevCurrentData.height
         } else if (status.status.getCode != Status.Code.NotFound) {
           log.error(
             s"$key: code=${status.status.getCode}, subCode=${status.status.getSubCode}, state=${status.status.getState}, codeString=${status.status.getCodeString}"
@@ -235,7 +253,7 @@ class RocksDBWriter(
       .toMap
 
     keyBufs.foreach(Util.releaseTemporaryDirectBuffer)
-    valBufs.foreach(Util.releaseTemporaryDirectBuffer)
+    valBufs.foreach(_.asInstanceOf[DirectBuffer].cleaner().clean())
 
     result
   }

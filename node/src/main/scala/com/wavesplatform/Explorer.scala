@@ -391,8 +391,8 @@ object Explorer extends ScorexLogging {
           val meta = rdb.db.get(Keys.transactionMetaById(TransactionId(ByteStr.decodeBase58(id).get), rdb.txMetaHandle))
           log.info(s"Meta: $meta")
         case "DH" =>
-          val address = Address.fromString(argument(1, "address")).explicitGet()
-          val key = argument(2, "key")
+          val address         = Address.fromString(argument(1, "address")).explicitGet()
+          val key             = argument(2, "key")
           val requestedHeight = argument(3, "height").toInt
           log.info(s"Loading address ID for $address")
           val addressId = rdb.db.get(Keys.addressId(address)).get
@@ -404,6 +404,31 @@ object Explorer extends ScorexLogging {
 //          }
           val problematicEntry = rdb.db.get(Keys.dataAt(addressId, key)(requestedHeight))
           log.info(s"Entry at $requestedHeight: $problematicEntry")
+        case "DHC" =>
+          log.info("Looking for data entry corruptions")
+          var thisAddressId = 0L
+          var prevHeight    = 0
+          var key           = ""
+          rdb.db.iterateOver(KeyTags.DataHistory.prefixBytes, None) { e =>
+            val addressIdFromKey = Longs.fromByteArray(e.getKey.slice(2, 10))
+            val heightFromKey    = Ints.fromByteArray(e.getKey.takeRight(4))
+            val keyFromKey       = new String(e.getKey.drop(10).dropRight(4), "utf-8")
+            if (addressIdFromKey != thisAddressId) {
+              thisAddressId = addressIdFromKey
+              prevHeight = heightFromKey
+              key = keyFromKey
+            } else if (key != keyFromKey) {
+              prevHeight = heightFromKey
+              key = keyFromKey
+            } else {
+              val node = readDataNode(key)(e.getValue)
+              if (node.prevHeight != prevHeight) {
+                val address = rdb.db.get(Keys.idToAddress(AddressId(thisAddressId)))
+                log.warn(s"$address/$key: node.prevHeight=${node.prevHeight}, actual=$prevHeight")
+                prevHeight = heightFromKey
+              }
+            }
+          }
       }
     } finally {
       reader.close()
