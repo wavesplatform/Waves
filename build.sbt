@@ -200,6 +200,14 @@ buildTarballsForDocker := {
   )
 }
 
+lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
+buildRIDERunnerForDocker := {
+  IO.copyFile(
+    (`ride-runner` / Universal / packageZipTarball).value,
+    (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
+  )
+}
+
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
   .sequential(
@@ -240,7 +248,6 @@ lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
 buildDebPackages := {
   (`grpc-server` / Debian / packageBin).value
   (node / Debian / packageBin).value
-  (`ride-runner` / Debian / packageBin).value
 }
 
 def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>

@@ -212,7 +212,7 @@ class RocksDBWriter(
     }
 
   override protected def loadEntryHeights(keys: Seq[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height] = {
-    val keyBufs = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
+    val keyBufs = database.getKeyBuffersFromKeys(keys.view.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
     val valBufs = database.getValueBuffers(keys.size, 4)
 
     val result = rdb.db
