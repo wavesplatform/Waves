@@ -84,10 +84,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
     libraryDependencies ++=
       Dependencies.protobuf.value ++
         Dependencies.langCompilerPlugins.value ++
-        Dependencies.circe.value ++
-        Seq(
-          "org.scala-js" %%% "scala-js-macrotask-executor" % "1.0.0"
-        ),
+        Dependencies.circe.value,
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
@@ -109,6 +106,9 @@ lazy val `repl-jvm` = repl.jvm
   )
 
 lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
+  .settings(
+    libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+  )
 
 lazy val `curve25519-test` = project.dependsOn(node)
 

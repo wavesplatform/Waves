@@ -32,19 +32,19 @@ object Dependencies {
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.11"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.104.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.106.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.10.3" // 2.10.x and later is built for Java 11
+  val playJson = "com.typesafe.play" %% "play-json" % "2.10.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.17" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.2" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.1" // 3.6.x and later is built for Java 11
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.1"
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.2"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.2"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.77"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -127,7 +127,7 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
-      "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                 %% "refined"       % "0.11.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "10.0.2",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi"),
@@ -161,8 +161,6 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      // https://github.com/netty/netty/wiki/Native-transports
-      // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.8",
       "net.logstash.logback"          % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonModule("caffeine"),
