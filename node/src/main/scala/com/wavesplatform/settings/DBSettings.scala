@@ -10,6 +10,5 @@ case class DBSettings(
     maxCacheSize: Int,
     maxRollbackDepth: Int,
     cleanupInterval: Option[Int] = None,
-    rememberBlocks: FiniteDuration,
     rocksdb: RocksDBSettings,
 )

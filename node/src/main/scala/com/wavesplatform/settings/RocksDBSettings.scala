@@ -5,6 +5,7 @@ case class RocksDBSettings(
     txCacheSize: SizeInBytes,
     txMetaCacheSize: SizeInBytes,
     txSnapshotCacheSize: SizeInBytes,
+    apiCacheSize: SizeInBytes,
     writeBufferSize: SizeInBytes,
     enableStatistics: Boolean,
     paranoidChecks: Boolean
