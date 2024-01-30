@@ -32,7 +32,7 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
-import org.rocksdb.{RocksDB, Status}
+import org.rocksdb.{Holder, ReadOptions, RocksDB, Status}
 import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 
@@ -424,8 +424,16 @@ class RocksDBWriter(
     }
   }
 
-  override def containsTransaction(tx: Transaction): Boolean =
-    writableDB.keyExists(rdb.txMetaHandle.handle, Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle).keyBytes)
+  override def containsTransaction(tx: Transaction): Boolean = {
+    val txMetaKey = Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)
+    val ro        = new ReadOptions().setVerifyChecksums(false)
+    try {
+      val resultHolder = new Holder[Array[Byte]]()
+      if (writableDB.keyMayExist(rdb.txMetaHandle.handle, ro, txMetaKey.keyBytes, resultHolder)) {
+        resultHolder.getValue != null || writableDB.keyExists(rdb.txMetaHandle.handle, ro, txMetaKey.keyBytes)
+      } else false
+    } finally ro.close()
+  }
 
   override protected def doAppend(
       blockMeta: PBBlockMeta,

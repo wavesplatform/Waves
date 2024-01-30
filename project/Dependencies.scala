@@ -69,7 +69,7 @@ object Dependencies {
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",
-      web3jModule("crypto")
+      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -130,7 +130,7 @@ object Dependencies {
       "eu.timepit"                 %% "refined"       % "0.11.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "10.0.2",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
-      web3jModule("abi"),
+      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test
     ) ++ test ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value

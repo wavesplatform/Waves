@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import cats.implicits.catsSyntaxOption
 import cats.syntax.apply.*
 import com.google.common.io.ByteStreams
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -217,6 +217,8 @@ object Importer extends ScorexLogging {
     val maxSize = importOptions.maxQueueSize
     val queue   = new mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])](maxSize)
 
+    val CurrentTS = System.currentTimeMillis()
+
     @tailrec
     def readBlocks(queue: mutable.Queue[(VanillaBlock, Option[BlockSnapshotResponse])], remainCount: Int, maxCount: Int): Unit = {
       if (remainCount == 0) ()
@@ -247,11 +249,12 @@ object Importer extends ScorexLogging {
             if (blocksToSkip > 0) {
               blocksToSkip -= 1
             } else {
-              val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + (maxCount - remainCount) + 1)
               val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, blockchain.height + (maxCount - remainCount) + 1)
               lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
-
-              val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
+              val block = (if (1 < blockBytes.head && blockBytes.head < 5 && Longs.fromByteArray(blockBytes.slice(1, 9)) < CurrentTS)
+                             Block.parseBytes(blockBytes).orElse(parsedProtoBlock)
+                           else
+                             parsedProtoBlock).get
               val blockSnapshot = snapshotsBytes.map { bytes =>
                 BlockSnapshotResponse(
                   block.id(),
@@ -360,7 +363,7 @@ object Importer extends ScorexLogging {
     val blocksFileOffset =
       importOptions.format match {
         case Formats.Binary =>
-          var blocksOffset = 0
+          var blocksOffset = 0L
           rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
             e.getKey match {
               case Array(_, _, 0, 0, 0, 1) => // Skip genesis
