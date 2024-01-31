@@ -458,7 +458,7 @@ class RocksDBWriter(
           prevFilter.put(readTransaction(Height(0))(iter.value())._2.id().arr)
           iter.next()
         }
-        log.info(s"Loaded $counter tx IDs from [$fromHeight, $height]. Filter size is ${memMeter.measureDeep(prevFilter)} bytes")
+        log.debug(s"Loaded $counter tx IDs from [$fromHeight, $height]. Filter size is ${memMeter.measureDeep(prevFilter)} bytes")
       }
 
       prevFilter
@@ -599,7 +599,7 @@ class RocksDBWriter(
       }
 
       if (blockMeta.getHeader.timestamp - TxFilterResetTs > settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2) {
-        log.info(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration.ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
+        log.trace(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration.ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
         TxFilterResetTs = blockMeta.getHeader.timestamp
         prevTxFilter = currentTxFilter
         currentTxFilter = mkFilter()
