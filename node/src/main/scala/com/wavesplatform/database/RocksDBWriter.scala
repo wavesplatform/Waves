@@ -453,7 +453,11 @@ class RocksDBWriter(
       Using(writableDB.newIterator(rdb.txHandle.handle)) { iter =>
         var counter = 0
         iter.seek(Keys.transactionAt(Height(fromHeight), TxNum(0.toShort), rdb.txHandle).keyBytes)
-        while (iter.isValid && Ints.fromByteArray(iter.key().slice(2, 6)) <= height) {
+        while (
+          iter.isValid &&
+          iter.key().startsWith(KeyTags.NthTransactionInfoAtHeight.prefixBytes) &&
+          Ints.fromByteArray(iter.key().slice(2, 6)) <= height
+        ) {
           counter += 1
           prevFilter.put(readTransaction(Height(0))(iter.value())._2.id().arr)
           iter.next()
@@ -599,7 +603,8 @@ class RocksDBWriter(
       }
 
       if (blockMeta.getHeader.timestamp - TxFilterResetTs > settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2) {
-        log.trace(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration.ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
+        log.trace(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration
+          .ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
         TxFilterResetTs = blockMeta.getHeader.timestamp
         prevTxFilter = currentTxFilter
         currentTxFilter = mkFilter()
