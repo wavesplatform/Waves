@@ -311,7 +311,7 @@ object Importer extends ScorexLogging {
               case _ =>
                 counter = counter + 1
             }
-          } else {
+          } else if (!quit){
             log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
           }
         }

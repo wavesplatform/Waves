@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import cats.implicits.catsSyntaxNestedBitraverse
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
+import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.account.{Address, Alias}
@@ -32,7 +33,7 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import io.netty.util.concurrent.DefaultThreadFactory
-import org.rocksdb.{Holder, ReadOptions, RocksDB, Status}
+import org.rocksdb.{RocksDB, Status}
 import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 
@@ -424,16 +425,47 @@ class RocksDBWriter(
     }
   }
 
-  override def containsTransaction(tx: Transaction): Boolean = {
-    val txMetaKey = Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)
-    val ro        = new ReadOptions().setVerifyChecksums(false)
-    try {
-      val resultHolder = new Holder[Array[Byte]]()
-      if (writableDB.keyMayExist(rdb.txMetaHandle.handle, ro, txMetaKey.keyBytes, resultHolder)) {
-        resultHolder.getValue != null || writableDB.keyExists(rdb.txMetaHandle.handle, ro, txMetaKey.keyBytes)
-      } else false
-    } finally ro.close()
+  private var TxFilterResetTs = lastBlock.get.header.timestamp
+  private def mkFilter()      = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000, 0.001f)
+  private def initFilters(): (BloomFilter[Array[Byte]], BloomFilter[Array[Byte]]) = {
+    val prevFilter = mkFilter()
+
+    var fromHeight = height
+    Using(writableDB.newIterator()) { iter =>
+      iter.seek(Keys.blockMetaAt(Height(height)).keyBytes)
+      var lastBlockTs = TxFilterResetTs
+
+      while (
+        iter.isValid &&
+        iter.key().startsWith(KeyTags.BlockInfoAtHeight.prefixBytes) &&
+        (TxFilterResetTs - lastBlockTs) < settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2
+      ) {
+        lastBlockTs = readBlockMeta(iter.value()).getHeader.timestamp
+        fromHeight = Ints.fromByteArray(iter.key().drop(2))
+        iter.prev()
+      }
+    }
+
+    Using(writableDB.newIterator(rdb.txHandle.handle)) { iter =>
+      var counter = 0
+      iter.seek(Keys.transactionAt(Height(fromHeight), TxNum(0.toShort), rdb.txHandle).keyBytes)
+      while (iter.isValid && Ints.fromByteArray(iter.key().slice(2, 6)) <= height) {
+        counter += 1
+        prevFilter.put(readTransaction(Height(0))(iter.value())._2.id().arr)
+        iter.next()
+      }
+      log.debug(s"Loaded $counter tx IDs from [$fromHeight, $height]. Filter size is ${memMeter.measureDeep(prevFilter)} bytes")
+    }
+
+    (prevFilter, mkFilter())
   }
+
+  private var (prevTxFilter, currentTxFilter) = initFilters()
+
+  override def containsTransaction(tx: Transaction): Boolean =
+    (prevTxFilter.mightContain(tx.id().arr) || currentTxFilter.mightContain(tx.id().arr)) && {
+      writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
+    }
 
   override protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -562,6 +594,12 @@ class RocksDBWriter(
         rw.put(Keys.assetScript(asset)(height), Some(script))
       }
 
+      if (blockMeta.getHeader.timestamp - TxFilterResetTs > settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2) {
+        TxFilterResetTs = blockMeta.getHeader.timestamp
+        prevTxFilter = currentTxFilter
+        currentTxFilter = mkFilter()
+      }
+
       val transactionsWithSize =
         snapshot.transactions.zipWithIndex.map { case ((id, txInfo), i) =>
           val tx   = txInfo.transaction
@@ -575,6 +613,7 @@ class RocksDBWriter(
             Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status))
           )
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
+          currentTxFilter.put(id.arr)
 
           txId -> (num, tx, size)
         }.toMap

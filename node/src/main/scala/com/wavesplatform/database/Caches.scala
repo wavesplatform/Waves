@@ -128,7 +128,7 @@ abstract class Caches extends Blockchain with Storage {
     VolumeAndFee(curVf.volume, curVf.fee)
   }
 
-  private val memMeter = MemoryMeter.builder().build()
+  protected val memMeter = MemoryMeter.builder().build()
 
   private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] =
     CacheBuilder
