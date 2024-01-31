@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 
 import java.nio.ByteBuffer
+import java.time.Duration
 import java.util
 import java.util.concurrent.*
 import scala.annotation.tailrec
@@ -425,42 +426,45 @@ class RocksDBWriter(
     }
   }
 
-  private var TxFilterResetTs = lastBlock.get.header.timestamp
+  private var TxFilterResetTs = lastBlock.fold(0L)(_.header.timestamp)
   private def mkFilter()      = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000, 0.001f)
-  private def initFilters(): (BloomFilter[Array[Byte]], BloomFilter[Array[Byte]]) = {
-    val prevFilter = mkFilter()
+  private var currentTxFilter = mkFilter()
+  private var prevTxFilter = lastBlock match {
+    case Some(b) =>
+      TxFilterResetTs = b.header.timestamp
+      val prevFilter = mkFilter()
 
-    var fromHeight = height
-    Using(writableDB.newIterator()) { iter =>
-      iter.seek(Keys.blockMetaAt(Height(height)).keyBytes)
-      var lastBlockTs = TxFilterResetTs
+      var fromHeight = height
+      Using(writableDB.newIterator()) { iter =>
+        iter.seek(Keys.blockMetaAt(Height(height)).keyBytes)
+        var lastBlockTs = TxFilterResetTs
 
-      while (
-        iter.isValid &&
-        iter.key().startsWith(KeyTags.BlockInfoAtHeight.prefixBytes) &&
-        (TxFilterResetTs - lastBlockTs) < settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2
-      ) {
-        lastBlockTs = readBlockMeta(iter.value()).getHeader.timestamp
-        fromHeight = Ints.fromByteArray(iter.key().drop(2))
-        iter.prev()
+        while (
+          iter.isValid &&
+          iter.key().startsWith(KeyTags.BlockInfoAtHeight.prefixBytes) &&
+          (TxFilterResetTs - lastBlockTs) < settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2
+        ) {
+          lastBlockTs = readBlockMeta(iter.value()).getHeader.timestamp
+          fromHeight = Ints.fromByteArray(iter.key().drop(2))
+          iter.prev()
+        }
       }
-    }
 
-    Using(writableDB.newIterator(rdb.txHandle.handle)) { iter =>
-      var counter = 0
-      iter.seek(Keys.transactionAt(Height(fromHeight), TxNum(0.toShort), rdb.txHandle).keyBytes)
-      while (iter.isValid && Ints.fromByteArray(iter.key().slice(2, 6)) <= height) {
-        counter += 1
-        prevFilter.put(readTransaction(Height(0))(iter.value())._2.id().arr)
-        iter.next()
+      Using(writableDB.newIterator(rdb.txHandle.handle)) { iter =>
+        var counter = 0
+        iter.seek(Keys.transactionAt(Height(fromHeight), TxNum(0.toShort), rdb.txHandle).keyBytes)
+        while (iter.isValid && Ints.fromByteArray(iter.key().slice(2, 6)) <= height) {
+          counter += 1
+          prevFilter.put(readTransaction(Height(0))(iter.value())._2.id().arr)
+          iter.next()
+        }
+        log.info(s"Loaded $counter tx IDs from [$fromHeight, $height]. Filter size is ${memMeter.measureDeep(prevFilter)} bytes")
       }
-      log.debug(s"Loaded $counter tx IDs from [$fromHeight, $height]. Filter size is ${memMeter.measureDeep(prevFilter)} bytes")
-    }
 
-    (prevFilter, mkFilter())
+      prevFilter
+    case None =>
+      mkFilter()
   }
-
-  private var (prevTxFilter, currentTxFilter) = initFilters()
 
   override def containsTransaction(tx: Transaction): Boolean =
     (prevTxFilter.mightContain(tx.id().arr) || currentTxFilter.mightContain(tx.id().arr)) && {
@@ -595,6 +599,7 @@ class RocksDBWriter(
       }
 
       if (blockMeta.getHeader.timestamp - TxFilterResetTs > settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2) {
+        log.info(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration.ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
         TxFilterResetTs = blockMeta.getHeader.timestamp
         prevTxFilter = currentTxFilter
         currentTxFilter = mkFilter()
