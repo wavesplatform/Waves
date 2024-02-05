@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 
 import java.nio.ByteBuffer
+import java.time.Duration
 import java.util
 import java.util.concurrent.*
 import scala.annotation.tailrec
@@ -115,14 +116,12 @@ object RocksDBWriter extends ScorexLogging {
       settings: BlockchainSettings,
       dbSettings: DBSettings,
       isLightMode: Boolean,
-      bfBlockInsertions: Int = 10000,
       forceCleanupExecutorService: Option[ExecutorService] = None
   ): RocksDBWriter = new RocksDBWriter(
     rdb,
     settings,
     dbSettings,
     isLightMode,
-    bfBlockInsertions,
     dbSettings.cleanupInterval match {
       case None => MoreExecutors.newDirectExecutorService() // We don't care if disabled
       case Some(_) =>
@@ -147,7 +146,6 @@ class RocksDBWriter(
     val settings: BlockchainSettings,
     val dbSettings: DBSettings,
     isLightMode: Boolean,
-    bfBlockInsertions: Int = 10000,
     cleanupExecutorService: ExecutorService
 ) extends Caches
     with AutoCloseable {
@@ -215,20 +213,18 @@ class RocksDBWriter(
       writableDB.get(Keys.data(addressId, key))
     }
 
-  override protected def loadEntryHeights(keys: Iterable[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height] = {
-    val keyBufs  = database.getKeyBuffersFromKeys(keys.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
-    val valBufs  = database.getValueBuffers(keys.size, 8)
-    val valueBuf = new Array[Byte](8)
+  override protected def loadEntryHeights(keys: Seq[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height] = {
+    val keyBufs = database.getKeyBuffersFromKeys(keys.view.map { case (addr, k) => Keys.data(addressIdOf(addr), k) }.toVector)
+    val valBufs = database.getValueBuffers(keys.size, 4)
 
     val result = rdb.db
       .multiGetByteBuffers(keyBufs.asJava, valBufs.asJava)
       .asScala
       .view
       .zip(keys)
-      .map { case (status, k @ (_, key)) =>
+      .map { case (status, k) =>
         if (status.status.getCode == Status.Code.Ok) {
-          status.value.get(valueBuf)
-          k -> readCurrentData(key)(valueBuf).height
+          k -> Height(status.value.getInt)
         } else k -> Height(0)
       }
       .toMap
@@ -399,11 +395,11 @@ class RocksDBWriter(
     }
 
     for ((addressId, nftIds) <- updatedNftLists.asMap().asScala) {
-      val kCount           = Keys.nftCount(AddressId(addressId.toLong))
+      val kCount           = Keys.nftCount(AddressId(addressId.toLong), rdb.apiHandle)
       val previousNftCount = rw.get(kCount)
       rw.put(kCount, previousNftCount + nftIds.size())
       for ((id, idx) <- nftIds.asScala.zipWithIndex) {
-        rw.put(Keys.nftAt(AddressId(addressId.toLong), previousNftCount + idx, id), Some(()))
+        rw.put(Keys.nftAt(AddressId(addressId.toLong), previousNftCount + idx, id, rdb.apiHandle), Some(()))
       }
     }
 
@@ -430,32 +426,52 @@ class RocksDBWriter(
     }
   }
 
-  // todo: instead of fixed-size block batches, store fixed-time batches
-  private val BlockStep  = 200
-  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * bfBlockInsertions, 0.01f)
-  private def initFilters(): (BloomFilter[Array[Byte]], BloomFilter[Array[Byte]]) = {
-    def loadFilter(heights: Seq[Int]): BloomFilter[Array[Byte]] = {
-      val filter = mkFilter()
-      heights.filter(_ > 0).foreach { h =>
-        loadTransactions(Height(h), rdb).foreach { case (_, tx) => filter.put(tx.id().arr) }
-      }
-      filter
-    }
+  private var TxFilterResetTs = lastBlock.fold(0L)(_.header.timestamp)
+  private def mkFilter()      = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000, 0.001f)
+  private var currentTxFilter = mkFilter()
+  private var prevTxFilter = lastBlock match {
+    case Some(b) =>
+      TxFilterResetTs = b.header.timestamp
+      val prevFilter = mkFilter()
 
-    val lastFilterStart = (height / BlockStep) * BlockStep + 1
-    val prevFilterStart = lastFilterStart - BlockStep
-    val (bf0Heights, bf1Heights) = if ((height / BlockStep) % 2 == 0) {
-      (lastFilterStart to height, prevFilterStart until lastFilterStart)
-    } else {
-      (prevFilterStart until lastFilterStart, lastFilterStart to height)
-    }
-    (loadFilter(bf0Heights), loadFilter(bf1Heights))
+      var fromHeight = height
+      Using(writableDB.newIterator()) { iter =>
+        iter.seek(Keys.blockMetaAt(Height(height)).keyBytes)
+        var lastBlockTs = TxFilterResetTs
+
+        while (
+          iter.isValid &&
+          iter.key().startsWith(KeyTags.BlockInfoAtHeight.prefixBytes) &&
+          (TxFilterResetTs - lastBlockTs) < settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2
+        ) {
+          lastBlockTs = readBlockMeta(iter.value()).getHeader.timestamp
+          fromHeight = Ints.fromByteArray(iter.key().drop(2))
+          iter.prev()
+        }
+      }
+
+      Using(writableDB.newIterator(rdb.txHandle.handle)) { iter =>
+        var counter = 0
+        iter.seek(Keys.transactionAt(Height(fromHeight), TxNum(0.toShort), rdb.txHandle).keyBytes)
+        while (
+          iter.isValid &&
+          iter.key().startsWith(KeyTags.NthTransactionInfoAtHeight.prefixBytes) &&
+          Ints.fromByteArray(iter.key().slice(2, 6)) <= height
+        ) {
+          counter += 1
+          prevFilter.put(readTransaction(Height(0))(iter.value())._2.id().arr)
+          iter.next()
+        }
+        log.debug(s"Loaded $counter tx IDs from [$fromHeight, $height]. Filter size is ${memMeter.measureDeep(prevFilter)} bytes")
+      }
+
+      prevFilter
+    case None =>
+      mkFilter()
   }
 
-  private var (bf0, bf1) = initFilters()
-
   override def containsTransaction(tx: Transaction): Boolean =
-    (bf0.mightContain(tx.id().arr) || bf1.mightContain(tx.id().arr)) && {
+    (prevTxFilter.mightContain(tx.id().arr) || currentTxFilter.mightContain(tx.id().arr)) && {
       writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
     }
 
@@ -586,14 +602,13 @@ class RocksDBWriter(
         rw.put(Keys.assetScript(asset)(height), Some(script))
       }
 
-      if (height % BlockStep == 1) {
-        if ((height / BlockStep) % 2 == 0) {
-          bf0 = mkFilter()
-        } else {
-          bf1 = mkFilter()
-        }
+      if (blockMeta.getHeader.timestamp - TxFilterResetTs > settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis * 2) {
+        log.trace(s"Rotating filter at $height, prev ts = $TxFilterResetTs, new ts = ${blockMeta.getHeader.timestamp}, interval = ${Duration
+          .ofMillis(blockMeta.getHeader.timestamp - TxFilterResetTs)}")
+        TxFilterResetTs = blockMeta.getHeader.timestamp
+        prevTxFilter = currentTxFilter
+        currentTxFilter = mkFilter()
       }
-      val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
 
       val transactionsWithSize =
         snapshot.transactions.zipWithIndex.map { case ((id, txInfo), i) =>
@@ -608,14 +623,14 @@ class RocksDBWriter(
             Some(PBSnapshots.toProtobuf(txInfo.snapshot, txInfo.status))
           )
           rw.put(Keys.transactionMetaById(txId, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, meta.status.protobuf, 0, size)))
-          targetBf.put(id.arr)
+          currentTxFilter.put(id.arr)
 
           txId -> (num, tx, size)
         }.toMap
 
       if (dbSettings.storeTransactionsByAddress) {
         val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
-          (aid, txIds, Keys.addressTransactionSeqNr(aid))
+          (aid, txIds, Keys.addressTransactionSeqNr(aid, rdb.apiHandle))
         }
         rw.multiGetInts(addressTxs.view.map(_._3).toVector)
           .zip(addressTxs)
@@ -625,7 +640,7 @@ class RocksDBWriter(
               val (num, tx, size) = transactionsWithSize(txId)
               (tx.tpe.id.toByte, num, size)
             }.toSeq
-            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
+            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr, rdb.apiHandle), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
             rw.put(txSeqNrKey, nextSeqNr)
           }
       }
@@ -637,13 +652,15 @@ class RocksDBWriter(
             address            <- Seq(details.recipientAddress, details.sender.toAddress)
             addressId = this.addressIdWithFallback(address, newAddresses)
           } yield (addressId, leaseId)
-        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) => (addressId, Keys.addressLeaseSeqNr(addressId)) }(_._2).toSeq
+        val leaseIdsByAddressId = addressIdWithLeaseIds.groupMap { case (addressId, _) =>
+          (addressId, Keys.addressLeaseSeqNr(addressId, rdb.apiHandle))
+        }(_._2).toSeq
 
         rw.multiGetInts(leaseIdsByAddressId.view.map(_._1._2).toVector)
           .zip(leaseIdsByAddressId)
           .foreach { case (prevSeqNr, ((addressId, leaseSeqKey), leaseIds)) =>
             val nextSeqNr = prevSeqNr.getOrElse(0) + 1
-            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr), Some(leaseIds))
+            rw.put(Keys.addressLeaseSeq(addressId, nextSeqNr, rdb.apiHandle), Some(leaseIds))
             rw.put(leaseSeqKey, nextSeqNr)
           }
       }
@@ -698,7 +715,7 @@ class RocksDBWriter(
           })
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-        try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
+        try rw.put(Keys.invokeScriptResult(txHeight, txNum, rdb.apiHandle), Some(result))
         catch {
           case NonFatal(e) =>
             throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
@@ -707,7 +724,7 @@ class RocksDBWriter(
 
       for ((txId, pbMeta) <- snapshot.ethereumTransactionMeta) {
         val txNum = transactionsWithSize(TransactionId @@ txId)._1
-        val key   = Keys.ethereumTransactionMeta(Height(height), txNum)
+        val key   = Keys.ethereumTransactionMeta(Height(height), txNum, rdb.apiHandle)
         rw.put(key, Some(pbMeta))
       }
 
@@ -975,11 +992,9 @@ class RocksDBWriter(
 
           for ((addressId, address) <- changedAddresses) {
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
-              log.trace(s"Discarding $k for $address at $currentHeight")
               accountDataToInvalidate += (address -> k)
 
-              rw.delete(Keys.dataAt(addressId, k)(currentHeight))
-              rollbackDataHistory(rw, Keys.data(addressId, k), Keys.dataAt(addressId, k)(_), currentHeight)
+              rollbackDataEntry(rw, k, address, addressId, currentHeight)
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
@@ -993,9 +1008,9 @@ class RocksDBWriter(
             discardLeaseBalance(address)
 
             if (dbSettings.storeTransactionsByAddress) {
-              val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
+              val kTxSeqNr = Keys.addressTransactionSeqNr(addressId, rdb.apiHandle)
               val txSeqNr  = rw.get(kTxSeqNr)
-              val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
+              val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr, rdb.apiHandle)
 
               rw.get(kTxHNSeq).collect { case (`currentHeight`, _) =>
                 rw.delete(kTxHNSeq)
@@ -1004,9 +1019,9 @@ class RocksDBWriter(
             }
 
             if (dbSettings.storeLeaseStatesByAddress) {
-              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId)
+              val leaseSeqNrKey = Keys.addressLeaseSeqNr(addressId, rdb.apiHandle)
               val leaseSeqNr    = rw.get(leaseSeqNrKey)
-              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr)
+              val leaseSeqKey   = Keys.addressLeaseSeq(addressId, leaseSeqNr, rdb.apiHandle)
               rw.get(leaseSeqKey)
                 .flatMap(_.headOption)
                 .flatMap(leaseDetails)
@@ -1054,7 +1069,7 @@ class RocksDBWriter(
 
               case _: DataTransaction => // see changed data keys removal
               case _: InvokeScriptTransaction | _: InvokeExpressionTransaction =>
-                rw.delete(Keys.invokeScriptResult(currentHeight, num))
+                rw.delete(Keys.invokeScriptResult(currentHeight, num, rdb.apiHandle))
 
               case tx: CreateAliasTransaction =>
                 rw.delete(Keys.addressIdOfAlias(tx.alias))
@@ -1063,7 +1078,7 @@ class RocksDBWriter(
                 ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
               case _: EthereumTransaction =>
-                rw.delete(Keys.ethereumTransactionMeta(currentHeight, num))
+                rw.delete(Keys.ethereumTransactionMeta(currentHeight, num, rdb.apiHandle))
             }
 
             if (tx.tpe != TransactionType.Genesis) {
@@ -1132,14 +1147,20 @@ class RocksDBWriter(
     discardedBlocks.reverse
   }
 
-  private def rollbackDataHistory(rw: RW, currentDataKey: Key[CurrentData], dataNodeKey: Height => Key[DataNode], currentHeight: Height): Unit = {
-    val currentData = rw.get(currentDataKey)
+  private def rollbackDataEntry(rw: RW, key: String, address: Address, addressId: AddressId, currentHeight: Height): Unit = {
+    val currentDataKey = Keys.data(addressId, key)
+    val currentData    = rw.get(currentDataKey)
+    rw.delete(Keys.dataAt(addressId, key)(currentHeight))
     if (currentData.height == currentHeight) {
-      val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
-      rw.delete(dataNodeKey(currentHeight))
-      prevDataNode.entry match {
-        case _: EmptyDataEntry => rw.delete(currentDataKey)
-        case _                 => rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      if (currentData.prevHeight > 0) {
+        val prevDataNode = rw.get(Keys.dataAt(addressId, key)(currentData.prevHeight))
+        log.trace(
+          s"PUT $address($addressId)/$key: ${currentData.entry}@$currentHeight => ${prevDataNode.entry}@${currentData.prevHeight}>${prevDataNode.prevHeight}"
+        )
+        rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+      } else {
+        log.trace(s"DEL $address($addressId)/$key: ${currentData.entry}@$currentHeight => EMPTY@${currentData.prevHeight}")
+        rw.delete(currentDataKey)
       }
     }
   }

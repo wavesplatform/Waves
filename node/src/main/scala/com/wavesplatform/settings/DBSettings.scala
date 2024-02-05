@@ -1,5 +1,4 @@
 package com.wavesplatform.settings
-import scala.concurrent.duration.FiniteDuration
 
 case class DBSettings(
     directory: String,
@@ -10,7 +9,5 @@ case class DBSettings(
     maxCacheSize: Int,
     maxRollbackDepth: Int,
     cleanupInterval: Option[Int] = None,
-    rememberBlocks: FiniteDuration,
-    useBloomFilter: Boolean,
-    rocksdb: RocksDBSettings
+    rocksdb: RocksDBSettings,
 )

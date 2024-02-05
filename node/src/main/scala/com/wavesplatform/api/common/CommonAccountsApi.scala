@@ -94,7 +94,7 @@ object CommonAccountsApi {
     }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
-      rdb.db.resourceObservable.flatMap { resource =>
+      rdb.db.resourceObservable(rdb.apiHandle.handle).flatMap { resource =>
         Observable
           .fromIterator(Task(nftIterator(resource, address, compositeBlockchain().snapshot, after, blockchain.assetDescription)))
       }

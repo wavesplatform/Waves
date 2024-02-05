@@ -89,7 +89,7 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
         val persistedNfts = Seq.newBuilder[IssuedAsset]
         d.rdb.db.readOnly { ro =>
           val addressId = ro.get(Keys.addressId(firstAccount)).get
-          ro.iterateOver(KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray) { e =>
+          ro.iterateOver(KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray, Some(d.rdb.apiHandle.handle)) { e =>
             persistedNfts += IssuedAsset(ByteStr(e.getKey.takeRight(32)))
           }
         }
@@ -99,7 +99,6 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
 
       val settings = settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)
       withDomain(settings)(assert)
-      withDomain(settings.copy(dbSettings = settings.dbSettings.copy(useBloomFilter = true)))(assert)
     }
   }
 

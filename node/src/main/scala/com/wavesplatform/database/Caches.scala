@@ -128,7 +128,7 @@ abstract class Caches extends Blockchain with Storage {
     VolumeAndFee(curVf.volume, curVf.fee)
   }
 
-  private val memMeter = MemoryMeter.builder().build()
+  protected val memMeter = MemoryMeter.builder().build()
 
   private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] =
     CacheBuilder
@@ -183,7 +183,7 @@ abstract class Caches extends Blockchain with Storage {
 
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
   protected def loadAccountData(acc: Address, key: String): CurrentData
-  protected def loadEntryHeights(keys: Iterable[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height]
+  protected def loadEntryHeights(keys: Seq[(Address, String)], addressIdOf: Address => AddressId): Map[(Address, String), Height]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
   private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] =
@@ -299,15 +299,15 @@ abstract class Caches extends Blockchain with Storage {
       (key, entry)       <- entries
     } yield ((address, key), entry)
 
-    val cachedEntries     = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
-    val loadedPrevEntries = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains), addressIdWithFallback(_, newAddressIds))
+    val cachedEntries          = accountDataCache.getAllPresent(newEntries.keys.asJava).asScala
+    val loadedPrevEntryHeights = loadEntryHeights(newEntries.keys.filterNot(cachedEntries.contains).toSeq, addressIdWithFallback(_, newAddressIds))
 
     val updatedDataWithNodes = (for {
-      (k, currentEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntries
-      newEntry          <- newEntries.get(k)
+      (k, heightOfPreviousEntry) <- cachedEntries.view.mapValues(_.height) ++ loadedPrevEntryHeights
+      newEntry                   <- newEntries.get(k)
     } yield k -> (
-      CurrentData(newEntry, Height(height), currentEntry),
-      DataNode(newEntry, currentEntry)
+      CurrentData(newEntry, Height(height), heightOfPreviousEntry),
+      DataNode(newEntry, heightOfPreviousEntry)
     )).toMap
 
     val orderFillsWithNodes = for {

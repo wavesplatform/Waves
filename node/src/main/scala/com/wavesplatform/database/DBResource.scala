@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
+import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, RocksIterator}
 
 import scala.collection.View
 import scala.collection.mutable.ArrayBuffer
@@ -18,9 +18,9 @@ trait DBResource extends AutoCloseable {
 }
 
 object DBResource {
-  def apply(db: RocksDB): DBResource = new DBResource {
+  def apply(db: RocksDB, iteratorCfHandle: Option[ColumnFamilyHandle] = None): DBResource = new DBResource {
     private[this] val snapshot    = db.getSnapshot
-    private[this] val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+    private[this] val readOptions = new ReadOptions().setSnapshot(snapshot)
 
     override def get[V](key: Key[V]): V = key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes))
 
@@ -35,9 +35,11 @@ object DBResource {
     def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A] =
       db.multiGet(readOptions, keys, valBufferSize)
 
-    override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
+    override lazy val prefixIterator: RocksIterator =
+      db.newIterator(iteratorCfHandle.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 
-    override lazy val fullIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
+    override lazy val fullIterator: RocksIterator =
+      db.newIterator(iteratorCfHandle.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))
 
     override def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A): A = prefixIterator.synchronized {
       if (prefixIterator.isOwningHandle) ifNotClosed(prefixIterator) else ifClosed

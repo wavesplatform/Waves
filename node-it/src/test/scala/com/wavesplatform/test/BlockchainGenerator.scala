@@ -64,10 +64,10 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private val settings: WavesSettings = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(quorum = 0))
 
-  def generateDb(genBlocks: Seq[GenBlock], dbDirPath: String = settings.dbSettings.directory): Unit =
+  def generateDb(genBlocks: Iterator[GenBlock], dbDirPath: String = settings.dbSettings.directory): Unit =
     generateBlockchain(genBlocks, settings.dbSettings.copy(directory = dbDirPath))
 
-  def generateBinaryFile(genBlocks: Seq[GenBlock]): Unit = {
+  def generateBinaryFile(genBlocks: Iterator[GenBlock]): Unit = {
     val targetHeight = genBlocks.size + 1
     log.info(s"Exporting to $targetHeight")
     val outputFilename = s"blockchain-$targetHeight"
@@ -94,7 +94,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
     }
   }
 
-  private def generateBlockchain(genBlocks: Seq[GenBlock], dbSettings: DBSettings, exportToFile: Block => Unit = _ => ()): Unit = {
+  private def generateBlockchain(genBlocks: Iterator[GenBlock], dbSettings: DBSettings, exportToFile: Block => Unit = _ => ()): Unit = {
     val scheduler = Schedulers.singleThread("appender")
     val time = new Time {
       val startTime: Long = settings.blockchainSettings.genesisSettings.timestamp
@@ -185,7 +185,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
           }
         case Left(err) => log.error(s"Error appending block: $err")
       }
-    }
+    }.get
   }
 
   private def correctTxTimestamp(genTx: GenTx, time: Time): Transaction =
