@@ -19,7 +19,7 @@ case class ReissueRequest(
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[ReissueTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, ReissueTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)
