@@ -66,18 +66,18 @@ object UtilApp {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
       case Some(cmd) =>
-        lazy val nodeState = new NodeState(cmd)
+        val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
         val inBytes        = IO.readInput(cmd)
         val result = {
           val doAction = cmd.mode match {
-            case Command.CompileScript   => Actions.doCompile(nodeState.settings) _
+            case Command.CompileScript   => Actions.doCompile(settings) _
             case Command.DecompileScript => Actions.doDecompile _
             case Command.SignBytes       => Actions.doSign _
             case Command.VerifySignature => Actions.doVerify _
             case Command.CreateKeyPair   => Actions.doCreateKeyPair _
             case Command.Hash            => Actions.doHash _
             case Command.SerializeTx     => Actions.doSerializeTx _
-            case Command.SignTx          => Actions.doSignTx(nodeState) _
+            case Command.SignTx          => Actions.doSignTx(new NodeState(cmd)) _
             case Command.SignTxWithSk    => Actions.doSignTxWithSK _
           }
           doAction(cmd, inBytes)
