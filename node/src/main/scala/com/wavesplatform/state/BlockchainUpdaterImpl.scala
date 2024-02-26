@@ -28,7 +28,6 @@ import kamon.Kamon
 import monix.reactive.Observable
 import monix.reactive.subjects.ReplaySubject
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import scala.collection.immutable.VectorMap
 
 class BlockchainUpdaterImpl(
@@ -46,15 +45,8 @@ class BlockchainUpdaterImpl(
   import com.wavesplatform.state.BlockchainUpdaterImpl.*
   import wavesSettings.blockchainSettings.functionalitySettings
 
-  private def inLock[R](l: Lock, f: => R): R = {
-    l.lockInterruptibly()
-    try f
-    finally l.unlock()
-  }
-
-  private val lock                     = new ReentrantReadWriteLock(true)
-  private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
-  private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
+  private def writeLock[B](f: => B): B = f
+  private def readLock[B](f: => B): B  = f
 
   private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
