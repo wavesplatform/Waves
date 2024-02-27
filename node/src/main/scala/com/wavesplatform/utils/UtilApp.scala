@@ -296,7 +296,7 @@ object UtilApp {
         case LeaseCancel     => json.as[LeaseCancelRequest].toTx.map(_.signWith(c.signOptions.privateKey))
         case CreateAlias     => json.as[CreateAliasRequest].toTx.map(_.signWith(c.signOptions.privateKey))
         case MassTransfer    => json.as[SignedMassTransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
-        case Data            => json.as[LeaseCancelRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Data            => json.as[SignedDataRequest].toTx.map(_.signWith(c.signOptions.privateKey))
         case SetScript       => json.as[SignedSetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
         case SponsorFee      => json.as[SignedSponsorFeeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
         case SetAssetScript  => json.as[SignedSetAssetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
