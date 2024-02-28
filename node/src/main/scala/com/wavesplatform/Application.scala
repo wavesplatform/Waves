@@ -47,7 +47,7 @@ import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
+import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
@@ -371,7 +371,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val heavyRequestScheduler = Scheduler(
         if (settings.config.getBoolean("kamon.enable"))
           ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
-        else heavyRequestExecutor
+        else heavyRequestExecutor,
+        ExecutionModel.AlwaysAsyncExecution
       )
 
       val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
