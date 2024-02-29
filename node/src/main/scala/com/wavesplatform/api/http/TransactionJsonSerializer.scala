@@ -221,7 +221,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
       gen.writeStartObject()
       gen.writeStringField("dApp", inv.dApp.toString)
       gen.writeValueField("call")(callSerializer(numbersAsString).serialize(inv.call, _, serializers))
-      gen.writeArrayField("payments", inv.payments)(attachedPaymentSerializer(numbersAsString), serializers)
+      gen.writeArrayField("payment", inv.payments)(attachedPaymentSerializer(numbersAsString), serializers)
       gen.writeValueField("stateChanges")(invokeScriptResultSerializer(numbersAsString).serialize(inv.stateChanges, _, serializers))
       gen.writeEndObject()
     }
