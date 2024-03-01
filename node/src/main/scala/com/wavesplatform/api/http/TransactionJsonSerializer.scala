@@ -258,7 +258,10 @@ final case class TransactionJsonSerializer(blockchain: Blockchain) {
           gen.writeNumberField("type", tx.tpe.id, numbersAsString)
           gen.writeStringField("id", tx.id().toString)
           gen.writeNumberField("fee", tx.assetFee._2, numbersAsString)
-          tx.assetFee._1.maybeBase58Repr.foreach(gen.writeStringField("feeAssetId", _))
+          tx.feeAssetId match {
+            case IssuedAsset(id) => gen.writeStringField("feeAssetId", id.toString)
+            case Asset.Waves => gen.writeNullField("feeAssetId")
+          }
           gen.writeNumberField("timestamp", tx.timestamp, numbersAsString)
           gen.writeNumberField("version", tx.version, numbersAsString)
           if (PBSince.affects(tx)) gen.writeNumberField("chainId", tx.chainId, numbersAsString)
