@@ -12,7 +12,9 @@ import io.grpc.protobuf.services.ProtoReflectionService
 import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
+import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
 import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import org.rocksdb.RocksDB
 
 import java.net.InetSocketAddress
@@ -22,15 +24,14 @@ import scala.concurrent.duration.*
 import scala.util.Try
 
 class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging with BlockchainUpdateTriggers {
+  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
   private[this] implicit val scheduler: SchedulerService = Schedulers.fixedPool(
-    sys.runtime.availableProcessors(),
+    settings.workerThreads,
     "blockchain-updates",
     UncaughtExceptionReporter(err => log.error("Uncaught exception in BlockchainUpdates scheduler", err)),
     ExecutionModel.Default,
     rejectedExecutionHandler = new akka.dispatch.SaneRejectedExecutionHandler
   )
-
-  private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
   private[this] val rdb      = RocksDB.open(context.settings.directory + "/blockchain-updates")
   private[this] val repo     = new Repo(rdb, context.blocksApi)
 

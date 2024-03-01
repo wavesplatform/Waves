@@ -237,7 +237,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
-      override def actorSystem: ActorSystem        = app.actorSystem
       override def utxEvents: Observable[UtxEvent] = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
@@ -372,7 +371,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         if (settings.config.getBoolean("kamon.enable"))
           ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
         else heavyRequestExecutor,
-        ExecutionModel.AlwaysAsyncExecution
+        ExecutionModel.BatchedExecution(100)
       )
 
       val serverRequestTimeout = FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
