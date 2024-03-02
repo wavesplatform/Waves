@@ -137,13 +137,13 @@ object RDB extends StrictLogging {
   private def createDbOptions(settings: DBSettings): OptionsWithResources[DBOptions] = {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
-      .setParanoidChecks(settings.rocksdb.paranoidChecks)
-      .setIncreaseParallelism(6)
+      .setIncreaseParallelism(settings.rocksdb.parallelism)
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
-      .setMaxOpenFiles(100)
+      .setMaxOpenFiles(-1)
       .setMaxSubcompactions(2) // Write stalls expected without this option. Can lead to max_background_jobs * max_subcompactions background threads
       .setMaxManifestFileSize(200 << 20)
+      .setAllowMmapReads(settings.rocksdb.allowMmapReads)
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()

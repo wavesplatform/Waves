@@ -423,7 +423,7 @@ package object database {
 
     def withReadOptions[A](f: ReadOptions => A): A = {
       val snapshot = db.getSnapshot
-      val ro       = new ReadOptions().setSnapshot(snapshot)
+      val ro       = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
       try f(ro)
       finally {
         ro.close()
@@ -529,7 +529,7 @@ package object database {
         } else ()
       }
 
-      val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), new ReadOptions().setTotalOrderSeek(true))
+      val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), new ReadOptions().setTotalOrderSeek(true).setVerifyChecksums(false))
       try {
         iterator.seek(prefix)
         loop(iterator)
