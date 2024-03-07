@@ -203,7 +203,8 @@ class BlockchainUpdaterImpl(
       challengedHitSource: Option[ByteStr] = None,
       verify: Boolean = true,
       txSignParCheck: Boolean = true
-  ): Either[ValidationError, BlockApplyResult] = {
+  ): Either[ValidationError, BlockApplyResult] =
+    writeLock {
       val height                             = rocksdb.height
       val notImplementedFeatures: Set[Short] = rocksdb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
 
@@ -334,7 +335,7 @@ class BlockchainUpdaterImpl(
                             verify,
                             txSignParCheck = txSignParCheck
                           )
-                      } yield writeLock {
+                      } yield {
                         val tempBlockchain = SnapshotBlockchain(
                           referencedBlockchain,
                           differResult.snapshot,
@@ -345,6 +346,8 @@ class BlockchainUpdaterImpl(
                           Some(differResult.computedStateHash)
                         )
                         miner.scheduleMining(Some(tempBlockchain))
+
+                        log.trace(s"Persisting block ${referencedForgedBlock.id()}, discarded microblock refs: ${discarded.map(_._1.reference).mkString("[", ",", "]")}")
 
                         if (discarded.nonEmpty) {
                           blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
@@ -504,7 +507,7 @@ class BlockchainUpdaterImpl(
       microBlock: MicroBlock,
       snapshot: Option[MicroBlockSnapshot],
       verify: Boolean = true
-  ): Either[ValidationError, BlockId] = {
+  ): Either[ValidationError, BlockId] = writeLock {
     ngState match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
