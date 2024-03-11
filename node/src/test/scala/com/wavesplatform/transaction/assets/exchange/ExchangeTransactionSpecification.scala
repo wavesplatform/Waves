@@ -193,7 +193,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
 
     forAll(preconditions) { case (sender1, sender2, matcher, pair, buyerMatcherFeeAssetId, sellerMatcherFeeAssetId, versions) =>
       val time                = ntpTime.correctedTime()
-      val expirationTimestamp = time + Order.MaxLiveTime
+      val expirationTimestamp = time + Order.MaxLiveTime / 2
 
       val buyPrice       = 60 * Order.PriceConstant
       val sellPrice      = 50 * Order.PriceConstant
@@ -350,7 +350,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
 
     forAll(preconditions) { case (sender1, sender2, matcher, pair, buyerMatcherFeeAssetId, sellerMatcherFeeAssetId, versions) =>
       val time                     = ntpTime.correctedTime()
-      val expirationTimestamp      = time + Order.MaxLiveTime
+      val expirationTimestamp      = time + Order.MaxLiveTime / 2
       val buyPrice                 = 1 * Order.PriceConstant
       val sellPrice                = (0.50 * Order.PriceConstant).toLong
       val matcherFee               = 300000L

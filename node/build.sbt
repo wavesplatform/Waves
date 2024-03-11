@@ -41,7 +41,8 @@ inTask(assembly)(
       case p
           if p.endsWith(".proto") ||
             p.endsWith("module-info.class") ||
-            p.endsWith("io.netty.versions.properties") =>
+            p.endsWith("io.netty.versions.properties") ||
+            p.endsWith(".kotlin_module") =>
         MergeStrategy.discard
 
       case "scala-collection-compat.properties" =>

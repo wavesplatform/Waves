@@ -28,12 +28,12 @@ package object common {
       def loadISR(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-          .orElse(txNumOpt.flatMap(loadInvokeScriptResult(rdb.db, m.height, _)))
+          .orElse(txNumOpt.flatMap(loadInvokeScriptResult(rdb.db, rdb.apiHandle, m.height, _)))
 
       def loadETM(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
-          .orElse(txNumOpt.flatMap(loadEthereumMetadata(rdb.db, m.height, _)))
+          .orElse(txNumOpt.flatMap(loadEthereumMetadata(rdb.db, rdb.apiHandle, m.height, _)))
 
       TransactionMeta.create(
         m.height,
@@ -90,11 +90,11 @@ package object common {
       ist =>
         maybeSnapshot
           .flatMap { case (_, s) => s.scriptResults.get(ist.id()) }
-          .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, ist.id())),
+          .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, rdb.apiHandle, ist.id())),
       et =>
         maybeSnapshot
           .flatMap { case (_, s) => s.ethereumTransactionMeta.get(et.id()) }
-          .orElse(loadEthereumMetadata(rdb.db, rdb.txMetaHandle, et.id()))
+          .orElse(loadEthereumMetadata(rdb.db, rdb.txMetaHandle, rdb.apiHandle, et.id()))
     )
   }
 }

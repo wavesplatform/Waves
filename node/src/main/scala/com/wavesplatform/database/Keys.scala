@@ -6,8 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
-import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ERC20Address, Transaction}
@@ -21,6 +19,7 @@ object CurrentBalance {
 case class BalanceNode(balance: Long, prevHeight: Height)
 object BalanceNode {
   val Empty: BalanceNode = BalanceNode(0, Height(0))
+  val SizeInBytes: Int   = 12
 }
 
 case class CurrentVolumeAndFee(volume: Long, fee: Long, height: Height, prevHeight: Height)
@@ -57,9 +56,8 @@ object Keys {
   import KeyHelpers.*
   import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
-  val version: Key[Int] = intKey(Version, default = 1)
-  val height: Key[Height] =
-    Key(Height, Array.emptyByteArray, v => state.Height @@ (if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else 0), Ints.toByteArray)
+  val version: Key[Int]   = intKey(Version, default = 1)
+  val height: Key[Height] = heightKey(Height)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
 
@@ -103,8 +101,13 @@ object Keys {
 
   def changedAddresses(height: Int): Key[Seq[AddressId]] = Key(ChangedAddresses, h(height), readAddressIds, writeAddressIds)
 
+  def changedWavesBalances(height: Int): Key[Seq[AddressId]] =
+    Key(ChangedWavesBalances, h(height), readAddressIds, writeAddressIds)
+
   def changedBalances(height: Int, asset: IssuedAsset): Key[Seq[AddressId]] =
     Key(ChangedAssetBalances, h(height) ++ asset.id.arr, readAddressIds, writeAddressIds)
+
+  def changedBalancesAtPrefix(height: Int): Array[Byte] = KeyTags.ChangedAssetBalances.prefixBytes ++ h(height)
 
   def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes, AddressId.fromByteArray, _.toByteArray)
 
@@ -120,9 +123,8 @@ object Keys {
   val approvedFeatures: Key[Map[Short, Int]]  = Key(ApprovedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
-  // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
-  def data(address: Address, key: String): Key[CurrentData] =
-    Key(Data, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
+  def data(addressId: AddressId, key: String): Key[CurrentData] =
+    Key(Data, addressId.toByteArray ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
   def dataAt(addressId: AddressId, key: String)(height: Int): Key[DataNode] =
     Key(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataNode(key), writeDataNode)
@@ -139,7 +141,8 @@ object Keys {
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
     Key.opt(AssetScript, hBytes(asset.id.arr, height), _ => (), _ => Array[Byte]())
 
-  val safeRollbackHeight: Key[Int] = intKey(SafeRollbackHeight)
+  val safeRollbackHeight: Key[Int]   = intKey(SafeRollbackHeight)
+  val lastCleanupHeight: Key[Height] = heightKey(LastCleanupHeight)
 
   def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
@@ -164,7 +167,7 @@ object Keys {
       Some(cfHandle.handle)
     )
 
-  def transactionStateSnapshotAt(height: Height, n: TxNum, cfHandle: RDB.TxHandle): Key[Option[TransactionStateSnapshot]] =
+  def transactionStateSnapshotAt(height: Height, n: TxNum, cfHandle: RDB.TxSnapshotHandle): Key[Option[TransactionStateSnapshot]] =
     Key.opt[TransactionStateSnapshot](
       NthTransactionStateSnapshotAtHeight,
       hNum(height, n),
@@ -173,26 +176,28 @@ object Keys {
       Some(cfHandle.handle)
     )
 
-  def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
-    bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray)
+  def addressTransactionSeqNr(addressId: AddressId, cfh: RDB.ApiHandle): Key[Int] =
+    bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray, cfh = Some(cfh.handle))
 
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum, Int)])]] =
+  def addressTransactionHN(addressId: AddressId, seqNr: Int, cfh: RDB.ApiHandle): Key[Option[(Height, Seq[(Byte, TxNum, Int)])]] =
     Key.opt(
       AddressTransactionHeightTypeAndNums,
       hBytes(addressId.toByteArray, seqNr),
       readTransactionHNSeqAndType,
-      writeTransactionHNSeqAndType
+      writeTransactionHNSeqAndType,
+      Some(cfh.handle)
     )
 
-  def addressLeaseSeqNr(addressId: AddressId): Key[Int] =
-    bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray)
+  def addressLeaseSeqNr(addressId: AddressId, cfh: RDB.ApiHandle): Key[Int] =
+    bytesSeqNr(AddressLeaseInfoSeqNr, addressId.toByteArray, cfh = Some(cfh.handle))
 
-  def addressLeaseSeq(addressId: AddressId, seqNr: Int): Key[Option[Seq[ByteStr]]] =
+  def addressLeaseSeq(addressId: AddressId, seqNr: Int, cfh: RDB.ApiHandle): Key[Option[Seq[ByteStr]]] =
     Key.opt(
       AddressLeaseInfoSeq,
       hBytes(addressId.toByteArray, seqNr),
       readLeaseIdSeq,
-      writeLeaseIdSeq
+      writeLeaseIdSeq,
+      Some(cfh.handle)
     )
 
   def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =
@@ -204,16 +209,8 @@ object Keys {
       Some(cfh.handle)
     )
 
-  def blockTransactionsFee(height: Int): Key[Long] =
-    Key(
-      BlockTransactionsFee,
-      h(height),
-      Longs.fromByteArray,
-      Longs.toByteArray
-    )
-
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
-    Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
+  def invokeScriptResult(height: Int, txNum: TxNum, cfh: RDB.ApiHandle): Key[Option[InvokeScriptResult]] =
+    Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes, Some(cfh.handle))
 
   val disabledAliases: Key[Set[Alias]] = Key(
     DisabledAliases,
@@ -228,13 +225,11 @@ object Keys {
   def assetStaticInfo(addr: ERC20Address): Key[Option[StaticAssetInfo]] =
     Key.opt(AssetStaticInfo, addr.arr, StaticAssetInfo.parseFrom, _.toByteArray)
 
-  def nftCount(addressId: AddressId): Key[Int] =
-    Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def nftCount(addressId: AddressId, cfh: RDB.ApiHandle): Key[Int] =
+    Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray, Some(cfh.handle))
 
-  def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
-    Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
-
-  def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
+  def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset, cfh: RDB.ApiHandle): Key[Option[Unit]] =
+    Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray, Some(cfh.handle))
 
   def stateHash(height: Int): Key[Option[StateHash]] =
     Key.opt(StateHash, h(height), readStateHash, writeStateHash)
@@ -242,8 +237,8 @@ object Keys {
   def blockStateHash(height: Int): Key[ByteStr] =
     Key(BlockStateHash, h(height), Option(_).fold(TxStateSnapshotHashBuilder.InitStateHash)(ByteStr(_)), _.arr)
 
-  def ethereumTransactionMeta(height: Height, txNum: TxNum): Key[Option[EthereumTransactionMeta]] =
-    Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray)
+  def ethereumTransactionMeta(height: Height, txNum: TxNum, cfh: RDB.ApiHandle): Key[Option[EthereumTransactionMeta]] =
+    Key.opt(EthereumTransactionMetaTag, hNum(height, txNum), EthereumTransactionMeta.parseFrom, _.toByteArray, Some(cfh.handle))
 
   def maliciousMinerBanHeights(addressBytes: Array[Byte]): Key[Seq[Int]] =
     historyKey(MaliciousMinerBanHeights, addressBytes)

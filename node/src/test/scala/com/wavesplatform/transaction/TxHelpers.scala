@@ -359,6 +359,16 @@ object TxHelpers {
     SetScriptTransaction.selfSigned(version, acc, Some(script), fee, timestamp, chainId).explicitGet()
   }
 
+  def removeScript(
+      acc: KeyPair,
+      fee: Long = FeeConstants(TransactionType.SetScript) * FeeUnit,
+      version: TxVersion = TxVersion.V1,
+      chainId: Byte = AddressScheme.current.chainId,
+      timestamp: TxTimestamp = timestamp
+  ): SetScriptTransaction = {
+    SetScriptTransaction.selfSigned(version, acc, None, fee, timestamp, chainId).explicitGet()
+  }
+
   def setAssetScript(
       acc: KeyPair,
       asset: IssuedAsset,
@@ -432,7 +442,7 @@ object TxHelpers {
   }
 
   def createAlias(
-      name: String,
+      name: String = "alias",
       sender: KeyPair = defaultSigner,
       fee: Long = TestValues.fee,
       version: TxVersion = TxVersion.V2,

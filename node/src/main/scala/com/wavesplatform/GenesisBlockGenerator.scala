@@ -96,7 +96,7 @@ object GenesisBlockGenerator {
       .headOption
       .map(new File(_).getAbsoluteFile.ensuring(f => !f.isDirectory && f.getParentFile.isDirectory || f.getParentFile.mkdirs()))
 
-    val settings = parseSettings(ConfigFactory.parseFile(inputConfFile))
+    val settings = parseSettings(ConfigFactory.parseFile(inputConfFile).resolve())
     val confBody = createConfig(settings)
     outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.utf8Bytes))
   }

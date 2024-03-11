@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
+import com.wavesplatform.state.TxMeta.Status
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
@@ -48,6 +49,8 @@ trait EmptyBlockchain extends Blockchain {
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = Seq.empty
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = None
+
+  override def transactionSnapshot(id: ByteStr): Option[(StateSnapshot, Status)] = None
 
   override def containsTransaction(tx: Transaction): Boolean = false
 

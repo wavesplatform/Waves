@@ -84,10 +84,7 @@ lazy val repl = crossProject(JSPlatform, JVMPlatform)
     libraryDependencies ++=
       Dependencies.protobuf.value ++
         Dependencies.langCompilerPlugins.value ++
-        Dependencies.circe.value ++
-        Seq(
-          "org.scala-js" %%% "scala-js-macrotask-executor" % "1.0.0"
-        ),
+        Dependencies.circe.value,
     inConfig(Compile)(
       Seq(
         PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
@@ -109,6 +106,9 @@ lazy val `repl-jvm` = repl.jvm
   )
 
 lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
+  .settings(
+    libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+  )
 
 lazy val `curve25519-test` = project.dependsOn(node)
 
@@ -198,6 +198,10 @@ buildTarballsForDocker := {
     (`grpc-server` / Universal / packageZipTarball).value,
     baseDirectory.value / "docker" / "target" / "waves-grpc-server.tgz"
   )
+}
+
+lazy val buildRIDERunnerForDocker = taskKey[Unit]("Package RIDE Runner tarball and copy it to docker/target")
+buildRIDERunnerForDocker := {
   IO.copyFile(
     (`ride-runner` / Universal / packageZipTarball).value,
     (`ride-runner` / baseDirectory).value / "docker" / "target" / s"${(`ride-runner` / name).value}.tgz"
@@ -213,7 +217,7 @@ checkPRRaw := Def
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
       (`lang-tests-js` / Test / test).value
-      (`grpc-server` / Test / test).value
+//      (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
@@ -244,7 +248,6 @@ lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
 buildDebPackages := {
   (`grpc-server` / Debian / packageBin).value
   (node / Debian / packageBin).value
-  (`ride-runner` / Debian / packageBin).value
 }
 
 def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>

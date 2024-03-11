@@ -197,7 +197,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   def balance(address: Address): Long               = blockchainUpdater.balance(address)
   def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
 
-  def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = rdb.db.withResource { resource =>
+  def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = rdb.db.withResource(rdb.apiHandle.handle) { resource =>
     AddressPortfolio
       .nftIterator(resource, address, blockchainUpdater.bestLiquidSnapshot.orEmpty, None, blockchainUpdater.assetDescription)
       .toSeq

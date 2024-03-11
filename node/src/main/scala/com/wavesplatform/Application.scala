@@ -431,8 +431,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot,
-          rocksDB.loadBalanceHistory,
-          rocksDB.loadStateHash,
+          rocksDB,
           () => utxStorage.getPriorityPool.map(_.compositeBlockchain),
           routeTimeout,
           heavyRequestScheduler
@@ -517,6 +516,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
       log.info("Closing storage")
+      rocksDB.close()
       rdb.close()
 
       // extensions should be shut down last, after all node functionality, to guarantee no data loss
@@ -637,7 +637,7 @@ object Application extends ScorexLogging {
       case "explore"                => Explorer.main(args.tail)
       case "util"                   => UtilApp.main(args.tail)
       case "help" | "--help" | "-h" => println("Usage: waves <config> | export | import | explore | util")
-      case _                        => startNode(args.headOption) // TODO: Consider adding option to specify network-name
+      case _                        => startNode(args.headOption)
     }
   }
 

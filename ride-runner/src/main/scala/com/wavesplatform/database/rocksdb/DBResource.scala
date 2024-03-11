@@ -35,6 +35,11 @@ object DBResource {
     def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A] =
       db.multiGet(readOptions, keys, valBufferSize)
 
+    /**
+     * Finds the exact key for iter.seek(key) if key.length < 10 and becomes invalid on iter.next().
+     * Works as intended if prefix(key).length >= 10.
+     * @see RDB.newColumnFamilyOptions
+     */
     override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 
     override lazy val fullIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))

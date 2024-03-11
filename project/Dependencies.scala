@@ -6,7 +6,7 @@ import scalapb.compiler.Version.scalapbVersion
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.5.1" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.5.2" classifier "protobuf-src" intransitive ()
 
   private def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.6.21"
 
@@ -20,29 +20,31 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
+  private def grpcModule(module: String) = "io.grpc" % module % "1.61.0"
+
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "32.1.3-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.0.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback         = "ch.qos.logback"      % "logback-classic"   % "1.4.14"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.11"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.101.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.106.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.10.3" // 2.10.x and later is built for Java 11
+  val playJson = "com.typesafe.play" %% "play-json" % "2.10.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.17" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.2" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.1" // 3.6.x and later is built for Java 11
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.1"
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.2"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.2"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.77"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -67,14 +69,15 @@ object Dependencies {
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",
-      web3jModule("crypto")
+      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
   lazy val it = scalaTest +: Seq(
     logback,
+    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.21", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.0",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.1",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -88,7 +91,7 @@ object Dependencies {
 
   lazy val qaseReportDeps = Seq(
     playJson,
-    ("io.qase" % "qase-api" % "3.1.1").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+    ("io.qase" % "qase-api" % "3.2.0").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -97,9 +100,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.8.1"
-
-  private val scalapbJson = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.12.1"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.10.0"
 
   lazy val node = Def.setting(
     Seq(
@@ -114,7 +115,7 @@ object Dependencies {
       kamonModule("influxdb"),
       kamonModule("akka-http"),
       kamonModule("executors"),
-      "org.influxdb" % "influxdb-java" % "2.23",
+      "org.influxdb" % "influxdb-java" % "2.24",
       googleGuava,
       "com.google.code.findbugs" % "jsr305" % "3.0.2" % Compile, // javax.annotation stubs
       playJson,
@@ -126,16 +127,16 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
-      "eu.timepit"                 %% "refined"       % "0.11.0" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "10.0.1",
+      "eu.timepit"                 %% "refined"       % "0.11.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.esaulpaugh"              % "headlong"      % "10.0.2",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
-      web3jModule("abi"),
+      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test
     ) ++ test ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.1"
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.2"
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -151,8 +152,8 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion,
-    "io.grpc"               % "grpc-services"        % scalapb.compiler.Version.grpcJavaVersion,
+    grpcModule("grpc-netty"),
+    grpcModule("grpc-services"),
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapbVersion,
     protoSchemasLib         % "protobuf"
   )
@@ -160,9 +161,6 @@ object Dependencies {
   lazy val rideRunner = Def.setting(
     Seq(
       rocksdb,
-      scalapbJson,
-      // https://github.com/netty/netty/wiki/Native-transports
-      // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.8",
       "net.logstash.logback"          % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonModule("caffeine"),
@@ -173,7 +171,7 @@ object Dependencies {
       akkaHttpModule("akka-http-testkit") % Test,
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
-      "io.grpc"                           % "grpc-inprocess"         % "1.60.0" % Test
+      grpcModule("grpc-inprocess")        % Test
     ) ++ Dependencies.console ++ Dependencies.logDeps ++ Dependencies.test
   )
 

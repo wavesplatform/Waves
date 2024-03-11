@@ -34,6 +34,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import java.nio.file.Files
 import scala.concurrent.duration.*
+import scala.util.Using
 
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
@@ -69,9 +70,9 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         ntpTime,
         ignoreBlockchainUpdateTriggers
       )
-      test(rdw)
+      Using.resource(rdw)(test)
     } finally {
-      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle).foreach { cfh =>
+      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle, rdb.apiHandle.handle).foreach { cfh =>
         rdb.db.deleteRange(cfh, MinKey, MaxKey)
       }
     }
@@ -91,7 +92,7 @@ trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers wit
         ntpTime,
         ignoreBlockchainUpdateTriggers
       )
-      test(bcu, rdw)
+      Using.resource(rdw)(test(bcu, _))
     } finally {
       Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle).foreach { cfh =>
         rdb.db.deleteRange(cfh, MinKey, MaxKey)
@@ -394,7 +395,7 @@ trait WithDomain extends WithState { _: Suite =>
       try {
         val wrappedDb = wrapDB(rdb.db)
         assert(wrappedDb.getNativeHandle == rdb.db.getNativeHandle, "wrap function should not create new database instance")
-        domain = Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, rdb.txSnapshotHandle, Seq.empty), bcu, blockchain, settings)
+        domain = Domain(new RDB(wrappedDb, rdb.txMetaHandle, rdb.txHandle, rdb.txSnapshotHandle, rdb.apiHandle, Seq.empty), bcu, blockchain, settings)
         val genesis = balances.map { case AddrWithBalance(address, amount) =>
           TxHelpers.genesis(address, amount)
         }

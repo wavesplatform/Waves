@@ -32,8 +32,9 @@ trait SharedDomain extends BeforeAndAfterAll with NTPTime with DBCacheSettings {
 
   override protected def afterAll(): Unit = {
     super.afterAll()
-    rdb.close()
     bui.shutdown()
+    ldb.close()
+    rdb.close()
     TestHelpers.deleteRecursively(path)
   }
 }

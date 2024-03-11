@@ -11,7 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.defaultSigner
-import com.wavesplatform.lang.directives.values.{V5, V7}
+import com.wavesplatform.lang.directives.values.{V5, V7, V8}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -20,7 +20,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BinaryDataEntry, EmptyDataEntry, InvokeScriptResult, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.defaultAddress
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, setScript, transfer}
 import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -432,6 +432,64 @@ class TransactionsRouteSpec
         (result \ "version").as[Int] shouldBe tx.version
         (result \ "type").as[Int] shouldBe tx.tpe.id
         (result \ "timestamp").as[Long] shouldBe tx.timestamp
+      }
+    }
+
+    "ethereum invocation" in {
+      val dApp      = TestCompiler(V8).compileContract("@Callable(i)\nfunc f() = []")
+      val ethInvoke = EthTxGenerator.generateEthInvoke(richAccount.toEthKeyPair, richAddress, "f", Nil, Nil)
+      domain.appendAndAssertSucceed(
+        transfer(richAccount, richAccount.toEthWavesAddress),
+        setScript(richAccount, dApp),
+        ethInvoke
+      )
+      Get(routePath(s"/address/$richAddress/limit/1")) ~> route ~> check {
+        val responseByAddress = responseAs[JsArray]
+        responseByAddress shouldBe Json.parse(
+          s""" [
+             |   [
+             |     {
+             |       "type": 18,
+             |       "id": "${ethInvoke.id()}",
+             |       "fee": 500000,
+             |       "feeAssetId": null,
+             |       "timestamp": ${ethInvoke.timestamp},
+             |       "version": 1,
+             |       "chainId": 84,
+             |       "bytes": "${EthEncoding.toHexString(ethInvoke.bytes())}",
+             |       "sender": "3MysRW4Crv73o2naQVbcVujvZoXvRXzA5Cg",
+             |       "senderPublicKey": "AdyAnaBxRoqiuuCPMUJc2EHS6AkGcVCnj9D1y67bVP5fTa3Lb785hc8a2ccic7SsafSeskBFf2c7apsxyLs1TQo",
+             |       "height": ${domain.blockchain.height},
+             |       "applicationStatus": "succeeded",
+             |       "spentComplexity": 1,
+             |       "payload": {
+             |         "type": "invocation",
+             |         "dApp": "3N7mQqVKEmpvRCefaRU4mvhmLKLvW1mjXfo",
+             |         "call": {
+             |           "function": "f",
+             |           "args": []
+             |         },
+             |         "payment": [],
+             |         "stateChanges": {
+             |           "data": [],
+             |           "transfers": [],
+             |           "issues": [],
+             |           "reissues": [],
+             |           "burns": [],
+             |           "sponsorFees": [],
+             |           "leases": [],
+             |           "leaseCancels": [],
+             |           "invokes": []
+             |         }
+             |       }
+             |     }
+             |   ]
+             | ]
+           """.stripMargin
+        )
+        Get(routePath(s"/info/${ethInvoke.id()}")) ~> route ~> check {
+          responseAs[JsObject] shouldBe responseByAddress.head.get.head.get
+        }
       }
     }
   }

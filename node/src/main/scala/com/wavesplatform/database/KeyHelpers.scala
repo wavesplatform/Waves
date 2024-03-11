@@ -1,9 +1,11 @@
 package com.wavesplatform.database
 
-import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
-import com.wavesplatform.state.TxNum
+import com.wavesplatform.state
+import com.wavesplatform.state.{Height, TxNum}
+import org.rocksdb.ColumnFamilyHandle
+
+import java.nio.ByteBuffer
 
 object KeyHelpers {
   def h(height: Int): Array[Byte] = Ints.toByteArray(height)
@@ -23,8 +25,16 @@ object KeyHelpers {
   def longKey(keyTag: KeyTags.KeyTag, default: Long = 0): Key[Long] =
     Key(keyTag, Array.emptyByteArray, v => if (v != null && v.length >= Longs.BYTES) Longs.fromByteArray(v) else default, Longs.toByteArray)
 
-  def bytesSeqNr(keyTag: KeyTags.KeyTag, suffix: Array[Byte], default: Int = 0): Key[Int] =
-    Key(keyTag, suffix, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray)
+  def heightKey(keyTag: KeyTags.KeyTag, default: Int = 0): Key[Height] =
+    Key(
+      keyTag,
+      Array.emptyByteArray,
+      v => state.Height @@ (if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default),
+      Ints.toByteArray
+    )
+
+  def bytesSeqNr(keyTag: KeyTags.KeyTag, suffix: Array[Byte], default: Int = 0, cfh: Option[ColumnFamilyHandle] = None): Key[Int] =
+    Key(keyTag, suffix, v => if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else default, Ints.toByteArray, cfh)
 
   def unsupported[A](message: String): A => Array[Byte] = _ => throw new UnsupportedOperationException(message)
 }

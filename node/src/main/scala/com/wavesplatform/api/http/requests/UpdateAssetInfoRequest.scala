@@ -21,7 +21,7 @@ case class UpdateAssetInfoRequest(
     fee: Long,
     feeAssetId: Option[String],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[UpdateAssetInfoTransaction] {
   override def toTxFrom(sender: PublicKey): Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
       _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)

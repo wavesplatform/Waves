@@ -147,9 +147,9 @@ class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
       }
 
       f(accounts, bcu)
-      bcu.shutdown()
     } finally {
       bcu.shutdown()
+      defaultWriter.close()
     }
   }
 }

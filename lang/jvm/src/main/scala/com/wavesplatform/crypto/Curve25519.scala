@@ -21,6 +21,9 @@ object Curve25519 {
   def sign(privateKey: Array[Byte], message: Array[Byte]): Array[Byte] =
     provider.calculateSignature(provider.getRandom(SignatureLength), privateKey, message)
 
-  def verify(signature: Array[Byte], message: Array[Byte], publicKey: Array[Byte]): Boolean = provider.verifySignature(publicKey, message, signature)
-
+  def verify(signature: Array[Byte], message: Array[Byte], publicKey: Array[Byte]): Boolean =
+    signature != null && signature.length == SignatureLength &&
+      publicKey != null && publicKey.length == KeyLength &&
+      message != null &&
+      provider.verifySignature(publicKey, message, signature)
 }

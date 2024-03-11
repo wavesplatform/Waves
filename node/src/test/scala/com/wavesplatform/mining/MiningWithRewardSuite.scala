@@ -1,10 +1,7 @@
 package com.wavesplatform.mining
 
-import scala.concurrent.Future
-import scala.concurrent.duration.*
 import cats.effect.Resource
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{TransactionGen, WithNewDBForEachTest}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -15,13 +12,14 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.*
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{TransactionGen, WithNewDBForEachTest}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -31,6 +29,9 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
+
+import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBForEachTest with TransactionGen with DBCacheSettings {
   import MiningWithRewardSuite.*
@@ -142,14 +143,17 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBFo
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
 
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, RDB)] =
-    Resource.make {
-      val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreBlockchainUpdateTriggers)
-      Task.now((bcu, db))
-    } { case (blockchainUpdater, _) =>
-      Task {
-        blockchainUpdater.shutdown()
+    Resource
+      .make {
+        val (bcu, rdbWriter) = TestStorageFactory(settings, db, ntpTime, ignoreBlockchainUpdateTriggers)
+        Task.now((bcu, rdbWriter, db))
+      } { case (blockchainUpdater, rdbWriter, _) =>
+        Task {
+          blockchainUpdater.shutdown()
+          rdbWriter.close()
+        }
       }
-    }
+      .map { case (blockchainUpdater, _, db) => (blockchainUpdater, db) }
 }
 
 object MiningWithRewardSuite {

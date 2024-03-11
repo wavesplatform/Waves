@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.typesafe.scalalogging.StrictLogging
-import com.wavesplatform.database.RDB.{TxHandle, TxMetaHandle}
+import com.wavesplatform.database.RDB.{ApiHandle, TxHandle, TxMetaHandle, TxSnapshotHandle}
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.utils.*
 import org.rocksdb.*
@@ -16,7 +16,8 @@ final class RDB(
     val db: RocksDB,
     val txMetaHandle: TxMetaHandle,
     val txHandle: TxHandle,
-    val txSnapshotHandle: TxHandle,
+    val txSnapshotHandle: TxSnapshotHandle,
+    val apiHandle: ApiHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
   override def close(): Unit = {
@@ -28,6 +29,9 @@ final class RDB(
 object RDB extends StrictLogging {
   final class TxMetaHandle private[RDB] (val handle: ColumnFamilyHandle)
   final class TxHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class TxSnapshotHandle private[RDB] (val handle: ColumnFamilyHandle)
+  final class ApiHandle private[RDB] (val handle: ColumnFamilyHandle)
+
   case class OptionsWithResources[A](options: A, resources: Seq[RocksObject])
 
   def open(settings: DBSettings): RDB = {
@@ -36,8 +40,7 @@ object RDB extends StrictLogging {
     logger.debug(s"Open DB at ${settings.directory}")
 
     val dbOptions = createDbOptions(settings)
-
-    val dbDir = file.getAbsoluteFile
+    val dbDir     = file.getAbsoluteFile
     dbDir.getParentFile.mkdirs()
 
     val handles             = new util.ArrayList[ColumnFamilyHandle]()
@@ -45,6 +48,7 @@ object RDB extends StrictLogging {
     val txMetaCfOptions     = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txCfOptions         = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val txSnapshotCfOptions = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txSnapshotCacheSize, 0.9, settings.rocksdb.writeBufferSize)
+    val apiCfOptions        = newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.apiCacheSize, 0.9, settings.rocksdb.writeBufferSize)
     val db = RocksDB.open(
       dbOptions.options,
       settings.directory,
@@ -52,12 +56,13 @@ object RDB extends StrictLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           defaultCfOptions.options
+            .setMaxWriteBufferNumber(3)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
           txMetaCfOptions.options
-            .optimizeForPointLookup(16 << 20)
+            .optimizeForPointLookup(16 << 20) // Iterators might not work with this option
             .setDisableAutoCompactions(true)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
         ),
@@ -70,6 +75,11 @@ object RDB extends StrictLogging {
           "tx-snapshot".utf8Bytes,
           txSnapshotCfOptions.options
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-snapshot").toPath, 0L)).asJava)
+        ),
+        new ColumnFamilyDescriptor(
+          "api".utf8Bytes,
+          apiCfOptions.options
+            .setCfPaths(Seq(new DbPath(new File(dbDir, "api").toPath, 0L)).asJava)
         )
       ).asJava,
       handles
@@ -79,7 +89,8 @@ object RDB extends StrictLogging {
       db,
       new TxMetaHandle(handles.get(1)),
       new TxHandle(handles.get(2)),
-      new TxHandle(handles.get(3)),
+      new TxSnapshotHandle(handles.get(3)),
+      new ApiHandle(handles.get(4)),
       dbOptions.resources ++ defaultCfOptions.resources ++ txMetaCfOptions.resources ++ txCfOptions.resources ++ txSnapshotCfOptions.resources
     )
   }
@@ -104,14 +115,17 @@ object RDB extends StrictLogging {
           .setPinL0FilterAndIndexBlocksInCache(true)
           .setFormatVersion(5)
           .setBlockSize(blockSize)
-          .setChecksumType(ChecksumType.kNoChecksum)
           .setBlockCache(blockCache)
           .setCacheIndexAndFilterBlocksWithHighPriority(true)
           .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
           .setDataBlockHashTableUtilRatio(0.5)
       )
       .setWriteBufferSize(writeBufferSize)
+      .setCompactionStyle(CompactionStyle.LEVEL)
       .setLevelCompactionDynamicLevelBytes(true)
+      // Defines the prefix.
+      // Improves an iterator performance for keys with prefixes of 10 or more bytes.
+      // If specified key has less than 10 bytes: iterator finds the exact key for seek(key) and becomes invalid after next().
       .useCappedPrefixExtractor(10)
       .setMemtablePrefixBloomSizeRatio(0.25)
       .setCompressionType(CompressionType.LZ4_COMPRESSION)
@@ -123,12 +137,13 @@ object RDB extends StrictLogging {
   private def createDbOptions(settings: DBSettings): OptionsWithResources[DBOptions] = {
     val dbOptions = new DBOptions()
       .setCreateIfMissing(true)
-      .setParanoidChecks(true)
-      .setIncreaseParallelism(4)
+      .setParanoidChecks(settings.rocksdb.paranoidChecks)
+      .setIncreaseParallelism(6)
       .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(4)
       .setCreateMissingColumnFamilies(true)
       .setMaxOpenFiles(100)
+      .setMaxSubcompactions(2) // Write stalls expected without this option. Can lead to max_background_jobs * max_subcompactions background threads
+      .setMaxManifestFileSize(200 << 20)
 
     if (settings.rocksdb.enableStatistics) {
       val statistics = new Statistics()

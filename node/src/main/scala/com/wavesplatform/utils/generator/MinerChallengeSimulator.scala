@@ -186,7 +186,7 @@ object MinerChallengeSimulator {
       val dbSettings         = wavesSettings.dbSettings.copy(directory = correctBlockchainDbDir)
       val fixedWavesSettings = wavesSettings.copy(dbSettings = dbSettings)
       val rdb                = RDB.open(dbSettings)
-      val rocksDBWriter      = new RocksDBWriter(rdb, fixedWavesSettings.blockchainSettings, fixedWavesSettings.dbSettings, false)
+      val rocksDBWriter      = RocksDBWriter(rdb, fixedWavesSettings.blockchainSettings, fixedWavesSettings.dbSettings, false)
       val fakeTime           = createFakeTime(rocksDBWriter.lastBlockTimestamp.get)
       val blockchainUpdater = new BlockchainUpdaterImpl(
         rocksDBWriter,
