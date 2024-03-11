@@ -15,7 +15,7 @@ case class CreateAliasRequest(
     timestamp: Option[TxTimestamp] = None,
     signature: Option[ByteStr] = None,
     proofs: Option[Proofs] = None
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[CreateAliasTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, CreateAliasTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)

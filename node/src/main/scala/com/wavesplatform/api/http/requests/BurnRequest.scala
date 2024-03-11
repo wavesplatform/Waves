@@ -19,7 +19,7 @@ case class BurnRequest(
     timestamp: Option[Long],
     signature: Option[ByteStr],
     proofs: Option[Proofs]
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[BurnTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, BurnTransaction] =
     for {
       validProofs <- toProofs(signature, proofs)

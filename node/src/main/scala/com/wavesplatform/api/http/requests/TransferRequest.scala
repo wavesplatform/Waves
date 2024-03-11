@@ -20,7 +20,7 @@ case class TransferRequest(
     timestamp: Option[Long] = None,
     signature: Option[ByteStr] = None,
     proofs: Option[Proofs] = None
-) extends TxBroadcastRequest {
+) extends TxBroadcastRequest[TransferTransaction] {
   def toTxFrom(sender: PublicKey): Either[ValidationError, TransferTransaction] =
     for {
       validRecipient <- AddressOrAlias.fromString(recipient)
