@@ -9,6 +9,7 @@ developers := List(
 )
 
 Compile / packageDoc / publishArtifact := true
+Test / packageDoc / publishArtifact := false
 
 inTask(assembly)(
   Seq(
