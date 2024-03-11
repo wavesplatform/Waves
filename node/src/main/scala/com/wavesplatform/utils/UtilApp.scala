@@ -1,22 +1,24 @@
 package com.wavesplatform.utils
 
-import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
-
 import com.google.common.io.ByteStreams
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, FastBase58}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionType}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, Version}
 import play.api.libs.json.{JsObject, Json}
 import scopt.OParser
+
+import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths}
 
 //noinspection ScalaStyle
 // TODO: Consider remove implemented methods from REST API
@@ -31,6 +33,7 @@ object UtilApp {
     case object Hash            extends Mode
     case object SerializeTx     extends Mode
     case object SignTx          extends Mode
+    case object SignTxWithSk    extends Mode
   }
 
   case class CompileOptions(assetScript: Boolean = false)
@@ -63,18 +66,19 @@ object UtilApp {
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {
       case Some(cmd) =>
-        lazy val nodeState = new NodeState(cmd)
+        val settings = Application.loadApplicationConfig(cmd.configFile.map(new File(_)))
         val inBytes        = IO.readInput(cmd)
         val result = {
           val doAction = cmd.mode match {
-            case Command.CompileScript   => Actions.doCompile(nodeState.settings) _
+            case Command.CompileScript   => Actions.doCompile(settings) _
             case Command.DecompileScript => Actions.doDecompile _
             case Command.SignBytes       => Actions.doSign _
             case Command.VerifySignature => Actions.doVerify _
             case Command.CreateKeyPair   => Actions.doCreateKeyPair _
             case Command.Hash            => Actions.doHash _
             case Command.SerializeTx     => Actions.doSerializeTx _
-            case Command.SignTx          => Actions.doSignTx(nodeState) _
+            case Command.SignTx          => Actions.doSignTx(new NodeState(cmd)) _
+            case Command.SignTxWithSk    => Actions.doSignTxWithSK _
           }
           doAction(cmd, inBytes)
         }
@@ -191,6 +195,15 @@ object UtilApp {
               .abbr("sa")
               .text("Signer address (requires corresponding key in wallet.dat)")
               .action((a, c) => c.copy(signTxOptions = c.signTxOptions.copy(signerAddress = a)))
+          ),
+        cmd("sign-with-sk")
+          .text("Sign JSON transaction with private key")
+          .action((_, c) => c.copy(mode = Command.SignTxWithSk))
+          .children(
+            opt[String]("private-key")
+              .abbr("sk")
+              .text("Private key")
+              .action((a, c) => c.copy(signOptions = c.signOptions.copy(privateKey = PrivateKey(Base58.decode(a)))))
           )
       ),
       help("help").hidden(),
@@ -265,6 +278,33 @@ object UtilApp {
         .left
         .map(_.toString)
         .map(tx => Json.toBytes(tx.json()))
+
+    def doSignTxWithSK(c: Command, data: Array[Byte]): ActionResult = {
+      import cats.syntax.either.*
+      import com.wavesplatform.api.http.requests.InvokeScriptRequest.signedInvokeScriptRequestReads
+      import com.wavesplatform.api.http.requests.SponsorFeeRequest.signedSponsorRequestFormat
+      import com.wavesplatform.transaction.TransactionType.*
+
+      val json = Json.parse(data)
+      (TransactionType((json \ "type").as[Int]) match {
+        case Issue           => json.as[IssueRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Transfer        => json.as[TransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Reissue         => json.as[ReissueRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Burn            => json.as[BurnRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Exchange        => json.as[ExchangeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Lease           => json.as[LeaseRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case LeaseCancel     => json.as[LeaseCancelRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case CreateAlias     => json.as[CreateAliasRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case MassTransfer    => json.as[SignedMassTransferRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case Data            => json.as[SignedDataRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case SetScript       => json.as[SignedSetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case SponsorFee      => json.as[SignedSponsorFeeRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case SetAssetScript  => json.as[SignedSetAssetScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case InvokeScript    => json.as[SignedInvokeScriptRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case UpdateAssetInfo => json.as[SignedUpdateAssetInfoRequest].toTx.map(_.signWith(c.signOptions.privateKey))
+        case other           => GenericError(s"Signing $other is not supported").asLeft[Transaction]
+      }).leftMap(_.toString).map(_.json().toString().getBytes())
+    }
   }
 
   private[this] object IO {
