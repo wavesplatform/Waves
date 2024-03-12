@@ -20,7 +20,8 @@ trait DBResource extends AutoCloseable {
 object DBResource {
   def apply(db: RocksDB, iteratorCfHandle: Option[ColumnFamilyHandle] = None): DBResource = new DBResource {
     private[this] val snapshot    = db.getSnapshot
-    private[this] val readOptions = new ReadOptions().setSnapshot(snapshot)
+    // checksum may be verification is **very** expensive, so it's explicitly disabled
+    private[this] val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
 
     override def get[V](key: Key[V]): V = key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes))
 
