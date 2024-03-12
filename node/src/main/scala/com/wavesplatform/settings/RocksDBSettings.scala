@@ -9,5 +9,6 @@ case class RocksDBSettings(
     writeBufferSize: SizeInBytes,
     enableStatistics: Boolean,
     allowMmapReads: Boolean,
-    parallelism: Int
+    parallelism: Int,
+    maxOpenFiles: Int
 )

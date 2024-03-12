@@ -140,7 +140,7 @@ object RDB extends StrictLogging {
       .setIncreaseParallelism(settings.rocksdb.parallelism)
       .setBytesPerSync(2 << 20)
       .setCreateMissingColumnFamilies(true)
-      .setMaxOpenFiles(-1)
+      .setMaxOpenFiles(settings.rocksdb.maxOpenFiles)
       .setMaxSubcompactions(2) // Write stalls expected without this option. Can lead to max_background_jobs * max_subcompactions background threads
       .setMaxManifestFileSize(200 << 20)
       .setAllowMmapReads(settings.rocksdb.allowMmapReads)
