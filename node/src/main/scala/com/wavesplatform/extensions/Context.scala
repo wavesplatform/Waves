@@ -1,6 +1,5 @@
 package com.wavesplatform.extensions
 
-import akka.actor.ActorSystem
 import com.wavesplatform.api.common.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.UtxEvent
@@ -30,5 +29,4 @@ trait Context {
 
   def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def utxEvents: Observable[UtxEvent]
-  def actorSystem: ActorSystem
 }

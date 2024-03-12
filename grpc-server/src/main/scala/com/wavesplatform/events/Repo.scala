@@ -172,6 +172,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
   }
 
   override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit = monitor.synchronized {
+    log.trace(s"Rolling back liquid microblock to $toBlockId")
     liquidState match {
       case Some(ls) =>
         val discardedMicroBlocks = if (ls.keyBlock.id == toBlockId) {
