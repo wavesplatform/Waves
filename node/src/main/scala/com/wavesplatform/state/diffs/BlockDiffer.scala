@@ -284,11 +284,11 @@ object BlockDiffer {
     }
 
   def createInitialBlockSnapshot(
-      blockchain: BlockchainUpdater & Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       reference: ByteStr,
       miner: Address
   ): Either[ValidationError, StateSnapshot] = {
-    val fullReward           = blockchain.computeNextReward.fold(Portfolio.empty)(Portfolio.waves)
+    val blockchain           = blockchainUpdater.referencedBlockchain(reference)
     val feeFromPreviousBlock = Portfolio.waves(blockchain.carryFee(Some(reference)))
 
     val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
@@ -296,7 +296,7 @@ object BlockDiffer {
 
     val rewardShares = BlockRewardCalculator.getBlockRewardShares(
       blockchain.height + 1,
-      fullReward.balance,
+      blockchainUpdater.computeNextReward.getOrElse(0),
       daoAddress,
       xtnBuybackAddress,
       blockchain

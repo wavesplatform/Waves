@@ -3,6 +3,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockSnapshot, MicroBlock, MicroBlockSnapshot}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import monix.reactive.Observable
 
@@ -20,6 +21,7 @@ trait BlockchainUpdater {
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
   def lastBlockInfo: Observable[LastBlockInfo]
   def isLastBlockId(id: ByteStr): Boolean
+  def referencedBlockchain(reference: ByteStr): Blockchain
   def shutdown(): Unit
 }
 

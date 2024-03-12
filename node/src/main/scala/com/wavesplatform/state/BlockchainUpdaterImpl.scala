@@ -196,6 +196,27 @@ class BlockchainUpdaterImpl(
         .orElse(lastBlockReward)
   }
 
+  def referencedBlockchain(reference: ByteStr): Blockchain =
+    ngState
+      .flatMap(ng =>
+        if (ng.base.header.reference == reference)
+          Some(SnapshotBlockchain(rocksdb, ng.reward))
+        else
+          ng.snapshotOf(reference)
+            .map { case (forgedBlock, liquidSnapshot, carry, _, stateHash, _) =>
+              SnapshotBlockchain(
+                rocksdb,
+                liquidSnapshot,
+                forgedBlock,
+                ng.hitSource,
+                carry,
+                computeNextReward,
+                Some(stateHash)
+              )
+            }
+      )
+      .getOrElse(SnapshotBlockchain(rocksdb, computeNextReward))
+
   override def processBlock(
       block: Block,
       hitSource: ByteStr,
@@ -296,7 +317,8 @@ class BlockchainUpdaterImpl(
                   )
               } else
                 metrics.forgeBlockTimeStats.measureOptional(ng.snapshotOf(block.header.reference)) match {
-                  case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
+                  case None =>
+                    Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidSnapshot, carry, totalFee, referencedComputedStateHash, discarded)) =>
                     if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = rocksdb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)

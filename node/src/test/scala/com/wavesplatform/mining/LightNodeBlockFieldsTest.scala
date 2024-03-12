@@ -5,7 +5,6 @@ import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.DigestLength
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures.LightNode
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint.Unlimited
@@ -22,132 +21,175 @@ import monix.reactive.Observable
 
 import scala.concurrent.duration.DurationInt
 
-class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
+class LightNodeBlockFieldsTest extends PropSpec with WithMiner {
   private val invalidStateHash = Some(Some(ByteStr.fill(DigestLength)(1)))
 
   property("new block fields appear `lightNodeBlockFieldsAbsenceInterval` blocks after LightNode activation") {
-    withDomain(
-      TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2).configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10)),
-      AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
-    ) { d =>
-      withMiner(
+    val settings =
+      TransactionStateSnapshot
+        .setFeaturesHeight(LightNode -> 2)
+        .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10))
+        .copy(minerSettings = TransactionStateSnapshot.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds))
+    withDomainAndMiner(
+      settings,
+      AddrWithBalance.enoughBalances(defaultSigner, secondSigner),
+      verify = false,
+      timeDrift = Int.MaxValue
+    ) { case (d, miner, append) =>
+      val microBlockMiner = new MicroBlockMinerImpl(
+        _ => (),
+        null,
+        d.blockchainUpdater,
+        d.utxPool,
+        d.settings.minerSettings,
+        miner.minerScheduler,
+        miner.appenderScheduler,
+        Observable.empty,
+        identity
+      )
+      val challenger = new BlockChallengerImpl(
         d.blockchain,
+        new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
+        d.wallet,
+        d.settings,
         d.testTime,
-        d.settings.copy(minerSettings = d.settings.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds)),
-        verify = false,
+        d.posSelector,
+        b => Task.now(append(b)),
         timeDrift = Int.MaxValue
-      ) { case (miner, append) =>
-        val microBlockMiner = new MicroBlockMinerImpl(
-          _ => (),
-          null,
-          d.blockchainUpdater,
-          d.utxPool,
-          d.settings.minerSettings,
-          miner.minerScheduler,
-          miner.appenderScheduler,
-          Observable.empty,
-          identity
-        )
-        val challenger = new BlockChallengerImpl(
-          d.blockchain,
-          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-          d.wallet,
-          d.settings,
-          d.testTime,
-          d.posSelector,
-          b => Task.now(append(b)),
-          timeDrift = Int.MaxValue
-        ) {
-          override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
-        }
-        def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
-        def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
-        def appendMicro() = {
-          d.utxPool.putIfNew(transfer()).resultE.explicitGet()
-          microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
-        }
-        def challengeBlock() = {
-          val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = invalidStateHash)
-          challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
-        }
-
-        appendBlock()
-        d.blockchain.height shouldBe 2
-        d.blockchain.isFeatureActivated(LightNode) shouldBe true
-        block(2).stateHash shouldBe None
-
-        appendMicro()
-        block(2).stateHash shouldBe None
-
-        challengeBlock()
-        d.blockchain.height shouldBe 3
-        block(3).stateHash shouldBe None
-        block(3).challengedHeader shouldBe None
-
-        (1 to 8).foreach(_ => appendBlock())
-        d.blockchain.height shouldBe 11
-        block(11).stateHash shouldBe None
-
-        appendMicro()
-        block(11).stateHash shouldBe None
-
-        appendBlock()
-        d.blockchain.height shouldBe 12
-        val hash1 = block(12).stateHash
-        hash1 shouldBe defined
-
-        appendMicro()
-        val hash2 = block(12).stateHash
-        hash2 shouldBe defined
-        hash2 should not be hash1
-
-        d.rollbackTo(10)
-        challengeBlock()
-        block(11).stateHash shouldBe None
-        block(11).challengedHeader shouldBe None
-
-        challengeBlock()
-        block(12).stateHash shouldBe defined
-        block(12).challengedHeader shouldBe defined
+      ) {
+        override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
       }
+      def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
+      def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
+      def appendMicro() = {
+        d.utxPool.putIfNew(transfer()).resultE.explicitGet()
+        microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
+      }
+      def challengeBlock() = {
+        val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = invalidStateHash)
+        challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
+      }
+
+      appendBlock()
+      d.blockchain.height shouldBe 2
+      d.blockchain.isFeatureActivated(LightNode) shouldBe true
+      block(2).stateHash shouldBe None
+
+      appendMicro()
+      block(2).stateHash shouldBe None
+
+      challengeBlock()
+      d.blockchain.height shouldBe 3
+      block(3).stateHash shouldBe None
+      block(3).challengedHeader shouldBe None
+
+      (1 to 8).foreach(_ => appendBlock())
+      d.blockchain.height shouldBe 11
+      block(11).stateHash shouldBe None
+
+      appendMicro()
+      block(11).stateHash shouldBe None
+
+      appendBlock()
+      d.blockchain.height shouldBe 12
+      val hash1 = block(12).stateHash
+      hash1 shouldBe defined
+
+      appendMicro()
+      val hash2 = block(12).stateHash
+      hash2 shouldBe defined
+      hash2 should not be hash1
+
+      d.rollbackTo(10)
+      challengeBlock()
+      block(11).stateHash shouldBe None
+      block(11).challengedHeader shouldBe None
+
+      challengeBlock()
+      block(12).stateHash shouldBe defined
+      block(12).challengedHeader shouldBe defined
+    }
+  }
+
+  property("micro forks should not produce invalid state hash") {
+    val settings =
+      TransactionStateSnapshot
+        .configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 0))
+        .copy(minerSettings = TransactionStateSnapshot.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds))
+    withDomainAndMiner(
+      settings,
+      AddrWithBalance.enoughBalances(defaultSigner, secondSigner),
+      verify = false,
+      timeDrift = Int.MaxValue
+    ) { case (d, miner, append) =>
+      val microBlockMiner = new MicroBlockMinerImpl(
+        _ => (),
+        null,
+        d.blockchainUpdater,
+        d.utxPool,
+        d.settings.minerSettings,
+        miner.minerScheduler,
+        miner.appenderScheduler,
+        Observable.empty,
+        identity
+      )
+      def appendBlock(ref: Option[ByteStr]) = append(miner.forgeBlock(defaultSigner, ref).explicitGet()._1).explicitGet()
+      def appendMicro() = {
+        d.utxPool.putIfNew(transfer()).resultE.explicitGet()
+        microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
+      }
+
+      appendBlock(None)
+      val blockId1 = d.lastBlockId
+      appendMicro()
+
+      // rollback to a key block before micro block
+      appendBlock(Some(blockId1))
+      d.lastBlock.header.reference shouldBe blockId1
+
+      appendMicro()
+      val blockId2 = d.lastBlockId
+      appendMicro()
+
+      // rollback to a micro block before another micro block
+      appendBlock(Some(blockId2))
+      d.lastBlock.header.reference shouldBe blockId2
     }
   }
 
   property(
     "blocks with challenged header or state hash should be allowed only `lightNodeBlockFieldsAbsenceInterval` blocks after LightNode activation"
   ) {
-    withDomain(
+    withDomainAndMiner(
       TransactionStateSnapshot.setFeaturesHeight(LightNode -> 2).configure(_.copy(lightNodeBlockFieldsAbsenceInterval = 10)),
       AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
-    ) { d =>
-      withMiner(d.blockchain, d.testTime, d.settings) { case (_, append) =>
-        (1 to 9).foreach(_ => d.appendBlock())
-        d.blockchain.height shouldBe 10
-        val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, stateHash = invalidStateHash)
-        val challengingBlock = d.createChallengingBlock(secondSigner, challengedBlock, strictTime = true)
-        val blockWithOnlyChallengingHeader = {
-          val challengedHeader = challengingBlock.header.challengedHeader.map(_.copy(stateHash = None))
-          val block            = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, challengedHeader = challengedHeader)
-          block.copy(header = block.header.copy(stateHash = None))
-        }
-        d.testTime.setTime(challengingBlock.header.timestamp)
-        append(challengedBlock) should produce("Block state hash is not supported yet")
-        append(challengingBlock) should produce("Block state hash is not supported yet")
-        append(blockWithOnlyChallengingHeader) should produce("Challenged header is not supported yet")
-
-        d.appendBlock()
-        d.blockchain.height shouldBe 11
-        val correctBlockWithStateHash = d.createBlock(ProtoBlockVersion, Nil, strictTime = true)
-        correctBlockWithStateHash.header.stateHash shouldBe defined
-        d.testTime.setTime(correctBlockWithStateHash.header.timestamp)
-        append(correctBlockWithStateHash) shouldBe a[Right[?, ?]]
-
-        d.rollbackTo(11)
-        val invalidBlock      = d.createBlock(ProtoBlockVersion, Nil, stateHash = invalidStateHash, strictTime = true)
-        val challengingBlock2 = d.createChallengingBlock(secondSigner, invalidBlock, strictTime = true)
-        d.testTime.setTime(challengingBlock2.header.timestamp)
-        append(challengingBlock2) shouldBe a[Right[?, ?]]
+    ) { case (d, _, append) =>
+      (1 to 9).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 10
+      val challengedBlock  = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, stateHash = invalidStateHash)
+      val challengingBlock = d.createChallengingBlock(secondSigner, challengedBlock, strictTime = true)
+      val blockWithOnlyChallengingHeader = {
+        val challengedHeader = challengingBlock.header.challengedHeader.map(_.copy(stateHash = None))
+        val block            = d.createBlock(ProtoBlockVersion, Nil, strictTime = true, challengedHeader = challengedHeader)
+        block.copy(header = block.header.copy(stateHash = None))
       }
+      d.testTime.setTime(challengingBlock.header.timestamp)
+      append(challengedBlock) should produce("Block state hash is not supported yet")
+      append(challengingBlock) should produce("Block state hash is not supported yet")
+      append(blockWithOnlyChallengingHeader) should produce("Challenged header is not supported yet")
+
+      d.appendBlock()
+      d.blockchain.height shouldBe 11
+      val correctBlockWithStateHash = d.createBlock(ProtoBlockVersion, Nil, strictTime = true)
+      correctBlockWithStateHash.header.stateHash shouldBe defined
+      d.testTime.setTime(correctBlockWithStateHash.header.timestamp)
+      append(correctBlockWithStateHash) shouldBe a[Right[?, ?]]
+
+      d.rollbackTo(11)
+      val invalidBlock      = d.createBlock(ProtoBlockVersion, Nil, stateHash = invalidStateHash, strictTime = true)
+      val challengingBlock2 = d.createChallengingBlock(secondSigner, invalidBlock, strictTime = true)
+      d.testTime.setTime(challengingBlock2.header.timestamp)
+      append(challengingBlock2) shouldBe a[Right[?, ?]]
     }
   }
 }
