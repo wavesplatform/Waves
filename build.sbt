@@ -168,7 +168,6 @@ inScope(Global)(
     network         := Network.default(),
     instrumentation := false,
     resolvers ++= Resolver.sonatypeOssRepos("releases") ++ Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
-    Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
     excludeLintKeys ++= Set(

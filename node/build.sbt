@@ -33,29 +33,7 @@ inConfig(Compile)(
   )
 )
 
-inTask(assembly)(
-  Seq(
-    test            := {},
-    assemblyJarName := s"waves-all-${version.value}.jar",
-    assemblyMergeStrategy := {
-      case p
-          if p.endsWith(".proto") ||
-            p.endsWith("module-info.class") ||
-            p.endsWith("io.netty.versions.properties") ||
-            p.endsWith(".kotlin_module") =>
-        MergeStrategy.discard
-
-      case "scala-collection-compat.properties" =>
-        MergeStrategy.discard
-      case p
-          if Set("scala/util/control/compat", "scala/collection/compat")
-            .exists(p.replace('\\', '/').contains) =>
-        MergeStrategy.last
-
-      case other => (assembly / assemblyMergeStrategy).value(other)
-    }
-  )
-)
+inTask(assembly)(CommonSettings.assemblySettings)
 
 // Adds "$lib_dir/*" to app_classpath in the executable file, this is needed for extensions
 scriptClasspath += "*"
