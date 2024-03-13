@@ -80,9 +80,9 @@ case class MicroBlockInv(sender: PublicKey, totalBlockId: ByteStr, reference: By
 }
 
 object MicroBlockInv {
-  def apply(sender: KeyPair, totalBlockRef: ByteStr, prevBlockRef: ByteStr): MicroBlockInv = {
-    val signature = crypto.sign(sender.privateKey, sender.toAddress.bytes ++ totalBlockRef.arr ++ prevBlockRef.arr)
-    new MicroBlockInv(sender.publicKey, totalBlockRef, prevBlockRef, signature)
+  def apply(sender: KeyPair, totalBlockId: ByteStr, prevBlockRef: ByteStr): MicroBlockInv = {
+    val signature = crypto.sign(sender.privateKey, sender.toAddress.bytes ++ totalBlockId.arr ++ prevBlockRef.arr)
+    new MicroBlockInv(sender.publicKey, totalBlockId, prevBlockRef, signature)
   }
 }
 
