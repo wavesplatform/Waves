@@ -44,12 +44,11 @@ object CommonBlocksApi {
         .flatMap(Observable.fromIterable(_))
 
     def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(BlockMeta, Seq[(TxMeta, Transaction)])] =
-      Observable.fromIterable(
-        (fixHeight(fromHeight) to fixHeight(toHeight))
-          .flatMap(h => metaAt(h))
-          .collect { case m if m.header.generator.toAddress == generatorAddress => m.height }
-          .flatMap(h => blockInfoAt(h))
-      )
+      for {
+        height <- Observable.fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
+        meta   <- Observable.fromIterable(metaAt(height)) if meta.header.generator.toAddress == generatorAddress
+        block  <- Observable.fromIterable(blockInfoAt(meta.height))
+      } yield block
 
     def blockDelay(blockId: BlockId, blockNum: Int): Option[Long] =
       blockchain
@@ -75,7 +74,10 @@ object CommonBlocksApi {
     def meta(id: ByteStr): Option[BlockMeta] = blockchain.heightOf(id).flatMap(metaAt)
 
     def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
-      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => metaAt(h)))
+      for {
+        height <- Observable.fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
+        meta   <- Observable.fromIterable(metaAt(height))
+      } yield meta
 
     def block(blockId: BlockId): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = blockchain.heightOf(blockId).flatMap(h => blockInfoAt(h))
   }
