@@ -40,7 +40,7 @@ jobs:
         if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
         env:
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-          PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY }}
+          PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_ASCII }}
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
         run: |
