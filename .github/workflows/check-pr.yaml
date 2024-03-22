@@ -79,9 +79,8 @@ jobs:
             echo "ThisBuild / version := \"$sbt_version\"" >> version.sbt
             echo Setting version to $sbt_version
           fi
-      - name: Publish lang
-        run: sbt ci-release
-        if: false # steps.filter.outputs.lang == 'true'
+      - name: Publish lang and node
+        run: sbt --mem 4096 --batch ";publishSigned;sonatypeBundleRelease"
         env:
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_BASE64 }}
