@@ -37,17 +37,6 @@ class PeerDatabaseImplSpecification extends FreeSpec {
     .resolve()
   private val settings2 = config2.as[NetworkSettings]("waves.network")
 
-  private val config3 = ConfigFactory
-    .parseString(s"""waves.network {
-                    |  file = null
-                    |  known-peers = ["$host1:1"]
-                    |  peers-data-residence-time = 2s
-                    |  enable-peers-exchange = no
-                    |}""".stripMargin)
-    .withFallback(ConfigFactory.load())
-    .resolve()
-  private val settings3 = config3.as[NetworkSettings]("waves.network")
-
   private def withDatabase(settings: NetworkSettings)(f: PeerDatabase => Unit): Unit = {
     val pdb = new PeerDatabaseImpl(settings)
     f(pdb)
@@ -76,14 +65,6 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       sleepLong()
       database.knownPeers shouldBe empty
       database.randomPeer(Set()) shouldBe empty
-    }
-
-    "known-peers should be always in database" in withDatabase(settings3) { database3 =>
-      database3.knownPeers.keys should contain(address1)
-      sleepLong()
-      database3.knownPeers.keys should contain(address1)
-      sleepShort()
-      database3.knownPeers.keys should contain(address1)
     }
 
     "touching peer prevent it from obsoleting" in withDatabase(settings1) { database =>

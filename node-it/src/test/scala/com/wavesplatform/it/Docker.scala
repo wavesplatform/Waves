@@ -305,7 +305,8 @@ class Docker(
 
   private def getNodeInfo(containerId: String, settings: WavesSettings): NodeInfo = {
     val restApiPort = settings.restAPISettings.port
-    val networkPort = settings.networkSettings.bindAddress.getPort
+    // assume test nodes always have an open port
+    val networkPort = settings.networkSettings.bindAddress.get.getPort
 
     val containerInfo  = inspectContainer(containerId)
     val wavesIpAddress = containerInfo.networkSettings().networks().get(wavesNetwork.name()).ipAddress()
