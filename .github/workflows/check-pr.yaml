@@ -1,10 +1,5 @@
 name: Check PR
 on:
-  push:
-    branches:
-      - version-[0-9].[0-9]+.x
-    tags:
-      - v[0-9].[0-9]+.[0-9]+
   pull_request:
 
 jobs:
@@ -35,14 +30,6 @@ jobs:
           QASE_PROJECT_CODE: PR
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
           CHECKPR_RUN_ID: ${{ github.run_id }}
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            lang:
-              - 'lang/**'
-              - 'build.sbt'
-              - 'project/*'
       - name: Compile external sources
         if: steps.filter.outputs.lang == 'true'
         run: |
@@ -57,32 +44,14 @@ jobs:
           find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;
       - name: Clean cache
         run: find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
-      - name: Prepare version
-        if: false # steps.filter.outputs.lang == 'true'
-        id: sbt-version
-        run: |
-          sbt_version=$(cut -d\" -f2 version.sbt)
-          git_ref=${GITHUB_REF##*/}
-          echo ${{ github.event }}
-          pr_number=${{ github.event.number }}
-          if [[ $git_ref =~ v[0-9]+\.[0-9]+\.[0-9]+$ ]] ; then
-            if [[ v$sbt_version != $git_ref ]] ; then
-              echo SBT version $sbt_version does not match tag $git_ref
-              exit 1
-            fi
-          else
-            if [[ $pr_number != "" ]] ; then
-              sbt_version=$sbt_version-$pr_number-SNAPSHOT
-            else
-              sbt_version=$sbt_version-SNAPSHOT
-            fi
-            echo "ThisBuild / version := \"$sbt_version\"" >> version.sbt
-            echo Setting version to $sbt_version
-          fi
-      - name: Publish lang and node
-        run: sbt --mem 4096 --batch ";publishSigned;sonatypeBundleRelease"
+      - name: Publish snapshots
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
         env:
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_BASE64 }}
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+        run: |
+          sbt_version=$(cut -d\" -f2 version.sbt)
+          pr_number=${{ github.event.number }}
+          sbt -Dproject.version=$sbt_version-$pr_number-SNAPSHOT --mem 4096 --batch ";publishSigned;sonatypeBundleRelease"
