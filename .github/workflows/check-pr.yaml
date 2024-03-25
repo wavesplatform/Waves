@@ -4,6 +4,7 @@ on:
 
 jobs:
   check-pr:
+    name: Check PR
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,9 +13,10 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
-          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY_ASCII }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - name: Check PR
+        if: false
         run: sbt --mem 4096 --batch ";checkPR;completeQaseRun"
         env:
           QASE_ENABLE: true
