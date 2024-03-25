@@ -13,7 +13,7 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
-          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY_ASCII }}
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - name: Check PR
         if: false
@@ -52,6 +52,7 @@ jobs:
         env:
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
         run: |
           sbt_version=$(cut -d\" -f2 version.sbt)
           pr_number=${{ github.event.number }}
