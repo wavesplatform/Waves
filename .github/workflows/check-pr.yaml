@@ -12,6 +12,8 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+          gpg-passphrase: PGP_PASSPHRASE
       - name: Check PR
         if: false
         run: sbt --mem 4096 --batch ";checkPR;completeQaseRun"
