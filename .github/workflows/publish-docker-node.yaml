@@ -8,43 +8,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '11'
+          cache: 'sbt'
 
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Cache SBT
-        uses: actions/cache@v3
-        with:
-          path: ~/.sbt
-          key: sbt-cache-${{ hashFiles('project/build.properties') }}
-
-      - name: Cache Coursier
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/coursier
-          key: coursier-cache
-
-      - name: Build sources
-        run: |
-          sbt --mem 4096 --batch -J-XX:+UseG1GC -Dcoursier.cache=~/.cache/coursier -Dsbt.boot.directory=~/.sbt ';buildTarballsForDocker;buildRIDERunnerForDocker'
+      - name: Build tarballs for Docker
+        run: sbt --mem 4096 --batch ';buildTarballsForDocker;buildRIDERunnerForDocker'
 
       - name: Setup Docker buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Log into Docker Hub registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Extract Docker public node metadata
         id: meta-public
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: wavesplatform/wavesnode
           flavor: |
@@ -55,7 +40,7 @@ jobs:
 
       - name: Extract Docker private node metadata
         id: meta-private
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: wavesplatform/waves-private-node
           flavor: |
@@ -66,7 +51,7 @@ jobs:
 
       - name: Extract Docker RIDE runner metadata
         id: meta-ride-runner
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: wavesplatform/ride-runner
           flavor: |
@@ -77,7 +62,7 @@ jobs:
 
       - name: Build and push Docker public image
         id: build-and-push-public
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: ./docker
           push: true
@@ -86,7 +71,7 @@ jobs:
 
       - name: Build and push Docker private image
         id: build-and-push-private
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: ./docker/private
           push: true
@@ -97,7 +82,7 @@ jobs:
 
       - name: Build and push Docker RIDE runner image
         id: build-and-push-ride-runner
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: ./ride-runner/docker
           push: true
