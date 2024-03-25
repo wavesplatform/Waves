@@ -12,10 +12,9 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
           cache: 'sbt'
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - name: Check PR
-        if: false
         run: sbt --mem 4096 --batch ";checkPR;completeQaseRun"
         env:
           QASE_ENABLE: true
@@ -24,6 +23,14 @@ jobs:
           QASE_PROJECT_CODE: PR
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
           CHECKPR_RUN_ID: ${{ github.run_id }}
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            lang:
+              - 'lang/**'
+              - 'build.sbt'
+              - 'project/*'
       - name: Compile external sources
         if: steps.filter.outputs.lang == 'true'
         run: |
@@ -41,8 +48,6 @@ jobs:
       - name: Publish snapshots
         if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
         env:
-          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-          PGP_SECRET: ${{ secrets.GPG_PRIVATE_KEY_BASE64 }}
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
         run: |
