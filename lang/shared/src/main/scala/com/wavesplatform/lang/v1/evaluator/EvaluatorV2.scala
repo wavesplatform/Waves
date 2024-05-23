@@ -264,6 +264,7 @@ class EvaluatorV2(
         }
 
       case fc: FUNCTION_CALL =>
+        println(s"function call ${fc.toStr.value()}, limit = $limit")
         val startArgs = fc.args
         evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
@@ -362,7 +363,7 @@ object EvaluatorV2 {
       correctFunctionCallScope: Boolean,
       newMode: Boolean,
       checkConstructorArgsTypes: Boolean = false,
-      enableExecutionLog: Boolean = false,
+      enableExecutionLog: Boolean = true,
       fixedThrownError: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (EXPR, Int, Log[Id])]] = {
     val log = ListBuffer[LogItem[Id]]()
