@@ -30,6 +30,25 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
+  private val customDApp = TestCompiler(V7).compileContract(
+    s"""
+       | @Callable(i)
+       | func f1(bigComplexity: Boolean, error: Boolean, doubleInvoke: Boolean) = {
+       |   strict dApp = Address(base58'$defaultAddress')
+       |   strict r = if (doubleInvoke) then dApp.invoke("f2", [bigComplexity, error], []) else 0
+       |   strict c = dApp.invoke("f2", [bigComplexity, error], [AttachedPayment(base58'$asset', 123)])
+       |   []
+       | }
+       |
+       | @Callable(i)
+       | func f2(bigComplexity: Boolean, error: Boolean) = {
+       |   strict c = if (bigComplexity) then ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} else 0
+       |   strict e = if (error) then throw("custom error") else 0
+       |   []
+       | }
+     """.stripMargin
+  )
+
   property("sync invoke payment should be validated after calling dApp if light node isn't activated") {
     withDomain(BlockRewardDistribution, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
       d.appendBlock(setScript(defaultSigner, dApp), setScript(secondSigner, dApp), issueTx)
@@ -52,6 +71,10 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
       d.appendBlockE(invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(false), CONST_BOOLEAN(false)))) should produce(
         "negative asset balance"
       )
+      d.appendAndAssertFailed(
+        invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false))),
+        "negative asset balance"
+      )
     }
   }
 
@@ -65,6 +88,21 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
       d.appendAndAssertFailed(
         invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(true))),
         "custom error"
+      )
+    }
+  }
+
+  property("custom: sync invoke should be correctly rejected and failed on enough balance and RIDE error if light node is activated") {
+    withDomain(TransactionStateSnapshot, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
+      d.appendBlock(setScript(defaultSigner, customDApp), setScript(secondSigner, customDApp), issueTx)
+      d.appendBlockE(
+        invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(false)))
+      ) should produce(
+        "negative asset balance"
+      )
+      d.appendAndAssertFailed(
+        invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(true))),
+        "negative asset balance"
       )
     }
   }
