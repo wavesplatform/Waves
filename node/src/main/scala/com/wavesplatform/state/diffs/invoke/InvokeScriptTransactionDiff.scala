@@ -345,6 +345,7 @@ object InvokeScriptTransactionDiff {
           InvokeRejectError(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
+          println(s"usedComplexity: $usedComplexity, failFreeLimit: $failFreeLimit")
           val msg = error match {
             case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
             case _                                                 => error.message
@@ -362,6 +363,7 @@ object InvokeScriptTransactionDiff {
               InvokeRejectError(message, log)
             case error =>
               val usedComplexity = startLimit - r.unusedComplexity
+              println(s"usedComplexity: $usedComplexity, failFreeLimit: $failFreeLimit")
               val msg = error match {
                 case fte: FailedTransactionError => fte.error.getOrElse(error.toString)
                 case _                           => error.toString

@@ -99,11 +99,11 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
         invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(false)))
       ) should produce(
         "negative asset balance"
-      )
+      ) // usedComplexity: 164, failFreeLimit: 1000
       d.appendAndAssertFailed(
         invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(true))),
         "negative asset balance"
-      )
+      ) // usedComplexity: 2482, failFreeLimit: 1000
     }
   }
 }
