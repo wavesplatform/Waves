@@ -42,7 +42,7 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
        |
        | @Callable(i)
        | func f2(bigComplexity: Boolean, error: Boolean) = {
-       |   strict c = if (bigComplexity) then ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} else 0
+       |   strict c = if (bigComplexity) then ${(1 to 2).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} else 0
        |   strict e = if (error) then throw("custom error") else 0
        |   []
        | }
@@ -103,7 +103,7 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
       d.appendAndAssertFailed(
         invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(true))),
         "negative asset balance"
-      ) // usedComplexity: 2482, failFreeLimit: 1000
+      ) // usedComplexity: 1042, failFreeLimit: 1000
     }
   }
 }
