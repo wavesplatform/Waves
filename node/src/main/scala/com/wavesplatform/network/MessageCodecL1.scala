@@ -11,7 +11,7 @@ import io.netty.handler.codec.MessageToMessageCodec
 import scala.util.{Failure, Success}
 
 @Sharable
-class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
+class MessageCodecL1(peerDatabase: PeerDatabase) extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
 
   import BasicMessagesRepo.specsByCodes
 

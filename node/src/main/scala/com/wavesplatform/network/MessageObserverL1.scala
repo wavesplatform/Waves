@@ -1,15 +1,16 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
+import com.wavesplatform.network.MessageObserverL1.Messages
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.{Schedulers, ScorexLogging}
+import com.wavesplatform.utils.Schedulers
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.ConcurrentSubject
 
 @Sharable
-class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MessageObserverL1 extends ChannelInboundHandlerAdapter {
 
   private implicit val scheduler: SchedulerService = Schedulers.fixedPool(2, "message-observer")
 
@@ -35,6 +36,19 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   }
 
+  def messages: Messages = {
+    (
+      signatures,
+      blocks,
+      blockchainScores,
+      microblockInvs,
+      microblockResponses,
+      transactions,
+      blockSnapshots,
+      microblockSnapshots
+    )
+  }
+
   def shutdown(): Unit = {
     signatures.onComplete()
     blocks.onComplete()
@@ -47,7 +61,7 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
   }
 }
 
-object MessageObserver {
+object MessageObserverL1 {
   type Messages = (
       ChannelObservable[Signatures],
       ChannelObservable[Block],
@@ -58,21 +72,4 @@ object MessageObserver {
       ChannelObservable[BlockSnapshotResponse],
       ChannelObservable[MicroBlockSnapshotResponse]
   )
-
-  def apply(): (MessageObserver, Messages) = {
-    val mo = new MessageObserver()
-    (
-      mo,
-      (
-        mo.signatures,
-        mo.blocks,
-        mo.blockchainScores,
-        mo.microblockInvs,
-        mo.microblockResponses,
-        mo.transactions,
-        mo.blockSnapshots,
-        mo.microblockSnapshots
-      )
-    )
-  }
 }

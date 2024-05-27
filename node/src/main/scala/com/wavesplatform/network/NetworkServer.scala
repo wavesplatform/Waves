@@ -2,9 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.network.MessageObserver.Messages
 import com.wavesplatform.settings.*
-import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel.*
@@ -23,10 +21,9 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-trait NS {
+trait NetworkServer {
   def connect(remoteAddress: InetSocketAddress): Unit
   def shutdown(): Unit
-  def messages: Messages
   def closedChannels: Observable[Channel]
 }
 
@@ -36,31 +33,28 @@ object NetworkServer extends ScorexLogging {
   private[this] val LengthFieldSize        = 4
 
   def apply(
-      settings: WavesSettings,
-      lastBlockInfos: Observable[LastBlockInfo],
-      historyReplier: HistoryReplier,
+      applicationName: String,
+      networkSettings: NetworkSettings,
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup,
-      peerInfo: ConcurrentHashMap[Channel, PeerInfo]
-  ): NS = {
+      peerInfo: ConcurrentHashMap[Channel, PeerInfo],
+      protocolSpecificPipeline: Seq[ChannelHandlerAdapter],
+      enableMetrics: Boolean = false
+  ): NetworkServer = {
     @volatile var shutdownInitiated = false
 
     val bossGroup   = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
     val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true))
     val handshake = Handshake(
-      Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter,
+      applicationName,
       Version.VersionTuple,
-      settings.networkSettings.nodeName,
-      settings.networkSettings.nonce,
-      settings.networkSettings.declaredAddress
+      networkSettings.nodeName,
+      networkSettings.nonce,
+      networkSettings.declaredAddress
     )
 
-    val trafficWatcher = new TrafficWatcher
-    val trafficLogger  = new TrafficLogger(settings.networkSettings.trafficLogger)
-    val messageCodec   = new MessageCodec(peerDatabase)
-
     val excludedAddresses: Set[InetSocketAddress] = {
-      val bindAddress = settings.networkSettings.bindAddress
+      val bindAddress = networkSettings.bindAddress
       val isLocal     = Option(bindAddress.getAddress).exists(_.isAnyLocalAddress)
       val localAddresses = if (isLocal) {
         NetworkInterface.getNetworkInterfaces.asScala
@@ -68,7 +62,7 @@ object NetworkServer extends ScorexLogging {
           .toSet
       } else Set(bindAddress)
 
-      localAddresses ++ settings.networkSettings.declaredAddress.toSet
+      localAddresses ++ networkSettings.declaredAddress.toSet
     }
 
     val lengthFieldPrepender = new LengthFieldPrepender(4)
@@ -83,37 +77,20 @@ object NetworkServer extends ScorexLogging {
     val fatalErrorHandler = new FatalErrorHandler
 
     val inboundConnectionFilter =
-      new InboundConnectionFilter(peerDatabase, settings.networkSettings.maxInboundConnections, settings.networkSettings.maxConnectionsPerHost)
+      new InboundConnectionFilter(peerDatabase, networkSettings.maxInboundConnections, networkSettings.maxConnectionsPerHost)
 
-    val (messageObserver, networkMessages)            = MessageObserver()
     val (channelClosedHandler, closedChannelsSubject) = ChannelClosedHandler()
-    val discardingHandler                             = new DiscardingHandler(lastBlockInfos.map(_.ready), settings.enableLightMode)
     val peerConnectionsMap                            = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
     val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnectionsMap, peerDatabase, allChannels)
 
-    def peerSynchronizer: ChannelHandlerAdapter = {
-      if (settings.networkSettings.enablePeersExchange) {
-        new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
-      } else PeerSynchronizer.Disabled
-    }
+    def pipelineTail: Seq[ChannelHandlerAdapter] =
+      Seq(
+        lengthFieldPrepender,
+        new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize)
+      ) ++ protocolSpecificPipeline ++
+        Seq(writeErrorHandler, channelClosedHandler, fatalErrorHandler)
 
-    def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
-      lengthFieldPrepender,
-      new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
-      channelClosedHandler,
-      trafficWatcher,
-      discardingHandler,
-      messageCodec,
-      trafficLogger,
-      writeErrorHandler,
-      peerSynchronizer,
-      historyReplier,
-      messageObserver,
-      fatalErrorHandler
-    )
-
-    val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
+    val serverChannel = networkSettings.declaredAddress.map { _ =>
       new ServerBootstrap()
         .group(bossGroup, workerGroup)
         .channel(classOf[NioServerSocketChannel])
@@ -121,14 +98,14 @@ object NetworkServer extends ScorexLogging {
           new PipelineInitializer(
             Seq(
               inboundConnectionFilter,
-              new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
+              new BrokenConnectionDetector(networkSettings.breakIdleConnectionsTimeout),
               new HandshakeDecoder(peerDatabase),
-              new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
+              new HandshakeTimeoutHandler(networkSettings.handshakeTimeout),
               serverHandshakeHandler
             ) ++ pipelineTail
           )
         )
-        .bind(settings.networkSettings.bindAddress)
+        .bind(networkSettings.bindAddress)
         .channel()
     }
 
@@ -137,15 +114,15 @@ object NetworkServer extends ScorexLogging {
     val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, peerConnectionsMap, peerDatabase, allChannels)
 
     val bootstrap = new Bootstrap()
-      .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
+      .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, networkSettings.connectionTimeout.toMillis.toInt: Integer)
       .group(workerGroup)
       .channel(classOf[NioSocketChannel])
       .handler(
         new PipelineInitializer(
           Seq(
-            new BrokenConnectionDetector(settings.networkSettings.breakIdleConnectionsTimeout),
+            new BrokenConnectionDetector(networkSettings.breakIdleConnectionsTimeout),
             new HandshakeDecoder(peerDatabase),
-            new HandshakeTimeoutHandler(if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else settings.networkSettings.handshakeTimeout),
+            new HandshakeTimeoutHandler(if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else networkSettings.handshakeTimeout),
             clientHandshakeHandler
           ) ++ pipelineTail
         )
@@ -209,27 +186,32 @@ object NetworkServer extends ScorexLogging {
       workerGroup.schedule(delay) {
         val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
 
-        def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
+        lazy val outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
         val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
         val incoming = all.filterNot(outgoing.contains)
 
         def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
-        log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-        if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
+        if (all.nonEmpty) {
+          log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+        }
+
+        if (outgoingChannels.size() < networkSettings.maxOutboundConnections) {
           peerDatabase
             .randomPeer(excluded = excludedAddresses ++ all)
             .foreach(doConnect)
         }
 
-        Metrics.write(
-          Point
-            .measurement("connections")
-            .addField("outgoing", outgoingStr)
-            .addField("incoming", incomingStr)
-            .addField("n", all.size)
-        )
+        if (enableMetrics) {
+          Metrics.write(
+            Point
+              .measurement("connections")
+              .addField("outgoing", outgoingStr)
+              .addField("incoming", incomingStr)
+              .addField("n", all.size)
+          )
+        }
 
         scheduleConnectTask()
       }
@@ -237,7 +219,7 @@ object NetworkServer extends ScorexLogging {
 
     scheduleConnectTask()
 
-    new NS {
+    new NetworkServer {
       override def connect(remoteAddress: InetSocketAddress): Unit = doConnect(remoteAddress)
 
       override def shutdown(): Unit =
@@ -250,11 +232,9 @@ object NetworkServer extends ScorexLogging {
         } finally {
           workerGroup.shutdownGracefully().await()
           bossGroup.shutdownGracefully().await()
-          messageObserver.shutdown()
           channelClosedHandler.shutdown()
         }
 
-      override val messages: Messages                  = networkMessages
       override val closedChannels: Observable[Channel] = closedChannelsSubject
     }
   }

@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.history.History
-import com.wavesplatform.network.HistoryReplier.*
+import com.wavesplatform.network.HistoryReplierL1.*
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
@@ -12,8 +12,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 @Sharable
-class HistoryReplier(score: => BigInt, history: History, settings: SynchronizationSettings)(implicit ec: ExecutionContext)
-    extends ChannelInboundHandlerAdapter
+class HistoryReplierL1(score: => BigInt, history: History, settings: SynchronizationSettings)(implicit ec: ExecutionContext)
+  extends ChannelInboundHandlerAdapter
     with ScorexLogging {
 
   private def respondWith(ctx: ChannelHandlerContext, value: Future[Message]): Unit =
@@ -78,6 +78,6 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
   def cacheSizes: CacheSizes = CacheSizes(0, 0)
 }
 
-object HistoryReplier {
+object HistoryReplierL1 {
   case class CacheSizes(blocks: Long, microBlocks: Long)
 }

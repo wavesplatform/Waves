@@ -1,15 +1,14 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
-
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 
+import java.net.InetSocketAddress
 import scala.concurrent.duration.FiniteDuration
 
+@Sharable
 class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
-
   private var peersRequested  = false
   private var declaredAddress = Option.empty[InetSocketAddress]
 
