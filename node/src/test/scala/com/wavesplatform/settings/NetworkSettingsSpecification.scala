@@ -42,7 +42,7 @@ class NetworkSettingsSpecification extends FlatSpec {
         |}""".stripMargin))
     val networkSettings = config.as[NetworkSettings]("waves.network")
 
-    networkSettings.bindAddress should be(new InetSocketAddress("127.0.0.1", 6868))
+    networkSettings.bindAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
     networkSettings.nodeName should be("default-node-name")
     networkSettings.declaredAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
     networkSettings.nonce should be(0)
