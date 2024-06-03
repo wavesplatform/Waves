@@ -44,7 +44,6 @@ object NetworkServerL1 {
       allChannels,
       peerInfo,
       protocolSpecificPipeline,
-      enableMetrics = true
     )
   }
 }

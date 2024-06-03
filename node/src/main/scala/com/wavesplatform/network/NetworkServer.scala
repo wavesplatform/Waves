@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.settings.*
+import com.wavesplatform.state.Cast
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel.*
@@ -14,7 +15,7 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.{InetSocketAddress, NetworkInterface, SocketAddress}
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
@@ -39,7 +40,6 @@ object NetworkServer extends ScorexLogging {
       allChannels: ChannelGroup,
       peerInfo: ConcurrentHashMap[Channel, PeerInfo],
       protocolSpecificPipeline: Seq[ChannelHandlerAdapter],
-      enableMetrics: Boolean = false
   ): NetworkServer = {
     @volatile var shutdownInitiated = false
 
@@ -53,17 +53,17 @@ object NetworkServer extends ScorexLogging {
       networkSettings.declaredAddress
     )
 
-    val excludedAddresses: Set[InetSocketAddress] = {
-      val bindAddress = networkSettings.bindAddress
-      val isLocal     = Option(bindAddress.getAddress).exists(_.isAnyLocalAddress)
-      val localAddresses = if (isLocal) {
-        NetworkInterface.getNetworkInterfaces.asScala
-          .flatMap(_.getInetAddresses.asScala.map(a => new InetSocketAddress(a, bindAddress.getPort)))
-          .toSet
-      } else Set(bindAddress)
+    val excludedAddresses: Set[InetSocketAddress] =
+      networkSettings.bindAddress.fold(Set.empty[InetSocketAddress]) { bindAddress =>
+        val isLocal = Option(bindAddress.getAddress).exists(_.isAnyLocalAddress)
+        val localAddresses = if (isLocal) {
+          NetworkInterface.getNetworkInterfaces.asScala
+            .flatMap(_.getInetAddresses.asScala.map(a => new InetSocketAddress(a, bindAddress.getPort)))
+            .toSet
+        } else Set(bindAddress)
 
-      localAddresses ++ networkSettings.declaredAddress.toSet
-    }
+        localAddresses ++ networkSettings.declaredAddress.toSet
+      }
 
     val lengthFieldPrepender = new LengthFieldPrepender(4)
 
@@ -90,7 +90,7 @@ object NetworkServer extends ScorexLogging {
       ) ++ protocolSpecificPipeline ++
         Seq(writeErrorHandler, channelClosedHandler, fatalErrorHandler)
 
-    val serverChannel = networkSettings.declaredAddress.map { _ =>
+    val serverChannel = networkSettings.bindAddress.map { bindAddress =>
       new ServerBootstrap()
         .group(bossGroup, workerGroup)
         .channel(classOf[NioServerSocketChannel])
@@ -105,7 +105,7 @@ object NetworkServer extends ScorexLogging {
             ) ++ pipelineTail
           )
         )
-        .bind(networkSettings.bindAddress)
+        .bind(bindAddress)
         .channel()
     }
 
@@ -143,6 +143,8 @@ object NetworkServer extends ScorexLogging {
             s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"
           )
         )
+
+      logConnections()
     }
 
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
@@ -165,6 +167,7 @@ object NetworkServer extends ScorexLogging {
           case other => log.debug(formatOutgoingChannelEvent(thisConnFuture.channel(), other.getMessage))
         }
       }
+      logConnections()
     }
 
     def doConnect(remoteAddress: InetSocketAddress): Unit =
@@ -178,39 +181,38 @@ object NetworkServer extends ScorexLogging {
         }
       )
 
+    def logConnections(): Unit = {
+      def mkAddressString(addresses: IterableOnce[SocketAddress]) =
+        addresses.iterator.map(_.toString).toVector.sorted.mkString("[", ",", "]")
+
+      val incoming = peerInfo.values().asScala.view.map(_.remoteAddress).filterNot(outgoingChannels.containsKey)
+
+      lazy val incomingStr = mkAddressString(incoming)
+      lazy val outgoingStr = mkAddressString(outgoingChannels.keySet.iterator().asScala)
+
+      val all = peerInfo.values().iterator().asScala.flatMap(_.remoteAddress.cast[InetSocketAddress])
+
+      log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+
+      Metrics.write(
+        Point
+          .measurement("connections")
+          .addField("outgoing", outgoingStr)
+          .addField("incoming", incomingStr)
+          .addField("n", all.size)
+      )
+    }
+
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
       val delay = (if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
-      log.trace(s"Next connection attempt in $delay")
 
       workerGroup.schedule(delay) {
-        val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
-
-        lazy val outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
-
-        val all      = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-        val incoming = all.filterNot(outgoing.contains)
-
-        def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
-
-        if (all.nonEmpty) {
-          log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-        }
-
         if (outgoingChannels.size() < networkSettings.maxOutboundConnections) {
+          val all = peerInfo.values().iterator().asScala.flatMap(_.remoteAddress.cast[InetSocketAddress])
           peerDatabase
             .randomPeer(excluded = excludedAddresses ++ all)
             .foreach(doConnect)
-        }
-
-        if (enableMetrics) {
-          Metrics.write(
-            Point
-              .measurement("connections")
-              .addField("outgoing", outgoingStr)
-              .addField("incoming", incomingStr)
-              .addField("n", all.size)
-          )
         }
 
         scheduleConnectTask()

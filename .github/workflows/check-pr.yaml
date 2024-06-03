@@ -1,31 +1,20 @@
 name: Check PR
 on:
-  push:
-    branches:
-      - version-[0-9].[0-9]+.x
-    tags:
-      - v[0-9].[0-9]+.[0-9]+
   pull_request:
 
 jobs:
   check-pr:
+    name: Check PR
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-java@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '11'
-      - name: Cache SBT
-        uses: actions/cache@v3
-        with:
-          path: ~/.sbt
-          key: sbt-cache-${{ hashFiles('project/build.properties') }}
-      - name: Cache Coursier
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/coursier
-          key: coursier-cache
+          cache: 'sbt'
+          gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
+          gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
       - name: Check PR
         run: sbt --mem 4096 --batch ";checkPR;completeQaseRun"
         env:
@@ -35,7 +24,7 @@ jobs:
           QASE_PROJECT_CODE: PR
           QASE_API_TOKEN: ${{ secrets.QASE_API_TOKEN }}
           CHECKPR_RUN_ID: ${{ github.run_id }}
-      - uses: dorny/paths-filter@v2
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
@@ -57,33 +46,13 @@ jobs:
           find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;
       - name: Clean cache
         run: find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
-      - name: Prepare version
-        if: false # steps.filter.outputs.lang == 'true'
-        id: sbt-version
-        run: |
-          sbt_version=$(cut -d\" -f2 version.sbt)
-          git_ref=${GITHUB_REF##*/}
-          echo ${{ github.event }}
-          pr_number=${{ github.event.number }}
-          if [[ $git_ref =~ v[0-9]+\.[0-9]+\.[0-9]+$ ]] ; then
-            if [[ v$sbt_version != $git_ref ]] ; then
-              echo SBT version $sbt_version does not match tag $git_ref
-              exit 1
-            fi
-          else
-            if [[ $pr_number != "" ]] ; then
-              sbt_version=$sbt_version-$pr_number-SNAPSHOT
-            else
-              sbt_version=$sbt_version-SNAPSHOT
-            fi
-            echo "ThisBuild / version := \"$sbt_version\"" >> version.sbt
-            echo Setting version to $sbt_version
-          fi
-      - name: Publish lang
-        run: sbt ci-release
-        if: false # steps.filter.outputs.lang == 'true'
+      - name: Publish snapshots
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
         env:
-          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-          PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_BASE64 }}
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
+        run: |
+          sbt_version=$(cut -d\" -f2 version.sbt)
+          pr_number=${{ github.event.number }}
+          sbt -Dproject.version=$sbt_version-$pr_number-SNAPSHOT --mem 4096 --batch publishSigned

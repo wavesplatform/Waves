@@ -17,7 +17,7 @@ case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discove
 
 case class NetworkSettings(
     file: Option[File],
-    bindAddress: InetSocketAddress,
+    bindAddress: Option[InetSocketAddress],
     declaredAddress: Option[InetSocketAddress],
     nodeName: String,
     nonce: Long,
@@ -48,7 +48,7 @@ object NetworkSettings {
 
   private[this] def fromConfig(config: Config): NetworkSettings = {
     val file        = config.getAs[File]("file")
-    val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
+    val bindAddress = config.getAs[String]("bind-address").map(addr => new InetSocketAddress(addr, config.as[Int]("port")))
     val nonce       = config.getOrElse("nonce", randomNonce)
     val nodeName    = config.getOrElse("node-name", s"Node-$nonce")
     require(nodeName.utf8Bytes.length <= MaxNodeNameBytesLength, s"Node name should have length less than $MaxNodeNameBytesLength bytes")
