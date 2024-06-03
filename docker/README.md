@@ -86,7 +86,7 @@ Once container is launched it will create:
 - `/docker/waves/waves-config/waves.conf` - default Waves config
 
 
-3. If you already have Waves Node configuration/data - place it in the corresponsing directories
+3. If you already have Waves Node configuration/data - place it in the corresponding directories
 
 4. Add the appropriate arguments to ```docker run``` command: 
 ```
@@ -188,5 +188,5 @@ Full node configuration is available on Github in `waves.custom.conf`: https://g
 
 You can use the following tags:
 
-- `latest` - currrent version of Mainnet
+- `latest` - current version of Mainnet
 - `vX.X.X` - specific version of Waves Node
