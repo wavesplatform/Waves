@@ -170,7 +170,7 @@ package object http {
     case NonFatal(e)           => logger.error("Uncaught error", e); complete(ApiError.Unknown)
   }
 
-  /** Handles all [[scala.util.control.NonFatal non-fatal]] exceptions and tries to handle fatal errors.
+  /** Handles all [[scala.util.control.NonFatal]] exceptions and tries to handle fatal errors.
     *
     * This directive can't handle __fatal__ errors from:
     *
