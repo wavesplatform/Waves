@@ -39,7 +39,7 @@ object NetworkServer extends ScorexLogging {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup,
       peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-      protocolSpecificPipeline: Seq[ChannelHandlerAdapter],
+      protocolSpecificPipeline: => Seq[ChannelHandlerAdapter],
   ): NetworkServer = {
     @volatile var shutdownInitiated = false
 

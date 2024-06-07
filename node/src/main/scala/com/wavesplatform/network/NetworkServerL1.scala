@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.transaction.LastBlockInfo
-import io.netty.channel.{Channel, ChannelHandlerAdapter}
+import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.reactive.Observable
 
@@ -24,18 +24,10 @@ object NetworkServerL1 {
     val peerSynchronizer = if (settings.networkSettings.enablePeersExchange) {
       new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
     } else PeerSynchronizer.Disabled
-
-    val protocolSpecificPipeline: Seq[ChannelHandlerAdapter] =
-      Seq(
-        new LegacyFrameCodecL1(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
-        new TrafficWatcher,
-        new DiscardingHandler(lastBlockInfos.map(_.ready), settings.enableLightMode),
-        new MessageCodecL1(peerDatabase),
-        new TrafficLoggerL1(settings.networkSettings.trafficLogger),
-        peerSynchronizer,
-        historyReplier,
-        messageObserver
-      )
+    val trafficWatcher    = new TrafficWatcher
+    val discardingHandler = new DiscardingHandler(lastBlockInfos.map(_.ready), settings.enableLightMode)
+    val messageCodec      = new MessageCodecL1(peerDatabase)
+    val trafficLogger     = new TrafficLoggerL1(settings.networkSettings.trafficLogger)
 
     NetworkServer(
       applicationName,
@@ -43,7 +35,16 @@ object NetworkServerL1 {
       peerDatabase,
       allChannels,
       peerInfo,
-      protocolSpecificPipeline,
+      Seq(
+        new LegacyFrameCodecL1(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
+        trafficWatcher,
+        discardingHandler,
+        messageCodec,
+        trafficLogger,
+        peerSynchronizer,
+        historyReplier,
+        messageObserver
+      )
     )
   }
 }
