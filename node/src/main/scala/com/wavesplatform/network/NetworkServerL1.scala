@@ -21,7 +21,7 @@ object NetworkServerL1 {
   ): NetworkServer = {
     val applicationName = Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter
 
-    val peerSynchronizer = if (settings.networkSettings.enablePeersExchange) {
+    def peerSynchronizer = if (settings.networkSettings.enablePeersExchange) {
       new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
     } else PeerSynchronizer.Disabled
     val trafficWatcher    = new TrafficWatcher
