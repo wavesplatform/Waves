@@ -50,7 +50,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
       """.stripMargin
 
       val (contractBalance, contractEffBalance) = sender.accountBalances(contract.toAddress.toString)
-      val script                                = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+      val script                                = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
       val setScriptId                           = sender.setScript(contract, Some(script), setScriptFee, version = v).id
 
       nodes.waitForHeightAriseAndTxPresent(setScriptId)

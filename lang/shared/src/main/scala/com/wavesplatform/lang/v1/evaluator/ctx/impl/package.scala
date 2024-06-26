@@ -33,7 +33,7 @@ package object impl {
 
   val arrayDataByKeyHeaders: Set[FunctionHeader] =
     Set(DATA_LONG_FROM_ARRAY, DATA_BOOLEAN_FROM_ARRAY, DATA_BYTES_FROM_ARRAY, DATA_STRING_FROM_ARRAY)
-      .map(Native)
+      .map(Native.apply)
 
   val arrayDataByIndexHeaders: Set[FunctionHeader] =
     Set("getInteger", "getBoolean", "getBinary", "getString")

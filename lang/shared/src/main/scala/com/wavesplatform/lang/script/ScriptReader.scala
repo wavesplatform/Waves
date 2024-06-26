@@ -68,7 +68,7 @@ object ScriptReader {
             s    <- ContractScript(stdLibVersion, dapp)
           } yield s
       }).left
-        .map(ScriptParseError)
+        .map(ScriptParseError.apply)
     } yield s
   }
 }

@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
-import com.wavesplatform.lang.{CommonError, ExecutionError, ThrownError}
+import com.wavesplatform.lang.*
 
 import scala.collection.mutable
 import scala.util.Try

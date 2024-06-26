@@ -5,10 +5,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.Miners
 import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.sync.*
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -108,7 +107,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   test("can update asset only with description which have valid length") {
     val invalidDescs = Seq("a" * (MaxAssetDescriptionLength + 1))
-    val validDescs = Seq("", "a" * MaxAssetDescriptionLength)
+    val validDescs   = Seq("", "a" * MaxAssetDescriptionLength)
     invalidDescs.foreach { desc =>
       assertGrpcError(
         sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee),
@@ -152,7 +151,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   test("check increased fee for smart sender/asset") {
     val scriptText = s"""true""".stripMargin
-    val script     = ScriptCompiler(scriptText, isAssetScript = true, ScriptEstimatorV2).explicitGet()._1
+    val script     = TestCompiler.DefaultVersion.compileAsset(scriptText)
     val smartAssetId =
       PBTransactions
         .vanilla(

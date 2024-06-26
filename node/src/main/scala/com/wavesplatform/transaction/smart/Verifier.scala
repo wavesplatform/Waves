@@ -62,7 +62,7 @@ object Verifier extends ScorexLogging {
             if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue,
             enableExecutionLog
           )
-        case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature =>
+        case (sps: SigProofsSwitch, Some(_)) if sps.usesLegacySignature =>
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: PaymentTransaction, Some(_)) =>
           Left(GenericError("Can't process transaction with signature from scripted account"))

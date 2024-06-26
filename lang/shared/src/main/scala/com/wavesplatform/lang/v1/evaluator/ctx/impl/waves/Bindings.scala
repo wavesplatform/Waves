@@ -228,7 +228,7 @@ object Bindings {
           buildPaymentTransactionType(proofsEnabled),
           Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled, version) + mapRecipient(recipient)
         )
-      case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled, version)
+      case ttx: Tx.Transfer => transferTransactionObject(ttx, proofsEnabled, version)
       case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           buildIssueTransactionType(proofsEnabled, version),

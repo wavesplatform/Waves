@@ -40,9 +40,9 @@ final case class EthABIConverter(script: Script) {
     ): Either[ValidationError, (List[EVALUATED], Seq[InvokeScriptTransaction.Payment])] = {
       val arr   = FastHex.decode(data)
       val func  = new Function(ethSignature)
-      val tuple = func.decodeCall(arr)
+      val tuple: Tuple = func.decodeCall(arr)
 
-      tuple.asScala.toList
+      (tuple: java.lang.Iterable[AnyRef]).asScala.toList
         .zip(args.map(_.rideType) :+ EthABIConverter.PaymentListType)
         .traverse { case (ethArg, rideT) => EthABIConverter.toRideValue(ethArg, rideT) }
         .flatMap(checkLen(func, tuple, arr.length, blockchain).as(_))

@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.{NumericExt, PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxVersion, TransactionSignOps}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 
 class MaxCallableComplexityTest extends PropSpec with WithDomain with TransactionGenBase {

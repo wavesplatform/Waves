@@ -90,12 +90,11 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
                 1.toByte,
                 sender,
                 Some(
-                  ScriptCompiler(
+                  ScriptCompiler.compile(
                     """match tx {
                     |  case _: Order => height >= 0
                     |  case _ => true
                     |}""".stripMargin,
-                    isAssetScript = false,
                     ScriptEstimatorV2
                   ).explicitGet()._1
                 ),

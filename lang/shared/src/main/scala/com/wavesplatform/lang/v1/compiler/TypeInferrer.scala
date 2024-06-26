@@ -62,7 +62,7 @@ object TypeInferrer {
     (groupByPosition(matchingTuples.map(_.types)) zip commonTuple.types)
       .forall {
         case (groupedTypes, t: TUPLE) =>
-          checkTuplesCommonType(groupedTypes.collect { case t: TUPLE => t }, t)
+          checkTuplesCommonType(groupedTypes.collect { case tt: TUPLE => tt }, t)
         case (groupedTypes, singleType) =>
           singleType.typeList.length < groupedTypes.map(_.typeList.length).sum
       }

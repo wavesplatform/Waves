@@ -12,7 +12,7 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.0"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.7.3"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.15.3"
 
@@ -20,31 +20,31 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.61.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.64.0"
 
-  val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
+  val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http")
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.0.0-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.2.1-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.4.14"
-  val janino          = "org.codehaus.janino" % "janino"            % "3.1.11"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.6"
+  val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.106.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.111.Final"
 
-  val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
+  val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.12")
 
-  val playJson = "com.typesafe.play" %% "play-json" % "2.10.4"
+  val playJson = "com.typesafe.play" %% "play-json" % "2.10.6"
 
-  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.17" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.2" % Test)
+  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.3" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.2"
-  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.2"
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.7"
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.7"
 
-  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.77"
+  val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.78.1"
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -75,23 +75,23 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.21", // To support Apple ARM
+    "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.22", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.16.1",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.17.1",
     asyncHttpClient
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.14.0",
-    "org.scalacheck"    %% "scalacheck"      % "1.17.0",
+    "org.scalacheck"    %% "scalacheck"      % "1.18.0",
     "org.mockito"        % "mockito-all"     % "1.10.19",
-    "org.scalamock"     %% "scalamock"       % "5.2.0"
+    "org.scalamock"     %% "scalamock"       % "6.0.0"
   ).map(_ % Test)
 
   lazy val qaseReportDeps = Seq(
     playJson,
-    ("io.qase" % "qase-api" % "3.2.0").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
+    ("io.qase" % "qase-api" % "3.2.1").excludeAll(ExclusionRule(organization = "javax.ws.rs"))
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
@@ -100,14 +100,14 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "8.10.0"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.2.1"
 
   lazy val node = Def.setting(
     Seq(
       rocksdb,
       ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
-      "commons-net"          % "commons-net"              % "3.10.0",
-      "commons-io"           % "commons-io"               % "2.15.1",
+      "commons-net"          % "commons-net"              % "3.11.1",
+      "commons-io"           % "commons-io"               % "2.16.1",
       "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.4" % Runtime,
       kamonCore,
@@ -127,8 +127,8 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
-      "eu.timepit"                 %% "refined"       % "0.11.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "10.0.2",
+      "eu.timepit"                 %% "refined"       % "0.11.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.esaulpaugh"              % "headlong"      % "11.1.1",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
       akkaModule("testkit")               % Test,
@@ -136,7 +136,7 @@ object Dependencies {
     ) ++ test ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
 
-  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.2"
+  val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.2" // grpc 1.64.0 still requires 3.25
 
   lazy val scalapbRuntime = Def.setting(
     Seq(
@@ -167,7 +167,7 @@ object Dependencies {
       kamonModule("prometheus"),
       sttp3,
       sttp3Monix,
-      "org.scala-lang.modules"           %% "scala-xml"              % "2.2.0", // JUnit reports
+      "org.scala-lang.modules"           %% "scala-xml"              % "2.3.0", // JUnit reports
       akkaHttpModule("akka-http-testkit") % Test,
       "com.softwaremill.diffx"           %% "diffx-core"             % "0.9.0" % Test,
       "com.softwaremill.diffx"           %% "diffx-scalatest-should" % "0.9.0" % Test,
@@ -176,7 +176,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.6"
+    val circeVersion = "0.14.8"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",

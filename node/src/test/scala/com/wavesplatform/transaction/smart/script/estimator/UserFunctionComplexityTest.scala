@@ -19,6 +19,8 @@ import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
+import scala.annotation.nowarn
+
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
   private val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
@@ -53,12 +55,14 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
     val exprThrow = FUNCTION_CALL(PureContext.throwNoMessage, List())
     est(exprThrow).explicitGet() shouldBe 2
 
+    @nowarn("cat=deprecation")
     val exprExtract = LET_BLOCK(
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.extract, List(REF("x")))
     )
     est(exprExtract).explicitGet() shouldBe 21
 
+    @nowarn("cat=deprecation")
     val exprIsDefined = LET_BLOCK(
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.isDefined, List(REF("x")))
@@ -120,12 +124,14 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
     val exprThrow = FUNCTION_CALL(PureContext.throwNoMessage, List())
     est(exprThrow).explicitGet() shouldBe 2
 
+    @nowarn("cat=deprecation")
     val exprExtract = LET_BLOCK(
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.extract, List(REF("x")))
     )
     est(exprExtract).explicitGet() shouldBe 21
 
+    @nowarn("cat=deprecation")
     val exprIsDefined = LET_BLOCK(
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.isDefined, List(REF("x")))
@@ -187,12 +193,14 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
     val exprThrow = FUNCTION_CALL(PureContext.throwNoMessage, List())
     est(exprThrow).explicitGet() shouldBe 1
 
+    @nowarn("cat=deprecation")
     val exprExtract = LET_BLOCK(
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.extract, List(REF("x")))
     )
     est(exprExtract).explicitGet() shouldBe 21
 
+    @nowarn("cat=deprecation")
     val exprIsDefined = LET_BLOCK(
       LET("x", CONST_LONG(2)),
       FUNCTION_CALL(PureContext.isDefined, List(REF("x")))
@@ -217,6 +225,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
     val exprUNot = FUNCTION_CALL(PureContext.uNot, List(TRUE))
     est(exprUNot).explicitGet() shouldBe 2
 
+    @nowarn("cat=deprecation")
     val exprDataByIndex = LET_BLOCK(
       LET("arr", FUNCTION_CALL(PureContext.listConstructor(checkSize = false), List(CONST_STRING("str_1").explicitGet(), REF(GlobalValNames.Nil)))),
       FUNCTION_CALL(User("getString"), List(REF("arr"), CONST_LONG(0)))

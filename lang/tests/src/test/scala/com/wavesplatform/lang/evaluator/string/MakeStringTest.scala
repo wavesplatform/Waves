@@ -27,10 +27,10 @@ class MakeStringTest extends EvaluatorSpec {
       case Nil =>
         REF(GlobalValNames.Nil)
 
-      case value :: rest =>
+      case head :: rest =>
         FUNCTION_CALL(
           Native(1100),
-          List(value, mkConsList(rest))
+          List(head, mkConsList(rest))
         )
     }
 

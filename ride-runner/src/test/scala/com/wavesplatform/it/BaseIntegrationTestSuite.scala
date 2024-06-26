@@ -89,7 +89,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     )
 
     val requestService = use(
-      new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler()), testScheduler) {
+      new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler[RideScriptRunRequest]()), testScheduler) {
         override def start(): Unit = {
           super.start()
           testScheduler.tick()

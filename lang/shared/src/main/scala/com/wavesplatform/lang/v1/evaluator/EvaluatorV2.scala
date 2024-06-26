@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.logFunc
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{CommonError, ExecutionError, ThrownError}
+import com.wavesplatform.lang.*
 import monix.eval.Coeval
 import shapeless.syntax.std.tuple.*
 

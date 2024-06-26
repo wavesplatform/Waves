@@ -245,7 +245,7 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
         ContractLimits.MaxTupleSize
       )
       ~ comment ~/ ")")
-      .map(Tuple)
+      .map(Tuple.apply)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName(check = true)
@@ -381,13 +381,13 @@ class Parser(stdLibVersion: StdLibVersion)(implicit offset: LibrariesOffset) {
     }
 
   def accessP[A: P]: P[(Int, Accessor, Int)] = P(
-    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex.apply) ~ "]" ~~ Index)
   )
 
   def getterOrOOPCall[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
-    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
+    } | (accessOrName.map(Getter.apply) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
       case (g @ Getter(name), args) =>
         args.fold(g: Accessor)(Method(name, _))
     }
