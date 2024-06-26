@@ -4,7 +4,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.network.{MessageCodec, PBBlockSpec, PeerDatabase, RawBytes}
+import com.wavesplatform.network.{MessageCodecL1, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Ignored
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.TxHelpers
@@ -25,8 +25,8 @@ class BlockAppenderSpec extends FlatSpec with WithDomain with BeforeAndAfterAll 
     val sender = TxHelpers.signer(1)
     withDomain(DomainPresets.ConsensusImprovements, AddrWithBalance.enoughBalances(sender)) { d =>
       val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-      val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
-      val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+      val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+      val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
       channels.add(channel1)
       channels.add(channel2)
       val appender = BlockAppender(
