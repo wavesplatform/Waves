@@ -147,7 +147,8 @@ object FunctionalitySettings {
     enforceTransferValidationAfter = 1698800,
     daoAddress = Some("3Myb6G8DkdBb8YcZzhrky65HrmiNuac3kvS"),
     xtnBuybackAddress = Some("3N13KQpdY3UU7JkWUBD9kN7t7xuUgeyYMTT"),
-    xtnBuybackRewardPeriod = 2000
+    xtnBuybackRewardPeriod = 2000,
+    blockRewardBoostPeriod = 2_000
   )
 
   val STAGENET: FunctionalitySettings = apply(
