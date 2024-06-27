@@ -20,7 +20,7 @@ object Dependencies {
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
-  private def grpcModule(module: String) = "io.grpc" % module % "1.64.0"
+  private def grpcModule(module: String) = "io.grpc" % module % "1.62.2"
 
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
@@ -32,7 +32,7 @@ object Dependencies {
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
-  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.111.Final"
+  val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.100.Final"
 
   val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.12")
 
