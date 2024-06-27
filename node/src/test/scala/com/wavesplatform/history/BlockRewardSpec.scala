@@ -1,13 +1,14 @@
 package com.wavesplatform.history
 
 import cats.syntax.option.*
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.http.RewardApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{BlockReward, BlockRewardDistribution, ConsensusImprovements}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
@@ -16,12 +17,13 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{BlockRewardCalculator, Blockchain, Height}
-import com.wavesplatform.test.DomainPresets.{RideV6, WavesSettingsOps, BlockRewardDistribution as BlockRewardDistributionSettings}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.{RideV6, WavesSettingsOps, BlockRewardDistribution as BlockRewardDistributionSettings}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 import org.scalacheck.Gen
+import org.scalactic.source.Position
 
 class BlockRewardSpec extends FreeSpec with WithDomain {
 
@@ -1306,5 +1308,107 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       xtnBuybackAddressReward shouldBe xtnBuybackAddressRewardF.map(_.apply(fullBlockReward)).getOrElse(0L)
       minerReward shouldBe fullBlockReward - daoAddressReward - xtnBuybackAddressReward
     }
+  }
+
+  private val daoAddress        = TxHelpers.address(10002)
+  private val xtnBuybackAddress = TxHelpers.address(10003)
+  private val settingsWithRewardBoost = DomainPresets.BlockRewardDistribution
+    .setFeaturesHeight(BlockchainFeatures.BoostBlockReward -> 5)
+    .configure(fs =>
+      fs.copy(
+        blockRewardBoostPeriod = 10,
+        daoAddress = Some(daoAddress.toString),
+        xtnBuybackAddress = Some(xtnBuybackAddress.toString)
+      )
+    )
+
+  private val blockMiner          = TxHelpers.signer(10001)
+  private val initialMinerBalance = 100_000.waves
+  private val boostedShare = 2.waves * 10
+  private val boostedShareAfterIncrease = 6.5.waves / 3 * 10
+  private val boostedMinerShareAfterIncrease: Long = 65.waves - 2 * boostedShareAfterIncrease
+  private val shareAfterIncrease = 6.5.waves / 3
+  private val minerShareAfterIncrease = 6.5.waves - 2 * shareAfterIncrease
+
+  private def assertBalances(blockchain: Blockchain, expectedBalances: (Address, Long)*)(implicit pos: Position): Unit =
+    expectedBalances.foreach { case (address, balance) =>
+      withClue(address) {
+        blockchain.balance(address) shouldEqual balance
+      }
+    }
+
+  "Boost block reward feature activation" in withDomain(
+    settingsWithRewardBoost.copy(blockchainSettings =
+      settingsWithRewardBoost.blockchainSettings.copy(
+        rewardsSettings = RewardsSettings(10, 10, 6.waves, 0.5.waves, 4)
+      )
+    ),
+    Seq(AddrWithBalance(blockMiner.toAddress, initialMinerBalance))
+  ) { d =>
+    (1 to 3).foreach(_ => d.appendKeyBlock(blockMiner))
+    // height 4: before activation
+    d.blockchain.height shouldBe 4
+    assertBalances(
+      d.blockchain,
+      blockMiner.toAddress -> (initialMinerBalance + 2.waves * 3),
+      daoAddress           -> 2.waves * 3,
+      xtnBuybackAddress    -> 2.waves * 3
+    )
+
+    d.appendKeyBlock(blockMiner)
+    // height 5: activation height
+    val rewardAtActivationHeight = 2.waves * 3 + boostedShare
+    d.blockchain.height shouldBe 5
+    assertBalances(
+      d.blockchain,
+      blockMiner.toAddress -> (initialMinerBalance + rewardAtActivationHeight),
+      daoAddress           -> rewardAtActivationHeight,
+      xtnBuybackAddress    -> rewardAtActivationHeight
+    )
+
+    d.appendKeyBlock(blockMiner)
+    // height 7: start voting
+    (1 to 3).foreach(_ => d.appendBlock(d.createBlock(Block.RewardBlockVersion, Seq.empty, generator = blockMiner, rewardVote = 7.waves)))
+    d.blockchain.height shouldBe 9
+    val rewardBeforeIncrease = rewardAtActivationHeight + 4 * boostedShare
+    assertBalances(
+      d.blockchain,
+      blockMiner.toAddress -> (initialMinerBalance + rewardBeforeIncrease),
+      daoAddress           -> rewardBeforeIncrease,
+      xtnBuybackAddress    -> rewardBeforeIncrease
+    )
+
+    // height 10: new base reward value = 65 waves
+    d.appendBlock(d.createBlock(Block.RewardBlockVersion, Seq.empty, generator = blockMiner, rewardVote = 7.waves))
+    d.blockchain.height shouldBe 10
+    val rewardAfterIncrease = rewardBeforeIncrease + boostedShareAfterIncrease
+    assertBalances(
+      d.blockchain,
+      blockMiner.toAddress -> (initialMinerBalance + rewardBeforeIncrease + boostedMinerShareAfterIncrease),
+      daoAddress           -> rewardAfterIncrease,
+      xtnBuybackAddress    -> rewardAfterIncrease
+    )
+
+    (1 to 4).foreach(_ => d.appendKeyBlock(blockMiner))
+    // height 14: before deactivation
+    d.blockchain.height shouldBe 14
+    val rewardBeforeDeactivation = rewardAfterIncrease + 4 * boostedShareAfterIncrease
+    assertBalances(
+      d.blockchain,
+      blockMiner.toAddress -> (initialMinerBalance + rewardBeforeIncrease + 5 * boostedMinerShareAfterIncrease),
+      daoAddress           -> rewardBeforeDeactivation,
+      xtnBuybackAddress    -> rewardBeforeDeactivation
+    )
+
+    d.appendKeyBlock(blockMiner)
+    // height 15: deactivation
+    d.blockchain.height shouldBe 15
+    val rewardAfterDeactivation = rewardBeforeDeactivation + shareAfterIncrease
+    assertBalances(
+      d.blockchain,
+      blockMiner.toAddress -> (initialMinerBalance + rewardBeforeIncrease + 5 * boostedMinerShareAfterIncrease + minerShareAfterIncrease),
+      daoAddress           -> rewardAfterDeactivation,
+      xtnBuybackAddress    -> rewardAfterDeactivation
+    )
   }
 }

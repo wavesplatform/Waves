@@ -8,7 +8,13 @@ import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 
 object BlockRewardCalculator {
 
-  case class BlockRewardShares(miner: Long, daoAddress: Long, xtnBuybackAddress: Long)
+  case class BlockRewardShares(miner: Long, daoAddress: Long, xtnBuybackAddress: Long) {
+    private[BlockRewardCalculator] def multiply(by: Long): BlockRewardShares = BlockRewardShares(
+      miner = miner * by,
+      daoAddress = daoAddress * by,
+      xtnBuybackAddress = xtnBuybackAddress * by
+    )
+  }
 
   val CurrentBlockRewardPart: Fraction   = Fraction(1, 3)
   val RemaindRewardAddressPart: Fraction = Fraction(1, 2)
@@ -16,6 +22,7 @@ object BlockRewardCalculator {
   val FullRewardInit: Long        = 6 * Constants.UnitsInWave
   val MaxAddressReward: Long      = 2 * Constants.UnitsInWave
   val GuaranteedMinerReward: Long = 2 * Constants.UnitsInWave
+  val RewardBoost                 = 10
 
   def getBlockRewardShares(
       height: Int,
@@ -50,7 +57,16 @@ object BlockRewardCalculator {
         calculateRewards(fullBlockReward, CurrentBlockRewardPart.apply(fullBlockReward), daoAddress, modifiedXtnBuybackAddress)
       }
     } else BlockRewardShares(fullBlockReward, 0, 0)
-  }
+  }.multiply(
+    if (
+      blockchain
+        .featureActivationHeight(BlockchainFeatures.BoostBlockReward.id)
+        .exists { boostHeight =>
+          boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
+        }
+    ) RewardBoost
+    else 1
+  )
 
   def getSortedBlockRewardShares(height: Int, fullBlockReward: Long, generator: Address, blockchain: Blockchain): Seq[(Address, Long)] = {
     val daoAddress        = blockchain.settings.functionalitySettings.daoAddressParsed.toOption.flatten
