@@ -31,7 +31,7 @@ class MessageCodecSpec extends FreeSpec {
     codec.blockCalls shouldBe 0
   }
 
-  private class SpyingMessageCodec extends MessageCodec(PeerDatabase.NoOp) {
+  private class SpyingMessageCodec extends MessageCodecL1(PeerDatabase.NoOp) {
     var blockCalls = 0
 
     override def block(ctx: ChannelHandlerContext, e: Throwable): Unit = {

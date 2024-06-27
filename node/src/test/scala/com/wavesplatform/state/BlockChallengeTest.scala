@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.mining.{BlockChallenger, BlockChallengerImpl}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
-import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, MessageCodec, PBBlockSpec, PeerDatabase, RawBytes}
+import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, MessageCodecL1, PBBlockSpec, PeerDatabase, RawBytes}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockRewardCalculator.BlockRewardShares
@@ -1885,8 +1885,8 @@ class BlockChallengeTest
 
   private def appendAndCheck(block: Block, d: Domain)(check: Block => Unit): Unit = {
     val channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val channel1 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
-    val channel2 = new EmbeddedChannel(new MessageCodec(PeerDatabase.NoOp))
+    val channel1 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
+    val channel2 = new EmbeddedChannel(new MessageCodecL1(PeerDatabase.NoOp))
     channels.add(channel1)
     channels.add(channel2)
     val appenderWithChallenger: Block => Task[Unit] =

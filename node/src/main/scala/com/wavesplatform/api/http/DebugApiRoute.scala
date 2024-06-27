@@ -49,7 +49,7 @@ case class DebugApiRoute(
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
     utxStorage: UtxPool,
     miner: Miner & MinerDebugInfo,
-    historyReplier: HistoryReplier,
+    historyReplier: HistoryReplierL1,
     extLoaderStateReporter: Coeval[RxExtensionLoader.State],
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
@@ -303,7 +303,7 @@ object DebugApiRoute {
 
   implicit val addressWrites: Writes[Address] = Writes((a: Address) => JsString(a.toString))
 
-  implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes]          = Json.format
+  implicit val hrCacheSizesFormat: Format[HistoryReplierL1.CacheSizes]        = Json.format
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format
   implicit val BigIntWrite: Writes[BigInt]                                    = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats]         = Json.writes[RxScoreObserver.Stats]
