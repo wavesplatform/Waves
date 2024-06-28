@@ -15,6 +15,7 @@ import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -31,6 +32,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.*
 import org.scalatest.Assertion
+import org.scalatest.OptionValues.convertOptionToValuable
 import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
@@ -615,6 +617,84 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       d.appendBlockE(TxHelpers.setScript(dApp, dAppAfterCappedReward), cleanData()) should beRight
       d.appendBlockE(invoke()) should beRight
       checkAfterBlockRewardDistrResult(miner, BlockRewardCalculator.MaxAddressReward)
+    }
+  }
+
+  property("Block reward boost is visible in dApp scripts") {
+    val daoAddress = TxHelpers.address(1003).toString
+    val xtnAddress = TxHelpers.address(1004).toString
+    val miner      = TxHelpers.signer(1005)
+    val invoker    = TxHelpers.signer(1006)
+    val dapp       = TxHelpers.signer(1007)
+    val settings = ConsensusImprovements
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 0,
+        BlockchainFeatures.CappedReward            -> 0,
+        BlockchainFeatures.BoostBlockReward        -> 5
+      )
+      .configure(fs =>
+        fs.copy(
+          blockRewardBoostPeriod = 10,
+          daoAddress = Some(daoAddress),
+          xtnBuybackAddress = Some(xtnAddress)
+        )
+      )
+
+    withDomain(
+      settings,
+      Seq(
+        AddrWithBalance(miner.toAddress, 100_000.waves),
+        AddrWithBalance(invoker.toAddress, 100.waves),
+        AddrWithBalance(dapp.toAddress, 100.waves)
+      )
+    ) { d =>
+      d.appendBlock(
+        TxHelpers.setScript(
+          dapp,
+          TestCompiler(V7).compileContract(s"""
+            func findRewardsFor(rewards: List[(Address, Int)], addr: Address) = {
+              func check(prev: Int|Unit, next: (Address, Int)) = match prev {
+                case _: Unit =>
+                  let (thisAddr, share) = next
+                  if (thisAddr == addr) then share else unit
+                case _ => prev
+              }
+    
+              FOLD<3>(rewards, unit, check)
+            }
+    
+            @Callable(i)
+            func storeBlockInfo(height: Int) = {
+              let prefix = i.transactionId.toBase58String() + "_"
+              let blockInfo = blockInfoByHeight(height).value()
+              [
+                IntegerEntry(prefix + "miner", findRewardsFor(blockInfo.rewards, blockInfo.generator).valueOrElse(0)),
+                IntegerEntry(prefix + "dao", findRewardsFor(blockInfo.rewards, addressFromStringValue("$daoAddress")).valueOrElse(0)),
+                IntegerEntry(prefix + "xtn", findRewardsFor(blockInfo.rewards, addressFromStringValue("$xtnAddress")).valueOrElse(0))
+              ]
+            }""")
+        )
+      )
+
+      def checkHeight(height: Int, minerShare: Long, daoShare: Long, xtnShare: Long): Unit = {
+        val invocation = TxHelpers.invoke(dapp.toAddress, Some("storeBlockInfo"), Seq(CONST_LONG(height)), invoker = invoker)
+
+        d.appendBlock(d.createBlock(Block.RewardBlockVersion, Seq(invocation), generator = miner))
+
+        d.blockchain.accountData(dapp.toAddress, invocation.id().toString + "_miner").value.value shouldBe minerShare
+        d.blockchain.accountData(dapp.toAddress, invocation.id().toString + "_dao").value.value shouldBe daoShare
+        d.blockchain.accountData(dapp.toAddress, invocation.id().toString + "_xtn").value.value shouldBe xtnShare
+      }
+
+      checkHeight(3, 2.waves, 2.waves, 2.waves)
+      d.appendBlock()
+      (1 to 10).foreach(i => checkHeight(i + 4, 20.waves, 20.waves, 20.waves))
+      checkHeight(15, 2.waves, 2.waves, 2.waves)
+
+      // check historic blocks again after deactivation
+      checkHeight(3, 2.waves, 2.waves, 2.waves)
+      checkHeight(5, 20.waves, 20.waves, 20.waves)
+      checkHeight(15, 2.waves, 2.waves, 2.waves)
     }
   }
 

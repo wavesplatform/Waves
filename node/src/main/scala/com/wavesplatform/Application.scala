@@ -623,7 +623,11 @@ object Application extends ScorexLogging {
       .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))
       .map { blockMeta =>
         val rewardShares = BlockRewardCalculator.getSortedBlockRewardShares(height, blockMeta.header.generator.toAddress, blockchainUpdater)
-        blockMeta.copy(rewardShares = rewardShares)
+        val rewardBoost = if (blockchainUpdater.isBlockRewardBoostActive(height)) BlockRewardCalculator.RewardBoost else 1
+        blockMeta.copy(
+          rewardShares = rewardShares,
+          reward = blockMeta.reward.map(_ * rewardBoost)
+        )
       }
 
   def main(args: Array[String]): Unit = {

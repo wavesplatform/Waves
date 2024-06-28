@@ -226,5 +226,12 @@ object Blockchain {
 
     def supportsLightNodeBlockFields(height: Int = blockchain.height): Boolean =
       blockchain.featureActivationHeight(LightNode.id).exists(height >= _ + blockchain.settings.functionalitySettings.lightNodeBlockFieldsAbsenceInterval)
+
+    def isBlockRewardBoostActive(height: Int): Boolean =
+      blockchain
+        .featureActivationHeight(BlockchainFeatures.BoostBlockReward.id)
+        .exists { boostHeight =>
+          boostHeight <= height && height < boostHeight + blockchain.settings.functionalitySettings.blockRewardBoostPeriod
+        }
   }
 }
