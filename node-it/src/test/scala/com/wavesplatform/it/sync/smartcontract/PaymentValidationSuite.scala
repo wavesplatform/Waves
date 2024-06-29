@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueFee, setScriptFee, smartFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -32,14 +33,8 @@ class PaymentValidationSuite extends BaseTransactionSuite {
     val scriptV4 = ScriptCompiler.compile(sourceV4, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(scriptV4), setScriptFee, waitForTx = true)
 
-    val scr = TestCompiler.DefaultVersion.compileAsset(
-      s"""
-         |{-# STDLIB_VERSION 4 #-}
-         |{-# CONTENT_TYPE EXPRESSION #-}
-         |{-# SCRIPT_TYPE ASSET #-}
-         |
-         |getStringValue(addressFromString("${dApp.toAddress.toString}").value(), "$wrKey") == "$wrValue"
-         """.stripMargin
+    val scr = TestCompiler(V4).compileAsset(
+      s"""getStringValue(addressFromString("${dApp.toAddress.toString}").value(), "$wrKey") == "$wrValue""""
     ).bytes().base64
     val smartAssetId = sender.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
 

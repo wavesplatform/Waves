@@ -11,6 +11,7 @@ import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
@@ -361,7 +362,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
                          | this.minSponsoredFee == unit
                          |case _ => false
                          |}""".stripMargin
-    val script1 = TestCompiler.DefaultVersion.compileAsset(scriptText1).bytes().base64
+    val script1 = TestCompiler(V4).compileAsset(scriptText1).bytes().base64
     sender.setAssetScript(smartAssetId1, issuer, setAssetScriptFee, Some(script1), waitForTx = true)
 
     sender.burn(issuer, smartAssetId1, 1, minFee + 2 * smartFee, waitForTx = true)
