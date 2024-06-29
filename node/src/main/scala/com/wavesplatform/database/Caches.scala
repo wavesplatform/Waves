@@ -246,7 +246,7 @@ abstract class Caches extends Blockchain with Storage {
       if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(hitSource.arr) else ByteString.EMPTY,
       ByteString.copyFrom(newScore.toByteArray),
       current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) +
-        (reward.getOrElse(0L) * (if (this.isBlockRewardBoostActive(newHeight)) BlockRewardCalculator.RewardBoost else 1))
+        (reward.getOrElse(0L) * this.blockRewardBoost(newHeight))
     )
     current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
 

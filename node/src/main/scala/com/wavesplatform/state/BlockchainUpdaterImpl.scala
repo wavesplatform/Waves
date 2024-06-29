@@ -632,7 +632,7 @@ class BlockchainUpdaterImpl(
     ngState match {
       case Some(ng) if this.height == height =>
         rocksdb.wavesAmount(height - 1) +
-          BigInt(ng.reward.getOrElse(0L)) * (if (this.isBlockRewardBoostActive(height)) BlockRewardCalculator.RewardBoost else 1)
+          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(height)
       case _ =>
         rocksdb.wavesAmount(height)
     }

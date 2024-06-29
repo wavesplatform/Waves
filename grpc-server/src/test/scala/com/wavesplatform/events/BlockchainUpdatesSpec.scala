@@ -1115,7 +1115,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
         subscription
           .fetchAllEvents(d.blockchain)
         .map(_.getUpdate.getAppend.getBlock.updatedWavesAmount) shouldBe
-          (2 to 16).scanLeft(100_000_000.waves) { (total, height) => total + 6.waves * (if (d.blockchain.isBlockRewardBoostActive(height)) BlockRewardCalculator.RewardBoost else 1) }
+          (2 to 16).scanLeft(100_000_000.waves) { (total, height) => total + 6.waves * d.blockchain.blockRewardBoost(height) }
 
 
       }
