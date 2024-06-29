@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionType}
+import com.wavesplatform.transaction.{Transaction, TransactionFactory, TransactionSignOps, TransactionType}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, Version}
 import play.api.libs.json.{JsObject, Json}
@@ -19,6 +19,7 @@ import scopt.OParser
 import java.io.{ByteArrayInputStream, File, FileInputStream, FileOutputStream}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
+import scala.annotation.nowarn
 
 //noinspection ScalaStyle
 // TODO: Consider remove implemented methods from REST API
@@ -224,7 +225,7 @@ object UtilApp {
   private[this] object Actions {
     type ActionResult = Either[String, Array[Byte]]
 
-    // noinspection ScalaDeprecation
+    @nowarn("cat=deprecation")
     def doCompile(settings: WavesSettings)(c: Command, str: Array[Byte]): ActionResult = {
       ScriptCompiler(new String(str), c.compileOptions.assetScript, settings.estimator)
         .map(_._1.bytes().arr)

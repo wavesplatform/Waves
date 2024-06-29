@@ -8,7 +8,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.{API, CompileResult}
 
 object ScriptCompiler {
-  @Deprecated
+  @deprecated("use ScriptCompiler.compile instead", "1.0")
   def apply(
       scriptText: String,
       isAssetScript: Boolean,

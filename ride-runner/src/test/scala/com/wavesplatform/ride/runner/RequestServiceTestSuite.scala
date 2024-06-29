@@ -228,7 +228,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasBasicGr
         )
       }
 
-      val requestsService = use(new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler()), testScheduler))
+      val requestsService = use(new DefaultRequestService(requestServiceSettings, blockchain, allTags, use(new TestJobScheduler[RideScriptRunRequest]()), testScheduler))
       val processor       = new BlockchainProcessor(blockchain, requestsService)
       val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 

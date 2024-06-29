@@ -1226,10 +1226,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   property("Disable use Order on SmartAccount") {
     val enoughFee        = 100000000
     val script           = "true"
-    val txScriptCompiled = ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler.compile(script, estimator).explicitGet()._1
 
-    val sellerScript = ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1
-    val buyerScript  = ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1
+    val sellerScript = ScriptCompiler.compile(script, estimator).explicitGet()._1
+    val buyerScript  = ScriptCompiler.compile(script, estimator).explicitGet()._1
 
     val buyer   = TxHelpers.signer(1)
     val seller  = TxHelpers.signer(2)
@@ -2069,9 +2069,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   ): (GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction, KeyPair) = {
     val enoughFee = 100000000
 
-    val txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false, estimator).explicitGet()._1
-    val sellerScript     = ScriptCompiler(sellerScriptSrc, isAssetScript = false, estimator).explicitGet()._1
-    val buyerScript      = ScriptCompiler(buyerScriptSrc, isAssetScript = false, estimator).explicitGet()._1
+    val txScriptCompiled = ScriptCompiler.compile(txScript, estimator).explicitGet()._1
+    val sellerScript     = ScriptCompiler.compile(sellerScriptSrc, estimator).explicitGet()._1
+    val buyerScript      = ScriptCompiler.compile(buyerScriptSrc, estimator).explicitGet()._1
 
     val buyer   = TxHelpers.signer(1)
     val seller  = TxHelpers.signer(2)

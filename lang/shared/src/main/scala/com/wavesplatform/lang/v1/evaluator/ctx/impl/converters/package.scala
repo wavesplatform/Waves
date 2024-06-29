@@ -17,9 +17,9 @@ package object converters {
   implicit def c(is: Seq[EVALUATED]): EVALUATED        = ARR(is.toIndexedSeq, false).explicitGet()
 
   implicit def fromOptionBV(v: Option[ByteStr]): EVALUATED = v.flatMap(CONST_BYTESTR(_).toOption).getOrElse(unit)
-  implicit def fromOptionL(v: Option[Long]): EVALUATED     = v.map(CONST_LONG).getOrElse(unit)
+  implicit def fromOptionL(v: Option[Long]): EVALUATED     = v.map(CONST_LONG.apply).getOrElse(unit)
   implicit def fromOptionS(v: Option[String]): EVALUATED   = v.flatMap(CONST_STRING(_).toOption).getOrElse(unit)
-  implicit def fromOptionB(v: Option[Boolean]): EVALUATED  = v.map(CONST_BOOLEAN).getOrElse(unit)
+  implicit def fromOptionB(v: Option[Boolean]): EVALUATED  = v.map(CONST_BOOLEAN.apply).getOrElse(unit)
   implicit def fromOptionCO(v: Option[CaseObj]): EVALUATED = v.getOrElse(unit)
 
   implicit def pure[F[_]: Monad, A <: EVALUATED](
