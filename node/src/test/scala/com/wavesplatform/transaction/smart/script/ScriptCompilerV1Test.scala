@@ -12,33 +12,35 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.test.*
 import org.scalatest.{EitherValues, Inside}
 
+import scala.annotation.nowarn
+
 class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
   private val estimator = ScriptEstimatorV2
 
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
+    ScriptCompiler.compile(script, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
   }
 
   property("use version 3 if not specified") {
     val script = scriptWithVersion(none)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V3, expectedExpr).explicitGet(), 13))
+    ScriptCompiler.compile(script, estimator) shouldBe Right((ExprScript(V3, expectedExpr).explicitGet(), 13))
   }
 
   property("fails on unsupported version") {
     val unsupportedVersionStr = (StdLibVersion.VersionDic.all.max.id + 1).toString
     val script                = scriptWithVersion(unsupportedVersionStr.some)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left(s"Illegal directive value $unsupportedVersionStr for key STDLIB_VERSION")
+    ScriptCompiler.compile(script, estimator) shouldBe Left(s"Illegal directive value $unsupportedVersionStr for key STDLIB_VERSION")
   }
 
   property("fails on incorrect version value") {
     val script = scriptWithVersion("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
+    ScriptCompiler.compile(script, estimator) shouldBe Left("Illegal directive value oOooOps for key STDLIB_VERSION")
   }
 
   property("fails on incorrect content type value") {
     val script = scriptWithContentType("oOooOps".some)
-    ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
+    ScriptCompiler.compile(script, estimator) shouldBe Left("Illegal directive value oOooOps for key CONTENT_TYPE")
   }
 
   property("fails on incorrect script type value") {
@@ -143,6 +145,7 @@ class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
         | a && b || c && d
       """.stripMargin
 
+    @nowarn("cat=deprecation")
     val resultExpr = LET_BLOCK(
       LET("a", TRUE),
       LET_BLOCK(
@@ -420,6 +423,7 @@ class ScriptCompilerV1Test extends PropSpec with EitherValues with Inside {
     ScriptCompiler.compile(script, estimator) shouldBe Symbol("right")
   }
 
+  @nowarn
   private val expectedExpr = LET_BLOCK(
     LET("x", CONST_LONG(10)),
     FUNCTION_CALL(

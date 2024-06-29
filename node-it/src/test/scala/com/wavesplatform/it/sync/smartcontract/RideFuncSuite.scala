@@ -42,7 +42,7 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |}
       """.stripMargin
 
-    val compiled = ScriptCompiler(scriptSrc, isAssetScript = false, estimator).explicitGet()._1
+    val compiled = ScriptCompiler.compile(scriptSrc, estimator).explicitGet()._1
 
     val tx =
       sender.signedBroadcast(
@@ -94,7 +94,7 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |}
       """.stripMargin
 
-    val updated = ScriptCompiler(udpatedScript, isAssetScript = false, estimator).explicitGet()._1
+    val updated = ScriptCompiler.compile(udpatedScript, estimator).explicitGet()._1
 
     val updTx =
       sender.signedBroadcast(

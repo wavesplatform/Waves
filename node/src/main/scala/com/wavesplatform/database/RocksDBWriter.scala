@@ -14,7 +14,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta, BlockMetaExt}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -1239,7 +1239,7 @@ class RocksDBWriter(
       tx <- db
         .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
-          case (tm, t: TransferTransaction) if tm.status == TxMeta.Status.Succeeded => t
+          case (m, t: TransferTransaction) if m.status == TxMeta.Status.Succeeded => t
           case (_, e @ EthereumTransaction(transfer: Transfer, _, _, _)) if tm.status == PBStatus.SUCCEEDED =>
             val asset = transfer.tokenAddress.fold[Asset](Waves)(resolveERC20Address(_).get)
             e.toTransferLike(TxPositiveAmount.unsafeFrom(transfer.amount), transfer.recipient, asset)

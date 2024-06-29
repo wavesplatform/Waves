@@ -15,7 +15,7 @@ class SponsorshipForContactsSuite extends BaseTransactionSuite with CancelAfterF
     sender.sponsorAsset(firstKeyPair, assetId, 100, sponsorReducedFee, waitForTx = true)
     sender.transfer(firstKeyPair, secondAddress, someAssetAmount / 2, minFee, Some(assetId), None, waitForTx = true)
 
-    val script = ScriptCompiler(s"""false""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(s"""false""".stripMargin, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val _      = sender.setScript(acc0, Some(script), setScriptFee, waitForTx = true)
 
     val firstAddressBalance       = sender.accountBalances(firstAddress)._1

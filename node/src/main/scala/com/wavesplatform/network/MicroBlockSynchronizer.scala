@@ -86,7 +86,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     }
 
     def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach { inv =>
-      requestData(inv.totalBlockId, inv, awaiting, successfullyReceived, MicroBlockRequest, "microblock")
+      requestData(inv.totalBlockId, inv, awaiting, successfullyReceived, MicroBlockRequest.apply, "microblock")
     }
 
     lastBlockIdEvents
@@ -150,7 +150,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
         .mapEval {
           case (ch, mbd @ MicroblockData(Some(mbInv), _, _)) =>
             Task.evalAsync {
-              requestData(mbInv.totalBlockId, ch -> mbd, waitingForSnapshot, receivedSnapshots, MicroSnapshotRequest, "microblock snapshot")
+              requestData(mbInv.totalBlockId, ch -> mbd, waitingForSnapshot, receivedSnapshots, MicroSnapshotRequest.apply, "microblock snapshot")
             }
           case _ => Task.unit
         }

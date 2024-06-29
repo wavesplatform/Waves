@@ -23,7 +23,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
-import com.wavesplatform.lang.{CoevalF, CommonError, ExecutionError, FailOrRejectError, ThrownError}
+import com.wavesplatform.lang.{CoevalF, CommonError, ExecutionError, FailOrRejectError, ThrownError, toError}
 import monix.eval.Coeval
 import shapeless.Coproduct.unsafeGet
 
@@ -440,13 +440,13 @@ object Functions {
               caseObjToRecipient(c)
                 .fold(
                   _.asLeft[EVALUATED].pure[F],
-                  r => env.accountBalanceOf(r, None).map(_.map(CONST_LONG).leftMap(CommonError(_)))
+                  r => env.accountBalanceOf(r, None).map(_.map(CONST_LONG.apply).leftMap(CommonError(_)))
                 )
             case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
               caseObjToRecipient(c)
                 .fold(
                   _.asLeft[EVALUATED].pure[F],
-                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError(_)))
+                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG.apply).leftMap(CommonError(_)))
                 )
             case xs =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector|Unit)", xs)
@@ -470,7 +470,7 @@ object Functions {
               caseObjToRecipient(c)
                 .fold(
                   _.asLeft[EVALUATED].pure[F],
-                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError(_)))
+                  r => env.accountBalanceOf(r, Some(assetId.arr)).map(_.map(CONST_LONG.apply).leftMap(CommonError(_)))
                 )
             case xs =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector)", xs)
@@ -628,7 +628,7 @@ object Functions {
                   }
                 case (dApp: CaseObj) :: _ if dApp.caseType == aliasType =>
                   dApp.fields.get("alias") match {
-                    case Some(CONST_STRING(a)) => env.resolveAlias(a).map(_.bimap(ThrownError, _.bytes))
+                    case Some(CONST_STRING(a)) => env.resolveAlias(a).map(_.bimap(ThrownError.apply, _.bytes))
                     case arg                   => thrown(s"Unexpected alias arg $arg")
                   }
                 case arg :: _ =>

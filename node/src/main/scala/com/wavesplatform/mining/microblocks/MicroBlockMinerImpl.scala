@@ -174,10 +174,10 @@ class MicroBlockMinerImpl(
             stateHash = if (blockchainUpdater.supportsLightNodeBlockFields()) stateHash else None,
             challengedHeader = None
           )
-          .leftMap(BlockBuildError)
+          .leftMap(BlockBuildError.apply)
         microBlock <- MicroBlock
           .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature, stateHash)
-          .leftMap(MicroBlockBuildError)
+          .leftMap(MicroBlockBuildError.apply)
       } yield (signedBlock, microBlock)
     }
 }

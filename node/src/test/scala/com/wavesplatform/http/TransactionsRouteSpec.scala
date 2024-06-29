@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.smart.script.trace.AccountVerifierTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, EthTxGenerator, TxHelpers, TxVersion, TransactionSignOps}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.{BlockGen, TestValues, crypto}
 import org.scalacheck.Gen.*

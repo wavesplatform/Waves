@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
-import com.wavesplatform.state.LeaseBalance
+import com.wavesplatform.state.{LeaseBalance, unsafeSummarizer}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
@@ -34,6 +34,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     val features = DomainPresets.settingsForRide(version).blockchainSettings.functionalitySettings.preActivatedFeatures
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = features)
   }
+
+  private def extractFee(sender: Address): PartialFunction[Transaction, Long] = { case z: Authorized if z.sender.toAddress == sender => z.assetFee._2 }
 
   private val v4Features = features(V4)
   private val v5Features = features(V5)
@@ -251,14 +253,14 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       d.appendBlock(preparingTxs*)
       d.appendBlock(invoke)
 
-      val invokerSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
+      val invokerSpentFee  = preparingTxs.collect(extractFee(invoker)).sum
       val invokerPortfolio = d.blockchain.wavesPortfolio(invoker)
       invokerPortfolio.lease shouldBe LeaseBalance(leaseAmount, out = 0)
       invokerPortfolio.balance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee.value
       invokerPortfolio.spendableBalance shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee.value
       invokerPortfolio.effectiveBalance(false).explicitGet() shouldBe ENOUGH_AMT - invokerSpentFee - invoke.fee.value + leaseAmount
 
-      val dAppSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+      val dAppSpentFee  = preparingTxs.collect(extractFee(dAppAcc)).sum
       val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
       dAppPortfolio.lease shouldBe LeaseBalance(in = 0, leaseAmount)
       dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee
@@ -277,8 +279,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: _, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          val invokerSpentFee = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
-          val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+          val invokerSpentFee = preparingTxs.collect(extractFee(invoker)).sum
+          val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect(extractFee(dAppAcc)).sum
 
           d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxFromDApp)
@@ -317,9 +319,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         withDomain(domainSettingsWithFS(v5Features)) { d =>
           val invokerSpentFee =
             (preparingTxs ++ Seq(leaseTxToDApp, leaseTxToDAppCancel)).collect {
-              case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2
+              case z: Authorized if z.sender.toAddress == invoker => z.assetFee._2
             }.sum
-          val dAppSpentFee = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+          val dAppSpentFee = (preparingTxs :+ leaseTxFromDApp).collect(extractFee(dAppAcc)).sum
 
           d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxFromDApp, leaseTxToDApp, leaseTxToDAppCancel)
@@ -356,8 +358,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _ :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
-          val dAppSpentFee    = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect(extractFee(invoker)).sum
+          val dAppSpentFee    = preparingTxs.collect(extractFee(dAppAcc)).sum
 
           d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxToDApp)
@@ -394,11 +396,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxFromDAppCancel) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect(extractFee(invoker)).sum
           val dAppSpentFee =
-            (preparingTxs ++ Seq(leaseTxFromDApp, leaseTxFromDAppCancel)).collect {
-              case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2
-            }.sum
+            (preparingTxs ++ Seq(leaseTxFromDApp, leaseTxFromDAppCancel)).collect(extractFee(dAppAcc)).sum
 
           d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxToDApp, leaseTxFromDApp, leaseTxFromDAppCancel)
@@ -431,7 +431,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
             -leaseTxFromDApp.fee.value - leaseTxFromDAppCancel.fee.value
           )
         }
-      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
+      case pc => throw new TestFailedException(s"Unexpected preconditions $pc", 0)
     }
   }
 
@@ -439,8 +439,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
-          val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect(extractFee(invoker)).sum
+          val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect(extractFee(dAppAcc)).sum
 
           d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxFromDApp, leaseTxToDApp)
@@ -473,7 +473,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
           )
           d.blockchain.generatingBalance(dAppAcc) shouldBe ENOUGH_AMT - dAppSpentFee + leaseTxFromDApp.fee.value.min(-leaseAmountDiff)
         }
-      case a => throw new TestFailedException(s"Unexpected preconditions $a", 0)
+      case other => throw new TestFailedException(s"Unexpected preconditions $other", 0)
     }
   }
 
@@ -726,7 +726,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       recipientPortfolio.spendableBalance shouldBe 0
       recipientPortfolio.effectiveBalance(false).explicitGet() shouldBe 0
 
-      val dAppSpentFee  = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
+      val dAppSpentFee  = preparingTxs.collect(extractFee(dAppAcc)).sum
       val dAppPortfolio = d.blockchain.wavesPortfolio(dAppAcc)
       dAppPortfolio.lease shouldBe LeaseBalance.empty
       dAppPortfolio.balance shouldBe ENOUGH_AMT - dAppSpentFee

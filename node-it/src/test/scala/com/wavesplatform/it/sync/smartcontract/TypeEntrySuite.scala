@@ -2,9 +2,10 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.{issueFee, smartMinFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
@@ -21,7 +22,7 @@ class TypeEntrySuite extends BaseTransactionSuite {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val smartAssetScript = ScriptCompiler(
+    val smartAssetScript =TestCompiler.DefaultVersion.compileAsset(
       s"""
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
@@ -31,14 +32,12 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |  && getIntegerValue(addressFromStringValue(""), "int") == 1
          |  && getBooleanValue(addressFromStringValue(""), "bool") == true
          |  && getStringValue(addressFromStringValue(""), "str") == "string"
-         """.stripMargin,
-      isAssetScript = true,
-      ScriptEstimatorV3.latest
-    ).explicitGet()._1.bytes().base64
+         """.stripMargin
+    ).bytes().base64
 
     firstAssetId = sender.issue(firstDApp, fee = issueFee, script = Some(smartAssetScript), waitForTx = true).id
 
-    val dAppScript = ScriptCompiler(
+    val dAppScript = ScriptCompiler.compile(
       s"""
          |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE DAPP #-}
@@ -95,11 +94,10 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |}
          |
          """.stripMargin,
-      isAssetScript = false,
       ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
-    val accountScript = ScriptCompiler(
+    val accountScript = ScriptCompiler.compile(
       s"""
          {-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE EXPRESSION #-}
@@ -111,7 +109,6 @@ class TypeEntrySuite extends BaseTransactionSuite {
          |  && getStringValue(addressFromStringValue("${firstDApp.toAddress.toString}"), "str") == "string"
          |
          """.stripMargin,
-      isAssetScript = false,
       ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 

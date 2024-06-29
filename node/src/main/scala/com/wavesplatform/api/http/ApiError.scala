@@ -26,8 +26,8 @@ trait ApiError {
 
 //noinspection TypeAnnotation
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError = {
-    e match {
+  implicit def fromValidationError(ve: ValidationError): ApiError = {
+    ve match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
       case TxValidationError.NonPositiveAmount(x, of)        => NonPositiveAmount(s"$x of $of")
@@ -52,8 +52,8 @@ object ApiError {
       case TxValidationError.WrongChain(ex, pr)              => InvalidChainId(ex, pr)
       case err: TxValidationError.TooManyProofs              => InvalidProofs(err.toString())
       case err: TxValidationError.ToBigProof                 => InvalidProofs(err.toString())
-      case TransactionValidationError(error, tx) =>
-        error match {
+      case TransactionValidationError(cause, tx) =>
+        cause match {
           case e: TxValidationError.TransactionNotAllowedByScript =>
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)

@@ -68,7 +68,7 @@ object SerdeV1 extends Serde[ByteBuffer, ByteArrayOutputStream] {
       case E_LONG   => Coeval.now(CONST_LONG(bb.getLong))
       case E_BYTES  => Coeval.now(CONST_BYTESTR(ByteStr(bb.getBytes)).explicitGet())
       case E_STRING => Coeval.now(CONST_STRING(bb.getString).explicitGet())
-      case E_IF     => (desAuxR(bb, allowObjects, acc), desAuxR(bb, allowObjects, acc), desAuxR(bb, allowObjects, acc)).mapN(IF)
+      case E_IF     => (desAuxR(bb, allowObjects, acc), desAuxR(bb, allowObjects, acc), desAuxR(bb, allowObjects, acc)).mapN(IF.apply)
       case E_BLOCK =>
         for {
           name     <- Coeval.now(bb.getString)

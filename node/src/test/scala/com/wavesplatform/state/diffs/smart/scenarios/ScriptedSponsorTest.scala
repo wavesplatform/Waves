@@ -82,7 +82,7 @@ class ScriptedSponsorTest extends PropSpec with WithState {
     val otherAcc  = TxHelpers.signer(3)
 
     val genesis             = Seq(contract, recipient).map(acc => TxHelpers.genesis(acc.toAddress))
-    val (script, _)         = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
+    val (script, _)         = ScriptCompiler.compile(s"{-# STDLIB_VERSION 2 #-}\n true", estimator).explicitGet()
     val issue               = TxHelpers.issue(contract, Long.MaxValue, fee = ENOUGH_FEE, version = TxVersion.V1)
     val asset               = IssuedAsset(issue.id())
     val sponsorTx           = TxHelpers.sponsor(asset, Some(1), contract, fee = SPONSOR_FEE)
@@ -98,7 +98,7 @@ class ScriptedSponsorTest extends PropSpec with WithState {
     val sponsor  = TxHelpers.signer(2)
 
     val genesis            = Seq(contract, sponsor).map(acc => TxHelpers.genesis(acc.toAddress))
-    val (script, _)        = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
+    val (script, _)        = ScriptCompiler.compile(s"{-# STDLIB_VERSION 2 #-}\n true", estimator).explicitGet()
     val issue              = TxHelpers.issue(sponsor, Long.MaxValue, fee = ENOUGH_FEE, version = TxVersion.V1)
     val asset              = IssuedAsset(issue.id())
     val sponsorTx          = TxHelpers.sponsor(asset, Some(1), sponsor, fee = SPONSOR_FEE)

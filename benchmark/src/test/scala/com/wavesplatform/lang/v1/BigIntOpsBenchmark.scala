@@ -196,7 +196,7 @@ class BigIntOpsSt {
   val maxSqrt = CONST_BIGINT(BigInt("57896044618658097711785492504343953926634992332820282019728792003956564819968"))
   val three   = CONST_BIGINT(3)
   val two     = CONST_BIGINT(2)
-  val list = ARR((PureContext.BigIntMin to PureContext.BigIntMin + PureContext.MaxListLengthV4 - 1).map(CONST_BIGINT), limited = true).explicitGet()
+  val list = ARR((PureContext.BigIntMin to PureContext.BigIntMin + PureContext.MaxListLengthV4 - 1).map(CONST_BIGINT.apply), limited = true).explicitGet()
   val listReversed = ARR(list.xs.reverse, limited = true).explicitGet()
   val maxBytes     = PureContext.BigIntMax.toByteArray
 

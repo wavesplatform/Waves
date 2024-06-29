@@ -132,7 +132,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.12",
+    scalaVersion         := "2.13.14",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -150,7 +150,8 @@ inScope(Global)(
       "-Xlint",
       "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
-      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
+      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s",
+      "-Wconf:cat=deprecation&site=com\\.wavesplatform\\.(lang\\..*|JsApiUtils)&origin=com\\.wavesplatform\\.lang\\.v1\\.compiler\\.Terms\\.LET_BLOCK:s"
     ),
     crossPaths        := false,
     cancelable        := true,
@@ -216,7 +217,7 @@ checkPRRaw := Def
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
       (`lang-tests-js` / Test / test).value
-//      (`grpc-server` / Test / test).value
+      (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value

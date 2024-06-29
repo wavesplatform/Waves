@@ -5,7 +5,7 @@ shopt -s nullglob
 #   -XX:+HeapDumpOnOutOfMemoryError
 #   -XX:HeapDumpPath=${RDATA}/heap-dumps
 # Why are these options required? See ride-runner/build.sbt
-JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.17.jar
+JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.18.jar
   --add-opens=java.base/java.lang=ALL-UNNAMED
   --add-opens=java.base/java.math=ALL-UNNAMED
   --add-opens=java.base/java.util=ALL-UNNAMED

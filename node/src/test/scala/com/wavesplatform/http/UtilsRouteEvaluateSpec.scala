@@ -488,7 +488,7 @@ class UtilsRouteEvaluateSpec
         Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("call" -> Json.obj("function" -> 1))) ~> route ~> check {
           val json = responseAs[JsValue]
           (json \ "message").as[String] shouldBe "failed to parse json message"
-          (json \ "validationErrors") match {
+          json \ "validationErrors" match {
             case JsDefined(validationErrors) =>
               validationErrors should matchJson("""{
                   "obj.call": [
@@ -596,7 +596,7 @@ class UtilsRouteEvaluateSpec
               if (hasIssuedAsset) d.appendBlock(issueTx)
 
               // -1 to test insufficient funds
-              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum - 1
+              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (`asset`, x) => x }.sum - 1
 
               val blockchainOverrides = Json.obj(
                 "accounts" -> Json.obj(
@@ -651,7 +651,7 @@ class UtilsRouteEvaluateSpec
               d.appendBlock(setScriptTx)
               if (hasIssuedAsset) d.appendBlock(issueTx)
 
-              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (`asset`, x) => x }.sum
 
               val blockchainOverrides = Json.obj(
                 "accounts" -> Json.obj(
@@ -749,7 +749,7 @@ class UtilsRouteEvaluateSpec
               val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
 
               // -1 to test insufficient funds
-              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum - 1
+              def collectLessBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (`asset`, x) => x }.sum - 1
 
               val blockchainOverrides = Json.obj(
                 "accounts" -> Json.obj(
@@ -843,7 +843,7 @@ class UtilsRouteEvaluateSpec
 
               val (invocationFeeInWaves, invocationFeeInAsset) = if (feeAsset == asset) (0, defaultInvocationFee) else (defaultInvocationFee, 0)
 
-              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (a, x) if a == asset => x }.sum
+              def collectBalance(asset: Asset): Long = paymentAssetWithAmounts.collect { case (`asset`, x) => x }.sum
 
               val callerWavesBalance = invocationFeeInWaves + collectBalance(Asset.Waves)
               val callerAssetBalance = invocationFeeInAsset + collectBalance(asset)

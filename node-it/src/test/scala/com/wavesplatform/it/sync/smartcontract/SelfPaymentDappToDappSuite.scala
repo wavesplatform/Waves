@@ -30,7 +30,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
   private lazy val (dApp1, dAppAddress1)   = (secondKeyPair, secondAddress)
   private lazy val (dApp2, dAppAddress2)   = (thirdKeyPair, thirdAddress)
 
-  private val dAppScript1 = ScriptCompiler(
+  private val dAppScript1 = ScriptCompiler.compile(
     s"""
        |{-# STDLIB_VERSION 5 #-}
        |{-# CONTENT_TYPE DAPP #-}
@@ -48,11 +48,10 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |}
        |
          """.stripMargin,
-    isAssetScript = false,
     ScriptEstimatorV3.latest
   ).explicitGet()._1.bytes().base64
 
-  private val dAppScript2 = ScriptCompiler(
+  private val dAppScript2 = ScriptCompiler.compile(
     s"""
        |{-# STDLIB_VERSION 5 #-}
        |{-# CONTENT_TYPE DAPP #-}
@@ -71,7 +70,6 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |}
        |
          """.stripMargin,
-    isAssetScript = false,
     ScriptEstimatorV3.latest
   ).explicitGet()._1.bytes().base64
 

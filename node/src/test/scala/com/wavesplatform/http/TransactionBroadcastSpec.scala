@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, Proofs, TxHelpers, TxPositiveAmount, TxVersion, TransactionSignOps}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, SharedSchedulerMixin}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory

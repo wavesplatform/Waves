@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.RewardApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.Keys
+import com.wavesplatform.database.{Keys, DBExt}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
