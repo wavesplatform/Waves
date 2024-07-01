@@ -26,10 +26,11 @@ object BlockchainFeatures {
   val CappedReward                    = BlockchainFeature(20, "Capped XTN buy-back & DAO amounts")
   val CeaseXtnBuyback                 = BlockchainFeature(21, "Cease XTN buy-back")
   val LightNode                       = BlockchainFeature(22, "Light Node")
+  val BoostBlockReward                = BlockchainFeature(23, "Boost Block Reward")
 
   // Not exposed
-  val ContinuationTransaction = BlockchainFeature(23, "Continuation Transaction")
-  val LeaseExpiration         = BlockchainFeature(24, "Lease Expiration")
+  val ContinuationTransaction = BlockchainFeature(24, "Continuation Transaction")
+  val LeaseExpiration         = BlockchainFeature(25, "Lease Expiration")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")
@@ -56,7 +57,8 @@ object BlockchainFeatures {
     BlockRewardDistribution,
     CappedReward,
     CeaseXtnBuyback,
-    LightNode
+    LightNode,
+    BoostBlockReward
   ).map(f => f.id -> f).toMap
 
   val implemented: Set[Short] = dict.keySet

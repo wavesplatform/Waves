@@ -347,7 +347,9 @@ class BlockchainUpdaterImpl(
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        log.trace(s"Persisting block ${referencedForgedBlock.id()}, discarded microblock refs: ${discarded.map(_._1.reference).mkString("[", ",", "]")}")
+                        log.trace(
+                          s"Persisting block ${referencedForgedBlock.id()}, discarded microblock refs: ${discarded.map(_._1.reference).mkString("[", ",", "]")}"
+                        )
 
                         if (discarded.nonEmpty) {
                           blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
@@ -629,7 +631,8 @@ class BlockchainUpdaterImpl(
   override def wavesAmount(height: Int): BigInt = readLock {
     ngState match {
       case Some(ng) if this.height == height =>
-        rocksdb.wavesAmount(height - 1) + BigInt(ng.reward.getOrElse(0L))
+        rocksdb.wavesAmount(height - 1) +
+          BigInt(ng.reward.getOrElse(0L)) * this.blockRewardBoost(height)
       case _ =>
         rocksdb.wavesAmount(height)
     }

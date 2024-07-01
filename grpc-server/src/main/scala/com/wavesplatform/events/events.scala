@@ -623,8 +623,7 @@ object BlockAppended {
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
     val wavesAmount        = blockchainBeforeWithReward.wavesAmount(height).toLong
-    val updatedWavesAmount = wavesAmount + reward.filter(_ => height > 0).getOrElse(0L)
-
+    val updatedWavesAmount = wavesAmount + reward.filter(_ => height > 0).getOrElse(0L) * blockchainBeforeWithReward.blockRewardBoost(height + 1)
     val activatedFeatures = blockchainBeforeWithReward.activatedFeatures.collect {
       case (id, activationHeight) if activationHeight == height + 1 => id.toInt
     }.toSeq
