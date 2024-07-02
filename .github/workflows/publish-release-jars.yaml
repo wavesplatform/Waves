@@ -28,8 +28,7 @@ jobs:
           cache: 'sbt'
           gpg-private-key: ${{ secrets.OSSRH_GPG_KEY }}
           gpg-passphrase: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
-      - name: Publish snapshots
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'publish-snapshots') }}
+      - name: Publish release jars
         env:
           SONATYPE_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
