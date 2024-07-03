@@ -47,7 +47,6 @@ class BlockchainTriggersSpec extends PropSpec with WithDomain with OptionValues 
               s |+| n2.snapshot
             })
           )
-          println(snapshot)
           updated.accountData(richAccount.toAddress, "foo_key").value.cast[IntegerDataEntry].value.value shouldEqual 5
         }
 
