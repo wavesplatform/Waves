@@ -356,7 +356,6 @@ class BlockchainUpdaterImpl(
                           metrics.microBlockForkStats.increment()
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.keyBlockSnapshot, reward, hitSource, this)
 
                         rocksdb.append(
                           liquidSnapshotWithCancelledLeases,
@@ -369,6 +368,7 @@ class BlockchainUpdaterImpl(
                         )
                         BlockStats.appended(referencedForgedBlock, referencedLiquidSnapshot.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.keyBlockSnapshot, reward, hitSource, rocksdb)
                         val (discardedMbs, discardedSnapshots) = discarded.unzip
                         if (discardedMbs.nonEmpty) {
                           log.trace(s"Discarded microblocks: $discardedMbs")
