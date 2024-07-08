@@ -23,6 +23,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, 
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, AssetIdLength, Transaction}
 import org.rocksdb.ColumnFamilyHandle
+import com.wavesplatform.protobuf.snapshot.TransactionStatus as PBStatus
 
 import java.io.{ByteArrayOutputStream, OutputStream}
 import java.nio.ByteBuffer
@@ -212,7 +213,8 @@ object KvPairs {
   implicit val dataEntryAsBytes: AsBytes[DataEntry[?]] =
     AsBytes.mk[DataEntry[?]]((os, x) => os.write(DataTxSerializer.serializeEntry(x)), DataTxSerializer.parseEntry)
 
-  implicit val txStatusAsBytes: AsBytes[TxMeta.Status] = ???
+  implicit val txStatusAsBytes: AsBytes[TxMeta.Status] =
+    AsBytes.mk[TxMeta.Status]((os, st) => os.write(st.protobuf.value.toByte), r => TxMeta.Status.fromProtobuf(PBStatus.fromValue(r.get)))
 
   implicit val txMetaAsBytes: AsBytes[TxMeta] = AsBytes[(state.Height, TxMeta.Status, Long)].transform[TxMeta](
     Function.tupled(TxMeta.apply),
