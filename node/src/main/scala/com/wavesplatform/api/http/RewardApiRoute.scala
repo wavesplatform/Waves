@@ -45,7 +45,7 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
     } yield RewardStatus(
       height,
       amount,
-      reward,
+      reward * blockchain.blockRewardBoost(height),
       rewardsSettings.minIncrement,
       term,
       nextCheck,

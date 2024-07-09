@@ -3,12 +3,15 @@ package com.wavesplatform.http
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.RewardApiRoute
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
-import play.api.libs.json.JsValue
+import org.scalactic.source.Position
+import play.api.libs.json.{JsObject, JsValue}
 
 class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
 
@@ -164,6 +167,69 @@ class RewardApiRouteSpec extends RouteSpec("/blockchain") with WithDomain {
       (response \ "term").as[Int] shouldBe expectedTerm
       (response \ "votingIntervalStart").as[Int] shouldBe expectedVotingIntervalStart
       (response \ "nextCheck").as[Int] shouldBe expectedNextCheck
+    }
+  }
+
+  "Boost block reward feature changes API response" in {
+    val miner      = TxHelpers.signer(3001)
+    val daoAddress = TxHelpers.address(3002)
+    val xtnAddress = TxHelpers.address(3003)
+
+    val settings = DomainPresets.ConsensusImprovements
+      .setFeaturesHeight(
+        BlockchainFeatures.BlockRewardDistribution -> 0,
+        BlockchainFeatures.CappedReward            -> 0,
+        BlockchainFeatures.BoostBlockReward        -> 5,
+        BlockchainFeatures.CeaseXtnBuyback         -> 0
+      )
+      .configure(fs =>
+        fs.copy(
+          xtnBuybackRewardPeriod = 10,
+          blockRewardBoostPeriod = 10,
+          xtnBuybackAddress = Some(xtnAddress.toString),
+          daoAddress = Some(daoAddress.toString)
+        )
+      )
+
+    withDomain(settings, Seq(AddrWithBalance(miner.toAddress, 100_000.waves))) { d =>
+      val route = new RewardApiRoute(d.blockchain).route
+
+      def checkRewardAndShares(height: Int, expectedReward: Long, expectedMinerShare: Long, expectedDaoShare: Long, expectedXtnShare: Option[Long])(
+          implicit pos: Position
+      ): Unit = {
+
+        val path = routePath(s"/rewards/$height")
+        withClue(path) {
+          Get(path) ~> route ~> check {
+            val jsonResp = responseAs[JsObject]
+            withClue(" reward:") {
+              (jsonResp \ "currentReward").as[Long] shouldBe expectedReward
+            }
+          }
+        }
+      }
+
+      (1 to 3).foreach(_ => d.appendKeyBlock(miner))
+      d.blockchain.height shouldBe 4
+      (1 to 3).foreach { h =>
+        checkRewardAndShares(h + 1, 6.waves, 2.waves, 2.waves, Some(2.waves))
+      }
+
+      // reward boost activation
+      (1 to 5).foreach(_ => d.appendKeyBlock(miner))
+      (1 to 5).foreach { h =>
+        checkRewardAndShares(h + 4, 60.waves, 20.waves, 20.waves, Some(20.waves))
+      }
+
+      // cease XTN buyback
+      (1 to 5).foreach(_ => d.appendKeyBlock(miner))
+      (1 to 5).foreach { h =>
+        checkRewardAndShares(h + 9, 60.waves, 40.waves, 20.waves, None)
+      }
+
+      d.appendKeyBlock(miner)
+      d.blockchain.height shouldBe 15
+      checkRewardAndShares(15, 6.waves, 4.waves, 2.waves, None)
     }
   }
 }
