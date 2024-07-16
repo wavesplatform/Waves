@@ -144,6 +144,29 @@ class MerkleTest extends PropSpec {
     }
   }
 
+  property("Test stagenet tx '7Sdny5J2gq1JF5BNPWWdibMneGEQa7FSV9WFyBfU5yrL'") {
+    val proofs = Seq("D4bn122GiEqs99z526GdhYETJqctLHGSmWokypEo9qu",
+      "DqspFkHCwkUdN8FsHkzVEGtfzhycFPgNNyi7YeMQunpR",
+      "9YapWwCMpJaytFUaSnBwGpHsuGuixtnChpPyzSZeQCC7",
+      "9CorA9cjXNdDQ3dxMk5aL4myMBELVdX1FH5RrJ6RTtG8",
+      "J1ZLoKt7wsX2oCXtWYrtaCxKJZyL1ZyZXYgVBXPhXtKh",
+      "Fm8onvGicJFTfPcBgRXMHY863HhPHHi3huHKCoBeyBFC",
+      "9jvzHEcg5NTgXAxyxtbSS3Qq9Zp84gcZ5WJTJWSZeGNr",
+      "32XGrpXv46NtBcHjaygGdwn1KqHqen3oNJSmRCAt7waN",
+      "2FM86QERU97ewCicP3NiYPKEDYe7jrriHFn9NSKgo3mE",
+      "6ze4HCcxj7gpjzAuE9Tco3nLU186mC6FAUZFbyuSVjaj"
+    ).map(s => ByteStr.decodeBase58(s).get.arr)
+    val leafHash = ByteStr.decodeBase58("DcasUHxyPk3bYLZs5h17SjZJAP4uUEzjkycboi4YAXGD").get.arr
+    val index = 0
+
+    val expectedScala = ByteStr.decodeBase58("2tbkpGTZgHdRySdzELT9ZzRSQ5bv25wisM8vWe2z3V3h").get
+    val goResult = ByteStr.decodeBase58("DSo8BedisrwWBPttDGPGnAeLRS8685gCVdHkKPQbHnR
+    eval(scriptCreateRootSrc(proofs, leafHash, index), V4) shouldBe CONST_BYTESTR(expectedScala)
+
+    val result = Merkle.createRoot(leafHash, index, proofs)
+    result shouldBe goResult.arr
+  }
+
   private def proofBytes(index: Int, proofs: Seq[Array[Byte]]): Array[Byte] =
     proofs.reverse
       .foldLeft(index -> Array.emptyByteArray) { case ((index, buf), proof) =>
