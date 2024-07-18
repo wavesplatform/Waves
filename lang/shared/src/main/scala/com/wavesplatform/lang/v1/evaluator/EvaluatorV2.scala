@@ -66,18 +66,24 @@ class EvaluatorV2(
             .getOrElse(evaluateConstructor(fc, limit, name))
       }
 
-      if (newMode) {
-        r.map { unused =>
-          if (unused == limit) {
-            if (unused >= 1 && fc.function.isInstanceOf[FunctionHeader.User]) {
-              ctx.log(LET(s"${fc.function.funcName}.$Complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
-              ctx.log(LET(ComplexityLimit, TRUE), CONST_LONG(unused - 1).asRight[ExecutionError])
-            }
-            unused - 1
-          } else unused
-        }
-      } else
-        r
+      val res = {
+        if (newMode) {
+          r.map { unused =>
+            if (unused == limit) {
+              if (unused >= 1 && fc.function.isInstanceOf[FunctionHeader.User]) {
+                ctx.log(LET(s"${fc.function.funcName}.$Complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
+                ctx.log(LET(ComplexityLimit, TRUE), CONST_LONG(unused - 1).asRight[ExecutionError])
+              }
+              unused - 1
+            } else unused
+          }
+        } else
+          r
+      }
+      res.map(unusedArgsComplexity => {
+//        println(s"function_call=${fc.function.funcName},limit=$unusedArgsComplexity,sum=${52000 - unusedArgsComplexity}")
+        unusedArgsComplexity
+      })
     }
 
     def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[Int] =
@@ -264,9 +270,11 @@ class EvaluatorV2(
         }
 
       case fc: FUNCTION_CALL =>
+        // println(s"function_call=${fc.function.funcName},limit=$limit,sum=${52000 - limit}") // not relevant
         val startArgs = fc.args
         evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
+            // println(s"function_call=${fc.function.funcName},limit=$unusedArgsComplexity,sum=${52000 - unusedArgsComplexity}") // not relevant
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
             if (argsEvaluated && unusedArgsComplexity > 0) {
               logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity, enableExecutionLog)

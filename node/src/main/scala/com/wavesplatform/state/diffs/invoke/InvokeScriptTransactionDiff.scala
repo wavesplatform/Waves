@@ -53,6 +53,11 @@ object InvokeScriptTransactionDiff {
       tx: InvokeScriptTransactionLike
   ): TracedResult[ValidationError, StateSnapshot] = {
 
+//    val isTargetTx = tx.id().toString.equals("3JaYYbHLJ37thyntYnPkZgdafMvRJ1JoU4CERtR6ehUy")
+//    if (isTargetTx) {
+//      println(">>>>>>>>> 3JaYYbHLJ37thyntYnPkZgdafMvRJ1JoU4CERtR6ehUy ") // Breakpoint
+//    }
+
     val accScriptEi =
       for {
         address <- blockchain.resolveAlias(tx.dApp)
@@ -272,11 +277,26 @@ object InvokeScriptTransactionDiff {
           )
           result <- executeInvoke(pk, version, contract, dAppAddress, environment, invocation)
         } yield result).leftMap {
-          case fte: FailedTransactionError => fte.copy(invocations = invocationTracker.toInvocationList)
-          case other                       => other
+          case fte: FailedTransactionError => {
+//            if (isTargetTx) {
+//              println("<<<<<<<<<<<< 3JaYYbHLJ37thyntYnPkZgdafMvRJ1JoU4CERtR6ehUy")
+//            }
+            fte.copy(invocations = invocationTracker.toInvocationList)
+          }
+          case other                       => {
+//            if (isTargetTx) {
+//              println("<<<<<<<<<<<< 3JaYYbHLJ37thyntYnPkZgdafMvRJ1JoU4CERtR6ehUy")
+//            }
+            other
+          }
         }
 
-      case Left(error) => TracedResult(Left(error))
+      case Left(error) => {
+//        if (isTargetTx) {
+//          println("<<<<<<<<<<<< 3JaYYbHLJ37thyntYnPkZgdafMvRJ1JoU4CERtR6ehUy")
+//        }
+        TracedResult(Left(error))
+      }
     }
   }
 
@@ -345,6 +365,7 @@ object InvokeScriptTransactionDiff {
           InvokeRejectError(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
+          //println(s"usedComplexity: $usedComplexity, failFreeLimit: $failFreeLimit")
           val msg = error match {
             case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
             case _                                                 => error.message
@@ -362,6 +383,7 @@ object InvokeScriptTransactionDiff {
               InvokeRejectError(message, log)
             case error =>
               val usedComplexity = startLimit - r.unusedComplexity
+              //println(s"usedComplexity: $usedComplexity, failFreeLimit: $failFreeLimit")
               val msg = error match {
                 case fte: FailedTransactionError => fte.error.getOrElse(error.toString)
                 case _                           => error.toString
