@@ -167,12 +167,13 @@ class MinerImpl(
     }
   }
 
-  def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
+  def forgeBlock(account: KeyPair, referenceOpt: Option[ByteStr] = None): Either[String, (Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height          = blockchainUpdater.height
     val version         = blockchainUpdater.nextBlockVersion
     val lastBlockHeader = blockchainUpdater.lastBlockHeader.get.header
-    val reference       = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get.blockId
+    val lastBlockInfo   = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills)
+    val reference       = referenceOpt.getOrElse(lastBlockInfo.get.blockId)
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
