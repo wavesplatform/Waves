@@ -153,7 +153,7 @@ object NetworkServer extends ScorexLogging {
         peerDatabase.touch(remoteAddress)
         thisConnFuture.channel().closeFuture().addListener(f => handleOutgoingChannelClosed(remoteAddress)(f))
       } else if (thisConnFuture.cause() != null) {
-        peerDatabase.suspendAndClose(thisConnFuture.channel())
+        peerDatabase.suspend(remoteAddress)
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
         thisConnFuture.cause() match {
           case e: ClosedChannelException =>
