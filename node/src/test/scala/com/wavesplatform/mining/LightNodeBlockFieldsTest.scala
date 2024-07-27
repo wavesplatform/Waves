@@ -1,6 +1,5 @@
 package com.wavesplatform.mining
 
-import com.wavesplatform.account.SeedKeyPair
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,10 +12,6 @@ import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, transfer}
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.concurrent.GlobalEventExecutor
-import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observable
 
@@ -34,7 +29,6 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         d.blockchain,
         d.testTime,
         d.settings.copy(minerSettings = d.settings.minerSettings.copy(quorum = 0, minMicroBlockAge = 0.seconds)),
-        verify = false,
         timeDrift = Int.MaxValue
       ) { case (miner, append) =>
         val microBlockMiner = new MicroBlockMinerImpl(
@@ -48,27 +42,15 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
           Observable.empty,
           identity
         )
-        val challenger = new BlockChallengerImpl(
-          d.blockchain,
-          new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
-          d.wallet,
-          d.settings,
-          d.testTime,
-          d.posSelector,
-          b => Task.now(append(b)),
-          timeDrift = Int.MaxValue
-        ) {
-          override def pickBestAccount(accounts: Seq[(SeedKeyPair, Long)]): Either[GenericError, (SeedKeyPair, Long)] = Right((defaultSigner, 0))
-        }
         def block(height: Int) = d.blocksApi.blockAtHeight(height).get._1.header
-        def appendBlock()      = append(miner.forgeBlock(defaultSigner).explicitGet()._1).explicitGet()
+        def appendBlock() = {
+          val block = miner.forgeBlock(defaultSigner).explicitGet()._1
+          d.testTime.setTime(block.header.timestamp)
+          append(block).explicitGet()
+        }
         def appendMicro() = {
           d.utxPool.putIfNew(transfer()).resultE.explicitGet()
           microBlockMiner.generateOneMicroBlockTask(defaultSigner, d.lastBlock, Unlimited, 0).runSyncUnsafe()
-        }
-        def challengeBlock() = {
-          val invalidBlock = d.createBlock(ProtoBlockVersion, Seq(), strictTime = true, stateHash = invalidStateHash)
-          challenger.challengeBlock(invalidBlock, null).runSyncUnsafe()
         }
 
         appendBlock()
@@ -79,12 +61,7 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         appendMicro()
         block(2).stateHash shouldBe None
 
-        challengeBlock()
-        d.blockchain.height shouldBe 3
-        block(3).stateHash shouldBe None
-        block(3).challengedHeader shouldBe None
-
-        (1 to 8).foreach(_ => appendBlock())
+        (1 to 9).foreach(_ => appendBlock())
         d.blockchain.height shouldBe 11
         block(11).stateHash shouldBe None
 
@@ -101,14 +78,10 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         hash2 shouldBe defined
         hash2 should not be hash1
 
-        d.rollbackTo(10)
-        challengeBlock()
-        block(11).stateHash shouldBe None
-        block(11).challengedHeader shouldBe None
-
-        challengeBlock()
-        block(12).stateHash shouldBe defined
-        block(12).challengedHeader shouldBe defined
+        d.rollbackTo(11)
+        d.lastBlock.header.stateHash shouldBe empty
+        appendBlock()
+        d.lastBlock.header.stateHash shouldBe defined
       }
     }
   }
@@ -147,6 +120,8 @@ class LightNodeBlockFieldsTest extends PropSpec with WithDomain {
         val challengingBlock2 = d.createChallengingBlock(secondSigner, invalidBlock, strictTime = true)
         d.testTime.setTime(challengingBlock2.header.timestamp)
         append(challengingBlock2) shouldBe a[Right[?, ?]]
+        challengingBlock2.header.challengedHeader shouldBe defined
+        challengingBlock2.header.stateHash shouldBe defined
       }
     }
   }

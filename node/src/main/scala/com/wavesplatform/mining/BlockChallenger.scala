@@ -16,8 +16,7 @@ import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult
 import com.wavesplatform.state.BlockchainUpdaterImpl.BlockApplyResult.Applied
 import com.wavesplatform.state.appender.MaxTimeDrift
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.SnapshotBlockchain
-import com.wavesplatform.state.{Blockchain, StateSnapshot, TxStateSnapshotHashBuilder}
+import com.wavesplatform.state.{Blockchain, SnapshotBlockchain, StateSnapshot, TxStateSnapshotHashBuilder}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -227,21 +226,19 @@ class BlockChallengerImpl(
           acc,
           blockFeatures(blockchainUpdater, settings),
           blockRewardVote(settings),
-          if (blockchainWithNewBlock.supportsLightNodeBlockFields()) Some(stateHash) else None,
-          if (blockchainWithNewBlock.supportsLightNodeBlockFields())
-            Some(
-              ChallengedHeader(
-                challengedBlock.header.timestamp,
-                challengedBlock.header.baseTarget,
-                challengedBlock.header.generationSignature,
-                challengedBlock.header.featureVotes,
-                challengedBlock.header.generator,
-                challengedBlock.header.rewardVote,
-                challengedStateHash,
-                challengedSignature
-              )
+          Some(stateHash),
+          Some(
+            ChallengedHeader(
+              challengedBlock.header.timestamp,
+              challengedBlock.header.baseTarget,
+              challengedBlock.header.generationSignature,
+              challengedBlock.header.featureVotes,
+              challengedBlock.header.generator,
+              challengedBlock.header.rewardVote,
+              challengedStateHash,
+              challengedSignature
             )
-          else None
+          )
         )
     } yield {
       log.debug(s"Forged challenging block $challengingBlock")
