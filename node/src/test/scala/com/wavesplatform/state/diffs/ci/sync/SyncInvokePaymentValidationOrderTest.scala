@@ -99,6 +99,11 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
     withDomain(lightNodeBeforeActivation, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
       d.appendBlock(setScript(defaultSigner, customDApp), setScript(secondSigner, customDApp), issueTx)
       d.appendBlockE(
+        invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(false)))
+      ) should produce(
+        "negative asset balance"
+      ) // usedComplexity: 162, failFreeLimit: 1000
+      d.appendBlockE(
         invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(false), CONST_BOOLEAN(true), CONST_BOOLEAN(false)))
       ) should produce(
         "custom error" // but should be "negative asset balance"
