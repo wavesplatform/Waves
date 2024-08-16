@@ -95,7 +95,7 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 
 ### Blockchain state
 
-If you are a Waves Blockchain newbie and launching Waves Node for the first time be aware that after launch it will start downloading the whole blockchain state from the other nodes. During this download it will be verifying all blocks one after another. This procesure can take some time.
+If you are a Waves Blockchain newbie and launching Waves Node for the first time be aware that after launch it will start downloading the whole blockchain state from the other nodes. During this download it will be verifying all blocks one after another. This procedure can take some time.
 
 You can speed this process up by downloading a compressed blockchain state from our official resources, extract it and mount inside the container (as discussed in the previous section). In this scenario Waves Node skips block verifying. This is a reason why it takes less time. This is also a reason why you must download blockchain state *only from our official resources*.
 
