@@ -9,6 +9,7 @@ import com.wavesplatform.test.DomainPresets.{BlockRewardDistribution, Transactio
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
+import com.wavesplatform.test.DomainPresets.WavesSettingsOps
 
 class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
   private val issueTx = issue()
@@ -92,7 +93,24 @@ class SyncInvokePaymentValidationOrderTest extends PropSpec with WithDomain {
     }
   }
 
-  property("custom: sync invoke should be correctly rejected and failed on enough balance and RIDE error if light node is activated") {
+  private val lightNodeBeforeActivation = DomainPresets.TransactionStateSnapshot.configure(_.copy(paymentsCheckHeight = 10))
+
+  property("custom before payments fix: sync invoke should be correctly rejected and failed on enough balance and RIDE error if light node is activated") {
+    withDomain(lightNodeBeforeActivation, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
+      d.appendBlock(setScript(defaultSigner, customDApp), setScript(secondSigner, customDApp), issueTx)
+      d.appendBlockE(
+        invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(false), CONST_BOOLEAN(true), CONST_BOOLEAN(false)))
+      ) should produce(
+        "custom error" // but should be "negative asset balance"
+      ) // usedComplexity: 84, failFreeLimit: 1000
+      d.appendAndAssertFailed(
+        invoke(invoker = secondSigner, func = Some("f1"), args = Seq(CONST_BOOLEAN(true), CONST_BOOLEAN(false), CONST_BOOLEAN(true))),
+        "negative asset balance"
+      ) // usedComplexity: 1042, failFreeLimit: 1000
+    }
+  }
+
+  property("custom after payments fix: sync invoke should be correctly rejected and failed on enough balance and RIDE error if light node is activated") {
     withDomain(TransactionStateSnapshot, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
       d.appendBlock(setScript(defaultSigner, customDApp), setScript(secondSigner, customDApp), issueTx)
       d.appendBlockE(
