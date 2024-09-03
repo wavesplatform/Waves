@@ -21,7 +21,6 @@ import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAsse
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader}
 import monix.eval.Coeval
-import shapeless3.Coproduct
 
 import scala.collection.mutable
 

@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Parser.LibrariesOffset
+import com.wavesplatform.common.utils.EitherExt2
 
 sealed trait CompileAndParseResult
 
@@ -161,10 +162,10 @@ object API {
       allowFreeCall: Boolean = true
   ): Either[String, CompileResult] =
     for {
-      directives            <- DirectiveParser(input)
-      ds                    <- extractDirectives(directives, defaultStdLib)
-      (linkedInput, offset) <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled              <- compileScript(ds, linkedInput, offset, estimator, needCompaction, removeUnusedCode, allowFreeCall)
+      directives <- DirectiveParser(input)
+      ds         <- extractDirectives(directives, defaultStdLib)
+      x          <- ScriptPreprocessor(input, libraries, ds.imports)
+      compiled   <- compileScript(ds, x._1, x._2, estimator, needCompaction, removeUnusedCode, allowFreeCall)
     } yield compiled
 
   def estimatorByVersion(version: Int): Either[String, ScriptEstimator] =

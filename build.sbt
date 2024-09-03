@@ -152,7 +152,6 @@ inScope(Global)(
     licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     publish / skip       := true,
     scalacOptions ++= Seq(
-//      "-Xsource:3",
       "-feature",
       "-deprecation",
       "-unchecked",
@@ -161,7 +160,8 @@ inScope(Global)(
       "-language:postfixOps",
       "-explain",
       "-Ykind-projector",
-      "-source:future"
+      "-source:3.0-migration",
+      "-rewrite",
 //      "-Ywarn-unused:-implicits",
 //      "-Xlint",
 //      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings

@@ -8,6 +8,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.contract.meta.MetaMapper

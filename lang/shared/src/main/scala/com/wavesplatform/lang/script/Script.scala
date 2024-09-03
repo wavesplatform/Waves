@@ -2,6 +2,7 @@ package com.wavesplatform.lang.script
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}

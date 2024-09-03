@@ -25,23 +25,23 @@ object Dependencies {
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.3" cross CrossVersion.full)
 
   val akkaHttp        = akkaHttpModule("akka-http").cross(CrossVersion.for3Use2_13)
-  val googleGuava     = "com.google.guava"    % "guava"             % "33.2.1-jre"
+  val googleGuava     = "com.google.guava"    % "guava"             % "33.3.0-jre"
   val kamonCore       = kamonModule("core")
   val machinist       = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.6"
+  val logback         = "ch.qos.logback"      % "logback-classic"   % "1.5.7"
   val janino          = "org.codehaus.janino" % "janino"            % "3.1.12"
-  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.12.3"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "3.0.0"
   val curve25519      = "com.wavesplatform"   % "curve25519-java"   % "0.6.6"
   val nettyHandler    = "io.netty"            % "netty-handler"     % "4.1.100.Final"
 
-  val shapeless = Def.setting("org.typelevel" %% "shapeless3-deriving" % "3.0.1")
+  val shapeless = Def.setting("org.typelevel" %% "shapeless3-deriving" % "3.4.3")
 
-  val playJson = "org.playframework" %% "play-json" % "3.0.3"
+  val playJson = "org.playframework" %% "play-json" % "3.0.4"
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.19" % Test
-  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.3" % Test)
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.4" % Test)
 
-  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.9.7"
+  val sttp3      = "com.softwaremill.sttp.client3" %% "core" % "3.9.7"
   val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.9.7"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk18on" % "1.78.1"
@@ -60,10 +60,10 @@ object Dependencies {
       // defined here because %%% can only be used within a task or setting macro
       // explicit dependency can likely be removed when monix 3 is released
       monixModule("eval").value,
-      "org.typelevel" %%% s"cats-core" % "2.10.0",
-      "com.lihaoyi"   %%% "fastparse"  % "3.0.2",
+      "org.typelevel" %%% s"cats-core" % "2.12.0",
+      "com.lihaoyi"   %%% "fastparse"  % "3.1.1",
       shapeless.value,
-      "org.typelevel" %%% "cats-mtl" % "1.4.0",
+      "org.typelevel" %%% "cats-mtl" % "1.5.0",
       "ch.obermuhlner"  % "big-math" % "2.3.2",
       googleGuava, // BaseEncoding.base16()
       curve25519,
@@ -77,7 +77,7 @@ object Dependencies {
     logback,
     "com.github.jnr"                   % "jnr-unixsocket"                % "0.38.22", // To support Apple ARM
     "com.spotify"                      % "docker-client"                 % "8.16.0",
-    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.17.1",
+    "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.17.2",
     asyncHttpClient
   ).map(_ % Test)
 
@@ -130,7 +130,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.11.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "com.esaulpaugh"              % "headlong"      % "11.1.1",
+      "com.esaulpaugh"              % "headlong"      % "12.1.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
       web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
@@ -181,7 +181,7 @@ object Dependencies {
   )
 
   lazy val circe = Def.setting {
-    val circeVersion = "0.14.8"
+    val circeVersion = "0.14.9"
     Seq(
       "io.circe" %%% "circe-core",
       "io.circe" %%% "circe-generic",
