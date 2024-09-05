@@ -69,12 +69,22 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
+lazy val `node-testkit` = project
+  .dependsOn(`lang-jvm`, `lang-testkit` % "test->test")
+  .in(file("node/testkit"))
+  .settings(
+    libraryDependencies ++=
+      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
+        "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
+      )
+  )
+
+lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test", `node-testkit` % "test->test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
 lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node % "compile->test")
+lazy val `node-generator` = project.dependsOn(node % "compile->test", `node-testkit` % "test->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
@@ -123,6 +133,7 @@ lazy val `waves-node` = (project in file("."))
     `repl-jvm`,
     node,
     `node-it`,
+    `node-testkit`,
     `node-generator`,
     benchmark,
     `repl-js`,
