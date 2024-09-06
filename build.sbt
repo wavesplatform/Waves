@@ -90,6 +90,7 @@ lazy val `node-testkit` = project
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`lang-jvm`, `node`, `lang-testkit` % "test;test->test", `node-testkit` % "compile->compile")
+  .settings(libraryDependencies ++= Dependencies.node.value) // TODO: adjust dependencies
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
