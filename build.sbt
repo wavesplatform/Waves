@@ -69,7 +69,6 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-
 lazy val node = project.dependsOn(`lang-jvm`)
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
@@ -87,7 +86,9 @@ lazy val `node-testkit` = project
       )
   )
 
-// lazy val `node-tests` = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test", `node-testkit` % "test->test")
+lazy val `node-tests` = project
+  .in(file("node/tests"))
+  .dependsOn(`lang-jvm`, `node`, `lang-testkit` % "test;test->test", `node-testkit` % "compile->compile")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
@@ -117,7 +118,8 @@ lazy val `repl-jvm` = repl.jvm
     )
   )
 
-lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
+lazy val `repl-js` = repl.js
+  .dependsOn(`lang-js`)
   .settings(
     libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
   )
@@ -136,6 +138,7 @@ lazy val `waves-node` = (project in file("."))
     node,
     `node-it`,
     `node-testkit`,
+    `node-tests`,
     `node-generator`,
     benchmark,
     `repl-js`,
@@ -231,7 +234,8 @@ checkPRRaw := Def
       (`lang-js` / Compile / fastOptJS).value
       (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
-      (node / Test / test).value
+      (`node-testkit` / Compile / compile).value
+      (`node-tests` / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
