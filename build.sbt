@@ -70,7 +70,7 @@ lazy val `lang-tests-js` = project
   )
 
 lazy val `node-testkit` = project
-  .dependsOn(`lang-jvm`, `lang-testkit` % "test->test")
+  .dependsOn(`lang-jvm`, `lang-testkit` % "compile->compile")
   .in(file("node/testkit"))
   .settings(
     libraryDependencies ++=
