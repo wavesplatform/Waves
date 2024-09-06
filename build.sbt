@@ -78,6 +78,7 @@ lazy val `node-generator` = project.dependsOn(node % "compile->test", `node-test
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
 lazy val `node-testkit` = project
+  .in(file("node/testkit"))
   .dependsOn(`lang-jvm`, `lang-testkit` % "compile->compile", `node` % "compile->compile")
   .settings(
     libraryDependencies ++=
