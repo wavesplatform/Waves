@@ -71,26 +71,25 @@ lazy val `lang-tests-js` = project
 
 lazy val node = project.dependsOn(`lang-jvm`)
 
-lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
-lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node % "compile->test", `node-testkit` % "test->test")
-lazy val benchmark        = project.dependsOn(node % "compile;test->test")
-
 lazy val `node-testkit` = project
   .in(file("node/testkit"))
-  .dependsOn(`lang-jvm`, `lang-testkit` % "compile->compile", `node` % "compile->compile")
+  .dependsOn(`lang-jvm`, `lang-testkit` % "compile->compile", `node` % "compile->test")
   .settings(
     libraryDependencies ++=
       Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
         "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
       )
   )
-
 lazy val `node-tests` = project
   .in(file("node/tests"))
-  .dependsOn(`lang-jvm`, `node`, `lang-testkit` % "test;test->test", `node-testkit` % "compile->compile")
+  .dependsOn(`lang-jvm`, `node`, `lang-testkit` % "test;test->test", `node-testkit` % "compile->test")
   .settings(libraryDependencies ++= Dependencies.node.value) // TODO: adjust dependencies
+
+lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided",`node-testkit` % "compile->test", `node-tests` % "compile->test")
+lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`, `node-tests` % "compile->test")
+lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `node-testkit` % "compile->test", `repl-jvm`, `grpc-server`,`node-tests` % "compile->test")
+lazy val `node-generator` = project.dependsOn(node % "compile->test", `node-testkit` % "compile->test", `node-tests` % "compile->test")
+lazy val benchmark        = project.dependsOn(node % "compile;test->test", `node-tests` % "compile->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
