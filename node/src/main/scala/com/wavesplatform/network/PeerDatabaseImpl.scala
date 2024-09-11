@@ -11,7 +11,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 import scala.collection.*
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -123,13 +123,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       }
     }
 
-    val knownPeersFromConfig = settings.knownPeers.flatMap(p => inetSocketAddress(p, 6868))
-    val nextCandidateFromConfig = knownPeersFromConfig.filterNot(knownPeers.keySet).headOption
-
-    nextCandidateFromConfig
+    settings.knownPeers.flatMap(p => inetSocketAddress(p, 6868)).filterNot(knownPeers.keySet).headOption
       .orElse(nextUnverified())
-      .orElse(Random.shuffle((knownPeers.keySet ++ knownPeersFromConfig).filterNot(excludeAddress)).headOption)
-
+      .orElse(Random.shuffle(knownPeers.keySet.filterNot(excludeAddress)).headOption)
   }
 
   def clearBlacklist(): Unit = {
@@ -138,11 +134,14 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   }
 
   override def close(): Unit = settings.file.foreach { f =>
-    log.info(s"Saving ${knownPeers.size} known peer(s) to ${f.getName}")
-    val rawPeers = for {
-      inetAddress <- knownPeers.keySet
-      address     <- Option(inetAddress.getAddress)
-    } yield s"${address.getHostAddress}:${inetAddress.getPort}"
+    val tsThreshold = System.currentTimeMillis() - 3.minutes.toMillis
+    val rawPeers = (for {
+      (inetAddress, timestamp) <- knownPeers
+      if timestamp >= tsThreshold
+      address <- Option(inetAddress.getAddress)
+    } yield s"${address.getHostAddress}:${inetAddress.getPort}").toSet
+
+    log.info(s"Saving ${rawPeers.size} known peer(s) to ${f.getName}")
 
     JsonFileStorage.save[PeersPersistenceType](rawPeers, f.getCanonicalPath)
   }
