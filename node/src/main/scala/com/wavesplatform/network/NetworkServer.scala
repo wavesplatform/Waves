@@ -149,6 +149,7 @@ object NetworkServer extends ScorexLogging {
 
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
       if (thisConnFuture.isSuccess) {
+        log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
         thisConnFuture.channel().closeFuture().addListener(f => handleOutgoingChannelClosed(remoteAddress)(f))
       } else if (thisConnFuture.cause() != null) {
         peerDatabase.suspend(remoteAddress)
