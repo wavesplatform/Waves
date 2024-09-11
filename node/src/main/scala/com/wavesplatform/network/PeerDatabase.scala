@@ -14,9 +14,7 @@ trait PeerDatabase extends AutoCloseable {
 
   def knownPeers: Map[InetSocketAddress, Long]
 
-  def blacklistedHosts: Set[InetAddress]
-
-  def suspendedHosts: Set[InetAddress]
+  def isBlacklisted(address: InetAddress): Boolean
 
   def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 
@@ -31,6 +29,8 @@ trait PeerDatabase extends AutoCloseable {
   def blacklistAndClose(channel: Channel, reason: String): Unit
 
   def suspendAndClose(channel: Channel): Unit
+
+  def livePeers: Set[InetSocketAddress]
 }
 
 object PeerDatabase {
@@ -44,8 +44,6 @@ object PeerDatabase {
 
     override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
 
-    override def blacklistedHosts: Set[InetAddress] = Set.empty
-
     override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
 
     override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
@@ -54,13 +52,15 @@ object PeerDatabase {
 
     override def suspend(host: InetSocketAddress): Unit = {}
 
-    override val suspendedHosts: Set[InetAddress] = Set.empty
+    override def isBlacklisted(address: InetAddress): Boolean = false
 
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
     override def blacklistAndClose(channel: Channel, reason: String): Unit = channel.close()
 
     override def suspendAndClose(channel: Channel): Unit = channel.close()
+
+    override def livePeers: Set[InetSocketAddress] = Set.empty
 
     override def close(): Unit = {}
   }

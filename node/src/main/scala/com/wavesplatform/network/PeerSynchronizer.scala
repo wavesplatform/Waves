@@ -43,7 +43,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
         requestPeers(ctx)
         super.channelRead(ctx, msg)
       case GetPeers =>
-        ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
+        ctx.writeAndFlush(KnownPeers(peerDatabase.livePeers.toSeq))
       case KnownPeers(peers) if peersRequested =>
         peersRequested = false
         val (added, notAdded) = peers.partition(peerDatabase.addCandidate)

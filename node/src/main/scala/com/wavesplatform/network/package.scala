@@ -29,9 +29,9 @@ package object network {
   def inetSocketAddress(addr: String, defaultPort: Int): Seq[InetSocketAddress] = {
     val uri        = new URI(s"node://$addr")
     val actualPort = if (uri.getPort > 0) uri.getPort else defaultPort
-    InetAddress.getAllByName(uri.getHost).map { ia =>
+    InetAddress.getAllByName(uri.getHost).view.map { ia =>
       new InetSocketAddress(ia, actualPort)
-    }
+    }.toSeq
   }
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {

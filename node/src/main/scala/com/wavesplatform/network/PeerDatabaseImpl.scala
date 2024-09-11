@@ -95,14 +95,13 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       .asMap()
       .asScala
       .collect {
-        case (addr, ts) if !(settings.enableBlacklisting && blacklistedHosts.contains(addr.getAddress)) => addr -> ts.toLong
+        case (addr, ts) if !(settings.enableBlacklisting && isBlacklisted(addr.getAddress)) => addr -> ts.toLong
       }
       .toMap
   }
 
-  override def blacklistedHosts: immutable.Set[InetAddress] = blacklist.asMap().asScala.keys.toSet
-
-  override def suspendedHosts: immutable.Set[InetAddress] = suspension.asMap().asScala.keys.toSet
+  def isBlacklisted(address: InetAddress): Boolean = blacklist.asMap().containsKey(address)
+  def isSuspended(address: InetAddress): Boolean   = suspension.asMap().containsKey(address)
 
   override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] =
     blacklist.asMap().asScala.view.mapValues(_.toLong).map { case (h, t) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
@@ -111,7 +110,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     def excludeAddress(isa: InetSocketAddress): Boolean = {
-      excluded(isa) || Option(isa.getAddress).exists(blacklistedHosts) || suspendedHosts(isa.getAddress)
+      excluded(isa) || isBlacklisted(isa.getAddress) || isSuspended(isa.getAddress)
     }
 
     @tailrec
@@ -123,7 +122,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       }
     }
 
-    settings.knownPeers.flatMap(p => inetSocketAddress(p, 6868)).filterNot(knownPeers.keySet).headOption
+    settings.knownPeers
+      .flatMap(p => inetSocketAddress(p, 6868))
+      .filterNot(excludeAddress)
+      .headOption
       .orElse(nextUnverified())
       .orElse(Random.shuffle(knownPeers.keySet.filterNot(excludeAddress)).headOption)
   }
@@ -133,13 +135,18 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     reasons.clear()
   }
 
-  override def close(): Unit = settings.file.foreach { f =>
+  override def livePeers: immutable.Set[InetSocketAddress] = {
     val tsThreshold = System.currentTimeMillis() - 3.minutes.toMillis
-    val rawPeers = (for {
+    (for {
       (inetAddress, timestamp) <- knownPeers
       if timestamp >= tsThreshold
-      address <- Option(inetAddress.getAddress)
-    } yield s"${address.getHostAddress}:${inetAddress.getPort}").toSet
+      address = inetAddress.getAddress
+      if address != null && !isBlacklisted(address) && !isSuspended(address)
+    } yield inetAddress).toSet
+  }
+
+  override def close(): Unit = settings.file.foreach { f =>
+    val rawPeers = livePeers.map(address => s"${address.getAddress.getHostAddress}:${address.getPort}")
 
     log.info(s"Saving ${rawPeers.size} known peer(s) to ${f.getName}")
 
