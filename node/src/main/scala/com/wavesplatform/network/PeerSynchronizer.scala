@@ -21,7 +21,6 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
-    declaredAddress.foreach(peerDatabase.touch)
     msg match {
       case hs: Handshake =>
         val rda = for {
@@ -34,7 +33,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
         rda match {
           case None => log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.map(_.getAddress)}")
           case Some(x) =>
-            log.trace(s"${id(ctx)} Touching declared address")
+            log.trace(s"${id(ctx)} Touching declared address $x")
             peerDatabase.touch(x)
             declaredAddress = Some(x)
         }

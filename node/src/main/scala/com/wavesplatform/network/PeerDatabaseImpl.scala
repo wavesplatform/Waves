@@ -119,11 +119,17 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       }
     }
 
-    nextUnverified() orElse Random
+    val fromConfig = settings.knownPeers.map(p => inetSocketAddress(p, 6868))
+    val msg = s"Calculate random peer, unverified: [${unverifiedPeers.asScala.mkString(",")}], known: [${knownPeers.mkString(",")}], from config: [${fromConfig.mkString(",")}]"
+
+
+    val result = nextUnverified() orElse Random
       .shuffle(
-        (knownPeers.keySet ++ settings.knownPeers.map(p => inetSocketAddress(p, 6868))).filterNot(excludeAddress)
+        (knownPeers.keySet ++ fromConfig).filterNot(excludeAddress)
       )
       .headOption
+    log.trace(s"$msg, result=$result")
+    result
   }
 
   def clearBlacklist(): Unit = {
