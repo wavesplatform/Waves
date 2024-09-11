@@ -1,8 +1,5 @@
 package com.wavesplatform.network
 
-import java.util
-import java.util.concurrent.{ConcurrentMap, TimeUnit}
-
 import com.wavesplatform.network.Handshake.InvalidHandshakeException
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
@@ -13,6 +10,8 @@ import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.AttributeKey
 import io.netty.util.concurrent.ScheduledFuture
 
+import java.util
+import java.util.concurrent.{ConcurrentMap, TimeUnit}
 import scala.concurrent.duration.FiniteDuration
 
 class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void] with ScorexLogging {
@@ -99,6 +98,17 @@ abstract class HandshakeHandler(
             val previousPeer = peerConnections.putIfAbsent(key, ctx.channel())
             if (previousPeer == null) {
               log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
+
+              (for {
+                rda        <- remoteHandshake.declaredAddress
+                rdaAddress <- Option(rda.getAddress)
+                ctxAddress <- ctx.remoteAddress.map(_.getAddress)
+                if rdaAddress == ctxAddress
+              } yield rda).foreach { x =>
+                log.trace(s"${id(ctx)} Touching declared address $x")
+                peerDatabase.touch(x)
+              }
+
               removeHandshakeHandlers(ctx, this)
               establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 

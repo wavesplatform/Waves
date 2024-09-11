@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.net.{InetSocketAddress, SocketAddress, URI}
-import java.util.concurrent.Callable
-
 import cats.Eq
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.block.Block
@@ -20,6 +17,8 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import org.slf4j.LoggerFactory
 
+import java.net.{InetAddress, InetSocketAddress, SocketAddress, URI}
+import java.util.concurrent.Callable
 import scala.concurrent.duration.*
 
 package object network {
@@ -27,10 +26,12 @@ package object network {
   private lazy val logger: Logger =
     Logger(LoggerFactory.getLogger(getClass.getName))
 
-  def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
-    val uri = new URI(s"node://$addr")
-    if (uri.getPort < 0) new InetSocketAddress(addr, defaultPort)
-    else new InetSocketAddress(uri.getHost, uri.getPort)
+  def inetSocketAddress(addr: String, defaultPort: Int): Seq[InetSocketAddress] = {
+    val uri        = new URI(s"node://$addr")
+    val actualPort = if (uri.getPort > 0) uri.getPort else defaultPort
+    InetAddress.getAllByName(uri.getHost).map { ia =>
+      new InetSocketAddress(ia, actualPort)
+    }
   }
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
@@ -78,9 +79,12 @@ package object network {
       logBroadcast(message, except)
       val st = broadcastTimeStats.withTag("object", message.getClass.getSimpleName).start()
       allChannels
-        .writeAndFlush(message, { (channel: Channel) =>
-          !except.contains(channel)
-        })
+        .writeAndFlush(
+          message,
+          { (channel: Channel) =>
+            !except.contains(channel)
+          }
+        )
         .addListener { (_: ChannelGroupFuture) =>
           st.stop()
         }

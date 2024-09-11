@@ -43,7 +43,11 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   private val unverifiedPeers  = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
   for (f <- settings.file if f.exists()) try {
-    JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(inetSocketAddress(a, 6863)))
+    for {
+      str <- JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath)
+      isa <- inetSocketAddress(str, 6868)
+    } addCandidate(isa)
+
     log.info(s"Loaded ${peersPersistence.size} known peer(s) from ${f.getName}")
   } catch {
     case NonFatal(_) => log.info("Legacy or corrupted peers.dat, ignoring, starting all over from known-peers...")
@@ -119,9 +123,8 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       }
     }
 
-    val fromConfig = settings.knownPeers.map(p => inetSocketAddress(p, 6868))
+    val fromConfig = settings.knownPeers.flatMap(p => inetSocketAddress(p, 6868))
     val msg = s"Calculate random peer, unverified: [${unverifiedPeers.asScala.mkString(",")}], known: [${knownPeers.mkString(",")}], from config: [${fromConfig.mkString(",")}]"
-
 
     val result = nextUnverified() orElse Random
       .shuffle(
