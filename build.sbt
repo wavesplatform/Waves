@@ -243,7 +243,6 @@ checkPRRaw := Def
       (`lang-js` / Compile / fastOptJS).value
       (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
-      (`node-testkit` / Compile / compile).value
       (`node-tests` / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
