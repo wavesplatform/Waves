@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
-import com.google.common.cache.{CacheBuilder, RemovalNotification}
+import com.google.common.base.Ticker
+import com.google.common.cache.CacheBuilder
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
@@ -16,24 +17,13 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Random
 import scala.util.control.NonFatal
 
-class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
-
-  private type PeerRemoved[T]         = RemovalNotification[T, java.lang.Long]
-  private type PeerRemovalListener[T] = PeerRemoved[T] => Unit
-
-  private def cache[T <: AnyRef](timeout: FiniteDuration, removalListener: Option[PeerRemovalListener[T]] = None) =
-    removalListener.fold {
-      CacheBuilder
-        .newBuilder()
-        .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
-        .build[T, java.lang.Long]()
-    } { listener =>
-      CacheBuilder
-        .newBuilder()
-        .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
-        .removalListener(listener(_))
-        .build[T, java.lang.Long]()
-    }
+class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.systemTicker()) extends PeerDatabase with ScorexLogging {
+  private def cache[T <: AnyRef](timeout: FiniteDuration) =
+    CacheBuilder
+      .newBuilder()
+      .ticker(ticker)
+      .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+      .build[T, java.lang.Long]()
 
   private type PeersPersistenceType = Set[String]
   private val peersPersistence = cache[InetSocketAddress](settings.peersDataResidenceTime)
@@ -67,15 +57,14 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     peersPersistence.put(socketAddress, Option(peersPersistence.getIfPresent(socketAddress)).fold(timestamp)(_.toLong.max(timestamp)))
   }
 
-  override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
+  override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, ticker.read())
 
   override def blacklist(inetAddress: InetAddress, reason: String): Unit =
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
-        unverifiedPeers.removeIf { x =>
-          Option(x.getAddress).contains(inetAddress)
-        }
-        blacklist.put(inetAddress, System.currentTimeMillis())
+        unverifiedPeers.removeIf(_.getAddress == inetAddress)
+        peersPersistence.asMap().entrySet().removeIf(_.getKey.getAddress == inetAddress)
+        blacklist.put(inetAddress, ticker.read())
         reasons.put(inetAddress, reason)
       }
     }
@@ -85,7 +74,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       unverifiedPeers.removeIf { x =>
         Option(x.getAddress).contains(address)
       }
-      suspension.put(address, System.currentTimeMillis())
+      suspension.put(address, ticker.read())
     }
   }
 
@@ -136,7 +125,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   }
 
   override def livePeers: immutable.Set[InetSocketAddress] = {
-    val tsThreshold = System.currentTimeMillis() - 3.minutes.toMillis
+    val tsThreshold = ticker.read() - 3.minutes.toNanos
     (for {
       (inetAddress, timestamp) <- knownPeers
       if timestamp >= tsThreshold
