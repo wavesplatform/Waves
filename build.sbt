@@ -82,11 +82,11 @@ lazy val `node-testkit` = project
   )
 lazy val `node-tests` = project
   .in(file("node/tests"))
-  .dependsOn(`lang-jvm`, `node`, `lang-testkit` % "test;test->test", `node-testkit` % "compile->test")
-  .settings(libraryDependencies ++= Dependencies.node.value) // TODO: adjust dependencies
+  .dependsOn(`lang-jvm`, `node`, `lang-testkit` % "test;test->test", `node-testkit`)
+  .settings(libraryDependencies ++= Dependencies.node.value)
 
 lazy val `grpc-server` =
-  project.dependsOn(node % "compile;test->test;runtime->provided", `node-testkit` % "compile->test", `node-tests` % "compile->test")
+  project.dependsOn(node % "compile;test->test;runtime->provided", `node-testkit`, `node-tests` % "compile->test")
 lazy val `ride-runner` = project.dependsOn(node % "compile;test->test", `grpc-server`, `node-tests` % "compile->test")
 lazy val `node-it` = project.dependsOn(
   node % "compile;test->test",
@@ -96,7 +96,7 @@ lazy val `node-it` = project.dependsOn(
   `grpc-server`,
   `node-tests` % "compile->test"
 )
-lazy val `node-generator` = project.dependsOn(node % "compile->test", `node-testkit` % "compile->test", `node-tests` % "compile->test")
+lazy val `node-generator` = project.dependsOn(node % "compile->test", `node-testkit`, `node-tests` % "compile->test")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test", `node-tests` % "compile->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
