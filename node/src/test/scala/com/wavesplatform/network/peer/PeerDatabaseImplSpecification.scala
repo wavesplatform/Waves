@@ -147,7 +147,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
         val settings = config.as[NetworkSettings]("waves.network")
         val database = new PeerDatabaseImpl(settings)
 
-        database.blacklistedHosts shouldBe empty
+        database.detailedBlacklist shouldBe empty
       }
 
       "should not add nodes to the blacklist" in {
@@ -164,7 +164,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
         val database = new PeerDatabaseImpl(settings)
         database.blacklist(address1.getAddress, "I don't like it")
 
-        database.blacklistedHosts shouldBe empty
+        database.detailedBlacklist shouldBe empty
       }
     }
   }

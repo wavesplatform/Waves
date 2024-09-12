@@ -27,10 +27,10 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
-      def isBlacklisted(address: InetSocketAddress) = peerDatabase.blacklistedHosts.contains(address.getAddress)
+      def isBlacklisted(address: InetSocketAddress) = peerDatabase.isBlacklisted(address.getAddress)
 
       assert(peerDatabase.knownPeers.isEmpty)
-      assert(peerDatabase.blacklistedHosts.isEmpty)
+      assert(peerDatabase.detailedBlacklist.isEmpty)
 
       When("Peer adds another peer to knownPeers")
       val address = new InetSocketAddress(InetAddress.getByName("localhost"), 1234)

@@ -1,20 +1,20 @@
 package com.wavesplatform.network
 
-import java.net.{InetAddress, InetSocketAddress}
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.{NetworkSettings, loadConfig}
 import com.wavesplatform.test.FeatureSpec
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 import org.scalatest.{GivenWhenThen, ParallelTestExecution}
+
+import java.net.{InetAddress, InetSocketAddress}
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 
   private val config = loadConfig(ConfigFactory.parseString("""waves.network {
-      |  known-peers = []
-      |  file = null
-      |  black-list-residence-time: 1s
-      |}""".stripMargin))
+                                                              |  known-peers = []
+                                                              |  file = null
+                                                              |  black-list-residence-time: 1s
+                                                              |}""".stripMargin))
 
   private val networkSettings = config.as[NetworkSettings]("waves.network")
 
@@ -34,24 +34,24 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
     val address3 = new InetSocketAddress(host3, 2)
 
     def isBlacklisted(address: InetSocketAddress): Boolean =
-      peerDatabase.blacklistedHosts.contains(address.getAddress)
+      peerDatabase.isBlacklisted(address.getAddress)
 
     Scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
       assert(peerDatabase.knownPeers.isEmpty)
-      assert(peerDatabase.blacklistedHosts.isEmpty)
+      assert(peerDatabase.detailedBlacklist.isEmpty)
 
       When("Peer adds another peer to knownPeers")
       peerDatabase.touch(address1)
       assert(peerDatabase.knownPeers.contains(address1))
-      assert(!peerDatabase.blacklistedHosts.contains(host1))
+      assert(!peerDatabase.detailedBlacklist.contains(host1))
 
       And("Peer blacklists another peer")
       val reason = "because"
       peerDatabase.blacklist(address1.getAddress, reason)
       assert(isBlacklisted(address1))
-      assert(peerDatabase.blacklistedHosts.contains(host1))
+      assert(peerDatabase.isBlacklisted(host1))
       assert(peerDatabase.detailedBlacklist(host1)._2 == reason)
       assert(!peerDatabase.knownPeers.contains(address1))
       assert(!peerDatabase.knownPeers.contains(address1))
@@ -70,7 +70,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
       Given("Peer database is empty")
       assert(peerDatabase.knownPeers.isEmpty)
-      assert(peerDatabase.blacklistedHosts.isEmpty)
+      assert(peerDatabase.detailedBlacklist.isEmpty)
 
       When("Peer adds other peers")
       peerDatabase.touch(address1)
