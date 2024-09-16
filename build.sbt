@@ -74,12 +74,7 @@ lazy val node = project.dependsOn(`lang-jvm`)
 lazy val `node-testkit` = project
   .in(file("node/testkit"))
   .dependsOn(`node`, `lang-testkit`)
-  .settings(
-    libraryDependencies ++=
-      Dependencies.test.map(_.withConfigurations(Some("compile"))) ++ Dependencies.qaseReportDeps ++ Dependencies.logDeps ++ Seq(
-        "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
-      )
-  )
+
 lazy val `node-tests` = project
   .in(file("node/tests"))
   .dependsOn(`node`, `lang-testkit` % "test->test", `node-testkit`)
