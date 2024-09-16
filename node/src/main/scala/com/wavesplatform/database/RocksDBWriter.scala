@@ -14,7 +14,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta, BlockMetaExt}
+import com.wavesplatform.database.protobuf.{BlockMetaExt, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -1315,28 +1315,16 @@ class RocksDBWriter(
     .build[(Int, AddressId), LeaseBalanceNode]()
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
-    @tailrec
-    def getBalanceAtHeight(h: Height, key: Height => Key[BalanceNode]): (Int, Long) = {
-      val balance = db.get(key(h))
-      if (h <= height) {
-        h -> balance.balance
-      } else {
-        getBalanceAtHeight(balance.prevHeight, key)
+    db.get(Keys.addressId(address)).flatMap { aid =>
+      val key = assetId match {
+        case Waves              => Keys.wavesBalanceAt(aid, Height(height))
+        case asset: IssuedAsset => Keys.assetBalanceAt(aid, asset, Height(height))
       }
-    }
-
-    db.get(Keys.addressId(address)).map { aid =>
-      val (balance, balanceNodeKey) =
-        assetId match {
-          case Waves                  => (db.get(Keys.wavesBalance(aid)), Keys.wavesBalanceAt(aid, _))
-          case asset @ IssuedAsset(_) => (db.get(Keys.assetBalance(aid, asset)), Keys.assetBalanceAt(aid, asset, _))
-        }
-
-      if (balance.height > height) {
-        getBalanceAtHeight(balance.prevHeight, balanceNodeKey)
-      } else {
-        balance.height -> balance.balance
-      }
+      Using(db.newIterator) { iter =>
+        iter.seekForPrev(key.keyBytes)
+        require(iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(4)))
+        Ints.fromByteArray(iter.key().takeRight(4)) -> key.parse(iter.value()).balance
+      }.toOption
     }
   }
 
