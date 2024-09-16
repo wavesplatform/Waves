@@ -12,12 +12,12 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 import scala.collection.*
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 import scala.util.control.NonFatal
 
-class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.systemTicker()) extends PeerDatabase with ScorexLogging {
+class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.systemTicker()) extends PeerDatabase with AutoCloseable with ScorexLogging {
   private def cache[T <: AnyRef](timeout: FiniteDuration) =
     CacheBuilder
       .newBuilder()
@@ -57,13 +57,12 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
     peersPersistence.put(socketAddress, Option(peersPersistence.getIfPresent(socketAddress)).fold(timestamp)(_.toLong.max(timestamp)))
   }
 
-  override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, ticker.read())
+  override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
 
   override def blacklist(inetAddress: InetAddress, reason: String): Unit =
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
         unverifiedPeers.removeIf(_.getAddress == inetAddress)
-        peersPersistence.asMap().entrySet().removeIf(_.getKey.getAddress == inetAddress)
         blacklist.put(inetAddress, ticker.read())
         reasons.put(inetAddress, reason)
       }
@@ -73,7 +72,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
     unverifiedPeers.synchronized {
       log.trace(s"Suspending $socketAddress")
       unverifiedPeers.removeIf(_ == socketAddress)
-      suspension.put(address, ticker.read())
+      suspension.put(address, System.currentTimeMillis())
     }
   }
 
@@ -123,18 +122,8 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
     reasons.clear()
   }
 
-  override def livePeers: immutable.Set[InetSocketAddress] = {
-    val tsThreshold = ticker.read() - 3.minutes.toNanos
-    (for {
-      (inetAddress, timestamp) <- knownPeers
-      if timestamp >= tsThreshold
-      address = inetAddress.getAddress
-      if address != null && !isBlacklisted(address) && !isSuspended(address)
-    } yield inetAddress).toSet
-  }
-
   override def close(): Unit = settings.file.foreach { f =>
-    val rawPeers = livePeers.map(address => s"${address.getAddress.getHostAddress}:${address.getPort}")
+    val rawPeers = knownPeers.keySet.map(address => s"${address.getAddress.getHostAddress}:${address.getPort}")
 
     log.info(s"Saving ${rawPeers.size} known peer(s) to ${f.getName}")
 
@@ -144,12 +133,6 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
   override def blacklistAndClose(channel: Channel, reason: String): Unit = getRemoteAddress(channel).foreach { x =>
     log.debug(s"Blacklisting ${id(channel)}: $reason")
     blacklist(x.getAddress, reason)
-    channel.close()
-  }
-
-  override def suspendAndClose(channel: Channel): Unit = getRemoteAddress(channel).foreach { x =>
-    log.debug(s"Suspending ${id(channel)}")
-    suspend(x)
     channel.close()
   }
 

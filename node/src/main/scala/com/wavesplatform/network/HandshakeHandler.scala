@@ -80,13 +80,20 @@ abstract class HandshakeHandler(
 
   import HandshakeHandler.*
 
-  private def suspendOrClose(msg: => String, verifiedRemoteAddress: Option[InetSocketAddress], ctx: ChannelHandlerContext): Unit = {
+  protected def suspendOrClose(msg: => String, verifiedRemoteAddress: Option[InetSocketAddress], ctx: ChannelHandlerContext): Unit = {
     log.debug(s"${id(ctx)} $msg")
     verifiedRemoteAddress.foreach(peerDatabase.suspend)
     ctx.close()
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+    case HandshakeTimeoutExpired =>
+      log.trace(s"Timeout expired while waiting for handshake: ${id(ctx.channel())}")
+      ctx.channel().remoteAddress() match {
+        case isa: InetSocketAddress => peerDatabase.suspend(isa)
+        case _                      =>
+      }
+      ctx.close()
     case remoteHandshake: Handshake =>
       val verifiedDeclaredAddress = remoteHandshake.declaredAddress.filter(_ == ctx.channel().remoteAddress())
 
@@ -131,11 +138,12 @@ abstract class HandshakeHandler(
               connectionNegotiated(ctx)
               ctx.fireChannelRead(msg)
             } else {
-              val peerAddress = ctx.remoteAddress.getOrElse("unknown")
-              log.debug(s"${id(ctx)} Already connected to peer $peerAddress with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
-              peerDatabase.suspendAndClose(ctx.channel())
+              suspendOrClose(
+                s"${id(ctx)} Already connected to peer with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}",
+                verifiedDeclaredAddress,
+                ctx
+              )
             }
-
         }
       }
     case _ => super.channelRead(ctx, msg)
@@ -185,15 +193,6 @@ object HandshakeHandler {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup
   ) extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
-
-    override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-      case HandshakeTimeoutExpired =>
-        peerDatabase.blacklistAndClose(ctx.channel(), "Timeout expired while waiting for handshake")
-
-      case _ =>
-        super.channelRead(ctx, msg)
-    }
-
     override protected def connectionNegotiated(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
       super.connectionNegotiated(ctx)
@@ -208,16 +207,6 @@ object HandshakeHandler {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup
   ) extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
-
-    override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-      case HandshakeTimeoutExpired =>
-        log.trace(s"Timeout expired while waiting for handshake: ${id(ctx.channel())}")
-        peerDatabase.suspendAndClose(ctx.channel())
-
-      case _ =>
-        super.channelRead(ctx, msg)
-    }
-
     override def channelActive(ctx: ChannelHandlerContext): Unit = {
       sendLocalHandshake(ctx)
       ctx.channel().attr(ConnectionStartAttributeKey).set(System.currentTimeMillis())

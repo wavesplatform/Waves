@@ -4,12 +4,9 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import io.netty.channel.Channel
 
-trait PeerDatabase extends AutoCloseable {
-
+trait PeerDatabase {
   def addCandidate(socketAddress: InetSocketAddress): Boolean
   def touch(socketAddress: InetSocketAddress): Unit
-
-  def livePeers: Set[InetSocketAddress]
 
   def nextCandidate(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 
@@ -23,10 +20,7 @@ trait PeerDatabase extends AutoCloseable {
   def detailedBlacklist: Map[InetAddress, (Long, String)]
   def detailedSuspended: Map[InetAddress, Long]
 
-
-
   def suspend(host: InetSocketAddress): Unit
-  def suspendAndClose(channel: Channel): Unit
 }
 
 object PeerDatabase {
@@ -53,11 +47,5 @@ object PeerDatabase {
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
     override def blacklistAndClose(channel: Channel, reason: String): Unit = channel.close()
-
-    override def suspendAndClose(channel: Channel): Unit = channel.close()
-
-    override def livePeers: Set[InetSocketAddress] = Set.empty
-
-    override def close(): Unit = {}
   }
 }

@@ -132,7 +132,7 @@ object NetworkServer extends ScorexLogging {
 
     def handleOutgoingChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
       outgoingChannels.remove(remoteAddress, closeFuture.channel())
-      if (!shutdownInitiated) peerDatabase.suspendAndClose(closeFuture.channel())
+      if (!shutdownInitiated) peerDatabase.suspend(remoteAddress)
 
       if (closeFuture.isSuccess)
         log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
