@@ -1,8 +1,5 @@
 package com.wavesplatform.network
 
-import java.util
-import java.util.concurrent.{ConcurrentMap, TimeUnit}
-
 import com.wavesplatform.network.Handshake.InvalidHandshakeException
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.buffer.ByteBuf
@@ -13,6 +10,9 @@ import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.AttributeKey
 import io.netty.util.concurrent.ScheduledFuture
 
+import java.net.InetSocketAddress
+import java.util
+import java.util.concurrent.{ConcurrentMap, TimeUnit}
 import scala.concurrent.duration.FiniteDuration
 
 class HandshakeDecoder(peerDatabase: PeerDatabase) extends ReplayingDecoder[Void] with ScorexLogging {
@@ -80,16 +80,30 @@ abstract class HandshakeHandler(
 
   import HandshakeHandler.*
 
+  private def suspendOrClose(msg: => String, verifiedRemoteAddress: Option[InetSocketAddress], ctx: ChannelHandlerContext): Unit = {
+    log.debug(s"${id(ctx)} $msg")
+    verifiedRemoteAddress.foreach(peerDatabase.suspend)
+    ctx.close()
+  }
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case remoteHandshake: Handshake =>
+      val verifiedDeclaredAddress = remoteHandshake.declaredAddress.filter(_ == ctx.channel().remoteAddress())
+
       if (localHandshake.applicationName != remoteHandshake.applicationName)
-        peerDatabase.blacklistAndClose(
-          ctx.channel(),
-          s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}"
+        suspendOrClose(
+          s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}",
+          verifiedDeclaredAddress,
+          ctx
         )
       else if (!versionIsSupported(remoteHandshake.applicationVersion))
-        peerDatabase.blacklistAndClose(ctx.channel(), s"Remote application version ${remoteHandshake.applicationVersion} is not supported")
+        suspendOrClose(s"Remote application version ${remoteHandshake.applicationVersion} is not supported", verifiedDeclaredAddress, ctx)
       else {
+        verifiedDeclaredAddress.foreach { vda =>
+          ctx.channel().attr(NodeDeclaredAddressAttributeKey).set(vda)
+          peerDatabase.touch(vda)
+        }
+
         PeerKey(ctx, remoteHandshake.nodeNonce) match {
           case None =>
             log.warn(s"Can't get PeerKey from ${id(ctx)}")
@@ -139,9 +153,11 @@ abstract class HandshakeHandler(
 
 object HandshakeHandler {
 
-  val NodeNameAttributeKey: AttributeKey[String]             = AttributeKey.newInstance[String]("name")
-  val NodeVersionAttributeKey: AttributeKey[(Int, Int, Int)] = AttributeKey.newInstance[(Int, Int, Int)]("version")
-  private val ConnectionStartAttributeKey                    = AttributeKey.newInstance[Long]("connectionStart")
+  val NodeNameAttributeKey: AttributeKey[String]                       = AttributeKey.newInstance[String]("name")
+  val NodeVersionAttributeKey: AttributeKey[(Int, Int, Int)]           = AttributeKey.newInstance[(Int, Int, Int)]("version")
+  val NodeDeclaredAddressAttributeKey: AttributeKey[InetSocketAddress] = AttributeKey.newInstance[InetSocketAddress]("declaredAddress")
+
+  private val ConnectionStartAttributeKey = AttributeKey.newInstance[Long]("connectionStart")
 
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
     (remoteVersion._1 == 0 && remoteVersion._2 >= 13) || (remoteVersion._1 == 1 && remoteVersion._2 >= 0)

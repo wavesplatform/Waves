@@ -7,30 +7,26 @@ import io.netty.channel.Channel
 trait PeerDatabase extends AutoCloseable {
 
   def addCandidate(socketAddress: InetSocketAddress): Boolean
-
   def touch(socketAddress: InetSocketAddress): Unit
 
+  def livePeers: Set[InetSocketAddress]
+
+  def nextCandidate(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
+
   def blacklist(host: InetAddress, reason: String): Unit
+  def blacklistAndClose(channel: Channel, reason: String): Unit
+  def isBlacklisted(address: InetAddress): Boolean
+  def clearBlacklist(): Unit
 
   def knownPeers: Map[InetSocketAddress, Long]
 
-  def isBlacklisted(address: InetAddress): Boolean
-
-  def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
-
   def detailedBlacklist: Map[InetAddress, (Long, String)]
-
   def detailedSuspended: Map[InetAddress, Long]
 
-  def clearBlacklist(): Unit
+
 
   def suspend(host: InetSocketAddress): Unit
-
-  def blacklistAndClose(channel: Channel, reason: String): Unit
-
   def suspendAndClose(channel: Channel): Unit
-
-  def livePeers: Set[InetSocketAddress]
 }
 
 object PeerDatabase {
@@ -44,7 +40,7 @@ object PeerDatabase {
 
     override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
 
-    override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
+    override def nextCandidate(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
 
     override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
 

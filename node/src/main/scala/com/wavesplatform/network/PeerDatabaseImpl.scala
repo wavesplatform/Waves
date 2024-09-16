@@ -71,9 +71,8 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
 
   override def suspend(socketAddress: InetSocketAddress): Unit = getAddress(socketAddress).foreach { address =>
     unverifiedPeers.synchronized {
-      unverifiedPeers.removeIf { x =>
-        Option(x.getAddress).contains(address)
-      }
+      log.trace(s"Suspending $socketAddress")
+      unverifiedPeers.removeIf(_ == socketAddress)
       suspension.put(address, ticker.read())
     }
   }
@@ -97,7 +96,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.view.mapValues(_.toLong).toMap
 
-  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
+  override def nextCandidate(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     def excludeAddress(isa: InetSocketAddress): Boolean = {
       excluded(isa) || isBlacklisted(isa.getAddress) || isSuspended(isa.getAddress)
     }

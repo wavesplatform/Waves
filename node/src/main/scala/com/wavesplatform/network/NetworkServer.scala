@@ -210,7 +210,7 @@ object NetworkServer extends ScorexLogging {
         if (outgoingChannels.size() < networkSettings.maxOutboundConnections) {
           val all = peerInfo.values().iterator().asScala.flatMap(_.remoteAddress.cast[InetSocketAddress])
           peerDatabase
-            .randomPeer(excluded = excludedAddresses ++ all)
+            .nextCandidate(excluded = excludedAddresses ++ all)
             .foreach(doConnect)
         }
 

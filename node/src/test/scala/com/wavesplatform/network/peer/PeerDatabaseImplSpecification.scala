@@ -55,7 +55,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
     "new candidate should be returned by randomPeer, but should not be added to knownPeers" in withDatabase(settings1) { database =>
       database.knownPeers shouldBe empty
       database.addCandidate(address1)
-      database.randomPeer(Set()) should contain(address1)
+      database.nextCandidate(Set()) should contain(address1)
       database.knownPeers shouldBe empty
     }
 
@@ -72,7 +72,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       database.knownPeers.keys should contain(address1)
       sleepLong()
       database.knownPeers shouldBe empty
-      database.randomPeer(Set()) shouldBe empty
+      database.nextCandidate(Set()) shouldBe empty
     }
 
     "touching peer prevent it from obsoleting" in withDatabase(settings1) { database =>
@@ -94,10 +94,10 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       database.knownPeers.keys should not contain address1
       database.knownPeers should be(empty)
 
-      database.randomPeer(Set()) should contain(address2)
+      database.nextCandidate(Set()) should contain(address2)
       database.blacklist(address2.getAddress, "")
-      database.randomPeer(Set()) should not contain address2
-      database.randomPeer(Set()) should be(empty)
+      database.nextCandidate(Set()) should not contain address2
+      database.nextCandidate(Set()) should be(empty)
     }
 
     "random peer should return peers from both from database and buffer" in withDatabase(settings2) { database2 =>
@@ -107,7 +107,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       keys should contain(address1)
       keys should not contain address2
 
-      val set = (1 to 10).flatMap(i => database2.randomPeer(Set())).toSet
+      val set = (1 to 10).flatMap(i => database2.nextCandidate(Set())).toSet
 
       set should contain(address1)
       set should contain(address2)
@@ -118,15 +118,13 @@ class PeerDatabaseImplSpecification extends FreeSpec {
       database.addCandidate(address1)
       database.addCandidate(address2)
 
-      database.randomPeer(Set(address1)) should contain(address2)
+      database.nextCandidate(Set(address1)) should contain(address2)
     }
 
     "filters out wildcard addresses" in withDatabase(settings1) { database =>
       database.addCandidate(new InetSocketAddress("0.0.0.0", 6863))
-      database.randomPeer(Set(address1, address2)) shouldBe None
+      database.nextCandidate(Set(address1, address2)) shouldBe None
     }
-
-    ""
 
     "should not add nodes to the blacklist if blacklisting is disabled" in {
       val config = ConfigFactory
