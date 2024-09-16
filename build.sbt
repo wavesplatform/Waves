@@ -77,7 +77,7 @@ lazy val `node-testkit` = project
 
 lazy val `node-tests` = project
   .in(file("node/tests"))
-  .dependsOn(`node`, `lang-testkit` % "test->test", `node-testkit`)
+  .dependsOn(`lang-testkit` % "test->test", `node-testkit`)
   .settings(libraryDependencies ++= Dependencies.node.value)
 
 lazy val `grpc-server` =
