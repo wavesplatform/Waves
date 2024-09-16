@@ -27,7 +27,7 @@ import org.asynchttpclient.Dsl.*
 import java.io.{FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Path, Paths}
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, Duration as JDuration}
 import java.time.format.DateTimeFormatter
 import java.util.Collections.*
 import java.util.concurrent.ConcurrentHashMap
@@ -58,9 +58,9 @@ class Docker(
       .setMaxConnections(18)
       .setMaxConnectionsPerHost(3)
       .setMaxRequestRetry(1)
-      .setReadTimeout(10000)
+      .setReadTimeout(JDuration.ofSeconds(10))
       .setKeepAlive(false)
-      .setRequestTimeout(10000)
+      .setRequestTimeout(JDuration.ofSeconds(10))
   )
 
   private val client = DefaultDockerClient.fromEnv().build()

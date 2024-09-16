@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
+import java.time.{Duration as JDuration}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
@@ -183,8 +184,8 @@ object AsyncHttpApi extends Assertions {
 
       def request =
         _get(s"${n.nodeApiEndpoint}/blocks/height?${System.currentTimeMillis()}")
-          .setReadTimeout(timeout)
-          .setRequestTimeout(timeout)
+          .setReadTimeout(JDuration.ofMillis(timeout))
+          .setRequestTimeout(JDuration.ofMillis(timeout))
           .build()
 
       def send(): Future[Option[Response]] =
