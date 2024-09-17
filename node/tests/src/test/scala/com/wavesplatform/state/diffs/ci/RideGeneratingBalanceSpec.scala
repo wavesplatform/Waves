@@ -65,7 +65,7 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
 
       // Block 1
       d.appendBlock(
-        TxHelpers.setScript(dAppAccount, dAppScript), // Note: setScript costs 1_000_000L
+        TxHelpers.setScript(dAppAccount, dAppScript), // Note: setScript costs 0.01.waves
         assertBalancesInRide(123.waves, 123.waves, 123.waves, 123.waves)
       )
       d.solidStateHeight shouldBe 1
