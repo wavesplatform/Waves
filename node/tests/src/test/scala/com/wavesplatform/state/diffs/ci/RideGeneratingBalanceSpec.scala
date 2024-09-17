@@ -11,7 +11,7 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
     val dAppAccount    = TxHelpers.signer(999)
     val anotherAccount = TxHelpers.signer(1)
 
-    val balances = Seq(AddrWithBalance(dAppAccount.toAddress, 123_0100_0000L), AddrWithBalance(anotherAccount.toAddress, 456.waves))
+    val balances = Seq(AddrWithBalance(dAppAccount.toAddress, 123.01.waves), AddrWithBalance(anotherAccount.toAddress, 456.waves))
 
     withDomain(DomainPresets.TransactionStateSnapshot, balances) { d =>
       // Arrange
@@ -87,7 +87,7 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
         assertBalancesInRide(124.waves, 124.waves, 124.waves, 124.waves),
         TxHelpers.transfer(dAppAccount, anotherAccount.toAddress, 10.waves),
         // Note: we expected the Generating balance to be 124.waves here
-        assertBalancesInRide(11399000000L, 11399000000L, 11399000000L, 11399000000L)
+        assertBalancesInRide(113.99.waves, 113.99.waves, 113.99.waves, 113.99.waves)
       )
     }
   }
