@@ -1323,7 +1323,7 @@ class RocksDBWriter(
       Using(db.newIterator) { iter =>
         iter.seekForPrev(key.keyBytes)
         require(iter.isValid && iter.key().startsWith(key.keyBytes.dropRight(4)))
-        Ints.fromByteArray(iter.key().takeRight(4)) -> key.parse(iter.value()).balance
+        Ints.fromByteArray(iter.key().takeRight(Ints.BYTES)) -> key.parse(iter.value()).balance
       }.toOption
     }
   }
