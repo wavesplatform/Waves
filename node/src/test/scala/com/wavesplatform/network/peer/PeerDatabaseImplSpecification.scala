@@ -52,7 +52,7 @@ class PeerDatabaseImplSpecification extends FreeSpec {
   }
 
   "Peer database" - {
-    "new candidate should be returned by randomPeer, but should not be added to knownPeers" in withDatabase(settings1) { database =>
+    "new candidate should be returned by nextCandidate, but should not be added to knownPeers" in withDatabase(settings1) { database =>
       database.knownPeers shouldBe empty
       database.addCandidate(address1)
       database.nextCandidate(Set()) should contain(address1)

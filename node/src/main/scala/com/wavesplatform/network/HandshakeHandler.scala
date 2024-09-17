@@ -80,7 +80,7 @@ abstract class HandshakeHandler(
 
   import HandshakeHandler.*
 
-  protected def suspendOrClose(msg: => String, verifiedRemoteAddress: Option[InetSocketAddress], ctx: ChannelHandlerContext): Unit = {
+  protected def suspendAndClose(msg: => String, verifiedRemoteAddress: Option[InetSocketAddress], ctx: ChannelHandlerContext): Unit = {
     log.debug(s"${id(ctx)} $msg")
     verifiedRemoteAddress.foreach(peerDatabase.suspend)
     ctx.close()
@@ -98,13 +98,13 @@ abstract class HandshakeHandler(
       val verifiedDeclaredAddress = remoteHandshake.declaredAddress.filter(_ == ctx.channel().remoteAddress())
 
       if (localHandshake.applicationName != remoteHandshake.applicationName)
-        suspendOrClose(
+        suspendAndClose(
           s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}",
           verifiedDeclaredAddress,
           ctx
         )
       else if (!versionIsSupported(remoteHandshake.applicationVersion))
-        suspendOrClose(s"Remote application version ${remoteHandshake.applicationVersion} is not supported", verifiedDeclaredAddress, ctx)
+        suspendAndClose(s"Remote application version ${remoteHandshake.applicationVersion} is not supported", verifiedDeclaredAddress, ctx)
       else {
         verifiedDeclaredAddress.foreach { vda =>
           ctx.channel().attr(NodeDeclaredAddressAttributeKey).set(vda)
@@ -138,7 +138,7 @@ abstract class HandshakeHandler(
               connectionNegotiated(ctx)
               ctx.fireChannelRead(msg)
             } else {
-              suspendOrClose(
+              suspendAndClose(
                 s"${id(ctx)} Already connected to peer with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}",
                 verifiedDeclaredAddress,
                 ctx

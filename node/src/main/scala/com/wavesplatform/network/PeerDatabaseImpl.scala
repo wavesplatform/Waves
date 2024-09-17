@@ -8,10 +8,11 @@ import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.TimeUnit
 import scala.annotation.tailrec
 import scala.collection.*
+import scala.collection.immutable.Seq
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -32,13 +33,16 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
   private val reasons          = mutable.Map.empty[InetAddress, String]
   private val unverifiedPeers  = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
-  for (f <- settings.file if f.exists()) try {
-    for {
-      str <- JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath)
-      isa <- inetSocketAddress(str, 6868)
-    } addCandidate(isa)
+  private val IPAndPort = """(\d+)\.(\d+)\.(\d+)\.(\d+):(\d+)""".r
 
-    log.info(s"Loaded ${peersPersistence.size} known peer(s) from ${f.getName}")
+  for (f <- settings.file if f.exists()) try {
+    JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).map {
+      case IPAndPort(a, b, c, d, port) =>
+        addCandidate(new InetSocketAddress(InetAddress.getByAddress(Array(a.toByte, b.toByte, c.toByte, d.toByte)), port.toInt))
+      case _ =>
+    }
+
+    log.info(s"Loaded ${unverifiedPeers.size} known peer(s) from ${f.getName}")
   } catch {
     case NonFatal(_) => log.info("Legacy or corrupted peers.dat, ignoring, starting all over from known-peers...")
   }
@@ -95,6 +99,18 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.view.mapValues(_.toLong).toMap
 
+  private def resolvePeerAddress(addr: String): Seq[InetSocketAddress] = {
+    val uri = new URI(s"node://$addr")
+    require(uri.getPort > 0, s"invalid port ${uri.getPort}")
+    InetAddress
+      .getAllByName(uri.getHost)
+      .view
+      .map { ia =>
+        new InetSocketAddress(ia, uri.getPort)
+      }
+      .toSeq
+  }
+
   override def nextCandidate(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     def excludeAddress(isa: InetSocketAddress): Boolean = {
       excluded(isa) || isBlacklisted(isa.getAddress) || isSuspended(isa.getAddress)
@@ -110,7 +126,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, ticker: Ticker = Ticker.system
     }
 
     settings.knownPeers
-      .flatMap(p => inetSocketAddress(p, 6868))
+      .flatMap(p => resolvePeerAddress(p))
       .filterNot(excludeAddress)
       .headOption
       .orElse(nextUnverified())

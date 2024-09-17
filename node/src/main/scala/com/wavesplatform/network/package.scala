@@ -17,7 +17,7 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import org.slf4j.LoggerFactory
 
-import java.net.{InetAddress, InetSocketAddress, SocketAddress, URI}
+import java.net.{InetSocketAddress, SocketAddress}
 import java.util.concurrent.Callable
 import scala.concurrent.duration.*
 
@@ -25,14 +25,6 @@ package object network {
   private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
   private lazy val logger: Logger =
     Logger(LoggerFactory.getLogger(getClass.getName))
-
-  def inetSocketAddress(addr: String, defaultPort: Int): Seq[InetSocketAddress] = {
-    val uri        = new URI(s"node://$addr")
-    val actualPort = if (uri.getPort > 0) uri.getPort else defaultPort
-    InetAddress.getAllByName(uri.getHost).view.map { ia =>
-      new InetSocketAddress(ia, actualPort)
-    }.toSeq
-  }
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
     def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[?] =

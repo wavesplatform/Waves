@@ -45,7 +45,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       When("Peer adds another peer to knownPeers")
       peerDatabase.touch(address1)
       assert(peerDatabase.knownPeers.contains(address1))
-      assert(!peerDatabase.detailedBlacklist.contains(host1))
+      assert(!peerDatabase.isBlacklisted(host1))
 
       And("Peer blacklists another peer")
       val reason = "because"
