@@ -1,15 +1,14 @@
 package com.wavesplatform.settings
 
-import java.io.File
-import java.net.{InetSocketAddress, URI}
-
 import com.typesafe.config.Config
 import com.wavesplatform.network.TrafficLogger
-import com.wavesplatform.utils._
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import com.wavesplatform.utils.*
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
+import java.io.File
+import java.net.{InetSocketAddress, URI}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
@@ -28,6 +27,7 @@ case class NetworkSettings(
     maxInboundConnections: Int,
     maxOutboundConnections: Int,
     maxConnectionsPerHost: Int,
+    minConnections: Option[Int],
     connectionTimeout: FiniteDuration,
     maxUnverifiedPeers: Int,
     enablePeersExchange: Boolean,
@@ -64,6 +64,7 @@ object NetworkSettings {
     val maxInboundConnections        = config.as[Int]("max-inbound-connections")
     val maxOutboundConnections       = config.as[Int]("max-outbound-connections")
     val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
+    val minConnections               = config.getAs[Int]("min-connections")
     val connectionTimeout            = config.as[FiniteDuration]("connection-timeout")
     val maxUnverifiedPeers           = config.as[Int]("max-unverified-peers")
     val enablePeersExchange          = config.as[Boolean]("enable-peers-exchange")
@@ -88,6 +89,7 @@ object NetworkSettings {
       maxInboundConnections,
       maxOutboundConnections,
       maxConnectionsFromSingleHost,
+      minConnections,
       connectionTimeout,
       maxUnverifiedPeers,
       enablePeersExchange,

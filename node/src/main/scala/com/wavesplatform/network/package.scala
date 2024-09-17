@@ -1,8 +1,5 @@
 package com.wavesplatform
 
-import java.net.{InetSocketAddress, SocketAddress, URI}
-import java.util.concurrent.Callable
-
 import cats.Eq
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.block.Block
@@ -20,18 +17,14 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import org.slf4j.LoggerFactory
 
+import java.net.{InetSocketAddress, SocketAddress}
+import java.util.concurrent.Callable
 import scala.concurrent.duration.*
 
 package object network {
   private val broadcastTimeStats = Kamon.timer("network-broadcast-time")
   private lazy val logger: Logger =
     Logger(LoggerFactory.getLogger(getClass.getName))
-
-  def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
-    val uri = new URI(s"node://$addr")
-    if (uri.getPort < 0) new InetSocketAddress(addr, defaultPort)
-    else new InetSocketAddress(uri.getHost, uri.getPort)
-  }
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
     def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[?] =
@@ -78,9 +71,12 @@ package object network {
       logBroadcast(message, except)
       val st = broadcastTimeStats.withTag("object", message.getClass.getSimpleName).start()
       allChannels
-        .writeAndFlush(message, { (channel: Channel) =>
-          !except.contains(channel)
-        })
+        .writeAndFlush(
+          message,
+          { (channel: Channel) =>
+            !except.contains(channel)
+          }
+        )
         .addListener { (_: ChannelGroupFuture) =>
           st.stop()
         }
