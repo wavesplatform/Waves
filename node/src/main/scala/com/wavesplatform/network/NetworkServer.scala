@@ -132,7 +132,7 @@ object NetworkServer extends ScorexLogging {
 
     def handleOutgoingChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
       outgoingChannels.remove(remoteAddress, closeFuture.channel())
-      if (!shutdownInitiated) peerDatabase.suspendAndClose(closeFuture.channel())
+      if (!shutdownInitiated) peerDatabase.suspend(remoteAddress)
 
       if (closeFuture.isSuccess)
         log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
@@ -150,7 +150,6 @@ object NetworkServer extends ScorexLogging {
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
       if (thisConnFuture.isSuccess) {
         log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
-        peerDatabase.touch(remoteAddress)
         thisConnFuture.channel().closeFuture().addListener(f => handleOutgoingChannelClosed(remoteAddress)(f))
       } else if (thisConnFuture.cause() != null) {
         peerDatabase.suspend(remoteAddress)
@@ -204,14 +203,14 @@ object NetworkServer extends ScorexLogging {
     }
 
     def scheduleConnectTask(): Unit = if (!shutdownInitiated) {
-      val delay = (if (peerConnectionsMap.isEmpty) AverageHandshakePeriod else 5.seconds) +
+      val delay = (if (peerConnectionsMap.isEmpty || networkSettings.minConnections.exists(_ > peerConnectionsMap.size())) AverageHandshakePeriod else 5.seconds) +
         (Random.nextInt(1000) - 500).millis // add some noise so that nodes don't attempt to connect to each other simultaneously
 
       workerGroup.schedule(delay) {
         if (outgoingChannels.size() < networkSettings.maxOutboundConnections) {
           val all = peerInfo.values().iterator().asScala.flatMap(_.remoteAddress.cast[InetSocketAddress])
           peerDatabase
-            .randomPeer(excluded = excludedAddresses ++ all)
+            .nextCandidate(excluded = excludedAddresses ++ all)
             .foreach(doConnect)
         }
 

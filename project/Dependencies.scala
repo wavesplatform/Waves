@@ -69,7 +69,7 @@ object Dependencies {
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves" % "0.2.1",
-      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
+      web3jModule("crypto").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -100,7 +100,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.5.2"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.6.1"
 
   lazy val node = Def.setting(
     Seq(
@@ -130,11 +130,14 @@ object Dependencies {
       "eu.timepit"                 %% "refined"       % "0.11.2" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.esaulpaugh"              % "headlong"      % "12.2.0",
       "com.github.jbellis"          % "jamm"          % "0.4.0", // Weighing caches
-      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on")),
-      akkaModule("testkit")               % Test,
-      akkaHttpModule("akka-http-testkit") % Test
-    ) ++ test ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
+      web3jModule("abi").excludeAll(ExclusionRule("org.bouncycastle", "bcprov-jdk15on"))
+    ) ++ console ++ logDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
+
+  lazy val nodeTests = Seq(
+    akkaModule("testkit")               % Test,
+    akkaHttpModule("akka-http-testkit") % Test
+  ) ++ test
 
   val gProto = "com.google.protobuf" % "protobuf-java" % "3.25.4" // grpc 1.64.0 still requires 3.25
 

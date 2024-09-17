@@ -69,13 +69,23 @@ lazy val `lang-tests-js` = project
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
-lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test;test->test")
+lazy val node = project.dependsOn(`lang-jvm`)
 
-lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `ride-runner`    = project.dependsOn(node % "compile;test->test", `grpc-server`)
-lazy val `node-it`        = project.dependsOn(node % "compile;test->test", `lang-testkit`, `repl-jvm`, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node % "compile->test")
-lazy val benchmark        = project.dependsOn(node % "compile;test->test")
+lazy val `node-testkit` = project
+  .in(file("node/testkit"))
+  .dependsOn(`node`, `lang-testkit`)
+
+lazy val `node-tests` = project
+  .in(file("node/tests"))
+  .dependsOn(`lang-testkit` % "test->test", `node-testkit`)
+  .settings(libraryDependencies ++= Dependencies.nodeTests)
+
+lazy val `grpc-server` =
+  project.dependsOn(node % "compile;runtime->provided", `node-testkit`, `node-tests` % "test->test")
+lazy val `ride-runner`    = project.dependsOn(node, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-it`        = project.dependsOn(`repl-jvm`, `grpc-server`, `node-tests` % "test->test")
+lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node-tests` % "compile->test")
+lazy val benchmark        = project.dependsOn(node, `node-tests` % "test->test")
 
 lazy val repl = crossProject(JSPlatform, JVMPlatform)
   .withoutSuffixFor(JVMPlatform)
@@ -105,7 +115,8 @@ lazy val `repl-jvm` = repl.jvm
     )
   )
 
-lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
+lazy val `repl-js` = repl.js
+  .dependsOn(`lang-js`)
   .settings(
     libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
   )
@@ -123,6 +134,8 @@ lazy val `waves-node` = (project in file("."))
     `repl-jvm`,
     node,
     `node-it`,
+    `node-testkit`,
+    `node-tests`,
     `node-generator`,
     benchmark,
     `repl-js`,
@@ -218,7 +231,7 @@ checkPRRaw := Def
       (`lang-js` / Compile / fastOptJS).value
       (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
-      (node / Test / test).value
+      (`node-tests` / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
