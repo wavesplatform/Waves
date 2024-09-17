@@ -141,7 +141,7 @@ case class SnapshotBlockchain(
     snapshot.orderFills.getOrElse(orderId, inner.filledVolumeAndFee(orderId))
 
   override def balanceAtHeight(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] =
-    if (maybeSnapshot.isEmpty || h < this.height) {
+    if (maybeSnapshot.forall(!_.balances.contains(address -> assetId)) || h < this.height) {
       inner.balanceAtHeight(address, h, assetId)
     } else {
       val balance = this.balance(address, assetId)
