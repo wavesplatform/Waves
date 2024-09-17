@@ -61,6 +61,7 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
         )
 
       // Act, assert
+      d.blockchain.height shouldBe 1
       d.solidStateHeight shouldBe 0
 
       // Block 1
@@ -68,18 +69,22 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
         TxHelpers.setScript(dAppAccount, dAppScript), // Note: setScript costs 0.01.waves
         assertBalancesInRide(123.waves, 123.waves, 123.waves, 123.waves)
       )
+      d.blockchain.height shouldBe 2
       d.solidStateHeight shouldBe 1
 
       // Block 2
       d.appendBlock(TxHelpers.transfer(anotherAccount, dAppAccount.toAddress, 1.waves))
+      d.blockchain.height shouldBe 3
       d.solidStateHeight shouldBe 2
 
       // Fast-forward to block 999
       Range.inclusive(3, 999).foreach(_ => d.appendBlock())
+      d.blockchain.height shouldBe 1000
       d.solidStateHeight shouldBe 999
 
       // Block 1000
       d.appendBlock(assertBalancesInRide(124.waves, 124.waves, 124.waves, 123.waves))
+      d.blockchain.height shouldBe 1001
       d.solidStateHeight shouldBe 1000
 
       // Block 1001
