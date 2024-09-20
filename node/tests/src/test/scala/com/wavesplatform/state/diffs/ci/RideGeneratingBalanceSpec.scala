@@ -95,7 +95,7 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
         TxHelpers.transfer(dAppAccount, anotherAccount.toAddress, 50.waves),
         // This assertion tells us that the generating balance
         // was updated by a transaction in this block.
-        // We (probably) expect the generating balance to be 110.waves here...
+        // TODO: Not sure if we should expect the generating balance to be 110.waves here...
         assertBalancesInRide(59.99.waves, 59.99.waves, 59.99.waves, 59.99.waves)
       )
     }
