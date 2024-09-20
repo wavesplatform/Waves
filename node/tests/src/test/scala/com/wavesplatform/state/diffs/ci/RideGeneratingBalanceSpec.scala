@@ -7,11 +7,11 @@ import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 
 class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
-  "generating balance is updated too early" in {
+  "generating balance is updated too early (TransactionStateSnapshot, STDLIB_VERSION 8)" in {
     val dAppAccount    = TxHelpers.signer(999)
     val anotherAccount = TxHelpers.signer(1)
 
-    val balances = Seq(AddrWithBalance(dAppAccount.toAddress, 123.01.waves), AddrWithBalance(anotherAccount.toAddress, 456.waves))
+    val balances = Seq(AddrWithBalance(dAppAccount.toAddress, 100.01.waves), AddrWithBalance(anotherAccount.toAddress, 500.waves))
 
     withDomain(DomainPresets.TransactionStateSnapshot, balances) { d =>
       // Arrange
@@ -62,37 +62,41 @@ class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
 
       // Act, assert
       d.blockchain.height shouldBe 1
-      d.solidStateHeight shouldBe 0
 
       // Block 1
       d.appendBlock(
         TxHelpers.setScript(dAppAccount, dAppScript), // Note: setScript costs 0.01.waves
-        assertBalancesInRide(123.waves, 123.waves, 123.waves, 123.waves)
+        assertBalancesInRide(100.waves, 100.waves, 100.waves, 100.waves)
       )
       d.blockchain.height shouldBe 2
-      d.solidStateHeight shouldBe 1
 
       // Block 2
-      d.appendBlock(TxHelpers.transfer(anotherAccount, dAppAccount.toAddress, 1.waves))
+      d.appendBlock(TxHelpers.transfer(anotherAccount, dAppAccount.toAddress, 10.waves))
       d.blockchain.height shouldBe 3
-      d.solidStateHeight shouldBe 2
 
-      // Fast-forward to block 999
+      // Fast-forward to block 1000
       Range.inclusive(3, 999).foreach(_ => d.appendBlock())
       d.blockchain.height shouldBe 1000
-      d.solidStateHeight shouldBe 999
-
-      // Block 1000
-      d.appendBlock(assertBalancesInRide(124.waves, 124.waves, 124.waves, 123.waves))
-      d.blockchain.height shouldBe 1001
-      d.solidStateHeight shouldBe 1000
 
       // Block 1001
+      // This assertion tells us that the generating balance
+      // is not being updated until the block 1002, which is expected,
+      // because `10.waves` was sent on height = 3, 
+      // and until height 1002 the balance is not updated
+      // (...the lowest of the last 1000 blocks, including 3 and 1002)
+      d.appendBlock(assertBalancesInRide(110.waves, 110.waves, 110.waves, 100.waves))
+      d.blockchain.height shouldBe 1001
+
+      // Block 1002
       d.appendBlock(
-        assertBalancesInRide(124.waves, 124.waves, 124.waves, 124.waves),
-        TxHelpers.transfer(dAppAccount, anotherAccount.toAddress, 10.waves),
-        // Note: we expected the Generating balance to be 124.waves here
-        assertBalancesInRide(113.99.waves, 113.99.waves, 113.99.waves, 113.99.waves)
+        // This assertion tells us that the generating balance
+        // was already updated after `10.waves` was sent on height = 3
+        assertBalancesInRide(110.waves, 110.waves, 110.waves, 110.waves),
+        TxHelpers.transfer(dAppAccount, anotherAccount.toAddress, 50.waves),
+        // This assertion tells us that the generating balance
+        // was updated by a transaction in this block.
+        // We (probably) expect the generating balance to be 110.waves here...
+        assertBalancesInRide(59.99.waves, 59.99.waves, 59.99.waves, 59.99.waves)
       )
     }
   }
