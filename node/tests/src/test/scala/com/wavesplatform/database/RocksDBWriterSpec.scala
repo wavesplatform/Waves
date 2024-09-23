@@ -300,6 +300,46 @@ class RocksDBWriterSpec extends FreeSpec with WithDomain {
         nonHistoricalKeys should contain theSameElementsInOrderAs nonHistoricalKeysWithoutCleanup
       }
     }
+
+    "balanceAtHeight returns correct values" in {
+      val richAccount = TxHelpers.signer(1001)
+      val account1    = TxHelpers.signer(1002)
+      val account2    = TxHelpers.signer(1003)
+      withDomain(DomainPresets.TransactionStateSnapshot, Seq(AddrWithBalance(richAccount.toAddress, 10_000.waves))) { d =>
+        val issueTx = TxHelpers.issue(richAccount, amount = 10000, decimals = 2.toByte, name = "IA01")
+        d.appendBlock(issueTx)
+        (1 to 3).foreach(_ => d.appendBlock())
+        d.blockchain.height shouldBe 5
+
+        d.appendBlock(TxHelpers.transfer(richAccount, account1.toAddress, 10.waves))
+        d.appendBlock(TxHelpers.transfer(richAccount, account1.toAddress, 100, asset = issueTx.asset))
+        d.appendBlock()
+        d.appendBlock(TxHelpers.transfer(richAccount, account1.toAddress, 1.waves))
+        d.appendBlock(TxHelpers.transfer(richAccount, account1.toAddress, 500, asset = issueTx.asset))
+        d.blockchain.height shouldBe 10
+
+        d.blockchain.balanceAtHeight(account1.toAddress, 10) shouldBe Some(9 -> 11.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress,  9) shouldBe Some(9 -> 11.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress,  8) shouldBe Some(6 -> 10.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress,  6) shouldBe Some(6 -> 10.waves)
+        d.blockchain.balanceAtHeight(account1.toAddress,  5) shouldBe None
+
+        d.blockchain.balanceAtHeight(account1.toAddress, 10, issueTx.asset) shouldBe Some(10 -> 600)
+        d.blockchain.balanceAtHeight(account1.toAddress,  9, issueTx.asset) shouldBe Some(7  -> 100)
+        d.blockchain.balanceAtHeight(account1.toAddress,  8, issueTx.asset) shouldBe Some(7  -> 100)
+        d.blockchain.balanceAtHeight(account1.toAddress,  6, issueTx.asset) shouldBe None
+
+        d.appendBlock(TxHelpers.transfer(richAccount, account2.toAddress, 20.waves))
+        d.appendBlock(TxHelpers.transfer(richAccount, account2.toAddress, 700, issueTx.asset))
+
+        d.blockchain.balanceAtHeight(account2.toAddress, 12) shouldBe Some(11 -> 20.waves)
+        d.blockchain.balanceAtHeight(account2.toAddress, 11) shouldBe Some(11 -> 20.waves)
+        d.blockchain.balanceAtHeight(account2.toAddress, 10) shouldBe None
+
+        d.blockchain.balanceAtHeight(account2.toAddress, 12, issueTx.asset) shouldBe Some(12 -> 700)
+        d.blockchain.balanceAtHeight(account2.toAddress, 11, issueTx.asset) shouldBe None
+      }
+    }
   }
 
   private val HistoricalKeyTags = Seq(

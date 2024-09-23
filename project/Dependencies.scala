@@ -100,7 +100,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.4.0"
+  private val rocksdb = "org.rocksdb" % "rocksdbjni" % "9.6.1"
 
   lazy val node = Def.setting(
     Seq(
