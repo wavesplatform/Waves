@@ -1,0 +1,49 @@
+name: Publish packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      dockerTag:
+        description: 'Docker tag'
+        required: false
+        type: string
+      buildDEBPackages:
+        description: 'Build DEB packages'
+        type: boolean
+        default: true
+      network:
+        description: 'Network'
+        type: choice
+        default: mainnet
+        options:
+          - mainnet
+          - testnet
+          - stagenet
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+          cache: 'sbt'
+      - if: ${{ inputs.buildDEBPackages }}
+        run: sbt -Dnetwork=${{ inputs.network }} --mem 4096 --batch buildDEBPackages
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.buildDEBPackages }}
+        with:
+          name: crashes
+          path: |
+            node/target/*.deb
+            grpc-server/target/*.deb
