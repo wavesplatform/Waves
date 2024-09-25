@@ -53,6 +53,15 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
         run: |
-          sbt_version=$(cut -d\" -f2 version.sbt)
+          version=$(echo ${{ github.base_ref }} | awk -F '[-\.]' '{print $2"."$3}')
           pr_number=${{ github.event.number }}
-          sbt -Dproject.version=$sbt_version-$pr_number-SNAPSHOT --mem 4096 --batch publishSigned
+          sbt -Dproject.version=$version-$pr_number-SNAPSHOT --mem 4096 --batch publishSigned
+      - name: Save crash data
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          if-no-files-found: ignore
+          name: crashes
+          path: |
+            hs*.log
+            core*

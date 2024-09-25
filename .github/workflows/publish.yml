@@ -30,5 +30,5 @@ jobs:
           SONATYPE_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
         run: |
-          version=$(echo ${{ github.event.number }} | cut -d- -f2)-SNAPSHOT
+          version=$(echo ${{ github.base_ref }} | awk -F '[-\.]' '{print $2"."$3}')-SNAPSHOT
           sbt -Dproject.version=$version --mem 4096 --batch publishSigned
