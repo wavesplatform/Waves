@@ -10,8 +10,9 @@ import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import org.scalatest.ParallelTestExecution
 
-class RideGeneratingBalanceSpec extends FreeSpec with WithDomain {
+class RideGeneratingBalanceSpec extends FreeSpec with WithDomain with ParallelTestExecution {
   def testGBAffectedByTxInCurrentBlock(preset: WavesSettings, stdLibVersion: StdLibVersion): Block = {
 
     val dAppAccount    = TxHelpers.signer(999)
