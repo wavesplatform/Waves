@@ -2064,14 +2064,14 @@ object PureContext {
       v5Functions(useNewPowPrecision)
     )
 
-  private[this] val v6Ctx =
+  private val v6Ctx =
     CTX[NoContext](
       v5Types,
       v5Vars,
       v6Functions
     )
 
-  private[this] val v8Ctx =
+  private val v8Ctx =
     CTX[NoContext](
       v5Types,
       v5Vars,

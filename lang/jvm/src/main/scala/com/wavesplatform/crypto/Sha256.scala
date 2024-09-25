@@ -3,7 +3,7 @@ package com.wavesplatform.crypto
 import java.security.MessageDigest
 
 object Sha256 {
-  private[this] val digest = new ThreadLocal[MessageDigest]() {
+  private val digest = new ThreadLocal[MessageDigest]() {
     override def initialValue(): MessageDigest = MessageDigest.getInstance("SHA-256")
   }
 

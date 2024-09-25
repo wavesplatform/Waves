@@ -4,8 +4,8 @@ import java.nio.charset.StandardCharsets.US_ASCII
 import scala.annotation.tailrec
 
 object FastBase58 extends BaseXXEncDec {
-  private[this] val Alphabet: Array[Byte] = Base58Alphabet.getBytes(US_ASCII)
-  private[this] val DecodeTable: Array[Byte] = Array(
+  private val Alphabet: Array[Byte] = Base58Alphabet.getBytes(US_ASCII)
+  private val DecodeTable: Array[Byte] = Array(
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, -1, -1, -1, -1, -1, -1, -1, 9, 10, 11, 12, 13, 14, 15, 16, -1, 17,
     18, 19, 20, 21, -1, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, -1, -1, -1, -1, -1, -1, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, -1, 44, 45,
@@ -111,7 +111,7 @@ object FastBase58 extends BaseXXEncDec {
 
   /** Scala.js linking errors fix (from java.lang.Byte)
     */
-  private[this] object ByteOps {
+  private object ByteOps {
     @inline
     def toUnsignedInt(x: Byte): Int = x.toInt & 0xff
 
